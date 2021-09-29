@@ -573,6 +573,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 errcode=Codes.BAD_JSON,
             )
 
+        # The event content should *not* include the authorising user as
+        # it won't be properly signed. Strip it out since it might come
+        # back from a client updating a display name / avatar.
+        #
+        # This only applies to restricted rooms, but there should be no reason
+        # for a client to include it. Unconditionally remove it.
+        content.pop(EventContentFields.AUTHORISING_USER, None)
+
         effective_membership_state = action
         if action in ["kick", "unban"]:
             effective_membership_state = "leave"
@@ -908,11 +916,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 Membership.JOIN,
                 Membership.INVITE,
             ):
-                # The event content should *not* include the authorising user as
-                # it won't be properly signed. Strip it out since it might come
-                # back from a client updating a display name / avatar.
-                content.pop(EventContentFields.AUTHORISING_USER, None)
-
                 return False, []
 
         # If the local host has a user who can issue invites, then a local
