@@ -756,7 +756,7 @@ class RoomCreationHandler(BaseHandler):
             if not self.config.roomdirectory.is_publishing_room_allowed(
                 user_id, room_id, room_alias
             ):
-                # Lets just return a generic message, as there may be all sorts of
+                # Let's just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages
                 # per alias creation rule?
                 raise SynapseError(403, "Not allowed to publish room")
