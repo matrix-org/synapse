@@ -561,9 +561,17 @@ class _ByteProducer:
         self._iterator = iterator
         self._paused = False
 
-        # Register the producer and start producing data.
-        self._request.registerProducer(self, True)
-        self.resumeProducing()
+        try:
+            self._request.registerProducer(self, True)
+        except RuntimeError as e:
+            logger.info("Connection disconnected before response was written: %r", e)
+
+            # We drop our references to data we'll not use.
+            self._request = None
+            self._iterator = iter(())
+        else:
+            # Start producing if `registerProducer` was successful
+            self.resumeProducing()
 
     def _send_data(self, data: List[bytes]) -> None:
         """
