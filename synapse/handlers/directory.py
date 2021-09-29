@@ -49,7 +49,7 @@ class DirectoryHandler(BaseHandler):
         self.store = hs.get_datastore()
         self.config = hs.config
         self.enable_room_list_search = hs.config.roomdirectory.enable_room_list_search
-        self.require_membership = hs.config.require_membership_for_aliases
+        self.require_membership = hs.config.server.require_membership_for_aliases
         self.third_party_event_rules = hs.get_third_party_event_rules()
 
         self.federation = hs.get_federation_client()

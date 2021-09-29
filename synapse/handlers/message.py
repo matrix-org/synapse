@@ -81,7 +81,7 @@ class MessageHandler:
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
-        self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
+        self._ephemeral_events_enabled = hs.config.server.enable_ephemeral_messages
 
         # The scheduled call to self._expire_event. None if no call is currently
         # scheduled.
@@ -415,7 +415,9 @@ class EventCreationHandler:
         self.server_name = hs.hostname
         self.notifier = hs.get_notifier()
         self.config = hs.config
-        self.require_membership_for_aliases = hs.config.require_membership_for_aliases
+        self.require_membership_for_aliases = (
+            hs.config.server.require_membership_for_aliases
+        )
         self._events_shard_config = self.config.worker.events_shard_config
         self._instance_name = hs.get_instance_name()
 
@@ -425,7 +427,7 @@ class EventCreationHandler:
             Membership.JOIN,
             Membership.KNOCK,
         }
-        if self.hs.config.include_profile_data_on_invite:
+        if self.hs.config.server.include_profile_data_on_invite:
             self.membership_types_to_include_profile_data_in.add(Membership.INVITE)
 
         self.send_event = ReplicationSendEventRestServlet.make_client(hs)
@@ -461,11 +463,11 @@ class EventCreationHandler:
         #
         self._rooms_to_exclude_from_dummy_event_insertion: Dict[str, int] = {}
         # The number of forward extremeities before a dummy event is sent.
-        self._dummy_events_threshold = hs.config.dummy_events_threshold
+        self._dummy_events_threshold = hs.config.server.dummy_events_threshold
 
         if (
             self.config.worker.run_background_tasks
-            and self.config.cleanup_extremities_with_dummy_events
+            and self.config.server.cleanup_extremities_with_dummy_events
         ):
             self.clock.looping_call(
                 lambda: run_as_background_process(
@@ -477,7 +479,7 @@ class EventCreationHandler:
 
         self._message_handler = hs.get_message_handler()
 
-        self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
+        self._ephemeral_events_enabled = hs.config.server.enable_ephemeral_messages
 
         self._external_cache = hs.get_external_cache()
 

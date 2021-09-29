@@ -666,7 +666,7 @@ class RoomCreationHandler(BaseHandler):
             await self.ratelimit(requester)
 
         room_version_id = config.get(
-            "room_version", self.config.default_room_version.identifier
+            "room_version", self.config.server.default_room_version.identifier
         )
 
         if not isinstance(room_version_id, str):
