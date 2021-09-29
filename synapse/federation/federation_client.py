@@ -250,6 +250,8 @@ class FederationClient(FederationBase):
 
         logger.debug("backfill transaction_data=%r", transaction_data)
 
+        assert transaction_data is not None
+
         room_version = await self.store.get_room_version(room_id)
 
         pdus = [
