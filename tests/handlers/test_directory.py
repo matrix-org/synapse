@@ -432,6 +432,50 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.result)
 
 
+class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
+    user_id = "@test:test"
+    data_template = '{"room_alias_name": "%%23unofficial_test%%3Atest", "visibility": "%s"}'
+
+    servlets = [directory.register_servlets, room.register_servlets]
+
+    def prepare(self, reactor, clock, hs):
+        # This time we add custom room list publication rules
+        config = {}
+        config["alias_creation_rules"] = []
+        config["room_list_publication_rules"] = [
+            {"user_id": "*", "alias": "*", "action": "deny"}
+        ]
+
+        rd_config = RoomDirectoryConfig()
+        rd_config.read_config(config)
+
+        self.hs.config.roomdirectory.is_publishing_room_allowed = (
+            rd_config.is_publishing_room_allowed
+        )
+
+        return hs
+
+    def test_denied(self):
+        channel = self.make_request(
+            "POST",
+            "createRoom",
+            (self.data_template % ("public",)).encode("ascii")
+        )
+        self.assertEquals(403, channel.code, channel.result)
+
+    def test_allowed(self):
+        channel = self.make_request(
+            "POST",
+            "createRoom",
+            (self.data_template % ("private",)).encode("ascii")
+        )
+        self.assertEquals(200, channel.code, channel.result)
+
+    def test_denied_then_allowed(self):
+        self.test_denied()
+        self.test_allowed()
+
+
 class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
     user_id = "@test:test"
 
