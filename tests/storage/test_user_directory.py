@@ -30,7 +30,7 @@ BELA = "@somenickname:a"
 
 
 class GetUserDirectoryTables:
-    """Helper functions that we want to reuse in tests/handlers/test+user_directory.py"""
+    """Helper functions that we want to reuse in tests/handlers/test_user_directory.py"""
 
     def __init__(self, store: DataStore):
         self.store = store
