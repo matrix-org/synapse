@@ -455,7 +455,11 @@ class ProfileHandler(BaseHandler):
                 continue
 
             new_name = profile.get("displayname")
+            if new_name is not None and not isinstance(new_name, str):
+                new_name = None
             new_avatar = profile.get("avatar_url")
+            if new_avatar is not None and not isinstance(new_avatar, str):
+                new_avatar = None
 
             # We always hit update to update the last_check timestamp
             await self.store.update_remote_profile_cache(user_id, new_name, new_avatar)
