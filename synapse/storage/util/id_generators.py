@@ -664,6 +664,7 @@ class _AsyncCtxManagerWrapper(Generic[T]):
     This is mainly useful if you have a plain context manager but the interface
     requires an async one.
     """
+
     inner: ContextManager[T]
 
     async def __aenter__(self) -> T:
