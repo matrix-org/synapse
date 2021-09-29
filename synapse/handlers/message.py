@@ -958,7 +958,7 @@ class EventCreationHandler:
         # Pass on the outlier property from the builder to the event
         # after it is created
         if builder.internal_metadata.outlier:
-            event.internal_metadata.outlier = builder.internal_metadata.outlier
+            event.internal_metadata.outlier = True
             context = EventContext.for_outlier()
 
         if requester:
