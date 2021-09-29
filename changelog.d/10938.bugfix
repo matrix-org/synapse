@@ -1,0 +1,1 @@
+Fix [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) `/batch_send` endpoint not being able to create outlier events.
