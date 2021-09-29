@@ -952,18 +952,13 @@ class EventCreationHandler:
             depth=depth,
         )
 
-        old_state = None
-
         # Pass on the outlier property from the builder to the event
         # after it is created
         if builder.internal_metadata.outlier:
-            event.internal_metadata.outlier = builder.internal_metadata.outlier
-
-            # Calculate the state for outliers that pass in their own `auth_event_ids`
-            if auth_event_ids:
-                old_state = await self.store.get_events_as_list(auth_event_ids)
-
-        context = await self.state.compute_event_context(event, old_state=old_state)
+            event.internal_metadata.outlier = True
+            context = EventContext.for_outlier()
+        else:
+            context = await self.state.compute_event_context(event)
 
         if requester:
             context.app_service = requester.app_service
