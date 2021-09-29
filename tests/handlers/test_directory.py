@@ -434,7 +434,9 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
 
 class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
     user_id = "@test:test"
-    data_template = '{"room_alias_name": "%%23unofficial_test%%3Atest", "visibility": "%s"}'
+    data_template = (
+        '{"room_alias_name": "%%23unofficial_test%%3Atest", "visibility": "%s"}'
+    )
 
     servlets = [directory.register_servlets, room.register_servlets]
 
@@ -457,17 +459,13 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
 
     def test_denied(self):
         channel = self.make_request(
-            "POST",
-            "createRoom",
-            (self.data_template % ("public",)).encode("ascii")
+            "POST", "createRoom", (self.data_template % ("public",)).encode("ascii")
         )
         self.assertEquals(403, channel.code, channel.result)
 
     def test_allowed(self):
         channel = self.make_request(
-            "POST",
-            "createRoom",
-            (self.data_template % ("private",)).encode("ascii")
+            "POST", "createRoom", (self.data_template % ("private",)).encode("ascii")
         )
         self.assertEquals(200, channel.code, channel.result)
 
