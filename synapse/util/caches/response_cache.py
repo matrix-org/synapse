@@ -104,8 +104,8 @@ class ResponseCache(Generic[KV]):
             return None
 
     def _set(
-        self, context: ResponseCacheContext[KV], deferred: defer.Deferred[RV]
-    ) -> defer.Deferred[RV]:
+        self, context: ResponseCacheContext[KV], deferred: "defer.Deferred[RV]"
+    ) -> "defer.Deferred[RV]":
         """Set the entry for the given key to the given deferred.
 
         *deferred* should run its callbacks in the sentinel logcontext (ie,
