@@ -521,9 +521,13 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
     @override_config(
         {
-            "user_consent": {"block_events_error": "Error"},
+            "user_consent": {
+                "block_events_error": "Error",
+                "require_at_registration": True,
+            },
             "form_secret": "53cr3t",
             "public_baseurl": "http://test",
+            "auto_join_rooms": ["#room:test"],
         },
     )
     def test_auto_create_auto_join_where_no_consent(self):
@@ -536,18 +540,20 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         #    * they have not given that consent
         #    * The server is configured to auto-join to a room
         # (and autocreate if necessary)
-        room_alias_str = "#room:test"
-        self.hs.config.auto_join_rooms = [room_alias_str]
 
         # When:-
-        #   * the user is registered and post consent actions are called
+        #   * the user is registered
         user_id = self.get_success(self.handler.register_user(localpart="jeff"))
-        self.get_success(self.handler.post_consent_actions(user_id))
 
         # Then:-
         #   * Ensure that they have not been joined to the room
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
+
+        # The user provides consent; ensure they are now in the rooms.
+        self.get_success(self.handler.post_consent_actions(user_id))
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertEqual(len(rooms), 1)
 
     def test_register_support_user(self):
         user_id = self.get_success(

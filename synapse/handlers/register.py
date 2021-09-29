@@ -340,6 +340,8 @@ class RegistrationHandler(BaseHandler):
             auth_provider=(auth_provider_id or ""),
         ).inc()
 
+        # If the user does not need to consent at registration, auto-join any
+        # configured rooms.
         if not self.hs.config.consent.user_consent_at_registration:
             if not self.hs.config.auto_join_rooms_for_guests and make_guest:
                 logger.info(
