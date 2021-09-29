@@ -40,6 +40,10 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVersions
 from synapse.crypto.event_signing import compute_event_signature
+from synapse.event_auth import (
+    check_auth_rules_for_event,
+    validate_event_for_room_version,
+)
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
@@ -742,10 +746,9 @@ class FederationHandler(BaseHandler):
 
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
-        await self._event_auth_handler.check_from_context(
-            room_version.identifier, event, context, do_sig_check=False
+        await self._event_auth_handler.check_auth_rules_from_context(
+            room_version, event, context
         )
-
         return event
 
     async def on_invite_request(
@@ -916,8 +919,8 @@ class FederationHandler(BaseHandler):
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_leave_request`
-            await self._event_auth_handler.check_from_context(
-                room_version_obj.identifier, event, context, do_sig_check=False
+            await self._event_auth_handler.check_auth_rules_from_context(
+                room_version_obj, event, context
             )
         except AuthError as e:
             logger.warning("Failed to create new leave %r because %s", event, e)
@@ -978,8 +981,8 @@ class FederationHandler(BaseHandler):
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_knock_request`
-            await self._event_auth_handler.check_from_context(
-                room_version_obj.identifier, event, context, do_sig_check=False
+            await self._event_auth_handler.check_auth_rules_from_context(
+                room_version_obj, event, context
             )
         except AuthError as e:
             logger.warning("Failed to create new knock %r because %s", event, e)
@@ -1168,7 +1171,8 @@ class FederationHandler(BaseHandler):
                 auth_for_e[(EventTypes.Create, "")] = create_event
 
             try:
-                event_auth.check(room_version, e, auth_events=auth_for_e)
+                validate_event_for_room_version(room_version, e)
+                check_auth_rules_for_event(room_version, e, auth_for_e)
             except SynapseError as err:
                 # we may get SynapseErrors here as well as AuthErrors. For
                 # instance, there are a couple of (ancient) events in some
@@ -1266,8 +1270,9 @@ class FederationHandler(BaseHandler):
             event.internal_metadata.send_on_behalf_of = self.hs.hostname
 
             try:
-                await self._event_auth_handler.check_from_context(
-                    room_version_obj.identifier, event, context
+                validate_event_for_room_version(room_version_obj, event)
+                await self._event_auth_handler.check_auth_rules_from_context(
+                    room_version_obj, event, context
                 )
             except AuthError as e:
                 logger.warning("Denying new third party invite %r because %s", event, e)
@@ -1317,8 +1322,9 @@ class FederationHandler(BaseHandler):
         )
 
         try:
-            await self._event_auth_handler.check_from_context(
-                room_version_obj.identifier, event, context
+            validate_event_for_room_version(room_version_obj, event)
+            await self._event_auth_handler.check_auth_rules_from_context(
+                room_version_obj, event, context
             )
         except AuthError as e:
             logger.warning("Denying third party invite %r because %s", event, e)
