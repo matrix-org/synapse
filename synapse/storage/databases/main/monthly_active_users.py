@@ -354,3 +354,17 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
                         await self.upsert_monthly_active_user(user_id)
             elif now - last_seen_timestamp > LAST_SEEN_GRANULARITY:
                 await self.upsert_monthly_active_user(user_id)
+
+    async def remove_deactivated_user(self, user_id: str) -> None:
+        """
+        Removes a deactivated user from the monthly active user
+        table and resets the "get_monthly_active_count" cache.
+
+        Args:
+            user_id(str): the user_id to remove
+        """
+
+        await self.db_pool.simple_delete_one(
+            table="monthly_active_users", keyvalues={"user_id": user_id}
+        )
+        await self.invalidate_cache_and_stream("get_monthly_active_count", ())
