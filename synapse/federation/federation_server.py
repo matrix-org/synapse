@@ -295,14 +295,16 @@ class FederationServer(FederationBase):
         Returns:
             HTTP response code and body
         """
-        response = await self.transaction_actions.have_responded(origin, transaction)
+        existing_response = await self.transaction_actions.have_responded(
+            origin, transaction
+        )
 
-        if response:
+        if existing_response:
             logger.debug(
                 "[%s] We've already responded to this request",
                 transaction.transaction_id,
             )
-            return response
+            return existing_response
 
         logger.debug("[%s] Transaction is new", transaction.transaction_id)
 
