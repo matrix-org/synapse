@@ -179,7 +179,7 @@ Robin Lambertz has packaged Synapse for NixOS at:
 <https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-synapse.nix>
 
 
-### Installing as a python module from PyPI
+### Installing as a Python module from PyPI
 
 It's also possible to install Synapse as a Python module from PyPI.
 
