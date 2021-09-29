@@ -1198,6 +1198,7 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
     async def get_new_events(
         self,
         user: UserID,
+        *,
         from_key: RoomStreamToken,
         limit: Optional[int],
         room_ids: Collection[str],
