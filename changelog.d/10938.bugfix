@@ -1,1 +1,1 @@
-Fix [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) `/batch_send` endpoint not being able to create outlier events.
+Fix bug introduced in Synapse 1.44 which caused the experimental [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) `/batch_send` endpoint to return a 500 error.
