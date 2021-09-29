@@ -237,9 +237,9 @@ class RoomCreationHandler(BaseHandler):
                 },
             },
         )
-        old_room_version = await self.store.get_room_version_id(old_room_id)
+        old_room_version = await self.store.get_room_version(old_room_id)
         await self._event_auth_handler.check_from_context(
-            old_room_version, tombstone_event, tombstone_context
+            old_room_version.identifier, tombstone_event, tombstone_context
         )
 
         await self.clone_existing_room(
