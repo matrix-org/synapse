@@ -30,7 +30,7 @@ from synapse.api.urls import (
 )
 from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.units import Transaction
-from synapse.http.matrixfederationclient import ByteParser
+from synapse.http.matrixfederationclient import ByteParser, MatrixFederationHttpClient
 from synapse.logging.utils import log_function
 from synapse.types import JsonDict
 
@@ -47,7 +47,7 @@ class TransportLayerClient:
 
     def __init__(self, hs):
         self.server_name = hs.hostname
-        self.client = hs.get_federation_http_client()
+        self.client: MatrixFederationHttpClient = hs.get_federation_http_client()
 
     @log_function
     async def get_room_state_ids(
