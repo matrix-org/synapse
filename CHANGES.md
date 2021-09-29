@@ -5,7 +5,7 @@ Features
 --------
 
 - Only allow the [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) `/batch_send?chunk_id=xxx` endpoint to connect to an already existing insertion event. ([\#10776](https://github.com/matrix-org/synapse/issues/10776))
-- Improve oEmbed previews by processing the author name, photo, and video information. ([\#10814](https://github.com/matrix-org/synapse/issues/10814), [\#10819](https://github.com/matrix-org/synapse/issues/10819))
+- Improve oEmbed URL previews by processing the author name, photo, and video information. ([\#10814](https://github.com/matrix-org/synapse/issues/10814), [\#10819](https://github.com/matrix-org/synapse/issues/10819))
 - Speed up responding with large JSON objects to requests. ([\#10868](https://github.com/matrix-org/synapse/issues/10868), [\#10905](https://github.com/matrix-org/synapse/issues/10905))
 - Add a `user_may_create_room_with_invites` spam checker callback to allow modules to allow or deny a room creation request based on the invites and/or 3PID invites it includes. ([\#10898](https://github.com/matrix-org/synapse/issues/10898))
 
@@ -54,14 +54,14 @@ Internal Changes
   haven't synced recently. ([\#10826](https://github.com/matrix-org/synapse/issues/10826))
 - Track cache eviction rates more finely in Prometheus's monitoring. ([\#10829](https://github.com/matrix-org/synapse/issues/10829))
 - Add missing type hints to handlers. ([\#10831](https://github.com/matrix-org/synapse/issues/10831), [\#10856](https://github.com/matrix-org/synapse/issues/10856))
-- Extend the ModuleApi to let plug-ins check whether an ID is local and to access IP + User Agent data. ([\#10833](https://github.com/matrix-org/synapse/issues/10833))
+- Extend the Module API to let plug-ins check whether an ID is local and to access IP + User Agent data. ([\#10833](https://github.com/matrix-org/synapse/issues/10833))
 - Factor out PNG image data to a constant to be used in several tests. ([\#10834](https://github.com/matrix-org/synapse/issues/10834))
 - Add a test to ensure state events sent by modules get persisted correctly. ([\#10835](https://github.com/matrix-org/synapse/issues/10835))
 - Rename [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) fields and event types from `chunk` to `batch` to match the `/batch_send` endpoint. ([\#10838](https://github.com/matrix-org/synapse/issues/10838))
 - Rename [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) `/batch_send` query parameter from `?prev_event` to more obvious usage with `?prev_event_id`. ([\#10839](https://github.com/matrix-org/synapse/issues/10839))
 - Add type hints to `synapse.http.site`. ([\#10867](https://github.com/matrix-org/synapse/issues/10867))
 - Include outlier status when we log V2 or V3 events. ([\#10879](https://github.com/matrix-org/synapse/issues/10879))
-- Break down Grafana's cache expiry time series based on reason for eviction, c.f. #10829. ([\#10880](https://github.com/matrix-org/synapse/issues/10880))
+- Break down Grafana's cache expiry time series based on reason for eviction, c.f. [\#10829](https://github.com/matrix-org/synapse/issues/10829). ([\#10880](https://github.com/matrix-org/synapse/issues/10880))
 - Clean up some of the federation event authentication code for clarity. ([\#10883](https://github.com/matrix-org/synapse/issues/10883), [\#10884](https://github.com/matrix-org/synapse/issues/10884), [\#10896](https://github.com/matrix-org/synapse/issues/10896), [\#10901](https://github.com/matrix-org/synapse/issues/10901))
 - Clean up some unnecessary parentheses in places around the codebase. ([\#10889](https://github.com/matrix-org/synapse/issues/10889))
 - Improve type hinting in the user directory code. ([\#10891](https://github.com/matrix-org/synapse/issues/10891))
