@@ -1520,7 +1520,6 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
     async def get_new_events(
         self,
         user: UserID,
-        *,
         from_key: Optional[int],
         limit: Optional[int] = None,
         room_ids: Optional[Collection[str]] = None,
