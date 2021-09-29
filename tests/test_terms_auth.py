@@ -15,11 +15,12 @@
 import json
 from unittest.mock import Mock
 
+from twisted.test.proto_helpers import MemoryReactorClock
+
 from synapse.rest.client.register import register_servlets
 from synapse.util import Clock
 
 from tests import unittest
-from tests.types import MemoryReactorClock
 
 
 class TermsTestCase(unittest.HomeserverTestCase):

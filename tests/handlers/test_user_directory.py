@@ -15,6 +15,7 @@ from unittest.mock import Mock, patch
 from urllib.parse import quote
 
 from twisted.internet import defer
+from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
@@ -27,7 +28,6 @@ from synapse.util import Clock
 
 from tests import unittest
 from tests.storage.test_user_directory import GetUserDirectoryTables
-from tests.types import MemoryReactor
 from tests.unittest import override_config
 
 

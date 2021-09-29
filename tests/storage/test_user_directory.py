@@ -13,13 +13,14 @@
 # limitations under the License.
 from typing import Dict, List, Set, Tuple
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.util import Clock
 
-from tests.types import MemoryReactor
 from tests.unittest import HomeserverTestCase, override_config
 
 ALICE = "@alice:a"
