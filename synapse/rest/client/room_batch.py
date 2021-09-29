@@ -176,6 +176,8 @@ class RoomBatchSendEventRestServlet(RestServlet):
     async def on_POST(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
+        logger.info("room batch send =====================================================")
+        logger.info("=====================================================================")
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
 
         if not requester.app_service:

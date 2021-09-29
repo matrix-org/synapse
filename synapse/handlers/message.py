@@ -959,7 +959,15 @@ class EventCreationHandler:
             event.internal_metadata.outlier = True
             context = EventContext.for_outlier()
         else:
-            context = await self.state.compute_event_context(event)
+            old_state = None
+            # Define the state for historical messages while we know to get all of
+            # state_groups setup properly when we `compute_event_context`.
+            if builder.internal_metadata.is_historical() and auth_event_ids:
+                old_state = await self.store.get_events_as_list(auth_event_ids)
+
+            context = await self.state.compute_event_context(event, old_state=old_state)
+
+        logger.info("create_new_client_event type=%s, event_id=%s context=%s", event.type, event.event_id, context)
 
         if requester:
             context.app_service = requester.app_service
