@@ -433,10 +433,9 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
 
 
 class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
-    user_id = "@test:test"
-    data_template = (
-        '{"room_alias_name": "%%23unofficial_test%%3Atest", "visibility": "%s"}'
-    )
+    user_id = "@admin:test"
+    denied_user_id = "@test:test"
+    data = {"room_alias_name": "unofficial_test"}
 
     servlets = [directory.register_servlets, room.register_servlets]
 
@@ -445,7 +444,8 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
         config = {}
         config["alias_creation_rules"] = []
         config["room_list_publication_rules"] = [
-            {"user_id": "*", "alias": "*", "action": "deny"}
+            {"user_id": "*", "alias": "*", "action": "deny"},
+            {"user_id": "@admin:test", "alias": "*", "action": "allow"},
         ]
 
         rd_config = RoomDirectoryConfig()
@@ -458,20 +458,32 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
         return hs
 
     def test_denied(self):
-        channel = self.make_request(
-            "POST", "createRoom", (self.data_template % ("public",)).encode("ascii")
+        # NOTE Setting is_public=True isn't enough
+        self.data["visibility"] = "public"
+        self.helper.create_room_as(
+            self.denied_user_id, extra_content=self.data, expect_code=403
         )
-        self.assertEquals(403, channel.code, channel.result)
 
-    def test_allowed(self):
-        channel = self.make_request(
-            "POST", "createRoom", (self.data_template % ("private",)).encode("ascii")
+    def test_allowed_without_publish(self):
+        self.helper.create_room_as(
+            self.denied_user_id,
+            extra_content=self.data,
+            is_public=False,
+            expect_code=200,
         )
-        self.assertEquals(200, channel.code, channel.result)
 
-    def test_denied_then_allowed(self):
+    def test_allowed_as_allowed(self):
+        self.helper.create_room_as(
+            self.user_id, extra_content=self.data, is_public=False, expect_code=200
+        )
+
+    def test_denied_then_retry_without_publish(self):
         self.test_denied()
-        self.test_allowed()
+        self.test_allowed_without_publish()
+
+    def test_denied_then_retry_as_allowed(self):
+        self.test_denied()
+        self.test_allowed_as_allowed()
 
 
 class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
