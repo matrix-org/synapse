@@ -70,7 +70,7 @@ class VoipRestServlet(RestServlet):
             {
                 "username": username,
                 "password": password,
-                "ttl": userLifetime / 1000,
+                "ttl": userLifetime // 1000,
                 "uris": turnUris,
             },
         )
