@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
-from typing import List
+from typing import Container, Iterable, List, Optional, Set, TypeVar
 
 import jsonschema
 from jsonschema import FormatChecker
@@ -23,7 +23,8 @@ from jsonschema import FormatChecker
 from synapse.api.constants import EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
-from synapse.types import RoomID, UserID
+from synapse.events import EventBase
+from synapse.types import JsonDict, RoomID, UserID
 
 FILTER_SCHEMA = {
     "additionalProperties": False,
@@ -167,6 +168,10 @@ class Filtering:
             raise SynapseError(400, str(e))
 
 
+# Filters work across events, presence EDUs, and account data.
+FilterEvent = TypeVar("FilterEvent", EventBase, UserPresenceState, JsonDict)
+
+
 class FilterCollection:
     def __init__(self, filter_json):
         self._filter_json = filter_json
@@ -249,7 +254,7 @@ class FilterCollection:
 
 
 class Filter:
-    def __init__(self, filter_json):
+    def __init__(self, filter_json: JsonDict):
         self.filter_json = filter_json
 
         self.types = self.filter_json.get("types", None)
@@ -266,20 +271,20 @@ class Filter:
         self.labels = self.filter_json.get("org.matrix.labels", None)
         self.not_labels = self.filter_json.get("org.matrix.not_labels", [])
 
-    def filters_all_types(self):
+    def filters_all_types(self) -> bool:
         return "*" in self.not_types
 
-    def filters_all_senders(self):
+    def filters_all_senders(self) -> bool:
         return "*" in self.not_senders
 
-    def filters_all_rooms(self):
+    def filters_all_rooms(self) -> bool:
         return "*" in self.not_rooms
 
-    def check(self, event):
+    def check(self, event: FilterEvent) -> bool:
         """Checks whether the filter matches the given event.
 
         Returns:
-            bool: True if the event matches
+            True if the event matches
         """
         # We usually get the full "events" as dictionaries coming through,
         # except for presence which actually gets passed around as its own
@@ -312,11 +317,18 @@ class Filter:
 
         return self.check_fields(room_id, sender, ev_type, labels, contains_url)
 
-    def check_fields(self, room_id, sender, event_type, labels, contains_url):
+    def check_fields(
+        self,
+        room_id: Optional[str],
+        sender: Optional[str],
+        event_type: Optional[str],
+        labels: Container[str],
+        contains_url: bool,
+    ) -> bool:
         """Checks whether the filter matches the given event fields.
 
         Returns:
-            bool: True if the event fields match
+            True if the event fields match
         """
         literal_keys = {
             "rooms": lambda v: room_id == v,
@@ -343,14 +355,14 @@ class Filter:
 
         return True
 
-    def filter_rooms(self, room_ids):
+    def filter_rooms(self, room_ids: Iterable[str]) -> Set[str]:
         """Apply the 'rooms' filter to a given list of rooms.
 
         Args:
-            room_ids (list): A list of room_ids.
+            room_ids: A list of room_ids.
 
         Returns:
-            list: A list of room_ids that match the filter
+            A list of room_ids that match the filter
         """
         room_ids = set(room_ids)
 
@@ -363,23 +375,23 @@ class Filter:
 
         return room_ids
 
-    def filter(self, events):
+    def filter(self, events: Iterable[FilterEvent]) -> List[FilterEvent]:
         return list(filter(self.check, events))
 
-    def limit(self):
+    def limit(self) -> int:
         return self.filter_json.get("limit", 10)
 
-    def lazy_load_members(self):
+    def lazy_load_members(self) -> bool:
         return self.filter_json.get("lazy_load_members", False)
 
-    def include_redundant_members(self):
+    def include_redundant_members(self) -> bool:
         return self.filter_json.get("include_redundant_members", False)
 
-    def with_room_ids(self, room_ids):
+    def with_room_ids(self, room_ids: Iterable[str]) -> "Filter":
         """Returns a new filter with the given room IDs appended.
 
         Args:
-            room_ids (iterable[unicode]): The room_ids to add
+            room_ids: The room_ids to add
 
         Returns:
             filter: A new filter including the given rooms and the old
@@ -390,8 +402,8 @@ class Filter:
         return newFilter
 
 
-def _matches_wildcard(actual_value, filter_value):
-    if filter_value.endswith("*"):
+def _matches_wildcard(actual_value: Optional[str], filter_value: str) -> bool:
+    if filter_value.endswith("*") and isinstance(actual_value, str):
         type_prefix = filter_value[:-1]
         return actual_value.startswith(type_prefix)
     else:
