@@ -1,1 +1,0 @@
-Fix a bug in Unicode support of the room search admin API. It is now possible to search for rooms with non-ASCII characters.

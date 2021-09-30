@@ -306,11 +306,13 @@ class RoomBatchSendEventRestServlet(RestServlet):
             # Verify the batch_id_from_query corresponds to an actual insertion event
             # and have the batch connected.
             corresponding_insertion_event_id = (
-                await self.store.get_insertion_event_by_batch_id(batch_id_from_query)
+                await self.store.get_insertion_event_by_batch_id(
+                    room_id, batch_id_from_query
+                )
             )
             if corresponding_insertion_event_id is None:
                 raise SynapseError(
-                    400,
+                    HTTPStatus.BAD_REQUEST,
                     "No insertion event corresponds to the given ?batch_id",
                     errcode=Codes.INVALID_PARAM,
                 )

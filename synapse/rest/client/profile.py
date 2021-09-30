@@ -41,7 +41,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester_user = None
 
-        if self.hs.config.require_auth_for_profile_requests:
+        if self.hs.config.server.require_auth_for_profile_requests:
             requester = await self.auth.get_user_by_req(request)
             requester_user = requester.user
 
@@ -94,7 +94,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester_user = None
 
-        if self.hs.config.require_auth_for_profile_requests:
+        if self.hs.config.server.require_auth_for_profile_requests:
             requester = await self.auth.get_user_by_req(request)
             requester_user = requester.user
 
@@ -146,7 +146,7 @@ class ProfileRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester_user = None
 
-        if self.hs.config.require_auth_for_profile_requests:
+        if self.hs.config.server.require_auth_for_profile_requests:
             requester = await self.auth.get_user_by_req(request)
             requester_user = requester.user
 

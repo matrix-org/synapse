@@ -117,7 +117,7 @@ class PublicRoomList(BaseFederationServlet):
     ):
         super().__init__(hs, authenticator, ratelimiter, server_name)
         self.handler = hs.get_room_list_handler()
-        self.allow_access = hs.config.allow_public_rooms_over_federation
+        self.allow_access = hs.config.server.allow_public_rooms_over_federation
 
     async def on_GET(
         self, origin: str, content: Literal[None], query: Dict[bytes, List[bytes]]
