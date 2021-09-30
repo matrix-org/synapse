@@ -42,9 +42,9 @@ class TLSConfigTests(TestCase):
         """
         config = {}
         t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
+        t.tls.read_config(config, config_dir_path="", data_dir_path="")
 
-        self.assertEqual(t.federation_client_minimum_tls_version, "1")
+        self.assertEqual(t.tls.federation_client_minimum_tls_version, "1")
 
     def test_tls_client_minimum_set(self):
         """
@@ -52,29 +52,29 @@ class TLSConfigTests(TestCase):
         """
         config = {"federation_client_minimum_tls_version": 1}
         t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
-        self.assertEqual(t.federation_client_minimum_tls_version, "1")
+        t.tls.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.tls.federation_client_minimum_tls_version, "1")
 
         config = {"federation_client_minimum_tls_version": 1.1}
         t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
-        self.assertEqual(t.federation_client_minimum_tls_version, "1.1")
+        t.tls.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.tls.federation_client_minimum_tls_version, "1.1")
 
         config = {"federation_client_minimum_tls_version": 1.2}
         t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
-        self.assertEqual(t.federation_client_minimum_tls_version, "1.2")
+        t.tls.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.tls.federation_client_minimum_tls_version, "1.2")
 
         # Also test a string version
         config = {"federation_client_minimum_tls_version": "1"}
         t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
-        self.assertEqual(t.federation_client_minimum_tls_version, "1")
+        t.tls.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.tls.federation_client_minimum_tls_version, "1")
 
         config = {"federation_client_minimum_tls_version": "1.2"}
         t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
-        self.assertEqual(t.federation_client_minimum_tls_version, "1.2")
+        t.tls.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.tls.federation_client_minimum_tls_version, "1.2")
 
     def test_tls_client_minimum_1_point_3_missing(self):
         """
@@ -91,7 +91,7 @@ class TLSConfigTests(TestCase):
         config = {"federation_client_minimum_tls_version": 1.3}
         t = TestConfig()
         with self.assertRaises(ConfigError) as e:
-            t.read_config(config, config_dir_path="", data_dir_path="")
+            t.tls.read_config(config, config_dir_path="", data_dir_path="")
         self.assertEqual(
             e.exception.args[0],
             (
@@ -112,8 +112,8 @@ class TLSConfigTests(TestCase):
 
         config = {"federation_client_minimum_tls_version": 1.3}
         t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
-        self.assertEqual(t.federation_client_minimum_tls_version, "1.3")
+        t.tls.read_config(config, config_dir_path="", data_dir_path="")
+        self.assertEqual(t.tls.federation_client_minimum_tls_version, "1.3")
 
     def test_tls_client_minimum_set_passed_through_1_2(self):
         """
@@ -121,7 +121,7 @@ class TLSConfigTests(TestCase):
         """
         config = {"federation_client_minimum_tls_version": 1.2}
         t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
+        t.tls.read_config(config, config_dir_path="", data_dir_path="")
 
         cf = FederationPolicyForHTTPS(t)
         options = _get_ssl_context_options(cf._verify_ssl_context)
@@ -137,7 +137,7 @@ class TLSConfigTests(TestCase):
         """
         config = {"federation_client_minimum_tls_version": 1}
         t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
+        t.tls.read_config(config, config_dir_path="", data_dir_path="")
 
         cf = FederationPolicyForHTTPS(t)
         options = _get_ssl_context_options(cf._verify_ssl_context)
@@ -159,7 +159,7 @@ class TLSConfigTests(TestCase):
         }
         t = TestConfig()
         e = self.assertRaises(
-            ConfigError, t.read_config, config, config_dir_path="", data_dir_path=""
+            ConfigError, t.tls.read_config, config, config_dir_path="", data_dir_path=""
         )
         self.assertIn("IDNA domain names", str(e))
 
@@ -174,7 +174,7 @@ class TLSConfigTests(TestCase):
             ]
         }
         t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
+        t.tls.read_config(config, config_dir_path="", data_dir_path="")
 
         cf = FederationPolicyForHTTPS(t)
 
