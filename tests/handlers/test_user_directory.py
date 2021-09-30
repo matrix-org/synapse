@@ -20,7 +20,8 @@ from twisted.test.proto_helpers import MemoryReactor
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
 from synapse.api.room_versions import RoomVersion, RoomVersions
-from synapse.rest.client import login, room, user_directory
+from synapse.appservice import ApplicationService
+from synapse.rest.client import login, register, room, user_directory
 from synapse.server import HomeServer
 from synapse.storage.roommember import ProfileInfo
 from synapse.types import create_requester
@@ -47,13 +48,29 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
     servlets = [
         login.register_servlets,
         synapse.rest.admin.register_servlets,
+        register.register_servlets,
         room.register_servlets,
     ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
         config["update_user_directory"] = True
-        return self.setup_test_homeserver(config=config)
+
+        self.appservice = ApplicationService(
+            token="i_am_an_app_service",
+            hostname="test",
+            id="1234",
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+            sender="@as:test",
+        )
+
+        mock_load_appservices = Mock(return_value=[self.appservice])
+        with patch(
+            "synapse.storage.databases.main.appservice.load_appservices",
+            mock_load_appservices,
+        ):
+            hs = self.setup_test_homeserver(config=config)
+        return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastore()
@@ -123,6 +140,26 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # profile is furthermore not in directory
         profile = self.get_success(self.store.get_user_in_directory(r_user_id))
+        self.assertTrue(profile is None)
+
+    def test_handle_local_profile_change_with_appservice_user(self) -> None:
+        # create user
+        as_user_id = self.register_appservice_user(
+            "as_user_alice", self.appservice.token
+        )
+
+        # profile is not in directory
+        profile = self.get_success(self.store.get_user_in_directory(as_user_id))
+        self.assertTrue(profile is None)
+
+        # update profile
+        profile_info = ProfileInfo(avatar_url="avatar_url", display_name="4L1c3")
+        self.get_success(
+            self.handler.handle_local_profile_change(as_user_id, profile_info)
+        )
+
+        # profile is still not in directory
+        profile = self.get_success(self.store.get_user_in_directory(as_user_id))
         self.assertTrue(profile is None)
 
     def test_handle_user_deactivated_support_user(self) -> None:
