@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Dict, List, Set, Tuple
+from unittest.mock import Mock, patch
 
 from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.api.constants import UserTypes
+from synapse.appservice import ApplicationService
 from synapse.rest import admin
-from synapse.rest.client import login, room
+from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.util import Clock
@@ -64,6 +67,14 @@ class GetUserDirectoryTables:
             ["user_id", "other_user_id", "room_id"],
         )
 
+    async def get_users_in_user_directory(self) -> Set[str]:
+        result = await self.store.db_pool.simple_select_list(
+            "user_directory",
+            None,
+            ["user_id"],
+        )
+        return {row["user_id"] for row in result}
+
 
 class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
     """Ensure that rebuilding the directory writes the correct data to the DB.
@@ -74,9 +85,27 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
 
     servlets = [
         login.register_servlets,
-        admin.register_servlets_for_client_rest_resource,
+        admin.register_servlets,
         room.register_servlets,
+        register.register_servlets,
     ]
+
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+        self.appservice = ApplicationService(
+            token="i_am_an_app_service",
+            hostname="test",
+            id="1234",
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+            sender="@as:test",
+        )
+
+        mock_load_appservices = Mock(return_value=[self.appservice])
+        with patch(
+            "synapse.storage.databases.main.appservice.load_appservices",
+            mock_load_appservices,
+        ):
+            hs = super().make_homeserver(reactor, clock)
+        return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastore()
@@ -203,6 +232,68 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
             self.user_dir_helper._compress_shared(shares_private),
             {(u1, u3, private_room), (u3, u1, private_room)},
         )
+
+    def test_population_excludes_support_user(self) -> None:
+        support = "@support1:test"
+        self.get_success(
+            self.store.register_user(
+                user_id=support, password_hash=None, user_type=UserTypes.SUPPORT
+            )
+        )
+        # Check the support user is not in the directory.
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        self.assertEqual(users, set())
+
+        # TODO add support user to a public and private room. Check that
+        # users_in_public_rooms and users_who_share_private_rooms is empty.
+
+        # Rebuild the directory. It should still exclude the support user.
+        self._purge_and_rebuild_user_dir()
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        self.assertEqual(users, set())
+
+    def test_population_excludes_deactivated_user(self) -> None:
+        user = self.register_user("naughty", "pass")
+        admin = self.register_user("admin", "pass", admin=True)
+        admin_token = self.login(admin, "pass")
+
+        # Directory contains both users to start with.
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        self.assertEqual(users, {admin, user})
+
+        # Deactivate the user.
+        channel = self.make_request(
+            "PUT",
+            f"/_synapse/admin/v2/users/{user}",
+            access_token=admin_token,
+            content={"deactivated": True},
+        )
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["deactivated"], True)
+
+        # They should no longer be in the directory.
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        self.assertEqual(users, {admin})
+
+        # Rebuild the user dir. The deactivated user should still be missing.
+        self._purge_and_rebuild_user_dir()
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        self.assertEqual(users, {admin})
+
+    def test_population_excludes_appservice_user(self) -> None:
+        # Register an AS user.
+        self.register_appservice_user("as_user_potato", self.appservice.token)
+        # TODO put this user in a public and private room with someone else
+
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        self.assertEqual(users, set())
+        # TODO assert the room sharing tables are as expected
+
+        self._purge_and_rebuild_user_dir()
+
+        # TODO assert the room sharing tables are as expected
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        self.assertEqual(users, set())
 
 
 class UserDirectoryStoreTestCase(HomeserverTestCase):
