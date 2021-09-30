@@ -15,7 +15,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
-from typing import Container, Iterable, List, Optional, Set, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Awaitable,
+    Container,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    TypeVar,
+    Union,
+)
 
 import jsonschema
 from jsonschema import FormatChecker
@@ -25,6 +35,9 @@ from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
 from synapse.events import EventBase
 from synapse.types import JsonDict, RoomID, UserID
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 FILTER_SCHEMA = {
     "additionalProperties": False,
@@ -131,15 +144,19 @@ def matrix_user_id_validator(user_id_str):
 
 
 class Filtering:
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.store = hs.get_datastore()
 
-    async def get_user_filter(self, user_localpart, filter_id):
+    async def get_user_filter(
+        self, user_localpart: str, filter_id: Union[int, str]
+    ) -> "FilterCollection":
         result = await self.store.get_user_filter(user_localpart, filter_id)
         return FilterCollection(result)
 
-    def add_user_filter(self, user_localpart, user_filter):
+    def add_user_filter(
+        self, user_localpart: str, user_filter: JsonDict
+    ) -> Awaitable[int]:
         self.check_valid_filter(user_filter)
         return self.store.add_user_filter(user_localpart, user_filter)
 
@@ -147,13 +164,13 @@ class Filtering:
     #   replace_user_filter at some point? There's no REST API specified for
     #   them however
 
-    def check_valid_filter(self, user_filter_json):
+    def check_valid_filter(self, user_filter_json: JsonDict) -> None:
         """Check if the provided filter is valid.
 
         This inspects all definitions contained within the filter.
 
         Args:
-            user_filter_json(dict): The filter
+            user_filter_json: The filter
         Raises:
             SynapseError: If the filter is not valid.
         """
