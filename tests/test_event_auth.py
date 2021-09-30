@@ -16,6 +16,7 @@ import unittest
 from typing import Optional
 
 from synapse import event_auth
+from synapse.api.constants import EventContentFields
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, make_event_from_dict
@@ -353,7 +354,7 @@ class EventAuthTestCase(unittest.TestCase):
         authorised_join_event = _join_event(
             pleb,
             additional_content={
-                "join_authorised_via_users_server": "@creator:example.com"
+                EventContentFields.AUTHORISING_USER: "@creator:example.com"
             },
         )
         event_auth.check_auth_rules_for_event(
@@ -376,7 +377,7 @@ class EventAuthTestCase(unittest.TestCase):
             _join_event(
                 pleb,
                 additional_content={
-                    "join_authorised_via_users_server": "@inviter:foo.test"
+                    EventContentFields.AUTHORISING_USER: "@inviter:foo.test"
                 },
             ),
             pl_auth_events,
@@ -401,7 +402,7 @@ class EventAuthTestCase(unittest.TestCase):
                 _join_event(
                     pleb,
                     additional_content={
-                        "join_authorised_via_users_server": "@other:example.com"
+                        EventContentFields.AUTHORISING_USER: "@other:example.com"
                     },
                 ),
                 auth_events,
@@ -417,7 +418,7 @@ class EventAuthTestCase(unittest.TestCase):
                     "join",
                     sender=creator,
                     additional_content={
-                        "join_authorised_via_users_server": "@inviter:foo.test"
+                        EventContentFields.AUTHORISING_USER: "@inviter:foo.test"
                     },
                 ),
                 auth_events,
