@@ -499,14 +499,14 @@ class StateGroupStorage:
             }
             for event_id, group in event_to_groups.items()
         }
-        logger.info(
-            "event_to_groups event_ids=%s event_to_groups=%s group_to_state=%s state_event_map=%s event_to_state=%s",
-            event_ids,
-            event_to_groups,
-            group_to_state,
-            state_event_map,
-            event_to_state
-        )
+        # logger.info(
+        #     "event_to_groups event_ids=%s event_to_groups=%s group_to_state=%s state_event_map=%s event_to_state=%s",
+        #     event_ids,
+        #     event_to_groups,
+        #     group_to_state,
+        #     state_event_map,
+        #     event_to_state
+        # )
 
         return {event: event_to_state[event] for event in event_ids}
 
@@ -535,6 +535,14 @@ class StateGroupStorage:
             event_id: group_to_state[group]
             for event_id, group in event_to_groups.items()
         }
+
+        logger.info(
+            "get_state_ids_for_events event_ids=%s event_to_groups=%s group_to_state=%s event_to_state=%s",
+            event_ids,
+            event_to_groups,
+            group_to_state,
+            event_to_state
+        )
 
         return {event: event_to_state[event] for event in event_ids}
 

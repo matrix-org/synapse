@@ -1009,8 +1009,8 @@ class FederationEventHandler:
         room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
         if (
             not room_version.msc2716_historical
-            or not self._config.experimental.msc2716_enabled
-            or marker_event.sender != room_creator
+            and (not self._config.experimental.msc2716_enabled
+            or marker_event.sender != room_creator)
         ):
             return
 

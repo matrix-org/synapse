@@ -1753,6 +1753,10 @@ class PersistEventsStore:
             # Not a insertion event
             return
 
+        logger.info(
+            "_handle_insertion_event at the start %s", event
+        )
+
         # Skip processing an insertion event if the room version doesn't
         # support it or the event is not from the room creator.
         room_version = self.store.get_room_version_txn(txn, event.room_id)
@@ -1763,10 +1767,17 @@ class PersistEventsStore:
             retcol="creator",
             allow_none=True,
         )
+        logger.info(
+            "_handle_insertion_event at the start room_version.msc2716_historical=%s self.hs.config.experimental.msc2716_enabled=%s event.sender=%s room_creator=%s",
+            room_version.msc2716_historical,
+            self.hs.config.experimental.msc2716_enabled,
+            event.sender,
+            room_creator
+        )
         if (
             not room_version.msc2716_historical
-            or not self.hs.config.experimental.msc2716_enabled
-            or event.sender != room_creator
+            and (not self.hs.config.experimental.msc2716_enabled
+            or event.sender != room_creator)
         ):
             return
 
@@ -1775,7 +1786,7 @@ class PersistEventsStore:
             # Invalid insertion event without next batch ID
             return
 
-        logger.debug(
+        logger.info(
             "_handle_insertion_event (next_batch_id=%s) %s", next_batch_id, event
         )
 
@@ -1827,8 +1838,8 @@ class PersistEventsStore:
         )
         if (
             not room_version.msc2716_historical
-            or not self.hs.config.experimental.msc2716_enabled
-            or event.sender != room_creator
+            and (not self.hs.config.experimental.msc2716_enabled
+            or event.sender != room_creator)
         ):
             return
 

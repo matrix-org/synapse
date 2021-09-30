@@ -557,6 +557,9 @@ class RoomMessageListRestServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
+        logger.info("room /messages =====================================================")
+        logger.info("====================================================================")
+
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         pagination_config = await PaginationConfig.from_request(
             self.store, request, default_limit=10

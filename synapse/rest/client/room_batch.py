@@ -307,6 +307,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
 
             # Verify the batch_id_from_query corresponds to an actual insertion event
             # and have the batch connected.
+            logger.info("get_insertion_event_by_batch_id room_id=%room_id batch_id_from_query=%s", room_id, batch_id_from_query)
             corresponding_insertion_event_id = (
                 await self.store.get_insertion_event_by_batch_id(
                     room_id, batch_id_from_query
