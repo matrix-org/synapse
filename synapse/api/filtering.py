@@ -134,12 +134,12 @@ USER_FILTER_SCHEMA = {
 
 
 @FormatChecker.cls_checks("matrix_room_id")
-def matrix_room_id_validator(room_id_str):
+def matrix_room_id_validator(room_id_str: str) -> RoomID:
     return RoomID.from_string(room_id_str)
 
 
 @FormatChecker.cls_checks("matrix_user_id")
-def matrix_user_id_validator(user_id_str):
+def matrix_user_id_validator(user_id_str: str) -> UserID:
     return UserID.from_string(user_id_str)
 
 
@@ -190,7 +190,7 @@ FilterEvent = TypeVar("FilterEvent", EventBase, UserPresenceState, JsonDict)
 
 
 class FilterCollection:
-    def __init__(self, filter_json):
+    def __init__(self, filter_json: JsonDict):
         self._filter_json = filter_json
 
         room_filter_json = self._filter_json.get("room", {})
@@ -210,25 +210,25 @@ class FilterCollection:
         self.event_fields = filter_json.get("event_fields", [])
         self.event_format = filter_json.get("event_format", "client")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
 
-    def get_filter_json(self):
+    def get_filter_json(self) -> JsonDict:
         return self._filter_json
 
-    def timeline_limit(self):
+    def timeline_limit(self) -> int:
         return self._room_timeline_filter.limit()
 
-    def presence_limit(self):
+    def presence_limit(self) -> int:
         return self._presence_filter.limit()
 
-    def ephemeral_limit(self):
+    def ephemeral_limit(self) -> int:
         return self._room_ephemeral_filter.limit()
 
-    def lazy_load_members(self):
+    def lazy_load_members(self) -> bool:
         return self._room_state_filter.lazy_load_members()
 
-    def include_redundant_members(self):
+    def include_redundant_members(self) -> bool:
         return self._room_state_filter.include_redundant_members()
 
     def filter_presence(self, events):
@@ -240,29 +240,31 @@ class FilterCollection:
     def filter_room_state(self, events):
         return self._room_state_filter.filter(self._room_filter.filter(events))
 
-    def filter_room_timeline(self, events):
+    def filter_room_timeline(self, events: Iterable[FilterEvent]) -> List[FilterEvent]:
         return self._room_timeline_filter.filter(self._room_filter.filter(events))
 
-    def filter_room_ephemeral(self, events):
+    def filter_room_ephemeral(self, events: Iterable[FilterEvent]) -> List[FilterEvent]:
         return self._room_ephemeral_filter.filter(self._room_filter.filter(events))
 
-    def filter_room_account_data(self, events):
+    def filter_room_account_data(
+        self, events: Iterable[FilterEvent]
+    ) -> List[FilterEvent]:
         return self._room_account_data.filter(self._room_filter.filter(events))
 
-    def blocks_all_presence(self):
+    def blocks_all_presence(self) -> bool:
         return (
             self._presence_filter.filters_all_types()
             or self._presence_filter.filters_all_senders()
         )
 
-    def blocks_all_room_ephemeral(self):
+    def blocks_all_room_ephemeral(self) -> bool:
         return (
             self._room_ephemeral_filter.filters_all_types()
             or self._room_ephemeral_filter.filters_all_senders()
             or self._room_ephemeral_filter.filters_all_rooms()
         )
 
-    def blocks_all_room_timeline(self):
+    def blocks_all_room_timeline(self) -> bool:
         return (
             self._room_timeline_filter.filters_all_types()
             or self._room_timeline_filter.filters_all_senders()
@@ -327,7 +329,7 @@ class Filter:
             room_id = event.get("room_id", None)
             ev_type = event.get("type", None)
 
-            content = event.get("content", {})
+            content = event.get("content") or {}
             # check if there is a string url field in the content for filtering purposes
             contains_url = isinstance(content.get("url"), str)
             labels = content.get(EventContentFields.LABELS, [])
