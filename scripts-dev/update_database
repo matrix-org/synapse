@@ -56,6 +56,12 @@ if __name__ == "__main__":
         required=True,
         help="A database config file for either a SQLite3 database or a PostgreSQL one.",
     )
+    parser.add_argument(
+        "--run-background-updates",
+        type=bool,
+        required=False,
+        help="Whether to run background updates after upgrading the database schema.",
+    )
 
     args = parser.parse_args()
 
@@ -82,19 +88,21 @@ if __name__ == "__main__":
     # Setup instantiates the store within the homeserver object and updates the
     # DB.
     hs.setup()
-    store = hs.get_datastore()
 
-    async def run_background_updates():
-        await store.db_pool.updates.run_background_updates(sleep=False)
-        # Stop the reactor to exit the script once every background update is run.
-        reactor.stop()
+    if args.run_background_updates:
+        store = hs.get_datastore()
 
-    def run():
-        # Apply all background updates on the database.
-        defer.ensureDeferred(
-            run_as_background_process("background_updates", run_background_updates)
-        )
+        async def run_background_updates():
+            await store.db_pool.updates.run_background_updates(sleep=False)
+            # Stop the reactor to exit the script once every background update is run.
+            reactor.stop()
 
-    reactor.callWhenRunning(run)
+        def run():
+            # Apply all background updates on the database.
+            defer.ensureDeferred(
+                run_as_background_process("background_updates", run_background_updates)
+            )
 
-    reactor.run()
+        reactor.callWhenRunning(run)
+
+        reactor.run()
