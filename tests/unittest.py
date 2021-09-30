@@ -22,6 +22,7 @@ import secrets
 import time
 from typing import Callable, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union
 from unittest.mock import Mock, patch
+from urllib.parse import quote
 
 from canonicaljson import json
 
@@ -595,6 +596,25 @@ class HomeserverTestCase(TestCase):
 
         user_id = channel.json_body["user_id"]
         return user_id
+
+    def register_appservice_user(
+        self,
+        username: str,
+        appservice_token: str,
+    ) -> str:
+        """Register an appservice user. Requires the client-facing registration API be registered.
+
+        Returns the MXID of the new user."""
+        urlencoded_token = quote(appservice_token)
+        channel = self.make_request(
+            "POST",
+            f"/_matrix/client/r0/register?access_token={urlencoded_token}",
+            {
+                "username": username,
+                "type": "m.login.application_service",
+            },
+        )
+        return channel.json_body["user_id"]
 
     def login(
         self,
