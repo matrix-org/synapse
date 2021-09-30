@@ -1162,19 +1162,17 @@ class RoomContextHandler:
         else:
             state_filter = StateFilter.all()
 
+        logger.info("get_event_context event_id=%s =====================", event_id)
         # XXX: why do we return the state as of the last event rather than the
         # first? Shouldn't we be consistent with /sync?
         # https://github.com/matrix-org/matrix-doc/issues/687
-
-        logger.info("get_event_context event_id=%s =====================", event_id)
-        
         event_id_to_get_state_from = last_event_id
 
         # For historical events, we want to get the state at the specified event.
         # TODO: maybe we can change how we're getting events_before and events_after
         # here so it still works correctly without this hack
-        if event.internal_metadata.is_historical():
-            event_id_to_get_state_from = event_id
+        # if event.internal_metadata.is_historical():
+        #     event_id_to_get_state_from = event_id
 
         state = await self.state_store.get_state_for_events(
             [event_id_to_get_state_from], state_filter=state_filter
