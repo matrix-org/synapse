@@ -491,7 +491,6 @@ class StateGroupStorage:
             [ev_id for sd in group_to_state.values() for ev_id in sd.values()],
             get_prev_content=False,
         )
-
         event_to_state = {
             event_id: {
                 k: state_event_map[v]
@@ -500,6 +499,14 @@ class StateGroupStorage:
             }
             for event_id, group in event_to_groups.items()
         }
+        logger.info(
+            "event_to_groups event_ids=%s event_to_groups=%s group_to_state=%s state_event_map=%s event_to_state=%s",
+            event_ids,
+            event_to_groups,
+            group_to_state,
+            state_event_map,
+            event_to_state
+        )
 
         return {event: event_to_state[event] for event in event_ids}
 

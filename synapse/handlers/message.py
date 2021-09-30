@@ -611,6 +611,7 @@ class EventCreationHandler:
                 auth_event_ids=auth_event_ids,
                 depth=depth,
             )
+            #logger.info("auth_event_ids before=%s", auth_event_ids)
             auth_events = await self.store.get_events_as_list(auth_event_ids)
             # Create a StateMap[str]
             auth_event_state_map = {
@@ -622,6 +623,7 @@ class EventCreationHandler:
                 current_state_ids=auth_event_state_map,
                 for_verification=False,
             )
+            #logger.info("auth_event_ids after=%s", auth_event_ids)
 
         event, context = await self.create_new_client_event(
             builder=builder,

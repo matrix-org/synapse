@@ -695,6 +695,7 @@ class RoomEventContextServlet(RestServlet):
         results = await self.room_context_handler.get_event_context(
             requester, room_id, event_id, limit, event_filter
         )
+        logger.info("get /context event_id=%s results=%s", event_id, results)
 
         if not results:
             raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
