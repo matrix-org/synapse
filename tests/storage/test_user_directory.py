@@ -233,6 +233,10 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
             {(u1, u3, private_room), (u3, u1, private_room)},
         )
 
+        # All three should have entries in the directory
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        self.assertEqual(users, {u1, u2, u3})
+
     def test_population_excludes_support_user(self) -> None:
         support = "@support1:test"
         self.get_success(
