@@ -173,41 +173,18 @@ class RoomBatchSendEventRestServlet(RestServlet):
 
         return create_requester(user_id, app_service=app_service)
 
-    async def on_POST(
-        self, request: SynapseRequest, room_id: str
-    ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request, allow_guest=False)
+    async def _getMostRecentAuthEventIdsFromEventIdList(
+        self, event_ids: List[str]
+    ) -> List[str]:
+        """Find the most recent auth event ids (derived from state events) that
+        allowed that message to be sent. We will use that as a base
+        to auth our historical messages against.
+        """
 
-        if not requester.app_service:
-            raise AuthError(
-                HTTPStatus.FORBIDDEN,
-                "Only application services can use the /batchsend endpoint",
-            )
-
-        body = parse_json_object_from_request(request)
-        assert_params_in_dict(body, ["state_events_at_start", "events"])
-
-        assert request.args is not None
-        prev_event_ids_from_query = parse_strings_from_args(
-            request.args, "prev_event_id"
-        )
-        batch_id_from_query = parse_string(request, "batch_id")
-
-        if prev_event_ids_from_query is None:
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "prev_event query parameter is required when inserting historical messages back in time",
-                errcode=Codes.MISSING_PARAM,
-            )
-
-        # For the event we are inserting next to (`prev_event_ids_from_query`),
-        # find the most recent auth events (derived from state events) that
-        # allowed that message to be sent. We will use that as a base
-        # to auth our historical messages against.
         (
             most_recent_prev_event_id,
             _,
-        ) = await self.store.get_max_depth_of(prev_event_ids_from_query)
+        ) = await self.store.get_max_depth_of(event_ids)
         # mapping from (type, state_key) -> state_event_id
         prev_state_map = await self.state_store.get_state_ids_for_event(
             most_recent_prev_event_id
@@ -216,8 +193,18 @@ class RoomBatchSendEventRestServlet(RestServlet):
         prev_state_ids = list(prev_state_map.values())
         auth_event_ids = prev_state_ids
 
+        return auth_event_ids
+
+    async def _persistStateEventsAtStart(
+        self,
+        state_events_at_start: List[str],
+        room_id: str,
+        initial_auth_event_ids: List[str],
+        requester: Requester,
+    ) -> List[str]:
         state_event_ids_at_start = []
-        for state_event in body["state_events_at_start"]:
+        auth_event_ids = initial_auth_event_ids.copy()
+        for state_event in state_events_at_start:
             assert_params_in_dict(
                 state_event, ["type", "origin_server_ts", "content", "sender"]
             )
@@ -240,7 +227,8 @@ class RoomBatchSendEventRestServlet(RestServlet):
             # Mark all events as historical
             event_dict["content"][EventContentFields.MSC2716_HISTORICAL] = True
 
-            # Make the state events float off on their own
+            # Make the state events float off on their own so we don't have a
+            # bunch of `@mxid joined the room` noise between each batch
             fake_prev_event_id = "$" + random_string(43)
 
             # TODO: This is pretty much the same as some other code to handle inserting state in this file
@@ -285,103 +273,18 @@ class RoomBatchSendEventRestServlet(RestServlet):
             state_event_ids_at_start.append(event_id)
             auth_event_ids.append(event_id)
 
-        events_to_create = body["events"]
+        return state_event_ids_at_start
 
-        inherited_depth = await self._inherit_depth_from_prev_ids(
-            prev_event_ids_from_query
-        )
-
-        # Figure out which batch to connect to. If they passed in
-        # batch_id_from_query let's use it. The batch ID passed in comes
-        # from the batch_id in the "insertion" event from the previous batch.
-        last_event_in_batch = events_to_create[-1]
-        batch_id_to_connect_to = batch_id_from_query
-        base_insertion_event = None
-        if batch_id_from_query:
-            #  All but the first base insertion event should point at a fake
-            #  event, which causes the HS to ask for the state at the start of
-            #  the batch later.
-            prev_event_ids = [fake_prev_event_id]
-
-            # Verify the batch_id_from_query corresponds to an actual insertion event
-            # and have the batch connected.
-            corresponding_insertion_event_id = (
-                await self.store.get_insertion_event_by_batch_id(
-                    room_id, batch_id_from_query
-                )
-            )
-            if corresponding_insertion_event_id is None:
-                raise SynapseError(
-                    HTTPStatus.BAD_REQUEST,
-                    "No insertion event corresponds to the given ?batch_id",
-                    errcode=Codes.INVALID_PARAM,
-                )
-            pass
-        # Otherwise, create an insertion event to act as a starting point.
-        #
-        # We don't always have an insertion event to start hanging more history
-        # off of (ideally there would be one in the main DAG, but that's not the
-        # case if we're wanting to add history to e.g. existing rooms without
-        # an insertion event), in which case we just create a new insertion event
-        # that can then get pointed to by a "marker" event later.
-        else:
-            prev_event_ids = prev_event_ids_from_query
-
-            base_insertion_event_dict = self._create_insertion_event_dict(
-                sender=requester.user.to_string(),
-                room_id=room_id,
-                origin_server_ts=last_event_in_batch["origin_server_ts"],
-            )
-            base_insertion_event_dict["prev_events"] = prev_event_ids.copy()
-
-            (
-                base_insertion_event,
-                _,
-            ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                await self._create_requester_for_user_id_from_app_service(
-                    base_insertion_event_dict["sender"],
-                    requester.app_service,
-                ),
-                base_insertion_event_dict,
-                prev_event_ids=base_insertion_event_dict.get("prev_events"),
-                auth_event_ids=auth_event_ids,
-                historical=True,
-                depth=inherited_depth,
-            )
-
-            batch_id_to_connect_to = base_insertion_event["content"][
-                EventContentFields.MSC2716_NEXT_BATCH_ID
-            ]
-
-        # Connect this current batch to the insertion event from the previous batch
-        batch_event = {
-            "type": EventTypes.MSC2716_BATCH,
-            "sender": requester.user.to_string(),
-            "room_id": room_id,
-            "content": {
-                EventContentFields.MSC2716_BATCH_ID: batch_id_to_connect_to,
-                EventContentFields.MSC2716_HISTORICAL: True,
-            },
-            # Since the batch event is put at the end of the batch,
-            # where the newest-in-time event is, copy the origin_server_ts from
-            # the last event we're inserting
-            "origin_server_ts": last_event_in_batch["origin_server_ts"],
-        }
-        # Add the batch event to the end of the batch (newest-in-time)
-        events_to_create.append(batch_event)
-
-        # Add an "insertion" event to the start of each batch (next to the oldest-in-time
-        # event in the batch) so the next batch can be connected to this one.
-        insertion_event = self._create_insertion_event_dict(
-            sender=requester.user.to_string(),
-            room_id=room_id,
-            # Since the insertion event is put at the start of the batch,
-            # where the oldest-in-time event is, copy the origin_server_ts from
-            # the first event we're inserting
-            origin_server_ts=events_to_create[0]["origin_server_ts"],
-        )
-        # Prepend the insertion event to the start of the batch (oldest-in-time)
-        events_to_create = [insertion_event] + events_to_create
+    async def _persistHistoricalEvents(
+        self,
+        events_to_create: List[str],
+        room_id: str,
+        initial_prev_event_ids: List[str],
+        inherited_depth: int,
+        auth_event_ids: List[str],
+        requester: Requester,
+    ) -> List[str]:
+        prev_event_ids = initial_prev_event_ids.copy()
 
         event_ids = []
         events_to_persist = []
@@ -440,6 +343,202 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 context=context,
             )
 
+        return event_ids
+
+    async def _handleBatchOfEvents(
+        self,
+        events_to_create: List[str],
+        room_id: str,
+        batch_id_to_connect_to: str,
+        initial_prev_event_ids: List[str],
+        inherited_depth: int,
+        auth_event_ids: List[str],
+        requester: Requester,
+    ) -> Tuple[List[str], str]:
+        """
+        Handles creating and persisting all of the historical events as well
+        as insertion and batch meta events to make the batch navigable in the DAG.
+
+        Returns:
+            Tuple containing a list of created events and the next_batch_id
+        """
+
+        # Connect this current batch to the insertion event from the previous batch
+        last_event_in_batch = events_to_create[-1]
+        batch_event = {
+            "type": EventTypes.MSC2716_BATCH,
+            "sender": requester.user.to_string(),
+            "room_id": room_id,
+            "content": {
+                EventContentFields.MSC2716_BATCH_ID: batch_id_to_connect_to,
+                EventContentFields.MSC2716_HISTORICAL: True,
+            },
+            # Since the batch event is put at the end of the batch,
+            # where the newest-in-time event is, copy the origin_server_ts from
+            # the last event we're inserting
+            "origin_server_ts": last_event_in_batch["origin_server_ts"],
+        }
+        # Add the batch event to the end of the batch (newest-in-time)
+        events_to_create.append(batch_event)
+
+        # Add an "insertion" event to the start of each batch (next to the oldest-in-time
+        # event in the batch) so the next batch can be connected to this one.
+        insertion_event = self._create_insertion_event_dict(
+            sender=requester.user.to_string(),
+            room_id=room_id,
+            # Since the insertion event is put at the start of the batch,
+            # where the oldest-in-time event is, copy the origin_server_ts from
+            # the first event we're inserting
+            origin_server_ts=events_to_create[0]["origin_server_ts"],
+        )
+        next_batch_id = insertion_event["content"][
+            EventContentFields.MSC2716_NEXT_BATCH_ID
+        ]
+        # Prepend the insertion event to the start of the batch (oldest-in-time)
+        events_to_create = [insertion_event] + events_to_create
+
+        # Create and persist all of the historical events
+        event_ids = await self._persistHistoricalEvents(
+            events_to_create=events_to_create,
+            room_id=room_id,
+            initial_prev_event_ids=initial_prev_event_ids,
+            inherited_depth=inherited_depth,
+            auth_event_ids=auth_event_ids,
+            requester=requester,
+        )
+
+        return event_ids, next_batch_id
+
+    async def on_POST(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
+
+        if not requester.app_service:
+            raise AuthError(
+                HTTPStatus.FORBIDDEN,
+                "Only application services can use the /batchsend endpoint",
+            )
+
+        body = parse_json_object_from_request(request)
+        assert_params_in_dict(body, ["state_events_at_start", "events"])
+
+        assert request.args is not None
+        prev_event_ids_from_query = parse_strings_from_args(
+            request.args, "prev_event_id"
+        )
+        batch_id_from_query = parse_string(request, "batch_id")
+
+        if prev_event_ids_from_query is None:
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "prev_event query parameter is required when inserting historical messages back in time",
+                errcode=Codes.MISSING_PARAM,
+            )
+
+        # Verify the batch_id_from_query corresponds to an actual insertion event
+        # and have the batch connected.
+        if batch_id_from_query:
+            corresponding_insertion_event_id = (
+                await self.store.get_insertion_event_by_batch_id(
+                    room_id, batch_id_from_query
+                )
+            )
+            if corresponding_insertion_event_id is None:
+                raise SynapseError(
+                    HTTPStatus.BAD_REQUEST,
+                    "No insertion event corresponds to the given ?batch_id",
+                    errcode=Codes.INVALID_PARAM,
+                )
+            pass
+
+        # For the event we are inserting next to (`prev_event_ids_from_query`),
+        # find the most recent auth events (derived from state events) that
+        # allowed that message to be sent. We will use that as a base
+        # to auth our historical messages against.
+        auth_event_ids = await self._getMostRecentAuthEventIdsFromEventIdList(
+            prev_event_ids_from_query
+        )
+
+        # Create and persist all of the state events that float off on their own
+        # before the batch. These will most likely be all of the invite/member
+        # state events used to auth the upcoming historical messages.
+        state_event_ids_at_start = await self._persistStateEventsAtStart(
+            state_events_at_start=body["state_events_at_start"],
+            room_id=room_id,
+            initial_auth_event_ids=auth_event_ids,
+            requester=requester,
+        )
+        # Update our ongoing auth event ID list with all of the new state we
+        # just created
+        auth_event_ids.extend(state_event_ids_at_start)
+
+        inherited_depth = await self._inherit_depth_from_prev_ids(
+            prev_event_ids_from_query
+        )
+
+        events_to_create = body["events"]
+
+        # Figure out which batch to connect to. If they passed in
+        # batch_id_from_query let's use it. The batch ID passed in comes
+        # from the batch_id in the "insertion" event from the previous batch.
+        last_event_in_batch = events_to_create[-1]
+        batch_id_to_connect_to = batch_id_from_query
+        base_insertion_event = None
+        if batch_id_from_query:
+            #  All but the first base insertion event should point at a fake
+            #  event, which causes the HS to ask for the state at the start of
+            #  the batch later.
+            fake_prev_event_id = "$" + random_string(43)
+            prev_event_ids = [fake_prev_event_id]
+        # Otherwise, create an insertion event to act as a starting point.
+        #
+        # We don't always have an insertion event to start hanging more history
+        # off of (ideally there would be one in the main DAG, but that's not the
+        # case if we're wanting to add history to e.g. existing rooms without
+        # an insertion event), in which case we just create a new insertion event
+        # that can then get pointed to by a "marker" event later.
+        else:
+            prev_event_ids = prev_event_ids_from_query
+
+            base_insertion_event_dict = self._create_insertion_event_dict(
+                sender=requester.user.to_string(),
+                room_id=room_id,
+                origin_server_ts=last_event_in_batch["origin_server_ts"],
+            )
+            base_insertion_event_dict["prev_events"] = prev_event_ids.copy()
+
+            (
+                base_insertion_event,
+                _,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                await self._create_requester_for_user_id_from_app_service(
+                    base_insertion_event_dict["sender"],
+                    requester.app_service,
+                ),
+                base_insertion_event_dict,
+                prev_event_ids=base_insertion_event_dict.get("prev_events"),
+                auth_event_ids=auth_event_ids,
+                historical=True,
+                depth=inherited_depth,
+            )
+
+            batch_id_to_connect_to = base_insertion_event["content"][
+                EventContentFields.MSC2716_NEXT_BATCH_ID
+            ]
+
+        # Create and persist all of the historical events as well as insertion
+        # and batch meta events to make the batch navigable in the DAG.
+        event_ids, next_batch_id = await self._handleBatchOfEvents(
+            events_to_create=events_to_create,
+            room_id=room_id,
+            batch_id_to_connect_to=batch_id_to_connect_to,
+            initial_prev_event_ids=prev_event_ids,
+            inherited_depth=inherited_depth,
+            auth_event_ids=auth_event_ids,
+            requester=requester,
+        )
+
         insertion_event_id = event_ids[0]
         batch_event_id = event_ids[-1]
         historical_event_ids = event_ids[1:-1]
@@ -447,9 +546,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
         response_dict = {
             "state_event_ids": state_event_ids_at_start,
             "event_ids": historical_event_ids,
-            "next_batch_id": insertion_event["content"][
-                EventContentFields.MSC2716_NEXT_BATCH_ID
-            ],
+            "next_batch_id": next_batch_id,
             "insertion_event_id": insertion_event_id,
             "batch_event_id": batch_event_id,
         }
