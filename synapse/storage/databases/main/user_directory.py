@@ -40,12 +40,10 @@ from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
-
 TEMP_TABLE = "_temp_populate_user_directory"
 
 
 class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
-
     # How many records do we calculate before sending it to
     # add_users_who_share_private_rooms?
     SHARE_PRIVATE_WORKING_SET = 500
@@ -235,13 +233,16 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 )
 
                 users_with_profile = await self.get_users_in_room_with_profiles(room_id)
+                # Throw away users excluded from the directory.
+                users_with_profile = {
+                    user_id: profile
+                    for user_id, profile in users_with_profile.items()
+                    if not self.hs.is_mine_id(user_id)
+                    or await self.should_include_local_user_in_dir(user_id)
+                }
 
                 # Update each user in the user directory.
                 for user_id, profile in users_with_profile.items():
-                    if self.hs.is_mine_id(
-                        user_id
-                    ) and not await self.should_include_local_user_in_dir(user_id):
-                        continue
                     await self.update_profile_in_user_dir(
                         user_id, profile.display_name, profile.avatar_url
                     )
@@ -250,11 +251,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
                 if is_public:
                     for user_id in users_with_profile:
-                        if self.hs.is_mine_id(
-                            user_id
-                        ) and not await self.should_include_local_user_in_dir(user_id):
-                            continue
-
                         to_insert.add(user_id)
 
                     if to_insert:
@@ -262,10 +258,10 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                         to_insert.clear()
                 else:
                     for user_id in users_with_profile:
+                        # We want the set of pairs (L, M) where L and M are
+                        # in `users_with_profile` and L is local.
+                        # Do so by looking for the local user L first.
                         if not self.hs.is_mine_id(user_id):
-                            continue
-
-                        if not await self.should_include_local_user_in_dir(user_id):
                             continue
 
                         for other_user_id in users_with_profile:
@@ -562,7 +558,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
 
 class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
-
     # How many records do we calculate before sending it to
     # add_users_who_share_private_rooms?
     SHARE_PRIVATE_WORKING_SET = 500
