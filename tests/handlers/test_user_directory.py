@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Tuple
 from unittest.mock import Mock, patch
 from urllib.parse import quote
 
@@ -29,6 +30,7 @@ from synapse.util import Clock
 
 from tests import unittest
 from tests.storage.test_user_directory import GetUserDirectoryTables
+from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import override_config
 
 
@@ -78,6 +80,137 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.event_builder_factory = self.hs.get_event_builder_factory()
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.user_dir_helper = GetUserDirectoryTables(self.store)
+
+    def test_normal_user_pair(self) -> None:
+        """Sanity check that the room-sharing tables are updated correctly."""
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        bob = self.register_user("bob", "pass")
+        bob_token = self.login(bob, "pass")
+
+        public = self.helper.create_room_as(
+            alice,
+            is_public=True,
+            extra_content={"visibility": "public"},
+            tok=alice_token,
+        )
+        private = self.helper.create_room_as(alice, is_public=False, tok=alice_token)
+        self.helper.invite(private, alice, bob, tok=alice_token)
+        self.helper.join(public, bob, tok=bob_token)
+        self.helper.join(private, bob, tok=bob_token)
+
+        # Alice also makes a second public room but no-one else joins
+        public2 = self.helper.create_room_as(
+            alice,
+            is_public=True,
+            extra_content={"visibility": "public"},
+            tok=alice_token,
+        )
+
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        in_public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        in_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+
+        self.assertEqual(users, {alice, bob})
+        self.assertEqual(
+            set(in_public), {(alice, public), (bob, public), (alice, public2)}
+        )
+        self.assertEqual(
+            self.user_dir_helper._compress_shared(in_private),
+            {(alice, bob, private), (bob, alice, private)},
+        )
+
+    # The next three tests (test_population_excludes_*) all setup
+    #   - A normal user included in the user dir
+    #   - A public and private room created by that user
+    #   - A user excluded from the room dir, belonging to both rooms
+
+    # They match similar logic in storage/test_user_directory. But that tests
+    # rebuilding the directory; this tests updating it incrementally.
+
+    def test_excludes_support_user(self) -> None:
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        support = "@support1:test"
+        self.get_success(
+            self.store.register_user(
+                user_id=support, password_hash=None, user_type=UserTypes.SUPPORT
+            )
+        )
+
+        public, private = self._create_rooms_and_inject_memberships(
+            alice, alice_token, support
+        )
+        self._check_only_one_user_in_directory(alice, public)
+
+    def test_excludes_deactivated_user(self) -> None:
+        admin = self.register_user("admin", "pass", admin=True)
+        admin_token = self.login(admin, "pass")
+        user = self.register_user("naughty", "pass")
+
+        # Deactivate the user.
+        channel = self.make_request(
+            "PUT",
+            f"/_synapse/admin/v2/users/{user}",
+            access_token=admin_token,
+            content={"deactivated": True},
+        )
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["deactivated"], True)
+
+        # Join the deactivated user to rooms owned by the admin.
+        # Is this something that could actually happen outside of a test?
+        public, private = self._create_rooms_and_inject_memberships(
+            admin, admin_token, user
+        )
+        self._check_only_one_user_in_directory(admin, public)
+
+    def test_excludes_appservices_user(self) -> None:
+        # Register an AS user.
+        user = self.register_user("user", "pass")
+        token = self.login(user, "pass")
+        as_user = self.register_appservice_user("as_user_potato", self.appservice.token)
+
+        # Join the AS user to rooms owned by the normal user.
+        public, private = self._create_rooms_and_inject_memberships(
+            user, token, as_user
+        )
+        self._check_only_one_user_in_directory(user, public)
+
+    def _create_rooms_and_inject_memberships(
+        self, creator: str, token: str, joiner: str
+    ) -> Tuple[str, str]:
+        """Create a public and private room as a normal user.
+        Then get the `joiner` into those rooms.
+        """
+        # TODO: Duplicates the same-named method in UserDirectoryInitialPopulationTest.
+        public_room = self.helper.create_room_as(
+            creator,
+            is_public=True,
+            # See https://github.com/matrix-org/synapse/issues/10951
+            extra_content={"visibility": "public"},
+            tok=token,
+        )
+        private_room = self.helper.create_room_as(creator, is_public=False, tok=token)
+
+        # HACK: get the user into these rooms
+        self.get_success(inject_member_event(self.hs, public_room, joiner, "join"))
+        self.get_success(inject_member_event(self.hs, private_room, joiner, "join"))
+
+        return public_room, private_room
+
+    def _check_only_one_user_in_directory(self, user: str, public: str) -> None:
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        in_public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        in_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+
+        self.assertEqual(users, {user})
+        self.assertEqual(set(in_public), {(user, public)})
+        self.assertEqual(in_private, [])
 
     def test_handle_local_profile_change_with_support_user(self) -> None:
         support_user_id = "@support:test"

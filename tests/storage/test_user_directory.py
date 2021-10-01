@@ -24,6 +24,7 @@ from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.util import Clock
 
+from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
 
 ALICE = "@alice:a"
@@ -237,33 +238,76 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
         self.assertEqual(users, {u1, u2, u3})
 
+    # The next three tests (test_population_excludes_*) all setup
+    #   - A normal user included in the user dir
+    #   - A public and private room created by that user
+    #   - A user excluded from the room dir, belonging to both rooms
+
+    # They match similar logic in handlers/test_user_directory.py But that tests
+    # updating the directory; this tests rebuilding it from scratch.
+
+    def _create_rooms_and_inject_memberships(
+        self, creator: str, token: str, joiner: str
+    ) -> Tuple[str, str]:
+        """Create a public and private room as a normal user.
+        Then get the `joiner` into those rooms.
+        """
+        public_room = self.helper.create_room_as(
+            creator,
+            is_public=True,
+            # See https://github.com/matrix-org/synapse/issues/10951
+            extra_content={"visibility": "public"},
+            tok=token,
+        )
+        private_room = self.helper.create_room_as(creator, is_public=False, tok=token)
+
+        # HACK: get the user into these rooms
+        self.get_success(inject_member_event(self.hs, public_room, joiner, "join"))
+        self.get_success(inject_member_event(self.hs, private_room, joiner, "join"))
+
+        return public_room, private_room
+
+    def _check_room_sharing_tables(
+        self, normal_user: str, public_room: str, private_room: str
+    ) -> None:
+        # After rebuilding the directory, we should only see the normal user.
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        self.assertEqual(users, {normal_user})
+        in_public_rooms = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
+        self.assertEqual(set(in_public_rooms), {(normal_user, public_room)})
+        in_private_rooms = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        self.assertEqual(in_private_rooms, [])
+
     def test_population_excludes_support_user(self) -> None:
+        # Create a normal and support user.
+        user = self.register_user("user", "pass")
+        token = self.login(user, "pass")
         support = "@support1:test"
         self.get_success(
             self.store.register_user(
                 user_id=support, password_hash=None, user_type=UserTypes.SUPPORT
             )
         )
-        # Check the support user is not in the directory.
-        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
-        self.assertEqual(users, set())
 
-        # TODO add support user to a public and private room. Check that
-        # users_in_public_rooms and users_who_share_private_rooms is empty.
+        # Join the support user to rooms owned by the normal user.
+        public, private = self._create_rooms_and_inject_memberships(
+            user, token, support
+        )
 
-        # Rebuild the directory. It should still exclude the support user.
+        # Rebuild the directory.
         self._purge_and_rebuild_user_dir()
-        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
-        self.assertEqual(users, set())
+
+        # Check the support user is not in the directory.
+        self._check_room_sharing_tables(user, public, private)
 
     def test_population_excludes_deactivated_user(self) -> None:
         user = self.register_user("naughty", "pass")
         admin = self.register_user("admin", "pass", admin=True)
         admin_token = self.login(admin, "pass")
-
-        # Directory contains both users to start with.
-        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
-        self.assertEqual(users, {admin, user})
 
         # Deactivate the user.
         channel = self.make_request(
@@ -275,29 +319,32 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["deactivated"], True)
 
-        # They should no longer be in the directory.
-        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
-        self.assertEqual(users, {admin})
+        # Join the deactivated user to rooms owned by the admin.
+        # Is this something that could actually happen outside of a test?
+        public, private = self._create_rooms_and_inject_memberships(
+            admin, admin_token, user
+        )
 
-        # Rebuild the user dir. The deactivated user should still be missing.
+        # Rebuild the user dir. The deactivated user should be missing.
         self._purge_and_rebuild_user_dir()
-        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
-        self.assertEqual(users, {admin})
+        self._check_room_sharing_tables(admin, public, private)
 
     def test_population_excludes_appservice_user(self) -> None:
         # Register an AS user.
-        self.register_appservice_user("as_user_potato", self.appservice.token)
-        # TODO put this user in a public and private room with someone else
+        user = self.register_user("user", "pass")
+        token = self.login(user, "pass")
+        as_user = self.register_appservice_user("as_user_potato", self.appservice.token)
 
-        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
-        self.assertEqual(users, set())
-        # TODO assert the room sharing tables are as expected
+        # Join the AS user to rooms owned by the normal user.
+        public, private = self._create_rooms_and_inject_memberships(
+            user, token, as_user
+        )
 
+        # Rebuild the directory.
         self._purge_and_rebuild_user_dir()
 
-        # TODO assert the room sharing tables are as expected
-        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
-        self.assertEqual(users, set())
+        # Check the AS user is not in the directory.
+        self._check_room_sharing_tables(user, public, private)
 
 
 class UserDirectoryStoreTestCase(HomeserverTestCase):
