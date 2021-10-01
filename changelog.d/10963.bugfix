@@ -1,0 +1,1 @@
+For the `create_room_as` test util, change the behaviour of the `is_public` option to explicitly set the `visibility` parameter of room creation requests to `true`, or to let the server decide on what value to use if left as `None`. Contributed by @AndrewFerr.
