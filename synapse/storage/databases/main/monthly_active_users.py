@@ -358,7 +358,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
     async def remove_deactivated_user_from_mau_table(self, user_id: str) -> None:
         """
         Removes a deactivated user from the monthly active user
-        table and resets the "get_monthly_active_count" cache.
+        table and resets affected caches.
 
         Args:
             user_id(str): the user_id to remove
