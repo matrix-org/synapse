@@ -1,6 +1,4 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2017-2018 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,17 +17,20 @@ import logging
 import os.path
 import re
 from textwrap import indent
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import attr
 import yaml
 from netaddr import AddrFormatError, IPNetwork, IPSet
+
+from twisted.conch.ssh.keys import Key
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_server_name
 
 from ._base import Config, ConfigError
+from ._util import validate_config
 
 logger = logging.Logger(__name__)
 
@@ -153,7 +154,7 @@ ROOM_COMPLEXITY_TOO_GREAT = (
 METRICS_PORT_WARNING = """\
 The metrics_port configuration option is deprecated in Synapse 0.31 in favour of
 a listener. Please see
-https://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.md
+https://matrix-org.github.io/synapse/latest/metrics-howto.html
 on how to configure the new listener.
 --------------------------------------------------------------------------------"""
 
@@ -181,39 +182,74 @@ KNOWN_RESOURCES = {
 
 @attr.s(frozen=True)
 class HttpResourceConfig:
-    names = attr.ib(
-        type=List[str],
+    names: List[str] = attr.ib(
         factory=list,
         validator=attr.validators.deep_iterable(attr.validators.in_(KNOWN_RESOURCES)),  # type: ignore
     )
-    compress = attr.ib(
-        type=bool,
+    compress: bool = attr.ib(
         default=False,
         validator=attr.validators.optional(attr.validators.instance_of(bool)),  # type: ignore[arg-type]
     )
 
 
-@attr.s(frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class HttpListenerConfig:
     """Object describing the http-specific parts of the config of a listener"""
 
-    x_forwarded = attr.ib(type=bool, default=False)
-    resources = attr.ib(type=List[HttpResourceConfig], factory=list)
-    additional_resources = attr.ib(type=Dict[str, dict], factory=dict)
-    tag = attr.ib(type=str, default=None)
+    x_forwarded: bool = False
+    resources: List[HttpResourceConfig] = attr.ib(factory=list)
+    additional_resources: Dict[str, dict] = attr.ib(factory=dict)
+    tag: Optional[str] = None
 
 
-@attr.s(frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class ListenerConfig:
     """Object describing the configuration of a single listener."""
 
-    port = attr.ib(type=int, validator=attr.validators.instance_of(int))
-    bind_addresses = attr.ib(type=List[str])
-    type = attr.ib(type=str, validator=attr.validators.in_(KNOWN_LISTENER_TYPES))
-    tls = attr.ib(type=bool, default=False)
+    port: int = attr.ib(validator=attr.validators.instance_of(int))
+    bind_addresses: List[str]
+    type: str = attr.ib(validator=attr.validators.in_(KNOWN_LISTENER_TYPES))
+    tls: bool = False
 
     # http_options is only populated if type=http
-    http_options = attr.ib(type=Optional[HttpListenerConfig], default=None)
+    http_options: Optional[HttpListenerConfig] = None
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class ManholeConfig:
+    """Object describing the configuration of the manhole"""
+
+    username: str = attr.ib(validator=attr.validators.instance_of(str))
+    password: str = attr.ib(validator=attr.validators.instance_of(str))
+    priv_key: Optional[Key]
+    pub_key: Optional[Key]
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RetentionConfig:
+    """Object describing the configuration of the manhole"""
+
+    interval: int
+    shortest_max_lifetime: Optional[int]
+    longest_max_lifetime: Optional[int]
+
+
+@attr.s(frozen=True)
+class LimitRemoteRoomsConfig:
+    enabled: bool = attr.ib(validator=attr.validators.instance_of(bool), default=False)
+    complexity: Union[float, int] = attr.ib(
+        validator=attr.validators.instance_of(
+            (float, int)  # type: ignore[arg-type] # noqa
+        ),
+        default=1.0,
+    )
+    complexity_error: str = attr.ib(
+        validator=attr.validators.instance_of(str),
+        default=ROOM_COMPLEXITY_TOO_GREAT,
+    )
+    admins_can_join: bool = attr.ib(
+        validator=attr.validators.instance_of(bool), default=False
+    )
 
 
 class ServerConfig(Config):
@@ -248,6 +284,7 @@ class ServerConfig(Config):
             self.use_presence = config.get("use_presence", True)
 
         # Custom presence router module
+        # This is the legacy way of configuring it (the config should now be put in the modules section)
         self.presence_router_module_class = None
         self.presence_router_config = None
         presence_router_config = presence_config.get("presence_router")
@@ -397,19 +434,22 @@ class ServerConfig(Config):
         self.ip_range_whitelist = generate_ip_set(
             config.get("ip_range_whitelist", ()), config_path=("ip_range_whitelist",)
         )
-
         # The federation_ip_range_blacklist is used for backwards-compatibility
-        # and only applies to federation and identity servers. If it is not given,
-        # default to ip_range_blacklist.
-        federation_ip_range_blacklist = config.get(
-            "federation_ip_range_blacklist", ip_range_blacklist
-        )
-        # Always blacklist 0.0.0.0, ::
-        self.federation_ip_range_blacklist = generate_ip_set(
-            federation_ip_range_blacklist,
-            ["0.0.0.0", "::"],
-            config_path=("federation_ip_range_blacklist",),
-        )
+        # and only applies to federation and identity servers.
+        if "federation_ip_range_blacklist" in config:
+            # Always blacklist 0.0.0.0, ::
+            self.federation_ip_range_blacklist = generate_ip_set(
+                config["federation_ip_range_blacklist"],
+                ["0.0.0.0", "::"],
+                config_path=("federation_ip_range_blacklist",),
+            )
+            # 'federation_ip_range_whitelist' was never a supported configuration option.
+            self.federation_ip_range_whitelist = None
+        else:
+            # No backwards-compatiblity requrired, as federation_ip_range_blacklist
+            # is not given. Default to ip_range_blacklist and ip_range_whitelist.
+            self.federation_ip_range_blacklist = self.ip_range_blacklist
+            self.federation_ip_range_whitelist = self.ip_range_whitelist
 
         # (undocumented) option for torturing the worker-mode replication a bit,
         # for testing. The value defines the number of milliseconds to pause before
@@ -502,7 +542,7 @@ class ServerConfig(Config):
                 " greater than 'allowed_lifetime_max'"
             )
 
-        self.retention_purge_jobs = []  # type: List[Dict[str, Optional[int]]]
+        self.retention_purge_jobs: List[RetentionConfig] = []
         for purge_job_config in retention_config.get("purge_jobs", []):
             interval_config = purge_job_config.get("interval")
 
@@ -536,20 +576,12 @@ class ServerConfig(Config):
                 )
 
             self.retention_purge_jobs.append(
-                {
-                    "interval": interval,
-                    "shortest_max_lifetime": shortest_max_lifetime,
-                    "longest_max_lifetime": longest_max_lifetime,
-                }
+                RetentionConfig(interval, shortest_max_lifetime, longest_max_lifetime)
             )
 
         if not self.retention_purge_jobs:
             self.retention_purge_jobs = [
-                {
-                    "interval": self.parse_duration("1d"),
-                    "shortest_max_lifetime": None,
-                    "longest_max_lifetime": None,
-                }
+                RetentionConfig(self.parse_duration("1d"), None, None)
             ]
 
         self.listeners = [parse_listener_def(x) for x in config.get("listeners", [])]
@@ -573,25 +605,6 @@ class ServerConfig(Config):
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
         self.gc_seconds = self.read_gc_intervals(config.get("gc_min_interval", None))
-
-        @attr.s
-        class LimitRemoteRoomsConfig:
-            enabled = attr.ib(
-                validator=attr.validators.instance_of(bool), default=False
-            )
-            complexity = attr.ib(
-                validator=attr.validators.instance_of(
-                    (float, int)  # type: ignore[arg-type] # noqa
-                ),
-                default=1.0,
-            )
-            complexity_error = attr.ib(
-                validator=attr.validators.instance_of(str),
-                default=ROOM_COMPLEXITY_TOO_GREAT,
-            )
-            admins_can_join = attr.ib(
-                validator=attr.validators.instance_of(bool), default=False
-            )
 
         self.limit_remote_rooms = LimitRemoteRoomsConfig(
             **(config.get("limit_remote_rooms") or {})
@@ -645,6 +658,41 @@ class ServerConfig(Config):
                 )
             )
 
+        manhole_settings = config.get("manhole_settings") or {}
+        validate_config(
+            _MANHOLE_SETTINGS_SCHEMA, manhole_settings, ("manhole_settings",)
+        )
+
+        manhole_username = manhole_settings.get("username", "matrix")
+        manhole_password = manhole_settings.get("password", "rabbithole")
+        manhole_priv_key_path = manhole_settings.get("ssh_priv_key_path")
+        manhole_pub_key_path = manhole_settings.get("ssh_pub_key_path")
+
+        manhole_priv_key = None
+        if manhole_priv_key_path is not None:
+            try:
+                manhole_priv_key = Key.fromFile(manhole_priv_key_path)
+            except Exception as e:
+                raise ConfigError(
+                    f"Failed to read manhole private key file {manhole_priv_key_path}"
+                ) from e
+
+        manhole_pub_key = None
+        if manhole_pub_key_path is not None:
+            try:
+                manhole_pub_key = Key.fromFile(manhole_pub_key_path)
+            except Exception as e:
+                raise ConfigError(
+                    f"Failed to read manhole public key file {manhole_pub_key_path}"
+                ) from e
+
+        self.manhole_settings = ManholeConfig(
+            username=manhole_username,
+            password=manhole_password,
+            priv_key=manhole_priv_key,
+            pub_key=manhole_pub_key,
+        )
+
         metrics_port = config.get("metrics_port")
         if metrics_port:
             logger.warning(METRICS_PORT_WARNING)
@@ -685,23 +733,21 @@ class ServerConfig(Config):
         # not included in the sample configuration file on purpose as it's a temporary
         # hack, so that some users can trial the new defaults without impacting every
         # user on the homeserver.
-        users_new_default_push_rules = (
+        users_new_default_push_rules: list = (
             config.get("users_new_default_push_rules") or []
-        )  # type: list
+        )
         if not isinstance(users_new_default_push_rules, list):
             raise ConfigError("'users_new_default_push_rules' must be a list")
 
         # Turn the list into a set to improve lookup speed.
-        self.users_new_default_push_rules = set(
-            users_new_default_push_rules
-        )  # type: set
+        self.users_new_default_push_rules: set = set(users_new_default_push_rules)
 
         # Whitelist of domain names that given next_link parameters must have
-        next_link_domain_whitelist = config.get(
+        next_link_domain_whitelist: Optional[List[str]] = config.get(
             "next_link_domain_whitelist"
-        )  # type: Optional[List[str]]
+        )
 
-        self.next_link_domain_whitelist = None  # type: Optional[Set[str]]
+        self.next_link_domain_whitelist: Optional[Set[str]] = None
         if next_link_domain_whitelist is not None:
             if not isinstance(next_link_domain_whitelist, list):
                 raise ConfigError("'next_link_domain_whitelist' must be a list")
@@ -709,11 +755,29 @@ class ServerConfig(Config):
             # Turn the list into a set to improve lookup speed.
             self.next_link_domain_whitelist = set(next_link_domain_whitelist)
 
+        templates_config = config.get("templates") or {}
+        if not isinstance(templates_config, dict):
+            raise ConfigError("The 'templates' section must be a dictionary")
+
+        self.custom_template_directory: Optional[str] = templates_config.get(
+            "custom_template_directory"
+        )
+        if self.custom_template_directory is not None and not isinstance(
+            self.custom_template_directory, str
+        ):
+            raise ConfigError("'custom_template_directory' must be a string")
+
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
 
     def generate_config_section(
-        self, server_name, data_dir_path, open_private_ports, listeners, **kwargs
+        self,
+        server_name,
+        data_dir_path,
+        open_private_ports,
+        listeners,
+        config_dir_path,
+        **kwargs,
     ):
         ip_range_blacklist = "\n".join(
             "        #  - '%s'" % ip for ip in DEFAULT_IP_RANGE_BLACKLIST
@@ -808,7 +872,7 @@ class ServerConfig(Config):
         # In most cases you should avoid using a matrix specific subdomain such as
         # matrix.example.com or synapse.example.com as the server_name for the same
         # reasons you wouldn't use user@email.example.com as your email address.
-        # See https://github.com/matrix-org/synapse/blob/master/docs/delegate.md
+        # See https://matrix-org.github.io/synapse/latest/delegate.html
         # for information on how to host Synapse on a subdomain while preserving
         # a clean server_name.
         #
@@ -856,20 +920,6 @@ class ServerConfig(Config):
           # replaces the previous top-level 'use_presence' option.
           #
           #enabled: false
-
-          # Presence routers are third-party modules that can specify additional logic
-          # to where presence updates from users are routed.
-          #
-          presence_router:
-            # The custom module's class. Uncomment to use a custom presence router module.
-            #
-            #module: "my_custom_router.PresenceRouter"
-
-            # Configuration options of the custom module. Refer to your module's
-            # documentation for available options.
-            #
-            #config:
-            #  example_option: 'something'
 
         # Whether to require authentication to retrieve profile data (avatars,
         # display names) of other users through the client API. Defaults to
@@ -959,6 +1009,8 @@ class ServerConfig(Config):
         #
         # This option replaces federation_ip_range_blacklist in Synapse v1.25.0.
         #
+        # Note: The value is ignored when an HTTP proxy is in use
+        #
         #ip_range_blacklist:
 %(ip_range_blacklist)s
 
@@ -985,9 +1037,9 @@ class ServerConfig(Config):
         #       'all local interfaces'.
         #
         #   type: the type of listener. Normally 'http', but other valid options are:
-        #       'manhole' (see docs/manhole.md),
-        #       'metrics' (see docs/metrics-howto.md),
-        #       'replication' (see docs/workers.md).
+        #       'manhole' (see https://matrix-org.github.io/synapse/latest/manhole.html),
+        #       'metrics' (see https://matrix-org.github.io/synapse/latest/metrics-howto.html),
+        #       'replication' (see https://matrix-org.github.io/synapse/latest/workers.html).
         #
         #   tls: set to true to enable TLS for this listener. Will use the TLS
         #       key/cert specified in tls_private_key_path / tls_certificate_path.
@@ -1012,8 +1064,8 @@ class ServerConfig(Config):
         #   client: the client-server API (/_matrix/client), and the synapse admin
         #       API (/_synapse/admin). Also implies 'media' and 'static'.
         #
-        #   consent: user consent forms (/_matrix/consent). See
-        #       docs/consent_tracking.md.
+        #   consent: user consent forms (/_matrix/consent).
+        #       See https://matrix-org.github.io/synapse/latest/consent_tracking.html.
         #
         #   federation: the server-server API (/_matrix/federation). Also implies
         #       'media', 'keys', 'openid'
@@ -1022,12 +1074,13 @@ class ServerConfig(Config):
         #
         #   media: the media API (/_matrix/media).
         #
-        #   metrics: the metrics interface. See docs/metrics-howto.md.
+        #   metrics: the metrics interface.
+        #       See https://matrix-org.github.io/synapse/latest/metrics-howto.html.
         #
         #   openid: OpenID authentication.
         #
-        #   replication: the HTTP replication API (/_synapse/replication). See
-        #       docs/workers.md.
+        #   replication: the HTTP replication API (/_synapse/replication).
+        #       See https://matrix-org.github.io/synapse/latest/workers.html.
         #
         #   static: static resources under synapse/static (/_matrix/static). (Mostly
         #       useful for 'fallback authentication'.)
@@ -1047,7 +1100,7 @@ class ServerConfig(Config):
           # that unwraps TLS.
           #
           # If you plan to use a reverse proxy, please see
-          # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
+          # https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
           #
           %(unsecure_http_bindings)s
 
@@ -1064,6 +1117,24 @@ class ServerConfig(Config):
           #- port: 9000
           #  bind_addresses: ['::1', '127.0.0.1']
           #  type: manhole
+
+        # Connection settings for the manhole
+        #
+        manhole_settings:
+          # The username for the manhole. This defaults to 'matrix'.
+          #
+          #username: manhole
+
+          # The password for the manhole. This defaults to 'rabbithole'.
+          #
+          #password: mypassword
+
+          # The private and public SSH key pair used to encrypt the manhole traffic.
+          # If these are left unset, then hardcoded and non-secret keys are used,
+          # which could allow traffic to be intercepted if sent over a public network.
+          #
+          #ssh_priv_key_path: %(config_dir_path)s/id_rsa
+          #ssh_pub_key_path: %(config_dir_path)s/id_rsa.pub
 
         # Forward extremities can build up in a room due to networking delays between
         # homeservers. Once this happens in a large room, calculation of the state of
@@ -1280,6 +1351,19 @@ class ServerConfig(Config):
         # all domains.
         #
         #next_link_domain_whitelist: ["matrix.org"]
+
+        # Templates to use when generating email or HTML page contents.
+        #
+        templates:
+          # Directory in which Synapse will try to find template files to use to generate
+          # email or HTML page contents.
+          # If not set, or a file is not found within the template directory, a default
+          # template from within the Synapse package will be used.
+          #
+          # See https://matrix-org.github.io/synapse/latest/templates.html for more
+          # information about using custom templates.
+          #
+          #custom_template_directory: /path/to/custom/templates/
         """
             % locals()
         )
@@ -1359,7 +1443,7 @@ def read_gc_thresholds(thresholds):
         return None
     try:
         assert len(thresholds) == 3
-        return (int(thresholds[0]), int(thresholds[1]), int(thresholds[2]))
+        return int(thresholds[0]), int(thresholds[1]), int(thresholds[2])
     except Exception:
         raise ConfigError(
             "Value of `gc_threshold` must be a list of three integers if set"
@@ -1420,3 +1504,14 @@ def _warn_if_webclient_configured(listeners: Iterable[ListenerConfig]) -> None:
                 if name == "webclient":
                     logger.warning(NO_MORE_WEB_CLIENT_WARNING)
                     return
+
+
+_MANHOLE_SETTINGS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "username": {"type": "string"},
+        "password": {"type": "string"},
+        "ssh_priv_key_path": {"type": "string"},
+        "ssh_pub_key_path": {"type": "string"},
+    },
+}

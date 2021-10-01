@@ -21,7 +21,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import RoomEncryptionAlgorithms
 from synapse.rest import admin
-from synapse.rest.client.v1 import login
+from synapse.rest.client import login
 from synapse.types import JsonDict, ReadReceipt
 
 from tests.test_utils import make_awaitable
@@ -336,7 +336,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         recovery
         """
         mock_send_txn = self.hs.get_federation_transport_client().send_transaction
-        mock_send_txn.side_effect = lambda t, cb: defer.fail("fail")
+        mock_send_txn.side_effect = lambda t, cb: defer.fail(AssertionError("fail"))
 
         # create devices
         u1 = self.register_user("user", "pass")
@@ -376,7 +376,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         This case tests the behaviour when the server has never been reachable.
         """
         mock_send_txn = self.hs.get_federation_transport_client().send_transaction
-        mock_send_txn.side_effect = lambda t, cb: defer.fail("fail")
+        mock_send_txn.side_effect = lambda t, cb: defer.fail(AssertionError("fail"))
 
         # create devices
         u1 = self.register_user("user", "pass")
@@ -429,7 +429,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         # now the server goes offline
         mock_send_txn = self.hs.get_federation_transport_client().send_transaction
-        mock_send_txn.side_effect = lambda t, cb: defer.fail("fail")
+        mock_send_txn.side_effect = lambda t, cb: defer.fail(AssertionError("fail"))
 
         self.login("user", "pass", device_id="D2")
         self.login("user", "pass", device_id="D3")

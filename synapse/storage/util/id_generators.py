@@ -19,6 +19,7 @@ from contextlib import contextmanager
 from typing import Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import attr
+from sortedcontainers import SortedSet
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.database import DatabasePool, LoggingTransaction
@@ -112,7 +113,7 @@ class StreamIdGenerator:
         # insertion ordering will ensure its in the correct ordering.
         #
         # The key and values are the same, but we never look at the values.
-        self._unfinished_ids = OrderedDict()  # type: OrderedDict[int, int]
+        self._unfinished_ids: OrderedDict[int, int] = OrderedDict()
 
     def get_next(self):
         """
@@ -236,15 +237,15 @@ class MultiWriterIdGenerator:
         # Note: If we are a negative stream then we still store all the IDs as
         # positive to make life easier for us, and simply negate the IDs when we
         # return them.
-        self._current_positions = {}  # type: Dict[str, int]
+        self._current_positions: Dict[str, int] = {}
 
         # Set of local IDs that we're still processing. The current position
         # should be less than the minimum of this set (if not empty).
-        self._unfinished_ids = set()  # type: Set[int]
+        self._unfinished_ids: SortedSet[int] = SortedSet()
 
         # Set of local IDs that we've processed that are larger than the current
         # position, due to there being smaller unpersisted IDs.
-        self._finished_ids = set()  # type: Set[int]
+        self._finished_ids: Set[int] = set()
 
         # We track the max position where we know everything before has been
         # persisted. This is done by a) looking at the min across all instances
@@ -265,7 +266,7 @@ class MultiWriterIdGenerator:
         self._persisted_upto_position = (
             min(self._current_positions.values()) if self._current_positions else 1
         )
-        self._known_persisted_positions = []  # type: List[int]
+        self._known_persisted_positions: List[int] = []
 
         self._sequence_gen = PostgresSequenceGenerator(sequence_name)
 
@@ -397,6 +398,11 @@ class MultiWriterIdGenerator:
                 # ... persist event ...
         """
 
+        # If we have a list of instances that are allowed to write to this
+        # stream, make sure we're in it.
+        if self._writers and self._instance_name not in self._writers:
+            raise Exception("Tried to allocate stream ID on non-writer")
+
         return _MultiWriterCtxManager(self)
 
     def get_next_mult(self, n: int):
@@ -405,6 +411,11 @@ class MultiWriterIdGenerator:
             async with stream_id_gen.get_next_mult(5) as stream_ids:
                 # ... persist events ...
         """
+
+        # If we have a list of instances that are allowed to write to this
+        # stream, make sure we're in it.
+        if self._writers and self._instance_name not in self._writers:
+            raise Exception("Tried to allocate stream ID on non-writer")
 
         return _MultiWriterCtxManager(self, n)
 
@@ -415,6 +426,11 @@ class MultiWriterIdGenerator:
             stream_id = stream_id_gen.get_next(txn)
             # ... persist event ...
         """
+
+        # If we have a list of instances that are allowed to write to this
+        # stream, make sure we're in it.
+        if self._writers and self._instance_name not in self._writers:
+            raise Exception("Tried to allocate stream ID on non-writer")
 
         next_id = self._load_next_id_txn(txn)
 
@@ -450,7 +466,7 @@ class MultiWriterIdGenerator:
             self._unfinished_ids.discard(next_id)
             self._finished_ids.add(next_id)
 
-            new_cur = None  # type: Optional[int]
+            new_cur: Optional[int] = None
 
             if self._unfinished_ids:
                 # If there are unfinished IDs then the new position will be the
@@ -458,7 +474,7 @@ class MultiWriterIdGenerator:
 
                 finished = set()
 
-                min_unfinshed = min(self._unfinished_ids)
+                min_unfinshed = self._unfinished_ids[0]
                 for s in self._finished_ids:
                     if s < min_unfinshed:
                         if new_cur is None or new_cur < s:

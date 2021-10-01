@@ -20,11 +20,12 @@ from synapse.events import EventBase
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, presence, room
+from synapse.rest.client import login, presence, room
 from synapse.types import create_requester
 
 from tests.events.test_presence_router import send_presence_update, sync_presence
 from tests.replication._base import BaseMultiWorkerStreamTestCase
+from tests.test_utils import simple_async_mock
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
 from tests.utils import USE_POSTGRES_FOR_TESTS
@@ -43,10 +44,15 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.module_api = homeserver.get_module_api()
         self.event_creation_handler = homeserver.get_event_creation_handler()
         self.sync_handler = homeserver.get_sync_handler()
+        self.auth_handler = homeserver.get_auth_handler()
 
     def make_homeserver(self, reactor, clock):
+        # Mock out the calls over federation.
+        fed_transport_client = Mock(spec=["send_transaction"])
+        fed_transport_client.send_transaction = simple_async_mock({})
+
         return self.setup_test_homeserver(
-            federation_transport_client=Mock(spec=["send_transaction"]),
+            federation_transport_client=fed_transport_client,
         )
 
     def test_can_register_user(self):
@@ -79,6 +85,87 @@ class ModuleApiTestCase(HomeserverTestCase):
         displayname = self.get_success(self.store.get_profile_displayname("bob"))
         self.assertEqual(displayname, "Bobberino")
 
+    def test_get_userinfo_by_id(self):
+        user_id = self.register_user("alice", "1234")
+        found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
+        self.assertEqual(found_user.user_id.to_string(), user_id)
+        self.assertIdentical(found_user.is_admin, False)
+
+    def test_get_userinfo_by_id__no_user_found(self):
+        found_user = self.get_success(self.module_api.get_userinfo_by_id("@alice:test"))
+        self.assertIsNone(found_user)
+
+    def test_get_user_ip_and_agents(self):
+        user_id = self.register_user("test_get_user_ip_and_agents_user", "1234")
+
+        # Initially, we should have no ip/agent for our user.
+        info = self.get_success(self.module_api.get_user_ip_and_agents(user_id))
+        self.assertEqual(info, [])
+
+        # Insert a first ip, agent. We should be able to retrieve it.
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token", "ip_1", "user_agent_1", "device_1", None
+            )
+        )
+        info = self.get_success(self.module_api.get_user_ip_and_agents(user_id))
+
+        self.assertEqual(len(info), 1)
+        last_seen_1 = info[0].last_seen
+
+        # Insert a second ip, agent at a later date. We should be able to retrieve it.
+        last_seen_2 = last_seen_1 + 10000
+        print("%s => %s" % (last_seen_1, last_seen_2))
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token", "ip_2", "user_agent_2", "device_2", last_seen_2
+            )
+        )
+        info = self.get_success(self.module_api.get_user_ip_and_agents(user_id))
+
+        self.assertEqual(len(info), 2)
+        ip_1_seen = False
+        ip_2_seen = False
+
+        for i in info:
+            if i.ip == "ip_1":
+                ip_1_seen = True
+                self.assertEqual(i.user_agent, "user_agent_1")
+                self.assertEqual(i.last_seen, last_seen_1)
+            elif i.ip == "ip_2":
+                ip_2_seen = True
+                self.assertEqual(i.user_agent, "user_agent_2")
+                self.assertEqual(i.last_seen, last_seen_2)
+        self.assertTrue(ip_1_seen)
+        self.assertTrue(ip_2_seen)
+
+        # If we fetch from a midpoint between last_seen_1 and last_seen_2,
+        # we should only find the second ip, agent.
+        info = self.get_success(
+            self.module_api.get_user_ip_and_agents(
+                user_id, (last_seen_1 + last_seen_2) / 2
+            )
+        )
+        self.assertEqual(len(info), 1)
+        self.assertEqual(info[0].ip, "ip_2")
+        self.assertEqual(info[0].user_agent, "user_agent_2")
+        self.assertEqual(info[0].last_seen, last_seen_2)
+
+        # If we fetch from a point later than last_seen_2, we shouldn't
+        # find anything.
+        info = self.get_success(
+            self.module_api.get_user_ip_and_agents(user_id, last_seen_2 + 10000)
+        )
+        self.assertEqual(info, [])
+
+    def test_get_user_ip_and_agents__no_user_found(self):
+        info = self.get_success(
+            self.module_api.get_user_ip_and_agents(
+                "@test_get_user_ip_and_agents_user_nonexistent:example.com"
+            )
+        )
+        self.assertEqual(info, [])
+
     def test_sending_events_into_room(self):
         """Tests that a module can send events into a room"""
         # Mock out create_and_send_nonmember_event to check whether events are being sent
@@ -100,9 +187,9 @@ class ModuleApiTestCase(HomeserverTestCase):
             "content": content,
             "sender": user_id,
         }
-        event = self.get_success(
+        event: EventBase = self.get_success(
             self.module_api.create_and_send_event_into_room(event_dict)
-        )  # type: EventBase
+        )
         self.assertEqual(event.sender, user_id)
         self.assertEqual(event.type, "m.room.message")
         self.assertEqual(event.room_id, room_id)
@@ -136,9 +223,9 @@ class ModuleApiTestCase(HomeserverTestCase):
             "sender": user_id,
             "state_key": "",
         }
-        event = self.get_success(
+        event: EventBase = self.get_success(
             self.module_api.create_and_send_event_into_room(event_dict)
-        )  # type: EventBase
+        )
         self.assertEqual(event.sender, user_id)
         self.assertEqual(event.type, "m.room.power_levels")
         self.assertEqual(event.room_id, room_id)
@@ -281,7 +368,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         )
         for call in calls:
             call_args = call[0]
-            federation_transaction = call_args[0]  # type: Transaction
+            federation_transaction: Transaction = call_args[0]
 
             # Get the sent EDUs in this transaction
             edus = federation_transaction.get_dict()["edus"]
@@ -390,7 +477,7 @@ def _test_sending_local_online_presence_to_local_user(
     )
     test_case.assertEqual(len(presence_updates), 1)
 
-    presence_update = presence_updates[0]  # type: UserPresenceState
+    presence_update: UserPresenceState = presence_updates[0]
     test_case.assertEqual(presence_update.user_id, test_case.presence_sender_id)
     test_case.assertEqual(presence_update.state, "online")
 
@@ -443,7 +530,7 @@ def _test_sending_local_online_presence_to_local_user(
     )
     test_case.assertEqual(len(presence_updates), 1)
 
-    presence_update = presence_updates[0]  # type: UserPresenceState
+    presence_update: UserPresenceState = presence_updates[0]
     test_case.assertEqual(presence_update.user_id, test_case.presence_sender_id)
     test_case.assertEqual(presence_update.state, "online")
 
@@ -454,7 +541,7 @@ def _test_sending_local_online_presence_to_local_user(
     )
     test_case.assertEqual(len(presence_updates), 1)
 
-    presence_update = presence_updates[0]  # type: UserPresenceState
+    presence_update: UserPresenceState = presence_updates[0]
     test_case.assertEqual(presence_update.user_id, test_case.presence_sender_id)
     test_case.assertEqual(presence_update.state, "online")
 

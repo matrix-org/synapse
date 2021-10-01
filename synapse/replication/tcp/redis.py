@@ -57,7 +57,7 @@ class ConstantProperty(Generic[T, V]):
     it.
     """
 
-    constant = attr.ib()  # type: V
+    constant: V = attr.ib()
 
     def __get__(self, obj: Optional[T], objtype: Optional[Type[T]] = None) -> V:
         return self.constant
@@ -91,9 +91,9 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
             commands.
     """
 
-    synapse_handler = None  # type: ReplicationCommandHandler
-    synapse_stream_name = None  # type: str
-    synapse_outbound_redis_connection = None  # type: txredisapi.RedisProtocol
+    synapse_handler: "ReplicationCommandHandler"
+    synapse_stream_name: str
+    synapse_outbound_redis_connection: txredisapi.RedisProtocol
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -364,6 +364,12 @@ def lazyConnection(
     factory.continueTrying = reconnect
 
     reactor = hs.get_reactor()
-    reactor.connectTCP(host.encode(), port, factory, timeout=30, bindAddress=None)
+    reactor.connectTCP(
+        host,  # type: ignore[arg-type]
+        port,
+        factory,
+        timeout=30,
+        bindAddress=None,
+    )
 
     return factory.handler

@@ -84,7 +84,7 @@ class RemoteKeyResourceTestCase(BaseRemoteKeyResourceTestCase):
         Checks that the response is a 200 and returns the decoded json body.
         """
         channel = FakeChannel(self.site, self.reactor)
-        req = SynapseRequest(channel)
+        req = SynapseRequest(channel, self.site)
         req.content = BytesIO(b"")
         req.requestReceived(
             b"GET",
@@ -183,7 +183,7 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
             )
 
             channel = FakeChannel(self.site, self.reactor)
-            req = SynapseRequest(channel)
+            req = SynapseRequest(channel, self.site)
             req.content = BytesIO(encode_canonical_json(data))
 
             req.requestReceived(
@@ -208,10 +208,10 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
         keyid = "ed25519:%s" % (testkey.version,)
 
         fetcher = PerspectivesKeyFetcher(self.hs2)
-        d = fetcher.get_keys({"targetserver": {keyid: 1000}})
+        d = fetcher.get_keys("targetserver", [keyid], 1000)
         res = self.get_success(d)
-        self.assertIn("targetserver", res)
-        keyres = res["targetserver"][keyid]
+        self.assertIn(keyid, res)
+        keyres = res[keyid]
         assert isinstance(keyres, FetchKeyResult)
         self.assertEqual(
             signedjson.key.encode_verify_key_base64(keyres.verify_key),
@@ -230,10 +230,10 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
         keyid = "ed25519:%s" % (testkey.version,)
 
         fetcher = PerspectivesKeyFetcher(self.hs2)
-        d = fetcher.get_keys({self.hs.hostname: {keyid: 1000}})
+        d = fetcher.get_keys(self.hs.hostname, [keyid], 1000)
         res = self.get_success(d)
-        self.assertIn(self.hs.hostname, res)
-        keyres = res[self.hs.hostname][keyid]
+        self.assertIn(keyid, res)
+        keyres = res[keyid]
         assert isinstance(keyres, FetchKeyResult)
         self.assertEqual(
             signedjson.key.encode_verify_key_base64(keyres.verify_key),
@@ -247,10 +247,10 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
         keyid = "ed25519:%s" % (self.hs_signing_key.version,)
 
         fetcher = PerspectivesKeyFetcher(self.hs2)
-        d = fetcher.get_keys({self.hs.hostname: {keyid: 1000}})
+        d = fetcher.get_keys(self.hs.hostname, [keyid], 1000)
         res = self.get_success(d)
-        self.assertIn(self.hs.hostname, res)
-        keyres = res[self.hs.hostname][keyid]
+        self.assertIn(keyid, res)
+        keyres = res[keyid]
         assert isinstance(keyres, FetchKeyResult)
         self.assertEqual(
             signedjson.key.encode_verify_key_base64(keyres.verify_key),

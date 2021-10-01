@@ -1,6 +1,6 @@
 # Use the Sytest image that comes with a lot of the build dependencies
 # pre-installed
-FROM matrixdotorg/sytest:latest
+FROM matrixdotorg/sytest:bionic
 
 # The Sytest image doesn't come with python, so install that
 RUN apt-get update && apt-get -qq install -y python3 python3-dev python3-pip
@@ -8,5 +8,23 @@ RUN apt-get update && apt-get -qq install -y python3 python3-dev python3-pip
 # We need tox to run the tests in run_pg_tests.sh
 RUN python3 -m pip install tox
 
-ADD run_pg_tests.sh /pg_tests.sh
-ENTRYPOINT /pg_tests.sh
+# Initialise the db
+RUN su -c '/usr/lib/postgresql/10/bin/initdb -D /var/lib/postgresql/data -E "UTF-8" --lc-collate="C.UTF-8" --lc-ctype="C.UTF-8" --username=postgres' postgres
+
+# Add a user with our UID and GID so that files get created on the host owned
+# by us, not root.
+ARG UID
+ARG GID
+RUN groupadd --gid $GID user
+RUN useradd --uid $UID --gid $GID --groups sudo --no-create-home user
+
+# Ensure we can start postgres by sudo-ing as the postgres user.
+RUN apt-get update && apt-get -qq install -y sudo
+RUN echo "user ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+ADD run_pg_tests.sh /run_pg_tests.sh
+# Use the "exec form" of ENTRYPOINT (https://docs.docker.com/engine/reference/builder/#entrypoint)
+# so that we can `docker run` this container and pass arguments to pg_tests.sh
+ENTRYPOINT ["/run_pg_tests.sh"]
+
+USER user

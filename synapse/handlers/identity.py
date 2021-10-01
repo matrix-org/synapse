@@ -57,12 +57,12 @@ class IdentityHandler(BaseHandler):
         self.http_client = SimpleHttpClient(hs)
         # An HTTP client for contacting identity servers specified by clients.
         self.blacklisting_http_client = SimpleHttpClient(
-            hs, ip_blacklist=hs.config.federation_ip_range_blacklist
+            hs, ip_blacklist=hs.config.server.federation_ip_range_blacklist
         )
         self.federation_http_client = hs.get_federation_http_client()
         self.hs = hs
 
-        self._web_client_location = hs.config.invite_client_location
+        self._web_client_location = hs.config.email.invite_client_location
 
         # Ratelimiters for `/requestToken` endpoints.
         self._3pid_validation_ratelimiter_ip = Ratelimiter(
@@ -302,7 +302,7 @@ class IdentityHandler(BaseHandler):
             )
 
         url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
-        url_bytes = "/_matrix/identity/api/v1/3pid/unbind".encode("ascii")
+        url_bytes = b"/_matrix/identity/api/v1/3pid/unbind"
 
         content = {
             "mxid": mxid,
@@ -419,7 +419,7 @@ class IdentityHandler(BaseHandler):
 
         token_expires = (
             self.hs.get_clock().time_msec()
-            + self.hs.config.email_validation_token_lifetime
+            + self.hs.config.email.email_validation_token_lifetime
         )
 
         await self.store.start_or_continue_validation_session(
@@ -465,7 +465,7 @@ class IdentityHandler(BaseHandler):
         if next_link:
             params["next_link"] = next_link
 
-        if self.hs.config.using_identity_server_from_trusted_list:
+        if self.hs.config.email.using_identity_server_from_trusted_list:
             # Warn that a deprecated config option is in use
             logger.warning(
                 'The config option "trust_identity_server_for_password_resets" '
@@ -518,7 +518,7 @@ class IdentityHandler(BaseHandler):
         if next_link:
             params["next_link"] = next_link
 
-        if self.hs.config.using_identity_server_from_trusted_list:
+        if self.hs.config.email.using_identity_server_from_trusted_list:
             # Warn that a deprecated config option is in use
             logger.warning(
                 'The config option "trust_identity_server_for_password_resets" '
@@ -540,13 +540,13 @@ class IdentityHandler(BaseHandler):
 
         # It is already checked that public_baseurl is configured since this code
         # should only be used if account_threepid_delegate_msisdn is true.
-        assert self.hs.config.public_baseurl
+        assert self.hs.config.server.public_baseurl
 
         # we need to tell the client to send the token back to us, since it doesn't
         # otherwise know where to send it, so add submit_url response parameter
         # (see also MSC2078)
         data["submit_url"] = (
-            self.hs.config.public_baseurl
+            self.hs.config.server.public_baseurl
             + "_matrix/client/unstable/add_threepid/msisdn/submit_token"
         )
         return data
@@ -572,12 +572,12 @@ class IdentityHandler(BaseHandler):
         validation_session = None
 
         # Try to validate as email
-        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+        if self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             # Ask our delegated email identity server
             validation_session = await self.threepid_from_creds(
                 self.hs.config.account_threepid_delegate_email, threepid_creds
             )
-        elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        elif self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             # Get a validated session matching these details
             validation_session = await self.store.get_threepid_validation_session(
                 "email", client_secret, sid=sid, validated=True
@@ -695,7 +695,7 @@ class IdentityHandler(BaseHandler):
                 return data["mxid"]
         except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
-        except IOError as e:
+        except OSError as e:
             logger.warning("Error from v1 identity server lookup: %s" % (e,))
 
         return None
@@ -824,6 +824,7 @@ class IdentityHandler(BaseHandler):
         room_avatar_url: str,
         room_join_rules: str,
         room_name: str,
+        room_type: Optional[str],
         inviter_display_name: str,
         inviter_avatar_url: str,
         id_access_token: Optional[str] = None,
@@ -843,6 +844,7 @@ class IdentityHandler(BaseHandler):
                 notifications.
             room_join_rules: The join rules of the email (e.g. "public").
             room_name: The m.room.name of the room.
+            room_type: The type of the room from its m.room.create event (e.g "m.space").
             inviter_display_name: The current display name of the
                 inviter.
             inviter_avatar_url: The URL of the inviter's avatar.
@@ -869,6 +871,10 @@ class IdentityHandler(BaseHandler):
             "sender_display_name": inviter_display_name,
             "sender_avatar_url": inviter_avatar_url,
         }
+
+        if room_type is not None:
+            invite_config["org.matrix.msc3288.room_type"] = room_type
+
         # If a custom web client location is available, include it in the request.
         if self._web_client_location:
             invite_config["org.matrix.web_client_location"] = self._web_client_location

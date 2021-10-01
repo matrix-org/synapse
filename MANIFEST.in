@@ -40,12 +40,13 @@ exclude mypy.ini
 exclude sytest-blacklist
 exclude test_postgresql.sh
 
+include book.toml
 include pyproject.toml
 recursive-include changelog.d *
 
-prune .buildkite
 prune .circleci
 prune .github
+prune .ci
 prune contrib
 prune debian
 prune demo/etc

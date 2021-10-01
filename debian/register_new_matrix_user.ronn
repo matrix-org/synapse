@@ -58,4 +58,4 @@ for Debian GNU/Linux distribution.
 
 ## SEE ALSO
 
-synctl(1), synapse_port_db(1), hash_password(1)
+synctl(1), synapse_port_db(1), hash_password(1), synapse_review_recent_signups(1)

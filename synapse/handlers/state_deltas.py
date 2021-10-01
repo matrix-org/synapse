@@ -13,12 +13,19 @@
 # limitations under the License.
 
 import logging
+from enum import Enum, auto
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+
+class MatchChange(Enum):
+    no_change = auto()
+    now_true = auto()
+    now_false = auto()
 
 
 class StateDeltasHandler:
@@ -31,18 +38,12 @@ class StateDeltasHandler:
         event_id: Optional[str],
         key_name: str,
         public_value: str,
-    ) -> Optional[bool]:
+    ) -> MatchChange:
         """Given two events check if the `key_name` field in content changed
         from not matching `public_value` to doing so.
 
         For example, check if `history_visibility` (`key_name`) changed from
         `shared` to `world_readable` (`public_value`).
-
-        Returns:
-            None if the field in the events either both match `public_value`
-            or if neither do, i.e. there has been no change.
-            True if it didn't match `public_value` but now does
-            False if it did match `public_value` but now doesn't
         """
         prev_event = None
         event = None
@@ -54,7 +55,7 @@ class StateDeltasHandler:
 
         if not event and not prev_event:
             logger.debug("Neither event exists: %r %r", prev_event_id, event_id)
-            return None
+            return MatchChange.no_change
 
         prev_value = None
         value = None
@@ -68,8 +69,8 @@ class StateDeltasHandler:
         logger.debug("prev_value: %r -> value: %r", prev_value, value)
 
         if value == public_value and prev_value != public_value:
-            return True
+            return MatchChange.now_true
         elif value != public_value and prev_value == public_value:
-            return False
+            return MatchChange.now_false
         else:
-            return None
+            return MatchChange.no_change

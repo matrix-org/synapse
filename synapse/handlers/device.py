@@ -267,7 +267,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
 
-    def _check_device_name_length(self, name: Optional[str]):
+    def _check_device_name_length(self, name: Optional[str]) -> None:
         """
         Checks whether a device name is longer than the maximum allowed length.
 
@@ -452,7 +452,7 @@ class DeviceHandler(DeviceWorkerHandler):
             user_id
         )
 
-        hosts = set()  # type: Set[str]
+        hosts: Set[str] = set()
         if self.hs.is_mine_id(user_id):
             hosts.update(get_domain_from_id(u) for u in users_who_share_room)
             hosts.discard(self.server_name)
@@ -613,20 +613,20 @@ class DeviceListUpdater:
         self._remote_edu_linearizer = Linearizer(name="remote_device_list")
 
         # user_id -> list of updates waiting to be handled.
-        self._pending_updates = (
-            {}
-        )  # type: Dict[str, List[Tuple[str, str, Iterable[str], JsonDict]]]
+        self._pending_updates: Dict[
+            str, List[Tuple[str, str, Iterable[str], JsonDict]]
+        ] = {}
 
         # Recently seen stream ids. We don't bother keeping these in the DB,
         # but they're useful to have them about to reduce the number of spurious
         # resyncs.
-        self._seen_updates = ExpiringCache(
+        self._seen_updates: ExpiringCache[str, Set[str]] = ExpiringCache(
             cache_name="device_update_edu",
             clock=self.clock,
             max_len=10000,
             expiry_ms=30 * 60 * 1000,
             iterable=True,
-        )  # type: ExpiringCache[str, Set[str]]
+        )
 
         # Attempt to resync out of sync device lists every 30s.
         self._resync_retry_in_progress = False
@@ -755,7 +755,7 @@ class DeviceListUpdater:
         """Given a list of updates for a user figure out if we need to do a full
         resync, or whether we have enough data that we can just apply the delta.
         """
-        seen_updates = self._seen_updates.get(user_id, set())  # type: Set[str]
+        seen_updates: Set[str] = self._seen_updates.get(user_id, set())
 
         extremity = await self.store.get_device_list_last_stream_id_for_remote(user_id)
 

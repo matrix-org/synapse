@@ -33,6 +33,9 @@ class RegistrationConfig(Config):
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
         self.enable_3pid_lookup = config.get("enable_3pid_lookup", True)
+        self.registration_requires_token = config.get(
+            "registration_requires_token", False
+        )
         self.registration_shared_secret = config.get("registration_shared_secret")
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
@@ -119,6 +122,30 @@ class RegistrationConfig(Config):
             session_lifetime = self.parse_duration(session_lifetime)
         self.session_lifetime = session_lifetime
 
+        # The `access_token_lifetime` applies for tokens that can be renewed
+        # using a refresh token, as per MSC2918. If it is `None`, the refresh
+        # token mechanism is disabled.
+        #
+        # Since it is incompatible with the `session_lifetime` mechanism, it is set to
+        # `None` by default if a `session_lifetime` is set.
+        access_token_lifetime = config.get(
+            "access_token_lifetime", "5m" if session_lifetime is None else None
+        )
+        if access_token_lifetime is not None:
+            access_token_lifetime = self.parse_duration(access_token_lifetime)
+        self.access_token_lifetime = access_token_lifetime
+
+        if session_lifetime is not None and access_token_lifetime is not None:
+            raise ConfigError(
+                "The refresh token mechanism is incompatible with the "
+                "`session_lifetime` option. Consider disabling the "
+                "`session_lifetime` option or disabling the refresh token "
+                "mechanism by removing the `access_token_lifetime` option."
+            )
+
+        # The fallback template used for authenticating using a registration token
+        self.registration_token_template = self.read_template("registration_token.html")
+
         # The success template used during fallback auth.
         self.fallback_success_template = self.read_template("auth_success.html")
 
@@ -177,6 +204,15 @@ class RegistrationConfig(Config):
         # Enable 3PIDs lookup requests to identity servers from this server.
         #
         #enable_3pid_lookup: true
+
+        # Require users to submit a token during registration.
+        # Tokens can be managed using the admin API:
+        # https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/registration_tokens.html
+        # Note that `enable_registration` must be set to `true`.
+        # Disabling this option will not delete any tokens previously generated.
+        # Defaults to false. Uncomment the following to require tokens:
+        #
+        #registration_requires_token: true
 
         # If set, allows registration of standard or admin accounts by anyone who
         # has the shared secret, even if registration is otherwise disabled.

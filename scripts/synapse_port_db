@@ -46,6 +46,7 @@ from synapse.storage.databases.main.events_bg_updates import (
 from synapse.storage.databases.main.media_repository import (
     MediaRepositoryBackgroundUpdateStore,
 )
+from synapse.storage.databases.main.presence import PresenceBackgroundUpdateStore
 from synapse.storage.databases.main.pusher import PusherWorkerStore
 from synapse.storage.databases.main.registration import (
     RegistrationBackgroundUpdateStore,
@@ -93,6 +94,7 @@ BOOLEAN_COLUMNS = {
     "local_media_repository": ["safe_from_quarantine"],
     "users": ["shadow_banned"],
     "e2e_fallback_keys_json": ["used"],
+    "access_tokens": ["used"],
 }
 
 
@@ -178,6 +180,7 @@ class Store(
     EndToEndKeyBackgroundStore,
     StatsStore,
     PusherWorkerStore,
+    PresenceBackgroundUpdateStore,
 ):
     def execute(self, f, *args, **kwargs):
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
@@ -307,7 +310,8 @@ class Porter(object):
                     information_schema.table_constraints AS tc
                     INNER JOIN information_schema.constraint_column_usage AS ccu
                     USING (table_schema, constraint_name)
-                WHERE tc.constraint_type = 'FOREIGN KEY';
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND tc.table_name != ccu.table_name;
             """
             txn.execute(sql)
 

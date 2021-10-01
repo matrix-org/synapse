@@ -23,7 +23,8 @@ from prometheus_client import Counter, Gauge
 
 from synapse.api.errors import HttpResponseException, SynapseError
 from synapse.http import RequestTimedOutError
-from synapse.logging.opentracing import inject_active_span_byte_dict, trace
+from synapse.logging import opentracing
+from synapse.logging.opentracing import trace
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
 
@@ -84,17 +85,17 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             is received.
     """
 
-    NAME = abc.abstractproperty()  # type: str  # type: ignore
-    PATH_ARGS = abc.abstractproperty()  # type: Tuple[str, ...]  # type: ignore
+    NAME: str = abc.abstractproperty()  # type: ignore
+    PATH_ARGS: Tuple[str, ...] = abc.abstractproperty()  # type: ignore
     METHOD = "POST"
     CACHE = True
     RETRY_ON_TIMEOUT = True
 
     def __init__(self, hs: "HomeServer"):
         if self.CACHE:
-            self.response_cache = ResponseCache(
+            self.response_cache: ResponseCache[str] = ResponseCache(
                 hs.get_clock(), "repl." + self.NAME, timeout_ms=30 * 60 * 1000
-            )  # type: ResponseCache[str]
+            )
 
         # We reserve `instance_name` as a parameter to sending requests, so we
         # assert here that sub classes don't try and use the name.
@@ -167,8 +168,8 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         client = hs.get_simple_http_client()
         local_instance_name = hs.get_instance_name()
 
-        master_host = hs.config.worker_replication_host
-        master_port = hs.config.worker_replication_http_port
+        master_host = hs.config.worker.worker_replication_host
+        master_port = hs.config.worker.worker_replication_http_port
 
         instance_map = hs.config.worker.instance_map
 
@@ -231,11 +232,11 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                 # have a good idea that the request has either succeeded or failed on
                 # the master, and so whether we should clean up or not.
                 while True:
-                    headers = {}  # type: Dict[bytes, List[bytes]]
+                    headers: Dict[bytes, List[bytes]] = {}
                     # Add an authorization header, if configured.
                     if replication_secret:
                         headers[b"Authorization"] = [b"Bearer " + replication_secret]
-                    inject_active_span_byte_dict(headers, None, check_destination=False)
+                    opentracing.inject_header_dict(headers, check_destination=False)
                     try:
                         result = await request_func(uri, data, headers=headers)
                         break
@@ -284,7 +285,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             self.__class__.__name__,
         )
 
-    def _check_auth_and_handle(self, request, **kwargs):
+    async def _check_auth_and_handle(self, request, **kwargs):
         """Called on new incoming requests when caching is enabled. Checks
         if there is a cached response for the request and returns that,
         otherwise calls `_handle_request` and caches its response.
@@ -299,8 +300,8 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         if self.CACHE:
             txn_id = kwargs.pop("txn_id")
 
-            return self.response_cache.wrap(
+            return await self.response_cache.wrap(
                 txn_id, self._handle_request, request, **kwargs
             )
 
-        return self._handle_request(request, **kwargs)
+        return await self._handle_request(request, **kwargs)

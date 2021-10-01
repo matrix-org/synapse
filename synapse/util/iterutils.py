@@ -21,13 +21,28 @@ from typing import (
     Iterable,
     Iterator,
     Mapping,
-    Sequence,
     Set,
+    Sized,
     Tuple,
     TypeVar,
 )
 
+from typing_extensions import Protocol
+
 T = TypeVar("T")
+S = TypeVar("S", bound="_SelfSlice")
+
+
+class _SelfSlice(Sized, Protocol):
+    """A helper protocol that matches types where taking a slice results in the
+    same type being returned.
+
+    This is more specific than `Sequence`, which allows another `Sequence` to be
+    returned.
+    """
+
+    def __getitem__(self: S, i: slice) -> S:
+        ...
 
 
 def batch_iter(iterable: Iterable[T], size: int) -> Iterator[Tuple[T, ...]]:
@@ -46,7 +61,7 @@ def batch_iter(iterable: Iterable[T], size: int) -> Iterator[Tuple[T, ...]]:
     return iter(lambda: tuple(islice(sourceiter, size)), ())
 
 
-def chunk_seq(iseq: Sequence[T], maxlen: int) -> Iterable[Sequence[T]]:
+def chunk_seq(iseq: S, maxlen: int) -> Iterator[S]:
     """Split the given sequence into chunks of the given size
 
     The last chunk may be shorter than the given size.
@@ -68,7 +83,7 @@ def sorted_topologically(
     # This is implemented by Kahn's algorithm.
 
     degree_map = {node: 0 for node in nodes}
-    reverse_graph = {}  # type: Dict[T, Set[T]]
+    reverse_graph: Dict[T, Set[T]] = {}
 
     for node, edges in graph.items():
         if node not in degree_map:

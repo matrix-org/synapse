@@ -22,6 +22,7 @@ from synapse.api.errors import (
     CodeMessageException,
     Codes,
     NotFoundError,
+    RequestSendFailed,
     ShadowBanError,
     StoreError,
     SynapseError,
@@ -47,8 +48,8 @@ class DirectoryHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.store = hs.get_datastore()
         self.config = hs.config
-        self.enable_room_list_search = hs.config.enable_room_list_search
-        self.require_membership = hs.config.require_membership_for_aliases
+        self.enable_room_list_search = hs.config.roomdirectory.enable_room_list_search
+        self.require_membership = hs.config.server.require_membership_for_aliases
         self.third_party_event_rules = hs.get_third_party_event_rules()
 
         self.federation = hs.get_federation_client()
@@ -142,7 +143,7 @@ class DirectoryHandler(BaseHandler):
             ):
                 raise AuthError(403, "This user is not permitted to create this alias")
 
-            if not self.config.is_alias_creation_allowed(
+            if not self.config.roomdirectory.is_alias_creation_allowed(
                 user_id, room_id, room_alias_str
             ):
                 # Lets just return a generic message, as there may be all sorts of
@@ -236,9 +237,9 @@ class DirectoryHandler(BaseHandler):
     async def get_association(self, room_alias: RoomAlias) -> JsonDict:
         room_id = None
         if self.hs.is_mine(room_alias):
-            result = await self.get_association_from_room_alias(
-                room_alias
-            )  # type: Optional[RoomAliasMapping]
+            result: Optional[
+                RoomAliasMapping
+            ] = await self.get_association_from_room_alias(room_alias)
 
             if result:
                 room_id = result.room_id
@@ -252,12 +253,14 @@ class DirectoryHandler(BaseHandler):
                     retry_on_dns_fail=False,
                     ignore_backoff=True,
                 )
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to fetch alias")
             except CodeMessageException as e:
                 logging.warning("Error retrieving alias")
                 if e.code == 404:
                     fed_result = None
                 else:
-                    raise
+                    raise SynapseError(502, "Failed to fetch alias")
 
             if fed_result and "room_id" in fed_result and "servers" in fed_result:
                 room_id = fed_result["room_id"]
@@ -456,7 +459,7 @@ class DirectoryHandler(BaseHandler):
             if canonical_alias:
                 room_aliases.append(canonical_alias)
 
-            if not self.config.is_publishing_room_allowed(
+            if not self.config.roomdirectory.is_publishing_room_allowed(
                 user_id, room_id, room_aliases
             ):
                 # Lets just return a generic message, as there may be all sorts of

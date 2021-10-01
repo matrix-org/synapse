@@ -63,7 +63,7 @@ class ProfileHandler(BaseHandler):
 
         self.user_directory_handler = hs.get_user_directory_handler()
 
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             self.clock.looping_call(
                 self._update_remote_profile_cache, self.PROFILE_UPDATE_MS
             )
@@ -197,7 +197,7 @@ class ProfileHandler(BaseHandler):
                 400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN,)
             )
 
-        displayname_to_set = new_displayname  # type: Optional[str]
+        displayname_to_set: Optional[str] = new_displayname
         if new_displayname == "":
             displayname_to_set = None
 
@@ -214,11 +214,10 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, displayname_to_set
         )
 
-        if self.hs.config.user_directory_search_all_users:
-            profile = await self.store.get_profileinfo(target_user.localpart)
-            await self.user_directory_handler.handle_local_profile_change(
-                target_user.to_string(), profile
-            )
+        profile = await self.store.get_profileinfo(target_user.localpart)
+        await self.user_directory_handler.handle_local_profile_change(
+            target_user.to_string(), profile
+        )
 
         await self._update_join_states(requester, target_user)
 
@@ -254,7 +253,7 @@ class ProfileHandler(BaseHandler):
         requester: Requester,
         new_avatar_url: str,
         by_admin: bool = False,
-    ):
+    ) -> None:
         """Set a new avatar URL for a user.
 
         Args:
@@ -286,7 +285,7 @@ class ProfileHandler(BaseHandler):
                 400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
 
-        avatar_url_to_set = new_avatar_url  # type: Optional[str]
+        avatar_url_to_set: Optional[str] = new_avatar_url
         if new_avatar_url == "":
             avatar_url_to_set = None
 
@@ -300,18 +299,17 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, avatar_url_to_set
         )
 
-        if self.hs.config.user_directory_search_all_users:
-            profile = await self.store.get_profileinfo(target_user.localpart)
-            await self.user_directory_handler.handle_local_profile_change(
-                target_user.to_string(), profile
-            )
+        profile = await self.store.get_profileinfo(target_user.localpart)
+        await self.user_directory_handler.handle_local_profile_change(
+            target_user.to_string(), profile
+        )
 
         await self._update_join_states(requester, target_user)
 
     async def on_profile_query(self, args: JsonDict) -> JsonDict:
         """Handles federation profile query requests."""
 
-        if not self.hs.config.allow_profile_lookup_over_federation:
+        if not self.hs.config.federation.allow_profile_lookup_over_federation:
             raise SynapseError(
                 403,
                 "Profile lookup over federation is disabled on this homeserver",
@@ -399,7 +397,7 @@ class ProfileHandler(BaseHandler):
         # when building a membership event. In this case, we must allow the
         # lookup.
         if (
-            not self.hs.config.limit_profile_requests_to_users_who_share_rooms
+            not self.hs.config.server.limit_profile_requests_to_users_who_share_rooms
             or not requester
         ):
             return
@@ -425,7 +423,7 @@ class ProfileHandler(BaseHandler):
             raise
 
     @wrap_as_background_process("Update remote profile")
-    async def _update_remote_profile_cache(self):
+    async def _update_remote_profile_cache(self) -> None:
         """Called periodically to check profiles of remote users we haven't
         checked in a while.
         """

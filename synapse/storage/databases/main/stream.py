@@ -39,6 +39,8 @@ import logging
 from collections import namedtuple
 from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Set, Tuple
 
+from frozendict import frozendict
+
 from twisted.internet import defer
 
 from synapse.api.filtering import Filter
@@ -379,7 +381,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
                 if p > min_pos
             }
 
-        return RoomStreamToken(None, min_pos, positions)
+        return RoomStreamToken(None, min_pos, frozendict(positions))
 
     async def get_room_events_stream_for_rooms(
         self,
@@ -622,7 +624,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
 
         self._set_before_and_after(events, rows)
 
-        return (events, token)
+        return events, token
 
     async def get_recent_event_ids_for_room(
         self, room_id: str, limit: int, end_token: RoomStreamToken
@@ -1085,9 +1087,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
         # stream token (as returned by `RoomStreamToken.get_max_stream_pos`) and
         # then filtering the results.
         if from_token.topological is not None:
-            from_bound = (
-                from_token.as_historical_tuple()
-            )  # type: Tuple[Optional[int], int]
+            from_bound: Tuple[Optional[int], int] = from_token.as_historical_tuple()
         elif direction == "b":
             from_bound = (
                 None,
@@ -1099,7 +1099,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
                 from_token.stream,
             )
 
-        to_bound = None  # type: Optional[Tuple[Optional[int], int]]
+        to_bound: Optional[Tuple[Optional[int], int]] = None
         if to_token:
             if to_token.topological is not None:
                 to_bound = to_token.as_historical_tuple()
@@ -1242,7 +1242,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
 
         self._set_before_and_after(events, rows)
 
-        return (events, token)
+        return events, token
 
     @cached()
     async def get_id_for_instance(self, instance_name: str) -> int:

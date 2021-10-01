@@ -4,7 +4,7 @@ This document explains how to enable VoIP relaying on your Home Server with
 TURN.
 
 The synapse Matrix Home Server supports integration with TURN server via the
-[TURN server REST API](<http://tools.ietf.org/html/draft-uberti-behave-turn-rest-00>). This
+[TURN server REST API](<https://tools.ietf.org/html/draft-uberti-behave-turn-rest-00>). This
 allows the Home Server to generate credentials that are valid for use on the
 TURN server through the use of a secret shared between the Home Server and the
 TURN server.

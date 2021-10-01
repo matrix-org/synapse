@@ -28,6 +28,7 @@ from canonicaljson import json
 from twisted.internet.defer import Deferred, ensureDeferred, succeed
 from twisted.python.failure import Failure
 from twisted.python.threadpool import ThreadPool
+from twisted.test.proto_helpers import MemoryReactor
 from twisted.trial import unittest
 from twisted.web.resource import Resource
 
@@ -46,6 +47,7 @@ from synapse.logging.context import (
 )
 from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
+from synapse.util import Clock
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.ratelimitutils import FederationRateLimiter
 
@@ -140,7 +142,7 @@ class TestCase(unittest.TestCase):
             try:
                 self.assertEquals(attrs[key], getattr(obj, key))
             except AssertionError as e:
-                raise (type(e))("Assert error for '.{}':".format(key)) from e
+                raise (type(e))(f"Assert error for '.{key}':") from e
 
     def assert_dict(self, required, actual):
         """Does a partial assert of a dict.
@@ -232,7 +234,7 @@ class HomeserverTestCase(TestCase):
         # Honour the `use_frozen_dicts` config option. We have to do this
         # manually because this is taken care of in the app `start` code, which
         # we don't run. Plus we want to reset it on tearDown.
-        events.USE_FROZEN_DICTS = self.hs.config.use_frozen_dicts
+        events.USE_FROZEN_DICTS = self.hs.config.server.use_frozen_dicts
 
         if self.hs is None:
             raise Exception("No homeserver returned from make_homeserver.")
@@ -252,7 +254,7 @@ class HomeserverTestCase(TestCase):
             reactor=self.reactor,
         )
 
-        from tests.rest.client.v1.utils import RestHelper
+        from tests.rest.client.utils import RestHelper
 
         self.helper = RestHelper(self.hs, self.site, getattr(self, "user_id", None))
 
@@ -371,7 +373,7 @@ class HomeserverTestCase(TestCase):
 
         return config
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer):
         """
         Prepare for the test.  This involves things like mocking out parts of
         the homeserver, or building test data common across the whole test
@@ -520,7 +522,7 @@ class HomeserverTestCase(TestCase):
         if not isinstance(deferred, Deferred):
             return d
 
-        results = []  # type: list
+        results: list = []
         deferred.addBoth(results.append)
 
         self.pump(by=by)
@@ -594,7 +596,15 @@ class HomeserverTestCase(TestCase):
         user_id = channel.json_body["user_id"]
         return user_id
 
-    def login(self, username, password, device_id=None):
+    def login(
+        self,
+        username,
+        password,
+        device_id=None,
+        custom_headers: Optional[
+            Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
+        ] = None,
+    ):
         """
         Log in a user, and get an access token. Requires the Login API be
         registered.
@@ -605,7 +615,10 @@ class HomeserverTestCase(TestCase):
             body["device_id"] = device_id
 
         channel = self.make_request(
-            "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
+            "POST",
+            "/_matrix/client/r0/login",
+            json.dumps(body).encode("utf8"),
+            custom_headers=custom_headers,
         )
         self.assertEqual(channel.code, 200, channel.result)
 
@@ -723,9 +736,9 @@ class TestTransportLayerServer(JsonResource):
             FederationRateLimitConfig(
                 window_size=1,
                 sleep_limit=1,
-                sleep_msec=1,
+                sleep_delay=1,
                 reject_limit=1000,
-                concurrent_requests=1000,
+                concurrent=1000,
             ),
         )
 
