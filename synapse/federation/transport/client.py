@@ -683,13 +683,15 @@ class TransportLayerClient:
         """
         path = _create_v1_path("/groups/%s/profile", group_id)
 
-        return self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             data=content,
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def get_group_summary(
@@ -829,15 +831,17 @@ class TransportLayerClient:
         return resp
 
     @log_function
-    def join_group(
+    async def join_group(
         self, destination: str, group_id: str, user_id: str, content: JsonDict
     ) -> JsonDict:
         """Attempts to join a group"""
         path = _create_v1_path("/groups/%s/users/%s/join", group_id, user_id)
 
-        return self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def invite_to_group(
