@@ -22,7 +22,6 @@ import secrets
 import time
 from typing import Callable, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union
 from unittest.mock import Mock, patch
-from urllib.parse import quote
 
 from canonicaljson import json
 
@@ -616,11 +615,12 @@ class HomeserverTestCase(TestCase):
         """
         channel = self.make_request(
             "POST",
-            f"/_matrix/client/r0/register?access_token={urlencoded_token}",
+            "/_matrix/client/r0/register",
             {
                 "username": username,
                 "type": "m.login.application_service",
             },
+            access_token=appservice_token,
         )
         return channel.json_body["user_id"]
 
