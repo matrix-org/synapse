@@ -28,6 +28,7 @@ from canonicaljson import json
 from twisted.internet.defer import Deferred, ensureDeferred, succeed
 from twisted.python.failure import Failure
 from twisted.python.threadpool import ThreadPool
+from twisted.test.proto_helpers import MemoryReactor
 from twisted.trial import unittest
 from twisted.web.resource import Resource
 
@@ -46,6 +47,7 @@ from synapse.logging.context import (
 )
 from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
+from synapse.util import Clock
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.ratelimitutils import FederationRateLimiter
 
@@ -232,7 +234,7 @@ class HomeserverTestCase(TestCase):
         # Honour the `use_frozen_dicts` config option. We have to do this
         # manually because this is taken care of in the app `start` code, which
         # we don't run. Plus we want to reset it on tearDown.
-        events.USE_FROZEN_DICTS = self.hs.config.use_frozen_dicts
+        events.USE_FROZEN_DICTS = self.hs.config.server.use_frozen_dicts
 
         if self.hs is None:
             raise Exception("No homeserver returned from make_homeserver.")
@@ -371,7 +373,7 @@ class HomeserverTestCase(TestCase):
 
         return config
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer):
         """
         Prepare for the test.  This involves things like mocking out parts of
         the homeserver, or building test data common across the whole test

@@ -327,23 +327,23 @@ class MatrixFederationHttpClient:
         self.reactor = hs.get_reactor()
 
         user_agent = hs.version_string
-        if hs.config.user_agent_suffix:
-            user_agent = "%s %s" % (user_agent, hs.config.user_agent_suffix)
+        if hs.config.server.user_agent_suffix:
+            user_agent = "%s %s" % (user_agent, hs.config.server.user_agent_suffix)
         user_agent = user_agent.encode("ascii")
 
         federation_agent = MatrixFederationAgent(
             self.reactor,
             tls_client_options_factory,
             user_agent,
-            hs.config.federation_ip_range_whitelist,
-            hs.config.federation_ip_range_blacklist,
+            hs.config.server.federation_ip_range_whitelist,
+            hs.config.server.federation_ip_range_blacklist,
         )
 
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
         # blacklist via IP literals in server names
         self.agent = BlacklistingAgentWrapper(
             federation_agent,
-            ip_blacklist=hs.config.federation_ip_range_blacklist,
+            ip_blacklist=hs.config.server.federation_ip_range_blacklist,
         )
 
         self.clock = hs.get_clock()

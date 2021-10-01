@@ -51,7 +51,7 @@ class SearchWorkerStore(SQLBaseStore):
             txn:
             entries: entries to be added to the table
         """
-        if not self.hs.config.enable_search:
+        if not self.hs.config.server.enable_search:
             return
         if isinstance(self.database_engine, PostgresEngine):
             sql = (
@@ -105,7 +105,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
-        if not hs.config.enable_search:
+        if not hs.config.server.enable_search:
             return
 
         self.db_pool.updates.register_background_update_handler(

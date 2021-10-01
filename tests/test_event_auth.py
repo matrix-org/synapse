@@ -16,6 +16,7 @@ import unittest
 from typing import Optional
 
 from synapse import event_auth
+from synapse.api.constants import EventContentFields
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, make_event_from_dict
@@ -37,21 +38,19 @@ class EventAuthTestCase(unittest.TestCase):
         }
 
         # creator should be able to send state
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V1,
             _random_state_event(creator),
             auth_events,
-            do_sig_check=False,
         )
 
         # joiner should not be able to send state
         self.assertRaises(
             AuthError,
-            event_auth.check,
+            event_auth.check_auth_rules_for_event,
             RoomVersions.V1,
             _random_state_event(joiner),
             auth_events,
-            do_sig_check=False,
         )
 
     def test_state_default_level(self):
@@ -76,19 +75,17 @@ class EventAuthTestCase(unittest.TestCase):
         # pleb should not be able to send state
         self.assertRaises(
             AuthError,
-            event_auth.check,
+            event_auth.check_auth_rules_for_event,
             RoomVersions.V1,
             _random_state_event(pleb),
             auth_events,
-            do_sig_check=False,
         ),
 
         # king should be able to send state
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V1,
             _random_state_event(king),
             auth_events,
-            do_sig_check=False,
         )
 
     def test_alias_event(self):
@@ -101,37 +98,33 @@ class EventAuthTestCase(unittest.TestCase):
         }
 
         # creator should be able to send aliases
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V1,
             _alias_event(creator),
             auth_events,
-            do_sig_check=False,
         )
 
         # Reject an event with no state key.
         with self.assertRaises(AuthError):
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V1,
                 _alias_event(creator, state_key=""),
                 auth_events,
-                do_sig_check=False,
             )
 
         # If the domain of the sender does not match the state key, reject.
         with self.assertRaises(AuthError):
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V1,
                 _alias_event(creator, state_key="test.com"),
                 auth_events,
-                do_sig_check=False,
             )
 
         # Note that the member does *not* need to be in the room.
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V1,
             _alias_event(other),
             auth_events,
-            do_sig_check=False,
         )
 
     def test_msc2432_alias_event(self):
@@ -144,34 +137,30 @@ class EventAuthTestCase(unittest.TestCase):
         }
 
         # creator should be able to send aliases
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V6,
             _alias_event(creator),
             auth_events,
-            do_sig_check=False,
         )
 
         # No particular checks are done on the state key.
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V6,
             _alias_event(creator, state_key=""),
             auth_events,
-            do_sig_check=False,
         )
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V6,
             _alias_event(creator, state_key="test.com"),
             auth_events,
-            do_sig_check=False,
         )
 
         # Per standard auth rules, the member must be in the room.
         with self.assertRaises(AuthError):
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _alias_event(other),
                 auth_events,
-                do_sig_check=False,
             )
 
     def test_msc2209(self):
@@ -191,20 +180,18 @@ class EventAuthTestCase(unittest.TestCase):
         }
 
         # pleb should be able to modify the notifications power level.
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V1,
             _power_levels_event(pleb, {"notifications": {"room": 100}}),
             auth_events,
-            do_sig_check=False,
         )
 
         # But an MSC2209 room rejects this change.
         with self.assertRaises(AuthError):
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _power_levels_event(pleb, {"notifications": {"room": 100}}),
                 auth_events,
-                do_sig_check=False,
             )
 
     def test_join_rules_public(self):
@@ -221,59 +208,53 @@ class EventAuthTestCase(unittest.TestCase):
         }
 
         # Check join.
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V6,
             _join_event(pleb),
             auth_events,
-            do_sig_check=False,
         )
 
         # A user cannot be force-joined to a room.
         with self.assertRaises(AuthError):
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _member_event(pleb, "join", sender=creator),
                 auth_events,
-                do_sig_check=False,
             )
 
         # Banned should be rejected.
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "ban")
         with self.assertRaises(AuthError):
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _join_event(pleb),
                 auth_events,
-                do_sig_check=False,
             )
 
         # A user who left can re-join.
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "leave")
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V6,
             _join_event(pleb),
             auth_events,
-            do_sig_check=False,
         )
 
         # A user can send a join if they're in the room.
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "join")
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V6,
             _join_event(pleb),
             auth_events,
-            do_sig_check=False,
         )
 
         # A user can accept an invite.
         auth_events[("m.room.member", pleb)] = _member_event(
             pleb, "invite", sender=creator
         )
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V6,
             _join_event(pleb),
             auth_events,
-            do_sig_check=False,
         )
 
     def test_join_rules_invite(self):
@@ -291,60 +272,54 @@ class EventAuthTestCase(unittest.TestCase):
 
         # A join without an invite is rejected.
         with self.assertRaises(AuthError):
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _join_event(pleb),
                 auth_events,
-                do_sig_check=False,
             )
 
         # A user cannot be force-joined to a room.
         with self.assertRaises(AuthError):
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _member_event(pleb, "join", sender=creator),
                 auth_events,
-                do_sig_check=False,
             )
 
         # Banned should be rejected.
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "ban")
         with self.assertRaises(AuthError):
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _join_event(pleb),
                 auth_events,
-                do_sig_check=False,
             )
 
         # A user who left cannot re-join.
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "leave")
         with self.assertRaises(AuthError):
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _join_event(pleb),
                 auth_events,
-                do_sig_check=False,
             )
 
         # A user can send a join if they're in the room.
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "join")
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V6,
             _join_event(pleb),
             auth_events,
-            do_sig_check=False,
         )
 
         # A user can accept an invite.
         auth_events[("m.room.member", pleb)] = _member_event(
             pleb, "invite", sender=creator
         )
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V6,
             _join_event(pleb),
             auth_events,
-            do_sig_check=False,
         )
 
     def test_join_rules_msc3083_restricted(self):
@@ -369,25 +344,23 @@ class EventAuthTestCase(unittest.TestCase):
 
         # Older room versions don't understand this join rule
         with self.assertRaises(AuthError):
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _join_event(pleb),
                 auth_events,
-                do_sig_check=False,
             )
 
         # A properly formatted join event should work.
         authorised_join_event = _join_event(
             pleb,
             additional_content={
-                "join_authorised_via_users_server": "@creator:example.com"
+                EventContentFields.AUTHORISING_USER: "@creator:example.com"
             },
         )
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V8,
             authorised_join_event,
             auth_events,
-            do_sig_check=False,
         )
 
         # A join issued by a specific user works (i.e. the power level checks
@@ -399,25 +372,23 @@ class EventAuthTestCase(unittest.TestCase):
         pl_auth_events[("m.room.member", "@inviter:foo.test")] = _join_event(
             "@inviter:foo.test"
         )
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V8,
             _join_event(
                 pleb,
                 additional_content={
-                    "join_authorised_via_users_server": "@inviter:foo.test"
+                    EventContentFields.AUTHORISING_USER: "@inviter:foo.test"
                 },
             ),
             pl_auth_events,
-            do_sig_check=False,
         )
 
         # A join which is missing an authorised server is rejected.
         with self.assertRaises(AuthError):
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V8,
                 _join_event(pleb),
                 auth_events,
-                do_sig_check=False,
             )
 
         # An join authorised by a user who is not in the room is rejected.
@@ -426,62 +397,57 @@ class EventAuthTestCase(unittest.TestCase):
             creator, {"invite": 100, "users": {"@other:example.com": 150}}
         )
         with self.assertRaises(AuthError):
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V8,
                 _join_event(
                     pleb,
                     additional_content={
-                        "join_authorised_via_users_server": "@other:example.com"
+                        EventContentFields.AUTHORISING_USER: "@other:example.com"
                     },
                 ),
                 auth_events,
-                do_sig_check=False,
             )
 
         # A user cannot be force-joined to a room. (This uses an event which
         # *would* be valid, but is sent be a different user.)
         with self.assertRaises(AuthError):
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V8,
                 _member_event(
                     pleb,
                     "join",
                     sender=creator,
                     additional_content={
-                        "join_authorised_via_users_server": "@inviter:foo.test"
+                        EventContentFields.AUTHORISING_USER: "@inviter:foo.test"
                     },
                 ),
                 auth_events,
-                do_sig_check=False,
             )
 
         # Banned should be rejected.
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "ban")
         with self.assertRaises(AuthError):
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V8,
                 authorised_join_event,
                 auth_events,
-                do_sig_check=False,
             )
 
         # A user who left can re-join.
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "leave")
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V8,
             authorised_join_event,
             auth_events,
-            do_sig_check=False,
         )
 
         # A user can send a join if they're in the room. (This doesn't need to
         # be authorised since the user is already joined.)
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "join")
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V8,
             _join_event(pleb),
             auth_events,
-            do_sig_check=False,
         )
 
         # A user can accept an invite. (This doesn't need to be authorised since
@@ -489,11 +455,10 @@ class EventAuthTestCase(unittest.TestCase):
         auth_events[("m.room.member", pleb)] = _member_event(
             pleb, "invite", sender=creator
         )
-        event_auth.check(
+        event_auth.check_auth_rules_for_event(
             RoomVersions.V8,
             _join_event(pleb),
             auth_events,
-            do_sig_check=False,
         )
 
 

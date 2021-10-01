@@ -1,1 +1,0 @@
-Fix a long-standing bug which caused deactivated users that were later reactivated to be missing from the user directory.

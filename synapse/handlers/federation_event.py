@@ -29,7 +29,6 @@ from typing import (
 
 from prometheus_client import Counter
 
-from synapse import event_auth
 from synapse.api.constants import (
     EventContentFields,
     EventTypes,
@@ -47,7 +46,11 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.event_auth import auth_types_for_event
+from synapse.event_auth import (
+    auth_types_for_event,
+    check_auth_rules_for_event,
+    validate_event_for_room_version,
+)
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_client import InvalidResponseError
@@ -1207,7 +1210,8 @@ class FederationEventHandler:
 
                 context = EventContext.for_outlier()
                 try:
-                    event_auth.check(room_version_obj, event, auth_events=auth)
+                    validate_event_for_room_version(room_version_obj, event)
+                    check_auth_rules_for_event(room_version_obj, event, auth)
                 except AuthError as e:
                     logger.warning("Rejecting %r because %s", event, e)
                     context.rejected = RejectedReason.AUTH_ERROR
@@ -1282,7 +1286,8 @@ class FederationEventHandler:
             auth_events_for_auth = calculated_auth_event_map
 
         try:
-            event_auth.check(room_version_obj, event, auth_events=auth_events_for_auth)
+            validate_event_for_room_version(room_version_obj, event)
+            check_auth_rules_for_event(room_version_obj, event, auth_events_for_auth)
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR
@@ -1394,7 +1399,10 @@ class FederationEventHandler:
         }
 
         try:
-            event_auth.check(room_version_obj, event, auth_events=current_auth_events)
+            # TODO: skip the call to validate_event_for_room_version? we should already
+            #    have validated the event.
+            validate_event_for_room_version(room_version_obj, event)
+            check_auth_rules_for_event(room_version_obj, event, current_auth_events)
         except AuthError as e:
             logger.warning(
                 "Soft-failing %r (from %s) because %s",

@@ -16,7 +16,12 @@ from unittest.mock import Mock
 
 from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
-from synapse.api.errors import Codes, ResourceLimitError, SynapseError
+from synapse.api.errors import (
+    CodeMessageException,
+    Codes,
+    ResourceLimitError,
+    SynapseError,
+)
 from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
@@ -120,14 +125,24 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         hs_config = self.default_config()
 
         # some of the tests rely on us having a user consent version
-        hs_config["user_consent"] = {
-            "version": "test_consent_version",
-            "template_dir": ".",
-        }
+        hs_config.setdefault("user_consent", {}).update(
+            {
+                "version": "test_consent_version",
+                "template_dir": ".",
+            }
+        )
         hs_config["max_mau_value"] = 50
         hs_config["limit_usage_by_mau"] = True
 
-        hs = self.setup_test_homeserver(config=hs_config)
+        # Don't attempt to reach out over federation.
+        self.mock_federation_client = Mock()
+        self.mock_federation_client.make_query.side_effect = CodeMessageException(
+            500, ""
+        )
+
+        hs = self.setup_test_homeserver(
+            config=hs_config, federation_client=self.mock_federation_client
+        )
 
         load_legacy_spam_checkers(hs)
 
@@ -138,9 +153,6 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor, clock, hs):
-        self.mock_distributor = Mock()
-        self.mock_distributor.declare("registered_user")
-        self.mock_captcha_client = Mock()
         self.handler = self.hs.get_registration_handler()
         self.store = self.hs.get_datastore()
         self.lots_of_users = 100
@@ -174,21 +186,21 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.assertEquals(result_user_id, user_id)
         self.assertTrue(result_token is not None)
 
+    @override_config({"limit_usage_by_mau": False})
     def test_mau_limits_when_disabled(self):
-        self.hs.config.limit_usage_by_mau = False
         # Ensure does not throw exception
         self.get_success(self.get_or_create_user(self.requester, "a", "display_name"))
 
+    @override_config({"limit_usage_by_mau": True})
     def test_get_or_create_user_mau_not_blocked(self):
-        self.hs.config.limit_usage_by_mau = True
         self.store.count_monthly_users = Mock(
-            return_value=make_awaitable(self.hs.config.max_mau_value - 1)
+            return_value=make_awaitable(self.hs.config.server.max_mau_value - 1)
         )
         # Ensure does not throw exception
         self.get_success(self.get_or_create_user(self.requester, "c", "User"))
 
+    @override_config({"limit_usage_by_mau": True})
     def test_get_or_create_user_mau_blocked(self):
-        self.hs.config.limit_usage_by_mau = True
         self.store.get_monthly_active_count = Mock(
             return_value=make_awaitable(self.lots_of_users)
         )
@@ -198,15 +210,15 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         )
 
         self.store.get_monthly_active_count = Mock(
-            return_value=make_awaitable(self.hs.config.max_mau_value)
+            return_value=make_awaitable(self.hs.config.server.max_mau_value)
         )
         self.get_failure(
             self.get_or_create_user(self.requester, "b", "display_name"),
             ResourceLimitError,
         )
 
+    @override_config({"limit_usage_by_mau": True})
     def test_register_mau_blocked(self):
-        self.hs.config.limit_usage_by_mau = True
         self.store.get_monthly_active_count = Mock(
             return_value=make_awaitable(self.lots_of_users)
         )
@@ -215,16 +227,16 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         )
 
         self.store.get_monthly_active_count = Mock(
-            return_value=make_awaitable(self.hs.config.max_mau_value)
+            return_value=make_awaitable(self.hs.config.server.max_mau_value)
         )
         self.get_failure(
             self.handler.register_user(localpart="local_part"), ResourceLimitError
         )
 
+    @override_config(
+        {"auto_join_rooms": ["#room:test"], "auto_join_rooms_for_guests": False}
+    )
     def test_auto_join_rooms_for_guests(self):
-        room_alias_str = "#room:test"
-        self.hs.config.auto_join_rooms = [room_alias_str]
-        self.hs.config.auto_join_rooms_for_guests = False
         user_id = self.get_success(
             self.handler.register_user(localpart="jeff", make_guest=True),
         )
@@ -243,34 +255,33 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.assertTrue(room_id["room_id"] in rooms)
         self.assertEqual(len(rooms), 1)
 
+    @override_config({"auto_join_rooms": []})
     def test_auto_create_auto_join_rooms_with_no_rooms(self):
-        self.hs.config.auto_join_rooms = []
         frank = UserID.from_string("@frank:test")
         user_id = self.get_success(self.handler.register_user(frank.localpart))
         self.assertEqual(user_id, frank.to_string())
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
 
+    @override_config({"auto_join_rooms": ["#room:another"]})
     def test_auto_create_auto_join_where_room_is_another_domain(self):
-        self.hs.config.auto_join_rooms = ["#room:another"]
         frank = UserID.from_string("@frank:test")
         user_id = self.get_success(self.handler.register_user(frank.localpart))
         self.assertEqual(user_id, frank.to_string())
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
 
+    @override_config(
+        {"auto_join_rooms": ["#room:test"], "autocreate_auto_join_rooms": False}
+    )
     def test_auto_create_auto_join_where_auto_create_is_false(self):
-        self.hs.config.autocreate_auto_join_rooms = False
-        room_alias_str = "#room:test"
-        self.hs.config.auto_join_rooms = [room_alias_str]
         user_id = self.get_success(self.handler.register_user(localpart="jeff"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
 
+    @override_config({"auto_join_rooms": ["#room:test"]})
     def test_auto_create_auto_join_rooms_when_user_is_not_a_real_user(self):
         room_alias_str = "#room:test"
-        self.hs.config.auto_join_rooms = [room_alias_str]
-
         self.store.is_real_user = Mock(return_value=make_awaitable(False))
         user_id = self.get_success(self.handler.register_user(localpart="support"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
@@ -294,10 +305,8 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.assertTrue(room_id["room_id"] in rooms)
         self.assertEqual(len(rooms), 1)
 
+    @override_config({"auto_join_rooms": ["#room:test"]})
     def test_auto_create_auto_join_rooms_when_user_is_not_the_first_real_user(self):
-        room_alias_str = "#room:test"
-        self.hs.config.auto_join_rooms = [room_alias_str]
-
         self.store.count_real_users = Mock(return_value=make_awaitable(2))
         self.store.is_real_user = Mock(return_value=make_awaitable(True))
         user_id = self.get_success(self.handler.register_user(localpart="real"))
@@ -510,6 +519,17 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(rooms, set())
         self.assertEqual(invited_rooms, [])
 
+    @override_config(
+        {
+            "user_consent": {
+                "block_events_error": "Error",
+                "require_at_registration": True,
+            },
+            "form_secret": "53cr3t",
+            "public_baseurl": "http://test",
+            "auto_join_rooms": ["#room:test"],
+        },
+    )
     def test_auto_create_auto_join_where_no_consent(self):
         """Test to ensure that the first user is not auto-joined to a room if
         they have not given general consent.
@@ -521,24 +541,19 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         #    * The server is configured to auto-join to a room
         # (and autocreate if necessary)
 
-        event_creation_handler = self.hs.get_event_creation_handler()
-        # (Messing with the internals of event_creation_handler is fragile
-        # but can't see a better way to do this. One option could be to subclass
-        # the test with custom config.)
-        event_creation_handler._block_events_without_consent_error = "Error"
-        event_creation_handler._consent_uri_builder = Mock()
-        room_alias_str = "#room:test"
-        self.hs.config.auto_join_rooms = [room_alias_str]
-
         # When:-
-        #   * the user is registered and post consent actions are called
+        #   * the user is registered
         user_id = self.get_success(self.handler.register_user(localpart="jeff"))
-        self.get_success(self.handler.post_consent_actions(user_id))
 
         # Then:-
         #   * Ensure that they have not been joined to the room
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
+
+        # The user provides consent; ensure they are now in the rooms.
+        self.get_success(self.handler.post_consent_actions(user_id))
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertEqual(len(rooms), 1)
 
     def test_register_support_user(self):
         user_id = self.get_success(

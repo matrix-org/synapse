@@ -119,7 +119,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         )
 
         if existing_user_id is None:
-            if self.config.request_token_inhibit_3pid_errors:
+            if self.config.server.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
@@ -403,7 +403,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         existing_user_id = await self.store.get_user_id_by_threepid("email", email)
 
         if existing_user_id is not None:
-            if self.config.request_token_inhibit_3pid_errors:
+            if self.config.server.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
@@ -486,7 +486,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         existing_user_id = await self.store.get_user_id_by_threepid("msisdn", msisdn)
 
         if existing_user_id is not None:
-            if self.hs.config.request_token_inhibit_3pid_errors:
+            if self.hs.config.server.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
@@ -857,8 +857,8 @@ def assert_valid_next_link(hs: "HomeServer", next_link: str) -> None:
     # If the domain whitelist is set, the domain must be in it
     if (
         valid
-        and hs.config.next_link_domain_whitelist is not None
-        and next_link_parsed.hostname not in hs.config.next_link_domain_whitelist
+        and hs.config.server.next_link_domain_whitelist is not None
+        and next_link_parsed.hostname not in hs.config.server.next_link_domain_whitelist
     ):
         valid = False
 
@@ -878,9 +878,13 @@ class WhoamiRestServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
-        response = {"user_id": requester.user.to_string()}
+        response = {
+            "user_id": requester.user.to_string(),
+            # MSC: https://github.com/matrix-org/matrix-doc/pull/3069
+            "org.matrix.msc3069.is_guest": bool(requester.is_guest),
+        }
 
         # Appservices and similar accounts do not have device IDs
         # that we can report on, so exclude them for compliance.
