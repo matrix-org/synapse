@@ -15,7 +15,7 @@
 
 import logging
 import urllib
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import attr
 import ijson
@@ -30,7 +30,11 @@ from synapse.api.urls import (
 )
 from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.units import Transaction
-from synapse.http.matrixfederationclient import ByteParser, MatrixFederationHttpClient
+from synapse.http.matrixfederationclient import (
+    ByteParser,
+    MatrixFederationHttpClient,
+    QueryArgs,
+)
 from synapse.logging.utils import log_function
 from synapse.types import JsonDict
 
@@ -104,7 +108,7 @@ class TransportLayerClient:
 
     @log_function
     async def backfill(
-        self, destination: str, room_id: str, event_tuples: Iterable[str], limit: int
+        self, destination: str, room_id: str, event_tuples: List[str], limit: int
     ) -> Optional[JsonDict]:
         """Requests `limit` previous PDUs in a given context before list of
         PDUs.
@@ -132,7 +136,11 @@ class TransportLayerClient:
 
         path = _create_v1_path("/backfill/%s", room_id)
 
-        args = {"v": event_tuples, "limit": [str(limit)]}
+        # wide type annotation needed because Dict's value type parameter is invariant
+        args: Dict[str, Union[str, List[str]]] = {
+            "v": event_tuples,
+            "limit": [str(limit)],
+        }
 
         resp = await self.client.get_json(
             destination, path=path, args=args, try_trailing_slash_on_400=True
@@ -213,7 +221,7 @@ class TransportLayerClient:
         room_id: str,
         user_id: str,
         membership: str,
-        params: Optional[Mapping[str, Union[str, Iterable[str]]]],
+        params: Optional[QueryArgs],
     ) -> JsonDict:
         """Asks a remote server to build and sign us a membership event
 
