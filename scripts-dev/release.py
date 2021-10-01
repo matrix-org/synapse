@@ -252,6 +252,8 @@ def prepare():
     # Otherwise, push and open the changelog in the browser.
     repo.git.push("-u", repo.remote().name, repo.active_branch.name)
 
+    print("Opening the changelog in your browser...")
+    print("Please ask others to give it a check.")
     click.launch(
         f"https://github.com/matrix-org/synapse/blob/{repo.active_branch.name}/CHANGES.md"
     )
@@ -303,7 +305,19 @@ def tag(gh_token: Optional[str]):
 
     # If no token was given, we bail here
     if not gh_token:
+        print("Launching the GitHub release page in your browser.")
+        print("Please correct the title and create a draft.")
+        if current_version.is_prerelease:
+            print("As this is an RC, remember to mark it as a pre-release!")
+        print("(by the way, this step can be automated by passing --gh-token,")
+        print(" or one of the GH_TOKEN or GITHUB_TOKEN env vars.)")
         click.launch(f"https://github.com/matrix-org/synapse/releases/edit/{tag_name}")
+
+        print("Once done, you need to wait for the release assets to build.")
+        if click.confirm("Launch the release assets actions page?", default=True):
+            click.launch(
+                f"https://github.com/matrix-org/synapse/actions?query=branch%3A{tag_name}"
+            )
         return
 
     # Create a new draft release
@@ -318,6 +332,7 @@ def tag(gh_token: Optional[str]):
     )
 
     # Open the release and the actions where we are building the assets.
+    print("Launching the release page and the actions page.")
     click.launch(release.html_url)
     click.launch(
         f"https://github.com/matrix-org/synapse/actions?query=branch%3A{tag_name}"
