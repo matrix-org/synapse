@@ -15,7 +15,7 @@
 
 from unittest.mock import Mock
 
-import synapse
+import synapse.rest.admin
 import synapse.api.errors
 from synapse.api.constants import EventTypes
 from synapse.config.room_directory import RoomDirectoryConfig
@@ -433,19 +433,29 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
 
 
 class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
-    user_id = "@admin:test"
-    denied_user_id = "@test:test"
     data = {"room_alias_name": "unofficial_test"}
 
-    servlets = [directory.register_servlets, room.register_servlets]
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        directory.register_servlets,
+        room.register_servlets
+    ]
+    hijack_auth = False
 
     def prepare(self, reactor, clock, hs):
+        self.allowed_user_id = self.register_user("allowed", "pass")
+        self.allowed_access_token = self.login("allowed", "pass")
+
+        self.denied_user_id = self.register_user("denied", "pass")
+        self.denied_access_token = self.login("denied", "pass")
+
         # This time we add custom room list publication rules
         config = {}
         config["alias_creation_rules"] = []
         config["room_list_publication_rules"] = [
             {"user_id": "*", "alias": "*", "action": "deny"},
-            {"user_id": "@admin:test", "alias": "*", "action": "allow"},
+            {"user_id": self.allowed_user_id, "alias": "*", "action": "allow"},
         ]
 
         rd_config = RoomDirectoryConfig()
@@ -457,33 +467,69 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
 
         return hs
 
-    def test_denied(self):
-        # NOTE Setting is_public=True isn't enough
-        self.data["visibility"] = "public"
-        self.helper.create_room_as(
-            self.denied_user_id, extra_content=self.data, expect_code=403
-        )
-
-    def test_allowed_without_publish(self):
+    def test_denied_without_publication_permission(self):
+        """
+        Try to create a room, register an alias for it, and publish it,
+        as a user without permission to publish rooms.
+        (This is used as both a standalone test & as a helper function.)
+        """
         self.helper.create_room_as(
             self.denied_user_id,
+            tok=self.denied_access_token,
+            extra_content=self.data,
+            is_public=True,
+            expect_code=403,
+        )
+
+    def test_allowed_when_creating_private_room(self):
+        """
+        Try to create a room, register an alias for it, and NOT publish it,
+        as a user without permission to publish rooms.
+        (This is used as both a standalone test & as a helper function.)
+        """
+        self.helper.create_room_as(
+            self.denied_user_id,
+            tok=self.denied_access_token,
             extra_content=self.data,
             is_public=False,
             expect_code=200,
         )
 
-    def test_allowed_as_allowed(self):
+    def test_allowed_with_publication_permission(self):
+        """
+        Try to create a room, register an alias for it, and publish it,
+        as a user WITH permission to publish rooms.
+        (This is used as both a standalone test & as a helper function.)
+        """
         self.helper.create_room_as(
-            self.user_id, extra_content=self.data, is_public=False, expect_code=200
+            self.allowed_user_id,
+            tok=self.allowed_access_token,
+            extra_content=self.data,
+            is_public=False,
+            expect_code=200
         )
 
-    def test_denied_then_retry_without_publish(self):
-        self.test_denied()
-        self.test_allowed_without_publish()
+    def test_can_create_as_private_room_after_rejection(self):
+        """
+        After failing to publish a room with an alias as a user without publish permission,
+        retry as the same user, but without publishing the room.
 
-    def test_denied_then_retry_as_allowed(self):
-        self.test_denied()
-        self.test_allowed_as_allowed()
+        This should pass, but used to fail because the alias was registered by the first
+        request, even though the room creation was denied.
+        """
+        self.test_denied_without_publication_permission()
+        self.test_allowed_when_creating_private_room()
+
+    def test_can_create_with_permission_after_rejection(self):
+        """
+        After failing to publish a room with an alias as a user without publish permission,
+        retry as someone with permission, using the same alias.
+
+        This also used to fail because of the alias having been registered by the first
+        request, leaving it unavailable for any other user's new rooms.
+        """
+        self.test_denied_without_publication_permission()
+        self.test_allowed_with_publication_permission()
 
 
 class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
