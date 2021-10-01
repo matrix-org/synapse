@@ -180,15 +180,16 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         self.get_success(self.handler.delete_device(user1, "abc"))
 
         # check that the device_inbox was deleted
-        self.get_failure(
+        res = self.get_success(
             self.store.db_pool.simple_select_one(
                 table="device_inbox",
                 keyvalues={"user_id": user1, "device_id": "abc"},
                 retcols=("user_id", "device_id"),
+                allow_none=True,
                 desc="get_device_id_from_device_inbox",
-            ),
-            synapse.api.errors.StoreError,
+            )
         )
+        self.assertIsNone(res)
 
     def test_update_device(self):
         self._record_users()

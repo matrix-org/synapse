@@ -93,3 +93,4 @@ class DevicesBackgroundUpdateStoreTestCase(HomeserverTestCase):
             )
         )
         self.assertEqual(1, len(res))
+        self.assertEqual(res[0], "cur_device")
