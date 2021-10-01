@@ -237,7 +237,7 @@ def prepare():
 
     # Commit the changes.
     repo.git.add("-u")
-    repo.git.commit(f"-m {new_version}")
+    repo.git.commit("-m", new_version)
 
     # We give the option to bail here in case the user wants to make sure things
     # are OK before pushing.
