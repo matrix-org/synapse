@@ -1167,13 +1167,12 @@ class RoomContextHandler:
         # XXX: why do we return the state as of the last event rather than the
         # first? Shouldn't we be consistent with /sync?
         # https://github.com/matrix-org/matrix-doc/issues/687
-        event_id_to_get_state_from = last_event_id
 
         state = await self.state_store.get_state_for_events(
-            [event_id_to_get_state_from], state_filter=state_filter
+            [last_event_id], state_filter=state_filter
         )
 
-        state_events = list(state[event_id_to_get_state_from].values())
+        state_events = list(state[last_event_id].values())
         if event_filter:
             state_events = event_filter.filter(state_events)
 
