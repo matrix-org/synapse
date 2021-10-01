@@ -1,1 +1,1 @@
-Fix a bug where messages in `device_inbox` table where not deleted, when deleting device(s).
+Fix a long-standing bug where messages in the `device_inbox` table for deleted devices would persist indefinitely. Contributed by @dklimpel and @JohannesKleine.
