@@ -323,12 +323,15 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
                     )
                 )
 
+            # Copy the port into a new, non-Optional variable so mypy knows we're
+            # not going to reset `instance_loc` to `None` under its feet. See
+            # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
+            port = instance_loc.port
+
             self.reactor.add_tcp_client_callback(
                 self.reactor.lookups[instance_loc.host],
                 instance_loc.port,
-                lambda: self._handle_http_replication_attempt(
-                    worker_hs, instance_loc.port
-                ),
+                lambda: self._handle_http_replication_attempt(worker_hs, port),
             )
 
         store = worker_hs.get_datastore()
