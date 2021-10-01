@@ -254,7 +254,6 @@ class TestMauLimit(unittest.HomeserverTestCase):
         # Deactivate user1
         url = "/_synapse/admin/v1/deactivate/%s" % user1
         channel = self.make_request("POST", url, access_token=admin_token)
-        print(channel.json_body)
         self.assertIn("success", channel.json_body["id_server_unbind_result"])
 
         # Check that deactivated user is no longer counted
