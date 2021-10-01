@@ -202,6 +202,15 @@ class RoomBatchSendEventRestServlet(RestServlet):
         initial_auth_event_ids: List[str],
         requester: Requester,
     ) -> List[str]:
+        """Takes all `state_events_at_start` event dictionaries and creates/persists
+        them as floating state events which don't resolve into the current room state.
+        They are floating because they reference a fake prev_event which doesn't connect
+        to the normal DAG at all.
+
+        Returns:
+            List of state event ID's we just persisted
+        """
+
         state_event_ids_at_start = []
         auth_event_ids = initial_auth_event_ids.copy()
         for state_event in state_events_at_start:
@@ -284,6 +293,17 @@ class RoomBatchSendEventRestServlet(RestServlet):
         auth_event_ids: List[str],
         requester: Requester,
     ) -> List[str]:
+        """Create and persists all events provided sequentially. Handles the
+        complexity of creating events in chronological order so they can
+        reference each other by prev_event but still persists in
+        reverse-chronoloical order so they have the correct
+        (topological_ordering, stream_ordering) and sort correctly from
+        /messages.
+
+        Returns:
+            List of persisted event IDs
+        """
+
         prev_event_ids = initial_prev_event_ids.copy()
 
         event_ids = []
