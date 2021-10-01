@@ -773,9 +773,9 @@ class ModuleApi:
             # Sanitize some of the data. We don't want to return tokens.
             return [
                 UserIpAndAgent(
-                    ip=str(data["ip"]),
-                    user_agent=str(data["user_agent"]),
-                    last_seen=int(data["last_seen"]),
+                    ip=data["ip"],
+                    user_agent=data["user_agent"],
+                    last_seen=data["last_seen"],
                 )
                 for data in raw_data
             ]
