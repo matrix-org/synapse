@@ -622,6 +622,7 @@ class HomeserverTestCase(TestCase):
             },
             access_token=appservice_token,
         )
+        self.assertEqual(channel.code, 200, channel.json_body)
         return channel.json_body["user_id"]
 
     def login(
