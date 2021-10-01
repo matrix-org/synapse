@@ -955,6 +955,11 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             self._remove_duplicate_outbound_pokes,
         )
 
+        self.db_pool.updates.register_background_update_handler(
+            "remove_deleted_devices_from_device_inbox",
+            self._remove_deleted_devices_from_device_inbox,
+        )
+
         # a pair of background updates that were added during the 1.14 release cycle,
         # but replaced with 58/06dlols_unique_idx.py
         self.db_pool.updates.register_noop_background_update(
@@ -1045,6 +1050,63 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
         return rows
 
+    async def _remove_deleted_devices_from_device_inbox(
+        self, progress: dict, batch_size: int
+    ) -> int:
+        """A background update that deletes all device_inboxes for deleted devices.
+
+        This should only need to be run once (when users upgrade to v1.45.0)
+
+        Args:
+            progress: dict used to store progress of this background update
+            batch_size: the maximum number of rows to retrieve in a single select query
+
+        Returns:
+            The number of deleted rows
+        """
+
+        def _remove_deleted_devices_from_device_inbox_txn(
+            txn: LoggingTransaction,
+        ) -> int:
+
+            sql = """
+                SELECT user_id, device_id, stream_id
+                    FROM device_inbox
+                    WHERE device_id
+                        NOT IN (SELECT device_id FROM devices)
+                    LIMIT ?;
+            """
+
+            txn.execute(sql, (batch_size,))
+            rows = txn.fetchall()
+
+            row = None
+            for row in rows:
+                self.db_pool.simple_delete_txn(
+                    txn,
+                    "device_inbox",
+                    {"user_id": row[0], "device_id": row[1], "stream_id": row[2]},
+                )
+
+            if row:
+                self.db_pool.updates._background_update_progress_txn(
+                    txn, "remove_deleted_devices_from_device_inbox", row
+                )
+
+            return len(rows)
+
+        number_deleted = await self.db_pool.runInteraction(
+            "_remove_deleted_devices_from_device_inbox",
+            _remove_deleted_devices_from_device_inbox_txn,
+        )
+
+        if number_deleted < batch_size:
+            await self.db_pool.updates._end_background_update(
+                "remove_deleted_devices_from_device_inbox"
+            )
+
+        return number_deleted
+
 
 class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
@@ -1121,7 +1183,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             raise StoreError(500, "Problem storing device.")
 
     async def delete_device(self, user_id: str, device_id: str) -> None:
-        """Delete a device.
+        """Delete a device and this device_inbox.
 
         Args:
             user_id: The ID of the user which owns the device
@@ -1133,10 +1195,10 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             desc="delete_device",
         )
 
-        await self.db_pool.simple_delete_one(
+        await self.db_pool.simple_delete(
             table="device_inbox",
             keyvalues={"user_id": user_id, "device_id": device_id},
-            desc="delete_device",
+            desc="delete_device_inbox",
         )
 
         self.device_id_exists_cache.invalidate((user_id, device_id))
@@ -1161,7 +1223,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             column="device_id",
             iterable=device_ids,
             keyvalues={"user_id": user_id},
-            desc="delete_devices",
+            desc="delete_devices_inbox",
         )
 
         for device_id in device_ids:

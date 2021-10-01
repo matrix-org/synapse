@@ -160,6 +160,36 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         # we'd like to check the access token was invalidated, but that's a
         # bit of a PITA.
 
+    def test_delete_device_and_device_inbox(self):
+        self._record_users()
+
+        # add an device_inbox
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                "device_inbox",
+                {
+                    "user_id": user1,
+                    "device_id": "abc",
+                    "stream_id": 1,
+                    "message_json": "{}",
+                },
+            )
+        )
+
+        # delete the device
+        self.get_success(self.handler.delete_device(user1, "abc"))
+
+        # check that the device_inbox was deleted
+        self.get_failure(
+            self.store.db_pool.simple_select_one(
+                table="device_inbox",
+                keyvalues={"user_id": user1, "device_id": "abc"},
+                retcols=("user_id", "device_id"),
+                desc="get_device_id_from_device_inbox",
+            ),
+            synapse.api.errors.StoreError,
+        )
+
     def test_update_device(self):
         self._record_users()
 
