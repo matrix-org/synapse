@@ -1,0 +1,1 @@
+Fix `/admin/whois/{user_id}` endpoint, which was broken in v1.44.0rc1.

@@ -591,8 +591,8 @@ class ClientIpStore(ClientIpWorkerStore):
         )
 
         results.update(
-            ((row["access_token"], row["ip"]), (row["user_agent"], row["last_seen"]))
-            for row in rows
+            ((access_token, ip), (user_agent, last_seen))
+            for access_token, ip, user_agent, last_seen in rows
         )
         return [
             {
