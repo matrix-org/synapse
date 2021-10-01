@@ -930,7 +930,6 @@ class EventCreationHandler:
                 auth_event_ids=auth_event_ids,
                 depth=depth,
             )
-            #logger.info("auth_event_ids before=%s", auth_event_ids)
             auth_events = await self.store.get_events_as_list(auth_event_ids)
             # Create a StateMap[str]
             auth_event_state_map = {
@@ -942,7 +941,6 @@ class EventCreationHandler:
                 current_state_ids=auth_event_state_map,
                 for_verification=False,
             )
-            #logger.info("auth_event_ids after=%s", auth_event_ids)
 
         if prev_event_ids is not None:
             assert (
@@ -952,7 +950,6 @@ class EventCreationHandler:
             )
         else:
             prev_event_ids = await self.store.get_prev_events_for_room(builder.room_id)
-
 
         # we now ought to have some prev_events (unless it's a create event).
         #
@@ -982,8 +979,6 @@ class EventCreationHandler:
                 old_state = await self.store.get_events_as_list(full_state_ids_at_event)
 
             context = await self.state.compute_event_context(event, old_state=old_state)
-
-        logger.info("create_new_client_event type=%s, event_id=%s context=%s", event.type, event.event_id, context)
 
         if requester:
             context.app_service = requester.app_service

@@ -557,9 +557,6 @@ class RoomMessageListRestServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-        logger.info("room /messages =====================================================")
-        logger.info("====================================================================")
-
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         pagination_config = await PaginationConfig.from_request(
             self.store, request, default_limit=10
@@ -698,7 +695,6 @@ class RoomEventContextServlet(RestServlet):
         results = await self.room_context_handler.get_event_context(
             requester, room_id, event_id, limit, event_filter
         )
-        logger.info("get /context event_id=%s results=%s", event_id, results)
 
         if not results:
             raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
