@@ -27,7 +27,12 @@ from unpaddedbase64 import decode_base64
 from twisted.internet import defer
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, RejectedReason
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    Membership,
+    RejectedReason,
+)
 from synapse.api.errors import (
     AuthError,
     CodeMessageException,
@@ -712,7 +717,7 @@ class FederationHandler(BaseHandler):
 
                 if include_auth_user_id:
                     event_content[
-                        "join_authorised_via_users_server"
+                        EventContentFields.AUTHORISING_USER
                     ] = await self._event_auth_handler.get_user_which_could_invite(
                         room_id,
                         state_ids,
