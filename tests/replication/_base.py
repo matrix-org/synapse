@@ -70,11 +70,11 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         # databases objects are the same.
         self.worker_hs.get_datastore().db_pool = hs.get_datastore().db_pool
 
-        # Normally we'd pass in the handler to setup_test_homeserver, which would
+        # Normally we'd pass in the handler to `setup_test_homeserver`, which would
         # eventually hit "Install @cache_in_self attributes" in tests/utils.py.
-        # Unfortunatly our handler wants a reference to the homserver. That leaves
+        # Unfortunately our handler wants a reference to the homeserver. That leaves
         # us with a chicken-and-egg problem.
-        # We can workaroudn this: create the homeserver first, create the handler
+        # We can workaround this: create the homeserver first, create the handler
         # and bodge it in after the fact. The bodging requires us to know the
         # dirty details of how `cache_in_self` works. We politely ask mypy to
         # ignore our dirty dealings.
