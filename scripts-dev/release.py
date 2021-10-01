@@ -35,6 +35,19 @@ from github import Github
 from packaging import version
 
 
+def run_until_successful(command, *args, **kwargs):
+    while True:
+        completed_process = subprocess.run(command, *args, **kwargs)
+        exit_code = completed_process.returncode
+        if exit_code == 0:
+            # successful, so nothing more to do here.
+            return completed_process
+
+        print(f"The command {command!r} failed with exit code {exit_code}.")
+        print("Please try to correct the failure and then re-run.")
+        click.confirm("Try again?", abort=True)
+
+
 @click.group()
 def cli():
     """An interactive script to walk through the parts of creating a release.
@@ -197,7 +210,7 @@ def prepare():
         f.write(parsed_synapse_ast.dumps())
 
     # Generate changelogs
-    subprocess.run("python3 -m towncrier", shell=True)
+    run_until_successful("python3 -m towncrier", shell=True)
 
     # Generate debian changelogs
     if parsed_new_version.pre is not None:
@@ -209,11 +222,11 @@ def prepare():
     else:
         debian_version = new_version
 
-    subprocess.run(
+    run_until_successful(
         f'dch -M -v {debian_version} "New synapse release {debian_version}."',
         shell=True,
     )
-    subprocess.run('dch -M -r -D stable ""', shell=True)
+    run_until_successful('dch -M -r -D stable ""', shell=True)
 
     # Show the user the changes and ask if they want to edit the change log.
     repo.git.add("-u")
