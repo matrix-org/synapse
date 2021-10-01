@@ -68,12 +68,14 @@ class TransportLayerClient:
         logger.debug("get_room_state_ids dest=%s, room=%s", destination, room_id)
 
         path = _create_v1_path("/state_ids/%s", room_id)
-        return await self.client.get_json(
+        resp = await self.client.get_json(
             destination,
             path=path,
             args={"event_id": event_id},
             try_trailing_slash_on_400=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def get_event(
@@ -94,9 +96,11 @@ class TransportLayerClient:
         logger.debug("get_pdu dest=%s, event_id=%s", destination, event_id)
 
         path = _create_v1_path("/event/%s", event_id)
-        return await self.client.get_json(
+        resp = await self.client.get_json(
             destination, path=path, timeout=timeout, try_trailing_slash_on_400=True
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def backfill(
@@ -130,9 +134,11 @@ class TransportLayerClient:
 
         args = {"v": event_tuples, "limit": [str(limit)]}
 
-        return await self.client.get_json(
+        resp = await self.client.get_json(
             destination, path=path, args=args, try_trailing_slash_on_400=True
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def send_transaction(
@@ -254,7 +260,7 @@ class TransportLayerClient:
             ignore_backoff = True
             retry_on_dns_fail = True
 
-        return await self.client.get_json(
+        resp = await self.client.get_json(
             destination=destination,
             path=path,
             args=params,
@@ -262,6 +268,8 @@ class TransportLayerClient:
             timeout=20000,
             ignore_backoff=ignore_backoff,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def send_join_v1(
@@ -324,7 +332,7 @@ class TransportLayerClient:
     ) -> JsonDict:
         path = _create_v2_path("/send_leave/%s/%s", room_id, event_id)
 
-        return await self.client.put_json(
+        resp = await self.client.put_json(
             destination=destination,
             path=path,
             data=content,
@@ -334,6 +342,8 @@ class TransportLayerClient:
             # sync.
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def send_knock_v1(
@@ -365,9 +375,11 @@ class TransportLayerClient:
         """
         path = _create_v1_path("/send_knock/%s/%s", room_id, event_id)
 
-        return await self.client.put_json(
+        resp = await self.client.put_json(
             destination=destination, path=path, data=content
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def send_invite_v1(
@@ -385,9 +397,11 @@ class TransportLayerClient:
     ) -> JsonDict:
         path = _create_v2_path("/invite/%s/%s", room_id, event_id)
 
-        return await self.client.put_json(
+        resp = await self.client.put_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def get_public_rooms(
@@ -460,6 +474,7 @@ class TransportLayerClient:
                     )
                 raise
 
+        assert isinstance(response, dict)
         return response
 
     @log_function
@@ -468,9 +483,11 @@ class TransportLayerClient:
     ) -> JsonDict:
         path = _create_v1_path("/exchange_third_party_invite/%s", room_id)
 
-        return await self.client.put_json(
+        resp = await self.client.put_json(
             destination=destination, path=path, data=event_dict
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def get_event_auth(
@@ -478,7 +495,9 @@ class TransportLayerClient:
     ) -> JsonDict:
         path = _create_v1_path("/event_auth/%s/%s", room_id, event_id)
 
-        return await self.client.get_json(destination=destination, path=path)
+        resp = await self.client.get_json(destination=destination, path=path)
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def query_client_keys(
@@ -518,9 +537,11 @@ class TransportLayerClient:
         """
         path = _create_v1_path("/user/keys/query")
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination, path=path, data=query_content, timeout=timeout
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def query_user_devices(
@@ -558,9 +579,11 @@ class TransportLayerClient:
         """
         path = _create_v1_path("/user/devices/%s", user_id)
 
-        return await self.client.get_json(
+        resp = await self.client.get_json(
             destination=destination, path=path, timeout=timeout
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def claim_client_keys(
@@ -597,9 +620,11 @@ class TransportLayerClient:
 
         path = _create_v1_path("/user/keys/claim")
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination, path=path, data=query_content, timeout=timeout
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def get_missing_events(
@@ -614,7 +639,7 @@ class TransportLayerClient:
     ) -> JsonDict:
         path = _create_v1_path("/get_missing_events/%s", room_id)
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination,
             path=path,
             data={
@@ -625,6 +650,8 @@ class TransportLayerClient:
             },
             timeout=timeout,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def get_group_profile(
@@ -633,12 +660,14 @@ class TransportLayerClient:
         """Get a group profile"""
         path = _create_v1_path("/groups/%s/profile", group_id)
 
-        return await self.client.get_json(
+        resp = await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def update_group_profile(
@@ -669,12 +698,14 @@ class TransportLayerClient:
         """Get a group summary"""
         path = _create_v1_path("/groups/%s/summary", group_id)
 
-        return await self.client.get_json(
+        resp = await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def get_rooms_in_group(
@@ -683,12 +714,14 @@ class TransportLayerClient:
         """Get all rooms in a group"""
         path = _create_v1_path("/groups/%s/rooms", group_id)
 
-        return await self.client.get_json(
+        resp = await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     async def add_room_to_group(
         self,
@@ -701,13 +734,15 @@ class TransportLayerClient:
         """Add a room to a group"""
         path = _create_v1_path("/groups/%s/room/%s", group_id, room_id)
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             data=content,
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     async def update_room_in_group(
         self,
@@ -723,13 +758,15 @@ class TransportLayerClient:
             "/groups/%s/room/%s/config/%s", group_id, room_id, config_key
         )
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             data=content,
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     async def remove_room_from_group(
         self, destination: str, group_id: str, requester_user_id: str, room_id: str
@@ -737,12 +774,14 @@ class TransportLayerClient:
         """Remove a room from a group"""
         path = _create_v1_path("/groups/%s/room/%s", group_id, room_id)
 
-        return await self.client.delete_json(
+        resp = await self.client.delete_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def get_users_in_group(
@@ -751,12 +790,14 @@ class TransportLayerClient:
         """Get users in a group"""
         path = _create_v1_path("/groups/%s/users", group_id)
 
-        return await self.client.get_json(
+        resp = await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def get_invited_users_in_group(
@@ -765,12 +806,14 @@ class TransportLayerClient:
         """Get users that have been invited to a group"""
         path = _create_v1_path("/groups/%s/invited_users", group_id)
 
-        return await self.client.get_json(
+        resp = await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def accept_group_invite(
@@ -779,9 +822,11 @@ class TransportLayerClient:
         """Accept a group invite"""
         path = _create_v1_path("/groups/%s/users/%s/accept_invite", group_id, user_id)
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     def join_group(
@@ -806,13 +851,15 @@ class TransportLayerClient:
         """Invite a user to a group"""
         path = _create_v1_path("/groups/%s/users/%s/invite", group_id, user_id)
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             data=content,
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def invite_to_group_notification(
@@ -824,9 +871,11 @@ class TransportLayerClient:
 
         path = _create_v1_path("/groups/local/%s/users/%s/invite", group_id, user_id)
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def remove_user_from_group(
@@ -840,13 +889,15 @@ class TransportLayerClient:
         """Remove a user from a group"""
         path = _create_v1_path("/groups/%s/users/%s/remove", group_id, user_id)
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             data=content,
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def remove_user_from_group_notification(
@@ -858,9 +909,11 @@ class TransportLayerClient:
 
         path = _create_v1_path("/groups/local/%s/users/%s/remove", group_id, user_id)
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def renew_group_attestation(
@@ -872,9 +925,11 @@ class TransportLayerClient:
 
         path = _create_v1_path("/groups/%s/renew_attestation/%s", group_id, user_id)
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def update_group_summary_room(
@@ -897,13 +952,15 @@ class TransportLayerClient:
         else:
             path = _create_v1_path("/groups/%s/summary/rooms/%s", group_id, room_id)
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": user_id},
             data=content,
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def delete_group_summary_room(
@@ -925,12 +982,14 @@ class TransportLayerClient:
         else:
             path = _create_v1_path("/groups/%s/summary/rooms/%s", group_id, room_id)
 
-        return await self.client.delete_json(
+        resp = await self.client.delete_json(
             destination=destination,
             path=path,
             args={"requester_user_id": user_id},
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def get_group_categories(
@@ -939,12 +998,14 @@ class TransportLayerClient:
         """Get all categories in a group"""
         path = _create_v1_path("/groups/%s/categories", group_id)
 
-        return await self.client.get_json(
+        resp = await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def get_group_category(
@@ -953,12 +1014,14 @@ class TransportLayerClient:
         """Get category info in a group"""
         path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id)
 
-        return await self.client.get_json(
+        resp = await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def update_group_category(
@@ -972,13 +1035,15 @@ class TransportLayerClient:
         """Update a category in a group"""
         path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id)
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             data=content,
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def delete_group_category(
@@ -987,12 +1052,14 @@ class TransportLayerClient:
         """Delete a category in a group"""
         path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id)
 
-        return await self.client.delete_json(
+        resp = await self.client.delete_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def get_group_roles(
@@ -1001,12 +1068,14 @@ class TransportLayerClient:
         """Get all roles in a group"""
         path = _create_v1_path("/groups/%s/roles", group_id)
 
-        return await self.client.get_json(
+        resp = await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def get_group_role(
@@ -1015,12 +1084,14 @@ class TransportLayerClient:
         """Get a roles info"""
         path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id)
 
-        return await self.client.get_json(
+        resp = await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def update_group_role(
@@ -1034,13 +1105,15 @@ class TransportLayerClient:
         """Update a role in a group"""
         path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id)
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             data=content,
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def delete_group_role(
@@ -1049,12 +1122,14 @@ class TransportLayerClient:
         """Delete a role in a group"""
         path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id)
 
-        return await self.client.delete_json(
+        resp = await self.client.delete_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def update_group_summary_user(
@@ -1074,13 +1149,15 @@ class TransportLayerClient:
         else:
             path = _create_v1_path("/groups/%s/summary/users/%s", group_id, user_id)
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             data=content,
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def set_group_join_policy(
@@ -1089,13 +1166,15 @@ class TransportLayerClient:
         """Sets the join policy for a group"""
         path = _create_v1_path("/groups/%s/settings/m.join_policy", group_id)
 
-        return await self.client.put_json(
+        resp = await self.client.put_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             data=content,
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     @log_function
     async def delete_group_summary_user(
@@ -1114,12 +1193,14 @@ class TransportLayerClient:
         else:
             path = _create_v1_path("/groups/%s/summary/users/%s", group_id, user_id)
 
-        return await self.client.delete_json(
+        resp = await self.client.delete_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
+        assert isinstance(resp, dict)
+        return resp
 
     async def bulk_get_publicised_groups(
         self, destination: str, user_ids: Iterable[str]
@@ -1130,9 +1211,11 @@ class TransportLayerClient:
 
         content = {"user_ids": user_ids}
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
+        assert isinstance(resp, dict)
+        return resp
 
     async def get_room_complexity(self, destination: str, room_id: str) -> JsonDict:
         """
@@ -1142,7 +1225,9 @@ class TransportLayerClient:
         """
         path = _create_path(FEDERATION_UNSTABLE_PREFIX, "/rooms/%s/complexity", room_id)
 
-        return await self.client.get_json(destination=destination, path=path)
+        resp = await self.client.get_json(destination=destination, path=path)
+        assert isinstance(resp, dict)
+        return resp
 
     async def get_space_summary(
         self,
@@ -1173,9 +1258,11 @@ class TransportLayerClient:
         if max_rooms_per_space is not None:
             params["max_rooms_per_space"] = max_rooms_per_space
 
-        return await self.client.post_json(
+        resp = await self.client.post_json(
             destination=destination, path=path, data=params
         )
+        assert isinstance(resp, dict)
+        return resp
 
     async def get_room_hierarchy(
         self,
@@ -1193,11 +1280,13 @@ class TransportLayerClient:
             FEDERATION_UNSTABLE_PREFIX, "/org.matrix.msc2946/hierarchy/%s", room_id
         )
 
-        return await self.client.get_json(
+        resp = await self.client.get_json(
             destination=destination,
             path=path,
             args={"suggested_only": "true" if suggested_only else "false"},
         )
+        assert isinstance(resp, dict)
+        return resp
 
 
 def _create_path(federation_prefix: str, path: str, *args: str) -> str:
