@@ -323,7 +323,7 @@ class TransportLayerClient:
     ) -> Tuple[int, JsonDict]:
         path = _create_v1_path("/send_leave/%s/%s", room_id, event_id)
 
-        return await self.client.put_json(
+        resp = await self.client.put_json(
             destination=destination,
             path=path,
             data=content,
@@ -333,6 +333,12 @@ class TransportLayerClient:
             # sync.
             ignore_backoff=True,
         )
+        assert isinstance(resp, list)
+        assert len(resp) == 2
+        code, body = resp
+        assert isinstance(code, int)
+        assert isinstance(body, dict)
+        return code, body
 
     @log_function
     async def send_leave_v2(
@@ -395,9 +401,15 @@ class TransportLayerClient:
     ) -> Tuple[int, JsonDict]:
         path = _create_v1_path("/invite/%s/%s", room_id, event_id)
 
-        return await self.client.put_json(
+        resp = await self.client.put_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
+        assert isinstance(resp, list)
+        assert len(resp) == 2
+        code, body = resp
+        assert isinstance(code, int)
+        assert isinstance(body, dict)
+        return code, body
 
     @log_function
     async def send_invite_v2(
