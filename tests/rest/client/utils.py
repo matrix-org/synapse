@@ -48,7 +48,7 @@ class RestHelper:
     def create_room_as(
         self,
         room_creator: Optional[str] = None,
-        is_public: bool = True,
+        is_public: bool = None,
         room_version: Optional[str] = None,
         tok: Optional[str] = None,
         expect_code: int = 200,
@@ -79,6 +79,8 @@ class RestHelper:
         content = extra_content or {}
         if not is_public:
             content["visibility"] = "private"
+        else:
+            content["visibility"] = "public"
         if room_version:
             content["room_version"] = room_version
         if tok:
