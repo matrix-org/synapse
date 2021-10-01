@@ -602,10 +602,18 @@ class HomeserverTestCase(TestCase):
         username: str,
         appservice_token: str,
     ) -> str:
-        """Register an appservice user. Requires the client-facing registration API be registered.
+        """Register an appservice user as an application service.
+        Requires the client-facing registration API be registered.
 
-        Returns the MXID of the new user."""
-        urlencoded_token = quote(appservice_token)
+        Args:
+            username: the user to be registered by an application service.
+                Should be a full username, i.e. ""@localpart:hostname" as opposed to just "localpart"
+            appservice_token: the acccess token for that application service.
+
+        Raises: if the request to '/register' does not return 200 OK.
+
+        Returns: the MXID of the new user.
+        """
         channel = self.make_request(
             "POST",
             f"/_matrix/client/r0/register?access_token={urlencoded_token}",
