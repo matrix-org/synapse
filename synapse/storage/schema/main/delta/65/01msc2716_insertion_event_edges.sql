@@ -13,5 +13,7 @@
  * limitations under the License.
  */
 
+-- Recreate the insertion_event_edges event_id index without the unique constraint
+-- because an insetion event can have multiple edges.
 DROP INDEX insertion_event_edges_event_id;
 CREATE INDEX IF NOT EXISTS insertion_event_edges_event_id ON insertion_event_edges(event_id);
