@@ -610,6 +610,29 @@ class EventCreationHandler:
 
         builder.internal_metadata.historical = historical
 
+        # Strip down the auth_event_ids to only what we need to auth the event.
+        # For example, we don't need extra m.room.member that don't match event.sender
+        if auth_event_ids is not None:
+            # If auth events are provided, prev events must be also.
+            assert prev_event_ids is not None
+
+            temp_event = await builder.build(
+                prev_event_ids=prev_event_ids,
+                auth_event_ids=auth_event_ids,
+                depth=depth,
+            )
+            auth_events = await self.store.get_events_as_list(auth_event_ids)
+            # Create a StateMap[str]
+            auth_event_state_map = {
+                (e.type, e.state_key): e.event_id for e in auth_events
+            }
+            # Actually strip down and use the necessary auth events
+            auth_event_ids = self._event_auth_handler.compute_auth_events(
+                event=temp_event,
+                current_state_ids=auth_event_state_map,
+                for_verification=False,
+            )
+
         event, context = await self.create_new_client_event(
             builder=builder,
             requester=requester,
@@ -921,33 +944,6 @@ class EventCreationHandler:
         Returns:
             Tuple of created event, context
         """
-
-        # Strip down the auth_event_ids to only what we need to auth the event.
-        # For example, we don't need extra m.room.member that don't match event.sender
-        if auth_event_ids is not None:
-            # If auth events are provided, prev events must be also.
-            assert prev_event_ids is not None
-
-            # Copy the full auth state before it stripped down
-            full_state_ids_at_event = auth_event_ids.copy()
-
-            temp_event = await builder.build(
-                prev_event_ids=prev_event_ids,
-                auth_event_ids=auth_event_ids,
-                depth=depth,
-            )
-            auth_events = await self.store.get_events_as_list(auth_event_ids)
-            # Create a StateMap[str]
-            auth_event_state_map = {
-                (e.type, e.state_key): e.event_id for e in auth_events
-            }
-            # Actually strip down and use the necessary auth events
-            auth_event_ids = self._event_auth_handler.compute_auth_events(
-                event=temp_event,
-                current_state_ids=auth_event_state_map,
-                for_verification=False,
-            )
-
         if prev_event_ids is not None:
             assert (
                 len(prev_event_ids) <= 10
@@ -978,16 +974,7 @@ class EventCreationHandler:
             event.internal_metadata.outlier = True
             context = EventContext.for_outlier()
         else:
-            old_state = None
-            # Define the state for historical messages while we know to get all of
-            # state_groups setup properly when we `compute_event_context`.
-            if builder.internal_metadata.is_historical() and full_state_ids_at_event:
-                old_state = await self.store.get_events_as_list(full_state_ids_at_event)
-
-            context = await self.state.compute_event_context(
-                event,
-                # old_state=old_state
-            )
+            context = await self.state.compute_event_context(event)
 
         if requester:
             context.app_service = requester.app_service

@@ -2072,15 +2072,13 @@ class PersistEventsStore:
         self.db_pool.simple_upsert_many_txn(
             txn,
             table="event_to_state_groups",
-            key_names=("event_id",),
-            key_values=(
-                (event_id,) for event_id, state_group_id in state_groups.items()
-            ),
-            value_names=("state_group", "event_id"),
-            value_values=(
+            key_names=["event_id"],
+            key_values=[(event_id,) for event_id, _ in state_groups.items()],
+            value_names=["state_group", "event_id"],
+            value_values=[
                 (state_group_id, event_id)
                 for event_id, state_group_id in state_groups.items()
-            ),
+            ],
         )
 
         for event_id, state_group_id in state_groups.items():

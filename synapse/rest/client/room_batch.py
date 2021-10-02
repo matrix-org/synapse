@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def generate_fake_prev_event_id():
+def generate_fake_prev_event_id() -> str:
     return "$" + random_string(43)
 
 
@@ -419,6 +419,8 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 historical=True,
                 depth=inherited_depth,
             )
+
+            assert context._state_group
 
             # Normally this is done when persisting the event but we have to
             # pre-emptively do it here because we create all the events first,
