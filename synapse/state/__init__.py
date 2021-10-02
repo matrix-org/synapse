@@ -304,13 +304,14 @@ class StateHandler:
                 event.room_id, event.prev_event_ids()
             )
             logger.info(
-                "compute_event_context %s event=%s (event.prev_event_ids=%s) entry.state_group=%s entry.prev_group=%s entry.delta_ids=%s",
+                "compute_event_context %s event=%s (event.prev_event_ids=%s) entry.state_group=%s entry.prev_group=%s entry.delta_ids=%s entry.state=%s",
                 event.type,
                 event.event_id,
                 event.prev_event_ids(),
                 entry.state_group,
                 entry.prev_group,
                 entry.delta_ids,
+                entry.state,
             )
 
             state_ids_before_event = entry.state
