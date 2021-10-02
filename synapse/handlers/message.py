@@ -617,6 +617,12 @@ class EventCreationHandler:
             auth_event_ids=auth_event_ids,
             depth=depth,
         )
+        logger.info(
+            "create_new_client_event %s event=%s state_group=%s",
+            event.type,
+            event.event_id,
+            context._state_group,
+        )
 
         # In an ideal world we wouldn't need the second part of this condition. However,
         # this behaviour isn't spec'd yet, meaning we should be able to deactivate this
@@ -978,7 +984,10 @@ class EventCreationHandler:
             if builder.internal_metadata.is_historical() and full_state_ids_at_event:
                 old_state = await self.store.get_events_as_list(full_state_ids_at_event)
 
-            context = await self.state.compute_event_context(event, old_state=old_state)
+            context = await self.state.compute_event_context(
+                event,
+                # old_state=old_state
+            )
 
         if requester:
             context.app_service = requester.app_service

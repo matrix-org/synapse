@@ -41,6 +41,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def generate_fake_prev_event_id():
+    return "$" + random_string(43)
+
+
 class RoomBatchSendEventRestServlet(RestServlet):
     """
     API endpoint which can insert a batch of events historically back in time
@@ -216,6 +220,10 @@ class RoomBatchSendEventRestServlet(RestServlet):
         prev_state_ids = list(prev_state_map.values())
         auth_event_ids = prev_state_ids
 
+        # Make the state events float off on their own
+
+        prev_event_id_for_state_chain = generate_fake_prev_event_id()
+
         state_event_ids_at_start = []
         for state_event in body["state_events_at_start"]:
             assert_params_in_dict(
@@ -240,9 +248,6 @@ class RoomBatchSendEventRestServlet(RestServlet):
             # Mark all events as historical
             event_dict["content"][EventContentFields.MSC2716_HISTORICAL] = True
 
-            # Make the state events float off on their own
-            fake_prev_event_id = "$" + random_string(43)
-
             # TODO: This is pretty much the same as some other code to handle inserting state in this file
             if event_dict["type"] == EventTypes.Member:
                 membership = event_dict["content"].get("membership", None)
@@ -254,8 +259,8 @@ class RoomBatchSendEventRestServlet(RestServlet):
                     room_id=room_id,
                     action=membership,
                     content=event_dict["content"],
-                    outlier=True,
-                    prev_event_ids=[fake_prev_event_id],
+                    # outlier=True,
+                    prev_event_ids=[prev_event_id_for_state_chain],
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
                     # reference and also update in the event when we append later.
@@ -274,7 +279,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
                     ),
                     event_dict,
                     outlier=True,
-                    prev_event_ids=[fake_prev_event_id],
+                    prev_event_ids=[prev_event_id_for_state_chain],
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
                     # reference and also update in the event when we append later.
@@ -284,6 +289,8 @@ class RoomBatchSendEventRestServlet(RestServlet):
 
             state_event_ids_at_start.append(event_id)
             auth_event_ids.append(event_id)
+            # Connect all the state in a floating chain
+            prev_event_id_for_state_chain = event_id
 
         events_to_create = body["events"]
 
@@ -298,11 +305,6 @@ class RoomBatchSendEventRestServlet(RestServlet):
         batch_id_to_connect_to = batch_id_from_query
         base_insertion_event = None
         if batch_id_from_query:
-            #  All but the first base insertion event should point at a fake
-            #  event, which causes the HS to ask for the state at the start of
-            #  the batch later.
-            prev_event_ids = [fake_prev_event_id]
-
             # Verify the batch_id_from_query corresponds to an actual insertion event
             # and have the batch connected.
             corresponding_insertion_event_id = (
@@ -325,14 +327,12 @@ class RoomBatchSendEventRestServlet(RestServlet):
         # an insertion event), in which case we just create a new insertion event
         # that can then get pointed to by a "marker" event later.
         else:
-            prev_event_ids = prev_event_ids_from_query
-
             base_insertion_event_dict = self._create_insertion_event_dict(
                 sender=requester.user.to_string(),
                 room_id=room_id,
                 origin_server_ts=last_event_in_batch["origin_server_ts"],
             )
-            base_insertion_event_dict["prev_events"] = prev_event_ids.copy()
+            base_insertion_event_dict["prev_events"] = prev_event_ids_from_query.copy()
 
             (
                 base_insertion_event,
@@ -383,10 +383,19 @@ class RoomBatchSendEventRestServlet(RestServlet):
         # Prepend the insertion event to the start of the batch (oldest-in-time)
         events_to_create = [insertion_event] + events_to_create
 
+        # Also connect the historical event chain to floating state chain,
+        # which causes the HS to ask for the state at the start of
+        # the batch later.
+        prev_event_ids = [prev_event_id_for_state_chain]
+
         event_ids = []
         events_to_persist = []
         for ev in events_to_create:
             assert_params_in_dict(ev, ["type", "origin_server_ts", "content", "sender"])
+
+            assert self.hs.is_mine_id(ev["sender"]), "User must be our own: %s" % (
+                event.sender,
+            )
 
             event_dict = {
                 "type": ev["type"],
@@ -410,15 +419,22 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 historical=True,
                 depth=inherited_depth,
             )
+
+            # Normally this is done when persisting the event but we have to
+            # pre-emptively do it here because we create all the events first,
+            # then persist them in another pass below. And we want to share
+            # state_groups across the whole batch so this lookup needs to work
+            # for the next event in the batch in this loop.
+            await self.store.store_state_group_id_for_event_id(
+                event_id=event.event_id,
+                state_group_id=context._state_group,
+            )
+
             logger.debug(
                 "RoomBatchSendEventRestServlet inserting event=%s, prev_event_ids=%s, auth_event_ids=%s",
                 event,
                 prev_event_ids,
                 auth_event_ids,
-            )
-
-            assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
-                event.sender,
             )
 
             events_to_persist.append((event, context))
