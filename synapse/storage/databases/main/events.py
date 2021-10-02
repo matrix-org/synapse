@@ -2073,11 +2073,10 @@ class PersistEventsStore:
             txn,
             table="event_to_state_groups",
             key_names=["event_id"],
-            key_values=[(event_id,) for event_id, _ in state_groups.items()],
-            value_names=["state_group", "event_id"],
+            key_values=[[event_id] for event_id, _ in state_groups.items()],
+            value_names=["state_group"],
             value_values=[
-                (state_group_id, event_id)
-                for event_id, state_group_id in state_groups.items()
+                [state_group_id] for _, state_group_id in state_groups.items()
             ],
         )
 
