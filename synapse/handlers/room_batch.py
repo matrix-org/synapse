@@ -1,11 +1,9 @@
 import logging
 from typing import TYPE_CHECKING, List, Tuple
 
-from synapse.http.servlet import (
-    assert_params_in_dict,
-)
 from synapse.api.constants import EventContentFields, EventTypes
 from synapse.appservice import ApplicationService
+from synapse.http.servlet import assert_params_in_dict
 from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util.stringutils import random_string
 
