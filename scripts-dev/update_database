@@ -61,7 +61,7 @@ def run_background_updates(hs):
     reactor.run()
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         description=(
             "Updates a synapse database to the latest schema and runs background updates"
@@ -110,3 +110,7 @@ if __name__ == "__main__":
 
     if args.run_background_updates:
         run_background_updates(hs)
+
+
+if __name__ == "__main__":
+    main()
