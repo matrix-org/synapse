@@ -42,6 +42,25 @@ class MockHomeserver(HomeServer):
         self.version_string = "Synapse/" + get_version_string(synapse)
 
 
+def run_background_updates(hs):
+    store = hs.get_datastore()
+
+    async def run_background_updates():
+        await store.db_pool.updates.run_background_updates(sleep=False)
+        # Stop the reactor to exit the script once every background update is run.
+        reactor.stop()
+
+    def run():
+        # Apply all background updates on the database.
+        defer.ensureDeferred(
+            run_as_background_process("background_updates", run_background_updates)
+        )
+
+    reactor.callWhenRunning(run)
+
+    reactor.run()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=(
@@ -90,19 +109,4 @@ if __name__ == "__main__":
     hs.setup()
 
     if args.run_background_updates:
-        store = hs.get_datastore()
-
-        async def run_background_updates():
-            await store.db_pool.updates.run_background_updates(sleep=False)
-            # Stop the reactor to exit the script once every background update is run.
-            reactor.stop()
-
-        def run():
-            # Apply all background updates on the database.
-            defer.ensureDeferred(
-                run_as_background_process("background_updates", run_background_updates)
-            )
-
-        reactor.callWhenRunning(run)
-
-        reactor.run()
+        run_background_updates(hs)
