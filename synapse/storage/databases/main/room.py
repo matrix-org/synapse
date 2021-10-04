@@ -679,8 +679,8 @@ class RoomWorkerStore(SQLBaseStore):
         # policy.
         if not ret:
             return {
-                "min_lifetime": self.config.retention_default_min_lifetime,
-                "max_lifetime": self.config.retention_default_max_lifetime,
+                "min_lifetime": self.config.server.retention_default_min_lifetime,
+                "max_lifetime": self.config.server.retention_default_max_lifetime,
             }
 
         row = ret[0]
@@ -690,10 +690,10 @@ class RoomWorkerStore(SQLBaseStore):
         # The default values will be None if no default policy has been defined, or if one
         # of the attributes is missing from the default policy.
         if row["min_lifetime"] is None:
-            row["min_lifetime"] = self.config.retention_default_min_lifetime
+            row["min_lifetime"] = self.config.server.retention_default_min_lifetime
 
         if row["max_lifetime"] is None:
-            row["max_lifetime"] = self.config.retention_default_max_lifetime
+            row["max_lifetime"] = self.config.server.retention_default_max_lifetime
 
         return row
 

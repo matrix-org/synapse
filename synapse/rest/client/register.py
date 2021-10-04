@@ -129,7 +129,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         )
 
         if existing_user_id is not None:
-            if self.hs.config.request_token_inhibit_3pid_errors:
+            if self.hs.config.server.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
@@ -209,7 +209,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         )
 
         if existing_user_id is not None:
-            if self.hs.config.request_token_inhibit_3pid_errors:
+            if self.hs.config.server.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
@@ -682,7 +682,7 @@ class RegisterRestServlet(RestServlet):
             # written to the db
             if threepid:
                 if is_threepid_reserved(
-                    self.hs.config.mau_limits_reserved_threepids, threepid
+                    self.hs.config.server.mau_limits_reserved_threepids, threepid
                 ):
                     await self.store.upsert_monthly_active_user(registered_user_id)
 

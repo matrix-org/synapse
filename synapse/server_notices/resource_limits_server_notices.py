@@ -47,9 +47,9 @@ class ResourceLimitsServerNotices:
         self._notifier = hs.get_notifier()
 
         self._enabled = (
-            hs.config.limit_usage_by_mau
+            hs.config.server.limit_usage_by_mau
             and self._server_notices_manager.is_enabled()
-            and not hs.config.hs_disabled
+            and not hs.config.server.hs_disabled
         )
 
     async def maybe_send_server_notice_to_user(self, user_id: str) -> None:
@@ -98,7 +98,7 @@ class ResourceLimitsServerNotices:
         try:
             if (
                 limit_type == LimitBlockingTypes.MONTHLY_ACTIVE_USER
-                and not self._config.mau_limit_alerting
+                and not self._config.server.mau_limit_alerting
             ):
                 # We have hit the MAU limit, but MAU alerting is disabled:
                 # reset room if necessary and return
@@ -149,7 +149,7 @@ class ResourceLimitsServerNotices:
             "body": event_body,
             "msgtype": ServerNoticeMsgType,
             "server_notice_type": ServerNoticeLimitReached,
-            "admin_contact": self._config.admin_contact,
+            "admin_contact": self._config.server.admin_contact,
             "limit_type": event_limit_type,
         }
         event = await self._server_notices_manager.send_notice(

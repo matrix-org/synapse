@@ -73,6 +73,7 @@ OG_TAG_VALUE_MAXLEN = 1000
 
 ONE_HOUR = 60 * 60 * 1000
 ONE_DAY = 24 * ONE_HOUR
+IMAGE_CACHE_EXPIRY_MS = 2 * ONE_DAY
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -496,6 +497,27 @@ class PreviewUrlResource(DirectServeJsonResource):
             logger.info("Still running DB updates; skipping expiry")
             return
 
+        def try_remove_parent_dirs(dirs: Iterable[str]) -> None:
+            """Attempt to remove the given chain of parent directories
+
+            Args:
+                dirs: The list of directory paths to delete, with children appearing
+                    before their parents.
+            """
+            for dir in dirs:
+                try:
+                    os.rmdir(dir)
+                except FileNotFoundError:
+                    # Already deleted, continue with deleting the rest
+                    pass
+                except OSError as e:
+                    # Failed, skip deleting the rest of the parent dirs
+                    if e.errno != errno.ENOTEMPTY:
+                        logger.warning(
+                            "Failed to remove media directory: %r: %s", dir, e
+                        )
+                    break
+
         # First we delete expired url cache entries
         media_ids = await self.store.get_expired_url_cache(now)
 
@@ -504,20 +526,16 @@ class PreviewUrlResource(DirectServeJsonResource):
             fname = self.filepaths.url_cache_filepath(media_id)
             try:
                 os.remove(fname)
+            except FileNotFoundError:
+                pass  # If the path doesn't exist, meh
             except OSError as e:
-                # If the path doesn't exist, meh
-                if e.errno != errno.ENOENT:
-                    logger.warning("Failed to remove media: %r: %s", media_id, e)
-                    continue
+                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                continue
 
             removed_media.append(media_id)
 
-            try:
-                dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
-                for dir in dirs:
-                    os.rmdir(dir)
-            except Exception:
-                pass
+            dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
+            try_remove_parent_dirs(dirs)
 
         await self.store.delete_url_cache(removed_media)
 
@@ -530,7 +548,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         # These may be cached for a bit on the client (i.e., they
         # may have a room open with a preview url thing open).
         # So we wait a couple of days before deleting, just in case.
-        expire_before = now - 2 * ONE_DAY
+        expire_before = now - IMAGE_CACHE_EXPIRY_MS
         media_ids = await self.store.get_url_cache_media_before(expire_before)
 
         removed_media = []
@@ -538,36 +556,30 @@ class PreviewUrlResource(DirectServeJsonResource):
             fname = self.filepaths.url_cache_filepath(media_id)
             try:
                 os.remove(fname)
+            except FileNotFoundError:
+                pass  # If the path doesn't exist, meh
             except OSError as e:
-                # If the path doesn't exist, meh
-                if e.errno != errno.ENOENT:
-                    logger.warning("Failed to remove media: %r: %s", media_id, e)
-                    continue
+                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                continue
 
-            try:
-                dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
-                for dir in dirs:
-                    os.rmdir(dir)
-            except Exception:
-                pass
+            dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
+            try_remove_parent_dirs(dirs)
 
             thumbnail_dir = self.filepaths.url_cache_thumbnail_directory(media_id)
             try:
                 shutil.rmtree(thumbnail_dir)
+            except FileNotFoundError:
+                pass  # If the path doesn't exist, meh
             except OSError as e:
-                # If the path doesn't exist, meh
-                if e.errno != errno.ENOENT:
-                    logger.warning("Failed to remove media: %r: %s", media_id, e)
-                    continue
+                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                continue
 
             removed_media.append(media_id)
 
-            try:
-                dirs = self.filepaths.url_cache_thumbnail_dirs_to_delete(media_id)
-                for dir in dirs:
-                    os.rmdir(dir)
-            except Exception:
-                pass
+            dirs = self.filepaths.url_cache_thumbnail_dirs_to_delete(media_id)
+            # Note that one of the directories to be deleted has already been
+            # removed by the `rmtree` above.
+            try_remove_parent_dirs(dirs)
 
         await self.store.delete_url_cache_media(removed_media)
 

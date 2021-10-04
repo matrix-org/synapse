@@ -52,6 +52,7 @@ from synapse.api.errors import (
 )
 from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
 from synapse.events.utils import copy_power_levels_contents
 from synapse.rest.admin._base import assert_user_is_admin
@@ -237,8 +238,9 @@ class RoomCreationHandler(BaseHandler):
                 },
             },
         )
-        old_room_version = await self.store.get_room_version_id(old_room_id)
-        await self._event_auth_handler.check_from_context(
+        old_room_version = await self.store.get_room_version(old_room_id)
+        validate_event_for_room_version(old_room_version, tombstone_event)
+        await self._event_auth_handler.check_auth_rules_from_context(
             old_room_version, tombstone_event, tombstone_context
         )
 
@@ -666,7 +668,7 @@ class RoomCreationHandler(BaseHandler):
             await self.ratelimit(requester)
 
         room_version_id = config.get(
-            "room_version", self.config.default_room_version.identifier
+            "room_version", self.config.server.default_room_version.identifier
         )
 
         if not isinstance(room_version_id, str):
