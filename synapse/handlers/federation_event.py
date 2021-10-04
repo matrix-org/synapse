@@ -1592,18 +1592,15 @@ class FederationEventHandler:
         """
         assert not event.internal_metadata.outlier
 
-        # take a copy of calculated_auth_event_map before we modify it.
-        auth_events: MutableStateMap[EventBase] = dict(calculated_auth_event_map)
-
         # check for events which are in the event's claimed auth_events, but not
         # in our calculated event map.
         event_auth_events = set(event.auth_event_ids())
         different_auth = event_auth_events.difference(
-            e.event_id for e in auth_events.values()
+            e.event_id for e in calculated_auth_event_map.values()
         )
 
         if not different_auth:
-            return context, auth_events
+            return context, calculated_auth_event_map
 
         logger.info(
             "auth_events refers to events which are not in our calculated auth "
@@ -1629,13 +1626,13 @@ class FederationEventHandler:
                 # XXX: should we reject the event in this case? It feels like we should,
                 # but then shouldn't we also do so if we've failed to fetch any of the
                 # auth events?
-                return context, auth_events
+                return context, calculated_auth_event_map
 
         # now we state-resolve between our own idea of the auth events, and the remote's
         # idea of them.
 
-        local_state = auth_events.values()
-        remote_auth_events = dict(auth_events)
+        local_state = calculated_auth_event_map.values()
+        remote_auth_events = dict(calculated_auth_event_map)
         remote_auth_events.update({(d.type, d.state_key): d for d in different_events})
         remote_state = remote_auth_events.values()
 
@@ -1649,10 +1646,12 @@ class FederationEventHandler:
             {
                 d
                 for d in new_state.values()
-                if auth_events.get((d.type, d.state_key)) != d
+                if calculated_auth_event_map.get((d.type, d.state_key)) != d
             },
         )
 
+        # take a copy of calculated_auth_event_map before we modify it.
+        auth_events: MutableStateMap[EventBase] = dict(calculated_auth_event_map)
         auth_events.update(new_state)
 
         context = await self._update_context_for_auth_events(
