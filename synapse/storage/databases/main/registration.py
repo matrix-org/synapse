@@ -207,7 +207,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             return False
 
         now = self._clock.time_msec()
-        trial_duration_ms = self.config.mau_trial_days * 24 * 60 * 60 * 1000
+        trial_duration_ms = self.config.server.mau_trial_days * 24 * 60 * 60 * 1000
         is_trial = (now - info["creation_ts"] * 1000) < trial_duration_ms
         return is_trial
 
@@ -1710,7 +1710,7 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         We do this by grandfathering in existing user threepids assuming that
         they used one of the server configured trusted identity servers.
         """
-        id_servers = set(self.config.trusted_third_party_id_servers)
+        id_servers = set(self.config.registration.trusted_third_party_id_servers)
 
         def _bg_user_threepids_grandfather_txn(txn):
             sql = """

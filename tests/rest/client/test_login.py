@@ -94,9 +94,9 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         self.hs = self.setup_test_homeserver()
-        self.hs.config.enable_registration = True
-        self.hs.config.registrations_require_3pid = []
-        self.hs.config.auto_join_rooms = []
+        self.hs.config.registration.enable_registration = True
+        self.hs.config.registration.registrations_require_3pid = []
+        self.hs.config.registration.auto_join_rooms = []
         self.hs.config.captcha.enable_registration_captcha = False
 
         return self.hs
@@ -1064,13 +1064,6 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
         register.register_servlets,
     ]
 
-    def register_as_user(self, username):
-        self.make_request(
-            b"POST",
-            "/_matrix/client/r0/register?access_token=%s" % (self.service.token,),
-            {"username": username},
-        )
-
     def make_homeserver(self, reactor, clock):
         self.hs = self.setup_test_homeserver()
 
@@ -1107,7 +1100,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
 
     def test_login_appservice_user(self):
         """Test that an appservice user can use /login"""
-        self.register_as_user(AS_USER)
+        self.register_appservice_user(AS_USER, self.service.token)
 
         params = {
             "type": login.LoginRestServlet.APPSERVICE_TYPE,
@@ -1121,7 +1114,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
 
     def test_login_appservice_user_bot(self):
         """Test that the appservice bot can use /login"""
-        self.register_as_user(AS_USER)
+        self.register_appservice_user(AS_USER, self.service.token)
 
         params = {
             "type": login.LoginRestServlet.APPSERVICE_TYPE,
@@ -1135,7 +1128,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
 
     def test_login_appservice_wrong_user(self):
         """Test that non-as users cannot login with the as token"""
-        self.register_as_user(AS_USER)
+        self.register_appservice_user(AS_USER, self.service.token)
 
         params = {
             "type": login.LoginRestServlet.APPSERVICE_TYPE,
@@ -1149,7 +1142,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
 
     def test_login_appservice_wrong_as(self):
         """Test that as users cannot login with wrong as token"""
-        self.register_as_user(AS_USER)
+        self.register_appservice_user(AS_USER, self.service.token)
 
         params = {
             "type": login.LoginRestServlet.APPSERVICE_TYPE,
@@ -1165,7 +1158,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
         """Test that users must provide a token when using the appservice
         login method
         """
-        self.register_as_user(AS_USER)
+        self.register_appservice_user(AS_USER, self.service.token)
 
         params = {
             "type": login.LoginRestServlet.APPSERVICE_TYPE,

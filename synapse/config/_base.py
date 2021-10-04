@@ -327,7 +327,7 @@ class RootConfig:
         """
         Redirect lookups on this object either to config objects, or values on
         config objects, so that `config.tls.blah` works, as well as legacy uses
-        of things like `config.server_name`. It will first look up the config
+        of things like `config.server.server_name`. It will first look up the config
         section name, and then values on those config classes.
         """
         if item in self._configs.keys():

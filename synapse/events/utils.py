@@ -105,7 +105,7 @@ def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
     if event_type == EventTypes.Member:
         add_fields("membership")
         if room_version.msc3375_redaction_rules:
-            add_fields("join_authorised_via_users_server")
+            add_fields(EventContentFields.AUTHORISING_USER)
     elif event_type == EventTypes.Create:
         # MSC2176 rules state that create events cannot be redacted.
         if room_version.msc2176_redaction_rules:
@@ -372,7 +372,7 @@ class EventClientSerializer:
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.experimental_msc1849_support_enabled = (
-            hs.config.experimental_msc1849_support_enabled
+            hs.config.server.experimental_msc1849_support_enabled
         )
 
     async def serialize_event(

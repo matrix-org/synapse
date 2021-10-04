@@ -546,12 +546,10 @@ async def _iterative_auth_checks(
                     auth_events[key] = event_map[ev_id]
 
         try:
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 room_version,
                 event,
                 auth_events,
-                do_sig_check=False,
-                do_size_check=False,
             )
 
             resolved_state[(event.type, event.state_key)] = event_id

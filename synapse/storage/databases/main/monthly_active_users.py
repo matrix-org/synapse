@@ -32,8 +32,8 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         self._clock = hs.get_clock()
         self.hs = hs
 
-        self._limit_usage_by_mau = hs.config.limit_usage_by_mau
-        self._max_mau_value = hs.config.max_mau_value
+        self._limit_usage_by_mau = hs.config.server.limit_usage_by_mau
+        self._max_mau_value = hs.config.server.max_mau_value
 
     @cached(num_args=0)
     async def get_monthly_active_count(self) -> int:
@@ -96,8 +96,8 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         """
         users = []
 
-        for tp in self.hs.config.mau_limits_reserved_threepids[
-            : self.hs.config.max_mau_value
+        for tp in self.hs.config.server.mau_limits_reserved_threepids[
+            : self.hs.config.server.max_mau_value
         ]:
             user_id = await self.hs.get_datastore().get_user_id_by_threepid(
                 tp["medium"], tp["address"]
@@ -212,7 +212,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
-        self._mau_stats_only = hs.config.mau_stats_only
+        self._mau_stats_only = hs.config.server.mau_stats_only
 
         # Do not add more reserved users than the total allowable number
         self.db_pool.new_transaction(
@@ -221,7 +221,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
             [],
             [],
             self._initialise_reserved_users,
-            hs.config.mau_limits_reserved_threepids[: self._max_mau_value],
+            hs.config.server.mau_limits_reserved_threepids[: self._max_mau_value],
         )
 
     def _initialise_reserved_users(self, txn, threepids):
@@ -354,3 +354,27 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
                         await self.upsert_monthly_active_user(user_id)
             elif now - last_seen_timestamp > LAST_SEEN_GRANULARITY:
                 await self.upsert_monthly_active_user(user_id)
+
+    async def remove_deactivated_user_from_mau_table(self, user_id: str) -> None:
+        """
+        Removes a deactivated user from the monthly active user
+        table and resets affected caches.
+
+        Args:
+            user_id(str): the user_id to remove
+        """
+
+        rows_deleted = await self.db_pool.simple_delete(
+            table="monthly_active_users",
+            keyvalues={"user_id": user_id},
+            desc="simple_delete",
+        )
+
+        if rows_deleted != 0:
+            await self.invalidate_cache_and_stream(
+                "user_last_seen_monthly_active", (user_id,)
+            )
+            await self.invalidate_cache_and_stream("get_monthly_active_count", ())
+            await self.invalidate_cache_and_stream(
+                "get_monthly_active_count_by_service", ()
+            )

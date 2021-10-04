@@ -84,16 +84,16 @@ class ConfigLoadingTestCase(unittest.TestCase):
         )
         # Check that disable_registration clobbers enable_registration.
         config = HomeServerConfig.load_config("", ["-c", self.file])
-        self.assertFalse(config.enable_registration)
+        self.assertFalse(config.registration.enable_registration)
 
         config = HomeServerConfig.load_or_generate_config("", ["-c", self.file])
-        self.assertFalse(config.enable_registration)
+        self.assertFalse(config.registration.enable_registration)
 
         # Check that either config value is clobbered by the command line.
         config = HomeServerConfig.load_or_generate_config(
             "", ["-c", self.file, "--enable-registration"]
         )
-        self.assertTrue(config.enable_registration)
+        self.assertTrue(config.registration.enable_registration)
 
     def test_stats_enabled(self):
         self.generate_config_and_remove_lines_containing("enable_metrics")
