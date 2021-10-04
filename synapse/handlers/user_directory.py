@@ -220,7 +220,7 @@ class UserDirectoryHandler(StateDeltasHandler):
 
                         for user_id in user_ids:
                             await self._handle_remove_user(room_id, user_id)
-                        return
+                        continue
                     else:
                         logger.debug("Server is still in room: %r", room_id)
 
