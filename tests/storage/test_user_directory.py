@@ -11,17 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, List, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple
+from unittest import mock
 from unittest.mock import Mock, patch
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.api.constants import UserTypes
+from synapse.api.constants import EventTypes, Membership, UserTypes
 from synapse.appservice import ApplicationService
 from synapse.rest import admin
 from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.storage.roommember import ProfileInfo
 from synapse.util import Clock
 
 from tests.test_utils.event_injection import inject_member_event
@@ -75,6 +77,19 @@ class GetUserDirectoryTables:
             ["user_id"],
         )
         return {row["user_id"] for row in result}
+
+    async def get_profiles_in_user_directory(self) -> Dict[str, ProfileInfo]:
+        rows = await self.store.db_pool.simple_select_list(
+            "user_directory",
+            None,
+            ("user_id", "display_name", "avatar_url"),
+        )
+        return {
+            row["user_id"]: ProfileInfo(
+                display_name=row["display_name"], avatar_url=row["avatar_url"]
+            )
+            for row in rows
+        }
 
 
 class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
@@ -345,6 +360,45 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
 
         # Check the AS user is not in the directory.
         self._check_room_sharing_tables(user, public, private)
+
+    def test_population_conceals_private_nickname(self) -> None:
+        # Make a private room, and set a nickname within
+        user = self.register_user("aaaa", "pass")
+        user_token = self.login(user, "pass")
+        private_room = self.helper.create_room_as(user, is_public=False, tok=user_token)
+        self.helper.send_state(
+            private_room,
+            EventTypes.Member,
+            state_key=user,
+            body={"membership": Membership.JOIN, "displayname": "BBBB"},
+            tok=user_token,
+        )
+
+        # Rebuild the user directory. Make the rescan of the `users` table a no-op
+        # so we only see the effect of scanning the `room_memberships` table.
+        async def mocked_process_users(*args: Any, **kwargs: Any) -> int:
+            await self.store.db_pool.updates._end_background_update(
+                "populate_user_directory_process_users"
+            )
+            return 1
+
+        with mock.patch.dict(
+            self.store.db_pool.updates._background_update_handlers,
+            populate_user_directory_process_users=mocked_process_users,
+        ):
+            self._purge_and_rebuild_user_dir()
+
+        # Local users are ignored by the scan over rooms
+        users = self.get_success(self.user_dir_helper.get_profiles_in_user_directory())
+        self.assertEqual(users, {})
+
+        # Do a full rebuild including the scan over the `users` table. The local
+        # user should appear with their profile name.
+        self._purge_and_rebuild_user_dir()
+        users = self.get_success(self.user_dir_helper.get_profiles_in_user_directory())
+        self.assertEqual(
+            users, {user: ProfileInfo(display_name="aaaa", avatar_url=None)}
+        )
 
 
 class UserDirectoryStoreTestCase(HomeserverTestCase):

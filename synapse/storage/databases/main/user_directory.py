@@ -232,6 +232,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     room_id
                 )
 
+                # TODO this leaks per-room profiles!
                 users_with_profile = await self.get_users_in_room_with_profiles(room_id)
                 # Throw away users excluded from the directory.
                 users_with_profile = {
@@ -241,8 +242,11 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     or await self.should_include_local_user_in_dir(user_id)
                 }
 
-                # Update each user in the user directory.
+                # Upsert a user_directory record for each remote user we see.
+                # (Local users are processed in `_populate_user_directory_users`.)
                 for user_id, profile in users_with_profile.items():
+                    if self.hs.is_mine_id(user_id):
+                        continue
                     await self.update_profile_in_user_dir(
                         user_id, profile.display_name, profile.avatar_url
                     )
