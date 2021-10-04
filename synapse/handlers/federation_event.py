@@ -1471,6 +1471,11 @@ class FederationEventHandler:
             logger.debug("Events %s are in the store", have_events)
             missing_auth.difference_update(have_events)
 
+        # missing_auth is now the set of event_ids which:
+        #  a. are listed in event.auth_events, *and*
+        #  b. are *not* part of our calculated auth events based on room state, *and*
+        #  c. are *not* yet in our database.
+
         if missing_auth:
             # If we don't have all the auth events, we need to get them.
             logger.info("auth_events contains unknown events: %s", missing_auth)
@@ -1492,9 +1497,30 @@ class FederationEventHandler:
                     }
                 )
 
+        # auth_events now contains
+        #   1. our *calculated* auth events based on the room state, plus:
+        #   2. any events which:
+        #       a. are listed in `event.auth_events`, *and*
+        #       b. are not part of our calculated auth events, *and*
+        #       c. were not in our database before the call to /event_auth
+        #       d. have since been added to our database (most likely by /event_auth).
+
         different_auth = event_auth_events.difference(
             e.event_id for e in auth_events.values()
         )
+
+        # different_auth is the set of events which *are* in `event.auth_events`, but
+        # which are *not* in `auth_events`. Comparing with (2.) above, this means
+        # exclusively the set of `event.auth_events` which we already had in our
+        # database before any call to /event_auth.
+        #
+        # I'm reasonably sure that the fact that events returned by /event_auth are
+        # blindly added to auth_events (and hence excluded from different_auth) is a bug
+        # - though it's a very long-standing one (see
+        # https://github.com/matrix-org/synapse/commit/78015948a7febb18e000651f72f8f58830a55b93#diff-0bc92da3d703202f5b9be2d3f845e375f5b1a6bc6ba61705a8af9be1121f5e42R786
+        # from Jan 2015 which seems to add it, though it actually just moves it from
+        # elsewhere (before that, it gets lost in a mess of huge "various bug fixes"
+        # PRs).
 
         if not different_auth:
             return context, auth_events
