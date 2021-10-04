@@ -228,10 +228,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             is_in_room = await self.is_host_joined(room_id, self.server_name)
 
             if is_in_room:
-                is_public = await self.is_room_world_readable_or_publicly_joinable(
-                    room_id
-                )
-
                 # TODO this leaks per-room profiles!
                 users_with_profile = await self.get_users_in_room_with_profiles(room_id)
                 # Throw away users excluded from the directory.
@@ -251,8 +247,11 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                         user_id, profile.display_name, profile.avatar_url
                     )
 
+                # Now update the room sharing tables to include this room.
                 to_insert = set()
-
+                is_public = await self.is_room_world_readable_or_publicly_joinable(
+                    room_id
+                )
                 if is_public:
                     for user_id in users_with_profile:
                         to_insert.add(user_id)
