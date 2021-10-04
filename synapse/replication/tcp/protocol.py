@@ -434,8 +434,9 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         if self.transport:
             self.transport.unregisterProducer()
 
-        # mark the logging context as finished
-        self._logging_context.__exit__(None, None, None)
+        # mark the logging context as finished by triggering `__exit__()`
+        with self._logging_context:
+            pass
 
     def __str__(self):
         addr = None
