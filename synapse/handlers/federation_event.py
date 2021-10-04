@@ -1271,6 +1271,7 @@ class FederationEventHandler:
             return context
 
         # next, check that we have all of the event's auth events.
+        #
         # Note that this can raise AuthError, which we want to propagate to the
         # caller rather than swallow with `context.rejected` (since we cannot be
         # certain that there is a permanent problem with the event).
@@ -1278,7 +1279,17 @@ class FederationEventHandler:
             origin, event
         )
 
-        # calculate what the auth events *should* be, to use as a basis for auth.
+        # ... and check that the event passes auth at those auth events.
+        try:
+            check_auth_rules_for_event(room_version_obj, event, claimed_auth_events)
+        except AuthError as e:
+            logger.warning(
+                "While checking auth of %r against auth_events: %s", event, e
+            )
+            context.rejected = RejectedReason.AUTH_ERROR
+            return context
+
+        # now check auth against what we think the auth events *should* be.
         prev_state_ids = await context.get_prev_state_ids()
         auth_events_ids = self._event_auth_handler.compute_auth_events(
             event, prev_state_ids, for_verification=True
