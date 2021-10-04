@@ -1250,8 +1250,17 @@ class FederationEventHandler:
         # This method should only be used for non-outliers
         assert not event.internal_metadata.outlier
 
+        # first of all, check that the event itself is valid.
         room_version = await self._store.get_room_version_id(event.room_id)
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+
+        try:
+            validate_event_for_room_version(room_version_obj, event)
+        except AuthError as e:
+            logger.warning("While validating received event %r: %s", event, e)
+            # TODO: use a different rejected reason here?
+            context.rejected = RejectedReason.AUTH_ERROR
+            return context
 
         # calculate what the auth events *should* be, to use as a basis for auth.
         prev_state_ids = await context.get_prev_state_ids()
@@ -1286,7 +1295,6 @@ class FederationEventHandler:
             auth_events_for_auth = calculated_auth_event_map
 
         try:
-            validate_event_for_room_version(room_version_obj, event)
             check_auth_rules_for_event(room_version_obj, event, auth_events_for_auth)
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
@@ -1399,9 +1407,6 @@ class FederationEventHandler:
         }
 
         try:
-            # TODO: skip the call to validate_event_for_room_version? we should already
-            #    have validated the event.
-            validate_event_for_room_version(room_version_obj, event)
             check_auth_rules_for_event(room_version_obj, event, current_auth_events)
         except AuthError as e:
             logger.warning(
