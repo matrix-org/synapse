@@ -248,18 +248,15 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     )
 
                 # Now update the room sharing tables to include this room.
-                to_insert = set()
                 is_public = await self.is_room_world_readable_or_publicly_joinable(
                     room_id
                 )
-                if is_public:
-                    for user_id in users_with_profile:
-                        to_insert.add(user_id)
-
-                    if to_insert:
-                        await self.add_users_in_public_rooms(room_id, to_insert)
-                        to_insert.clear()
+                if is_public and users_with_profile:
+                    await self.add_users_in_public_rooms(
+                        room_id, users_with_profile.keys()
+                    )
                 else:
+                    to_insert = set()
                     for user_id in users_with_profile:
                         # We want the set of pairs (L, M) where L and M are
                         # in `users_with_profile` and L is local.
