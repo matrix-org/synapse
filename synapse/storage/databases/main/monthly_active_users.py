@@ -372,7 +372,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
 
         if rows_deleted != 0:
             await self.invalidate_cache_and_stream(
-                "user_last_seen_monthly_active", (user_id)
+                "user_last_seen_monthly_active", (user_id,)
             )
             await self.invalidate_cache_and_stream("get_monthly_active_count", ())
             await self.invalidate_cache_and_stream(
