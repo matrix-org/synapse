@@ -1,3 +1,13 @@
+Synapse 1.44.0rc3 (2021-10-04)
+==============================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse v1.40.0 where changing a user's display name or avatar in a restricted room would cause an authentication error. ([\#10933](https://github.com/matrix-org/synapse/issues/10933))
+- Fix `/admin/whois/{user_id}` endpoint, which was broken in v1.44.0rc1. ([\#10968](https://github.com/matrix-org/synapse/issues/10968))
+
+
 Synapse 1.44.0rc2 (2021-09-30)
 ==============================
 
