@@ -1421,7 +1421,6 @@ class FederationEventHandler:
                 context,
                 auth_events_for_auth,
             ) = await self._update_auth_events_and_context_for_auth(
-                origin,
                 event,
                 context,
                 calculated_auth_event_map=calculated_auth_event_map,
@@ -1562,7 +1561,6 @@ class FederationEventHandler:
 
     async def _update_auth_events_and_context_for_auth(
         self,
-        origin: str,
         event: EventBase,
         context: EventContext,
         calculated_auth_event_map: StateMap[EventBase],
@@ -1579,7 +1577,6 @@ class FederationEventHandler:
         processing of the event.
 
         Args:
-            origin:
             event:
             context:
 
