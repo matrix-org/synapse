@@ -15,8 +15,8 @@
 
 from unittest.mock import Mock
 
-import synapse.rest.admin
 import synapse.api.errors
+import synapse.rest.admin
 from synapse.api.constants import EventTypes
 from synapse.config.room_directory import RoomDirectoryConfig
 from synapse.rest.client import directory, login, room
@@ -439,7 +439,7 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         directory.register_servlets,
-        room.register_servlets
+        room.register_servlets,
     ]
     hijack_auth = False
 
@@ -506,7 +506,7 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
             tok=self.allowed_access_token,
             extra_content=self.data,
             is_public=False,
-            expect_code=200
+            expect_code=200,
         )
 
     def test_can_create_as_private_room_after_rejection(self):
