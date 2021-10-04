@@ -1,3 +1,19 @@
+Synapse 1.44.0rc2 (2021-09-30)
+==============================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in v1.44.0rc1 which caused the experimental [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) `/batch_send` endpoint to return a 500 error. ([\#10938](https://github.com/matrix-org/synapse/issues/10938))
+- Fix a bug introduced in v1.44.0rc1 which prevented sending presence events to application services. ([\#10944](https://github.com/matrix-org/synapse/issues/10944))
+
+
+Improved Documentation
+----------------------
+
+- Minor updates to the installation instructions. ([\#10919](https://github.com/matrix-org/synapse/issues/10919))
+
+
 Synapse 1.44.0rc1 (2021-09-29)
 ==============================
 

@@ -217,6 +217,9 @@ class EventContentFields:
     # For "marker" events
     MSC2716_MARKER_INSERTION = "org.matrix.msc2716.marker.insertion"
 
+    # The authorising user for joining a restricted room.
+    AUTHORISING_USER = "join_authorised_via_users_server"
+
 
 class RoomTypes:
     """Understood values of the room_type field of m.room.create events."""
