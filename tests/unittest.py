@@ -317,6 +317,15 @@ class HomeserverTestCase(TestCase):
             self.reactor.advance(0.01)
             time.sleep(0.01)
 
+    def wait_for_background_updates(self) -> None:
+        """Block until we've written completed all background updates."""
+        while not self.get_success(
+            self.store.db_pool.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
+            )
+
     def make_homeserver(self, reactor, clock):
         """
         Make and return a homeserver.
