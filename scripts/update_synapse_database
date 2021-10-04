@@ -79,7 +79,7 @@ def main():
         "--run-background-updates",
         type=bool,
         required=False,
-        help="Whether to run background updates after upgrading the database schema.",
+        help="run background updates after upgrading the database schema",
     )
 
     args = parser.parse_args()
