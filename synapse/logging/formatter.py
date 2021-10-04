@@ -16,6 +16,13 @@
 import logging
 import traceback
 from io import StringIO
+from types import TracebackType
+from typing import Optional, Tuple, Type, Union
+
+ExceptionInfo = Union[
+    Tuple[Type[BaseException], BaseException, Optional[TracebackType]],
+    Tuple[None, None, None],
+]
 
 
 class LogFormatter(logging.Formatter):
@@ -28,10 +35,7 @@ class LogFormatter(logging.Formatter):
     where it was caught are logged).
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def formatException(self, ei):
+    def formatException(self, ei: ExceptionInfo) -> str:
         sio = StringIO()
         (typ, val, tb) = ei
 
