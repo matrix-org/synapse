@@ -59,7 +59,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         self.hs = self.setup_test_homeserver()
 
-        self.hs.config.registration_shared_secret = "shared"
+        self.hs.config.registration.registration_shared_secret = "shared"
 
         self.hs.get_media_repository = Mock()
         self.hs.get_deactivate_account_handler = Mock()
@@ -71,7 +71,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         If there is no shared secret, registration through this method will be
         prevented.
         """
-        self.hs.config.registration_shared_secret = None
+        self.hs.config.registration.registration_shared_secret = None
 
         channel = self.make_request("POST", self.url, b"{}")
 
