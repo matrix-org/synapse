@@ -73,7 +73,7 @@ def main():
         "--database-config",
         type=argparse.FileType("r"),
         required=True,
-        help="A database config file for either a SQLite3 database or a PostgreSQL one.",
+        help="Synapse configuration file, giving the details of the database to be updated",
     )
     parser.add_argument(
         "--run-background-updates",
