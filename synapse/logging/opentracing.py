@@ -339,6 +339,7 @@ def ensure_active_span(message, ret=None):
                     "There was no active span when trying to %s."
                     " Did you forget to start one or did a context slip?",
                     message,
+                    stack_info=True,
                 )
 
                 return ret
