@@ -41,28 +41,27 @@ logger = logging.getLogger(__name__)
 LAST_SEEN_GRANULARITY = 120 * 1000
 
 
-LastClientIpByDeviceEntry = TypedDict(
-    "LastClientIpByDeviceEntry",
-    {
-        # These types must match the columns in the `devices` table
-        "user_id": str,
-        "ip": Optional[str],
-        "user_agent": Optional[str],
-        "device_id": str,
-        "last_seen": Optional[int],
-    },
-)
+class DeviceLastConnectionInfo(TypedDict):
+    """Metadata for the last connection seen for a user and device combination"""
 
-UserIpAndAgentsEntry = TypedDict(
-    "UserIpAndAgentsEntry",
-    {
-        # These types must match the columns in the `user_ips` table
-        "access_token": str,
-        "ip": str,
-        "user_agent": str,
-        "last_seen": int,
-    },
-)
+    # These types must match the columns in the `devices` table
+    user_id: str
+    device_id: str
+
+    ip: Optional[str]
+    user_agent: Optional[str]
+    last_seen: Optional[int]
+
+
+class LastConnectionInfo(TypedDict):
+    """Metadata for the last connection seen for an access token and IP combination"""
+
+    # These types must match the columns in the `user_ips` table
+    access_token: str
+    ip: str
+
+    user_agent: str
+    last_seen: int
 
 
 class ClientIpBackgroundUpdateStore(SQLBaseStore):
@@ -450,7 +449,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
 
     async def get_last_client_ip_by_device(
         self, user_id: str, device_id: Optional[str]
-    ) -> Dict[Tuple[str, str], LastClientIpByDeviceEntry]:
+    ) -> Dict[Tuple[str, str], DeviceLastConnectionInfo]:
         """For each device_id listed, give the user_ip it was last seen on.
 
         The result might be slightly out of date as client IPs are inserted in batches.
@@ -469,7 +468,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
             keyvalues["device_id"] = device_id
 
         res = cast(
-            List[LastClientIpByDeviceEntry],
+            List[DeviceLastConnectionInfo],
             await self.db_pool.simple_select_list(
                 table="devices",
                 keyvalues=keyvalues,
@@ -586,7 +585,7 @@ class ClientIpStore(ClientIpWorkerStore, MonthlyActiveUsersStore):
 
     async def get_last_client_ip_by_device(
         self, user_id: str, device_id: Optional[str]
-    ) -> Dict[Tuple[str, str], LastClientIpByDeviceEntry]:
+    ) -> Dict[Tuple[str, str], DeviceLastConnectionInfo]:
         """For each device_id listed, give the user_ip it was last seen on
 
         Args:
@@ -622,7 +621,7 @@ class ClientIpStore(ClientIpWorkerStore, MonthlyActiveUsersStore):
 
     async def get_user_ip_and_agents(
         self, user: UserID, since_ts: int = 0
-    ) -> List[UserIpAndAgentsEntry]:
+    ) -> List[LastConnectionInfo]:
         """
         Fetch IP/User Agent connection since a given timestamp.
         """
