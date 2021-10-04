@@ -64,7 +64,7 @@ def run_background_updates(hs):
 def main():
     parser = argparse.ArgumentParser(
         description=(
-            "Updates a synapse database to the latest schema and runs background updates"
+            "Updates a synapse database to the latest schema and optionally runs background updates"
             " on it."
         )
     )
