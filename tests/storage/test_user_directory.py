@@ -12,15 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Dict, List, Set, Tuple
+from unittest.mock import Mock, patch
 
 from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.api.constants import UserTypes
+from synapse.appservice import ApplicationService
 from synapse.rest import admin
-from synapse.rest.client import login, room
+from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.util import Clock
 
+from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
 
 ALICE = "@alice:a"
@@ -64,6 +68,14 @@ class GetUserDirectoryTables:
             ["user_id", "other_user_id", "room_id"],
         )
 
+    async def get_users_in_user_directory(self) -> Set[str]:
+        result = await self.store.db_pool.simple_select_list(
+            "user_directory",
+            None,
+            ["user_id"],
+        )
+        return {row["user_id"] for row in result}
+
 
 class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
     """Ensure that rebuilding the directory writes the correct data to the DB.
@@ -74,9 +86,27 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
 
     servlets = [
         login.register_servlets,
-        admin.register_servlets_for_client_rest_resource,
+        admin.register_servlets,
         room.register_servlets,
+        register.register_servlets,
     ]
+
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+        self.appservice = ApplicationService(
+            token="i_am_an_app_service",
+            hostname="test",
+            id="1234",
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+            sender="@as:test",
+        )
+
+        mock_load_appservices = Mock(return_value=[self.appservice])
+        with patch(
+            "synapse.storage.databases.main.appservice.load_appservices",
+            mock_load_appservices,
+        ):
+            hs = super().make_homeserver(reactor, clock)
+        return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastore()
@@ -203,6 +233,118 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
             self.user_dir_helper._compress_shared(shares_private),
             {(u1, u3, private_room), (u3, u1, private_room)},
         )
+
+        # All three should have entries in the directory
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        self.assertEqual(users, {u1, u2, u3})
+
+    # The next three tests (test_population_excludes_*) all set up
+    #   - A normal user included in the user dir
+    #   - A public and private room created by that user
+    #   - A user excluded from the room dir, belonging to both rooms
+
+    # They match similar logic in handlers/test_user_directory.py But that tests
+    # updating the directory; this tests rebuilding it from scratch.
+
+    def _create_rooms_and_inject_memberships(
+        self, creator: str, token: str, joiner: str
+    ) -> Tuple[str, str]:
+        """Create a public and private room as a normal user.
+        Then get the `joiner` into those rooms.
+        """
+        public_room = self.helper.create_room_as(
+            creator,
+            is_public=True,
+            # See https://github.com/matrix-org/synapse/issues/10951
+            extra_content={"visibility": "public"},
+            tok=token,
+        )
+        private_room = self.helper.create_room_as(creator, is_public=False, tok=token)
+
+        # HACK: get the user into these rooms
+        self.get_success(inject_member_event(self.hs, public_room, joiner, "join"))
+        self.get_success(inject_member_event(self.hs, private_room, joiner, "join"))
+
+        return public_room, private_room
+
+    def _check_room_sharing_tables(
+        self, normal_user: str, public_room: str, private_room: str
+    ) -> None:
+        # After rebuilding the directory, we should only see the normal user.
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        self.assertEqual(users, {normal_user})
+        in_public_rooms = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
+        self.assertEqual(set(in_public_rooms), {(normal_user, public_room)})
+        in_private_rooms = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        self.assertEqual(in_private_rooms, [])
+
+    def test_population_excludes_support_user(self) -> None:
+        # Create a normal and support user.
+        user = self.register_user("user", "pass")
+        token = self.login(user, "pass")
+        support = "@support1:test"
+        self.get_success(
+            self.store.register_user(
+                user_id=support, password_hash=None, user_type=UserTypes.SUPPORT
+            )
+        )
+
+        # Join the support user to rooms owned by the normal user.
+        public, private = self._create_rooms_and_inject_memberships(
+            user, token, support
+        )
+
+        # Rebuild the directory.
+        self._purge_and_rebuild_user_dir()
+
+        # Check the support user is not in the directory.
+        self._check_room_sharing_tables(user, public, private)
+
+    def test_population_excludes_deactivated_user(self) -> None:
+        user = self.register_user("naughty", "pass")
+        admin = self.register_user("admin", "pass", admin=True)
+        admin_token = self.login(admin, "pass")
+
+        # Deactivate the user.
+        channel = self.make_request(
+            "PUT",
+            f"/_synapse/admin/v2/users/{user}",
+            access_token=admin_token,
+            content={"deactivated": True},
+        )
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["deactivated"], True)
+
+        # Join the deactivated user to rooms owned by the admin.
+        # Is this something that could actually happen outside of a test?
+        public, private = self._create_rooms_and_inject_memberships(
+            admin, admin_token, user
+        )
+
+        # Rebuild the user dir. The deactivated user should be missing.
+        self._purge_and_rebuild_user_dir()
+        self._check_room_sharing_tables(admin, public, private)
+
+    def test_population_excludes_appservice_user(self) -> None:
+        # Register an AS user.
+        user = self.register_user("user", "pass")
+        token = self.login(user, "pass")
+        as_user = self.register_appservice_user("as_user_potato", self.appservice.token)
+
+        # Join the AS user to rooms owned by the normal user.
+        public, private = self._create_rooms_and_inject_memberships(
+            user, token, as_user
+        )
+
+        # Rebuild the directory.
+        self._purge_and_rebuild_user_dir()
+
+        # Check the AS user is not in the directory.
+        self._check_room_sharing_tables(user, public, private)
 
 
 class UserDirectoryStoreTestCase(HomeserverTestCase):
