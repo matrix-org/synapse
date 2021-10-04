@@ -216,20 +216,6 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         self.helper.invite(private_room, src=u1, targ=u3, tok=u1_token)
         self.helper.join(private_room, user=u3, tok=u3_token)
 
-        self.get_success(self.store.update_user_directory_stream_pos(None))
-        self.get_success(self.store.delete_all_from_user_dir())
-
-        shares_private = self.get_success(
-            self.user_dir_helper.get_users_who_share_private_rooms()
-        )
-        public_users = self.get_success(
-            self.user_dir_helper.get_users_in_public_rooms()
-        )
-
-        # Nothing updated yet
-        self.assertEqual(shares_private, [])
-        self.assertEqual(public_users, [])
-
         # Do the initial population of the user directory via the background update
         self._purge_and_rebuild_user_dir()
 
