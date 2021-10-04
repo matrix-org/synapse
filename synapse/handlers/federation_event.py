@@ -1417,12 +1417,8 @@ class FederationEventHandler:
         }
 
         try:
-            (
-                context,
-                auth_events_for_auth,
-            ) = await self._update_auth_events_and_context_for_auth(
+            updated_auth_events = await self._update_auth_events_for_auth(
                 event,
-                context,
                 calculated_auth_event_map=calculated_auth_event_map,
             )
         except Exception:
@@ -1435,6 +1431,14 @@ class FederationEventHandler:
                 "Ignoring failure and continuing processing of event.",
                 event.event_id,
             )
+            updated_auth_events = None
+
+        if updated_auth_events:
+            context = await self._update_context_for_auth_events(
+                event, context, updated_auth_events
+            )
+            auth_events_for_auth = updated_auth_events
+        else:
             auth_events_for_auth = calculated_auth_event_map
 
         try:
@@ -1559,12 +1563,11 @@ class FederationEventHandler:
             soft_failed_event_counter.inc()
             event.internal_metadata.soft_failed = True
 
-    async def _update_auth_events_and_context_for_auth(
+    async def _update_auth_events_for_auth(
         self,
         event: EventBase,
-        context: EventContext,
         calculated_auth_event_map: StateMap[EventBase],
-    ) -> Tuple[EventContext, StateMap[EventBase]]:
+    ) -> Optional[StateMap[EventBase]]:
         """Helper for _check_event_auth. See there for docs.
 
         Checks whether a given event has the expected auth events. If it
@@ -1578,14 +1581,14 @@ class FederationEventHandler:
 
         Args:
             event:
-            context:
 
             calculated_auth_event_map:
                 Our calculated auth_events based on the state of the room
                 at the event's position in the DAG.
 
         Returns:
-            updated context, updated auth event map
+            updated auth event map, or None if no changes are needed.
+
         """
         assert not event.internal_metadata.outlier
 
@@ -1597,7 +1600,7 @@ class FederationEventHandler:
         )
 
         if not different_auth:
-            return context, calculated_auth_event_map
+            return None
 
         logger.info(
             "auth_events refers to events which are not in our calculated auth "
@@ -1635,7 +1638,7 @@ class FederationEventHandler:
         }
         if not different_state:
             logger.info("State res returned no new state")
-            return context, calculated_auth_event_map
+            return None
 
         logger.info(
             "After state res: updating auth_events with new state %s",
@@ -1645,12 +1648,7 @@ class FederationEventHandler:
         # take a copy of calculated_auth_event_map before we modify it.
         auth_events: MutableStateMap[EventBase] = dict(calculated_auth_event_map)
         auth_events.update(different_state)
-
-        context = await self._update_context_for_auth_events(
-            event, context, auth_events
-        )
-
-        return context, auth_events
+        return auth_events
 
     async def _load_or_fetch_auth_events_for_event(
         self, destination: str, event: EventBase
