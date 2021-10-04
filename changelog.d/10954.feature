@@ -1,1 +1,1 @@
-Add `--run-background-updates` option to `update_database` script. Contributed by @Fizzadar at Beeper.
+Include an `update_synapse_database` script in the distribution. Contributed by @Fizzadar at Beeper.
