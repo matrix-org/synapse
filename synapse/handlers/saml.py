@@ -16,10 +16,10 @@ import re
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Set, Tuple
 
 import attr
+import saml2
 import saml2.response
 from saml2.client import Saml2Client
 
-import saml2
 from synapse.api.errors import SynapseError
 from synapse.config import ConfigError
 from synapse.handlers._base import BaseHandler
