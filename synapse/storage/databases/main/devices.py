@@ -1082,7 +1082,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             """
 
             txn.execute(sql, (last_device_id, batch_size))
-            device_ids_to_delete = txn.fetchall()
+            device_ids_to_delete = [row[0] for row in txn]
 
             count_deleted_devices = self.db_pool.simple_delete_many_txn(
                 txn,
@@ -1195,18 +1195,21 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             user_id: The ID of the user which owns the device
             device_id: The ID of the device to delete
         """
-        await self.db_pool.simple_delete_one(
-            table="devices",
-            keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
-            desc="delete_device",
-        )
 
-        await self.db_pool.simple_delete(
-            table="device_inbox",
-            keyvalues={"user_id": user_id, "device_id": device_id},
-            desc="delete_device_inbox",
-        )
+        def _delete_device_txn(txn: LoggingTransaction) -> None:
+            self.db_pool.simple_delete_one(
+                table="devices",
+                keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
+                desc="delete_device",
+            )
 
+            self.db_pool.simple_delete(
+                table="device_inbox",
+                keyvalues={"user_id": user_id, "device_id": device_id},
+                desc="delete_device_inbox",
+            )
+
+        return await self.db_pool.runInteraction("delete_device", _delete_device_txn)
         self.device_id_exists_cache.invalidate((user_id, device_id))
 
     async def delete_devices(self, user_id: str, device_ids: List[str]) -> None:
@@ -1216,22 +1219,25 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             user_id: The ID of the user which owns the devices
             device_ids: The IDs of the devices to delete
         """
-        await self.db_pool.simple_delete_many(
-            table="devices",
-            column="device_id",
-            iterable=device_ids,
-            keyvalues={"user_id": user_id, "hidden": False},
-            desc="delete_devices",
-        )
 
-        await self.db_pool.simple_delete_many(
-            table="device_inbox",
-            column="device_id",
-            iterable=device_ids,
-            keyvalues={"user_id": user_id},
-            desc="delete_devices_inbox",
-        )
+        def _delete_devices_txn(txn: LoggingTransaction) -> None:
+            self.db_pool.simple_delete_many(
+                table="devices",
+                column="device_id",
+                iterable=device_ids,
+                keyvalues={"user_id": user_id, "hidden": False},
+                desc="delete_devices",
+            )
 
+            self.db_pool.simple_delete_many(
+                table="device_inbox",
+                column="device_id",
+                iterable=device_ids,
+                keyvalues={"user_id": user_id},
+                desc="delete_devices_inbox",
+            )
+
+        return await self.db_pool.runInteraction("delete_devices", _delete_devices_txn)
         for device_id in device_ids:
             self.device_id_exists_cache.invalidate((user_id, device_id))
 
