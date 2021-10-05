@@ -1225,7 +1225,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 txn,
                 table="devices",
                 column="device_id",
-                iterable=device_ids,
+                values=device_ids,
                 keyvalues={"user_id": user_id, "hidden": False},
             )
 
@@ -1233,7 +1233,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 txn,
                 table="device_inbox",
                 column="device_id",
-                iterable=device_ids,
+                values=device_ids,
                 keyvalues={"user_id": user_id},
             )
 
