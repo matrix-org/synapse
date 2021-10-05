@@ -1,1 +1,1 @@
-Fix spurious "Expected logging context replication_command_handler-############### was lost" warnings when losing the replication connection.
+Fix spurious warnings about losing the logging context on the `ReplicationCommandHandler` when losing the replication connection.
