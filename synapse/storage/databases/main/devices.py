@@ -1197,16 +1197,16 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         """
 
         def _delete_device_txn(txn: LoggingTransaction) -> None:
-            self.db_pool.simple_delete_one(
+            self.db_pool.simple_delete_one_txn(
+                txn,
                 table="devices",
                 keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
-                desc="delete_device",
             )
 
-            self.db_pool.simple_delete(
+            self.db_pool.simple_delete_txn(
+                txn,
                 table="device_inbox",
                 keyvalues={"user_id": user_id, "device_id": device_id},
-                desc="delete_device_inbox",
             )
 
         await self.db_pool.runInteraction("delete_device", _delete_device_txn)
@@ -1221,20 +1221,20 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         """
 
         def _delete_devices_txn(txn: LoggingTransaction) -> None:
-            self.db_pool.simple_delete_many(
+            self.db_pool.simple_delete_many_txn(
+                txn,
                 table="devices",
                 column="device_id",
                 iterable=device_ids,
                 keyvalues={"user_id": user_id, "hidden": False},
-                desc="delete_devices",
             )
 
-            self.db_pool.simple_delete_many(
+            self.db_pool.simple_delete_many_txn(
+                txn,
                 table="device_inbox",
                 column="device_id",
                 iterable=device_ids,
                 keyvalues={"user_id": user_id},
-                desc="delete_devices_inbox",
             )
 
         await self.db_pool.runInteraction("delete_devices", _delete_devices_txn)
