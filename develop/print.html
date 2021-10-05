@@ -2614,7 +2614,7 @@ in the local HS will automatically rejoin the room.</p>
 <h2 id="historical-note"><a class="header" href="#historical-note">Historical Note</a></h2>
 <p>This document was originally written to guide server admins through the upgrade
 path towards Synapse 1.0. Specifically,
-<a href="https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md">MSC1711</a>
+<a href="https://github.com/matrix-org/matrix-doc/blob/main/proposals/1711-x509-for-federation.md">MSC1711</a>
 required that all servers present valid TLS certificates on their federation
 API. Admins were encouraged to achieve compliance from version 0.99.0 (released
 in February 2019) ahead of version 1.0 (released June 2019) enforcing the
@@ -2849,7 +2849,7 @@ coffin of the Perspectives project (which was already pretty dead). So, the
 Spec Core Team decided that a better approach would be to mandate valid TLS
 certificates for federation alongside the rest of the Web. More details can be
 found in
-<a href="https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md#background-the-failure-of-the-perspectives-approach">MSC1711</a>.</p>
+<a href="https://github.com/matrix-org/matrix-doc/blob/main/proposals/1711-x509-for-federation.md#background-the-failure-of-the-perspectives-approach">MSC1711</a>.</p>
 <p>This results in a breaking change, which is disruptive, but absolutely critical
 for the security model. However, the existence of Let's Encrypt as a trivial
 way to replace the old self-signed certificates with valid CA-signed ones helps
@@ -9112,7 +9112,8 @@ def generate_mac(nonce, user, password, admin=False, user_type=None):
 </code></pre>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="registration-tokens"><a class="header" href="#registration-tokens">Registration Tokens</a></h1>
 <p>This API allows you to manage tokens which can be used to authenticate
-registration requests, as proposed in <a href="https://github.com/govynnus/matrix-doc/blob/token-registration/proposals/3231-token-authenticated-registration.md">MSC3231</a>.
+registration requests, as proposed in
+<a href="https://github.com/matrix-org/matrix-doc/blob/main/proposals/3231-token-authenticated-registration.md">MSC3231</a>.
 To use it, you will need to enable the <code>registration_requires_token</code> config
 option, and authenticate by providing an <code>access_token</code> for a server admin:
 see <a href="usage/administration/admin_api/../../usage/administration/admin_api">Admin API</a>.
