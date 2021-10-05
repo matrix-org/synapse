@@ -154,7 +154,8 @@ setup(
     python_requires="~=3.6",
     entry_points={
         'console_scripts': [
-            'homeserver = synapse.app.homeserver:main'
+            'homeserver = synapse.app.homeserver:main',
+            'worker = synapse.app.generic_worker:main'
         ]
     },
     classifiers=[
