@@ -1065,34 +1065,41 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             The number of deleted rows
         """
 
+        last_device_id = progress.get("device_id", "")
+
         def _remove_deleted_devices_from_device_inbox_txn(
             txn: LoggingTransaction,
         ) -> int:
 
             sql = """
-                SELECT user_id, device_id, stream_id
+                SELECT device_id
                     FROM device_inbox
                     WHERE device_id
                         NOT IN (SELECT device_id FROM devices)
+                        AND device_id > ?
+                    ORDER BY device_id ASC
                     LIMIT ?;
             """
 
-            txn.execute(sql, (batch_size,))
-            rows = txn.fetchall()
+            txn.execute(sql, (last_device_id, batch_size))
+            device_ids_to_delete = txn.fetchall()
 
-            for row in rows:
-                self.db_pool.simple_delete_txn(
-                    txn,
-                    "device_inbox",
-                    {"user_id": row[0], "device_id": row[1], "stream_id": row[2]},
-                )
+            count_deleted_devices = self.db_pool.simple_delete_many_txn(
+                txn,
+                "device_inbox",
+                column="device_id",
+                values=device_ids_to_delete,
+                keyvalues={},
+            )
 
-            if rows:
+            if device_ids_to_delete:
                 self.db_pool.updates._background_update_progress_txn(
-                    txn, "remove_deleted_devices_from_device_inbox", row
+                    txn,
+                    "remove_deleted_devices_from_device_inbox",
+                    {"device_id": device_ids_to_delete[-1]},
                 )
 
-            return len(rows)
+            return count_deleted_devices
 
         number_deleted = await self.db_pool.runInteraction(
             "_remove_deleted_devices_from_device_inbox",
