@@ -1209,7 +1209,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 desc="delete_device_inbox",
             )
 
-        return await self.db_pool.runInteraction("delete_device", _delete_device_txn)
+        await self.db_pool.runInteraction("delete_device", _delete_device_txn)
         self.device_id_exists_cache.invalidate((user_id, device_id))
 
     async def delete_devices(self, user_id: str, device_ids: List[str]) -> None:
@@ -1237,7 +1237,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 desc="delete_devices_inbox",
             )
 
-        return await self.db_pool.runInteraction("delete_devices", _delete_devices_txn)
+        await self.db_pool.runInteraction("delete_devices", _delete_devices_txn)
         for device_id in device_ids:
             self.device_id_exists_cache.invalidate((user_id, device_id))
 
