@@ -1,0 +1,1 @@
+Log stack traces when a missing opentracing span is detected.

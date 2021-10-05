@@ -1710,7 +1710,7 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         We do this by grandfathering in existing user threepids assuming that
         they used one of the server configured trusted identity servers.
         """
-        id_servers = set(self.config.trusted_third_party_id_servers)
+        id_servers = set(self.config.registration.trusted_third_party_id_servers)
 
         def _bg_user_threepids_grandfather_txn(txn):
             sql = """

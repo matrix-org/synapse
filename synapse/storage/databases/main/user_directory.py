@@ -40,12 +40,10 @@ from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
-
 TEMP_TABLE = "_temp_populate_user_directory"
 
 
 class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
-
     # How many records do we calculate before sending it to
     # add_users_who_share_private_rooms?
     SHARE_PRIVATE_WORKING_SET = 500
@@ -235,6 +233,13 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 )
 
                 users_with_profile = await self.get_users_in_room_with_profiles(room_id)
+                # Throw away users excluded from the directory.
+                users_with_profile = {
+                    user_id: profile
+                    for user_id, profile in users_with_profile.items()
+                    if not self.hs.is_mine_id(user_id)
+                    or await self.should_include_local_user_in_dir(user_id)
+                }
 
                 # Update each user in the user directory.
                 for user_id, profile in users_with_profile.items():
@@ -246,9 +251,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
                 if is_public:
                     for user_id in users_with_profile:
-                        if self.get_if_app_services_interested_in_user(user_id):
-                            continue
-
                         to_insert.add(user_id)
 
                     if to_insert:
@@ -256,10 +258,10 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                         to_insert.clear()
                 else:
                     for user_id in users_with_profile:
+                        # We want the set of pairs (L, M) where L and M are
+                        # in `users_with_profile` and L is local.
+                        # Do so by looking for the local user L first.
                         if not self.hs.is_mine_id(user_id):
-                            continue
-
-                        if self.get_if_app_services_interested_in_user(user_id):
                             continue
 
                         for other_user_id in users_with_profile:
@@ -349,10 +351,11 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
 
         for user_id in users_to_work_on:
-            profile = await self.get_profileinfo(get_localpart_from_id(user_id))
-            await self.update_profile_in_user_dir(
-                user_id, profile.display_name, profile.avatar_url
-            )
+            if await self.should_include_local_user_in_dir(user_id):
+                profile = await self.get_profileinfo(get_localpart_from_id(user_id))
+                await self.update_profile_in_user_dir(
+                    user_id, profile.display_name, profile.avatar_url
+                )
 
             # We've finished processing a user. Delete it from the table.
             await self.db_pool.simple_delete_one(
@@ -368,6 +371,24 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             )
 
         return len(users_to_work_on)
+
+    async def should_include_local_user_in_dir(self, user: str) -> bool:
+        """Certain classes of local user are omitted from the user directory.
+        Is this user one of them?
+        """
+        # App service users aren't usually contactable, so exclude them.
+        if self.get_if_app_services_interested_in_user(user):
+            # TODO we might want to make this configurable for each app service
+            return False
+
+        # Support users are for diagnostics and should not appear in the user directory.
+        if await self.is_support_user(user):
+            return False
+
+        # Deactivated users aren't contactable, so should not appear in the user directory.
+        if await self.get_user_deactivated_status(user):
+            return False
+        return True
 
     async def is_room_world_readable_or_publicly_joinable(self, room_id: str) -> bool:
         """Check if the room is either world_readable or publically joinable"""
@@ -537,7 +558,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
 
 class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
-
     # How many records do we calculate before sending it to
     # add_users_who_share_private_rooms?
     SHARE_PRIVATE_WORKING_SET = 500
