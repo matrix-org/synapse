@@ -77,7 +77,7 @@ def main():
     )
     parser.add_argument(
         "--run-background-updates",
-        action='store_true',
+        action="store_true",
         required=False,
         help="run background updates after upgrading the database schema",
     )
