@@ -6,10 +6,9 @@ Please update any links to point to the new website instead.
 ## About
 
 This directory currently holds a series of markdown files documenting how to install, use
-and develop Synapse, a Matrix "homeserver" implementation developed by the matrix.org core 
-team. The documentation is readable directly from this repository, but it is recommended 
-to instead browse through the [website](https://matrix-org.github.io/synapse) for easier 
-discoverability.
+and develop Synapse. The documentation is readable directly from this repository, but it is 
+recommended to instead browse through the [website](https://matrix-org.github.io/synapse) for 
+easier discoverability.
 
 ## Adding to the documentation
 
