@@ -74,8 +74,8 @@ class ServerContextFactory(ContextFactory):
         context.set_options(
             SSL.OP_NO_SSLv2 | SSL.OP_NO_SSLv3 | SSL.OP_NO_TLSv1 | SSL.OP_NO_TLSv1_1
         )
-        context.use_certificate_chain_file(config.tls_certificate_file)
-        context.use_privatekey(config.tls_private_key)
+        context.use_certificate_chain_file(config.tls.tls_certificate_file)
+        context.use_privatekey(config.tls.tls_private_key)
 
         # https://hynek.me/articles/hardening-your-web-servers-ssl-ciphers/
         context.set_cipher_list(

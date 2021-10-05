@@ -1179,4 +1179,4 @@ def _child_events_comparison_key(
         order = None
 
     # Items without an order come last.
-    return (order is None, order, child.origin_server_ts, child.room_id)
+    return order is None, order, child.origin_server_ts, child.room_id

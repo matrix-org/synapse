@@ -74,7 +74,7 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     store = hs.get_datastore()
 
     stats["homeserver"] = hs.config.server.server_name
-    stats["server_context"] = hs.config.server_context
+    stats["server_context"] = hs.config.server.server_context
     stats["timestamp"] = now
     stats["uptime_seconds"] = uptime
     version = sys.version_info
@@ -131,10 +131,12 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     log_level = synapse_logger.getEffectiveLevel()
     stats["log_level"] = logging.getLevelName(log_level)
 
-    logger.info("Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats))
+    logger.info(
+        "Reporting stats to %s: %s" % (hs.config.metrics.report_stats_endpoint, stats)
+    )
     try:
         await hs.get_proxied_http_client().put_json(
-            hs.config.report_stats_endpoint, stats
+            hs.config.metrics.report_stats_endpoint, stats
         )
     except Exception as e:
         logger.warning("Error reporting stats: %s", e)
@@ -169,7 +171,7 @@ def start_phone_stats_home(hs):
         current_mau_count_by_service = {}
         reserved_users = ()
         store = hs.get_datastore()
-        if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
+        if hs.config.server.limit_usage_by_mau or hs.config.server.mau_stats_only:
             current_mau_count = await store.get_monthly_active_count()
             current_mau_count_by_service = (
                 await store.get_monthly_active_count_by_service()
@@ -181,14 +183,14 @@ def start_phone_stats_home(hs):
             current_mau_by_service_gauge.labels(app_service).set(float(count))
 
         registered_reserved_users_mau_gauge.set(float(len(reserved_users)))
-        max_mau_gauge.set(float(hs.config.max_mau_value))
+        max_mau_gauge.set(float(hs.config.server.max_mau_value))
 
-    if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
+    if hs.config.server.limit_usage_by_mau or hs.config.server.mau_stats_only:
         generate_monthly_active_users()
         clock.looping_call(generate_monthly_active_users, 5 * 60 * 1000)
     # End of monthly active user settings
 
-    if hs.config.report_stats:
+    if hs.config.metrics.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
         clock.looping_call(phone_stats_home, 3 * 60 * 60 * 1000, hs, stats)
 

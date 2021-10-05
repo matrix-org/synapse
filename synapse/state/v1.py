@@ -329,12 +329,10 @@ def _resolve_auth_events(
         auth_events[(prev_event.type, prev_event.state_key)] = prev_event
         try:
             # The signatures have already been checked at this point
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V1,
                 event,
                 auth_events,
-                do_sig_check=False,
-                do_size_check=False,
             )
             prev_event = event
         except AuthError:
@@ -349,12 +347,10 @@ def _resolve_normal_events(
     for event in _ordered_events(events):
         try:
             # The signatures have already been checked at this point
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V1,
                 event,
                 auth_events,
-                do_sig_check=False,
-                do_size_check=False,
             )
             return event
         except AuthError:

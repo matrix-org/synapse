@@ -52,6 +52,7 @@ from synapse.api.errors import (
 )
 from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
 from synapse.events.utils import copy_power_levels_contents
 from synapse.rest.admin._base import assert_user_is_admin
@@ -126,7 +127,7 @@ class RoomCreationHandler(BaseHandler):
         for preset_name, preset_config in self._presets_dict.items():
             encrypted = (
                 preset_name
-                in self.config.encryption_enabled_by_default_for_room_presets
+                in self.config.room.encryption_enabled_by_default_for_room_presets
             )
             preset_config["encrypted"] = encrypted
 
@@ -141,7 +142,7 @@ class RoomCreationHandler(BaseHandler):
         self._upgrade_response_cache: ResponseCache[Tuple[str, str]] = ResponseCache(
             hs.get_clock(), "room_upgrade", timeout_ms=FIVE_MINUTES_IN_MS
         )
-        self._server_notices_mxid = hs.config.server_notices_mxid
+        self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
 
@@ -237,8 +238,9 @@ class RoomCreationHandler(BaseHandler):
                 },
             },
         )
-        old_room_version = await self.store.get_room_version_id(old_room_id)
-        await self._event_auth_handler.check_from_context(
+        old_room_version = await self.store.get_room_version(old_room_id)
+        validate_event_for_room_version(old_room_version, tombstone_event)
+        await self._event_auth_handler.check_auth_rules_from_context(
             old_room_version, tombstone_event, tombstone_context
         )
 
@@ -649,8 +651,16 @@ class RoomCreationHandler(BaseHandler):
             requester, config, is_requester_admin=is_requester_admin
         )
 
-        if not is_requester_admin and not await self.spam_checker.user_may_create_room(
-            user_id
+        invite_3pid_list = config.get("invite_3pid", [])
+        invite_list = config.get("invite", [])
+
+        if not is_requester_admin and not (
+            await self.spam_checker.user_may_create_room(user_id)
+            and await self.spam_checker.user_may_create_room_with_invites(
+                user_id,
+                invite_list,
+                invite_3pid_list,
+            )
         ):
             raise SynapseError(403, "You are not permitted to create rooms")
 
@@ -658,7 +668,7 @@ class RoomCreationHandler(BaseHandler):
             await self.ratelimit(requester)
 
         room_version_id = config.get(
-            "room_version", self.config.default_room_version.identifier
+            "room_version", self.config.server.default_room_version.identifier
         )
 
         if not isinstance(room_version_id, str):
@@ -684,8 +694,6 @@ class RoomCreationHandler(BaseHandler):
             if mapping:
                 raise SynapseError(400, "Room alias already taken", Codes.ROOM_IN_USE)
 
-        invite_3pid_list = config.get("invite_3pid", [])
-        invite_list = config.get("invite", [])
         for i in invite_list:
             try:
                 uid = UserID.from_string(i)
@@ -757,7 +765,9 @@ class RoomCreationHandler(BaseHandler):
             )
 
         if is_public:
-            if not self.config.is_publishing_room_allowed(user_id, room_id, room_alias):
+            if not self.config.roomdirectory.is_publishing_room_allowed(
+                user_id, room_id, room_alias
+            ):
                 # Lets just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages
                 # per alias creation rule?
@@ -1235,7 +1245,7 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
             else:
                 end_key = to_key
 
-        return (events, end_key)
+        return events, end_key
 
     def get_current_key(self) -> RoomStreamToken:
         return self.store.get_room_max_token()

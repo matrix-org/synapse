@@ -57,12 +57,12 @@ class IdentityHandler(BaseHandler):
         self.http_client = SimpleHttpClient(hs)
         # An HTTP client for contacting identity servers specified by clients.
         self.blacklisting_http_client = SimpleHttpClient(
-            hs, ip_blacklist=hs.config.federation_ip_range_blacklist
+            hs, ip_blacklist=hs.config.server.federation_ip_range_blacklist
         )
         self.federation_http_client = hs.get_federation_http_client()
         self.hs = hs
 
-        self._web_client_location = hs.config.invite_client_location
+        self._web_client_location = hs.config.email.invite_client_location
 
         # Ratelimiters for `/requestToken` endpoints.
         self._3pid_validation_ratelimiter_ip = Ratelimiter(
@@ -419,7 +419,7 @@ class IdentityHandler(BaseHandler):
 
         token_expires = (
             self.hs.get_clock().time_msec()
-            + self.hs.config.email_validation_token_lifetime
+            + self.hs.config.email.email_validation_token_lifetime
         )
 
         await self.store.start_or_continue_validation_session(
@@ -465,7 +465,7 @@ class IdentityHandler(BaseHandler):
         if next_link:
             params["next_link"] = next_link
 
-        if self.hs.config.using_identity_server_from_trusted_list:
+        if self.hs.config.email.using_identity_server_from_trusted_list:
             # Warn that a deprecated config option is in use
             logger.warning(
                 'The config option "trust_identity_server_for_password_resets" '
@@ -518,7 +518,7 @@ class IdentityHandler(BaseHandler):
         if next_link:
             params["next_link"] = next_link
 
-        if self.hs.config.using_identity_server_from_trusted_list:
+        if self.hs.config.email.using_identity_server_from_trusted_list:
             # Warn that a deprecated config option is in use
             logger.warning(
                 'The config option "trust_identity_server_for_password_resets" '
@@ -572,12 +572,18 @@ class IdentityHandler(BaseHandler):
         validation_session = None
 
         # Try to validate as email
-        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+        if self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            # Remote emails will only be used if a valid identity server is provided.
+            assert (
+                self.hs.config.registration.account_threepid_delegate_email is not None
+            )
+
             # Ask our delegated email identity server
             validation_session = await self.threepid_from_creds(
-                self.hs.config.account_threepid_delegate_email, threepid_creds
+                self.hs.config.registration.account_threepid_delegate_email,
+                threepid_creds,
             )
-        elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        elif self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             # Get a validated session matching these details
             validation_session = await self.store.get_threepid_validation_session(
                 "email", client_secret, sid=sid, validated=True
@@ -587,10 +593,11 @@ class IdentityHandler(BaseHandler):
             return validation_session
 
         # Try to validate as msisdn
-        if self.hs.config.account_threepid_delegate_msisdn:
+        if self.hs.config.registration.account_threepid_delegate_msisdn:
             # Ask our delegated msisdn identity server
             validation_session = await self.threepid_from_creds(
-                self.hs.config.account_threepid_delegate_msisdn, threepid_creds
+                self.hs.config.registration.account_threepid_delegate_msisdn,
+                threepid_creds,
             )
 
         return validation_session

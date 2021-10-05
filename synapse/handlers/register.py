@@ -97,7 +97,8 @@ class RegistrationHandler(BaseHandler):
         self.ratelimiter = hs.get_registration_ratelimiter()
         self.macaroon_gen = hs.get_macaroon_generator()
         self._account_validity_handler = hs.get_account_validity_handler()
-        self._server_notices_mxid = hs.config.server_notices_mxid
+        self._user_consent_version = self.hs.config.consent.user_consent_version
+        self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self._server_name = hs.hostname
 
         self.spam_checker = hs.get_spam_checker()
@@ -115,8 +116,8 @@ class RegistrationHandler(BaseHandler):
             self._register_device_client = self.register_device_inner
             self.pusher_pool = hs.get_pusherpool()
 
-        self.session_lifetime = hs.config.session_lifetime
-        self.access_token_lifetime = hs.config.access_token_lifetime
+        self.session_lifetime = hs.config.registration.session_lifetime
+        self.access_token_lifetime = hs.config.registration.access_token_lifetime
 
         init_counters_for_auth_provider("")
 
@@ -339,8 +340,13 @@ class RegistrationHandler(BaseHandler):
             auth_provider=(auth_provider_id or ""),
         ).inc()
 
-        if not self.hs.config.user_consent_at_registration:
-            if not self.hs.config.auto_join_rooms_for_guests and make_guest:
+        # If the user does not need to consent at registration, auto-join any
+        # configured rooms.
+        if not self.hs.config.consent.user_consent_at_registration:
+            if (
+                not self.hs.config.registration.auto_join_rooms_for_guests
+                and make_guest
+            ):
                 logger.info(
                     "Skipping auto-join for %s because auto-join for guests is disabled",
                     user_id,
@@ -386,7 +392,7 @@ class RegistrationHandler(BaseHandler):
             "preset": self.hs.config.registration.autocreate_auto_join_room_preset,
         }
 
-        # If the configuration providers a user ID to create rooms with, use
+        # If the configuration provides a user ID to create rooms with, use
         # that instead of the first user registered.
         requires_join = False
         if self.hs.config.registration.auto_join_user_id:
@@ -853,7 +859,7 @@ class RegistrationHandler(BaseHandler):
             # Necessary due to auth checks prior to the threepid being
             # written to the db
             if is_threepid_reserved(
-                self.hs.config.mau_limits_reserved_threepids, threepid
+                self.hs.config.server.mau_limits_reserved_threepids, threepid
             ):
                 await self.store.upsert_monthly_active_user(user_id)
 
@@ -864,7 +870,9 @@ class RegistrationHandler(BaseHandler):
             await self._register_msisdn_threepid(user_id, threepid)
 
         if auth_result and LoginType.TERMS in auth_result:
-            await self._on_user_consented(user_id, self.hs.config.user_consent_version)
+            # The terms type should only exist if consent is enabled.
+            assert self._user_consent_version is not None
+            await self._on_user_consented(user_id, self._user_consent_version)
 
     async def _on_user_consented(self, user_id: str, consent_version: str) -> None:
         """A user consented to the terms on registration
@@ -910,8 +918,8 @@ class RegistrationHandler(BaseHandler):
         # getting mail spam where they weren't before if email
         # notifs are set up on a homeserver)
         if (
-            self.hs.config.email_enable_notifs
-            and self.hs.config.email_notif_for_new_users
+            self.hs.config.email.email_enable_notifs
+            and self.hs.config.email.email_notif_for_new_users
             and token
         ):
             # Pull the ID of the access token back out of the db

@@ -21,10 +21,13 @@ from twisted.internet.error import DNSLookupError
 from twisted.test.proto_helpers import AccumulatingProtocol
 
 from synapse.config.oembed import OEmbedEndpointConfig
+from synapse.rest.media.v1.preview_url_resource import IMAGE_CACHE_EXPIRY_MS
+from synapse.util.stringutils import parse_and_validate_mxc_uri
 
 from tests import unittest
 from tests.server import FakeTransport
 from tests.test_utils import SMALL_PNG
+from tests.utils import MockClock
 
 try:
     import lxml
@@ -725,12 +728,10 @@ class URLPreviewTests(unittest.HomeserverTestCase):
     def test_oembed_autodiscovery(self):
         """
         Autodiscovery works by finding the link in the HTML response and then requesting an oEmbed URL.
-
         1. Request a preview of a URL which is not known to the oEmbed code.
         2. It returns HTML including a link to an oEmbed preview.
         3. The oEmbed preview is requested and returns a URL for an image.
         4. The image is requested for thumbnailing.
-
         """
         # This is a little cheesy in that we use the www subdomain (which isn't the
         # list of oEmbed patterns) to get "raw" HTML response.
@@ -822,3 +823,160 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(body["og:image:height"], 1)
         self.assertEqual(body["og:image:width"], 1)
         self.assertEqual(body["og:image:type"], "image/png")
+
+    def _download_image(self):
+        """Downloads an image into the URL cache.
+        Returns:
+            A (host, media_id) tuple representing the MXC URI of the image.
+        """
+        self.lookups["cdn.twitter.com"] = [(IPv4Address, "10.1.2.3")]
+
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://cdn.twitter.com/matrixdotorg",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\nContent-Type: image/png\r\n\r\n"
+            % (len(SMALL_PNG),)
+            + SMALL_PNG
+        )
+
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        body = channel.json_body
+        mxc_uri = body["og:image"]
+        host, _port, media_id = parse_and_validate_mxc_uri(mxc_uri)
+        self.assertIsNone(_port)
+        return host, media_id
+
+    def test_storage_providers_exclude_files(self):
+        """Test that files are not stored in or fetched from storage providers."""
+        host, media_id = self._download_image()
+
+        rel_file_path = self.preview_url.filepaths.url_cache_filepath_rel(media_id)
+        media_store_path = os.path.join(self.media_store_path, rel_file_path)
+        storage_provider_path = os.path.join(self.storage_path, rel_file_path)
+
+        # Check storage
+        self.assertTrue(os.path.isfile(media_store_path))
+        self.assertFalse(
+            os.path.isfile(storage_provider_path),
+            "URL cache file was unexpectedly stored in a storage provider",
+        )
+
+        # Check fetching
+        channel = self.make_request(
+            "GET",
+            f"download/{host}/{media_id}",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+        self.assertEqual(channel.code, 200)
+
+        # Move cached file into the storage provider
+        os.makedirs(os.path.dirname(storage_provider_path), exist_ok=True)
+        os.rename(media_store_path, storage_provider_path)
+
+        channel = self.make_request(
+            "GET",
+            f"download/{host}/{media_id}",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+        self.assertEqual(
+            channel.code,
+            404,
+            "URL cache file was unexpectedly retrieved from a storage provider",
+        )
+
+    def test_storage_providers_exclude_thumbnails(self):
+        """Test that thumbnails are not stored in or fetched from storage providers."""
+        host, media_id = self._download_image()
+
+        rel_thumbnail_path = (
+            self.preview_url.filepaths.url_cache_thumbnail_directory_rel(media_id)
+        )
+        media_store_thumbnail_path = os.path.join(
+            self.media_store_path, rel_thumbnail_path
+        )
+        storage_provider_thumbnail_path = os.path.join(
+            self.storage_path, rel_thumbnail_path
+        )
+
+        # Check storage
+        self.assertTrue(os.path.isdir(media_store_thumbnail_path))
+        self.assertFalse(
+            os.path.isdir(storage_provider_thumbnail_path),
+            "URL cache thumbnails were unexpectedly stored in a storage provider",
+        )
+
+        # Check fetching
+        channel = self.make_request(
+            "GET",
+            f"thumbnail/{host}/{media_id}?width=32&height=32&method=scale",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+        self.assertEqual(channel.code, 200)
+
+        # Remove the original, otherwise thumbnails will regenerate
+        rel_file_path = self.preview_url.filepaths.url_cache_filepath_rel(media_id)
+        media_store_path = os.path.join(self.media_store_path, rel_file_path)
+        os.remove(media_store_path)
+
+        # Move cached thumbnails into the storage provider
+        os.makedirs(os.path.dirname(storage_provider_thumbnail_path), exist_ok=True)
+        os.rename(media_store_thumbnail_path, storage_provider_thumbnail_path)
+
+        channel = self.make_request(
+            "GET",
+            f"thumbnail/{host}/{media_id}?width=32&height=32&method=scale",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+        self.assertEqual(
+            channel.code,
+            404,
+            "URL cache thumbnail was unexpectedly retrieved from a storage provider",
+        )
+
+    def test_cache_expiry(self):
+        """Test that URL cache files and thumbnails are cleaned up properly on expiry."""
+        self.preview_url.clock = MockClock()
+
+        _host, media_id = self._download_image()
+
+        file_path = self.preview_url.filepaths.url_cache_filepath(media_id)
+        file_dirs = self.preview_url.filepaths.url_cache_filepath_dirs_to_delete(
+            media_id
+        )
+        thumbnail_dir = self.preview_url.filepaths.url_cache_thumbnail_directory(
+            media_id
+        )
+        thumbnail_dirs = self.preview_url.filepaths.url_cache_thumbnail_dirs_to_delete(
+            media_id
+        )
+
+        self.assertTrue(os.path.isfile(file_path))
+        self.assertTrue(os.path.isdir(thumbnail_dir))
+
+        self.preview_url.clock.advance_time_msec(IMAGE_CACHE_EXPIRY_MS + 1)
+        self.get_success(self.preview_url._expire_url_cache_data())
+
+        for path in [file_path] + file_dirs + [thumbnail_dir] + thumbnail_dirs:
+            self.assertFalse(
+                os.path.exists(path),
+                f"{os.path.relpath(path, self.media_store_path)} was not deleted",
+            )

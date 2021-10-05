@@ -84,7 +84,7 @@ class RemoteKeyResourceTestCase(BaseRemoteKeyResourceTestCase):
         Checks that the response is a 200 and returns the decoded json body.
         """
         channel = FakeChannel(self.site, self.reactor)
-        req = SynapseRequest(channel)
+        req = SynapseRequest(channel, self.site)
         req.content = BytesIO(b"")
         req.requestReceived(
             b"GET",
@@ -183,7 +183,7 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
             )
 
             channel = FakeChannel(self.site, self.reactor)
-            req = SynapseRequest(channel)
+            req = SynapseRequest(channel, self.site)
             req.content = BytesIO(encode_canonical_json(data))
 
             req.requestReceived(

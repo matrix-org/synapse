@@ -133,6 +133,10 @@ class DeactivateAccountHandler(BaseHandler):
         # delete from user directory
         await self.user_directory_handler.handle_local_user_deactivated(user_id)
 
+        # If the user is present in the monthly active users table
+        # remove them
+        await self.store.remove_deactivated_user_from_mau_table(user_id)
+
         # Mark the user as erased, if they asked for that
         if erase_data:
             user = UserID.from_string(user_id)
@@ -255,13 +259,16 @@ class DeactivateAccountHandler(BaseHandler):
         Args:
             user_id: ID of user to be re-activated
         """
-        # Add the user to the directory, if necessary.
         user = UserID.from_string(user_id)
-        profile = await self.store.get_profileinfo(user.localpart)
-        await self.user_directory_handler.handle_local_profile_change(user_id, profile)
 
         # Ensure the user is not marked as erased.
         await self.store.mark_user_not_erased(user_id)
 
         # Mark the user as active.
         await self.store.set_user_deactivated_status(user_id, False)
+
+        # Add the user to the directory, if necessary. Note that
+        # this must be done after the user is re-activated, because
+        # deactivated users are excluded from the user directory.
+        profile = await self.store.get_profileinfo(user.localpart)
+        await self.user_directory_handler.handle_local_profile_change(user_id, profile)

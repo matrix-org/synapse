@@ -13,11 +13,11 @@
 # limitations under the License.
 
 """Tests REST events for /rooms paths."""
-
+import synapse.rest.admin
 from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.appservice import ApplicationService
-from synapse.rest.client import register, sync
+from synapse.rest.client import login, profile, register, sync
 
 from tests import unittest
 from tests.unittest import override_config
@@ -26,7 +26,13 @@ from tests.utils import default_config
 
 class TestMauLimit(unittest.HomeserverTestCase):
 
-    servlets = [register.register_servlets, sync.register_servlets]
+    servlets = [
+        register.register_servlets,
+        sync.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        profile.register_servlets,
+        login.register_servlets,
+    ]
 
     def default_config(self):
         config = default_config("test")
@@ -165,7 +171,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
 
     @override_config({"mau_trial_days": 1})
     def test_trial_users_cant_come_back(self):
-        self.hs.config.mau_trial_days = 1
+        self.hs.config.server.mau_trial_days = 1
 
         # We should be able to register more than the limit initially
         token1 = self.create_user("kermit1")
@@ -228,6 +234,31 @@ class TestMauLimit(unittest.HomeserverTestCase):
         count = self.store.get_monthly_active_count()
         self.reactor.advance(100)
         self.assertEqual(2, self.successResultOf(count))
+
+    def test_deactivated_users_dont_count_towards_mau(self):
+        user1 = self.register_user("madonna", "password")
+        self.register_user("prince", "password2")
+        self.register_user("frodo", "onering", True)
+
+        token1 = self.login("madonna", "password")
+        token2 = self.login("prince", "password2")
+        admin_token = self.login("frodo", "onering")
+
+        self.do_sync_for_user(token1)
+        self.do_sync_for_user(token2)
+
+        # Check that mau count is what we expect
+        count = self.get_success(self.store.get_monthly_active_count())
+        self.assertEqual(count, 2)
+
+        # Deactivate user1
+        url = "/_synapse/admin/v1/deactivate/%s" % user1
+        channel = self.make_request("POST", url, access_token=admin_token)
+        self.assertIn("success", channel.json_body["id_server_unbind_result"])
+
+        # Check that deactivated user is no longer counted
+        count = self.get_success(self.store.get_monthly_active_count())
+        self.assertEqual(count, 1)
 
     def create_user(self, localpart, token=None, appservice=False):
         request_data = {

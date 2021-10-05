@@ -186,23 +186,23 @@ def start(config_options):
     config.worker.worker_app = "synapse.app.admin_cmd"
 
     if (
-        not config.worker_daemonize
-        and not config.worker_log_file
-        and not config.worker_log_config
+        not config.worker.worker_daemonize
+        and not config.worker.worker_log_file
+        and not config.worker.worker_log_config
     ):
         # Since we're meant to be run as a "command" let's not redirect stdio
         # unless we've actually set log config.
-        config.no_redirect_stdio = True
+        config.logging.no_redirect_stdio = True
 
     # Explicitly disable background processes
-    config.update_user_directory = False
+    config.server.update_user_directory = False
     config.worker.run_background_tasks = False
     config.start_pushers = False
     config.pusher_shard_config.instances = []
     config.send_federation = False
     config.federation_shard_config.instances = []
 
-    synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
+    synapse.events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
 
     ss = AdminCmdServer(
         config.server.server_name,
