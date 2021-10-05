@@ -185,11 +185,7 @@ def start(config_options):
     # a full worker config.
     config.worker.worker_app = "synapse.app.admin_cmd"
 
-    if (
-        not config.worker.worker_daemonize
-        and not config.worker.worker_log_file
-        and not config.worker.worker_log_config
-    ):
+    if not config.worker.worker_daemonize and not config.worker.worker_log_config:
         # Since we're meant to be run as a "command" let's not redirect stdio
         # unless we've actually set log config.
         config.logging.no_redirect_stdio = True
@@ -221,7 +217,7 @@ def start(config_options):
 
     async def run():
         with LoggingContext("command"):
-            _base.start(ss)
+            await _base.start(ss)
             await args.func(ss, args)
 
     _base.start_worker_reactor(
