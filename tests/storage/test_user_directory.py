@@ -54,6 +54,11 @@ class GetUserDirectoryTables:
         return r
 
     async def get_users_in_public_rooms(self) -> List[Tuple[str, str]]:
+        """Fetch the entire `users_in_public_rooms` table.
+
+        Returns a list of tuples (user_id, room_id) where room_id is public and
+        contains the user with the given id.
+        """
         r = await self.store.db_pool.simple_select_list(
             "users_in_public_rooms", None, ("user_id", "room_id")
         )
@@ -64,6 +69,13 @@ class GetUserDirectoryTables:
         return retval
 
     async def get_users_who_share_private_rooms(self) -> List[Dict[str, str]]:
+        """Fetch the entire `users_who_share_private_rooms` table.
+
+        Returns a dict containing "user_id", "other_user_id" and "room_id" keys.
+        The dicts can be flattened to Tuples with the `_compress_shared` method.
+        (This seems a little awkward---maybe we could clean this up.)
+        """
+
         return await self.store.db_pool.simple_select_list(
             "users_who_share_private_rooms",
             None,
@@ -71,6 +83,10 @@ class GetUserDirectoryTables:
         )
 
     async def get_users_in_user_directory(self) -> Set[str]:
+        """Fetch the set of users in the `user_directory` table.
+
+        This is useful when checking we've correctly excluded users from the directory.
+        """
         result = await self.store.db_pool.simple_select_list(
             "user_directory",
             None,
@@ -79,6 +95,12 @@ class GetUserDirectoryTables:
         return {row["user_id"] for row in result}
 
     async def get_profiles_in_user_directory(self) -> Dict[str, ProfileInfo]:
+        """Fetch users and their profiles from the `user_directory` table.
+
+        This is useful when we want to inspect display names and avatars.
+        It's almost the entire contents of the `user_directory` table: the only
+        thing missing is an unused room_id column.
+        """
         rows = await self.store.db_pool.simple_select_list(
             "user_directory",
             None,
