@@ -563,7 +563,7 @@ class _ByteProducer:
 
         try:
             self._request.registerProducer(self, True)
-        except RuntimeError as e:
+        except (AttributeError, RuntimeError) as e:
             logger.info("Connection disconnected before response was written: %r", e)
 
             # We drop our references to data we'll not use.
