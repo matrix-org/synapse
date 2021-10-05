@@ -198,7 +198,7 @@ class AuthHandler(BaseHandler):
             if inst.is_enabled():
                 self.checkers[inst.AUTH_TYPE] = inst  # type: ignore
 
-        self.bcrypt_rounds = hs.config.bcrypt_rounds
+        self.bcrypt_rounds = hs.config.registration.bcrypt_rounds
 
         # we can't use hs.get_module_api() here, because to do so will create an
         # import loop.

@@ -89,7 +89,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.spam_checker = hs.get_spam_checker()
         self.third_party_event_rules = hs.get_third_party_event_rules()
         self._server_notices_mxid = self.config.servernotices.server_notices_mxid
-        self._enable_lookup = hs.config.enable_3pid_lookup
+        self._enable_lookup = hs.config.registration.enable_3pid_lookup
         self.allow_per_room_profiles = self.config.server.allow_per_room_profiles
 
         self._join_rate_limiter_local = Ratelimiter(
@@ -573,6 +573,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 errcode=Codes.BAD_JSON,
             )
 
+        # The event content should *not* include the authorising user as
+        # it won't be properly signed. Strip it out since it might come
+        # back from a client updating a display name / avatar.
+        #
+        # This only applies to restricted rooms, but there should be no reason
+        # for a client to include it. Unconditionally remove it.
+        content.pop(EventContentFields.AUTHORISING_USER, None)
+
         effective_membership_state = action
         if action in ["kick", "unban"]:
             effective_membership_state = "leave"
@@ -939,7 +947,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # be included in the event content in order to efficiently validate
         # the event.
         content[
-            "join_authorised_via_users_server"
+            EventContentFields.AUTHORISING_USER
         ] = await self.event_auth_handler.get_user_which_could_invite(
             room_id,
             current_state_ids,
