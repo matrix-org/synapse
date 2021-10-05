@@ -1,4 +1,5 @@
 # Copyright 2020 Dirk Klimpel
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +15,6 @@
 
 import json
 import os
-from binascii import unhexlify
 
 from parameterized import parameterized
 
@@ -25,6 +25,7 @@ from synapse.rest.media.v1.filepath import MediaFilePaths
 
 from tests import unittest
 from tests.server import FakeSite, make_request
+from tests.test_utils import SMALL_PNG
 
 
 class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
@@ -42,7 +43,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
-        self.filepaths = MediaFilePaths(hs.config.media_store_path)
+        self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
 
     def test_no_auth(self):
         """
@@ -110,15 +111,10 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
 
         download_resource = self.media_repo.children[b"download"]
         upload_resource = self.media_repo.children[b"upload"]
-        image_data = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
 
         # Upload some media into the room
         response = self.helper.upload_media(
-            upload_resource, image_data, tok=self.admin_user_tok, expect_code=200
+            upload_resource, SMALL_PNG, tok=self.admin_user_tok, expect_code=200
         )
         # Extract media ID from the response
         server_and_media_id = response["content_uri"][6:]  # Cut off 'mxc://'
@@ -129,7 +125,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         # Attempt to access media
         channel = make_request(
             self.reactor,
-            FakeSite(download_resource),
+            FakeSite(download_resource, self.reactor),
             "GET",
             server_and_media_id,
             shorthand=False,
@@ -168,7 +164,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         # Attempt to access media
         channel = make_request(
             self.reactor,
-            FakeSite(download_resource),
+            FakeSite(download_resource, self.reactor),
             "GET",
             server_and_media_id,
             shorthand=False,
@@ -204,7 +200,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
-        self.filepaths = MediaFilePaths(hs.config.media_store_path)
+        self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
         self.url = "/_synapse/admin/v1/media/%s/delete" % self.server_name
 
     def test_no_auth(self):
@@ -504,16 +500,10 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         Create a media and return media_id and server_and_media_id
         """
         upload_resource = self.media_repo.children[b"upload"]
-        # file size is 67 Byte
-        image_data = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
 
         # Upload some media into the room
         response = self.helper.upload_media(
-            upload_resource, image_data, tok=self.admin_user_tok, expect_code=200
+            upload_resource, SMALL_PNG, tok=self.admin_user_tok, expect_code=200
         )
         # Extract media ID from the response
         server_and_media_id = response["content_uri"][6:]  # Cut off 'mxc://'
@@ -535,7 +525,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         channel = make_request(
             self.reactor,
-            FakeSite(download_resource),
+            FakeSite(download_resource, self.reactor),
             "GET",
             server_and_media_id,
             shorthand=False,
@@ -584,16 +574,10 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
 
         # Create media
         upload_resource = media_repo.children[b"upload"]
-        # file size is 67 Byte
-        image_data = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
 
         # Upload some media into the room
         response = self.helper.upload_media(
-            upload_resource, image_data, tok=self.admin_user_tok, expect_code=200
+            upload_resource, SMALL_PNG, tok=self.admin_user_tok, expect_code=200
         )
         # Extract media ID from the response
         server_and_media_id = response["content_uri"][6:]  # Cut off 'mxc://'
@@ -711,16 +695,10 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
 
         # Create media
         upload_resource = media_repo.children[b"upload"]
-        # file size is 67 Byte
-        image_data = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
 
         # Upload some media into the room
         response = self.helper.upload_media(
-            upload_resource, image_data, tok=self.admin_user_tok, expect_code=200
+            upload_resource, SMALL_PNG, tok=self.admin_user_tok, expect_code=200
         )
         # Extract media ID from the response
         server_and_media_id = response["content_uri"][6:]  # Cut off 'mxc://'

@@ -392,7 +392,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_http_client_context_factory(self) -> IPolicyForHTTPS:
-        if self.config.use_insecure_ssl_client_just_for_testing_do_not_use:
+        if self.config.tls.use_insecure_ssl_client_just_for_testing_do_not_use:
             return InsecureInterceptableContextFactory()
         return RegularPolicyForHTTPS()
 
@@ -418,8 +418,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         return SimpleHttpClient(
             self,
-            ip_whitelist=self.config.ip_range_whitelist,
-            ip_blacklist=self.config.ip_range_blacklist,
+            ip_whitelist=self.config.server.ip_range_whitelist,
+            ip_blacklist=self.config.server.ip_range_blacklist,
             use_proxy=True,
         )
 
@@ -801,18 +801,18 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         logger.info(
             "Connecting to redis (host=%r port=%r) for external cache",
-            self.config.redis_host,
-            self.config.redis_port,
+            self.config.redis.redis_host,
+            self.config.redis.redis_port,
         )
 
         return lazyConnection(
             hs=self,
-            host=self.config.redis_host,
-            port=self.config.redis_port,
+            host=self.config.redis.redis_host,
+            port=self.config.redis.redis_port,
             password=self.config.redis.redis_password,
             reconnect=True,
         )
 
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"
-        return self.config.send_federation
+        return self.config.worker.send_federation

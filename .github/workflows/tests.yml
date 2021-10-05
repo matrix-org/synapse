@@ -192,6 +192,7 @@ jobs:
       volumes:
         - ${{ github.workspace }}:/src
       env:
+        SYTEST_BRANCH: ${{ github.head_ref }}
         POSTGRES: ${{ matrix.postgres && 1}}
         MULTI_POSTGRES: ${{ (matrix.postgres == 'multi-postgres') && 1}}
         WORKERS: ${{ matrix.workers && 1 }}

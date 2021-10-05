@@ -130,7 +130,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         sequence: int,
         key: KT,
         value: Dict[DKT, DV],
-        fetched_keys: Optional[Set[DKT]] = None,
+        fetched_keys: Optional[Iterable[DKT]] = None,
     ) -> None:
         """Updates the entry in the cache
 
@@ -155,7 +155,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
                 self._update_or_insert(key, value, fetched_keys)
 
     def _update_or_insert(
-        self, key: KT, value: Dict[DKT, DV], known_absent: Set[DKT]
+        self, key: KT, value: Dict[DKT, DV], known_absent: Iterable[DKT]
     ) -> None:
         # We pop and reinsert as we need to tell the cache the size may have
         # changed

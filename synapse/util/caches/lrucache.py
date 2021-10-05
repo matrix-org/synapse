@@ -40,7 +40,7 @@ from twisted.internet.interfaces import IReactorTime
 from synapse.config import cache as cache_config
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.util import Clock, caches
-from synapse.util.caches import CacheMetric, register_cache
+from synapse.util.caches import CacheMetric, EvictionReason, register_cache
 from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
 from synapse.util.linked_list import ListNode
 
@@ -202,10 +202,11 @@ class _Node:
         cache: "weakref.ReferenceType[LruCache]",
         clock: Clock,
         callbacks: Collection[Callable[[], None]] = (),
+        prune_unread_entries: bool = True,
     ):
         self._list_node = ListNode.insert_after(self, root)
-        self._global_list_node = None
-        if USE_GLOBAL_LIST:
+        self._global_list_node: Optional[_TimedListNode] = None
+        if USE_GLOBAL_LIST and prune_unread_entries:
             self._global_list_node = _TimedListNode.insert_after(self, GLOBAL_ROOT)
             self._global_list_node.update_last_access(clock)
 
@@ -314,6 +315,7 @@ class LruCache(Generic[KT, VT]):
         metrics_collection_callback: Optional[Callable[[], None]] = None,
         apply_cache_factor_from_config: bool = True,
         clock: Optional[Clock] = None,
+        prune_unread_entries: bool = True,
     ):
         """
         Args:
@@ -403,7 +405,7 @@ class LruCache(Generic[KT, VT]):
                 evicted_len = delete_node(node)
                 cache.pop(node.key, None)
                 if metrics:
-                    metrics.inc_evictions(evicted_len)
+                    metrics.inc_evictions(EvictionReason.size, evicted_len)
 
         def synchronized(f: FT) -> FT:
             @wraps(f)
@@ -427,7 +429,15 @@ class LruCache(Generic[KT, VT]):
         self.len = synchronized(cache_len)
 
         def add_node(key, value, callbacks: Collection[Callable[[], None]] = ()):
-            node = _Node(list_root, key, value, weak_ref_to_self, real_clock, callbacks)
+            node = _Node(
+                list_root,
+                key,
+                value,
+                weak_ref_to_self,
+                real_clock,
+                callbacks,
+                prune_unread_entries,
+            )
             cache[key] = node
 
             if size_callback:

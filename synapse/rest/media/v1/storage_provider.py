@@ -93,13 +93,18 @@ class StorageProviderWrapper(StorageProvider):
         if file_info.server_name and not self.store_remote:
             return None
 
+        if file_info.url_cache:
+            # The URL preview cache is short lived and not worth offloading or
+            # backing up.
+            return None
+
         if self.store_synchronous:
             # store_file is supposed to return an Awaitable, but guard
             # against improper implementations.
             await maybe_awaitable(self.backend.store_file(path, file_info))  # type: ignore
         else:
             # TODO: Handle errors.
-            async def store():
+            async def store() -> None:
                 try:
                     return await maybe_awaitable(
                         self.backend.store_file(path, file_info)
@@ -110,6 +115,11 @@ class StorageProviderWrapper(StorageProvider):
             run_in_background(store)
 
     async def fetch(self, path: str, file_info: FileInfo) -> Optional[Responder]:
+        if file_info.url_cache:
+            # Files in the URL preview cache definitely aren't stored here,
+            # so avoid any potentially slow I/O or network access.
+            return None
+
         # store_file is supposed to return an Awaitable, but guard
         # against improper implementations.
         return await maybe_awaitable(self.backend.fetch(path, file_info))
@@ -125,10 +135,10 @@ class FileStorageProviderBackend(StorageProvider):
 
     def __init__(self, hs: "HomeServer", config: str):
         self.hs = hs
-        self.cache_directory = hs.config.media_store_path
+        self.cache_directory = hs.config.media.media_store_path
         self.base_directory = config
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "FileStorageProviderBackend[%s]" % (self.base_directory,)
 
     async def store_file(self, path: str, file_info: FileInfo) -> None:
@@ -138,8 +148,7 @@ class FileStorageProviderBackend(StorageProvider):
         backup_fname = os.path.join(self.base_directory, path)
 
         dirname = os.path.dirname(backup_fname)
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
+        os.makedirs(dirname, exist_ok=True)
 
         await defer_to_thread(
             self.hs.get_reactor(), shutil.copyfile, primary_fname, backup_fname

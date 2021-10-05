@@ -46,7 +46,7 @@ class StatsHandler:
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
 
-        self.stats_enabled = hs.config.stats_enabled
+        self.stats_enabled = hs.config.stats.stats_enabled
 
         # The current position in the current_state_delta stream
         self.pos: Optional[int] = None
@@ -68,7 +68,7 @@ class StatsHandler:
 
         self._is_processing = True
 
-        async def process():
+        async def process() -> None:
             try:
                 await self._unsafe_process()
             finally:

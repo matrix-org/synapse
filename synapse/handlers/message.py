@@ -46,6 +46,7 @@ from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
+from synapse.handlers.directory import DirectoryHandler
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
@@ -298,7 +299,7 @@ class MessageHandler:
             for user_id, profile in users_with_profile.items()
         }
 
-    def maybe_schedule_expiry(self, event: EventBase):
+    def maybe_schedule_expiry(self, event: EventBase) -> None:
         """Schedule the expiry of an event if there's not already one scheduled,
         or if the one running is for an event that will expire after the provided
         timestamp.
@@ -318,7 +319,7 @@ class MessageHandler:
         # a task scheduled for a timestamp that's sooner than the provided one.
         self._schedule_expiry_for_event(event.event_id, expiry_ts)
 
-    async def _schedule_next_expiry(self):
+    async def _schedule_next_expiry(self) -> None:
         """Retrieve the ID and the expiry timestamp of the next event to be expired,
         and schedule an expiry task for it.
 
@@ -331,7 +332,7 @@ class MessageHandler:
             event_id, expiry_ts = res
             self._schedule_expiry_for_event(event_id, expiry_ts)
 
-    def _schedule_expiry_for_event(self, event_id: str, expiry_ts: int):
+    def _schedule_expiry_for_event(self, event_id: str, expiry_ts: int) -> None:
         """Schedule an expiry task for the provided event if there's not already one
         scheduled at a timestamp that's sooner than the provided one.
 
@@ -367,7 +368,7 @@ class MessageHandler:
             event_id,
         )
 
-    async def _expire_event(self, event_id: str):
+    async def _expire_event(self, event_id: str) -> None:
         """Retrieve and expire an event that needs to be expired from the database.
 
         If the event doesn't exist in the database, log it and delete the expiry date
@@ -442,7 +443,7 @@ class EventCreationHandler:
         )
 
         self._block_events_without_consent_error = (
-            self.config.block_events_without_consent_error
+            self.config.consent.block_events_without_consent_error
         )
 
         # we need to construct a ConsentURIBuilder here, as it checks that the necessary
@@ -665,7 +666,7 @@ class EventCreationHandler:
 
         self.validator.validate_new(event, self.config)
 
-        return (event, context)
+        return event, context
 
     async def _is_exempt_from_privacy_policy(
         self, builder: EventBuilder, requester: Requester
@@ -691,10 +692,10 @@ class EventCreationHandler:
         return False
 
     async def _is_server_notices_room(self, room_id: str) -> bool:
-        if self.config.server_notices_mxid is None:
+        if self.config.servernotices.server_notices_mxid is None:
             return False
         user_ids = await self.store.get_users_in_room(room_id)
-        return self.config.server_notices_mxid in user_ids
+        return self.config.servernotices.server_notices_mxid in user_ids
 
     async def assert_accepted_privacy_policy(self, requester: Requester) -> None:
         """Check if a user has accepted the privacy policy
@@ -730,8 +731,8 @@ class EventCreationHandler:
 
         # exempt the system notices user
         if (
-            self.config.server_notices_mxid is not None
-            and user_id == self.config.server_notices_mxid
+            self.config.servernotices.server_notices_mxid is not None
+            and user_id == self.config.servernotices.server_notices_mxid
         ):
             return
 
@@ -743,7 +744,7 @@ class EventCreationHandler:
         if u["appservice_id"] is not None:
             # users registered by an appservice are exempt
             return
-        if u["consent_version"] == self.config.user_consent_version:
+        if u["consent_version"] == self.config.consent.user_consent_version:
             return
 
         consent_uri = self._consent_uri_builder.build_user_consent_uri(user.localpart)
@@ -951,18 +952,13 @@ class EventCreationHandler:
             depth=depth,
         )
 
-        old_state = None
-
         # Pass on the outlier property from the builder to the event
         # after it is created
         if builder.internal_metadata.outlier:
-            event.internal_metadata.outlier = builder.internal_metadata.outlier
-
-            # Calculate the state for outliers that pass in their own `auth_event_ids`
-            if auth_event_ids:
-                old_state = await self.store.get_events_as_list(auth_event_ids)
-
-        context = await self.state.compute_event_context(event, old_state=old_state)
+            event.internal_metadata.outlier = True
+            context = EventContext.for_outlier()
+        else:
+            context = await self.state.compute_event_context(event)
 
         if requester:
             context.app_service = requester.app_service
@@ -1003,7 +999,7 @@ class EventCreationHandler:
 
         logger.debug("Created event %s", event.event_id)
 
-        return (event, context)
+        return event, context
 
     @measure_func("handle_new_client_event")
     async def handle_new_client_event(
@@ -1229,7 +1225,10 @@ class EventCreationHandler:
             self._external_cache_joined_hosts_updates[state_entry.state_group] = None
 
     async def _validate_canonical_alias(
-        self, directory_handler, room_alias_str: str, expected_room_id: str
+        self,
+        directory_handler: DirectoryHandler,
+        room_alias_str: str,
+        expected_room_id: str,
     ) -> None:
         """
         Ensure that the given room alias points to the expected room ID.
@@ -1421,7 +1420,7 @@ class EventCreationHandler:
                 # structural protocol level).
                 is_msc2716_event = (
                     original_event.type == EventTypes.MSC2716_INSERTION
-                    or original_event.type == EventTypes.MSC2716_CHUNK
+                    or original_event.type == EventTypes.MSC2716_BATCH
                     or original_event.type == EventTypes.MSC2716_MARKER
                 )
                 if not room_version_obj.msc2716_historical and is_msc2716_event:
@@ -1477,7 +1476,7 @@ class EventCreationHandler:
             # If there's an expiry timestamp on the event, schedule its expiry.
             self._message_handler.maybe_schedule_expiry(event)
 
-        def _notify():
+        def _notify() -> None:
             try:
                 self.notifier.on_new_room_event(
                     event, event_pos, max_stream_token, extra_users=extra_users
@@ -1523,7 +1522,7 @@ class EventCreationHandler:
         except Exception:
             logger.exception("Error bumping presence active time")
 
-    async def _send_dummy_events_to_fill_extremities(self):
+    async def _send_dummy_events_to_fill_extremities(self) -> None:
         """Background task to send dummy events into rooms that have a large
         number of extremities
         """
@@ -1600,7 +1599,7 @@ class EventCreationHandler:
                 )
         return False
 
-    def _expire_rooms_to_exclude_from_dummy_event_insertion(self):
+    def _expire_rooms_to_exclude_from_dummy_event_insertion(self) -> None:
         expire_before = self.clock.time_msec() - _DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY
         to_expire = set()
         for room_id, time in self._rooms_to_exclude_from_dummy_event_insertion.items():

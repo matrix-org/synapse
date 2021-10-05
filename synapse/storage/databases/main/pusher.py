@@ -324,7 +324,7 @@ class PusherWorkerStore(SQLBaseStore):
                 txn,
                 table="pushers",
                 column="user_name",
-                iterable=users,
+                values=users,
                 keyvalues={},
             )
 
@@ -373,7 +373,7 @@ class PusherWorkerStore(SQLBaseStore):
                 txn,
                 table="pushers",
                 column="id",
-                iterable=(pusher_id for pusher_id, token in pushers if token is None),
+                values=[pusher_id for pusher_id, token in pushers if token is None],
                 keyvalues={},
             )
 

@@ -70,7 +70,7 @@ class DummyAuthChecker(UserInteractiveAuthChecker):
 class TermsAuthChecker(UserInteractiveAuthChecker):
     AUTH_TYPE = LoginType.TERMS
 
-    def is_enabled(self):
+    def is_enabled(self) -> bool:
         return True
 
     async def check_auth(self, authdict: dict, clientip: str) -> Any:
@@ -82,10 +82,10 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
-        self._enabled = bool(hs.config.recaptcha_private_key)
+        self._enabled = bool(hs.config.captcha.recaptcha_private_key)
         self._http_client = hs.get_proxied_http_client()
-        self._url = hs.config.recaptcha_siteverify_api
-        self._secret = hs.config.recaptcha_private_key
+        self._url = hs.config.captcha.recaptcha_siteverify_api
+        self._secret = hs.config.captcha.recaptcha_private_key
 
     def is_enabled(self) -> bool:
         return self._enabled
@@ -161,12 +161,17 @@ class _BaseThreepidAuthChecker:
                 self.hs.config.account_threepid_delegate_msisdn, threepid_creds
             )
         elif medium == "email":
-            if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            if (
+                self.hs.config.email.threepid_behaviour_email
+                == ThreepidBehaviour.REMOTE
+            ):
                 assert self.hs.config.account_threepid_delegate_email
                 threepid = await identity_handler.threepid_from_creds(
                     self.hs.config.account_threepid_delegate_email, threepid_creds
                 )
-            elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            elif (
+                self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL
+            ):
                 threepid = None
                 row = await self.store.get_threepid_validation_session(
                     medium,
@@ -218,7 +223,7 @@ class EmailIdentityAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChec
         _BaseThreepidAuthChecker.__init__(self, hs)
 
     def is_enabled(self) -> bool:
-        return self.hs.config.threepid_behaviour_email in (
+        return self.hs.config.email.threepid_behaviour_email in (
             ThreepidBehaviour.REMOTE,
             ThreepidBehaviour.LOCAL,
         )

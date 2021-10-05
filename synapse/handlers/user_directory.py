@@ -61,7 +61,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
         self.update_user_directory = hs.config.update_user_directory
-        self.search_all_users = hs.config.user_directory_search_all_users
+        self.search_all_users = hs.config.userdirectory.user_directory_search_all_users
         self.spam_checker = hs.get_spam_checker()
         # The current position in the current_state_delta stream
         self.pos: Optional[int] = None
@@ -114,7 +114,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         if self._is_processing:
             return
 
-        async def process():
+        async def process() -> None:
             try:
                 await self._unsafe_process()
             finally:

@@ -200,11 +200,7 @@ class Config:
     @classmethod
     def ensure_directory(cls, dir_path):
         dir_path = cls.abspath(dir_path)
-        try:
-            os.makedirs(dir_path)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
+        os.makedirs(dir_path, exist_ok=True)
         if not os.path.isdir(dir_path):
             raise ConfigError("%s is not a directory" % (dir_path,))
         return dir_path
@@ -693,8 +689,7 @@ class RootConfig:
                     open_private_ports=config_args.open_private_ports,
                 )
 
-                if not path_exists(config_dir_path):
-                    os.makedirs(config_dir_path)
+                os.makedirs(config_dir_path, exist_ok=True)
                 with open(config_path, "w") as config_file:
                     config_file.write(config_str)
                     config_file.write("\n\n# vim:ft=yaml")

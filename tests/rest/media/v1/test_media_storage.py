@@ -1,4 +1,4 @@
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ from synapse.rest.media.v1.storage_provider import FileStorageProviderBackend
 
 from tests import unittest
 from tests.server import FakeSite, make_request
+from tests.test_utils import SMALL_PNG
 from tests.utils import default_config
 
 
@@ -52,7 +53,7 @@ class MediaStorageTests(unittest.HomeserverTestCase):
         self.primary_base_path = os.path.join(self.test_dir, "primary")
         self.secondary_base_path = os.path.join(self.test_dir, "secondary")
 
-        hs.config.media_store_path = self.primary_base_path
+        hs.config.media.media_store_path = self.primary_base_path
 
         storage_providers = [FileStorageProviderBackend(hs, self.secondary_base_path)]
 
@@ -134,11 +135,7 @@ class _TestImage:
         # smoll png
         (
             _TestImage(
-                unhexlify(
-                    b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-                    b"0000001f15c4890000000a49444154789c63000100000500010d"
-                    b"0a2db40000000049454e44ae426082"
-                ),
+                SMALL_PNG,
                 b"image/png",
                 b".png",
                 unhexlify(
@@ -255,7 +252,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         channel = make_request(
             self.reactor,
-            FakeSite(self.download_resource),
+            FakeSite(self.download_resource, self.reactor),
             "GET",
             self.media_id,
             shorthand=False,
@@ -387,7 +384,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         params = "?width=32&height=32&method=scale"
         channel = make_request(
             self.reactor,
-            FakeSite(self.thumbnail_resource),
+            FakeSite(self.thumbnail_resource, self.reactor),
             "GET",
             self.media_id + params,
             shorthand=False,
@@ -416,7 +413,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         channel = make_request(
             self.reactor,
-            FakeSite(self.thumbnail_resource),
+            FakeSite(self.thumbnail_resource, self.reactor),
             "GET",
             self.media_id + params,
             shorthand=False,
@@ -436,7 +433,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         params = "?width=32&height=32&method=" + method
         channel = make_request(
             self.reactor,
-            FakeSite(self.thumbnail_resource),
+            FakeSite(self.thumbnail_resource, self.reactor),
             "GET",
             self.media_id + params,
             shorthand=False,
@@ -593,15 +590,8 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
 
     def test_upload_innocent(self):
         """Attempt to upload some innocent data that should be allowed."""
-
-        image_data = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
-
         self.helper.upload_media(
-            self.upload_resource, image_data, tok=self.tok, expect_code=200
+            self.upload_resource, SMALL_PNG, tok=self.tok, expect_code=200
         )
 
     def test_upload_ban(self):
