@@ -564,6 +564,10 @@ class _ByteProducer:
         try:
             self._request.registerProducer(self, True)
         except (AttributeError, RuntimeError) as e:
+            # Twisted will raise a RuntimeError in some cases.
+            # Calling self._request.registerProducer might also raise an AttributeError
+            # since the underlying Twisted code calls self._request.channel.registerProducer,
+            # however self._request.channel will be None if the connection was lost.
             logger.info("Connection disconnected before response was written: %r", e)
 
             # We drop our references to data we'll not use.
