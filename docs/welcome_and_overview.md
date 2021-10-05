@@ -1,7 +1,6 @@
 # Introduction
 
-Welcome to the documentation for Synapse, the reference
-[Matrix](https://matrix.org) homeserver implementation.
+Welcome to the documentation for Synapse.
 
 ## Installing and using Synapse
 
