@@ -303,16 +303,6 @@ class StateHandler:
             entry = await self.resolve_state_groups_for_events(
                 event.room_id, event.prev_event_ids()
             )
-            logger.info(
-                "compute_event_context %s event=%s (event.prev_event_ids=%s) entry.state_group=%s entry.prev_group=%s entry.delta_ids=%s entry.state=%s",
-                event.type,
-                event.event_id,
-                event.prev_event_ids(),
-                entry.state_group,
-                entry.prev_group,
-                entry.delta_ids,
-                entry.state,
-            )
 
             state_ids_before_event = entry.state
             state_group_before_event = entry.state_group
@@ -409,9 +399,6 @@ class StateHandler:
         # dict[int, dict[(str, str), str]]
         state_groups_ids = await self.state_store.get_state_groups_ids(
             room_id, event_ids
-        )
-        logger.info(
-            "resolve_state_groups_for_events state_groups_ids=%s", state_groups_ids
         )
 
         if len(state_groups_ids) == 0:
