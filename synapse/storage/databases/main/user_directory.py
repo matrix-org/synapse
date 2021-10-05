@@ -252,10 +252,10 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     room_id
                 )
                 if is_public:
-                  if users_with_profile:
-                    await self.add_users_in_public_rooms(
-                        room_id, users_with_profile.keys()
-                    )
+                    if users_with_profile:
+                        await self.add_users_in_public_rooms(
+                            room_id, users_with_profile.keys()
+                        )
                 else:
                     to_insert = set()
                     for user_id in users_with_profile:
