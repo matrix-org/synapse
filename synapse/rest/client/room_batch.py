@@ -349,7 +349,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 depth=inherited_depth,
             )
 
-            batch_id_to_connect_to = base_insertion_event["content"][
+            batch_id_to_connect_to = base_insertion_event.content[
                 EventContentFields.MSC2716_NEXT_BATCH_ID
             ]
 
@@ -434,7 +434,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
         for (event, context) in reversed(events_to_persist):
             ev = await self.event_creation_handler.handle_new_client_event(
                 await self._create_requester_for_user_id_from_app_service(
-                    event["sender"], requester.app_service
+                    event.sender, requester.app_service
                 ),
                 event=event,
                 context=context,
