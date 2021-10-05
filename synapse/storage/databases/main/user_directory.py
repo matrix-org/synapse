@@ -251,7 +251,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 is_public = await self.is_room_world_readable_or_publicly_joinable(
                     room_id
                 )
-                if is_public and users_with_profile:
+                if is_public:
+                  if users_with_profile:
                     await self.add_users_in_public_rooms(
                         room_id, users_with_profile.keys()
                     )
