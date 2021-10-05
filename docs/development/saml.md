@@ -1,6 +1,6 @@
 # How to test SAML as a developer without a server
 
-https://github.com/DFE-Digital/samling is a great resource for being able to tinker with the 
+https://fujifish.github.io/samling/samling.html (https://github.com/fujifish/samling) is a great resource for being able to tinker with the 
 SAML options within Synapse without needing to deploy and configure a complicated software stack.
 
 To make Synapse (and therefore Element) use it:
