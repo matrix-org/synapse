@@ -76,11 +76,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.6", "3.7", "3.8", "3.9"]
+        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10"]
         database: ["sqlite"]
         include:
           # Newest Python without optional deps
-          - python-version: "3.9"
+          - python-version: "3.10"
             toxenv: "py-noextras,combine"
 
           # Oldest Python with PostgreSQL
@@ -88,10 +88,10 @@ jobs:
             database: "postgres"
             postgres-version: "9.6"
 
-          # Newest Python with PostgreSQL
-          - python-version: "3.9"
+          # Newest Python with newest PostgreSQL
+          - python-version: "3.10"
             database: "postgres"
-            postgres-version: "13"
+            postgres-version: "14"
 
     steps:
       - uses: actions/checkout@v2
@@ -256,8 +256,8 @@ jobs:
           - python-version: "3.6"
             postgres-version: "9.6"
 
-          - python-version: "3.9"
-            postgres-version: "13"
+          - python-version: "3.10"
+            postgres-version: "14"
 
     services:
       postgres:
