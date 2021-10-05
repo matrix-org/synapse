@@ -263,7 +263,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
                     # resolve into the current state and shows a bunch of noice
                     # in the room. In reality, we just want the state_group
                     # created to share with the rest of the batch.
-                    # outlier=True,
+                    outlier=True,
                     prev_event_ids=[prev_event_id_for_state_chain],
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
