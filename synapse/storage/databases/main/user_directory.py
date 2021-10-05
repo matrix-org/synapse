@@ -228,7 +228,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             is_in_room = await self.is_host_joined(room_id, self.server_name)
 
             if is_in_room:
-                # TODO this leaks per-room profiles!
                 users_with_profile = await self.get_users_in_room_with_profiles(room_id)
                 # Throw away users excluded from the directory.
                 users_with_profile = {
@@ -239,10 +238,17 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 }
 
                 # Upsert a user_directory record for each remote user we see.
-                # (Local users are processed in `_populate_user_directory_users`.)
                 for user_id, profile in users_with_profile.items():
+                    # Local users are processed separately in
+                    # `_populate_user_directory_users`; there we can read from
+                    # the `profiles` table to ensure we don't leak their per-room
+                    # profiles. It also means we write local users to this table
+                    # exactly once, rather than once for every room they're in.
                     if self.hs.is_mine_id(user_id):
                         continue
+                    # TODO `users_with_profile` above reads from the `user_directory`
+                    #   table, meaning that `profile` is bespoke to this room.
+                    #   and this leaks remote users' per-room profiles to the user directory.
                     await self.update_profile_in_user_dir(
                         user_id, profile.display_name, profile.avatar_url
                     )
