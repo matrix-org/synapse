@@ -332,7 +332,6 @@ class UserDirectoryHandler(StateDeltasHandler):
         # being added multiple times. The batching upserts shouldn't make this
         # too bad, though.
         for user_id, profile in other_users_in_room_with_profiles.items():
-            await self._upsert_directory_entry_for_user(room_id, user_id, profile)
             await self._track_user_joined_room(room_id, user_id, profile)
 
     async def _upsert_directory_entry_for_user(
