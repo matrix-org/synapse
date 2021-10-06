@@ -11,17 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, List, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple
+from unittest import mock
 from unittest.mock import Mock, patch
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.api.constants import UserTypes
+from synapse.api.constants import EventTypes, Membership, UserTypes
 from synapse.appservice import ApplicationService
 from synapse.rest import admin
 from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.storage.roommember import ProfileInfo
 from synapse.util import Clock
 
 from tests.test_utils.event_injection import inject_member_event
@@ -52,6 +54,11 @@ class GetUserDirectoryTables:
         return r
 
     async def get_users_in_public_rooms(self) -> List[Tuple[str, str]]:
+        """Fetch the entire `users_in_public_rooms` table.
+
+        Returns a list of tuples (user_id, room_id) where room_id is public and
+        contains the user with the given id.
+        """
         r = await self.store.db_pool.simple_select_list(
             "users_in_public_rooms", None, ("user_id", "room_id")
         )
@@ -62,6 +69,13 @@ class GetUserDirectoryTables:
         return retval
 
     async def get_users_who_share_private_rooms(self) -> List[Dict[str, str]]:
+        """Fetch the entire `users_who_share_private_rooms` table.
+
+        Returns a dict containing "user_id", "other_user_id" and "room_id" keys.
+        The dicts can be flattened to Tuples with the `_compress_shared` method.
+        (This seems a little awkward---maybe we could clean this up.)
+        """
+
         return await self.store.db_pool.simple_select_list(
             "users_who_share_private_rooms",
             None,
@@ -69,12 +83,35 @@ class GetUserDirectoryTables:
         )
 
     async def get_users_in_user_directory(self) -> Set[str]:
+        """Fetch the set of users in the `user_directory` table.
+
+        This is useful when checking we've correctly excluded users from the directory.
+        """
         result = await self.store.db_pool.simple_select_list(
             "user_directory",
             None,
             ["user_id"],
         )
         return {row["user_id"] for row in result}
+
+    async def get_profiles_in_user_directory(self) -> Dict[str, ProfileInfo]:
+        """Fetch users and their profiles from the `user_directory` table.
+
+        This is useful when we want to inspect display names and avatars.
+        It's almost the entire contents of the `user_directory` table: the only
+        thing missing is an unused room_id column.
+        """
+        rows = await self.store.db_pool.simple_select_list(
+            "user_directory",
+            None,
+            ("user_id", "display_name", "avatar_url"),
+        )
+        return {
+            row["user_id"]: ProfileInfo(
+                display_name=row["display_name"], avatar_url=row["avatar_url"]
+            )
+            for row in rows
+        }
 
 
 class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
@@ -175,12 +212,7 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
             )
         )
 
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
     def test_initial(self) -> None:
         """
@@ -200,20 +232,6 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         private_room = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
         self.helper.invite(private_room, src=u1, targ=u3, tok=u1_token)
         self.helper.join(private_room, user=u3, tok=u3_token)
-
-        self.get_success(self.store.update_user_directory_stream_pos(None))
-        self.get_success(self.store.delete_all_from_user_dir())
-
-        shares_private = self.get_success(
-            self.user_dir_helper.get_users_who_share_private_rooms()
-        )
-        public_users = self.get_success(
-            self.user_dir_helper.get_users_in_public_rooms()
-        )
-
-        # Nothing updated yet
-        self.assertEqual(shares_private, [])
-        self.assertEqual(public_users, [])
 
         # Do the initial population of the user directory via the background update
         self._purge_and_rebuild_user_dir()
@@ -345,6 +363,45 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
 
         # Check the AS user is not in the directory.
         self._check_room_sharing_tables(user, public, private)
+
+    def test_population_conceals_private_nickname(self) -> None:
+        # Make a private room, and set a nickname within
+        user = self.register_user("aaaa", "pass")
+        user_token = self.login(user, "pass")
+        private_room = self.helper.create_room_as(user, is_public=False, tok=user_token)
+        self.helper.send_state(
+            private_room,
+            EventTypes.Member,
+            state_key=user,
+            body={"membership": Membership.JOIN, "displayname": "BBBB"},
+            tok=user_token,
+        )
+
+        # Rebuild the user directory. Make the rescan of the `users` table a no-op
+        # so we only see the effect of scanning the `room_memberships` table.
+        async def mocked_process_users(*args: Any, **kwargs: Any) -> int:
+            await self.store.db_pool.updates._end_background_update(
+                "populate_user_directory_process_users"
+            )
+            return 1
+
+        with mock.patch.dict(
+            self.store.db_pool.updates._background_update_handlers,
+            populate_user_directory_process_users=mocked_process_users,
+        ):
+            self._purge_and_rebuild_user_dir()
+
+        # Local users are ignored by the scan over rooms
+        users = self.get_success(self.user_dir_helper.get_profiles_in_user_directory())
+        self.assertEqual(users, {})
+
+        # Do a full rebuild including the scan over the `users` table. The local
+        # user should appear with their profile name.
+        self._purge_and_rebuild_user_dir()
+        users = self.get_success(self.user_dir_helper.get_profiles_in_user_directory())
+        self.assertEqual(
+            users, {user: ProfileInfo(display_name="aaaa", avatar_url=None)}
+        )
 
 
 class UserDirectoryStoreTestCase(HomeserverTestCase):

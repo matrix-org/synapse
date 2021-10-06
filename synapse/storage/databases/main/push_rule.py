@@ -101,7 +101,9 @@ class PushRulesWorkerStore(
             prefilled_cache=push_rules_prefill,
         )
 
-        self._users_new_default_push_rules = hs.config.users_new_default_push_rules
+        self._users_new_default_push_rules = (
+            hs.config.server.users_new_default_push_rules
+        )
 
     @abc.abstractmethod
     def get_max_push_rules_stream_id(self):
