@@ -253,9 +253,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                             display_name=event.content.get("displayname"),
                         )
 
-                        await self._upsert_directory_entry_for_user(
-                            room_id, state_key, profile
-                        )
+                        await self._upsert_directory_entry_for_user(state_key, profile)
                         await self._track_user_joined_room(room_id, state_key)
                     else:  # The user left
                         await self._handle_remove_user(room_id, state_key)
@@ -333,7 +331,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             await self._track_user_joined_room(room_id, user_id)
 
     async def _upsert_directory_entry_for_user(
-        self, room_id: str, user_id: str, profile: ProfileInfo
+        self, user_id: str, profile: ProfileInfo
     ) -> None:
         """Someone's just joined a room. Ensure they have an entry in the user directory.
 
@@ -347,7 +345,9 @@ class UserDirectoryHandler(StateDeltasHandler):
         )
 
     async def _track_user_joined_room(
-        self, room_id: str, user_id: str,
+        self,
+        room_id: str,
+        user_id: str,
     ) -> None:
         """Someone's just joined a room. Update `users_in_public_rooms` or
         `users_who_share_private_rooms` as appropriate.
