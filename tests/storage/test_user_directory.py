@@ -11,16 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, List, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple
+from unittest import mock
+from unittest.mock import Mock, patch
 
 from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.api.constants import EventTypes, Membership, UserTypes
+from synapse.appservice import ApplicationService
 from synapse.rest import admin
-from synapse.rest.client import login, room
+from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.storage.roommember import ProfileInfo
 from synapse.util import Clock
 
+from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
 
 ALICE = "@alice:a"
@@ -48,6 +54,11 @@ class GetUserDirectoryTables:
         return r
 
     async def get_users_in_public_rooms(self) -> List[Tuple[str, str]]:
+        """Fetch the entire `users_in_public_rooms` table.
+
+        Returns a list of tuples (user_id, room_id) where room_id is public and
+        contains the user with the given id.
+        """
         r = await self.store.db_pool.simple_select_list(
             "users_in_public_rooms", None, ("user_id", "room_id")
         )
@@ -58,11 +69,49 @@ class GetUserDirectoryTables:
         return retval
 
     async def get_users_who_share_private_rooms(self) -> List[Dict[str, str]]:
+        """Fetch the entire `users_who_share_private_rooms` table.
+
+        Returns a dict containing "user_id", "other_user_id" and "room_id" keys.
+        The dicts can be flattened to Tuples with the `_compress_shared` method.
+        (This seems a little awkward---maybe we could clean this up.)
+        """
+
         return await self.store.db_pool.simple_select_list(
             "users_who_share_private_rooms",
             None,
             ["user_id", "other_user_id", "room_id"],
         )
+
+    async def get_users_in_user_directory(self) -> Set[str]:
+        """Fetch the set of users in the `user_directory` table.
+
+        This is useful when checking we've correctly excluded users from the directory.
+        """
+        result = await self.store.db_pool.simple_select_list(
+            "user_directory",
+            None,
+            ["user_id"],
+        )
+        return {row["user_id"] for row in result}
+
+    async def get_profiles_in_user_directory(self) -> Dict[str, ProfileInfo]:
+        """Fetch users and their profiles from the `user_directory` table.
+
+        This is useful when we want to inspect display names and avatars.
+        It's almost the entire contents of the `user_directory` table: the only
+        thing missing is an unused room_id column.
+        """
+        rows = await self.store.db_pool.simple_select_list(
+            "user_directory",
+            None,
+            ("user_id", "display_name", "avatar_url"),
+        )
+        return {
+            row["user_id"]: ProfileInfo(
+                display_name=row["display_name"], avatar_url=row["avatar_url"]
+            )
+            for row in rows
+        }
 
 
 class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
@@ -74,9 +123,27 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
 
     servlets = [
         login.register_servlets,
-        admin.register_servlets_for_client_rest_resource,
+        admin.register_servlets,
         room.register_servlets,
+        register.register_servlets,
     ]
+
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+        self.appservice = ApplicationService(
+            token="i_am_an_app_service",
+            hostname="test",
+            id="1234",
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+            sender="@as:test",
+        )
+
+        mock_load_appservices = Mock(return_value=[self.appservice])
+        with patch(
+            "synapse.storage.databases.main.appservice.load_appservices",
+            mock_load_appservices,
+        ):
+            hs = super().make_homeserver(reactor, clock)
+        return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastore()
@@ -145,12 +212,7 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
             )
         )
 
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
     def test_initial(self) -> None:
         """
@@ -171,20 +233,6 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         self.helper.invite(private_room, src=u1, targ=u3, tok=u1_token)
         self.helper.join(private_room, user=u3, tok=u3_token)
 
-        self.get_success(self.store.update_user_directory_stream_pos(None))
-        self.get_success(self.store.delete_all_from_user_dir())
-
-        shares_private = self.get_success(
-            self.user_dir_helper.get_users_who_share_private_rooms()
-        )
-        public_users = self.get_success(
-            self.user_dir_helper.get_users_in_public_rooms()
-        )
-
-        # Nothing updated yet
-        self.assertEqual(shares_private, [])
-        self.assertEqual(public_users, [])
-
         # Do the initial population of the user directory via the background update
         self._purge_and_rebuild_user_dir()
 
@@ -202,6 +250,157 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         self.assertEqual(
             self.user_dir_helper._compress_shared(shares_private),
             {(u1, u3, private_room), (u3, u1, private_room)},
+        )
+
+        # All three should have entries in the directory
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        self.assertEqual(users, {u1, u2, u3})
+
+    # The next three tests (test_population_excludes_*) all set up
+    #   - A normal user included in the user dir
+    #   - A public and private room created by that user
+    #   - A user excluded from the room dir, belonging to both rooms
+
+    # They match similar logic in handlers/test_user_directory.py But that tests
+    # updating the directory; this tests rebuilding it from scratch.
+
+    def _create_rooms_and_inject_memberships(
+        self, creator: str, token: str, joiner: str
+    ) -> Tuple[str, str]:
+        """Create a public and private room as a normal user.
+        Then get the `joiner` into those rooms.
+        """
+        public_room = self.helper.create_room_as(
+            creator,
+            is_public=True,
+            # See https://github.com/matrix-org/synapse/issues/10951
+            extra_content={"visibility": "public"},
+            tok=token,
+        )
+        private_room = self.helper.create_room_as(creator, is_public=False, tok=token)
+
+        # HACK: get the user into these rooms
+        self.get_success(inject_member_event(self.hs, public_room, joiner, "join"))
+        self.get_success(inject_member_event(self.hs, private_room, joiner, "join"))
+
+        return public_room, private_room
+
+    def _check_room_sharing_tables(
+        self, normal_user: str, public_room: str, private_room: str
+    ) -> None:
+        # After rebuilding the directory, we should only see the normal user.
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        self.assertEqual(users, {normal_user})
+        in_public_rooms = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
+        self.assertEqual(set(in_public_rooms), {(normal_user, public_room)})
+        in_private_rooms = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        self.assertEqual(in_private_rooms, [])
+
+    def test_population_excludes_support_user(self) -> None:
+        # Create a normal and support user.
+        user = self.register_user("user", "pass")
+        token = self.login(user, "pass")
+        support = "@support1:test"
+        self.get_success(
+            self.store.register_user(
+                user_id=support, password_hash=None, user_type=UserTypes.SUPPORT
+            )
+        )
+
+        # Join the support user to rooms owned by the normal user.
+        public, private = self._create_rooms_and_inject_memberships(
+            user, token, support
+        )
+
+        # Rebuild the directory.
+        self._purge_and_rebuild_user_dir()
+
+        # Check the support user is not in the directory.
+        self._check_room_sharing_tables(user, public, private)
+
+    def test_population_excludes_deactivated_user(self) -> None:
+        user = self.register_user("naughty", "pass")
+        admin = self.register_user("admin", "pass", admin=True)
+        admin_token = self.login(admin, "pass")
+
+        # Deactivate the user.
+        channel = self.make_request(
+            "PUT",
+            f"/_synapse/admin/v2/users/{user}",
+            access_token=admin_token,
+            content={"deactivated": True},
+        )
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["deactivated"], True)
+
+        # Join the deactivated user to rooms owned by the admin.
+        # Is this something that could actually happen outside of a test?
+        public, private = self._create_rooms_and_inject_memberships(
+            admin, admin_token, user
+        )
+
+        # Rebuild the user dir. The deactivated user should be missing.
+        self._purge_and_rebuild_user_dir()
+        self._check_room_sharing_tables(admin, public, private)
+
+    def test_population_excludes_appservice_user(self) -> None:
+        # Register an AS user.
+        user = self.register_user("user", "pass")
+        token = self.login(user, "pass")
+        as_user = self.register_appservice_user("as_user_potato", self.appservice.token)
+
+        # Join the AS user to rooms owned by the normal user.
+        public, private = self._create_rooms_and_inject_memberships(
+            user, token, as_user
+        )
+
+        # Rebuild the directory.
+        self._purge_and_rebuild_user_dir()
+
+        # Check the AS user is not in the directory.
+        self._check_room_sharing_tables(user, public, private)
+
+    def test_population_conceals_private_nickname(self) -> None:
+        # Make a private room, and set a nickname within
+        user = self.register_user("aaaa", "pass")
+        user_token = self.login(user, "pass")
+        private_room = self.helper.create_room_as(user, is_public=False, tok=user_token)
+        self.helper.send_state(
+            private_room,
+            EventTypes.Member,
+            state_key=user,
+            body={"membership": Membership.JOIN, "displayname": "BBBB"},
+            tok=user_token,
+        )
+
+        # Rebuild the user directory. Make the rescan of the `users` table a no-op
+        # so we only see the effect of scanning the `room_memberships` table.
+        async def mocked_process_users(*args: Any, **kwargs: Any) -> int:
+            await self.store.db_pool.updates._end_background_update(
+                "populate_user_directory_process_users"
+            )
+            return 1
+
+        with mock.patch.dict(
+            self.store.db_pool.updates._background_update_handlers,
+            populate_user_directory_process_users=mocked_process_users,
+        ):
+            self._purge_and_rebuild_user_dir()
+
+        # Local users are ignored by the scan over rooms
+        users = self.get_success(self.user_dir_helper.get_profiles_in_user_directory())
+        self.assertEqual(users, {})
+
+        # Do a full rebuild including the scan over the `users` table. The local
+        # user should appear with their profile name.
+        self._purge_and_rebuild_user_dir()
+        users = self.get_success(self.user_dir_helper.get_profiles_in_user_directory())
+        self.assertEqual(
+            users, {user: ProfileInfo(display_name="aaaa", avatar_url=None)}
         )
 
 

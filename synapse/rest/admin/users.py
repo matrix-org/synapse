@@ -442,7 +442,7 @@ class UserRegisterServlet(RestServlet):
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         self._clear_old_nonces()
 
-        if not self.hs.config.registration_shared_secret:
+        if not self.hs.config.registration.registration_shared_secret:
             raise SynapseError(400, "Shared secret registration is not enabled")
 
         body = parse_json_object_from_request(request)
@@ -498,7 +498,7 @@ class UserRegisterServlet(RestServlet):
         got_mac = body["mac"]
 
         want_mac_builder = hmac.new(
-            key=self.hs.config.registration_shared_secret.encode(),
+            key=self.hs.config.registration.registration_shared_secret.encode(),
             digestmod=hashlib.sha1,
         )
         want_mac_builder.update(nonce.encode("utf8"))

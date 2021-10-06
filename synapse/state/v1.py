@@ -225,7 +225,7 @@ def _resolve_with_state(
     conflicted_state_ids: StateMap[Set[str]],
     auth_event_ids: StateMap[str],
     state_map: Dict[str, EventBase],
-):
+) -> MutableStateMap[str]:
     conflicted_state = {}
     for key, event_ids in conflicted_state_ids.items():
         events = [state_map[ev_id] for ev_id in event_ids if ev_id in state_map]
@@ -362,7 +362,7 @@ def _resolve_normal_events(
 
 
 def _ordered_events(events: Iterable[EventBase]) -> List[EventBase]:
-    def key_func(e):
+    def key_func(e: EventBase) -> Tuple[int, str]:
         # we have to use utf-8 rather than ascii here because it turns out we allow
         # people to send us events with non-ascii event IDs :/
         return -int(e.depth), hashlib.sha1(e.event_id.encode("utf-8")).hexdigest()

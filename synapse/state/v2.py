@@ -481,7 +481,7 @@ async def _reverse_topological_power_sort(
         if idx % _AWAIT_AFTER_ITERATIONS == 0:
             await clock.sleep(0)
 
-    def _get_power_order(event_id):
+    def _get_power_order(event_id: str) -> Tuple[int, int, str]:
         ev = event_map[event_id]
         pl = event_to_pl[event_id]
 

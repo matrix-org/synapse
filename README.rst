@@ -55,11 +55,8 @@ solutions. The hope is for Matrix to act as the building blocks for a new
 generation of fully open and interoperable messaging and VoIP apps for the
 internet.
 
-Synapse is a reference "homeserver" implementation of Matrix from the core
-development team at matrix.org, written in Python/Twisted.  It is intended to
-showcase the concept of Matrix and let folks see the spec in the context of a
-codebase and let you run your own homeserver and generally help bootstrap the
-ecosystem.
+Synapse is a Matrix "homeserver" implementation developed by the matrix.org core 
+team, written in Python 3/Twisted.
 
 In Matrix, every user runs one or more Matrix clients, which connect through to
 a Matrix homeserver. The homeserver stores all their personal chat history and

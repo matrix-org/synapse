@@ -1710,7 +1710,7 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         We do this by grandfathering in existing user threepids assuming that
         they used one of the server configured trusted identity servers.
         """
-        id_servers = set(self.config.trusted_third_party_id_servers)
+        id_servers = set(self.config.registration.trusted_third_party_id_servers)
 
         def _bg_user_threepids_grandfather_txn(txn):
             sql = """
@@ -1778,7 +1778,9 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
     def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
 
-        self._ignore_unknown_session_error = hs.config.request_token_inhibit_3pid_errors
+        self._ignore_unknown_session_error = (
+            hs.config.server.request_token_inhibit_3pid_errors
+        )
 
         self._access_tokens_id_gen = IdGenerator(db_conn, "access_tokens", "id")
         self._refresh_tokens_id_gen = IdGenerator(db_conn, "refresh_tokens", "id")
