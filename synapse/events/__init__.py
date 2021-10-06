@@ -489,7 +489,7 @@ class FrozenEventV3(FrozenEventV2):
 
 def _event_type_from_format_version(
     format_version: int,
-) -> Type[Union[FrozenEvent, FrozenEventV2, FrozenEventV2]]:
+) -> Type[Union[FrozenEvent, FrozenEventV2, FrozenEventV3]]:
     """Returns the python type to use to construct an Event object for the
     given event format version.
 
