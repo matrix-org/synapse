@@ -229,10 +229,14 @@ class UserDirectoryHandler(StateDeltasHandler):
                 ) or await self.store.should_include_local_user_in_dir(state_key)
                 if include_in_dir:
                     if change is MatchChange.no_change:
-                        # Handle any profile changes
-                        await self._handle_profile_change(
-                            state_key, room_id, prev_event_id, event_id
-                        )
+                        # Handle any profile changes for remote users.
+                        # (For local users we are not forced to scan membership
+                        # events; instead the rest of the application calls
+                        # `_handle_local_profile_change`.)
+                        if not self.is_mine_id(state_key):
+                            await self._handle_profile_change(
+                                state_key, room_id, prev_event_id, event_id
+                            )
                         continue
 
                     if change is MatchChange.now_true:  # The user joined
