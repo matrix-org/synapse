@@ -1595,7 +1595,7 @@ class FederationEventHandler:
         logger.info(
             "After state res: updating auth_events with new state %s",
             {
-                (d.type, d.state_key): d.event_id
+                d
                 for d in new_state.values()
                 if auth_events.get((d.type, d.state_key)) != d
             },
