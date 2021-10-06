@@ -860,6 +860,7 @@ class RoomCreationHandler(BaseHandler):
                     "invite",
                     ratelimit=False,
                     content=content,
+                    new_room=True,
                 )
 
         for invite_3pid in invite_3pid_list:
@@ -962,6 +963,7 @@ class RoomCreationHandler(BaseHandler):
             "join",
             ratelimit=ratelimit,
             content=creator_join_profile,
+            new_room=True,
         )
 
         # We treat the power levels override specially as this needs to be one

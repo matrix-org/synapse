@@ -19,6 +19,21 @@ either a `bool` to indicate whether the event must be rejected because of spam, 
 to indicate the event must be rejected because of spam and to give a rejection reason to
 forward to clients.
 
+### `user_may_join_room`
+
+```python
+async def user_may_join_room(user: str, room: str, is_invited: bool) -> bool
+```
+
+Called when a user is trying to join a room. The module must return a `bool` to indicate
+whether the user can join the room. The user is represented by their Matrix user ID (e.g.
+`@alice:example.com`) and the room is represented by its Matrix ID (e.g.
+`!room:example.com`). The module is also given a boolean to indicate whether the user
+currently has a pending invite in the room.
+
+This callback isn't called if the join is performed by a server administrator, or in the
+context of a room creation.
+
 ### `user_may_invite`
 
 ```python
