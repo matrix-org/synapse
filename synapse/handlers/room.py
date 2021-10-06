@@ -76,8 +76,6 @@ from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.visibility import filter_events_for_client
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -88,10 +86,12 @@ id_server_scheme = "https://"
 FIVE_MINUTES_IN_MS = 5 * 60 * 1000
 
 
-class RoomCreationHandler(BaseHandler):
+class RoomCreationHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.hs = hs
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
