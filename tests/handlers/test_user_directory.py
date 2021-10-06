@@ -409,7 +409,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Alice should have a user directory entry created at registration.
         users = self.get_success(self.user_dir_helper.get_profiles_in_user_directory())
-        print(users)
         self.assertEqual(
             users[alice], ProfileInfo(display_name="alice", avatar_url=None)
         )
