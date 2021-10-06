@@ -1,0 +1,1 @@
+Fix a long-standing bug where the remainder of a batch of user directory changes would be silently dropped if the server left a room early in the batch.
