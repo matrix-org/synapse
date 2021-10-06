@@ -31,6 +31,9 @@ whether the user can join the room. The user is represented by their Matrix user
 `!room:example.com`). The module is also given a boolean to indicate whether the user
 currently has a pending invite in the room.
 
+This callback isn't called if the join is performed by a server administrator, or in the
+context of a room creation.
+
 ### `user_may_invite`
 
 ```python
