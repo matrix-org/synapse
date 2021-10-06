@@ -252,8 +252,10 @@ class UserDirectoryHandler(StateDeltasHandler):
                             avatar_url=event.content.get("avatar_url"),
                             display_name=event.content.get("displayname"),
                         )
-
-                        await self._upsert_directory_entry_for_user(state_key, profile)
+                        if is_remote:
+                            await self._upsert_directory_entry_for_remote_user(
+                                state_key, profile
+                            )
                         await self._track_user_joined_room(room_id, state_key)
                     else:  # The user left
                         await self._handle_remove_user(room_id, state_key)
@@ -330,13 +332,12 @@ class UserDirectoryHandler(StateDeltasHandler):
         for user_id in users_in_room:
             await self._track_user_joined_room(room_id, user_id)
 
-    async def _upsert_directory_entry_for_user(
+    async def _upsert_directory_entry_for_remote_user(
         self, user_id: str, profile: ProfileInfo
     ) -> None:
-        """Someone's just joined a room. Ensure they have an entry in the user directory.
-
-        The caller is responsible for ensuring that the given user is not excluded
-        from the user directory.
+        """A remote user has just joined a room. Ensure they have an entry in
+        the user directory. The caller is responsible for making sure they're
+        remote.
         """
         logger.debug("Adding new user to dir, %r", user_id)
 
