@@ -955,11 +955,6 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             self._remove_duplicate_outbound_pokes,
         )
 
-        self.db_pool.updates.register_background_update_handler(
-            "remove_deleted_devices_from_device_inbox",
-            self._remove_deleted_devices_from_device_inbox,
-        )
-
         # a pair of background updates that were added during the 1.14 release cycle,
         # but replaced with 58/06dlols_unique_idx.py
         self.db_pool.updates.register_noop_background_update(
@@ -1049,69 +1044,6 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             )
 
         return rows
-
-    async def _remove_deleted_devices_from_device_inbox(
-        self, progress: JsonDict, batch_size: int
-    ) -> int:
-        """A background update that deletes all device_inboxes for deleted devices.
-
-        This should only need to be run once (when users upgrade to v1.45.0)
-
-        Args:
-            progress: JsonDict used to store progress of this background update
-            batch_size: the maximum number of rows to retrieve in a single select query
-
-        Returns:
-            The number of deleted rows
-        """
-
-        last_device_id = progress.get("device_id", "")
-
-        def _remove_deleted_devices_from_device_inbox_txn(
-            txn: LoggingTransaction,
-        ) -> int:
-
-            sql = """
-                SELECT device_id
-                    FROM device_inbox
-                    WHERE device_id
-                        NOT IN (SELECT device_id FROM devices)
-                        AND device_id > ?
-                    ORDER BY device_id ASC
-                    LIMIT ?;
-            """
-
-            txn.execute(sql, (last_device_id, batch_size))
-            device_ids_to_delete = [row[0] for row in txn]
-
-            count_deleted_devices = self.db_pool.simple_delete_many_txn(
-                txn,
-                "device_inbox",
-                column="device_id",
-                values=device_ids_to_delete,
-                keyvalues={},
-            )
-
-            if device_ids_to_delete:
-                self.db_pool.updates._background_update_progress_txn(
-                    txn,
-                    "remove_deleted_devices_from_device_inbox",
-                    {"device_id": device_ids_to_delete[-1]},
-                )
-
-            return count_deleted_devices
-
-        number_deleted = await self.db_pool.runInteraction(
-            "_remove_deleted_devices_from_device_inbox",
-            _remove_deleted_devices_from_device_inbox_txn,
-        )
-
-        if number_deleted < batch_size:
-            await self.db_pool.updates._end_background_update(
-                "remove_deleted_devices_from_device_inbox"
-            )
-
-        return number_deleted
 
 
 class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):

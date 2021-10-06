@@ -18,7 +18,7 @@ from synapse.rest.client import devices
 from tests.unittest import HomeserverTestCase
 
 
-class DevicesBackgroundUpdateStoreTestCase(HomeserverTestCase):
+class DeviceInboxBackgroundUpdateStoreTestCase(HomeserverTestCase):
 
     servlets = [
         admin.register_servlets,
@@ -75,13 +75,7 @@ class DevicesBackgroundUpdateStoreTestCase(HomeserverTestCase):
         # ... and tell the DataStore that it hasn't finished all updates yet
         self.store.db_pool.updates._all_done = False
 
-        # Now let's actually drive the updates to completion
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         # Make sure the background task deleted old device_inbox
         res = self.get_success(
