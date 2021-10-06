@@ -372,8 +372,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # Alice makes two rooms. Bob joins one of them.
         room1 = self.helper.create_room_as(alice, tok=alice_token)
         room2 = self.helper.create_room_as(alice, tok=alice_token)
-        print("room1=", room1)
-        print("room2=", room2)
         self.helper.join(room1, bob, tok=bob_token)
 
         # The user sharing tables should have been updated.
