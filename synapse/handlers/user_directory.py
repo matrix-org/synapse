@@ -242,19 +242,9 @@ class UserDirectoryHandler(StateDeltasHandler):
                         continue
 
                     if change is MatchChange.now_true:  # The user joined
-                        event = await self.store.get_event(event_id, allow_none=True)
-                        # It isn't expected for this event to not exist, but we
-                        # don't want the entire background process to break.
-                        if event is None:
-                            continue
-
-                        profile = ProfileInfo(
-                            avatar_url=event.content.get("avatar_url"),
-                            display_name=event.content.get("displayname"),
-                        )
                         if is_remote:
                             await self._upsert_directory_entry_for_remote_user(
-                                state_key, profile
+                                state_key, event_id
                             )
                         await self._track_user_joined_room(room_id, state_key)
                     else:  # The user left
@@ -333,12 +323,23 @@ class UserDirectoryHandler(StateDeltasHandler):
             await self._track_user_joined_room(room_id, user_id)
 
     async def _upsert_directory_entry_for_remote_user(
-        self, user_id: str, profile: ProfileInfo
+        self, user_id: str, event_id: str
     ) -> None:
         """A remote user has just joined a room. Ensure they have an entry in
         the user directory. The caller is responsible for making sure they're
         remote.
         """
+        event = await self.store.get_event(event_id, allow_none=True)
+        # It isn't expected for this event to not exist, but we
+        # don't want the entire background process to break.
+        if event is None:
+            return
+
+        profile = ProfileInfo(
+            avatar_url=event.content.get("avatar_url"),
+            display_name=event.content.get("displayname"),
+        )
+
         logger.debug("Adding new user to dir, %r", user_id)
 
         await self.store.update_profile_in_user_dir(
