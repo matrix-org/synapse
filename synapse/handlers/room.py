@@ -97,6 +97,7 @@ class RoomCreationHandler(BaseHandler):
         self.room_member_handler = hs.get_room_member_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
         self.config = hs.config
+        self.request_ratelimiter = hs.get_request_ratelimiter()
 
         # Room state based off defined presets
         self._presets_dict: Dict[str, Dict[str, Any]] = {
@@ -162,7 +163,7 @@ class RoomCreationHandler(BaseHandler):
         Raises:
             ShadowBanError if the requester is shadow-banned.
         """
-        await self.ratelimit(requester)
+        await self.request_ratelimiter.ratelimit(requester)
 
         user_id = requester.user.to_string()
 
@@ -665,7 +666,7 @@ class RoomCreationHandler(BaseHandler):
             raise SynapseError(403, "You are not permitted to create rooms")
 
         if ratelimit:
-            await self.ratelimit(requester)
+            await self.request_ratelimiter.ratelimit(requester)
 
         room_version_id = config.get(
             "room_version", self.config.server.default_room_version.identifier

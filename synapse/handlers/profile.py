@@ -62,6 +62,7 @@ class ProfileHandler(BaseHandler):
         )
 
         self.user_directory_handler = hs.get_user_directory_handler()
+        self.request_ratelimiter = hs.get_request_ratelimiter()
 
         if hs.config.worker.run_background_tasks:
             self.clock.looping_call(
@@ -346,7 +347,7 @@ class ProfileHandler(BaseHandler):
         if not self.hs.is_mine(target_user):
             return
 
-        await self.ratelimit(requester)
+        await self.request_ratelimiter.ratelimit(requester)
 
         # Do not actually update the room state for shadow-banned users.
         if requester.shadow_banned:
