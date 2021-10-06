@@ -7672,6 +7672,32 @@ context of a room creation.</p>
 <p>Called when processing an invitation. The module must return a <code>bool</code> indicating whether
 the inviter can invite the invitee to the given room. Both inviter and invitee are
 represented by their Matrix user ID (e.g. <code>@alice:example.com</code>).</p>
+<h3 id="user_may_send_3pid_invite"><a class="header" href="#user_may_send_3pid_invite"><code>user_may_send_3pid_invite</code></a></h3>
+<pre><code class="language-python">async def user_may_send_3pid_invite(
+    inviter: str,
+    medium: str,
+    address: str,
+    room_id: str,
+) -&gt; bool
+</code></pre>
+<p>Called when processing an invitation using a third-party identifier (also called a 3PID,
+e.g. an email address or a phone number). The module must return a <code>bool</code> indicating
+whether the inviter can invite the invitee to the given room.</p>
+<p>The inviter is represented by their Matrix user ID (e.g. <code>@alice:example.com</code>), and the
+invitee is represented by its medium (e.g. &quot;email&quot;) and its address
+(e.g. <code>alice@example.com</code>). See <a href="https://matrix.org/docs/spec/appendices#pid-types">the Matrix specification</a>
+for more information regarding third-party identifiers.</p>
+<p>For example, a call to this callback to send an invitation to the email address
+<code>alice@example.com</code> would look like this:</p>
+<pre><code class="language-python">await user_may_send_3pid_invite(
+    &quot;@bob:example.com&quot;,  # The inviter's user ID
+    &quot;email&quot;,  # The medium of the 3PID to invite
+    &quot;alice@example.com&quot;,  # The address of the 3PID to invite
+    &quot;!some_room:example.com&quot;,  # The ID of the room to send the invite into
+)
+</code></pre>
+<p><strong>Note</strong>: If the third-party identifier is already associated with a matrix user ID,
+<a href="modules/spam_checker_callbacks.html#user_may_invite"><code>user_may_invite</code></a> will be used instead.</p>
 <h3 id="user_may_create_room"><a class="header" href="#user_may_create_room"><code>user_may_create_room</code></a></h3>
 <pre><code class="language-python">async def user_may_create_room(user: str) -&gt; bool
 </code></pre>
