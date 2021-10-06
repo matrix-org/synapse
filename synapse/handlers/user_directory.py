@@ -253,7 +253,10 @@ class UserDirectoryHandler(StateDeltasHandler):
                             display_name=event.content.get("displayname"),
                         )
 
-                        await self._handle_new_user(room_id, state_key, profile)
+                        await self._upsert_directory_entry_for_user(
+                            room_id, state_key, profile
+                        )
+                        await self._track_user_joined_room(room_id, state_key, profile)
                     else:  # The user left
                         await self._handle_remove_user(room_id, state_key)
             else:
@@ -329,16 +332,16 @@ class UserDirectoryHandler(StateDeltasHandler):
         # being added multiple times. The batching upserts shouldn't make this
         # too bad, though.
         for user_id, profile in other_users_in_room_with_profiles.items():
-            await self._handle_new_user(room_id, user_id, profile)
+            await self._upsert_directory_entry_for_user(room_id, user_id, profile)
+            await self._track_user_joined_room(room_id, user_id, profile)
 
-    async def _handle_new_user(
+    async def _upsert_directory_entry_for_user(
         self, room_id: str, user_id: str, profile: ProfileInfo
     ) -> None:
-        """Called when we might need to add user to directory
+        """Someone's just joined a room. Ensure they have an entry in the user directory.
 
-        Args:
-            room_id: The room ID that user joined or started being public
-            user_id
+        The caller is responsible for ensuring that the given user is not excluded
+        from the user directory.
         """
         logger.debug("Adding new user to dir, %r", user_id)
 
@@ -346,10 +349,18 @@ class UserDirectoryHandler(StateDeltasHandler):
             user_id, profile.display_name, profile.avatar_url
         )
 
+    async def _track_user_joined_room(
+        self, room_id: str, user_id: str, profile: ProfileInfo
+    ) -> None:
+        """Someone's just joined a room. Update `users_in_public_rooms` or
+        `users_who_share_private_rooms` as appropriate.
+
+        The caller is responsible for ensuring that the given user is not excluded
+        from the user directory.
+        """
         is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
         )
-        # Now we update users who share rooms with users.
         other_users_in_room = await self.store.get_users_in_room(room_id)
 
         if is_public:
