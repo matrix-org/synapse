@@ -37,7 +37,6 @@ class BaseHandler:
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
-        self.state_handler = hs.get_state_handler()
         self.distributor = hs.get_distributor()
         self.clock = hs.get_clock()
         self.hs = hs
