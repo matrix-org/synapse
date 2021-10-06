@@ -195,6 +195,16 @@ Synapse instances. Spam checker callbacks can be registered using the module API
 either a <code>bool</code> to indicate whether the event must be rejected because of spam, or a <code>str</code>
 to indicate the event must be rejected because of spam and to give a rejection reason to
 forward to clients.</p>
+<h3 id="user_may_join_room"><a class="header" href="#user_may_join_room"><code>user_may_join_room</code></a></h3>
+<pre><code class="language-python">async def user_may_join_room(user: str, room: str, is_invited: bool) -&gt; bool
+</code></pre>
+<p>Called when a user is trying to join a room. The module must return a <code>bool</code> to indicate
+whether the user can join the room. The user is represented by their Matrix user ID (e.g.
+<code>@alice:example.com</code>) and the room is represented by its Matrix ID (e.g.
+<code>!room:example.com</code>). The module is also given a boolean to indicate whether the user
+currently has a pending invite in the room.</p>
+<p>This callback isn't called if the join is performed by a server administrator, or in the
+context of a room creation.</p>
 <h3 id="user_may_invite"><a class="header" href="#user_may_invite"><code>user_may_invite</code></a></h3>
 <pre><code class="language-python">async def user_may_invite(inviter: str, invitee: str, room_id: str) -&gt; bool
 </code></pre>
