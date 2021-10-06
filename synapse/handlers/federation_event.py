@@ -1489,6 +1489,9 @@ class FederationEventHandler:
         # if we have missing events, we need to fetch those events from somewhere.
         #
         # we start by checking if they are in the store, and then try calling /event_auth/.
+        #
+        # TODO: this code is now redundant, since it should be impossible for us to
+        #   get here without already having the auth events.
         if missing_auth:
             have_events = await self._store.have_seen_events(
                 event.room_id, missing_auth
