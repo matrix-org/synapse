@@ -214,7 +214,7 @@ class FederationEventHandler:
 
         if missing_prevs:
             # We only backfill backwards to the min depth.
-            min_depth = await self.get_min_depth_for_context(pdu.room_id)
+            min_depth = await self._store.get_min_depth(pdu.room_id)
             logger.debug("min_depth: %d", min_depth)
 
             if min_depth is not None and pdu.depth > min_depth:
@@ -1690,16 +1690,27 @@ class FederationEventHandler:
         # persist_events_and_notify directly.)
         assert not event.internal_metadata.outlier
 
-        try:
-            if (
-                not backfilled
-                and not context.rejected
-                and (await self._store.get_min_depth(event.room_id)) <= event.depth
-            ):
+        if not backfilled and not context.rejected:
+            min_depth = await self._store.get_min_depth(event.room_id)
+            if min_depth is None or min_depth <= event.depth:
+                # XXX richvdh 2021/10/07: I don't really understand what this
+                # condition is doing. I think it's trying not to send pushes
+                # for events that predate our join - but that's not really what
+                # min_depth means, and anyway ancient events are a more general
+                # problem.
+                #
+                # for now I'm just going to log about it.
+                logger.info(
+                    "Skipping push actions for old event with depth %s < %s",
+                    event.depth,
+                    min_depth,
+                )
+            else:
                 await self._action_generator.handle_push_actions_for_event(
                     event, context
                 )
 
+        try:
             await self.persist_events_and_notify(
                 event.room_id, [(event, context)], backfilled=backfilled
             )
@@ -1831,6 +1842,3 @@ class FederationEventHandler:
                 len(ev.auth_event_ids()),
             )
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Too many auth_events")
-
-    async def get_min_depth_for_context(self, context: str) -> int:
-        return await self._store.get_min_depth(context)
