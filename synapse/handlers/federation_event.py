@@ -408,16 +408,20 @@ class FederationEventHandler:
         Persists the event separately. Notifies about the persisted events
         where appropriate.
 
-        Will attempt to fetch missing auth events.
-
         Args:
             origin: Where the events came from
-            room_id,
+            room_id:
             auth_events
             state
             event
             room_version: The room version we expect this room to have, and
                 will raise if it doesn't match the version in the create event.
+
+        Returns:
+            The stream ID after which all events have been persisted.
+
+        Raises:
+            SynapseError if the response is in some way invalid.
         """
         events_to_context = {}
         for e in itertools.chain(auth_events, state):
@@ -446,24 +450,14 @@ class FederationEventHandler:
         if room_version.identifier != room_version_id:
             raise SynapseError(400, "Room version mismatch")
 
-        missing_auth_events = set()
+        # we should have all of the auth events in the chain.
         for e in itertools.chain(auth_events, state, [event]):
             for e_id in e.auth_event_ids():
                 if e_id not in event_map:
-                    missing_auth_events.add(e_id)
-
-        for e_id in missing_auth_events:
-            m_ev = await self._federation_client.get_pdu(
-                [origin],
-                e_id,
-                room_version=room_version,
-                outlier=True,
-                timeout=10000,
-            )
-            if m_ev and m_ev.event_id == e_id:
-                event_map[e_id] = m_ev
-            else:
-                logger.info("Failed to find auth event %r", e_id)
+                    logger.info(
+                        "Auth chain incomplete: %s refers to missing event %s", e, e_id
+                    )
+                    raise SynapseError(400, "Auth chain incomplete")
 
         for e in itertools.chain(auth_events, state, [event]):
             auth_for_e = [
