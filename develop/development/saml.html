@@ -183,10 +183,9 @@
                         </div>
 
                         <h1 id="how-to-test-saml-as-a-developer-without-a-server"><a class="header" href="#how-to-test-saml-as-a-developer-without-a-server">How to test SAML as a developer without a server</a></h1>
-<p>https://capriza.github.io/samling/samling.html (https://github.com/capriza/samling) is a great
-resource for being able to tinker with the SAML options within Synapse without needing to
-deploy and configure a complicated software stack.</p>
-<p>To make Synapse (and therefore Riot) use it:</p>
+<p>https://fujifish.github.io/samling/samling.html (https://github.com/fujifish/samling) is a great resource for being able to tinker with the 
+SAML options within Synapse without needing to deploy and configure a complicated software stack.</p>
+<p>To make Synapse (and therefore Element) use it:</p>
 <ol>
 <li>Use the samling.html URL above or deploy your own and visit the IdP Metadata tab.</li>
 <li>Copy the XML to your clipboard.</li>
@@ -208,9 +207,9 @@ the XML from step 2 as the contents.</li>
 the dependencies are installed and ready to go.</li>
 <li>Restart Synapse.</li>
 </ol>
-<p>Then in Riot:</p>
+<p>Then in Element:</p>
 <ol>
-<li>Visit the login page with a Riot pointing at your homeserver.</li>
+<li>Visit the login page and point Element towards your homeserver using the <code>public_baseurl</code> above.</li>
 <li>Click the Single Sign-On button.</li>
 <li>On the samling page, enter a Name Identifier and add a SAML Attribute for <code>uid=your_localpart</code>.
 The response must also be signed.</li>
