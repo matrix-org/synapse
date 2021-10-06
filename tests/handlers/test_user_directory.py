@@ -402,6 +402,41 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         public3 = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
         self.assertEqual(set(public3), {(alice, room2), (bob, room2)})
 
+    def test_per_room_profile_doesnt_alter_directory_entry(self) -> None:
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        bob = self.register_user("bob", "pass")
+
+        # Alice should have a user directory entry created at registration.
+        users = self.get_success(self.user_dir_helper.get_profiles_in_user_directory())
+        print(users)
+        self.assertEqual(
+            users[alice], ProfileInfo(display_name="alice", avatar_url=None)
+        )
+
+        # Alice makes a room for herself.
+        room = self.helper.create_room_as(alice, is_public=True, tok=alice_token)
+
+        # Alice sets a nickname unique to that room.
+        self.helper.send_state(
+            room,
+            "m.room.member",
+            {
+                "displayname": "Freddy Mercury",
+                "membership": "join",
+            },
+            alice_token,
+            state_key=alice,
+        )
+
+        # Alice's display name remains the same in the user directory.
+        search_result = self.get_success(self.handler.search_users(bob, alice, 10))
+        self.assertEqual(
+            search_result["results"],
+            [{"display_name": "alice", "avatar_url": None, "user_id": alice}],
+            0,
+        )
+
     def test_private_room(self) -> None:
         """
         A user can be searched for only by people that are either in a public
