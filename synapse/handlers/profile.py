@@ -32,8 +32,6 @@ from synapse.types import (
     get_domain_from_id,
 )
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -43,7 +41,7 @@ MAX_DISPLAYNAME_LEN = 256
 MAX_AVATAR_URL_LEN = 1000
 
 
-class ProfileHandler(BaseHandler):
+class ProfileHandler:
     """Handles fetching and updating user profile information.
 
     ProfileHandler can be instantiated directly on workers and will
@@ -54,7 +52,9 @@ class ProfileHandler(BaseHandler):
     PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
+        self.clock = hs.get_clock()
+        self.hs = hs
 
         self.federation = hs.get_federation_client()
         hs.get_federation_registry().register_query_handler(
