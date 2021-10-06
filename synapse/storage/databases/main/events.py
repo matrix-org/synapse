@@ -1763,9 +1763,8 @@ class PersistEventsStore:
             retcol="creator",
             allow_none=True,
         )
-        if (
-            not room_version.msc2716_historical
-            or not self.hs.config.experimental.msc2716_enabled
+        if not room_version.msc2716_historical and (
+            not self.hs.config.experimental.msc2716_enabled
             or event.sender != room_creator
         ):
             return
@@ -1825,9 +1824,8 @@ class PersistEventsStore:
             retcol="creator",
             allow_none=True,
         )
-        if (
-            not room_version.msc2716_historical
-            or not self.hs.config.experimental.msc2716_enabled
+        if not room_version.msc2716_historical and (
+            not self.hs.config.experimental.msc2716_enabled
             or event.sender != room_creator
         ):
             return
