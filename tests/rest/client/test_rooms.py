@@ -2477,12 +2477,10 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.code, 200)
 
         # Check that the callback was called with the right params.
-        expected_call_args = ((self.user_id, "email", email_to_invite, self.room_id),)
-
-        self.assertEquals(mock.call_args, expected_call_args, mock.call_args)
+        mock.assert_called_with(self.user_id, "email", email_to_invite, self.room_id)
 
         # Check that the call to send the invite was made.
-        self.assertEquals(make_invite_mock.call_count, 1)
+        make_invite_mock.assert_called_once()
 
         # Now change the return value of the callback to deny any invite and test that
         # we can't send the invite.
@@ -2501,4 +2499,4 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.code, 403)
 
         # Also check that it stopped before calling _make_and_store_3pid_invite.
-        self.assertEquals(make_invite_mock.call_count, 1)
+        make_invite_mock.assert_called_once()
