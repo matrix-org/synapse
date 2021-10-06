@@ -27,7 +27,7 @@ To make Synapse (and therefore Element) use it:
 
 Then in Element:
 
-1. Visit the login page with a Element pointing at your homeserver.
+1. Visit the login page and point Element towards your homeserver using the `public_baseurl` above.
 2. Click the Single Sign-On button.
 3. On the samling page, enter a Name Identifier and add a SAML Attribute for `uid=your_localpart`.
    The response must also be signed.
