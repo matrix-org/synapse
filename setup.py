@@ -116,7 +116,7 @@ CONDITIONAL_REQUIREMENTS["mypy"] = [
     "mypy==0.812",
     "mypy-zope==0.2.13",
     "types-jsonschema>=3.2.0",
-
+    "types-pyOpenSSL>=20.0.7",
 ]
 
 # Dependencies which are exclusively required by unit test code. This is
