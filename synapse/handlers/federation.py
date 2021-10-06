@@ -1167,13 +1167,11 @@ class FederationHandler(BaseHandler):
                 logger.info("Failed to find auth event %r", e_id)
 
         for e in itertools.chain(auth_events, state, [event]):
-            auth_for_e = {
-                (event_map[e_id].type, event_map[e_id].state_key): event_map[e_id]
-                for e_id in e.auth_event_ids()
-                if e_id in event_map
-            }
+            auth_for_e = [
+                event_map[e_id] for e_id in e.auth_event_ids() if e_id in event_map
+            ]
             if create_event:
-                auth_for_e[(EventTypes.Create, "")] = create_event
+                auth_for_e.append(create_event)
 
             try:
                 validate_event_for_room_version(room_version, e)
