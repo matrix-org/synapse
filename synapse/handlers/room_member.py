@@ -1299,10 +1299,22 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if invitee:
             # Note that update_membership with an action of "invite" can raise
             # a ShadowBanError, but this was done above already.
+            # We don't check the invite against the spamchecker(s) here (through
+            # user_may_invite) because we'll do it further down the line anyway (in
+            # update_membership_locked).
             _, stream_id = await self.update_membership(
                 requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
             )
         else:
+            # Check if the spamchecker(s) allow this invite to go through.
+            if not await self.spam_checker.user_may_send_3pid_invite(
+                inviter_userid=requester.user.to_string(),
+                medium=medium,
+                address=address,
+                room_id=room_id,
+            ):
+                raise SynapseError(403, "Cannot send threepid invite")
+
             stream_id = await self._make_and_store_3pid_invite(
                 requester,
                 id_server,
