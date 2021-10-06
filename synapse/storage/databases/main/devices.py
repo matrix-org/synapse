@@ -1128,21 +1128,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             device_id: The ID of the device to delete
         """
 
-        def _delete_device_txn(txn: LoggingTransaction) -> None:
-            self.db_pool.simple_delete_one_txn(
-                txn,
-                table="devices",
-                keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
-            )
-
-            self.db_pool.simple_delete_txn(
-                txn,
-                table="device_inbox",
-                keyvalues={"user_id": user_id, "device_id": device_id},
-            )
-
-        await self.db_pool.runInteraction("delete_device", _delete_device_txn)
-        self.device_id_exists_cache.invalidate((user_id, device_id))
+        await self.delete_devices(user_id, [device_id])
 
     async def delete_devices(self, user_id: str, device_ids: List[str]) -> None:
         """Deletes several devices.
