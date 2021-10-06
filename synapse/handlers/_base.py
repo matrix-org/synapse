@@ -36,7 +36,6 @@ class BaseHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
-        self.notifier = hs.get_notifier()
         self.distributor = hs.get_distributor()
         self.clock = hs.get_clock()
         self.hs = hs
