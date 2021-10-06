@@ -1499,8 +1499,11 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         if len(remote_room_hosts) == 0:
             raise SynapseError(404, "No known servers")
 
-        check_complexity = self.hs.config.limit_remote_rooms.enabled
-        if check_complexity and self.hs.config.limit_remote_rooms.admins_can_join:
+        check_complexity = self.hs.config.server.limit_remote_rooms.enabled
+        if (
+            check_complexity
+            and self.hs.config.server.limit_remote_rooms.admins_can_join
+        ):
             check_complexity = not await self.auth.is_server_admin(user)
 
         if check_complexity:

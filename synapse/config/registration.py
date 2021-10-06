@@ -45,7 +45,10 @@ class RegistrationConfig(Config):
         account_threepid_delegates = config.get("account_threepid_delegates") or {}
         self.account_threepid_delegate_email = account_threepid_delegates.get("email")
         self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
-        if self.account_threepid_delegate_msisdn and not self.public_baseurl:
+        if (
+            self.account_threepid_delegate_msisdn
+            and not self.root.server.public_baseurl
+        ):
             raise ConfigError(
                 "The configuration option `public_baseurl` is required if "
                 "`account_threepid_delegate.msisdn` is set, such that "
@@ -85,7 +88,7 @@ class RegistrationConfig(Config):
         if mxid_localpart:
             # Convert the localpart to a full mxid.
             self.auto_join_user_id = UserID(
-                mxid_localpart, self.server_name
+                mxid_localpart, self.root.server.server_name
             ).to_string()
 
         if self.autocreate_auto_join_rooms:

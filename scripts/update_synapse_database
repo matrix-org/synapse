@@ -36,7 +36,7 @@ class MockHomeserver(HomeServer):
 
     def __init__(self, config, **kwargs):
         super(MockHomeserver, self).__init__(
-            config.server_name, reactor=reactor, config=config, **kwargs
+            config.server.server_name, reactor=reactor, config=config, **kwargs
         )
 
         self.version_string = "Synapse/" + get_version_string(synapse)
