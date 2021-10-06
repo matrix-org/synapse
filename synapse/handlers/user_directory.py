@@ -296,7 +296,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             room_id
         )
 
-        logger.debug("Change: %r, publicness: %r", publicness, is_public)
+        logger.debug("Publicness change: %r, is_public: %r", publicness, is_public)
 
         if publicness is MatchChange.now_true and not is_public:
             # If we became world readable but room isn't currently public then
