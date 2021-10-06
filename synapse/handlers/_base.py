@@ -60,8 +60,6 @@ class BaseHandler:
 
         self.server_name = hs.hostname
 
-        self.event_builder_factory = hs.get_event_builder_factory()
-
     async def ratelimit(
         self,
         requester: Requester,
