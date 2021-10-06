@@ -1,0 +1,1 @@
+Use type stubs for jsonschema, pyOpenSSL and Pillow when running mypy in CI.
