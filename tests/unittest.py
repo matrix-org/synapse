@@ -318,7 +318,7 @@ class HomeserverTestCase(TestCase):
             time.sleep(0.01)
 
     def wait_for_background_updates(self) -> None:
-        """Block until all background updates have completed."""
+        """Block until all background database updates have completed."""
         while not self.get_success(
             self.store.db_pool.updates.has_completed_background_updates()
         ):
