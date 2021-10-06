@@ -449,6 +449,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             third_party_signed: Information from a 3PID invite.
             ratelimit: Whether to rate limit the request.
             content: The content of the created event.
+            new_room: Whether the membership update is happening in the context of a room
+                creation.
             require_consent: Whether consent is required.
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
@@ -523,6 +525,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             third_party_signed:
             ratelimit:
             content:
+            new_room: Whether the membership update is happening in the context of a room
+                creation.
             require_consent:
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
@@ -711,24 +715,29 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     # so don't really fit into the general auth process.
                     raise AuthError(403, "Guest access not allowed")
 
+            # Figure out whether the user is a server admin to determine whether they
+            # should be able to bypass the spam checker.
             if (
                 self._server_notices_mxid is not None
                 and requester.user.to_string() == self._server_notices_mxid
             ):
                 # allow the server notices mxid to join rooms
-                is_requester_admin = True
+                bypass_spam_checker = True
 
             else:
-                is_requester_admin = await self.auth.is_server_admin(requester.user)
+                bypass_spam_checker = await self.auth.is_server_admin(requester.user)
 
             inviter = await self._get_inviter(target.to_string(), room_id)
-            if not is_requester_admin:
+            if (
+                not bypass_spam_checker
                 # We assume that if the spam checker allowed the user to create
                 # a room then they're allowed to join it.
-                if not new_room and not await self.spam_checker.user_may_join_room(
+                and not new_room
+                and not await self.spam_checker.user_may_join_room(
                     target.to_string(), room_id, is_invited=inviter is not None
-                ):
-                    raise SynapseError(403, "Not allowed to join this room")
+                )
+            ):
+                raise SynapseError(403, "Not allowed to join this room")
 
             # Check if a remote join should be performed.
             remote_join, remote_room_hosts = await self._should_perform_remote_join(
