@@ -807,12 +807,10 @@ def trace(func=None, opname=None):
                         result.addCallbacks(call_back, err_back)
 
                     else:
-                        if inspect.iscoroutine(result):
-                            logger.error(
-                                "@trace did not wrap %s correctly! "
-                                "The function is not async but returns a coroutine.",
-                                func.__qualname__,
-                            )
+                        assert not inspect.iscoroutine(result), (
+                            f"@trace did not wrap {func.__qualname__} correctly! "
+                            "The function is not async but returns a coroutine."
+                        )
 
                         scope.__exit__(None, None, None)
 
