@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import itertools
 import logging
 from http import HTTPStatus
 from typing import (
@@ -45,7 +46,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVersions
 from synapse.event_auth import (
     auth_types_for_event,
     check_auth_rules_for_event,
@@ -388,6 +389,119 @@ class FederationEventHandler:
             event.room_version,
             user_id,
             prev_member_event,
+        )
+
+    async def process_remote_join(
+        self,
+        origin: str,
+        room_id: str,
+        auth_events: List[EventBase],
+        state: List[EventBase],
+        event: EventBase,
+        room_version: RoomVersion,
+    ) -> int:
+        """Persists the events returned by a send_join
+
+        Checks the auth chain is valid (and passes auth checks) for the
+        state and event. Then persists the auth chain and state atomically.
+        Persists the event separately. Notifies about the persisted events
+        where appropriate.
+
+        Will attempt to fetch missing auth events.
+
+        Args:
+            origin: Where the events came from
+            room_id,
+            auth_events
+            state
+            event
+            room_version: The room version we expect this room to have, and
+                will raise if it doesn't match the version in the create event.
+        """
+        events_to_context = {}
+        for e in itertools.chain(auth_events, state):
+            e.internal_metadata.outlier = True
+            events_to_context[e.event_id] = EventContext.for_outlier()
+
+        event_map = {
+            e.event_id: e for e in itertools.chain(auth_events, state, [event])
+        }
+
+        create_event = None
+        for e in auth_events:
+            if (e.type, e.state_key) == (EventTypes.Create, ""):
+                create_event = e
+                break
+
+        if create_event is None:
+            # If the state doesn't have a create event then the room is
+            # invalid, and it would fail auth checks anyway.
+            raise SynapseError(400, "No create event in state")
+
+        room_version_id = create_event.content.get(
+            "room_version", RoomVersions.V1.identifier
+        )
+
+        if room_version.identifier != room_version_id:
+            raise SynapseError(400, "Room version mismatch")
+
+        missing_auth_events = set()
+        for e in itertools.chain(auth_events, state, [event]):
+            for e_id in e.auth_event_ids():
+                if e_id not in event_map:
+                    missing_auth_events.add(e_id)
+
+        for e_id in missing_auth_events:
+            m_ev = await self._federation_client.get_pdu(
+                [origin],
+                e_id,
+                room_version=room_version,
+                outlier=True,
+                timeout=10000,
+            )
+            if m_ev and m_ev.event_id == e_id:
+                event_map[e_id] = m_ev
+            else:
+                logger.info("Failed to find auth event %r", e_id)
+
+        for e in itertools.chain(auth_events, state, [event]):
+            auth_for_e = [
+                event_map[e_id] for e_id in e.auth_event_ids() if e_id in event_map
+            ]
+            if create_event:
+                auth_for_e.append(create_event)
+
+            try:
+                validate_event_for_room_version(room_version, e)
+                check_auth_rules_for_event(room_version, e, auth_for_e)
+            except SynapseError as err:
+                # we may get SynapseErrors here as well as AuthErrors. For
+                # instance, there are a couple of (ancient) events in some
+                # rooms whose senders do not have the correct sigil; these
+                # cause SynapseErrors in auth.check. We don't want to give up
+                # the attempt to federate altogether in such cases.
+
+                logger.warning("Rejecting %s because %s", e.event_id, err.msg)
+
+                if e == event:
+                    raise
+                events_to_context[e.event_id].rejected = RejectedReason.AUTH_ERROR
+
+        if auth_events or state:
+            await self.persist_events_and_notify(
+                room_id,
+                [
+                    (e, events_to_context[e.event_id])
+                    for e in itertools.chain(auth_events, state)
+                ],
+            )
+
+        new_event_context = await self._state_handler.compute_event_context(
+            event, old_state=state
+        )
+
+        return await self.persist_events_and_notify(
+            room_id, [(event, new_event_context)]
         )
 
     @log_function
