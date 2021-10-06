@@ -1116,14 +1116,12 @@ class FederationEventHandler:
 
         await concurrently_execute(get_event, event_ids, 5)
         logger.info("Fetched %i events of %i requested", len(events), len(event_ids))
-        await self._auth_and_persist_fetched_events(destination, room_id, events)
+        await self._auth_and_persist_outliers(destination, room_id, events)
 
-    async def _auth_and_persist_fetched_events(
+    async def _auth_and_persist_outliers(
         self, origin: str, room_id: str, events: Iterable[EventBase]
     ) -> None:
-        """Persist the events fetched by _get_events_and_persist or _get_remote_auth_chain_for_event
-
-        The events to be persisted must be outliers.
+        """Persist a batch of outlier events fetched from remote servers.
 
         We first sort the events to make sure that we process each event's auth_events
         before the event itself, and then auth and persist them.
@@ -1167,15 +1165,15 @@ class FederationEventHandler:
                 shortstr(e.event_id for e in roots),
             )
 
-            await self._auth_and_persist_fetched_events_inner(origin, room_id, roots)
+            await self._auth_and_persist_outliers_inner(origin, room_id, roots)
 
             for ev in roots:
                 del event_map[ev.event_id]
 
-    async def _auth_and_persist_fetched_events_inner(
+    async def _auth_and_persist_outliers_inner(
         self, origin: str, room_id: str, fetched_events: Collection[EventBase]
     ) -> None:
-        """Helper for _auth_and_persist_fetched_events
+        """Helper for _auth_and_persist_outliers
 
         Persists a batch of events where we have (theoretically) already persisted all
         of their auth events.
@@ -1719,7 +1717,7 @@ class FederationEventHandler:
         for s in seen_remotes:
             remote_event_map.pop(s, None)
 
-        await self._auth_and_persist_fetched_events(
+        await self._auth_and_persist_outliers(
             destination, room_id, remote_event_map.values()
         )
 
