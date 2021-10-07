@@ -232,7 +232,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                         # Handle any profile changes for remote users.
                         # (For local users we are not forced to scan membership
                         # events; instead the rest of the application calls
-                        # `_handle_local_profile_change`.)
+                        # `handle_local_profile_change`.)
                         if not self.is_mine_id(state_key):
                             await self._handle_profile_change(
                                 state_key, room_id, prev_event_id, event_id
