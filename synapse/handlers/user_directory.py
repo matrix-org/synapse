@@ -203,6 +203,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                     public_value=Membership.JOIN,
                 )
 
+                is_remote = not self.is_mine_id(state_key)
                 if change is MatchChange.now_false:
                     # Need to check if the server left the room entirely, if so
                     # we might need to remove all the users in that room
@@ -224,16 +225,17 @@ class UserDirectoryHandler(StateDeltasHandler):
                     else:
                         logger.debug("Server is still in room: %r", room_id)
 
-                include_in_dir = not self.is_mine_id(
-                    state_key
-                ) or await self.store.should_include_local_user_in_dir(state_key)
+                include_in_dir = (
+                    is_remote
+                    or await self.store.should_include_local_user_in_dir(state_key)
+                )
                 if include_in_dir:
                     if change is MatchChange.no_change:
                         # Handle any profile changes for remote users.
                         # (For local users we are not forced to scan membership
                         # events; instead the rest of the application calls
                         # `handle_local_profile_change`.)
-                        if not self.is_mine_id(state_key):
+                        if is_remote:
                             await self._handle_profile_change(
                                 state_key, room_id, prev_event_id, event_id
                             )
