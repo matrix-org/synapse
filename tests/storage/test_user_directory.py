@@ -212,12 +212,7 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
             )
         )
 
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
     def test_initial(self) -> None:
         """
