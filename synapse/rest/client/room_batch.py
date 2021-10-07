@@ -128,17 +128,15 @@ class RoomBatchSendEventRestServlet(RestServlet):
         # find the most recent auth events (derived from state events) that
         # allowed that message to be sent. We will use that as a base
         # to auth our historical messages against.
-        auth_event_ids = (
-            await self.room_batch_handler.getMostRecentAuthEventIdsFromEventIdList(
-                prev_event_ids_from_query
-            )
+        auth_event_ids = await self.room_batch_handler.get_most_recent_auth_event_ids_from_event_id_list(
+            prev_event_ids_from_query
         )
 
         # Create and persist all of the state events that float off on their own
         # before the batch. These will most likely be all of the invite/member
         # state events used to auth the upcoming historical messages.
         state_event_ids_at_start = (
-            await self.room_batch_handler.persistStateEventsAtStart(
+            await self.room_batch_handler.persist_state_events_at_start(
                 state_events_at_start=body["state_events_at_start"],
                 room_id=room_id,
                 initial_auth_event_ids=auth_event_ids,
@@ -207,7 +205,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
 
         # Create and persist all of the historical events as well as insertion
         # and batch meta events to make the batch navigable in the DAG.
-        event_ids, next_batch_id = await self.room_batch_handler.handleBatchOfEvents(
+        event_ids, next_batch_id = await self.room_batch_handler.handle_batch_of_events(
             events_to_create=events_to_create,
             room_id=room_id,
             batch_id_to_connect_to=batch_id_to_connect_to,

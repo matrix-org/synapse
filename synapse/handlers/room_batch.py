@@ -112,7 +112,7 @@ class RoomBatchHandler:
 
         return create_requester(user_id, app_service=app_service)
 
-    async def getMostRecentAuthEventIdsFromEventIdList(
+    async def get_most_recent_auth_event_ids_from_event_id_list(
         self, event_ids: List[str]
     ) -> List[str]:
         """Find the most recent auth event ids (derived from state events) that
@@ -134,7 +134,7 @@ class RoomBatchHandler:
 
         return auth_event_ids
 
-    async def persistStateEventsAtStart(
+    async def persist_state_events_at_start(
         self,
         state_events_at_start: List[JsonDict],
         room_id: str,
@@ -224,7 +224,7 @@ class RoomBatchHandler:
 
         return state_event_ids_at_start
 
-    async def persistHistoricalEvents(
+    async def persist_historical_events(
         self,
         events_to_create: List[JsonDict],
         room_id: str,
@@ -306,7 +306,7 @@ class RoomBatchHandler:
 
         return event_ids
 
-    async def handleBatchOfEvents(
+    async def handle_batch_of_events(
         self,
         events_to_create: List[JsonDict],
         room_id: str,
@@ -359,7 +359,7 @@ class RoomBatchHandler:
         events_to_create = [insertion_event] + events_to_create
 
         # Create and persist all of the historical events
-        event_ids = await self.persistHistoricalEvents(
+        event_ids = await self.persist_historical_events(
             events_to_create=events_to_create,
             room_id=room_id,
             initial_prev_event_ids=initial_prev_event_ids,
