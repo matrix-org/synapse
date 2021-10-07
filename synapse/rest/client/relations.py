@@ -230,12 +230,9 @@ class RelationPaginationServlet(RestServlet):
         original_event = await self._event_serializer.serialize_event(
             event, now, bundle_aggregations=False
         )
-        # Similarly, we don't allow relations to be applied to relations, so we
-        # return the original relations without any aggregations on top of them
-        # here.
-        serialized_events = await self._event_serializer.serialize_events(
-            events, now, bundle_aggregations=False
-        )
+        # For any relations applying to the original event they need their
+        # aggregations applied to them.
+        serialized_events = await self._event_serializer.serialize_events(events, now)
 
         return_value = pagination_chunk.to_dict()
         return_value["chunk"] = serialized_events
