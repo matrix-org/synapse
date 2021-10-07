@@ -15,7 +15,17 @@
 """Contains functions for registering clients."""
 
 import logging
-from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+)
 
 from prometheus_client import Counter
 from typing_extensions import TypedDict
@@ -103,6 +113,7 @@ class RegistrationHandler(BaseHandler):
 
         self.spam_checker = hs.get_spam_checker()
 
+        self._register_device_client: Callable[..., Awaitable[Mapping[str, Any]]]
         if hs.config.worker.worker_app:
             self._register_client = ReplicationRegisterServlet.make_client(hs)
             self._register_device_client = RegisterDeviceReplicationServlet.make_client(
