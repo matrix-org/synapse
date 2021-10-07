@@ -310,7 +310,7 @@ def tag(gh_token: Optional[str]):
         if current_version.is_prerelease:
             print("As this is an RC, remember to mark it as a pre-release!")
         print("(by the way, this step can be automated by passing --gh-token,")
-        print(" or one of the GH_TOKEN or GITHUB_TOKEN env vars.)")
+        print("or one of the GH_TOKEN or GITHUB_TOKEN env vars.)")
         click.launch(f"https://github.com/matrix-org/synapse/releases/edit/{tag_name}")
 
         print("Once done, you need to wait for the release assets to build.")
