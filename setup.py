@@ -113,11 +113,14 @@ CONDITIONAL_REQUIREMENTS["dev"] = CONDITIONAL_REQUIREMENTS["lint"] + [
 ]
 
 CONDITIONAL_REQUIREMENTS["mypy"] = [
-    "mypy==0.812",
-    "mypy-zope==0.2.13",
+    "mypy>=0.812",
+    "mypy-zope>=0.2.13",
+    "types-bleach>=4.1.0",
     "types-jsonschema>=3.2.0",
-    "types-pyOpenSSL>=20.0.7",
     "types-Pillow>=8.3.4",
+    "types-pyOpenSSL>=20.0.7",
+    "types-PyYAML>=5.4.10",
+    "types-setuptools>=57.4.0",
 ]
 
 # Dependencies which are exclusively required by unit test code. This is
