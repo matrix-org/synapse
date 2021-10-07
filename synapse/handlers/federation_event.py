@@ -404,9 +404,8 @@ class FederationEventHandler:
         """Persists the events returned by a send_join
 
         Checks the auth chain is valid (and passes auth checks) for the
-        state and event. Then persists the auth chain and state atomically.
-        Persists the event separately. Notifies about the persisted events
-        where appropriate.
+        state and event. Then persists all of the events.
+        Notifies about the persisted events where appropriate.
 
         Args:
             origin: Where the events came from
@@ -423,14 +422,10 @@ class FederationEventHandler:
         Raises:
             SynapseError if the response is in some way invalid.
         """
-        events_to_context = {}
         for e in itertools.chain(auth_events, state):
             e.internal_metadata.outlier = True
-            events_to_context[e.event_id] = EventContext.for_outlier()
 
-        event_map = {
-            e.event_id: e for e in itertools.chain(auth_events, state, [event])
-        }
+        event_map = {e.event_id: e for e in itertools.chain(auth_events, state)}
 
         create_event = None
         for e in auth_events:
@@ -459,38 +454,17 @@ class FederationEventHandler:
                     )
                     raise SynapseError(400, "Auth chain incomplete")
 
-        for e in itertools.chain(auth_events, state, [event]):
-            auth_for_e = [
-                event_map[e_id] for e_id in e.auth_event_ids() if e_id in event_map
-            ]
-            if create_event:
-                auth_for_e.append(create_event)
+        # filter out any events we have already seen
+        seen_remotes = await self._store.have_seen_events(room_id, event_map.keys())
+        for s in seen_remotes:
+            event_map.pop(s, None)
 
-            try:
-                validate_event_for_room_version(room_version, e)
-                check_auth_rules_for_event(room_version, e, auth_for_e)
-            except SynapseError as err:
-                # we may get SynapseErrors here as well as AuthErrors. For
-                # instance, there are a couple of (ancient) events in some
-                # rooms whose senders do not have the correct sigil; these
-                # cause SynapseErrors in auth.check. We don't want to give up
-                # the attempt to federate altogether in such cases.
+        # persist the auth chain and state events.
+        # any invalid events here will be marked as rejected, and we'll carry on.
+        await self._auth_and_persist_outliers(room_id, event_map.values())
 
-                logger.warning("Rejecting %s because %s", e.event_id, err.msg)
-
-                if e == event:
-                    raise
-                events_to_context[e.event_id].rejected = RejectedReason.AUTH_ERROR
-
-        if auth_events or state:
-            await self.persist_events_and_notify(
-                room_id,
-                [
-                    (e, events_to_context[e.event_id])
-                    for e in itertools.chain(auth_events, state)
-                ],
-            )
-
+        # and now persist the join event itself.
+        logger.info("Peristing join-via-remote %s", event)
         new_event_context = await self._state_handler.compute_event_context(
             event, old_state=state
         )
