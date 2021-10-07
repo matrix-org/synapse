@@ -113,8 +113,8 @@ CONDITIONAL_REQUIREMENTS["dev"] = CONDITIONAL_REQUIREMENTS["lint"] + [
 ]
 
 CONDITIONAL_REQUIREMENTS["mypy"] = [
-    "mypy>=0.812",
-    "mypy-zope>=0.2.13",
+    "mypy==0.910",
+    "mypy-zope==0.3.2",
     "types-bleach>=4.1.0",
     "types-jsonschema>=3.2.0",
     "types-Pillow>=8.3.4",
