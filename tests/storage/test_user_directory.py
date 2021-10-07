@@ -364,6 +364,21 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         # Check the AS user is not in the directory.
         self._check_room_sharing_tables(user, public, private)
 
+    def test_population_excludes_appservice_sender(self) -> None:
+        user = self.register_user("user", "pass")
+        token = self.login(user, "pass")
+
+        # Join the AS sender to rooms owned by the normal user.
+        public, private = self._create_rooms_and_inject_memberships(
+            user, token, self.appservice.sender
+        )
+
+        # Rebuild the directory.
+        self._purge_and_rebuild_user_dir()
+
+        # Check the AS sender is not in the directory.
+        self._check_room_sharing_tables(user, public, private)
+
     def test_population_conceals_private_nickname(self) -> None:
         # Make a private room, and set a nickname within
         user = self.register_user("aaaa", "pass")

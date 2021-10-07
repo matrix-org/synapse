@@ -295,6 +295,27 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         profile = self.get_success(self.store.get_user_in_directory(as_user_id))
         self.assertTrue(profile is None)
 
+    def test_handle_local_profile_change_with_appservice_sender(self) -> None:
+        # profile is not in directory
+        profile = self.get_success(
+            self.store.get_user_in_directory(self.appservice.sender)
+        )
+        self.assertTrue(profile is None)
+
+        # update profile
+        profile_info = ProfileInfo(avatar_url="avatar_url", display_name="4L1c3")
+        self.get_success(
+            self.handler.handle_local_profile_change(
+                self.appservice.sender, profile_info
+            )
+        )
+
+        # profile is still not in directory
+        profile = self.get_success(
+            self.store.get_user_in_directory(self.appservice.sender)
+        )
+        self.assertTrue(profile is None)
+
     def test_handle_user_deactivated_support_user(self) -> None:
         s_user_id = "@support:test"
         self.get_success(
