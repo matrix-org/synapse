@@ -81,7 +81,7 @@ jobs:
         include:
           # Newest Python without optional deps
           - python-version: "3.10"
-            toxenv: "py-noextras,combine"
+            toxenv: "py-noextras"
 
           # Oldest Python with PostgreSQL
           - python-version: "3.6"
@@ -111,7 +111,7 @@ jobs:
         if: ${{ matrix.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
-      - run: tox -e py,combine
+      - run: tox -e py
         env:
           TRIAL_FLAGS: "--jobs=2"
           SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
@@ -169,7 +169,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install tox
-      - run: tox -e py,combine
+      - run: tox -e py
         env:
           TRIAL_FLAGS: "--jobs=2"
       - name: Dump logs
