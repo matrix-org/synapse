@@ -464,6 +464,23 @@ class EventClientSerializer:
                     "sender": edit.sender,
                 }
 
+            # If this event is the start of a thread, include a summary of the replies.
+            (
+                thread_count,
+                thread_senders,
+                latest_thread_event,
+            ) = await self.store.get_thread_summary(event_id)
+            if latest_thread_event:
+                r = serialized_event["unsigned"].setdefault("m.relations", {})
+                r[RelationTypes.THREAD] = {
+                    # Don't bundle aggregations as this could recurse forever.
+                    "latest_event": await self.serialize_event(
+                        latest_thread_event, time_now, bundle_aggregations=False
+                    ),
+                    "senders": thread_senders,
+                    "count": thread_count,
+                }
+
         return serialized_event
 
     async def serialize_events(
