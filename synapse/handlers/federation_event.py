@@ -1116,10 +1116,10 @@ class FederationEventHandler:
 
         await concurrently_execute(get_event, event_ids, 5)
         logger.info("Fetched %i events of %i requested", len(events), len(event_ids))
-        await self._auth_and_persist_outliers(destination, room_id, events)
+        await self._auth_and_persist_outliers(room_id, events)
 
     async def _auth_and_persist_outliers(
-        self, origin: str, room_id: str, events: Iterable[EventBase]
+        self, room_id: str, events: Iterable[EventBase]
     ) -> None:
         """Persist a batch of outlier events fetched from remote servers.
 
@@ -1129,7 +1129,6 @@ class FederationEventHandler:
         Notifies about the events where appropriate.
 
         Params:
-            origin: where the events came from
             room_id: the room that the events are meant to be in (though this has
                not yet been checked)
             events: the events that have been fetched
@@ -1165,13 +1164,13 @@ class FederationEventHandler:
                 shortstr(e.event_id for e in roots),
             )
 
-            await self._auth_and_persist_outliers_inner(origin, room_id, roots)
+            await self._auth_and_persist_outliers_inner(room_id, roots)
 
             for ev in roots:
                 del event_map[ev.event_id]
 
     async def _auth_and_persist_outliers_inner(
-        self, origin: str, room_id: str, fetched_events: Collection[EventBase]
+        self, room_id: str, fetched_events: Collection[EventBase]
     ) -> None:
         """Helper for _auth_and_persist_outliers
 
@@ -1717,9 +1716,7 @@ class FederationEventHandler:
         for s in seen_remotes:
             remote_event_map.pop(s, None)
 
-        await self._auth_and_persist_outliers(
-            destination, room_id, remote_event_map.values()
-        )
+        await self._auth_and_persist_outliers(room_id, remote_event_map.values())
 
     async def _update_context_for_auth_events(
         self, event: EventBase, context: EventContext, auth_events: StateMap[EventBase]
