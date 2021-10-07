@@ -78,6 +78,7 @@ jobs:
       matrix:
         python-version: ["3.6", "3.7", "3.8", "3.9", "3.10"]
         database: ["sqlite"]
+        toxenv: ["py"]
         include:
           # Newest Python without optional deps
           - python-version: "3.10"
@@ -111,7 +112,7 @@ jobs:
         if: ${{ matrix.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
-      - run: tox -e py
+      - run: tox -e ${{ matrix.toxenv }}
         env:
           TRIAL_FLAGS: "--jobs=2"
           SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
