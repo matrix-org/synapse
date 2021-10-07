@@ -153,21 +153,23 @@ class _BaseThreepidAuthChecker:
 
         # msisdns are currently always ThreepidBehaviour.REMOTE
         if medium == "msisdn":
-            if not self.hs.config.account_threepid_delegate_msisdn:
+            if not self.hs.config.registration.account_threepid_delegate_msisdn:
                 raise SynapseError(
                     400, "Phone number verification is not enabled on this homeserver"
                 )
             threepid = await identity_handler.threepid_from_creds(
-                self.hs.config.account_threepid_delegate_msisdn, threepid_creds
+                self.hs.config.registration.account_threepid_delegate_msisdn,
+                threepid_creds,
             )
         elif medium == "email":
             if (
                 self.hs.config.email.threepid_behaviour_email
                 == ThreepidBehaviour.REMOTE
             ):
-                assert self.hs.config.account_threepid_delegate_email
+                assert self.hs.config.registration.account_threepid_delegate_email
                 threepid = await identity_handler.threepid_from_creds(
-                    self.hs.config.account_threepid_delegate_email, threepid_creds
+                    self.hs.config.registration.account_threepid_delegate_email,
+                    threepid_creds,
                 )
             elif (
                 self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL
@@ -240,7 +242,7 @@ class MsisdnAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChecker):
         _BaseThreepidAuthChecker.__init__(self, hs)
 
     def is_enabled(self) -> bool:
-        return bool(self.hs.config.account_threepid_delegate_msisdn)
+        return bool(self.hs.config.registration.account_threepid_delegate_msisdn)
 
     async def check_auth(self, authdict: dict, clientip: str) -> Any:
         return await self._check_threepid("msisdn", authdict)
@@ -252,7 +254,7 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.hs = hs
-        self._enabled = bool(hs.config.registration_requires_token)
+        self._enabled = bool(hs.config.registration.registration_requires_token)
         self.store = hs.get_datastore()
 
     def is_enabled(self) -> bool:

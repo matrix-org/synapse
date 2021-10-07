@@ -132,12 +132,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
 
-        # Support users are for diagnostics and should not appear in the user directory.
-        is_support = await self.store.is_support_user(user_id)
-        # When change profile information of deactivated user it should not appear in the user directory.
-        is_deactivated = await self.store.get_user_deactivated_status(user_id)
-
-        if not (is_support or is_deactivated):
+        if await self.store.should_include_local_user_in_dir(user_id):
             await self.store.update_profile_in_user_dir(
                 user_id, profile.display_name, profile.avatar_url
             )
@@ -208,6 +203,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                     public_value=Membership.JOIN,
                 )
 
+                is_remote = not self.is_mine_id(state_key)
                 if change is MatchChange.now_false:
                     # Need to check if the server left the room entirely, if so
                     # we might need to remove all the users in that room
@@ -225,17 +221,24 @@ class UserDirectoryHandler(StateDeltasHandler):
 
                         for user_id in user_ids:
                             await self._handle_remove_user(room_id, user_id)
-                        return
+                        continue
                     else:
                         logger.debug("Server is still in room: %r", room_id)
 
-                is_support = await self.store.is_support_user(state_key)
-                if not is_support:
+                include_in_dir = (
+                    is_remote
+                    or await self.store.should_include_local_user_in_dir(state_key)
+                )
+                if include_in_dir:
                     if change is MatchChange.no_change:
-                        # Handle any profile changes
-                        await self._handle_profile_change(
-                            state_key, room_id, prev_event_id, event_id
-                        )
+                        # Handle any profile changes for remote users.
+                        # (For local users we are not forced to scan membership
+                        # events; instead the rest of the application calls
+                        # `handle_local_profile_change`.)
+                        if is_remote:
+                            await self._handle_profile_change(
+                                state_key, room_id, prev_event_id, event_id
+                            )
                         continue
 
                     if change is MatchChange.now_true:  # The user joined
@@ -356,13 +359,7 @@ class UserDirectoryHandler(StateDeltasHandler):
 
             # First, if they're our user then we need to update for every user
             if self.is_mine_id(user_id):
-
-                is_appservice = self.store.get_if_app_services_interested_in_user(
-                    user_id
-                )
-
-                # We don't care about appservice users.
-                if not is_appservice:
+                if await self.store.should_include_local_user_in_dir(user_id):
                     for other_user_id in other_users_in_room:
                         if user_id == other_user_id:
                             continue
@@ -374,10 +371,10 @@ class UserDirectoryHandler(StateDeltasHandler):
                 if user_id == other_user_id:
                     continue
 
-                is_appservice = self.store.get_if_app_services_interested_in_user(
+                include_other_user = self.is_mine_id(
                     other_user_id
-                )
-                if self.is_mine_id(other_user_id) and not is_appservice:
+                ) and await self.store.should_include_local_user_in_dir(other_user_id)
+                if include_other_user:
                     to_insert.add((other_user_id, user_id))
 
             if to_insert:

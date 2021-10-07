@@ -3,7 +3,7 @@
 ## Historical Note
 This document was originally written to guide server admins through the upgrade
 path towards Synapse 1.0. Specifically,
-[MSC1711](https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md)
+[MSC1711](https://github.com/matrix-org/matrix-doc/blob/main/proposals/1711-x509-for-federation.md)
 required that all servers present valid TLS certificates on their federation
 API. Admins were encouraged to achieve compliance from version 0.99.0 (released
 in February 2019) ahead of version 1.0 (released June 2019) enforcing the
@@ -282,7 +282,7 @@ coffin of the Perspectives project (which was already pretty dead). So, the
 Spec Core Team decided that a better approach would be to mandate valid TLS
 certificates for federation alongside the rest of the Web. More details can be
 found in
-[MSC1711](https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md#background-the-failure-of-the-perspectives-approach).
+[MSC1711](https://github.com/matrix-org/matrix-doc/blob/main/proposals/1711-x509-for-federation.md#background-the-failure-of-the-perspectives-approach).
 
 This results in a breaking change, which is disruptive, but absolutely critical
 for the security model. However, the existence of Let's Encrypt as a trivial

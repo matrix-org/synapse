@@ -44,8 +44,8 @@ def check_3pid_allowed(hs: "HomeServer", medium: str, address: str) -> bool:
         bool: whether the 3PID medium/address is allowed to be added to this HS
     """
 
-    if hs.config.allowed_local_3pids:
-        for constraint in hs.config.allowed_local_3pids:
+    if hs.config.registration.allowed_local_3pids:
+        for constraint in hs.config.registration.allowed_local_3pids:
             logger.debug(
                 "Checking 3PID %s (%s) against %s (%s)",
                 address,
