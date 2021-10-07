@@ -465,13 +465,16 @@ class FederationEventHandler:
 
         # and now persist the join event itself.
         logger.info("Peristing join-via-remote %s", event)
-        new_event_context = await self._state_handler.compute_event_context(
-            event, old_state=state
-        )
+        with nested_logging_context(suffix=event.event_id):
+            context = await self._state_handler.compute_event_context(
+                event, old_state=state
+            )
 
-        return await self.persist_events_and_notify(
-            room_id, [(event, new_event_context)]
-        )
+            context = await self._check_event_auth(origin, event, context)
+            if context.rejected:
+                raise SynapseError(400, "Join event was rejected")
+
+            return await self.persist_events_and_notify(room_id, [(event, context)])
 
     @log_function
     async def backfill(
@@ -944,9 +947,15 @@ class FederationEventHandler:
     ) -> None:
         """Called when we have a new non-outlier event.
 
-        This is called when we have a new event to add to the room DAG - either directly
-        via a /send request, retrieved via get_missing_events after a /send request, or
-        backfilled after a client request.
+        This is called when we have a new event to add to the room DAG. This can be
+        due to:
+           * events received directly via a /send request
+           * events retrieved via get_missing_events after a /send request
+           * events backfilled after a client request.
+
+        It's not currently used for events received from incoming send_{join,knock,leave}
+        requests (which go via on_send_membership_event), nor for joins created by a
+        remote join dance (which go via process_remote_join).
 
         We need to do auth checks and put it through the StateHandler.
 
