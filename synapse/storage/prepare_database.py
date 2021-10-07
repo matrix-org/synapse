@@ -487,6 +487,7 @@ def _upgrade_existing_database(
                 spec = importlib.util.spec_from_file_location(
                     module_name, absolute_path
                 )
+                assert spec is not None
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)  # type: ignore
 
