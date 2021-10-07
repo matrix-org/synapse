@@ -1,0 +1,1 @@
+Fix exception thrown when attempting to notify appservice `sender` of new messages.
