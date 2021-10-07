@@ -1,0 +1,1 @@
+Correct a bugfix introduced in Synapse v1.44.0 that wouldn't catch every error of the connection breaks before a response could be written to it.

@@ -118,7 +118,7 @@ class _StateCacheEntry:
         else:
             self.state_id = _gen_state_id()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.state)
 
 

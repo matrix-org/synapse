@@ -894,6 +894,9 @@ class FederationEventHandler:
                 backfilled=backfilled,
             )
         except AuthError as e:
+            # FIXME richvdh 2021/10/07 I don't think this is reachable. Let's log it
+            #   for now
+            logger.exception("Unexpected AuthError from _check_event_auth")
             raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
 
         await self._run_push_actions_and_persist_event(event, context, backfilled)
@@ -1158,7 +1161,10 @@ class FederationEventHandler:
                 return
 
             logger.info(
-                "Persisting %i of %i remaining events", len(roots), len(event_map)
+                "Persisting %i of %i remaining outliers: %s",
+                len(roots),
+                len(event_map),
+                shortstr(e.event_id for e in roots),
             )
 
             await self._auth_and_persist_fetched_events_inner(origin, room_id, roots)

@@ -1778,7 +1778,9 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
     def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
 
-        self._ignore_unknown_session_error = hs.config.request_token_inhibit_3pid_errors
+        self._ignore_unknown_session_error = (
+            hs.config.server.request_token_inhibit_3pid_errors
+        )
 
         self._access_tokens_id_gen = IdGenerator(db_conn, "access_tokens", "id")
         self._refresh_tokens_id_gen = IdGenerator(db_conn, "refresh_tokens", "id")
