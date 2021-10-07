@@ -111,6 +111,9 @@ class _EventInternalMetadata:
         # in the DAG)
         self.outlier = False
 
+    # Tell mypy to ignore the types of properties defined by DictProperty until
+    # that is properly annotated.
+
     out_of_band_membership: bool = DictProperty("out_of_band_membership")  # type: ignore[assignment]
     send_on_behalf_of: str = DictProperty("send_on_behalf_of")  # type: ignore[assignment]
     recheck_redaction: bool = DictProperty("recheck_redaction")  # type: ignore[assignment]
@@ -228,6 +231,9 @@ class EventBase(metaclass=abc.ABCMeta):
         self._dict = event_dict
 
         self.internal_metadata = _EventInternalMetadata(internal_metadata_dict)
+
+    # Tell mypy to ignore the types of properties defined by DictProperty until
+    # that is properly annotated.
 
     auth_events = DictProperty("auth_events")  # type: ignore[assignment]
     depth = DictProperty("depth")  # type: ignore[assignment]
