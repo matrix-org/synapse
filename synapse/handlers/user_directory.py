@@ -350,11 +350,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             user_id, profile.display_name, profile.avatar_url
         )
 
-    async def _track_user_joined_room(
-        self,
-        room_id: str,
-        user_id: str,
-    ) -> None:
+    async def _track_user_joined_room(self, room_id: str, user_id: str) -> None:
         """Someone's just joined a room. Update `users_in_public_rooms` or
         `users_who_share_private_rooms` as appropriate.
 
