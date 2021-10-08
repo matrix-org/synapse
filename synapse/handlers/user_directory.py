@@ -242,18 +242,15 @@ class UserDirectoryHandler(StateDeltasHandler):
                         continue
 
                     if change is MatchChange.now_true:  # The user joined
-                        event = await self.store.get_event(event_id, allow_none=True)
-                        # It isn't expected for this event to not exist, but we
-                        # don't want the entire background process to break.
-                        if event is None:
-                            continue
-
-                        profile = ProfileInfo(
-                            avatar_url=event.content.get("avatar_url"),
-                            display_name=event.content.get("displayname"),
-                        )
-
-                        await self._handle_new_user(room_id, state_key, profile)
+                        # This may be the first time we've seen a remote user. If
+                        # so, ensure we have a directory entry for them. (We don't
+                        # need to do this for local users: their directory entry
+                        # is created at the point of registration.
+                        if is_remote:
+                            await self._upsert_directory_entry_for_remote_user(
+                                state_key, event_id
+                            )
+                        await self._track_user_joined_room(room_id, state_key)
                     else:  # The user left
                         await self._handle_remove_user(room_id, state_key)
             else:
@@ -303,7 +300,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             room_id
         )
 
-        logger.debug("Change: %r, publicness: %r", publicness, is_public)
+        logger.debug("Publicness change: %r, is_public: %r", publicness, is_public)
 
         if publicness is MatchChange.now_true and not is_public:
             # If we became world readable but room isn't currently public then
@@ -314,42 +311,50 @@ class UserDirectoryHandler(StateDeltasHandler):
             # ignore the change
             return
 
-        other_users_in_room_with_profiles = (
-            await self.store.get_users_in_room_with_profiles(room_id)
-        )
+        users_in_room = await self.store.get_users_in_room(room_id)
 
         # Remove every user from the sharing tables for that room.
-        for user_id in other_users_in_room_with_profiles.keys():
+        for user_id in users_in_room:
             await self.store.remove_user_who_share_room(user_id, room_id)
 
         # Then, re-add them to the tables.
-        # NOTE: this is not the most efficient method, as handle_new_user sets
+        # NOTE: this is not the most efficient method, as _track_user_joined_room sets
         # up local_user -> other_user and other_user_whos_local -> local_user,
         # which when ran over an entire room, will result in the same values
         # being added multiple times. The batching upserts shouldn't make this
         # too bad, though.
-        for user_id, profile in other_users_in_room_with_profiles.items():
-            await self._handle_new_user(room_id, user_id, profile)
+        for user_id in users_in_room:
+            await self._track_user_joined_room(room_id, user_id)
 
-    async def _handle_new_user(
-        self, room_id: str, user_id: str, profile: ProfileInfo
+    async def _upsert_directory_entry_for_remote_user(
+        self, user_id: str, event_id: str
     ) -> None:
-        """Called when we might need to add user to directory
-
-        Args:
-            room_id: The room ID that user joined or started being public
-            user_id
+        """A remote user has just joined a room. Ensure they have an entry in
+        the user directory. The caller is responsible for making sure they're
+        remote.
         """
+        event = await self.store.get_event(event_id, allow_none=True)
+        # It isn't expected for this event to not exist, but we
+        # don't want the entire background process to break.
+        if event is None:
+            return
+
         logger.debug("Adding new user to dir, %r", user_id)
 
         await self.store.update_profile_in_user_dir(
-            user_id, profile.display_name, profile.avatar_url
+            user_id, event.content.get("displayname"), event.content.get("avatar_url")
         )
 
+    async def _track_user_joined_room(self, room_id: str, user_id: str) -> None:
+        """Someone's just joined a room. Update `users_in_public_rooms` or
+        `users_who_share_private_rooms` as appropriate.
+
+        The caller is responsible for ensuring that the given user is not excluded
+        from the user directory.
+        """
         is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
         )
-        # Now we update users who share rooms with users.
         other_users_in_room = await self.store.get_users_in_room(room_id)
 
         if is_public:
