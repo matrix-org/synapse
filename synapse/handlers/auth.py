@@ -52,7 +52,6 @@ from synapse.api.errors import (
     UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
-from synapse.handlers._base import BaseHandler
 from synapse.handlers.ui_auth import (
     INTERACTIVE_AUTH_CHECKERS,
     UIAuthSessionDataConstants,
@@ -186,12 +185,13 @@ class LoginTokenAttributes:
     auth_provider_id = attr.ib(type=str)
 
 
-class AuthHandler(BaseHandler):
+class AuthHandler:
     SESSION_EXPIRE_MS = 48 * 60 * 60 * 1000
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
         self.checkers: Dict[str, UserInteractiveAuthChecker] = {}
         for auth_checker_class in INTERACTIVE_AUTH_CHECKERS:
             inst = auth_checker_class(hs)
