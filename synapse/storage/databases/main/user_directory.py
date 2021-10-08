@@ -383,9 +383,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         """Certain classes of local user are omitted from the user directory.
         Is this user one of them?
         """
-        # The main app service sender isn't usually contactable, so exclude them
-        if self.get_app_service_by_user_id(user) is not None:
-            return False
 
         # App service users aren't usually contactable, so exclude them.
         if self.get_if_app_services_interested_in_user(user):

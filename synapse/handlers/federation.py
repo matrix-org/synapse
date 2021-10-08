@@ -150,7 +150,7 @@ class FederationHandler(BaseHandler):
         insertion_events_to_be_backfilled = (
             await self.store.get_insertion_event_backwards_extremities_in_room(room_id)
         )
-        logger.info(
+        logger.debug(
             "_maybe_backfill_inner: extremities oldest_events_with_depth=%s insertion_events_to_be_backfilled=%s",
             oldest_events_with_depth,
             insertion_events_to_be_backfilled,
@@ -205,7 +205,7 @@ class FederationHandler(BaseHandler):
             redact=False,
             check_history_visibility_only=True,
         )
-        logger.info(
+        logger.debug(
             "_maybe_backfill_inner: filtered_extremities %s", filtered_extremities
         )
 
@@ -232,7 +232,7 @@ class FederationHandler(BaseHandler):
         # much larger factor will result in triggering a backfill request much
         # earlier than necessary.
         if current_depth - 2 * limit > max_depth:
-            logger.info(
+            logger.debug(
                 "Not backfilling as we don't need to. %d < %d - 2 * %d",
                 max_depth,
                 current_depth,
@@ -251,7 +251,7 @@ class FederationHandler(BaseHandler):
             t for t in sorted_extremeties_tuple if int(t[1]) <= current_depth
         ]
 
-        logger.info(
+        logger.debug(
             "room_id: %s, backfill: current_depth: %s, limit: %s, max_depth: %s, extrems: %s filtered_sorted_extremeties_tuple: %s",
             room_id,
             current_depth,
