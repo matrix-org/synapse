@@ -321,8 +321,8 @@ class UserDirectoryHandler(StateDeltasHandler):
                 return
             else:
                 logger.debug("Server is still in room: %r", room_id)
-
-        if change is MatchChange.no_change:
+                await self._handle_remove_user(room_id, state_key)
+        elif change is MatchChange.no_change:
             # Handle any profile changes for remote users.
             # (For local users we are not forced to scan membership
             # events; instead the rest of the application calls
@@ -342,8 +342,6 @@ class UserDirectoryHandler(StateDeltasHandler):
                     state_key, event_id
                 )
             await self._track_user_joined_room(room_id, state_key)
-        else:  # The user left
-            await self._handle_remove_user(room_id, state_key)
 
     async def _upsert_directory_entry_for_remote_user(
         self, user_id: str, event_id: str
