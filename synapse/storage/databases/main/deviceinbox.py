@@ -19,9 +19,10 @@ from synapse.logging import issue9533_logger
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.replication.tcp.streams import ToDeviceStream
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
+from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.stream_change_cache import StreamChangeCache
@@ -600,41 +601,40 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
             The number of deleted rows
         """
 
-        last_device_id = progress.get("device_id", "")
-
         def _remove_deleted_devices_from_device_inbox_txn(
             txn: LoggingTransaction,
         ) -> int:
 
             sql = """
-                SELECT device_id
-                    FROM device_inbox
-                    WHERE device_id
-                        NOT IN (SELECT device_id FROM devices)
-                        AND device_id > ?
-                    ORDER BY device_id ASC
-                    LIMIT ?;
+                WITH get_devices AS
+                  (SELECT device_inbox.device_id, device_inbox.user_id
+                   FROM device_inbox
+                   WHERE (device_inbox.device_id, device_inbox.user_id)
+                       NOT IN
+                           (SELECT device_id, user_id FROM devices)
+                   LIMIT ?)
+                SELECT DISTINCT * FROM get_devices;
             """
 
-            txn.execute(sql, (last_device_id, batch_size))
-            device_ids_to_delete = [row[0] for row in txn]
+            txn.execute(sql, (batch_size,))
+            rows = txn.fetchall()
 
-            count_deleted_devices = self.db_pool.simple_delete_many_txn(
-                txn,
-                "device_inbox",
-                column="device_id",
-                values=device_ids_to_delete,
-                keyvalues={},
-            )
+            num_deleted = 0
+            for row in rows:
+                num_deleted += self.db_pool.simple_delete_txn(
+                    txn,
+                    "device_inbox",
+                    {"device_id": row[0], "user_id": row[1]},
+                )
 
-            if device_ids_to_delete:
+            if rows:
                 self.db_pool.updates._background_update_progress_txn(
                     txn,
                     self.REMOVE_DELETED_DEVICES,
-                    {"device_id": device_ids_to_delete[-1]},
+                    {"device_id": rows[-1][0], "user_id": rows[-1][1]},
                 )
 
-            return count_deleted_devices
+            return num_deleted
 
         number_deleted = await self.db_pool.runInteraction(
             "_remove_deleted_devices_from_device_inbox",
