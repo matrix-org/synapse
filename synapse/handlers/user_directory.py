@@ -288,8 +288,23 @@ class UserDirectoryHandler(StateDeltasHandler):
             key_name="membership",
             public_value=Membership.JOIN,
         )
+        # We have to do two things:
+        # 1. Update the room-sharing tables.
+        #    This applies to remote users and non-excluded local users.
+        # 2. Update the user_directory and user_directory_search tables.
+        #    This applies to remote users only, because we only become aware of
+        #    the (and any profile changes) by listening to these events.
+        #    The rest of the application knows exactly when local users are
+        #    created or their profile changed---it will directly call methods
+        #    on this class.
 
+        # Both cases ignore excluded local users, so start by discarding them.
         is_remote = not self.is_mine_id(state_key)
+        if not is_remote and not await self.store.should_include_local_user_in_dir(
+            state_key
+        ):
+            return
+
         if change is MatchChange.now_false:
             # Need to check if the server left the room entirely, if so
             # we might need to remove all the users in that room
@@ -307,33 +322,29 @@ class UserDirectoryHandler(StateDeltasHandler):
             else:
                 logger.debug("Server is still in room: %r", room_id)
 
-        include_in_dir = is_remote or await self.store.should_include_local_user_in_dir(
-            state_key
-        )
-        if include_in_dir:
-            if change is MatchChange.no_change:
-                # Handle any profile changes for remote users.
-                # (For local users we are not forced to scan membership
-                # events; instead the rest of the application calls
-                # `handle_local_profile_change`.)
-                if is_remote:
-                    await self._handle_profile_change(
-                        state_key, room_id, prev_event_id, event_id
-                    )
-                return
+        if change is MatchChange.no_change:
+            # Handle any profile changes for remote users.
+            # (For local users we are not forced to scan membership
+            # events; instead the rest of the application calls
+            # `handle_local_profile_change`.)
+            if is_remote:
+                await self._handle_profile_change(
+                    state_key, room_id, prev_event_id, event_id
+                )
+            return
 
-            if change is MatchChange.now_true:  # The user joined
-                # This may be the first time we've seen a remote user. If
-                # so, ensure we have a directory entry for them. (We don't
-                # need to do this for local users: their directory entry
-                # is created at the point of registration.
-                if is_remote:
-                    await self._upsert_directory_entry_for_remote_user(
-                        state_key, event_id
-                    )
-                await self._track_user_joined_room(room_id, state_key)
-            else:  # The user left
-                await self._handle_remove_user(room_id, state_key)
+        if change is MatchChange.now_true:  # The user joined
+            # This may be the first time we've seen a remote user. If
+            # so, ensure we have a directory entry for them. (We don't
+            # need to do this for local users: their directory entry
+            # is created at the point of registration.
+            if is_remote:
+                await self._upsert_directory_entry_for_remote_user(
+                    state_key, event_id
+                )
+            await self._track_user_joined_room(room_id, state_key)
+        else:  # The user left
+            await self._handle_remove_user(room_id, state_key)
 
     async def _upsert_directory_entry_for_remote_user(
         self, user_id: str, event_id: str
