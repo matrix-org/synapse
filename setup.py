@@ -103,6 +103,15 @@ CONDITIONAL_REQUIREMENTS["lint"] = [
     "flake8",
 ]
 
+CONDITIONAL_REQUIREMENTS["dev"] = CONDITIONAL_REQUIREMENTS["lint"] + [
+    # The following are used by the release script
+    "click==7.1.2",
+    "redbaron==0.9.2",
+    "GitPython==3.1.14",
+    "commonmark==0.9.1",
+    "pygithub==1.55",
+]
+
 CONDITIONAL_REQUIREMENTS["mypy"] = [
     "mypy==0.910",
     "mypy-zope==0.3.2",
@@ -120,20 +129,6 @@ CONDITIONAL_REQUIREMENTS["mypy"] = [
 #
 # parameterized_class decorator was introduced in parameterized 0.7.0
 CONDITIONAL_REQUIREMENTS["test"] = ["parameterized>=0.7.0"]
-
-CONDITIONAL_REQUIREMENTS["dev"] = (
-    CONDITIONAL_REQUIREMENTS["lint"]
-    + CONDITIONAL_REQUIREMENTS["mypy"]
-    + CONDITIONAL_REQUIREMENTS["test"]
-    + [
-        # The following are used by the release script
-        "click==7.1.2",
-        "redbaron==0.9.2",
-        "GitPython==3.1.14",
-        "commonmark==0.9.1",
-        "pygithub==1.55",
-    ]
-)
 
 setup(
     name="matrix-synapse",
