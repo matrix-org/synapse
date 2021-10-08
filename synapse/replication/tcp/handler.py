@@ -171,7 +171,10 @@ class ReplicationCommandHandler:
             if hs.config.worker.worker_app is not None:
                 continue
 
-            if stream.NAME == FederationStream.NAME and hs.config.send_federation:
+            if (
+                stream.NAME == FederationStream.NAME
+                and hs.config.worker.send_federation
+            ):
                 # We only support federation stream if federation sending
                 # has been disabled on the master.
                 continue
@@ -225,7 +228,7 @@ class ReplicationCommandHandler:
         self._is_master = hs.config.worker.worker_app is None
 
         self._federation_sender = None
-        if self._is_master and not hs.config.send_federation:
+        if self._is_master and not hs.config.worker.send_federation:
             self._federation_sender = hs.get_federation_sender()
 
         self._server_notices_sender = None

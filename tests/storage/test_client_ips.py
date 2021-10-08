@@ -242,12 +242,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
     def test_devices_last_seen_bg_update(self):
         # First make sure we have completed all updates.
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         user_id = "@user:id"
         device_id = "MY_DEVICE"
@@ -311,12 +306,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         self.store.db_pool.updates._all_done = False
 
         # Now let's actually drive the updates to completion
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         # We should now get the correct result again
         result = self.get_success(
@@ -337,12 +327,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
     def test_old_user_ips_pruned(self):
         # First make sure we have completed all updates.
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         user_id = "@user:id"
         device_id = "MY_DEVICE"

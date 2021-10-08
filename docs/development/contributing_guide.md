@@ -63,7 +63,7 @@ TBD
 
 # 5. Get in touch.
 
-Join our developer community on Matrix: #synapse-dev:matrix.org !
+Join our developer community on Matrix: [#synapse-dev:matrix.org](https://matrix.to/#/#synapse-dev:matrix.org)!
 
 
 # 6. Pick an issue.
