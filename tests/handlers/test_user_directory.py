@@ -230,7 +230,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
         profile = self.get_success(self.store.get_user_in_directory(support_user_id))
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
         display_name = "display_name"
 
         profile_info = ProfileInfo(avatar_url="avatar_url", display_name=display_name)
@@ -264,7 +264,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # profile is not in directory
         profile = self.get_success(self.store.get_user_in_directory(r_user_id))
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
 
         # update profile after deactivation
         self.get_success(
@@ -273,7 +273,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # profile is furthermore not in directory
         profile = self.get_success(self.store.get_user_in_directory(r_user_id))
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
 
     def test_handle_local_profile_change_with_appservice_user(self) -> None:
         # create user
@@ -283,7 +283,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # profile is not in directory
         profile = self.get_success(self.store.get_user_in_directory(as_user_id))
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
 
         # update profile
         profile_info = ProfileInfo(avatar_url="avatar_url", display_name="4L1c3")
@@ -293,14 +293,14 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # profile is still not in directory
         profile = self.get_success(self.store.get_user_in_directory(as_user_id))
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
 
     def test_handle_local_profile_change_with_appservice_sender(self) -> None:
         # profile is not in directory
         profile = self.get_success(
             self.store.get_user_in_directory(self.appservice.sender)
         )
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
 
         # update profile
         profile_info = ProfileInfo(avatar_url="avatar_url", display_name="4L1c3")
@@ -314,7 +314,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         profile = self.get_success(
             self.store.get_user_in_directory(self.appservice.sender)
         )
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
 
     def test_handle_user_deactivated_support_user(self) -> None:
         s_user_id = "@support:test"
