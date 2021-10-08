@@ -234,6 +234,11 @@ class EventBase(metaclass=abc.ABCMeta):
 
     # Tell mypy to ignore the types of properties defined by DictProperty until
     # that is properly annotated.
+    #
+    # Note that auth_events, prev_events differ based on the sub-classes of
+    # EventBase.
+    #
+    # TODO: Add a type for state_key.
 
     auth_events = DictProperty("auth_events")  # type: ignore[assignment]
     depth: int = DictProperty("depth")  # type: ignore[assignment]
