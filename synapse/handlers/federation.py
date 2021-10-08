@@ -157,7 +157,7 @@ class FederationHandler(BaseHandler):
         )
 
         if not oldest_events_with_depth and not insertion_events_to_be_backfilled:
-            logger.info("Not backfilling as no extremeties found.")
+            logger.debug("Not backfilling as no extremeties found.")
             return False
 
         # We only want to paginate if we can actually see the events we'll get,
