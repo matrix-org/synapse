@@ -339,15 +339,10 @@ class UserDirectoryHandler(StateDeltasHandler):
         if event is None:
             return
 
-        profile = ProfileInfo(
-            avatar_url=event.content.get("avatar_url"),
-            display_name=event.content.get("displayname"),
-        )
-
         logger.debug("Adding new user to dir, %r", user_id)
 
         await self.store.update_profile_in_user_dir(
-            user_id, profile.display_name, profile.avatar_url
+            user_id, event.content.get("displayname"), event.content.get("avatar_url")
         )
 
     async def _track_user_joined_room(self, room_id: str, user_id: str) -> None:
