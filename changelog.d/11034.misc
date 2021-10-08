@@ -1,0 +1,1 @@
+When installing the optional developer dependencies, also include the dependencies needed for type-checking and unit testing.
