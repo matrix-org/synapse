@@ -332,8 +332,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                     state_key, room_id, prev_event_id, event_id
                 )
             return
-
-        if change is MatchChange.now_true:  # The user joined
+        elif change is MatchChange.now_true:  # The user joined
             # This may be the first time we've seen a remote user. If
             # so, ensure we have a directory entry for them. (We don't
             # need to do this for local users: their directory entry
