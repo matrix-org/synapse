@@ -318,7 +318,6 @@ class UserDirectoryHandler(StateDeltasHandler):
 
                 for user_id in user_ids:
                     await self._handle_remove_user(room_id, user_id)
-                return
             else:
                 logger.debug("Server is still in room: %r", room_id)
                 await self._handle_remove_user(room_id, state_key)
@@ -331,7 +330,6 @@ class UserDirectoryHandler(StateDeltasHandler):
                 await self._handle_profile_change(
                     state_key, room_id, prev_event_id, event_id
                 )
-            return
         elif change is MatchChange.now_true:  # The user joined
             # This may be the first time we've seen a remote user. If
             # so, ensure we have a directory entry for them. (We don't
