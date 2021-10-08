@@ -1,0 +1,1 @@
+Update GHA config to run tests against Python 3.10 and PostgreSQL 14.

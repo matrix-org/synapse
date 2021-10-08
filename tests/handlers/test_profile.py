@@ -110,7 +110,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
     def test_set_my_name_if_disabled(self):
-        self.hs.config.enable_set_displayname = False
+        self.hs.config.registration.enable_set_displayname = False
 
         # Setting displayname for the first time is allowed
         self.get_success(
@@ -225,7 +225,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
     def test_set_my_avatar_if_disabled(self):
-        self.hs.config.enable_set_avatar_url = False
+        self.hs.config.registration.enable_set_avatar_url = False
 
         # Setting displayname for the first time is allowed
         self.get_success(

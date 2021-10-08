@@ -73,7 +73,9 @@ class ServerNoticesConfig(Config):
             return
 
         mxid_localpart = c["system_mxid_localpart"]
-        self.server_notices_mxid = UserID(mxid_localpart, self.server_name).to_string()
+        self.server_notices_mxid = UserID(
+            mxid_localpart, self.root.server.server_name
+        ).to_string()
         self.server_notices_mxid_display_name = c.get("system_mxid_display_name", None)
         self.server_notices_mxid_avatar_url = c.get("system_mxid_avatar_url", None)
         # todo: i18n
