@@ -363,6 +363,146 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(s["results"]), 1)
         self.assertEqual(s["results"][0]["user_id"], user)
 
+    def test_process_join_after_server_leaves_room(self) -> None:
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        bob = self.register_user("bob", "pass")
+        bob_token = self.login(bob, "pass")
+
+        # Alice makes two rooms. Bob joins one of them.
+        room1 = self.helper.create_room_as(alice, tok=alice_token)
+        room2 = self.helper.create_room_as(alice, tok=alice_token)
+        self.helper.join(room1, bob, tok=bob_token)
+
+        # The user sharing tables should have been updated.
+        public1 = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        self.assertEqual(set(public1), {(alice, room1), (alice, room2), (bob, room1)})
+
+        # Alice leaves room1. The user sharing tables should be updated.
+        self.helper.leave(room1, alice, tok=alice_token)
+        public2 = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        self.assertEqual(set(public2), {(alice, room2), (bob, room1)})
+
+        # Pause the processing of new events.
+        dir_handler = self.hs.get_user_directory_handler()
+        dir_handler.update_user_directory = False
+
+        # Bob leaves one room and joins the other.
+        self.helper.leave(room1, bob, tok=bob_token)
+        self.helper.join(room2, bob, tok=bob_token)
+
+        # Process the leave and join in one go.
+        dir_handler.update_user_directory = True
+        dir_handler.notify_new_event()
+        self.wait_for_background_updates()
+
+        # The user sharing tables should have been updated.
+        public3 = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        self.assertEqual(set(public3), {(alice, room2), (bob, room2)})
+
+    def test_per_room_profile_doesnt_alter_directory_entry(self) -> None:
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        bob = self.register_user("bob", "pass")
+
+        # Alice should have a user directory entry created at registration.
+        users = self.get_success(self.user_dir_helper.get_profiles_in_user_directory())
+        self.assertEqual(
+            users[alice], ProfileInfo(display_name="alice", avatar_url=None)
+        )
+
+        # Alice makes a room for herself.
+        room = self.helper.create_room_as(alice, is_public=True, tok=alice_token)
+
+        # Alice sets a nickname unique to that room.
+        self.helper.send_state(
+            room,
+            "m.room.member",
+            {
+                "displayname": "Freddy Mercury",
+                "membership": "join",
+            },
+            alice_token,
+            state_key=alice,
+        )
+
+        # Alice's display name remains the same in the user directory.
+        search_result = self.get_success(self.handler.search_users(bob, alice, 10))
+        self.assertEqual(
+            search_result["results"],
+            [{"display_name": "alice", "avatar_url": None, "user_id": alice}],
+            0,
+        )
+
+    def test_making_room_public_doesnt_alter_directory_entry(self) -> None:
+        """Per-room names shouldn't go to the directory when the room becomes public.
+
+        This isn't about preventing a leak (the room is now public, so the nickname
+        is too). It's about preserving the invariant that we only show a user's public
+        profile in the user directory results.
+
+        I made this a Synapse test case rather than a Complement one because
+        I think this is (strictly speaking) an implementation choice. Synapse
+        has chosen to only ever use the public profile when responding to a user
+        directory search. There's no privacy leak here, because making the room
+        public discloses the per-room name.
+
+        The spec doesn't mandate anything about _how_ a user
+        should appear in a /user_directory/search result. Hypothetical example:
+        suppose Bob searches for Alice. When representing Alice in a search
+        result, it's reasonable to use any of Alice's nicknames that Bob is
+        aware of. Heck, maybe we even want to use lots of them in a combined
+        displayname like `Alice (aka "ali", "ally", "41iC3")`.
+        """
+
+        # TODO the same should apply when Alice is a remote user.
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        bob = self.register_user("bob", "pass")
+        bob_token = self.login(bob, "pass")
+
+        # Alice and Bob are in a private room.
+        room = self.helper.create_room_as(alice, is_public=False, tok=alice_token)
+        self.helper.invite(room, src=alice, targ=bob, tok=alice_token)
+        self.helper.join(room, user=bob, tok=bob_token)
+
+        # Alice has a nickname unique to that room.
+
+        self.helper.send_state(
+            room,
+            "m.room.member",
+            {
+                "displayname": "Freddy Mercury",
+                "membership": "join",
+            },
+            alice_token,
+            state_key=alice,
+        )
+
+        # Check Alice isn't recorded as being in a public room.
+        public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        self.assertNotIn((alice, room), public)
+
+        # One of them makes the room public.
+        self.helper.send_state(
+            room,
+            "m.room.join_rules",
+            {"join_rule": "public"},
+            alice_token,
+        )
+
+        # Check that Alice is now recorded as being in a public room
+        public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        self.assertIn((alice, room), public)
+
+        # Alice's display name remains the same in the user directory.
+        search_result = self.get_success(self.handler.search_users(bob, alice, 10))
+        self.assertEqual(
+            search_result["results"],
+            [{"display_name": "alice", "avatar_url": None, "user_id": alice}],
+            0,
+        )
+
     def test_private_room(self) -> None:
         """
         A user can be searched for only by people that are either in a public

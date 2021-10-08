@@ -48,7 +48,7 @@ class AuthRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
         self.recaptcha_template = hs.config.captcha.recaptcha_template
-        self.terms_template = hs.config.terms_template
+        self.terms_template = hs.config.consent.terms_template
         self.registration_token_template = (
             hs.config.registration.registration_token_template
         )

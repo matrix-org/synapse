@@ -228,10 +228,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             is_in_room = await self.is_host_joined(room_id, self.server_name)
 
             if is_in_room:
-                is_public = await self.is_room_world_readable_or_publicly_joinable(
-                    room_id
-                )
-
                 users_with_profile = await self.get_users_in_room_with_profiles(room_id)
                 # Throw away users excluded from the directory.
                 users_with_profile = {
@@ -241,22 +237,33 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     or await self.should_include_local_user_in_dir(user_id)
                 }
 
-                # Update each user in the user directory.
+                # Upsert a user_directory record for each remote user we see.
                 for user_id, profile in users_with_profile.items():
+                    # Local users are processed separately in
+                    # `_populate_user_directory_users`; there we can read from
+                    # the `profiles` table to ensure we don't leak their per-room
+                    # profiles. It also means we write local users to this table
+                    # exactly once, rather than once for every room they're in.
+                    if self.hs.is_mine_id(user_id):
+                        continue
+                    # TODO `users_with_profile` above reads from the `user_directory`
+                    #   table, meaning that `profile` is bespoke to this room.
+                    #   and this leaks remote users' per-room profiles to the user directory.
                     await self.update_profile_in_user_dir(
                         user_id, profile.display_name, profile.avatar_url
                     )
 
-                to_insert = set()
-
+                # Now update the room sharing tables to include this room.
+                is_public = await self.is_room_world_readable_or_publicly_joinable(
+                    room_id
+                )
                 if is_public:
-                    for user_id in users_with_profile:
-                        to_insert.add(user_id)
-
-                    if to_insert:
-                        await self.add_users_in_public_rooms(room_id, to_insert)
-                        to_insert.clear()
+                    if users_with_profile:
+                        await self.add_users_in_public_rooms(
+                            room_id, users_with_profile.keys()
+                        )
                 else:
+                    to_insert = set()
                     for user_id in users_with_profile:
                         # We want the set of pairs (L, M) where L and M are
                         # in `users_with_profile` and L is local.

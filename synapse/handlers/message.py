@@ -62,8 +62,6 @@ from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_events_for_client
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.events.third_party_rules import ThirdPartyEventRules
     from synapse.server import HomeServer
@@ -433,8 +431,7 @@ class EventCreationHandler:
 
         self.send_event = ReplicationSendEventRestServlet.make_client(hs)
 
-        # This is only used to get at ratelimit function
-        self.base_handler = BaseHandler(hs)
+        self.request_ratelimiter = hs.get_request_ratelimiter()
 
         # We arbitrarily limit concurrent event creation for a room to 5.
         # This is to stop us from diverging history *too* much.
@@ -1324,7 +1321,7 @@ class EventCreationHandler:
                     original_event and event.sender != original_event.sender
                 )
 
-            await self.base_handler.ratelimit(
+            await self.request_ratelimiter.ratelimit(
                 requester, is_admin_redaction=is_admin_redaction
             )
 

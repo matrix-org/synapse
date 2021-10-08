@@ -301,7 +301,7 @@ def refresh_certificate(hs):
     if not hs.config.server.has_tls_listener():
         return
 
-    hs.config.read_certificate_from_disk()
+    hs.config.tls.read_certificate_from_disk()
     hs.tls_server_context_factory = context_factory.ServerContextFactory(hs.config)
 
     if hs._listening_services:

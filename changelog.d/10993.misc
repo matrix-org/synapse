@@ -1,0 +1,1 @@
+Fix a long-standing bug where `ReadWriteLock`s could drop logging contexts on exit.
