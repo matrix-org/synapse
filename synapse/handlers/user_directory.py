@@ -242,6 +242,10 @@ class UserDirectoryHandler(StateDeltasHandler):
                         continue
 
                     if change is MatchChange.now_true:  # The user joined
+                        # This may be the first time we've seen a remote user. If
+                        # so, ensure we have a directory entry for them. (We don't
+                        # need to do this for local users: their directory entry
+                        # is created at the point of registration.
                         if is_remote:
                             await self._upsert_directory_entry_for_remote_user(
                                 state_key, event_id
