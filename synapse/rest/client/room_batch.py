@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 def generate_fake_prev_event_id() -> str:
-    return "$" + random_string(43)
+    return "$fake_" + random_string(43)
 
 
 class RoomBatchSendEventRestServlet(RestServlet):
