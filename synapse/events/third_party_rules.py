@@ -14,7 +14,7 @@
 import logging
 from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Tuple
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import ModuleFailedException, SynapseError
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.types import Requester, StateMap
@@ -218,8 +218,9 @@ class ThirdPartyEventRules:
             try:
                 res, replacement_data = await callback(event, state_events)
             except Exception as e:
-                logger.warning("Failed to run module API callback %s: %s", callback, e)
-                continue
+                raise ModuleFailedException(
+                    "Failed to run `check_event_allowed` module API callback"
+                ) from e
 
             # Return if the event shouldn't be allowed or if the module came up with a
             # replacement dict for the event.
