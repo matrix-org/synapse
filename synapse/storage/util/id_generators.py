@@ -429,7 +429,7 @@ class MultiWriterIdGenerator:
             raise Exception("Tried to allocate stream ID on non-writer")
 
         # Cast safety: the second argument to _MultiWriterCtxManager, multiple_ids,
-        # controls the return type. If zero or omitted, the context manager yields
+        # controls the return type. If `None` or omitted, the context manager yields
         # a single integer stream_id; otherwise it yields a list of stream_ids.
         return cast(AsyncContextManager[int], _MultiWriterCtxManager(self))
 
