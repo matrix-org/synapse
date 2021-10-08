@@ -282,7 +282,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         event_id: str,
         state_key: str,
     ) -> None:
-        change = await self._get_key_change(
+        joined = await self._get_key_change(
             prev_event_id,
             event_id,
             key_name="membership",
@@ -305,7 +305,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         ):
             return
 
-        if change is MatchChange.now_false:
+        if joined is MatchChange.now_false:
             # Need to check if the server left the room entirely, if so
             # we might need to remove all the users in that room
             is_in_room = await self.store.is_host_joined(room_id, self.server_name)
@@ -321,7 +321,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             else:
                 logger.debug("Server is still in room: %r", room_id)
                 await self._handle_remove_user(room_id, state_key)
-        elif change is MatchChange.no_change:
+        elif joined is MatchChange.no_change:
             # Handle any profile changes for remote users.
             # (For local users the rest of the application calls
             # `handle_local_profile_change`.)
@@ -329,7 +329,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 await self._handle_possible_remote_profile_change(
                     state_key, room_id, prev_event_id, event_id
                 )
-        elif change is MatchChange.now_true:  # The user joined
+        elif joined is MatchChange.now_true:  # The user joined
             # This may be the first time we've seen a remote user. If
             # so, ensure we have a directory entry for them. (For local users,
             # the rest of the application calls `handle_local_profile_change`.)
