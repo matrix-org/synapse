@@ -198,3 +198,31 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         self.assertEqual(log["url"], "/_matrix/client/versions")
         self.assertEqual(log["protocol"], "1.1")
         self.assertEqual(log["user_agent"], "")
+
+    def test_with_exception(self):
+        """
+        The logging exception type & value should be added to the JSON response.
+        """
+        handler = logging.StreamHandler(self.output)
+        handler.setFormatter(JsonFormatter())
+        logger = self.get_logger(handler)
+
+        try:
+            raise ValueError("That's wrong, you wally!")
+        except ValueError:
+            logger.exception("Hello there, %s!", "wally")
+
+        log = self.get_log_line()
+
+        # The terse logger should give us these keys.
+        expected_log_keys = [
+            "log",
+            "level",
+            "namespace",
+            "exc_type",
+            "exc_value",
+        ]
+        self.assertCountEqual(log.keys(), expected_log_keys)
+        self.assertEqual(log["log"], "Hello there, wally!")
+        self.assertEqual(log["exc_type"], "ValueError")
+        self.assertEqual(log["exc_value"], "That's wrong, you wally!")

@@ -112,7 +112,16 @@ CONDITIONAL_REQUIREMENTS["dev"] = CONDITIONAL_REQUIREMENTS["lint"] + [
     "pygithub==1.55",
 ]
 
-CONDITIONAL_REQUIREMENTS["mypy"] = ["mypy==0.812", "mypy-zope==0.2.13"]
+CONDITIONAL_REQUIREMENTS["mypy"] = [
+    "mypy==0.910",
+    "mypy-zope==0.3.2",
+    "types-bleach>=4.1.0",
+    "types-jsonschema>=3.2.0",
+    "types-Pillow>=8.3.4",
+    "types-pyOpenSSL>=20.0.7",
+    "types-PyYAML>=5.4.10",
+    "types-setuptools>=57.4.0",
+]
 
 # Dependencies which are exclusively required by unit test code. This is
 # NOT a list of all modules that are necessary to run the unit tests.
