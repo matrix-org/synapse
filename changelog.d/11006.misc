@@ -1,1 +1,1 @@
-Use type stubs for jsonschema, pyOpenSSL and Pillow when running mypy in CI.
+Bump mypy version for CI to 0.910, and pull in new type stubs for dependencies.
