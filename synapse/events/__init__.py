@@ -235,13 +235,11 @@ class EventBase(metaclass=abc.ABCMeta):
     # Tell mypy to ignore the types of properties defined by DictProperty until
     # that is properly annotated.
 
-    auth_events = DictProperty("auth_events")  # type: ignore[assignment]
     depth: int = DictProperty("depth")  # type: ignore[assignment]
     content: JsonDict = DictProperty("content")  # type: ignore[assignment]
     hashes: Dict[str, str] = DictProperty("hashes")  # type: ignore[assignment]
     origin: str = DictProperty("origin")  # type: ignore[assignment]
     origin_server_ts: int = DictProperty("origin_server_ts")  # type: ignore[assignment]
-    prev_events = DictProperty("prev_events")  # type: ignore[assignment]
     redacts: Optional[str] = DefaultDictProperty("redacts", None)  # type: ignore[assignment]
     room_id: str = DictProperty("room_id")  # type: ignore[assignment]
     sender: str = DictProperty("sender")  # type: ignore[assignment]
@@ -321,7 +319,7 @@ class EventBase(metaclass=abc.ABCMeta):
         Returns:
             The list of event IDs of this event's prev_events
         """
-        return [e for e, _ in self.prev_events]
+        return [e for e, _ in self._dict["prev_events"]]
 
     def auth_event_ids(self) -> List[str]:
         """Returns the list of auth event IDs. The order matches the order
@@ -330,7 +328,7 @@ class EventBase(metaclass=abc.ABCMeta):
         Returns:
             The list of event IDs of this event's auth_events
         """
-        return [e for e, _ in self.auth_events]
+        return [e for e, _ in self._dict["auth_events"]]
 
     def freeze(self) -> None:
         """'Freeze' the event dict, so it cannot be modified by accident"""
@@ -462,7 +460,7 @@ class FrozenEventV2(EventBase):
         Returns:
             The list of event IDs of this event's prev_events
         """
-        return self.prev_events
+        return self._dict["prev_events"]
 
     def auth_event_ids(self) -> List[str]:
         """Returns the list of auth event IDs. The order matches the order
@@ -471,7 +469,7 @@ class FrozenEventV2(EventBase):
         Returns:
             The list of event IDs of this event's auth_events
         """
-        return self.auth_events
+        return self._dict["auth_events"]
 
 
 class FrozenEventV3(FrozenEventV2):
