@@ -237,7 +237,7 @@ class EventBase(metaclass=abc.ABCMeta):
 
     auth_events = DictProperty("auth_events")  # type: ignore[assignment]
     depth: int = DictProperty("depth")  # type: ignore[assignment]
-    content = DictProperty("content")  # type: ignore[assignment]
+    content: JsonDict = DictProperty("content")  # type: ignore[assignment]
     hashes: Dict[str, str] = DictProperty("hashes")  # type: ignore[assignment]
     origin: str = DictProperty("origin")  # type: ignore[assignment]
     origin_server_ts: int = DictProperty("origin_server_ts")  # type: ignore[assignment]
