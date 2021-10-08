@@ -224,7 +224,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         # Create "many" backward extremities. The magic number we're trying to
         # create more than is 5 which corresponds to the number of backward
         # extremities we slice off in `_maybe_backfill_inner`
-        for i in range(0, 8):
+        for _ in range(0, 8):
             event_handler = self.hs.get_event_creation_handler()
             event, context = self.get_success(
                 event_handler.create_event(
