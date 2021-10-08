@@ -14,8 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class RoomBatchHandler:
-    """Contains some read only APIs to get state about a room"""
-
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastore()
@@ -25,6 +23,17 @@ class RoomBatchHandler:
         self.auth = hs.get_auth()
 
     async def inherit_depth_from_prev_ids(self, prev_event_ids: List[str]) -> int:
+        """Finds the depth which would sort it after the most-recent
+        prev_event_id but before the successors of those events. If no
+        successors are found, we assume it's an historical extremity part of the
+        current batch and use the same depth of the prev_event_ids.
+
+        Args:
+            prev_event_ids: List of prev event IDs
+
+        Returns:
+            Inherited depth
+        """
         (
             most_recent_prev_event_id,
             most_recent_prev_event_depth,
@@ -116,8 +125,14 @@ class RoomBatchHandler:
         self, event_ids: List[str]
     ) -> List[str]:
         """Find the most recent auth event ids (derived from state events) that
-        allowed that message to be sent. We will use that as a base
+        allowed that message to be sent. We will use this as a base
         to auth our historical messages against.
+
+        Args:
+            event_ids: List of event ID's to look at
+
+        Returns:
+            List of event ID's
         """
 
         (
@@ -139,17 +154,26 @@ class RoomBatchHandler:
         state_events_at_start: List[JsonDict],
         room_id: str,
         initial_auth_event_ids: List[str],
-        requester: Requester,
+        app_service_requester: Requester,
     ) -> List[str]:
         """Takes all `state_events_at_start` event dictionaries and creates/persists
         them as floating state events which don't resolve into the current room state.
         They are floating because they reference a fake prev_event which doesn't connect
         to the normal DAG at all.
 
+        Args:
+            state_events_at_start:
+            room_id: Room where you want the events persisted in.
+            initial_auth_event_ids: These will be the auth_events for the first
+                state event created. Each event created afterwards will be
+                added to the list of auth events for the next state event
+                created.
+            app_service_requester: The requester of an application service.
+
         Returns:
             List of state event ID's we just persisted
         """
-        assert requester.app_service
+        assert app_service_requester.app_service
 
         state_event_ids_at_start = []
         auth_event_ids = initial_auth_event_ids.copy()
@@ -185,7 +209,7 @@ class RoomBatchHandler:
                 membership = event_dict["content"].get("membership", None)
                 event_id, _ = await self.room_member_handler.update_membership(
                     await self.create_requester_for_user_id_from_app_service(
-                        state_event["sender"], requester.app_service
+                        state_event["sender"], app_service_requester.app_service
                     ),
                     target=UserID.from_string(event_dict["state_key"]),
                     room_id=room_id,
@@ -207,7 +231,7 @@ class RoomBatchHandler:
                     _,
                 ) = await self.event_creation_handler.create_and_send_nonmember_event(
                     await self.create_requester_for_user_id_from_app_service(
-                        state_event["sender"], requester.app_service
+                        state_event["sender"], app_service_requester.app_service
                     ),
                     event_dict,
                     outlier=True,
@@ -231,7 +255,7 @@ class RoomBatchHandler:
         initial_prev_event_ids: List[str],
         inherited_depth: int,
         auth_event_ids: List[str],
-        requester: Requester,
+        app_service_requester: Requester,
     ) -> List[str]:
         """Create and persists all events provided sequentially. Handles the
         complexity of creating events in chronological order so they can
@@ -240,10 +264,23 @@ class RoomBatchHandler:
         (topological_ordering, stream_ordering) and sort correctly from
         /messages.
 
+        Args:
+            events_to_create: List of historical events to create in JSON
+                dictionary format.
+            room_id: Room where you want the events persisted in.
+            initial_prev_event_ids: These will be the prev_events for the first
+                event created. Each event created afterwards will point to the
+                previous event created.
+            inherited_depth: The depth to create the events at (you will
+                probably by calling inherit_depth_from_prev_ids(...)).
+            auth_event_ids: Define which events allow you to create the given
+                event in the room.
+            app_service_requester: The requester of an application service.
+
         Returns:
             List of persisted event IDs
         """
-        assert requester.app_service
+        assert app_service_requester.app_service
 
         prev_event_ids = initial_prev_event_ids.copy()
 
@@ -266,7 +303,7 @@ class RoomBatchHandler:
 
             event, context = await self.event_creation_handler.create_event(
                 await self.create_requester_for_user_id_from_app_service(
-                    ev["sender"], requester.app_service
+                    ev["sender"], app_service_requester.app_service
                 ),
                 event_dict,
                 prev_event_ids=event_dict.get("prev_events"),
@@ -298,7 +335,7 @@ class RoomBatchHandler:
         for (event, context) in reversed(events_to_persist):
             await self.event_creation_handler.handle_new_client_event(
                 await self.create_requester_for_user_id_from_app_service(
-                    event["sender"], requester.app_service
+                    event["sender"], app_service_requester.app_service
                 ),
                 event=event,
                 context=context,
@@ -314,11 +351,26 @@ class RoomBatchHandler:
         initial_prev_event_ids: List[str],
         inherited_depth: int,
         auth_event_ids: List[str],
-        requester: Requester,
+        app_service_requester: Requester,
     ) -> Tuple[List[str], str]:
         """
         Handles creating and persisting all of the historical events as well
         as insertion and batch meta events to make the batch navigable in the DAG.
+
+        Args:
+            events_to_create: List of historical events to create in JSON
+                dictionary format.
+            room_id: Room where you want the events created in.
+            batch_id_to_connect_to: The batch_id from the insertion event you
+                want this batch to connect to.
+            initial_prev_event_ids: These will be the prev_events for the first
+                event created. Each event created afterwards will point to the
+                previous event created.
+            inherited_depth: The depth to create the events at (you will
+                probably by calling inherit_depth_from_prev_ids(...)).
+            auth_event_ids: Define which events allow you to create the given
+                event in the room.
+            app_service_requester: The requester of an application service.
 
         Returns:
             Tuple containing a list of created events and the next_batch_id
@@ -328,7 +380,7 @@ class RoomBatchHandler:
         last_event_in_batch = events_to_create[-1]
         batch_event = {
             "type": EventTypes.MSC2716_BATCH,
-            "sender": requester.user.to_string(),
+            "sender": app_service_requester.user.to_string(),
             "room_id": room_id,
             "content": {
                 EventContentFields.MSC2716_BATCH_ID: batch_id_to_connect_to,
@@ -345,7 +397,7 @@ class RoomBatchHandler:
         # Add an "insertion" event to the start of each batch (next to the oldest-in-time
         # event in the batch) so the next batch can be connected to this one.
         insertion_event = self.create_insertion_event_dict(
-            sender=requester.user.to_string(),
+            sender=app_service_requester.user.to_string(),
             room_id=room_id,
             # Since the insertion event is put at the start of the batch,
             # where the oldest-in-time event is, copy the origin_server_ts from
@@ -365,7 +417,7 @@ class RoomBatchHandler:
             initial_prev_event_ids=initial_prev_event_ids,
             inherited_depth=inherited_depth,
             auth_event_ids=auth_event_ids,
-            requester=requester,
+            app_service_requester=app_service_requester,
         )
 
         return event_ids, next_batch_id

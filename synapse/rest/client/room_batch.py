@@ -140,7 +140,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 state_events_at_start=body["state_events_at_start"],
                 room_id=room_id,
                 initial_auth_event_ids=auth_event_ids,
-                requester=requester,
+                app_service_requester=requester,
             )
         )
         # Update our ongoing auth event ID list with all of the new state we
@@ -212,7 +212,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
             initial_prev_event_ids=prev_event_ids,
             inherited_depth=inherited_depth,
             auth_event_ids=auth_event_ids,
-            requester=requester,
+            app_service_requester=requester,
         )
 
         insertion_event_id = event_ids[0]
