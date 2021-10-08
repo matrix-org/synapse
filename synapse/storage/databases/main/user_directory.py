@@ -383,11 +383,19 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         """Certain classes of local user are omitted from the user directory.
         Is this user one of them?
         """
-        # The main app service sender isn't usually contactable, so exclude them
+        # We're opting to exclude the appservice sender (user defined by the
+        # `sender_localpart` in the appservice registration) even though
+        # technically it could be DM-able. In the future, this could potentially
+        # be configurable per-appservice whether the appservice sender can be
+        # contacted.
         if self.get_app_service_by_user_id(user) is not None:
             return False
 
-        # App service users aren't usually contactable, so exclude them.
+        # We're opting to exclude appservice users (anyone matching the user
+        # namespace regex in the appservice registration) even though technically
+        # they could be DM-able. In the future, this could potentially
+        # be configurable per-appservice whether the appservice users can be
+        # contacted.
         if self.get_if_app_services_interested_in_user(user):
             # TODO we might want to make this configurable for each app service
             return False
