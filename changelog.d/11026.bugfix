@@ -1,1 +1,1 @@
-Fix exception thrown when attempting to notify appservice `sender` of new messages.
+Exclude application service sender membership from user directory to fix a bug stopping the user directory from being populated.
