@@ -1,0 +1,1 @@
+Document the *fail open* behaviour of the Module API's `check_event_allowed` callback for third-party rules.

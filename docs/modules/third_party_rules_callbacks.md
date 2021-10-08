@@ -41,6 +41,10 @@ event with new data by returning the new event's data as a dictionary. In order 
 that, it is recommended the module calls `event.get_dict()` to get the current event as a
 dictionary, and modify the returned dictionary accordingly.
 
+If `check_event_allowed` raises an exception, the check will fail open: the event
+is taken to be permitted by the module. If there are more `check_event_allowed` callbacks,
+the event proceeds to the next one. Otherwise, the event is accepted.
+
 Note that replacing the event only works for events sent by local users, not for events
 received over federation.
 
