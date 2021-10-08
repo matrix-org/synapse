@@ -503,6 +503,35 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             0,
         )
 
+    def test_local_user_remains_in_directory_after_leaving_all_rooms(self) -> None:
+        """We should preserve the invariant that local, non-excluded users are
+        always in the user_directory table.
+
+        This is a choice to simplify the implementation, and also ensure that
+        the config option to search for all users works in this case."""
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+
+        # Alice should have a user directory entry created at registration.
+        users = self.get_success(self.user_dir_helper.get_profiles_in_user_directory())
+        self.assertEqual(
+            users, {alice: ProfileInfo(display_name="alice", avatar_url=None)}
+        )
+
+        # Alice makes a room for herself.
+        room = self.helper.create_room_as(alice, tok=alice_token)
+
+        # Alice leaves that room.
+        self.helper.leave(room, alice, tok=alice_token)
+
+        # Wait for background updates to ensure that the user directory handler
+        # handler has processed all events. Alice should remain in the directory.
+        self.wait_for_background_updates()
+        users = self.get_success(self.user_dir_helper.get_profiles_in_user_directory())
+        self.assertEqual(
+            users, {alice: ProfileInfo(display_name="alice", avatar_url=None)}
+        )
+
     def test_private_room(self) -> None:
         """
         A user can be searched for only by people that are either in a public

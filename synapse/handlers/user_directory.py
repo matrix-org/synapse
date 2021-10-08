@@ -413,11 +413,13 @@ class UserDirectoryHandler(StateDeltasHandler):
         # Remove user from sharing tables
         await self.store.remove_user_who_share_room(user_id, room_id)
 
-        # Are they still in any rooms? If not, remove them entirely.
-        rooms_user_is_in = await self.store.get_user_dir_rooms_user_is_in(user_id)
+        # If they're a remote user and not in any rooms we can see,
+        # remove their user_directory entry.
+        if not self.is_mine_id(user_id):
+            rooms_user_is_in = await self.store.get_user_dir_rooms_user_is_in(user_id)
 
-        if len(rooms_user_is_in) == 0:
-            await self.store.remove_from_user_dir(user_id)
+            if len(rooms_user_is_in) == 0:
+                await self.store.remove_from_user_dir(user_id)
 
     async def _handle_possible_remote_profile_change(
         self,
