@@ -641,7 +641,12 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
             _remove_deleted_devices_from_device_inbox_txn,
         )
 
-        if number_deleted < batch_size:
+        # The task is finished when no more lines are deleted.
+        # The `batch_size` only specifies how many devices are cleaned per run.
+        # More than one line is deleted in the deviceinbox per run and device,
+        # so it is possible that the number of deleted lines is larger
+        # than the batch size.
+        if not number_deleted:
             await self.db_pool.updates._end_background_update(
                 self.REMOVE_DELETED_DEVICES
             )
