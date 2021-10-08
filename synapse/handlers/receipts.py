@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
 from synapse.api.constants import ReadReceiptEventFields
 from synapse.appservice import ApplicationService
-from synapse.handlers._base import BaseHandler
 from synapse.streams import EventSource
 from synapse.types import JsonDict, ReadReceipt, UserID, get_domain_from_id
 
@@ -26,10 +25,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ReceiptsHandler(BaseHandler):
+class ReceiptsHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.notifier = hs.get_notifier()
         self.server_name = hs.config.server.server_name
         self.store = hs.get_datastore()
         self.event_auth_handler = hs.get_event_auth_handler()
@@ -238,7 +236,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         if self.config.experimental.msc2285_enabled:
             events = ReceiptEventSource.filter_out_hidden(events, user.to_string())
 
-        return (events, to_key)
+        return events, to_key
 
     async def get_new_events_as(
         self, from_key: int, service: ApplicationService
@@ -270,7 +268,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
             events.append(event)
 
-        return (events, to_key)
+        return events, to_key
 
     def get_current_key(self, direction: str = "f") -> int:
         return self.store.get_max_receipt_stream_id()

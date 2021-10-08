@@ -17,11 +17,10 @@
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from twisted.web.server import Request
-
 from synapse.api.errors import SynapseError
 from synapse.http.server import DirectServeJsonResource, set_cors_headers
 from synapse.http.servlet import parse_integer, parse_string
+from synapse.http.site import SynapseRequest
 from synapse.rest.media.v1.media_storage import MediaStorage
 
 from ._base import (
@@ -54,10 +53,10 @@ class ThumbnailResource(DirectServeJsonResource):
         self.store = hs.get_datastore()
         self.media_repo = media_repo
         self.media_storage = media_storage
-        self.dynamic_thumbnails = hs.config.dynamic_thumbnails
+        self.dynamic_thumbnails = hs.config.media.dynamic_thumbnails
         self.server_name = hs.hostname
 
-    async def _async_render_GET(self, request: Request) -> None:
+    async def _async_render_GET(self, request: SynapseRequest) -> None:
         set_cors_headers(request)
         server_name, media_id, _ = parse_media_id(request)
         width = parse_integer(request, "width", required=True)
@@ -88,7 +87,7 @@ class ThumbnailResource(DirectServeJsonResource):
 
     async def _respond_local_thumbnail(
         self,
-        request: Request,
+        request: SynapseRequest,
         media_id: str,
         width: int,
         height: int,
@@ -121,7 +120,7 @@ class ThumbnailResource(DirectServeJsonResource):
 
     async def _select_or_generate_local_thumbnail(
         self,
-        request: Request,
+        request: SynapseRequest,
         media_id: str,
         desired_width: int,
         desired_height: int,
@@ -186,7 +185,7 @@ class ThumbnailResource(DirectServeJsonResource):
 
     async def _select_or_generate_remote_thumbnail(
         self,
-        request: Request,
+        request: SynapseRequest,
         server_name: str,
         media_id: str,
         desired_width: int,
@@ -249,7 +248,7 @@ class ThumbnailResource(DirectServeJsonResource):
 
     async def _respond_remote_thumbnail(
         self,
-        request: Request,
+        request: SynapseRequest,
         server_name: str,
         media_id: str,
         width: int,
@@ -280,7 +279,7 @@ class ThumbnailResource(DirectServeJsonResource):
 
     async def _select_and_respond_with_thumbnail(
         self,
-        request: Request,
+        request: SynapseRequest,
         desired_width: int,
         desired_height: int,
         desired_method: str,

@@ -23,7 +23,6 @@ import twisted.internet.error
 import twisted.web.http
 from twisted.internet.defer import Deferred
 from twisted.web.resource import Resource
-from twisted.web.server import Request
 
 from synapse.api.errors import (
     FederationDeniedError,
@@ -34,6 +33,7 @@ from synapse.api.errors import (
 )
 from synapse.config._base import ConfigError
 from synapse.config.repository import ThumbnailRequirement
+from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID
@@ -76,29 +76,35 @@ class MediaRepository:
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
-        self.max_upload_size = hs.config.max_upload_size
-        self.max_image_pixels = hs.config.max_image_pixels
+        self.max_upload_size = hs.config.media.max_upload_size
+        self.max_image_pixels = hs.config.media.max_image_pixels
 
         Thumbnailer.set_limits(self.max_image_pixels)
 
-        self.primary_base_path: str = hs.config.media_store_path
+        self.primary_base_path: str = hs.config.media.media_store_path
         self.filepaths: MediaFilePaths = MediaFilePaths(self.primary_base_path)
 
-        self.dynamic_thumbnails = hs.config.dynamic_thumbnails
-        self.thumbnail_requirements = hs.config.thumbnail_requirements
+        self.dynamic_thumbnails = hs.config.media.dynamic_thumbnails
+        self.thumbnail_requirements = hs.config.media.thumbnail_requirements
 
         self.remote_media_linearizer = Linearizer(name="media_remote")
 
         self.recently_accessed_remotes: Set[Tuple[str, str]] = set()
         self.recently_accessed_locals: Set[str] = set()
 
-        self.federation_domain_whitelist = hs.config.federation_domain_whitelist
+        self.federation_domain_whitelist = (
+            hs.config.federation.federation_domain_whitelist
+        )
 
         # List of StorageProviders where we should search for media and
         # potentially upload to.
         storage_providers = []
 
-        for clz, provider_config, wrapper_config in hs.config.media_storage_providers:
+        for (
+            clz,
+            provider_config,
+            wrapper_config,
+        ) in hs.config.media.media_storage_providers:
             backend = clz(hs, provider_config)
             provider = StorageProviderWrapper(
                 backend,
@@ -187,7 +193,7 @@ class MediaRepository:
         return "mxc://%s/%s" % (self.server_name, media_id)
 
     async def get_local_media(
-        self, request: Request, media_id: str, name: Optional[str]
+        self, request: SynapseRequest, media_id: str, name: Optional[str]
     ) -> None:
         """Responds to requests for local media, if exists, or returns 404.
 
@@ -221,7 +227,11 @@ class MediaRepository:
         )
 
     async def get_remote_media(
-        self, request: Request, server_name: str, media_id: str, name: Optional[str]
+        self,
+        request: SynapseRequest,
+        server_name: str,
+        media_id: str,
+        name: Optional[str],
     ) -> None:
         """Respond to requests for remote media.
 
@@ -969,7 +979,7 @@ class MediaRepositoryResource(Resource):
 
     def __init__(self, hs: "HomeServer"):
         # If we're not configured to use it, raise if we somehow got here.
-        if not hs.config.can_load_media_repo:
+        if not hs.config.media.can_load_media_repo:
             raise ConfigError("Synapse is not configured to use a media repo.")
 
         super().__init__()
@@ -980,7 +990,7 @@ class MediaRepositoryResource(Resource):
         self.putChild(
             b"thumbnail", ThumbnailResource(hs, media_repo, media_repo.media_storage)
         )
-        if hs.config.url_preview_enabled:
+        if hs.config.media.url_preview_enabled:
             self.putChild(
                 b"preview_url",
                 PreviewUrlResource(hs, media_repo, media_repo.media_storage),

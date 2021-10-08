@@ -1,0 +1,1 @@
+Add a `CODEOWNERS` file to automatically request reviews from the `@matrix-org/synapse-core` team on new pull requests.

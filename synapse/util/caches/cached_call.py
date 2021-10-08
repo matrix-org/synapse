@@ -85,7 +85,7 @@ class CachedCall(Generic[TV]):
             # result in the deferred, since `awaiting` a deferred destroys its result.
             # (Also, if it's a Failure, GCing the deferred would log a critical error
             # about unhandled Failures)
-            def got_result(r):
+            def got_result(r: Union[TV, Failure]) -> None:
                 self._result = r
 
             self._deferred.addBoth(got_result)

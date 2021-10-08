@@ -47,7 +47,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.event_creation_handler = hs.get_event_creation_handler()
-        hs.config.user_consent_version = "1"
+        hs.config.consent.user_consent_version = "1"
 
         consent_uri_builder = Mock()
         consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"

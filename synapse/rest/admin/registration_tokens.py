@@ -113,7 +113,7 @@ class NewRegistrationTokenRestServlet(RestServlet):
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         # A string of all the characters allowed to be in a registration_token
-        self.allowed_chars = string.ascii_letters + string.digits + "-_"
+        self.allowed_chars = string.ascii_letters + string.digits + "._~-"
         self.allowed_chars_set = set(self.allowed_chars)
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:

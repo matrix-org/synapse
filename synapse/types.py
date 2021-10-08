@@ -30,6 +30,7 @@ from typing import (
 )
 
 import attr
+from frozendict import frozendict
 from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
 from zope.interface import Interface
@@ -457,6 +458,9 @@ class RoomStreamToken:
 
     Note: The `RoomStreamToken` cannot have both a topological part and an
     instance map.
+
+    For caching purposes, `RoomStreamToken`s and by extension, all their
+    attributes, must be hashable.
     """
 
     topological = attr.ib(
@@ -466,12 +470,12 @@ class RoomStreamToken:
     stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
 
     instance_map = attr.ib(
-        type=Dict[str, int],
-        factory=dict,
+        type="frozendict[str, int]",
+        factory=frozendict,
         validator=attr.validators.deep_mapping(
             key_validator=attr.validators.instance_of(str),
             value_validator=attr.validators.instance_of(int),
-            mapping_validator=attr.validators.instance_of(dict),
+            mapping_validator=attr.validators.instance_of(frozendict),
         ),
     )
 
@@ -507,7 +511,7 @@ class RoomStreamToken:
                 return cls(
                     topological=None,
                     stream=stream,
-                    instance_map=instance_map,
+                    instance_map=frozendict(instance_map),
                 )
         except Exception:
             pass
@@ -540,7 +544,7 @@ class RoomStreamToken:
             for instance in set(self.instance_map).union(other.instance_map)
         }
 
-        return RoomStreamToken(None, max_stream, instance_map)
+        return RoomStreamToken(None, max_stream, frozendict(instance_map))
 
     def as_historical_tuple(self) -> Tuple[int, int]:
         """Returns a tuple of `(topological, stream)` for historical tokens.
@@ -552,7 +556,7 @@ class RoomStreamToken:
                 "Cannot call `RoomStreamToken.as_historical_tuple` on live token"
             )
 
-        return (self.topological, self.stream)
+        return self.topological, self.stream
 
     def get_stream_pos_for_instance(self, instance_name: str) -> int:
         """Get the stream position that the given writer was at at this token.
@@ -593,6 +597,12 @@ class RoomStreamToken:
 
 @attr.s(slots=True, frozen=True)
 class StreamToken:
+    """A collection of positions within multiple streams.
+
+    For caching purposes, `StreamToken`s and by extension, all their attributes,
+    must be hashable.
+    """
+
     room_key = attr.ib(
         type=RoomStreamToken, validator=attr.validators.instance_of(RoomStreamToken)
     )
@@ -756,7 +766,7 @@ def get_verify_key_from_cross_signing_key(key_info):
         raise ValueError("Invalid key")
     # and return that one key
     for key_id, key_data in keys.items():
-        return (key_id, decode_verify_key_bytes(key_id, decode_base64(key_data)))
+        return key_id, decode_verify_key_bytes(key_id, decode_base64(key_data))
 
 
 @attr.s(auto_attribs=True, frozen=True, slots=True)

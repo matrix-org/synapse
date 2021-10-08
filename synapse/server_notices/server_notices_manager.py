@@ -39,15 +39,11 @@ class ServerNoticesManager:
         self._server_name = hs.hostname
 
         self._notifier = hs.get_notifier()
-        self.server_notices_mxid = self._config.server_notices_mxid
+        self.server_notices_mxid = self._config.servernotices.server_notices_mxid
 
-    def is_enabled(self):
-        """Checks if server notices are enabled on this server.
-
-        Returns:
-            bool
-        """
-        return self._config.server_notices_mxid is not None
+    def is_enabled(self) -> bool:
+        """Checks if server notices are enabled on this server."""
+        return self.server_notices_mxid is not None
 
     async def send_notice(
         self,
@@ -71,9 +67,9 @@ class ServerNoticesManager:
         room_id = await self.get_or_create_notice_room_for_user(user_id)
         await self.maybe_invite_user_to_room(user_id, room_id)
 
-        system_mxid = self._config.server_notices_mxid
+        assert self.server_notices_mxid is not None
         requester = create_requester(
-            system_mxid, authenticated_entity=self._server_name
+            self.server_notices_mxid, authenticated_entity=self._server_name
         )
 
         logger.info("Sending server notice to %s", user_id)
@@ -81,7 +77,7 @@ class ServerNoticesManager:
         event_dict = {
             "type": type,
             "room_id": room_id,
-            "sender": system_mxid,
+            "sender": self.server_notices_mxid,
             "content": event_content,
         }
 
@@ -106,7 +102,7 @@ class ServerNoticesManager:
         Returns:
             room id of notice room.
         """
-        if not self.is_enabled():
+        if self.server_notices_mxid is None:
             raise Exception("Server notices not enabled")
 
         assert self._is_mine_id(user_id), "Cannot send server notices to remote users"
@@ -139,12 +135,12 @@ class ServerNoticesManager:
         # avatar, we have to use both.
         join_profile = None
         if (
-            self._config.server_notices_mxid_display_name is not None
-            or self._config.server_notices_mxid_avatar_url is not None
+            self._config.servernotices.server_notices_mxid_display_name is not None
+            or self._config.servernotices.server_notices_mxid_avatar_url is not None
         ):
             join_profile = {
-                "displayname": self._config.server_notices_mxid_display_name,
-                "avatar_url": self._config.server_notices_mxid_avatar_url,
+                "displayname": self._config.servernotices.server_notices_mxid_display_name,
+                "avatar_url": self._config.servernotices.server_notices_mxid_avatar_url,
             }
 
         requester = create_requester(
@@ -154,7 +150,7 @@ class ServerNoticesManager:
             requester,
             config={
                 "preset": RoomCreationPreset.PRIVATE_CHAT,
-                "name": self._config.server_notices_room_name,
+                "name": self._config.servernotices.server_notices_room_name,
                 "power_level_content_override": {"users_default": -10},
             },
             ratelimit=False,
@@ -178,6 +174,7 @@ class ServerNoticesManager:
             user_id: The ID of the user to invite.
             room_id: The ID of the room to invite the user to.
         """
+        assert self.server_notices_mxid is not None
         requester = create_requester(
             self.server_notices_mxid, authenticated_entity=self._server_name
         )

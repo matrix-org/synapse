@@ -1,0 +1,1 @@
+Fixes a long-standing bug wherin deactivated users still count towards the mau limit.

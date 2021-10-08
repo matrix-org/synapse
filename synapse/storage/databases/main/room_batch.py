@@ -18,7 +18,9 @@ from synapse.storage._base import SQLBaseStore
 
 
 class RoomBatchStore(SQLBaseStore):
-    async def get_insertion_event_by_batch_id(self, batch_id: str) -> Optional[str]:
+    async def get_insertion_event_by_batch_id(
+        self, room_id: str, batch_id: str
+    ) -> Optional[str]:
         """Retrieve a insertion event ID.
 
         Args:
@@ -30,7 +32,7 @@ class RoomBatchStore(SQLBaseStore):
         """
         return await self.db_pool.simple_select_one_onecol(
             table="insertion_events",
-            keyvalues={"next_batch_id": batch_id},
+            keyvalues={"room_id": room_id, "next_batch_id": batch_id},
             retcol="event_id",
             allow_none=True,
         )

@@ -195,7 +195,7 @@ class SynapseHomeServer(HomeServer):
                 }
             )
 
-            if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            if self.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
                 from synapse.rest.synapse.client.password_reset import (
                     PasswordResetSubmitTokenResource,
                 )
@@ -234,7 +234,7 @@ class SynapseHomeServer(HomeServer):
             )
 
         if name in ["media", "federation", "client"]:
-            if self.config.enable_media_repo:
+            if self.config.server.enable_media_repo:
                 media_repo = self.get_media_repository_resource()
                 resources.update(
                     {MEDIA_PREFIX: media_repo, LEGACY_MEDIA_PREFIX: media_repo}
@@ -248,7 +248,7 @@ class SynapseHomeServer(HomeServer):
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         if name == "webclient":
-            webclient_loc = self.config.web_client_location
+            webclient_loc = self.config.server.web_client_location
 
             if webclient_loc is None:
                 logger.warning(
@@ -269,7 +269,7 @@ class SynapseHomeServer(HomeServer):
                 # https://twistedmatrix.com/trac/ticket/7678
                 resources[WEB_CLIENT_PREFIX] = File(webclient_loc)
 
-        if name == "metrics" and self.config.enable_metrics:
+        if name == "metrics" and self.config.metrics.enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
 
         if name == "replication":
@@ -278,7 +278,7 @@ class SynapseHomeServer(HomeServer):
         return resources
 
     def start_listening(self):
-        if self.config.redis_enabled:
+        if self.config.redis.redis_enabled:
             # If redis is enabled we connect via the replication command handler
             # in the same way as the workers (since we're effectively a client
             # rather than a server).
@@ -305,7 +305,7 @@ class SynapseHomeServer(HomeServer):
                 for s in services:
                     reactor.addSystemEventTrigger("before", "shutdown", s.stopListening)
             elif listener.type == "metrics":
-                if not self.config.enable_metrics:
+                if not self.config.metrics.enable_metrics:
                     logger.warning(
                         "Metrics listener configured, but "
                         "enable_metrics is not True!"
@@ -343,7 +343,7 @@ def setup(config_options):
         # generating config files and shouldn't try to continue.
         sys.exit(0)
 
-    events.USE_FROZEN_DICTS = config.use_frozen_dicts
+    events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
     synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
 
     if config.server.gc_seconds:
@@ -366,7 +366,7 @@ def setup(config_options):
 
     async def start():
         # Load the OIDC provider metadatas, if OIDC is enabled.
-        if hs.config.oidc_enabled:
+        if hs.config.oidc.oidc_enabled:
             oidc = hs.get_oidc_handler()
             # Loading the provider metadata also ensures the provider config is valid.
             await oidc.load_metadata()
@@ -439,11 +439,11 @@ def run(hs):
 
     _base.start_reactor(
         "synapse-homeserver",
-        soft_file_limit=hs.config.soft_file_limit,
-        gc_thresholds=hs.config.gc_thresholds,
-        pid_file=hs.config.pid_file,
-        daemonize=hs.config.daemonize,
-        print_pidfile=hs.config.print_pidfile,
+        soft_file_limit=hs.config.server.soft_file_limit,
+        gc_thresholds=hs.config.server.gc_thresholds,
+        pid_file=hs.config.server.pid_file,
+        daemonize=hs.config.server.daemonize,
+        print_pidfile=hs.config.server.print_pidfile,
         logger=logger,
     )
 
@@ -455,7 +455,7 @@ def main():
         hs = setup(sys.argv[1:])
 
         # redirect stdio to the logs, if configured.
-        if not hs.config.no_redirect_stdio:
+        if not hs.config.logging.no_redirect_stdio:
             redirect_stdio_to_logs()
 
         run(hs)

@@ -29,7 +29,6 @@ import attr
 
 from twisted.internet.defer import Deferred
 from twisted.internet.error import DNSLookupError
-from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
@@ -74,6 +73,7 @@ OG_TAG_VALUE_MAXLEN = 1000
 
 ONE_HOUR = 60 * 60 * 1000
 ONE_DAY = 24 * ONE_HOUR
+IMAGE_CACHE_EXPIRY_MS = 2 * ONE_DAY
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -126,14 +126,14 @@ class PreviewUrlResource(DirectServeJsonResource):
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.filepaths = media_repo.filepaths
-        self.max_spider_size = hs.config.max_spider_size
+        self.max_spider_size = hs.config.media.max_spider_size
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.client = SimpleHttpClient(
             hs,
             treq_args={"browser_like_redirects": True},
-            ip_whitelist=hs.config.url_preview_ip_range_whitelist,
-            ip_blacklist=hs.config.url_preview_ip_range_blacklist,
+            ip_whitelist=hs.config.media.url_preview_ip_range_whitelist,
+            ip_blacklist=hs.config.media.url_preview_ip_range_blacklist,
             use_proxy=True,
         )
         self.media_repo = media_repo
@@ -151,8 +151,8 @@ class PreviewUrlResource(DirectServeJsonResource):
             or instance_running_jobs == hs.get_instance_name()
         )
 
-        self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
-        self.url_preview_accept_language = hs.config.url_preview_accept_language
+        self.url_preview_url_blacklist = hs.config.media.url_preview_url_blacklist
+        self.url_preview_accept_language = hs.config.media.url_preview_accept_language
 
         # memory cache mapping urls to an ObservableDeferred returning
         # JSON-encoded OG metadata
@@ -168,7 +168,7 @@ class PreviewUrlResource(DirectServeJsonResource):
                 self._start_expire_url_cache_data, 10 * 1000
             )
 
-    async def _async_render_OPTIONS(self, request: Request) -> None:
+    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
         request.setHeader(b"Allow", b"OPTIONS, GET")
         respond_with_json(request, 200, {}, send_cors=True)
 
@@ -305,7 +305,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             with open(media_info.filename, "rb") as file:
                 body = file.read()
 
-            oembed_response = self._oembed.parse_oembed_response(media_info.uri, body)
+            oembed_response = self._oembed.parse_oembed_response(url, body)
             og = oembed_response.open_graph_result
 
             # Use the cache age from the oEmbed result, instead of the HTTP response.
@@ -486,7 +486,6 @@ class PreviewUrlResource(DirectServeJsonResource):
 
     async def _expire_url_cache_data(self) -> None:
         """Clean up expired url cache content, media and thumbnails."""
-        # TODO: Delete from backup media store
 
         assert self._worker_run_media_background_jobs
 
@@ -498,6 +497,27 @@ class PreviewUrlResource(DirectServeJsonResource):
             logger.info("Still running DB updates; skipping expiry")
             return
 
+        def try_remove_parent_dirs(dirs: Iterable[str]) -> None:
+            """Attempt to remove the given chain of parent directories
+
+            Args:
+                dirs: The list of directory paths to delete, with children appearing
+                    before their parents.
+            """
+            for dir in dirs:
+                try:
+                    os.rmdir(dir)
+                except FileNotFoundError:
+                    # Already deleted, continue with deleting the rest
+                    pass
+                except OSError as e:
+                    # Failed, skip deleting the rest of the parent dirs
+                    if e.errno != errno.ENOTEMPTY:
+                        logger.warning(
+                            "Failed to remove media directory: %r: %s", dir, e
+                        )
+                    break
+
         # First we delete expired url cache entries
         media_ids = await self.store.get_expired_url_cache(now)
 
@@ -506,20 +526,16 @@ class PreviewUrlResource(DirectServeJsonResource):
             fname = self.filepaths.url_cache_filepath(media_id)
             try:
                 os.remove(fname)
+            except FileNotFoundError:
+                pass  # If the path doesn't exist, meh
             except OSError as e:
-                # If the path doesn't exist, meh
-                if e.errno != errno.ENOENT:
-                    logger.warning("Failed to remove media: %r: %s", media_id, e)
-                    continue
+                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                continue
 
             removed_media.append(media_id)
 
-            try:
-                dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
-                for dir in dirs:
-                    os.rmdir(dir)
-            except Exception:
-                pass
+            dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
+            try_remove_parent_dirs(dirs)
 
         await self.store.delete_url_cache(removed_media)
 
@@ -532,7 +548,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         # These may be cached for a bit on the client (i.e., they
         # may have a room open with a preview url thing open).
         # So we wait a couple of days before deleting, just in case.
-        expire_before = now - 2 * ONE_DAY
+        expire_before = now - IMAGE_CACHE_EXPIRY_MS
         media_ids = await self.store.get_url_cache_media_before(expire_before)
 
         removed_media = []
@@ -540,36 +556,30 @@ class PreviewUrlResource(DirectServeJsonResource):
             fname = self.filepaths.url_cache_filepath(media_id)
             try:
                 os.remove(fname)
+            except FileNotFoundError:
+                pass  # If the path doesn't exist, meh
             except OSError as e:
-                # If the path doesn't exist, meh
-                if e.errno != errno.ENOENT:
-                    logger.warning("Failed to remove media: %r: %s", media_id, e)
-                    continue
+                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                continue
 
-            try:
-                dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
-                for dir in dirs:
-                    os.rmdir(dir)
-            except Exception:
-                pass
+            dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
+            try_remove_parent_dirs(dirs)
 
             thumbnail_dir = self.filepaths.url_cache_thumbnail_directory(media_id)
             try:
                 shutil.rmtree(thumbnail_dir)
+            except FileNotFoundError:
+                pass  # If the path doesn't exist, meh
             except OSError as e:
-                # If the path doesn't exist, meh
-                if e.errno != errno.ENOENT:
-                    logger.warning("Failed to remove media: %r: %s", media_id, e)
-                    continue
+                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                continue
 
             removed_media.append(media_id)
 
-            try:
-                dirs = self.filepaths.url_cache_thumbnail_dirs_to_delete(media_id)
-                for dir in dirs:
-                    os.rmdir(dir)
-            except Exception:
-                pass
+            dirs = self.filepaths.url_cache_thumbnail_dirs_to_delete(media_id)
+            # Note that one of the directories to be deleted has already been
+            # removed by the `rmtree` above.
+            try_remove_parent_dirs(dirs)
 
         await self.store.delete_url_cache_media(removed_media)
 

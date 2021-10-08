@@ -13,7 +13,7 @@
 #  limitations under the License.
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 import attr
 
@@ -22,6 +22,8 @@ from synapse.types import JsonDict
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
+    from lxml import etree
+
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -31,7 +33,7 @@ logger = logging.getLogger(__name__)
 class OEmbedResult:
     # The Open Graph result (converted from the oEmbed result).
     open_graph_result: JsonDict
-    # Number of seconds to cache the content, according to the oEmbed response.
+    # Number of milliseconds to cache the content, according to the oEmbed response.
     #
     # This will be None if no cache-age is provided in the oEmbed response (or
     # if the oEmbed response cannot be turned into an Open Graph response).
@@ -119,10 +121,22 @@ class OEmbedProvider:
             # Ensure the cache age is None or an int.
             cache_age = oembed.get("cache_age")
             if cache_age:
-                cache_age = int(cache_age)
+                cache_age = int(cache_age) * 1000
 
             # The results.
-            open_graph_response = {"og:title": oembed.get("title")}
+            open_graph_response = {
+                "og:url": url,
+            }
+
+            # Use either title or author's name as the title.
+            title = oembed.get("title") or oembed.get("author_name")
+            if title:
+                open_graph_response["og:title"] = title
+
+            # Use the provider name and as the site.
+            provider_name = oembed.get("provider_name")
+            if provider_name:
+                open_graph_response["og:site_name"] = provider_name
 
             # If a thumbnail exists, use it. Note that dimensions will be calculated later.
             if "thumbnail_url" in oembed:
@@ -137,6 +151,15 @@ class OEmbedProvider:
                 # If this is a photo, use the full image, not the thumbnail.
                 open_graph_response["og:image"] = oembed["url"]
 
+            elif oembed_type == "video":
+                open_graph_response["og:type"] = "video.other"
+                calc_description_and_urls(open_graph_response, oembed["html"])
+                open_graph_response["og:video:width"] = oembed["width"]
+                open_graph_response["og:video:height"] = oembed["height"]
+
+            elif oembed_type == "link":
+                open_graph_response["og:type"] = "website"
+
             else:
                 raise RuntimeError(f"Unknown oEmbed type: {oembed_type}")
 
@@ -147,6 +170,14 @@ class OEmbedProvider:
             cache_age = None
 
         return OEmbedResult(open_graph_response, cache_age)
+
+
+def _fetch_urls(tree: "etree.Element", tag_name: str) -> List[str]:
+    results = []
+    for tag in tree.xpath("//*/" + tag_name):
+        if "src" in tag.attrib:
+            results.append(tag.attrib["src"])
+    return results
 
 
 def calc_description_and_urls(open_graph_response: JsonDict, html_body: str) -> None:
@@ -178,6 +209,16 @@ def calc_description_and_urls(open_graph_response: JsonDict, html_body: str) -> 
     # The data was successfully parsed, but no tree was found.
     if tree is None:
         return
+
+    # Attempt to find interesting URLs (images, videos, embeds).
+    if "og:image" not in open_graph_response:
+        image_urls = _fetch_urls(tree, "img")
+        if image_urls:
+            open_graph_response["og:image"] = image_urls[0]
+
+    video_urls = _fetch_urls(tree, "video") + _fetch_urls(tree, "embed")
+    if video_urls:
+        open_graph_response["og:video"] = video_urls[0]
 
     from synapse.rest.media.v1.preview_url_resource import _calc_description
 

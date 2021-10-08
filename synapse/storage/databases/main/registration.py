@@ -207,7 +207,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             return False
 
         now = self._clock.time_msec()
-        trial_duration_ms = self.config.mau_trial_days * 24 * 60 * 60 * 1000
+        trial_duration_ms = self.config.server.mau_trial_days * 24 * 60 * 60 * 1000
         is_trial = (now - info["creation_ts"] * 1000) < trial_duration_ms
         return is_trial
 
@@ -388,7 +388,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             "get_users_expiring_soon",
             select_users_txn,
             self._clock.time_msec(),
-            self.config.account_validity_renew_at,
+            self.config.account_validity.account_validity_renew_at,
         )
 
     async def set_renewal_mail_status(self, user_id: str, email_sent: bool) -> None:
@@ -1710,7 +1710,7 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         We do this by grandfathering in existing user threepids assuming that
         they used one of the server configured trusted identity servers.
         """
-        id_servers = set(self.config.trusted_third_party_id_servers)
+        id_servers = set(self.config.registration.trusted_third_party_id_servers)
 
         def _bg_user_threepids_grandfather_txn(txn):
             sql = """
@@ -1783,7 +1783,9 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        self._ignore_unknown_session_error = hs.config.request_token_inhibit_3pid_errors
+        self._ignore_unknown_session_error = (
+            hs.config.server.request_token_inhibit_3pid_errors
+        )
 
         self._access_tokens_id_gen = IdGenerator(db_conn, "access_tokens", "id")
         self._refresh_tokens_id_gen = IdGenerator(db_conn, "refresh_tokens", "id")
@@ -2020,7 +2022,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 (user_id_obj.localpart, create_profile_with_displayname),
             )
 
-        if self.hs.config.stats_enabled:
+        if self.hs.config.stats.stats_enabled:
             # we create a new completed user statistics row
 
             # we don't strictly need current_token since this user really can't
