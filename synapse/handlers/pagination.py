@@ -378,6 +378,7 @@ class PaginationHandler:
                     curr_topo = await self.store.get_current_topological_token(
                         room_id, room_token.stream
                     )
+                    logger.info("message pagination curr_topo=%s", curr_topo)
 
                 if membership == Membership.LEAVE:
                     # If they have left the room then clamp the token to be before

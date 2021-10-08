@@ -150,14 +150,14 @@ class FederationHandler(BaseHandler):
         insertion_events_to_be_backfilled = (
             await self.store.get_insertion_event_backwards_extremities_in_room(room_id)
         )
-        logger.debug(
+        logger.info(
             "_maybe_backfill_inner: extremities oldest_events_with_depth=%s insertion_events_to_be_backfilled=%s",
             oldest_events_with_depth,
             insertion_events_to_be_backfilled,
         )
 
         if not oldest_events_with_depth and not insertion_events_to_be_backfilled:
-            logger.debug("Not backfilling as no extremeties found.")
+            logger.info("Not backfilling as no extremeties found.")
             return False
 
         # We only want to paginate if we can actually see the events we'll get,
@@ -205,7 +205,7 @@ class FederationHandler(BaseHandler):
             redact=False,
             check_history_visibility_only=True,
         )
-        logger.debug(
+        logger.info(
             "_maybe_backfill_inner: filtered_extremities %s", filtered_extremities
         )
 
@@ -232,7 +232,7 @@ class FederationHandler(BaseHandler):
         # much larger factor will result in triggering a backfill request much
         # earlier than necessary.
         if current_depth - 2 * limit > max_depth:
-            logger.debug(
+            logger.info(
                 "Not backfilling as we don't need to. %d < %d - 2 * %d",
                 max_depth,
                 current_depth,
@@ -240,18 +240,10 @@ class FederationHandler(BaseHandler):
             )
             return False
 
-        logger.debug(
-            "room_id: %s, backfill: current_depth: %s, max_depth: %s, extrems: %s",
-            room_id,
-            current_depth,
-            max_depth,
-            sorted_extremeties_tuple,
-        )
-
         # We ignore extremities that have a greater depth than our current depth
         # as:
         #    1. we don't really care about getting events that have happened
-        #       before our current position; and
+        #       after our current position; and
         #    2. we have likely previously tried and failed to backfill from that
         #       extremity, so to avoid getting "stuck" requesting the same
         #       backfill repeatedly we drop those extremities.
@@ -259,9 +251,19 @@ class FederationHandler(BaseHandler):
             t for t in sorted_extremeties_tuple if int(t[1]) <= current_depth
         ]
 
+        logger.info(
+            "room_id: %s, backfill: current_depth: %s, limit: %s, max_depth: %s, extrems: %s filtered_sorted_extremeties_tuple: %s",
+            room_id,
+            current_depth,
+            limit,
+            max_depth,
+            sorted_extremeties_tuple,
+            filtered_sorted_extremeties_tuple,
+        )
+
         # However, we need to check that the filtered extremities are non-empty.
         # If they are empty then either we can a) bail or b) still attempt to
-        # backill. We opt to try backfilling anyway just in case we do get
+        # backfill. We opt to try backfilling anyway just in case we do get
         # relevant events.
         if filtered_sorted_extremeties_tuple:
             sorted_extremeties_tuple = filtered_sorted_extremeties_tuple
@@ -318,7 +320,7 @@ class FederationHandler(BaseHandler):
             for dom in domains:
                 try:
                     await self._federation_event_handler.backfill(
-                        dom, room_id, limit=100, extremities=extremities
+                        dom, room_id, limit=100, extremities=extremities.keys()
                     )
                     # If this succeeded then we probably already have the
                     # appropriate stuff.
@@ -391,7 +393,7 @@ class FederationHandler(BaseHandler):
             for key, state_dict in states.items()
         }
 
-        for e_id, _ in sorted_extremeties_tuple:
+        for e_id in event_ids:
             likely_extremeties_domains = get_domains_from_state(states[e_id])
 
             success = await try_backfill(
