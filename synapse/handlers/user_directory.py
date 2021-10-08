@@ -323,22 +323,18 @@ class UserDirectoryHandler(StateDeltasHandler):
                 await self._handle_remove_user(room_id, state_key)
         elif change is MatchChange.no_change:
             # Handle any profile changes for remote users.
-            # (For local users we are not forced to scan membership
-            # events; instead the rest of the application calls
+            # (For local users the rest of the application calls
             # `handle_local_profile_change`.)
             if is_remote:
-                await self._handle_profile_change(
+                await self._handle_possible_remote_profile_change(
                     state_key, room_id, prev_event_id, event_id
                 )
         elif change is MatchChange.now_true:  # The user joined
             # This may be the first time we've seen a remote user. If
-            # so, ensure we have a directory entry for them. (We don't
-            # need to do this for local users: their directory entry
-            # is created at the point of registration.
+            # so, ensure we have a directory entry for them. (For local users,
+            # the rest of the application calls `handle_local_profile_change`.)
             if is_remote:
-                await self._upsert_directory_entry_for_remote_user(
-                    state_key, event_id
-                )
+                await self._upsert_directory_entry_for_remote_user(state_key, event_id)
             await self._track_user_joined_room(room_id, state_key)
 
     async def _upsert_directory_entry_for_remote_user(
@@ -401,7 +397,12 @@ class UserDirectoryHandler(StateDeltasHandler):
                 await self.store.add_users_who_share_private_room(room_id, to_insert)
 
     async def _handle_remove_user(self, room_id: str, user_id: str) -> None:
-        """Called when we might need to remove user from directory
+        """Called when when someone leaves a room. The user may be local or remote.
+
+        (If the person who left was the last local user in this room, the server
+        is no longer in the room. We call this function to forget that the remaining
+        remote users are in the room, even though they haven't left. So the name is
+        a little misleading!)
 
         Args:
             room_id: The room ID that user left or stopped being public that
@@ -418,7 +419,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         if len(rooms_user_is_in) == 0:
             await self.store.remove_from_user_dir(user_id)
 
-    async def _handle_profile_change(
+    async def _handle_possible_remote_profile_change(
         self,
         user_id: str,
         room_id: str,
@@ -426,7 +427,8 @@ class UserDirectoryHandler(StateDeltasHandler):
         event_id: Optional[str],
     ) -> None:
         """Check member event changes for any profile changes and update the
-        database if there are.
+        database if there are. This is intended for remote users only. The caller
+        is responsible for checking that the given user is remote.
         """
         if not prev_event_id or not event_id:
             return
