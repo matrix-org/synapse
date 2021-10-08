@@ -129,7 +129,7 @@ class PushRuleEvaluatorForEvent:
         self._value_cache = _flatten_dict(event)
 
     def matches(
-        self, condition: Dict[str, Any], user_id: str, display_name: str
+        self, condition: Dict[str, Any], user_id: str, display_name: Optional[str]
     ) -> bool:
         if condition["kind"] == "event_match":
             return self._event_match(condition, user_id)
@@ -172,7 +172,7 @@ class PushRuleEvaluatorForEvent:
 
             return _glob_matches(pattern, haystack)
 
-    def _contains_display_name(self, display_name: str) -> bool:
+    def _contains_display_name(self, display_name: Optional[str]) -> bool:
         if not display_name:
             return False
 

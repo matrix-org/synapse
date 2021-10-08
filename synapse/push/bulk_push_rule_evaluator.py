@@ -232,6 +232,8 @@ class BulkPushRuleEvaluator:
                 # that user, as they might not be already joined.
                 if event.type == EventTypes.Member and event.state_key == uid:
                     display_name = event.content.get("displayname", None)
+                    if not isinstance(display_name, str):
+                        display_name = None
 
             if count_as_unread:
                 # Add an element for the current user if the event needs to be marked as
@@ -268,7 +270,7 @@ def _condition_checker(
     evaluator: PushRuleEvaluatorForEvent,
     conditions: List[dict],
     uid: str,
-    display_name: str,
+    display_name: Optional[str],
     cache: Dict[str, bool],
 ) -> bool:
     for cond in conditions:
