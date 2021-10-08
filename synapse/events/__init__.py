@@ -236,18 +236,18 @@ class EventBase(metaclass=abc.ABCMeta):
     # that is properly annotated.
 
     auth_events = DictProperty("auth_events")  # type: ignore[assignment]
-    depth = DictProperty("depth")  # type: ignore[assignment]
+    depth: int = DictProperty("depth")  # type: ignore[assignment]
     content = DictProperty("content")  # type: ignore[assignment]
-    hashes = DictProperty("hashes")  # type: ignore[assignment]
-    origin = DictProperty("origin")  # type: ignore[assignment]
-    origin_server_ts = DictProperty("origin_server_ts")  # type: ignore[assignment]
+    hashes: Dict[str, str] = DictProperty("hashes")  # type: ignore[assignment]
+    origin: str = DictProperty("origin")  # type: ignore[assignment]
+    origin_server_ts: int = DictProperty("origin_server_ts")  # type: ignore[assignment]
     prev_events = DictProperty("prev_events")  # type: ignore[assignment]
     redacts = DefaultDictProperty("redacts", None)  # type: ignore[assignment]
-    room_id = DictProperty("room_id")  # type: ignore[assignment]
-    sender = DictProperty("sender")  # type: ignore[assignment]
+    room_id: str = DictProperty("room_id")  # type: ignore[assignment]
+    sender: str = DictProperty("sender")  # type: ignore[assignment]
     state_key = DictProperty("state_key")  # type: ignore[assignment]
-    type = DictProperty("type")  # type: ignore[assignment]
-    user_id = DictProperty("sender")  # type: ignore[assignment]
+    type: str = DictProperty("type")  # type: ignore[assignment]
+    user_id: str = DictProperty("sender")  # type: ignore[assignment]
 
     @property
     def event_id(self) -> str:
