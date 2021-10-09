@@ -39,8 +39,6 @@ from synapse.util.stringutils import (
     valid_id_server_location,
 )
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -49,10 +47,9 @@ logger = logging.getLogger(__name__)
 id_server_scheme = "https://"
 
 
-class IdentityHandler(BaseHandler):
+class IdentityHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.store = hs.get_datastore()
         # An HTTP client for contacting trusted URLs.
         self.http_client = SimpleHttpClient(hs)
         # An HTTP client for contacting identity servers specified by clients.
