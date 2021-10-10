@@ -35,6 +35,7 @@ class JWTConfig(Config):
             # that the claims exist on the JWT.
             self.jwt_issuer = jwt_config.get("issuer")
             self.jwt_audiences = jwt_config.get("audiences")
+            self.jwt_verify_signature = jwt_config.get("verify_signature", True)
 
             try:
                 import jwt
@@ -48,6 +49,7 @@ class JWTConfig(Config):
             self.jwt_algorithm = None
             self.jwt_issuer = None
             self.jwt_audiences = None
+            self.jwt_verify_signature = True
 
     def generate_config_section(self, **kwargs):
         return """\
@@ -105,4 +107,9 @@ class JWTConfig(Config):
             #
             #audiences:
             #    - "provided-by-your-issuer"
+
+            # Uncomment the following to disable verify_signature of JSON web
+            # tokens. Defaults to True.
+            #
+            #verify_signature: false
         """

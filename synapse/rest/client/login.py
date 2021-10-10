@@ -74,6 +74,7 @@ class LoginRestServlet(RestServlet):
         self.jwt_algorithm = hs.config.jwt.jwt_algorithm
         self.jwt_issuer = hs.config.jwt.jwt_issuer
         self.jwt_audiences = hs.config.jwt.jwt_audiences
+        self.jwt_verify_signature = hs.config.jwt.jwt_verify_signature
 
         # SSO configuration.
         self.saml2_enabled = hs.config.saml2.saml2_enabled
@@ -399,6 +400,7 @@ class LoginRestServlet(RestServlet):
                 algorithms=[self.jwt_algorithm],
                 issuer=self.jwt_issuer,
                 audience=self.jwt_audiences,
+                options={"verify_signature": self.jwt_verify_signature}
             )
         except jwt.PyJWTError as e:
             # A JWT error occurred, return some info back to the client.
