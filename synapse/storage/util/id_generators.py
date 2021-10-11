@@ -411,10 +411,20 @@ class MultiWriterIdGenerator:
         cur.close()
 
     def _load_next_id_txn(self, txn: Cursor) -> int:
-        return self._sequence_gen.get_next_id_txn(txn)
+        next_id = self._sequence_gen.get_next_id_txn(txn)
+
+        with self._lock:
+            self._unfinished_ids.add(next_id)
+
+        return next_id
 
     def _load_next_mult_id_txn(self, txn: Cursor, n: int) -> List[int]:
-        return self._sequence_gen.get_next_mult_txn(txn, n)
+        stream_ids = self._sequence_gen.get_next_mult_txn(txn, n)
+
+        with self._lock:
+            self._unfinished_ids.update(stream_ids)
+
+        return stream_ids
 
     def get_next(self) -> AsyncContextManager[int]:
         """
@@ -462,9 +472,6 @@ class MultiWriterIdGenerator:
             raise Exception("Tried to allocate stream ID on non-writer")
 
         next_id = self._load_next_id_txn(txn)
-
-        with self._lock:
-            self._unfinished_ids.add(next_id)
 
         txn.call_after(self._mark_id_as_finished, next_id)
         txn.call_on_exception(self._mark_id_as_finished, next_id)
@@ -696,9 +703,6 @@ class _MultiWriterCtxManager:
             self.multiple_ids or 1,
             db_autocommit=True,
         )
-
-        with self.id_gen._lock:
-            self.id_gen._unfinished_ids.update(self.stream_ids)
 
         if self.multiple_ids is None:
             return self.stream_ids[0] * self.id_gen._return_factor
