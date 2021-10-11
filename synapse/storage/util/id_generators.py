@@ -290,6 +290,9 @@ class MultiWriterIdGenerator:
         )
         self._known_persisted_positions: List[int] = []
 
+        # The maximum stream ID that we have seen been allocated across any writer.
+        self._max_seen_allocated_stream_id = 1
+
         self._sequence_gen = PostgresSequenceGenerator(sequence_name)
 
         # We check that the table and sequence haven't diverged.
@@ -304,6 +307,10 @@ class MultiWriterIdGenerator:
 
         # This goes and fills out the above state from the database.
         self._load_current_ids(db_conn, tables)
+
+        self._max_seen_allocated_stream_id = (
+            max(self._current_positions.values()) if self._current_positions else 1
+        )
 
     def _load_current_ids(
         self,
@@ -415,6 +422,9 @@ class MultiWriterIdGenerator:
 
         with self._lock:
             self._unfinished_ids.add(next_id)
+            self._max_seen_allocated_stream_id = max(
+                self._max_seen_allocated_stream_id, self._unfinished_ids[-1]
+            )
 
         return next_id
 
@@ -423,6 +433,9 @@ class MultiWriterIdGenerator:
 
         with self._lock:
             self._unfinished_ids.update(stream_ids)
+            self._max_seen_allocated_stream_id = max(
+                self._max_seen_allocated_stream_id, self._unfinished_ids[-1]
+            )
 
         return stream_ids
 
@@ -580,6 +593,10 @@ class MultiWriterIdGenerator:
         with self._lock:
             self._current_positions[instance_name] = max(
                 new_id, self._current_positions.get(instance_name, 0)
+            )
+
+            self._max_seen_allocated_stream_id = max(
+                self._max_seen_allocated_stream_id, new_id
             )
 
             self._add_persisted_position(new_id)
