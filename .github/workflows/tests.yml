@@ -122,7 +122,7 @@ jobs:
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
         #       It also ignores find's exit code; this is a best effort affair
-        if: $ {{ always() }}
+        if: ${{ always() }}
         run: >-
           find _trial_temp -name '*.log'
           -exec echo "::group::{}" \;
@@ -147,7 +147,7 @@ jobs:
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
         #       It also ignores find's exit code; this is a best effort affair
-        if: $ {{ always() }}
+        if: ${{ always() }}
         run: >-
           find _trial_temp -name '*.log'
           -exec echo "::group::{}" \;
@@ -178,7 +178,7 @@ jobs:
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
         #       It also ignores find's exit code; this is a best effort affair
-        if: $ {{ always() }}
+        if: ${{ always() }}
         run: >-
           find _trial_temp -name '*.log'
           -exec echo "::group::{}" \;
