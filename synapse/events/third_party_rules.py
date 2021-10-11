@@ -218,12 +218,12 @@ class ThirdPartyEventRules:
             try:
                 res, replacement_data = await callback(event, state_events)
             except SynapseError as e:
-                # HACK. Being able to throw SynapseErrors is relied upon by
+                # FIXME: Being able to throw SynapseErrors is relied upon by
                 # some modules. PR #10386 accidentally broke this ability.
                 # That said, we aren't keen on exposing this implementation detail
                 # to modules and we should one day have a proper way to do what
                 # is wanted.
-                # This module API callback needs a rework so that hacks such as
+                # This module callback needs a rework so that hacks such as
                 # this one are not necessary.
                 raise e
             except Exception as e:
