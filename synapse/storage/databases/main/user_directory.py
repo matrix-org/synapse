@@ -383,13 +383,13 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         """Certain classes of local user are omitted from the user directory.
         Is this user one of them?
         """
-        # We're opting to exclude the appservice sender (user defined by the
-        # `sender_localpart` in the appservice registration) even though
-        # technically it could be DM-able. In the future, this could potentially
-        # be configurable per-appservice whether the appservice sender can be
-        # contacted.
+        # We include the appservice sender in the directory. These typically
+        # aren't covered by `get_if_app_services_interested_in_user`.
+        # We need to handle it here or else we'll get a "row not found" error
+        # in the deactivated user check, because the sender doesn't have an
+        # entry in the `users` table.
         if self.get_app_service_by_user_id(user) is not None:
-            return False
+            return True
 
         # We're opting to exclude appservice users (anyone matching the user
         # namespace regex in the appservice registration) even though technically
