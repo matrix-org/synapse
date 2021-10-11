@@ -63,7 +63,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             hostname="test",
             id="1234",
             namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
-            sender="@as:test",
+            # Note: this user does not match the regex above, so that tests
+            # can distinguish the sender from the AS user.
+            sender="@as_main:test",
         )
 
         mock_load_appservices = Mock(return_value=[self.appservice])
@@ -178,6 +180,15 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             user, token, as_user
         )
         self._check_only_one_user_in_directory(user, public)
+
+    def test_excludes_appservice_sender(self) -> None:
+        user = self.register_user("user", "pass")
+        token = self.login(user, "pass")
+        room = self.helper.create_room_as(
+            self.appservice.sender, is_public=True, tok=self.appservice.token
+        )
+        self.helper.join(room, user, tok=token)
+        self._check_only_one_user_in_directory(user, room)
 
     def _create_rooms_and_inject_memberships(
         self, creator: str, token: str, joiner: str
