@@ -1,0 +1,1 @@
+Work around a regression in the experimental Module API callback `check_event_allowed` that caused raised `SynapseError`s to be ignored.
