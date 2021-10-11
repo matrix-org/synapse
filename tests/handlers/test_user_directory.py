@@ -188,6 +188,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self.appservice.sender, is_public=True, tok=self.appservice.token
         )
         self.helper.join(room, user, tok=token)
+
+        # Will this make the test pass in CI? It's fine locally.
+        self.wait_for_background_updates()
         users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
         in_public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
         in_private = self.get_success(
