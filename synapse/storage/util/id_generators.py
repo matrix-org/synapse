@@ -36,7 +36,7 @@ from typing import (
 )
 
 import attr
-from sortedcontainers import SortedSet
+from sortedcontainers import SortedList, SortedSet
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.database import (
@@ -265,6 +265,15 @@ class MultiWriterIdGenerator:
         # should be less than the minimum of this set (if not empty).
         self._unfinished_ids: SortedSet[int] = SortedSet()
 
+        # We also need to track when we've requested some new stream IDs but
+        # they haven't yet been added to the `_unfinished_ids` set. Every time
+        # we request a new stream ID we add the current max stream ID to the
+        # list, and remove it once we've added the newly allocated IDs to the
+        # `_unfinished_ids` set. This means that we *may* be allocated stream
+        # IDs above those in the list, and so we can't advance the local current
+        # position beyond the minimum stream ID in this list.
+        self._in_flight_fetches: SortedList[int] = SortedList()
+
         # Set of local IDs that we've processed that are larger than the current
         # position, due to there being smaller unpersisted IDs.
         self._finished_ids: Set[int] = set()
@@ -418,24 +427,30 @@ class MultiWriterIdGenerator:
         cur.close()
 
     def _load_next_id_txn(self, txn: Cursor) -> int:
-        next_id = self._sequence_gen.get_next_id_txn(txn)
-
-        with self._lock:
-            self._unfinished_ids.add(next_id)
-            self._max_seen_allocated_stream_id = max(
-                self._max_seen_allocated_stream_id, self._unfinished_ids[-1]
-            )
-
-        return next_id
+        stream_ids = self._load_next_mult_id_txn(txn, 1)
+        return stream_ids[0]
 
     def _load_next_mult_id_txn(self, txn: Cursor, n: int) -> List[int]:
-        stream_ids = self._sequence_gen.get_next_mult_txn(txn, n)
-
+        # We need to track that we've requested some more stream IDs, and what
+        # the current max allocated stream ID is. This is to prevent a race
+        # where we've been allocated stream IDs but they have not yet been added
+        # to the `_unfinished_ids` set, allowing the current position to advance
+        # past them.
         with self._lock:
-            self._unfinished_ids.update(stream_ids)
-            self._max_seen_allocated_stream_id = max(
-                self._max_seen_allocated_stream_id, self._unfinished_ids[-1]
-            )
+            current_max = self._max_seen_allocated_stream_id
+            self._in_flight_fetches.add(current_max)
+
+        try:
+            stream_ids = self._sequence_gen.get_next_mult_txn(txn, n)
+
+            with self._lock:
+                self._unfinished_ids.update(stream_ids)
+                self._max_seen_allocated_stream_id = max(
+                    self._max_seen_allocated_stream_id, self._unfinished_ids[-1]
+                )
+        finally:
+            with self._lock:
+                self._in_flight_fetches.remove(current_max)
 
         return stream_ids
 
@@ -544,6 +559,11 @@ class MultiWriterIdGenerator:
                 self._finished_ids.clear()
 
             if new_cur:
+                # If we are currently fetching new stream IDs we need to ensure
+                # that we don't advance past where we
+                if self._in_flight_fetches:
+                    new_cur = min(new_cur, self._in_flight_fetches[0])
+
                 curr = self._current_positions.get(self._instance_name, 0)
                 self._current_positions[self._instance_name] = max(curr, new_cur)
 
@@ -629,7 +649,11 @@ class MultiWriterIdGenerator:
         # to report a recent position when asked, rather than a potentially old
         # one (if this instance hasn't written anything for a while).
         our_current_position = self._current_positions.get(self._instance_name)
-        if our_current_position and not self._unfinished_ids:
+        if (
+            our_current_position
+            and not self._unfinished_ids
+            and not self._in_flight_fetches
+        ):
             self._current_positions[self._instance_name] = max(
                 our_current_position, new_id
             )
