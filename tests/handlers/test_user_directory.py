@@ -181,14 +181,22 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
         self._check_only_one_user_in_directory(user, public)
 
-    def test_excludes_appservice_sender(self) -> None:
+    def test_includes_appservice_sender(self) -> None:
         user = self.register_user("user", "pass")
         token = self.login(user, "pass")
         room = self.helper.create_room_as(
             self.appservice.sender, is_public=True, tok=self.appservice.token
         )
         self.helper.join(room, user, tok=token)
-        self._check_only_one_user_in_directory(user, room)
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        in_public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        in_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+
+        self.assertEqual(users, {user, self.appservice.sender})
+        self.assertEqual(set(in_public), {(user, room), (self.appservice.sender, room)})
+        self.assertEqual(in_private, [])
 
     def _create_rooms_and_inject_memberships(
         self, creator: str, token: str, joiner: str
@@ -314,18 +322,18 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertIsNone(profile)
 
         # update profile
-        profile_info = ProfileInfo(avatar_url="avatar_url", display_name="4L1c3")
+        profile_info = ProfileInfo(avatar_url="avatar_url", display_name="beep boop")
         self.get_success(
             self.handler.handle_local_profile_change(
                 self.appservice.sender, profile_info
             )
         )
 
-        # profile is still not in directory
+        # profile is now set
         profile = self.get_success(
             self.store.get_user_in_directory(self.appservice.sender)
         )
-        self.assertIsNone(profile)
+        self.assertEqual(profile, {"display_name": "beep boop", "avatar_url": "avatar_url"})
 
     def test_handle_user_deactivated_support_user(self) -> None:
         s_user_id = "@support:test"
