@@ -333,7 +333,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         profile = self.get_success(
             self.store.get_user_in_directory(self.appservice.sender)
         )
-        self.assertEqual(profile, {"display_name": "beep boop", "avatar_url": "avatar_url"})
+        self.assertEqual(
+            profile, {"display_name": "beep boop", "avatar_url": "avatar_url"}
+        )
 
     def test_handle_user_deactivated_support_user(self) -> None:
         s_user_id = "@support:test"
