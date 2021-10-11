@@ -1,1 +1,1 @@
-Exclude application service sender membership from user directory to fix a bug stopping the user directory from being populated.
+Fix a long-standing bug where rebuilding the user directory wouldn't exclude support and disabled users.
