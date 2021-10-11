@@ -134,7 +134,9 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
             hostname="test",
             id="1234",
             namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
-            sender="@as:test",
+            # Note: this user does not match the regex above, so that tests
+            # can distinguish the sender from the AS user.
+            sender="@as_main:test",
         )
 
         mock_load_appservices = Mock(return_value=[self.appservice])
@@ -205,9 +207,19 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
             self.store.db_pool.simple_insert(
                 "background_updates",
                 {
-                    "update_name": "populate_user_directory_cleanup",
+                    "update_name": "populate_user_directory_process_appservice_senders",
                     "progress_json": "{}",
                     "depends_on": "populate_user_directory_process_users",
+                },
+            )
+        )
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                "background_updates",
+                {
+                    "update_name": "populate_user_directory_cleanup",
+                    "progress_json": "{}",
+                    "depends_on": "populate_user_directory_process_appservice_senders",
                 },
             )
         )
@@ -254,7 +266,7 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
 
         # All three should have entries in the directory
         users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
-        self.assertEqual(users, {u1, u2, u3})
+        self.assertEqual(users, {u1, u2, u3, self.appservice.sender})
 
     # The next three tests (test_population_excludes_*) all set up
     #   - A normal user included in the user dir
@@ -290,7 +302,7 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
     ) -> None:
         # After rebuilding the directory, we should only see the normal user.
         users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
-        self.assertEqual(users, {normal_user})
+        self.assertEqual(users, {normal_user, self.appservice.sender})
         in_public_rooms = self.get_success(
             self.user_dir_helper.get_users_in_public_rooms()
         )
@@ -364,7 +376,7 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         # Check the AS user is not in the directory.
         self._check_room_sharing_tables(user, public, private)
 
-    def test_population_excludes_appservice_sender(self) -> None:
+    def test_population_includes_appservice_sender(self) -> None:
         user = self.register_user("user", "pass")
         token = self.login(user, "pass")
 
@@ -376,8 +388,25 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         # Rebuild the directory.
         self._purge_and_rebuild_user_dir()
 
-        # Check the AS sender is not in the directory.
-        self._check_room_sharing_tables(user, public, private)
+        # Check the AS sender is in the directory.
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        self.assertEqual(users, {user, self.appservice.sender})
+        in_public_rooms = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
+        self.assertEqual(
+            set(in_public_rooms), {(user, public), (self.appservice.sender, public)}
+        )
+        in_private_rooms = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        self.assertEqual(
+            self.user_dir_helper._compress_shared(in_private_rooms),
+            {
+                (user, self.appservice.sender, private),
+                (self.appservice.sender, user, private),
+            },
+        )
 
     def test_population_conceals_private_nickname(self) -> None:
         # Make a private room, and set a nickname within
@@ -407,15 +436,16 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
             self._purge_and_rebuild_user_dir()
 
         # Local users are ignored by the scan over rooms
-        users = self.get_success(self.user_dir_helper.get_profiles_in_user_directory())
-        self.assertEqual(users, {})
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        self.assertEqual(users, {self.appservice.sender})
 
         # Do a full rebuild including the scan over the `users` table. The local
         # user should appear with their profile name.
         self._purge_and_rebuild_user_dir()
         users = self.get_success(self.user_dir_helper.get_profiles_in_user_directory())
         self.assertEqual(
-            users, {user: ProfileInfo(display_name="aaaa", avatar_url=None)}
+            users[user],
+            ProfileInfo(display_name="aaaa", avatar_url=None),
         )
 
 

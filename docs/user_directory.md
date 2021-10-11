@@ -5,11 +5,6 @@ The user directory is currently maintained based on the 'visible' users
 on this particular server - i.e. ones which your account shares a room with, or
 who are present in a publicly viewable room present on the server.
 
-The directory info is stored in various tables, which can (typically after
-DB corruption) get stale or out of sync.  If this happens, for now the
-solution to fix it is to execute the SQL [here](https://github.com/matrix-org/synapse/blob/master/synapse/storage/schema/main/delta/53/user_dir_populate.sql)
-and then restart synapse. This should then start a background task to
-flush the current tables and regenerate the directory.
 
 Data model
 ----------
@@ -21,7 +16,8 @@ see who.
 
 From all of these tables we exclude three types of local user:
   - support users
-  - appservice users
+  - appservice users (e.g. people using IRC)
+    - but not the "appservice sender" (e.g. the bot which bridges Matrix to IRC).
   - deactivated users
 
 * `user_directory`. This contains the user_id, display name and avatar we'll
@@ -47,3 +43,36 @@ From all of these tables we exclude three types of local user:
 * `users_who_share_private_rooms`. Rows are triples `(L, M, room id)` where `L`
    is a local user and `M` is a local or remote user. `L` and `M` should be
    different, but this isn't enforced by a constraint.
+
+
+Rebuilding the directory
+------------------------
+
+The directory info is stored in various tables, which can (typically after
+DB corruption) get stale or out of sync.  If this happens, for now the
+solution to fix it is to execute the following SQL and then restart Synapse.
+
+```sql
+-- Set up staging tables
+INSERT INTO background_updates (update_name, progress_json) VALUES
+    ('populate_user_directory_createtables', '{}');
+
+-- Run through each room and update the room sharing tables.
+-- Also add directory entries for remote users.
+INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+    ('populate_user_directory_process_rooms', '{}', 'populate_user_directory_createtables');
+
+-- Insert directory entries for all local users.
+INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+    ('populate_user_directory_process_users', '{}', 'populate_user_directory_process_rooms');
+    
+-- Insert directory entries for all appservice senders.
+INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+    ('populate_user_directory_process_appservice_senders', '{}', 'populate_user_directory_process_users');
+
+-- Clean up staging tables
+INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+    ('populate_user_directory_cleanup', '{}', 'populate_user_directory_process_appservice_senders');
+```
+This should then start a background task to
+flush the current tables and regenerate the directory.

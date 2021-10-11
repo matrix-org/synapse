@@ -28,6 +28,7 @@ from typing import (
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+    from synapse.appservice import ApplicationService
 
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
 from synapse.storage.database import DatabasePool, LoggingTransaction
@@ -69,6 +70,10 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         self.db_pool.updates.register_background_update_handler(
             "populate_user_directory_process_users",
             self._populate_user_directory_process_users,
+        )
+        self.db_pool.updates.register_background_update_handler(
+            "populate_user_directory_process_appservice_senders",
+            self._populate_user_directory_process_appservice_senders,
         )
         self.db_pool.updates.register_background_update_handler(
             "populate_user_directory_cleanup", self._populate_user_directory_cleanup
@@ -378,6 +383,23 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             )
 
         return len(users_to_work_on)
+
+    async def _populate_user_directory_process_appservice_senders(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Add appservice senders to the `user_directory` table.
+
+        Appservices users don't live in the users table, so they won't be picked up
+        by `_populate_user_directory_process_users`. Process them explicitly here.
+        """
+        service: "ApplicationService"
+        for service in self.services_cache:
+            await self.update_profile_in_user_dir(service.sender, None, None)
+
+        await self.db_pool.updates._end_background_update(
+            "populate_user_directory_process_appservice_senders"
+        )
+        return 1
 
     async def should_include_local_user_in_dir(self, user: str) -> bool:
         """Certain classes of local user are omitted from the user directory.

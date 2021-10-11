@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+-- For the most up-to-date version of these instructions, see docs/user_directory.md
+
 -- Set up staging tables
 INSERT INTO background_updates (update_name, progress_json) VALUES
     ('populate_user_directory_createtables', '{}');
