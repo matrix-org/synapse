@@ -188,6 +188,27 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.helper.join(room, self.appservice.sender, tok=self.appservice.token)
         self._check_only_one_user_in_directory(user, room)
 
+    def test_user_not_in_users_table(self) -> None:
+        """Unclear how it happens, but on matrix.org we've seen join events
+        for users who aren't in the users table. Test that we don't fall over
+        when processing such a user.
+        """
+        user1 = self.register_user("user1", "pass")
+        token1 = self.login(user1, "pass")
+        room = self.helper.create_room_as(user1, is_public=True, tok=token1)
+
+        # Inject a join event for a user who doesn't exist
+        self.get_success(inject_member_event(self.hs, room, "@not-a-user:test", "join"))
+
+        # Another new user registers and joins the room
+        user2 = self.register_user("user2", "pass")
+        token2 = self.login(user2, "pass")
+        self.helper.join(room, user2, tok=token2)
+
+        # The dodgy event should not have stopped us from processing user2's join.
+        in_public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        self.assertEqual(set(in_public), {(user1, room), (user2, room)})
+
     def _create_rooms_and_inject_memberships(
         self, creator: str, token: str, joiner: str
     ) -> Tuple[str, str]:
