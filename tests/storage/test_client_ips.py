@@ -147,37 +147,6 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
     @parameterized.expand([(False,), (True,)])
-    def test_get_user_ip_and_agents(self, after_persisting: bool):
-        """Test `get_user_ip_and_agents` for persisted and unpersisted data"""
-        self.reactor.advance(12345678)
-
-        user_id = "@user:id"
-        user = UserID.from_string(user_id)
-
-        # Insert a user IP
-        self.get_success(
-            self.store.insert_client_ip(
-                user_id, "access_token", "ip", "user_agent", "MY_DEVICE"
-            )
-        )
-
-        if after_persisting:
-            # Trigger the storage loop
-            self.reactor.advance(10)
-
-        self.assertEqual(
-            self.get_success(self.store.get_user_ip_and_agents(user)),
-            [
-                {
-                    "access_token": "access_token",
-                    "ip": "ip",
-                    "user_agent": "user_agent",
-                    "last_seen": 12345678000,
-                },
-            ],
-        )
-
-    @parameterized.expand([(False,), (True,)])
     def test_get_last_client_ip_by_device(self, after_persisting: bool):
         """Test `get_last_client_ip_by_device` for persisted and unpersisted data"""
         self.reactor.advance(12345678)
@@ -218,6 +187,37 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
                     "last_seen": 12345678000,
                 },
             },
+        )
+
+    @parameterized.expand([(False,), (True,)])
+    def test_get_user_ip_and_agents(self, after_persisting: bool):
+        """Test `get_user_ip_and_agents` for persisted and unpersisted data"""
+        self.reactor.advance(12345678)
+
+        user_id = "@user:id"
+        user = UserID.from_string(user_id)
+
+        # Insert a user IP
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token", "ip", "user_agent", "MY_DEVICE"
+            )
+        )
+
+        if after_persisting:
+            # Trigger the storage loop
+            self.reactor.advance(10)
+
+        self.assertEqual(
+            self.get_success(self.store.get_user_ip_and_agents(user)),
+            [
+                {
+                    "access_token": "access_token",
+                    "ip": "ip",
+                    "user_agent": "user_agent",
+                    "last_seen": 12345678000,
+                },
+            ],
         )
 
     @override_config({"limit_usage_by_mau": False, "max_mau_value": 50})
