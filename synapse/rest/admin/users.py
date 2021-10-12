@@ -282,21 +282,11 @@ class UserRestServletV2(RestServlet):
                 add_external_ids = new_external_ids - cur_external_ids
                 del_external_ids = cur_external_ids - new_external_ids
 
-                # remove old external_ids
-                for auth_provider, external_id in del_external_ids:
-                    await self.store.remove_user_external_id(
-                        auth_provider,
-                        external_id,
-                        user_id,
-                    )
-
-                # add new external_ids
-                for auth_provider, external_id in add_external_ids:
-                    await self.store.record_user_external_id(
-                        auth_provider,
-                        external_id,
-                        user_id,
-                    )
+                await self.store.record_and_remove_user_external_id(
+                    add_external_ids,
+                    del_external_ids,
+                    user_id,
+                )
 
             if "avatar_url" in body and isinstance(body["avatar_url"], str):
                 await self.profile_handler.set_avatar_url(

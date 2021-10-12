@@ -16,14 +16,18 @@
 import logging
 import random
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union
 
 import attr
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidationError
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.types import Connection, Cursor
@@ -589,14 +593,30 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             external_id: id on that system
             user_id: complete mxid that it is mapped to
         """
-        await self.db_pool.simple_insert(
+        await self.db_pool.runInteraction(
+            "record_user_external_id",
+            self._record_user_external_id_txn,
+            auth_provider,
+            external_id,
+            user_id,
+        )
+
+    def _record_user_external_id_txn(
+        self,
+        txn: LoggingTransaction,
+        auth_provider: str,
+        external_id: str,
+        user_id: str,
+    ) -> None:
+
+        self.db_pool.simple_insert_txn(
+            txn,
             table="user_external_ids",
             values={
                 "auth_provider": auth_provider,
                 "external_id": external_id,
                 "user_id": user_id,
             },
-            desc="record_user_external_id",
         )
 
     async def remove_user_external_id(
@@ -611,15 +631,77 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             external_id: id on that system
             user_id: complete mxid that it is mapped to
         """
-        await self.db_pool.simple_delete(
+        await self.db_pool.runInteraction(
+            "remove_user_external_id",
+            self._remove_user_external_id_txn,
+            auth_provider,
+            external_id,
+            user_id,
+        )
+
+    def _remove_user_external_id_txn(
+        self,
+        txn: LoggingTransaction,
+        auth_provider: str,
+        external_id: str,
+        user_id: str,
+    ) -> None:
+
+        self.db_pool.simple_delete_txn(
+            txn,
             table="user_external_ids",
             keyvalues={
                 "auth_provider": auth_provider,
                 "external_id": external_id,
                 "user_id": user_id,
             },
-            desc="remove_user_external_id",
         )
+
+    async def record_and_remove_user_external_id(
+        self,
+        record_external_ids: Set[Tuple[str, str]],
+        remove_external_ids: Set[Tuple[str, str]],
+        user_id: str,
+    ) -> None:
+        """Record and remove mappings from external user ids to a mxid
+        in a single transaction.
+
+        Args:
+            record_external_ids:
+                set with tuple of auth_provider and external_id to record
+            remove_external_ids:
+                set with tuple of auth_provider and external_id to remove
+            user_id: complete mxid that it is mapped to
+        Raises:
+            StoreError if the new external_id could not be mapped.
+        """
+
+        def _record_and_remove_user_external_id_txn(
+            txn: LoggingTransaction,
+        ):
+            for auth_provider, external_id in record_external_ids:
+                self._record_user_external_id_txn(
+                    txn,
+                    auth_provider,
+                    external_id,
+                    user_id,
+                )
+
+            for auth_provider, external_id in remove_external_ids:
+                self._remove_user_external_id_txn(
+                    txn,
+                    auth_provider,
+                    external_id,
+                    user_id,
+                )
+
+        try:
+            await self.db_pool.runInteraction(
+                "record_and_remove_user_external_id",
+                _record_and_remove_user_external_id_txn,
+            )
+        except self.database_engine.module.IntegrityError:
+            raise StoreError(409, "External id already in use.")
 
     async def get_user_by_external_id(
         self, auth_provider: str, external_id: str
