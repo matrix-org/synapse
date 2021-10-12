@@ -1,0 +1,2 @@
+# Automatically request reviews from the synapse-core team when a pull request comes in.
+* @matrix-org/synapse-core

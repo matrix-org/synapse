@@ -1,1 +1,0 @@
-Make `StateFilter` frozen so it is hashable.

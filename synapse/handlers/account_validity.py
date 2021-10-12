@@ -47,7 +47,7 @@ class AccountValidityHandler:
         self.send_email_handler = self.hs.get_send_email_handler()
         self.clock = self.hs.get_clock()
 
-        self._app_name = self.hs.config.email_app_name
+        self._app_name = self.hs.config.email.email_app_name
 
         self._account_validity_enabled = (
             hs.config.account_validity.account_validity_enabled
@@ -67,12 +67,8 @@ class AccountValidityHandler:
             and self._account_validity_renew_by_email_enabled
         ):
             # Don't do email-specific configuration if renewal by email is disabled.
-            self._template_html = (
-                hs.config.account_validity.account_validity_template_html
-            )
-            self._template_text = (
-                hs.config.account_validity.account_validity_template_text
-            )
+            self._template_html = hs.config.email.account_validity_template_html
+            self._template_text = hs.config.email.account_validity_template_text
             self._renew_email_subject = (
                 hs.config.account_validity.account_validity_renew_email_subject
             )

@@ -338,7 +338,7 @@ class BackgroundProcessLoggingContext(LoggingContext):
         super().__init__("%s-%s" % (name, instance_id))
         self._proc = _BackgroundProcess(name, self)
 
-    def start(self, rusage: "Optional[resource._RUsage]") -> None:
+    def start(self, rusage: "Optional[resource.struct_rusage]") -> None:
         """Log context has started running (again)."""
 
         super().start(rusage)

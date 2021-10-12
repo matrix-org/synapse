@@ -1034,13 +1034,13 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             LIMIT ?
         """
 
-        # Find any chunk connections of a given insertion event
-        chunk_connection_query = """
+        # Find any batch connections of a given insertion event
+        batch_connection_query = """
             SELECT e.depth, c.event_id FROM insertion_events AS i
-            /* Find the chunk that connects to the given insertion event */
-            INNER JOIN chunk_events AS c
-            ON i.next_chunk_id = c.chunk_id
-            /* Get the depth of the chunk start event from the events table */
+            /* Find the batch that connects to the given insertion event */
+            INNER JOIN batch_events AS c
+            ON i.next_batch_id = c.batch_id
+            /* Get the depth of the batch start event from the events table */
             INNER JOIN events AS e USING (event_id)
             /* Find an insertion event which matches the given event_id */
             WHERE i.event_id = ?
@@ -1077,12 +1077,12 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
             event_results.add(event_id)
 
-            # Try and find any potential historical chunks of message history.
+            # Try and find any potential historical batches of message history.
             #
             # First we look for an insertion event connected to the current
             # event (by prev_event). If we find any, we need to go and try to
-            # find any chunk events connected to the insertion event (by
-            # chunk_id). If we find any, we'll add them to the queue and
+            # find any batch events connected to the insertion event (by
+            # batch_id). If we find any, we'll add them to the queue and
             # navigate up the DAG like normal in the next iteration of the loop.
             txn.execute(
                 connected_insertion_event_query, (event_id, limit - len(event_results))
@@ -1097,17 +1097,17 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 connected_insertion_event = row[1]
                 queue.put((-connected_insertion_event_depth, connected_insertion_event))
 
-                # Find any chunk connections for the given insertion event
+                # Find any batch connections for the given insertion event
                 txn.execute(
-                    chunk_connection_query,
+                    batch_connection_query,
                     (connected_insertion_event, limit - len(event_results)),
                 )
-                chunk_start_event_id_results = txn.fetchall()
+                batch_start_event_id_results = txn.fetchall()
                 logger.debug(
-                    "_get_backfill_events: chunk_start_event_id_results %s",
-                    chunk_start_event_id_results,
+                    "_get_backfill_events: batch_start_event_id_results %s",
+                    batch_start_event_id_results,
                 )
-                for row in chunk_start_event_id_results:
+                for row in batch_start_event_id_results:
                     if row[1] not in event_results:
                         queue.put((-row[0], row[1]))
 

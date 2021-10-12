@@ -45,12 +45,16 @@ class UserDirectoryConfig(Config):
             #enabled: false
 
             # Defines whether to search all users visible to your HS when searching
-            # the user directory, rather than limiting to users visible in public
-            # rooms. Defaults to false.
+            # the user directory. If false, search results will only contain users
+            # visible in public rooms and users sharing a room with the requester.
+            # Defaults to false.
             #
-            # If you set it true, you'll have to rebuild the user_directory search
-            # indexes, see:
-            # https://matrix-org.github.io/synapse/latest/user_directory.html
+            # NB. If you set this to true, and the last time the user_directory search
+            # indexes were (re)built was before Synapse 1.44, you'll have to
+            # rebuild the indexes in order to search through all known users.
+            # These indexes are built the first time Synapse starts; admins can
+            # manually trigger a rebuild following the instructions at
+            #     https://matrix-org.github.io/synapse/latest/user_directory.html
             #
             # Uncomment to return search results containing all known users, even if that
             # user does not share a room with the requester.
