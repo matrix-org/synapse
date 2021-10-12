@@ -50,7 +50,7 @@ setup a *virtualenv*, as follows:
 cd path/where/you/have/cloned/the/repository
 python3 -m venv ./env
 source ./env/bin/activate
-pip install -e ".[all,lint,mypy,test]"
+pip install -e ".[all,dev]"
 pip install tox
 ```
 

@@ -51,8 +51,6 @@ from synapse.types import (
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_left_room
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -118,9 +116,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
         )
 
-        # This is only used to get at the ratelimit function. It's fine there are
-        # multiple of these as it doesn't store state.
-        self.base_handler = BaseHandler(hs)
+        self.request_ratelimiter = hs.get_request_ratelimiter()
 
     @abc.abstractmethod
     async def _remote_join(
@@ -1275,7 +1271,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         # We need to rate limit *before* we send out any 3PID invites, so we
         # can't just rely on the standard ratelimiting of events.
-        await self.base_handler.ratelimit(requester)
+        await self.request_ratelimiter.ratelimit(requester)
 
         can_invite = await self.third_party_event_rules.check_threepid_can_be_invited(
             medium, address, room_id
