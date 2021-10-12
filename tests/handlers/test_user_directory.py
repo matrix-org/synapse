@@ -184,10 +184,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
     def test_excludes_appservice_sender(self) -> None:
         user = self.register_user("user", "pass")
         token = self.login(user, "pass")
-        room = self.helper.create_room_as(
-            self.appservice.sender, is_public=True, tok=self.appservice.token
-        )
-        self.helper.join(room, user, tok=token)
+        room = self.helper.create_room_as(user, is_public=True, tok=token)
+        self.helper.join(room, self.appservice.sender, tok=self.appservice.token)
         self._check_only_one_user_in_directory(user, room)
 
     def _create_rooms_and_inject_memberships(
