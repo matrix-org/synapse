@@ -193,14 +193,6 @@ class StateFilter:
                 include_others=True,
             )
 
-    def approx_difference(self, subtrahend: "StateFilter") -> "StateFilter":
-        """
-        Stub implementation! Satisfies the condition that it's an overestimate.
-        """
-        if self == subtrahend:
-            return StateFilter.none()
-        return self
-
     def make_sql_filter_clause(self) -> Tuple[str, List[str]]:
         """Converts the filter to an SQL clause.
 
