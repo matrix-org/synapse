@@ -124,7 +124,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             {(alice, bob, private), (bob, alice, private)},
         )
 
-    # The next three tests (test_population_excludes_*) all setup
+    # The next four tests (test_excludes_*) all setup
     #   - A normal user included in the user dir
     #   - A public and private room created by that user
     #   - A user excluded from the room dir, belonging to both rooms
