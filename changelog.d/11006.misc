@@ -1,0 +1,1 @@
+Bump mypy version for CI to 0.910, and pull in new type stubs for dependencies.

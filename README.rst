@@ -298,7 +298,7 @@ to install using pip and a virtualenv::
 
     python3 -m venv ./env
     source ./env/bin/activate
-    pip install -e ".[all,test]"
+    pip install -e ".[all,dev]"
 
 This will run a process of downloading and installing all the needed
 dependencies into a virtual env. If any dependencies fail to install,

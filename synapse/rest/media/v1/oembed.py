@@ -96,6 +96,32 @@ class OEmbedProvider:
         # No match.
         return None
 
+    def autodiscover_from_html(self, tree: "etree.Element") -> Optional[str]:
+        """
+        Search an HTML document for oEmbed autodiscovery information.
+
+        Args:
+            tree: The parsed HTML body.
+
+        Returns:
+            The URL to use for oEmbed information, or None if no URL was found.
+        """
+        # Search for link elements with the proper rel and type attributes.
+        for tag in tree.xpath(
+            "//link[@rel='alternate'][@type='application/json+oembed']"
+        ):
+            if "href" in tag.attrib:
+                return tag.attrib["href"]
+
+        # Some providers (e.g. Flickr) use alternative instead of alternate.
+        for tag in tree.xpath(
+            "//link[@rel='alternative'][@type='application/json+oembed']"
+        ):
+            if "href" in tag.attrib:
+                return tag.attrib["href"]
+
+        return None
+
     def parse_oembed_response(self, url: str, raw_body: bytes) -> OEmbedResult:
         """
         Parse the oEmbed response into an Open Graph response.
