@@ -317,7 +317,9 @@ class MultiWriterIdGenerator:
         # This goes and fills out the above state from the database.
         self._load_current_ids(db_conn, tables)
 
-        self._max_seen_allocated_stream_id = max(self._current_positions.values(), default=1)
+        self._max_seen_allocated_stream_id = max(
+            self._current_positions.values(), default=1
+        )
 
     def _load_current_ids(
         self,
@@ -530,13 +532,25 @@ class MultiWriterIdGenerator:
 
             new_cur: Optional[int] = None
 
-            if self._unfinished_ids:
+            if self._unfinished_ids or self._in_flight_fetches:
                 # If there are unfinished IDs then the new position will be the
-                # largest finished ID less than the minimum unfinished ID.
+                # largest finished ID strictly less than the minimum unfinished
+                # ID.
+
+                # The minimum unfinished ID needs to take account of both
+                # `_unfinished_ids` and `_in_flight_fetches`.
+                if self._unfinished_ids and self._in_flight_fetches:
+                    # `_in_flight_fetches` stores the maximum safe stream ID, so
+                    # we add one to make it equivalent to the minimum unsafe ID.
+                    min_unfinshed = min(
+                        self._unfinished_ids[0], self._in_flight_fetches[0] + 1
+                    )
+                elif self._in_flight_fetches:
+                    min_unfinshed = self._in_flight_fetches[0] + 1
+                else:
+                    min_unfinshed = self._unfinished_ids[0]
 
                 finished = set()
-
-                min_unfinshed = self._unfinished_ids[0]
                 for s in self._finished_ids:
                     if s < min_unfinshed:
                         if new_cur is None or new_cur < s:
@@ -557,11 +571,6 @@ class MultiWriterIdGenerator:
                 self._finished_ids.clear()
 
             if new_cur:
-                # If we are currently fetching new stream IDs we need to ensure
-                # that we don't advance past where we
-                if self._in_flight_fetches:
-                    new_cur = min(new_cur, self._in_flight_fetches[0])
-
                 curr = self._current_positions.get(self._instance_name, 0)
                 self._current_positions[self._instance_name] = max(curr, new_cur)
 
