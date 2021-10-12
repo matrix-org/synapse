@@ -317,9 +317,7 @@ class MultiWriterIdGenerator:
         # This goes and fills out the above state from the database.
         self._load_current_ids(db_conn, tables)
 
-        self._max_seen_allocated_stream_id = (
-            max(self._current_positions.values()) if self._current_positions else 1
-        )
+        self._max_seen_allocated_stream_id = max(self._current_positions.values(), default=1)
 
     def _load_current_ids(
         self,

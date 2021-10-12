@@ -1,1 +1,1 @@
-Fix bug when using multiple event persister workers where events were not correctly sent down `/sync` due to a race.
+Fix a long-standing bug when using multiple event persister workers where events were not correctly sent down `/sync` due to a race.
