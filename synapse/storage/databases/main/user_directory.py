@@ -26,6 +26,8 @@ from typing import (
     cast,
 )
 
+from synapse.api.errors import StoreError
+
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -405,8 +407,14 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             return False
 
         # Deactivated users aren't contactable, so should not appear in the user directory.
-        if await self.get_user_deactivated_status(user):
+        try:
+            if await self.get_user_deactivated_status(user):
+                return False
+        except StoreError:
+            # No such user in the users table. No need to do this when calling
+            # is_support_user---that returns False if the user is missing.
             return False
+
         return True
 
     async def is_room_world_readable_or_publicly_joinable(self, room_id: str) -> bool:
