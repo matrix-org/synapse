@@ -129,9 +129,9 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer") -> None:
                         request_info: Collection[Tuple[str, str]],
                         auth_provider_id: Optional[str],
                     ) -> Union[Awaitable[RegistrationBehaviour], RegistrationBehaviour]:
-                        # We've already made sure f is not None above, but mypy doesn't
-                        # do well across function boundaries so we need to tell it f is
-                        # definitely not None.
+                        # Assertion required because mypy can't prove we won't
+                        # change `f` back to `None`. See
+                        # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
                         assert f is not None
 
                         return f(
@@ -147,8 +147,9 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer") -> None:
                     )
 
             def run(*args: Any, **kwargs: Any) -> Awaitable:
-                # mypy doesn't do well across function boundaries so we need to tell it
-                # wrapped_func is definitely not None.
+                # Assertion required because mypy can't prove we won't change `f`
+                # back to `None`. See
+                # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
                 assert wrapped_func is not None
 
                 return maybe_awaitable(wrapped_func(*args, **kwargs))

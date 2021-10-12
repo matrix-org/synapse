@@ -77,9 +77,9 @@ def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
                 event: EventBase,
                 state_events: StateMap[EventBase],
             ) -> Tuple[bool, Optional[dict]]:
-                # We've already made sure f is not None above, but mypy doesn't do well
-                # across function boundaries so we need to tell it f is definitely not
-                # None.
+                # Assertion required because mypy can't prove we won't change
+                # `f` back to `None`. See
+                # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
                 assert f is not None
 
                 res = await f(event, state_events)
@@ -98,9 +98,9 @@ def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
             async def wrap_on_create_room(
                 requester: Requester, config: dict, is_requester_admin: bool
             ) -> None:
-                # We've already made sure f is not None above, but mypy doesn't do well
-                # across function boundaries so we need to tell it f is definitely not
-                # None.
+                # Assertion required because mypy can't prove we won't change
+                # `f` back to `None`. See
+                # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
                 assert f is not None
 
                 res = await f(requester, config, is_requester_admin)
@@ -113,8 +113,9 @@ def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
             return wrap_on_create_room
 
         def run(*args: Any, **kwargs: Any) -> Awaitable:
-            # mypy doesn't do well across function boundaries so we need to tell it
-            # f is definitely not None.
+            # Assertion required because mypy can't prove we won't change  `f`
+            # back to `None`. See
+            # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
             assert f is not None
 
             return maybe_awaitable(f(*args, **kwargs))

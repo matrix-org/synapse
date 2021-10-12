@@ -70,8 +70,9 @@ def load_legacy_presence_router(hs: "HomeServer") -> None:
             return None
 
         def run(*args: Any, **kwargs: Any) -> Awaitable:
-            # mypy doesn't do well across function boundaries so we need to tell it
-            # f is definitely not None.
+            # Assertion required because mypy can't prove we won't change `f`
+            # back to `None`. See
+            # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
             assert f is not None
 
             return maybe_awaitable(f(*args, **kwargs))
