@@ -191,7 +191,7 @@ class OEmbedProvider:
 
         except Exception as e:
             # Trap any exception and let the code follow as usual.
-            logger.warning(f"Error parsing oEmbed metadata from {url}: {e:r}")
+            logger.warning("Error parsing oEmbed metadata from %s: %r", url, e)
             open_graph_response = {}
             cache_age = None
 
