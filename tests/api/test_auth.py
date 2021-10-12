@@ -25,7 +25,9 @@ from synapse.api.errors import (
     MissingClientTokenError,
     ResourceLimitError,
 )
+from synapse.appservice import ApplicationService
 from synapse.storage.databases.main.registration import TokenLookupResult
+from synapse.types import Requester
 
 from tests import unittest
 from tests.test_utils import simple_async_mock
@@ -215,9 +217,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         user_id = "@baldrick:matrix.org"
         macaroon = pymacaroons.Macaroon(
-            location=self.hs.config.server_name,
+            location=self.hs.config.server.server_name,
             identifier="key",
-            key=self.hs.config.macaroon_secret_key,
+            key=self.hs.config.key.macaroon_secret_key,
         )
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("type = access")
@@ -237,9 +239,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         user_id = "@baldrick:matrix.org"
         macaroon = pymacaroons.Macaroon(
-            location=self.hs.config.server_name,
+            location=self.hs.config.server.server_name,
             identifier="key",
-            key=self.hs.config.macaroon_secret_key,
+            key=self.hs.config.key.macaroon_secret_key,
         )
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("type = access")
@@ -266,7 +268,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.store.get_monthly_active_count = simple_async_mock(lots_of_users)
 
         e = self.get_failure(self.auth.check_auth_blocking(), ResourceLimitError)
-        self.assertEquals(e.value.admin_contact, self.hs.config.admin_contact)
+        self.assertEquals(e.value.admin_contact, self.hs.config.server.admin_contact)
         self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
         self.assertEquals(e.value.code, 403)
 
@@ -290,6 +292,66 @@ class AuthTestCase(unittest.HomeserverTestCase):
         # Real users not allowed
         self.get_failure(self.auth.check_auth_blocking(), ResourceLimitError)
 
+    def test_blocking_mau__appservice_requester_allowed_when_not_tracking_ips(self):
+        self.auth_blocking._max_mau_value = 50
+        self.auth_blocking._limit_usage_by_mau = True
+        self.auth_blocking._track_appservice_user_ips = False
+
+        self.store.get_monthly_active_count = simple_async_mock(100)
+        self.store.user_last_seen_monthly_active = simple_async_mock()
+        self.store.is_trial_user = simple_async_mock()
+
+        appservice = ApplicationService(
+            "abcd",
+            self.hs.config.server.server_name,
+            id="1234",
+            namespaces={
+                "users": [{"regex": "@_appservice.*:sender", "exclusive": True}]
+            },
+            sender="@appservice:sender",
+        )
+        requester = Requester(
+            user="@appservice:server",
+            access_token_id=None,
+            device_id="FOOBAR",
+            is_guest=False,
+            shadow_banned=False,
+            app_service=appservice,
+            authenticated_entity="@appservice:server",
+        )
+        self.get_success(self.auth.check_auth_blocking(requester=requester))
+
+    def test_blocking_mau__appservice_requester_disallowed_when_tracking_ips(self):
+        self.auth_blocking._max_mau_value = 50
+        self.auth_blocking._limit_usage_by_mau = True
+        self.auth_blocking._track_appservice_user_ips = True
+
+        self.store.get_monthly_active_count = simple_async_mock(100)
+        self.store.user_last_seen_monthly_active = simple_async_mock()
+        self.store.is_trial_user = simple_async_mock()
+
+        appservice = ApplicationService(
+            "abcd",
+            self.hs.config.server.server_name,
+            id="1234",
+            namespaces={
+                "users": [{"regex": "@_appservice.*:sender", "exclusive": True}]
+            },
+            sender="@appservice:sender",
+        )
+        requester = Requester(
+            user="@appservice:server",
+            access_token_id=None,
+            device_id="FOOBAR",
+            is_guest=False,
+            shadow_banned=False,
+            app_service=appservice,
+            authenticated_entity="@appservice:server",
+        )
+        self.get_failure(
+            self.auth.check_auth_blocking(requester=requester), ResourceLimitError
+        )
+
     def test_reserved_threepid(self):
         self.auth_blocking._limit_usage_by_mau = True
         self.auth_blocking._max_mau_value = 1
@@ -310,7 +372,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.auth_blocking._hs_disabled = True
         self.auth_blocking._hs_disabled_message = "Reason for being disabled"
         e = self.get_failure(self.auth.check_auth_blocking(), ResourceLimitError)
-        self.assertEquals(e.value.admin_contact, self.hs.config.admin_contact)
+        self.assertEquals(e.value.admin_contact, self.hs.config.server.admin_contact)
         self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
         self.assertEquals(e.value.code, 403)
 
@@ -325,7 +387,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.auth_blocking._hs_disabled = True
         self.auth_blocking._hs_disabled_message = "Reason for being disabled"
         e = self.get_failure(self.auth.check_auth_blocking(), ResourceLimitError)
-        self.assertEquals(e.value.admin_contact, self.hs.config.admin_contact)
+        self.assertEquals(e.value.admin_contact, self.hs.config.server.admin_contact)
         self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
         self.assertEquals(e.value.code, 403)
 

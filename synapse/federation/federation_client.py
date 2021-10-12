@@ -37,7 +37,7 @@ from typing import (
 import attr
 from prometheus_client import Counter
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
@@ -501,8 +501,6 @@ class FederationClient(FederationBase):
             destination, auth_chain, outlier=True, room_version=room_version
         )
 
-        signed_auth.sort(key=lambda e: e.depth)
-
         return signed_auth
 
     def _is_unknown_endpoint(
@@ -877,9 +875,9 @@ class FederationClient(FederationBase):
             # If the join is being authorised via allow rules, we need to send
             # the /send_join back to the same server that was originally used
             # with /make_join.
-            if "join_authorised_via_users_server" in pdu.content:
+            if EventContentFields.AUTHORISING_USER in pdu.content:
                 destinations = [
-                    get_domain_from_id(pdu.content["join_authorised_via_users_server"])
+                    get_domain_from_id(pdu.content[EventContentFields.AUTHORISING_USER])
                 ]
 
         return await self._try_destination_list(

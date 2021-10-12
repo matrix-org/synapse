@@ -31,8 +31,6 @@ from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.visibility import filter_events_for_client
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -40,9 +38,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class InitialSyncHandler(BaseHandler):
+class InitialSyncHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.state_handler = hs.get_state_handler()
         self.hs = hs
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
@@ -125,7 +125,7 @@ class InitialSyncHandler(BaseHandler):
 
         now_token = self.hs.get_event_sources().get_current_token()
 
-        presence_stream = self.hs.get_event_sources().sources["presence"]
+        presence_stream = self.hs.get_event_sources().sources.presence
         presence, _ = await presence_stream.get_new_events(
             user, from_key=None, include_offline=False
         )

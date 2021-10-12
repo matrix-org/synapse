@@ -1,0 +1,1 @@
+Work around a regression, introduced in Synapse 1.39.0, that caused `SynapseError`s raised by the experimental third-party rules module callback `check_event_allowed` to be ignored.

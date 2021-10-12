@@ -65,10 +65,10 @@ class CasHandler:
         self._auth_handler = hs.get_auth_handler()
         self._registration_handler = hs.get_registration_handler()
 
-        self._cas_server_url = hs.config.cas_server_url
-        self._cas_service_url = hs.config.cas_service_url
-        self._cas_displayname_attribute = hs.config.cas_displayname_attribute
-        self._cas_required_attributes = hs.config.cas_required_attributes
+        self._cas_server_url = hs.config.cas.cas_server_url
+        self._cas_service_url = hs.config.cas.cas_service_url
+        self._cas_displayname_attribute = hs.config.cas.cas_displayname_attribute
+        self._cas_required_attributes = hs.config.cas.cas_required_attributes
 
         self._http_client = hs.get_proxied_http_client()
 

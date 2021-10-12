@@ -47,8 +47,9 @@ RUN apt-get update -qq -o Acquire::Languages=none \
     && cd /dh-virtualenv \
     && env DEBIAN_FRONTEND=noninteractive mk-build-deps -ri -t "apt-get -y --no-install-recommends"
 
-# build it
-RUN cd /dh-virtualenv && dpkg-buildpackage -us -uc -b
+# Build it. Note that building the docs doesn't work due to differences in
+# Sphinx APIs across versions/distros.
+RUN cd /dh-virtualenv && DEB_BUILD_OPTIONS=nodoc dpkg-buildpackage -us -uc -b
 
 ###
 ### Stage 1

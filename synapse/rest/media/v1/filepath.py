@@ -195,22 +195,23 @@ class MediaFilePaths:
 
     url_cache_thumbnail = _wrap_in_base_path(url_cache_thumbnail_rel)
 
-    def url_cache_thumbnail_directory(self, media_id: str) -> str:
+    def url_cache_thumbnail_directory_rel(self, media_id: str) -> str:
         # Media id is of the form <DATE><RANDOM_STRING>
         # E.g.: 2017-09-28-fsdRDt24DS234dsf
 
         if NEW_FORMAT_ID_RE.match(media_id):
-            return os.path.join(
-                self.base_path, "url_cache_thumbnails", media_id[:10], media_id[11:]
-            )
+            return os.path.join("url_cache_thumbnails", media_id[:10], media_id[11:])
         else:
             return os.path.join(
-                self.base_path,
                 "url_cache_thumbnails",
                 media_id[0:2],
                 media_id[2:4],
                 media_id[4:],
             )
+
+    url_cache_thumbnail_directory = _wrap_in_base_path(
+        url_cache_thumbnail_directory_rel
+    )
 
     def url_cache_thumbnail_dirs_to_delete(self, media_id: str) -> List[str]:
         "The dirs to try and remove if we delete the media_id thumbnails"

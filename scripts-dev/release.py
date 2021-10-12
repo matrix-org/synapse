@@ -35,6 +35,19 @@ from github import Github
 from packaging import version
 
 
+def run_until_successful(command, *args, **kwargs):
+    while True:
+        completed_process = subprocess.run(command, *args, **kwargs)
+        exit_code = completed_process.returncode
+        if exit_code == 0:
+            # successful, so nothing more to do here.
+            return completed_process
+
+        print(f"The command {command!r} failed with exit code {exit_code}.")
+        print("Please try to correct the failure and then re-run.")
+        click.confirm("Try again?", abort=True)
+
+
 @click.group()
 def cli():
     """An interactive script to walk through the parts of creating a release.
@@ -197,7 +210,7 @@ def prepare():
         f.write(parsed_synapse_ast.dumps())
 
     # Generate changelogs
-    subprocess.run("python3 -m towncrier", shell=True)
+    run_until_successful("python3 -m towncrier", shell=True)
 
     # Generate debian changelogs
     if parsed_new_version.pre is not None:
@@ -209,11 +222,11 @@ def prepare():
     else:
         debian_version = new_version
 
-    subprocess.run(
+    run_until_successful(
         f'dch -M -v {debian_version} "New synapse release {debian_version}."',
         shell=True,
     )
-    subprocess.run('dch -M -r -D stable ""', shell=True)
+    run_until_successful('dch -M -r -D stable ""', shell=True)
 
     # Show the user the changes and ask if they want to edit the change log.
     repo.git.add("-u")
@@ -224,7 +237,7 @@ def prepare():
 
     # Commit the changes.
     repo.git.add("-u")
-    repo.git.commit(f"-m {new_version}")
+    repo.git.commit("-m", new_version)
 
     # We give the option to bail here in case the user wants to make sure things
     # are OK before pushing.
@@ -239,6 +252,8 @@ def prepare():
     # Otherwise, push and open the changelog in the browser.
     repo.git.push("-u", repo.remote().name, repo.active_branch.name)
 
+    print("Opening the changelog in your browser...")
+    print("Please ask others to give it a check.")
     click.launch(
         f"https://github.com/matrix-org/synapse/blob/{repo.active_branch.name}/CHANGES.md"
     )
@@ -276,7 +291,7 @@ def tag(gh_token: Optional[str]):
     if click.confirm("Edit text?", default=False):
         changes = click.edit(changes, require_save=False)
 
-    repo.create_tag(tag_name, message=changes)
+    repo.create_tag(tag_name, message=changes, sign=True)
 
     if not click.confirm("Push tag to GitHub?", default=True):
         print("")
@@ -290,7 +305,19 @@ def tag(gh_token: Optional[str]):
 
     # If no token was given, we bail here
     if not gh_token:
+        print("Launching the GitHub release page in your browser.")
+        print("Please correct the title and create a draft.")
+        if current_version.is_prerelease:
+            print("As this is an RC, remember to mark it as a pre-release!")
+        print("(by the way, this step can be automated by passing --gh-token,")
+        print("or one of the GH_TOKEN or GITHUB_TOKEN env vars.)")
         click.launch(f"https://github.com/matrix-org/synapse/releases/edit/{tag_name}")
+
+        print("Once done, you need to wait for the release assets to build.")
+        if click.confirm("Launch the release assets actions page?", default=True):
+            click.launch(
+                f"https://github.com/matrix-org/synapse/actions?query=branch%3A{tag_name}"
+            )
         return
 
     # Create a new draft release
@@ -305,6 +332,7 @@ def tag(gh_token: Optional[str]):
     )
 
     # Open the release and the actions where we are building the assets.
+    print("Launching the release page and the actions page.")
     click.launch(release.html_url)
     click.launch(
         f"https://github.com/matrix-org/synapse/actions?query=branch%3A{tag_name}"

@@ -6785,7 +6785,7 @@
               "expr": "rate(synapse_util_caches_cache:evicted_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 1,
-              "legendFormat": "{{name}} {{job}}-{{index}}",
+              "legendFormat": "{{name}} ({{reason}}) {{job}}-{{index}}",
               "refId": "A"
             }
           ],
@@ -10888,5 +10888,5 @@
   "timezone": "",
   "title": "Synapse",
   "uid": "000000012",
-  "version": 99
+  "version": 100
 }

@@ -71,7 +71,7 @@ class ReplicationStreamer:
         self.notifier = hs.get_notifier()
         self._instance_name = hs.get_instance_name()
 
-        self._replication_torture_level = hs.config.replication_torture_level
+        self._replication_torture_level = hs.config.server.replication_torture_level
 
         self.notifier.add_replication_callback(self.on_notifier_poke)
 
