@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse v1.40.0 where the signature checks for room version 8/9 could be applied to earlier room versions in some situations.
