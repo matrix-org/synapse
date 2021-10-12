@@ -124,6 +124,17 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/url_cache/2020-01-02/GerZNDnDZVjsOtar",
         )
 
+    def test_url_cache_filepath_legacy(self):
+        """Test old-style URL cache paths"""
+        self.assertEqual(
+            self.filepaths.url_cache_filepath_rel("GerZNDnDZVjsOtardLuwfIBg"),
+            "url_cache/Ge/rZ/NDnDZVjsOtardLuwfIBg",
+        )
+        self.assertEqual(
+            self.filepaths.url_cache_filepath("GerZNDnDZVjsOtardLuwfIBg"),
+            "/media_store/url_cache/Ge/rZ/NDnDZVjsOtardLuwfIBg",
+        )
+
     def test_url_cache_filepath_dirs_to_delete(self):
         """Test URL cache cleanup paths"""
         self.assertEqual(
@@ -131,6 +142,18 @@ class MediaFilePathsTestCase(unittest.TestCase):
                 "2020-01-02_GerZNDnDZVjsOtar"
             ),
             ["/media_store/url_cache/2020-01-02"],
+        )
+
+    def test_url_cache_filepath_dirs_to_delete_legacy(self):
+        """Test old-style URL cache cleanup paths"""
+        self.assertEqual(
+            self.filepaths.url_cache_filepath_dirs_to_delete(
+                "GerZNDnDZVjsOtardLuwfIBg"
+            ),
+            [
+                "/media_store/url_cache/Ge/rZ",
+                "/media_store/url_cache/Ge",
+            ],
         )
 
     def test_url_cache_thumbnail(self):
@@ -148,6 +171,21 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/url_cache_thumbnails/2020-01-02/GerZNDnDZVjsOtar/800-600-image-jpeg-scale",
         )
 
+    def test_url_cache_thumbnail_legacy(self):
+        """Test old-style URL cache thumbnail paths"""
+        self.assertEqual(
+            self.filepaths.url_cache_thumbnail_rel(
+                "GerZNDnDZVjsOtardLuwfIBg", 800, 600, "image/jpeg", "scale"
+            ),
+            "url_cache_thumbnails/Ge/rZ/NDnDZVjsOtardLuwfIBg/800-600-image-jpeg-scale",
+        )
+        self.assertEqual(
+            self.filepaths.url_cache_thumbnail(
+                "GerZNDnDZVjsOtardLuwfIBg", 800, 600, "image/jpeg", "scale"
+            ),
+            "/media_store/url_cache_thumbnails/Ge/rZ/NDnDZVjsOtardLuwfIBg/800-600-image-jpeg-scale",
+        )
+
     def test_url_cache_thumbnail_directory(self):
         """Test URL cache thumbnail directory paths"""
         self.assertEqual(
@@ -161,6 +199,19 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/url_cache_thumbnails/2020-01-02/GerZNDnDZVjsOtar",
         )
 
+    def test_url_cache_thumbnail_directory_legacy(self):
+        """Test old-style URL cache thumbnail directory paths"""
+        self.assertEqual(
+            self.filepaths.url_cache_thumbnail_directory_rel(
+                "GerZNDnDZVjsOtardLuwfIBg"
+            ),
+            "url_cache_thumbnails/Ge/rZ/NDnDZVjsOtardLuwfIBg",
+        )
+        self.assertEqual(
+            self.filepaths.url_cache_thumbnail_directory("GerZNDnDZVjsOtardLuwfIBg"),
+            "/media_store/url_cache_thumbnails/Ge/rZ/NDnDZVjsOtardLuwfIBg",
+        )
+
     def test_url_cache_thumbnail_dirs_to_delete(self):
         """Test URL cache thumbnail cleanup paths"""
         self.assertEqual(
@@ -170,5 +221,18 @@ class MediaFilePathsTestCase(unittest.TestCase):
             [
                 "/media_store/url_cache_thumbnails/2020-01-02/GerZNDnDZVjsOtar",
                 "/media_store/url_cache_thumbnails/2020-01-02",
+            ],
+        )
+
+    def test_url_cache_thumbnail_dirs_to_delete_legacy(self):
+        """Test old-style URL cache thumbnail cleanup paths"""
+        self.assertEqual(
+            self.filepaths.url_cache_thumbnail_dirs_to_delete(
+                "GerZNDnDZVjsOtardLuwfIBg"
+            ),
+            [
+                "/media_store/url_cache_thumbnails/Ge/rZ/NDnDZVjsOtardLuwfIBg",
+                "/media_store/url_cache_thumbnails/Ge/rZ",
+                "/media_store/url_cache_thumbnails/Ge",
             ],
         )
