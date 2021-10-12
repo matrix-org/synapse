@@ -1,6 +1,8 @@
 Synapse 1.45.0rc1 (2021-10-12)
 ==============================
 
+**Note:** We are aware of [a performance issue](https://github.com/matrix-org/synapse/issues/11049) introduced in Synapse v1.44.0, as well as [a bug](https://github.com/matrix-org/synapse/issues/11025) with the user directory when using application services. While this release candidate doesn't fix either of those issues, a second release candidate is expected to come out in a few days to address them.
+
 Features
 --------
 
