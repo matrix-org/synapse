@@ -542,17 +542,17 @@ class MultiWriterIdGenerator:
                 if self._unfinished_ids and self._in_flight_fetches:
                     # `_in_flight_fetches` stores the maximum safe stream ID, so
                     # we add one to make it equivalent to the minimum unsafe ID.
-                    min_unfinshed = min(
+                    min_unfinished = min(
                         self._unfinished_ids[0], self._in_flight_fetches[0] + 1
                     )
                 elif self._in_flight_fetches:
-                    min_unfinshed = self._in_flight_fetches[0] + 1
+                    min_unfinished = self._in_flight_fetches[0] + 1
                 else:
-                    min_unfinshed = self._unfinished_ids[0]
+                    min_unfinished = self._unfinished_ids[0]
 
                 finished = set()
                 for s in self._finished_ids:
-                    if s < min_unfinshed:
+                    if s < min_unfinished:
                         if new_cur is None or new_cur < s:
                             new_cur = s
                     else:
