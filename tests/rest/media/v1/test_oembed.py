@@ -34,7 +34,18 @@ class OEmbedTests(HomeserverTestCase):
         )
 
     def test_version(self):
-        """Accept versions are 1.0."""
-        result = self.parse_response({"version": "1.0", "type": "link"})
-        # An empty Open Graph response is an error, ensure the URL is included.
+        """Accept versions that are similar to 1.0 as a string or int (or missing)."""
+        for version in ("1.0", 1.0, 1):
+            result = self.parse_response({"version": version, "type": "link"})
+            # An empty Open Graph response is an error, ensure the URL is included.
+            self.assertIn("og:url", result.open_graph_result)
+
+        # A missing version should be treated as 1.0.
+        result = self.parse_response({"type": "link"})
         self.assertIn("og:url", result.open_graph_result)
+
+        # Invalid versions should be rejected.
+        for version in ("2.0", "1", 1.1, 0, None, {}, []):
+            result = self.parse_response({"version": version, "type": "link"})
+            # An empty Open Graph response is an error, ensure the URL is included.
+            self.assertEqual({}, result.open_graph_result)

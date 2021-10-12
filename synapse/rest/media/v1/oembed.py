@@ -137,10 +137,11 @@ class OEmbedProvider:
             # oEmbed responses *must* be UTF-8 according to the spec.
             oembed = json_decoder.decode(raw_body.decode("utf-8"))
 
-            # Ensure there's a version of 1.0.
-            oembed_version = oembed["version"]
-            if oembed_version != "1.0":
-                raise RuntimeError(f"Invalid version: {oembed_version}")
+            # The version is a required string field, but not always provided,
+            # or sometimes provided as a float. Be lenient.
+            oembed_version = oembed.get("version", "1.0")
+            if oembed_version != "1.0" and oembed_version != 1:
+                raise RuntimeError(f"Invalid oEmbed version: {oembed_version}")
 
             # Ensure the cache age is None or an int.
             cache_age = oembed.get("cache_age")
