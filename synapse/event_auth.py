@@ -155,6 +155,12 @@ def check_auth_rules_for_event(
                 "which is in room %s"
                 % (event.event_id, room_id, auth_event.event_id, auth_event.room_id),
             )
+        if auth_event.rejected_reason:
+            raise AuthError(
+                403,
+                "During auth for event %s: found rejected event %s in the state"
+                % (event.event_id, auth_event.event_id),
+            )
 
     # Implementation of https://matrix.org/docs/spec/rooms/v1#authorization-rules
     #

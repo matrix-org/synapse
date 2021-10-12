@@ -50,7 +50,7 @@ setup a *virtualenv*, as follows:
 cd path/where/you/have/cloned/the/repository
 python3 -m venv ./env
 source ./env/bin/activate
-pip install -e ".[all,lint,mypy,test]"
+pip install -e ".[all,dev]"
 pip install tox
 ```
 
@@ -63,7 +63,7 @@ TBD
 
 # 5. Get in touch.
 
-Join our developer community on Matrix: #synapse-dev:matrix.org !
+Join our developer community on Matrix: [#synapse-dev:matrix.org](https://matrix.to/#/#synapse-dev:matrix.org)!
 
 
 # 6. Pick an issue.
