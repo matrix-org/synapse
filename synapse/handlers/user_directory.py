@@ -249,6 +249,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                         event = await self.store.get_event(event_id, allow_none=True)
                         # It isn't expected for this event to not exist, but we
                         # don't want the entire background process to break.
+                        logger.error(f"DMR: event_id={event_id}, event={event}")
                         if event is None:
                             continue
 
@@ -344,7 +345,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             room_id: The room ID that user joined or started being public
             user_id
         """
-        logger.debug("Adding new user to dir, %r", user_id)
+        logger.error("Adding new user to dir, %r", user_id)
 
         await self.store.update_profile_in_user_dir(
             user_id, profile.display_name, profile.avatar_url
