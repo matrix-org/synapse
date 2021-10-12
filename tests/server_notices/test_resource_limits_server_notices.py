@@ -346,7 +346,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         invites = []
 
         # Register as many users as the MAU limit allows.
-        for i in range(self.hs.config.max_mau_value):
+        for i in range(self.hs.config.server.max_mau_value):
             localpart = "user%d" % i
             user_id = self.register_user(localpart, "password")
             tok = self.login(localpart, "password")

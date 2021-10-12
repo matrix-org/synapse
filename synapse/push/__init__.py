@@ -94,7 +94,7 @@ class Pusher(metaclass=abc.ABCMeta):
         self._start_processing()
 
     @abc.abstractmethod
-    def _start_processing(self):
+    def _start_processing(self) -> None:
         """Start processing push notifications."""
         raise NotImplementedError()
 

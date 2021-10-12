@@ -1,0 +1,1 @@
+Fix CI to run the unit tests without optional deps.

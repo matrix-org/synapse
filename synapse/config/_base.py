@@ -118,21 +118,6 @@ class Config:
             "synapse", "res/templates"
         )
 
-    def __getattr__(self, item: str) -> Any:
-        """
-        Try and fetch a configuration option that does not exist on this class.
-
-        This is so that existing configs that rely on `self.value`, where value
-        is actually from a different config section, continue to work.
-        """
-        if item in ["generate_config_section", "read_config"]:
-            raise AttributeError(item)
-
-        if self.root is None:
-            raise AttributeError(item)
-        else:
-            return self.root._get_unclassed_config(self.section, item)
-
     @staticmethod
     def parse_size(value):
         if isinstance(value, int):
@@ -289,7 +274,9 @@ class Config:
         env.filters.update(
             {
                 "format_ts": _format_ts_filter,
-                "mxc_to_http": _create_mxc_to_http_filter(self.public_baseurl),
+                "mxc_to_http": _create_mxc_to_http_filter(
+                    self.root.server.public_baseurl
+                ),
             }
         )
 
@@ -311,8 +298,6 @@ class RootConfig:
     config_classes = []
 
     def __init__(self):
-        self._configs = OrderedDict()
-
         for config_class in self.config_classes:
             if config_class.section is None:
                 raise ValueError("%r requires a section name" % (config_class,))
@@ -321,42 +306,7 @@ class RootConfig:
                 conf = config_class(self)
             except Exception as e:
                 raise Exception("Failed making %s: %r" % (config_class.section, e))
-            self._configs[config_class.section] = conf
-
-    def __getattr__(self, item: str) -> Any:
-        """
-        Redirect lookups on this object either to config objects, or values on
-        config objects, so that `config.tls.blah` works, as well as legacy uses
-        of things like `config.server_name`. It will first look up the config
-        section name, and then values on those config classes.
-        """
-        if item in self._configs.keys():
-            return self._configs[item]
-
-        return self._get_unclassed_config(None, item)
-
-    def _get_unclassed_config(self, asking_section: Optional[str], item: str):
-        """
-        Fetch a config value from one of the instantiated config classes that
-        has not been fetched directly.
-
-        Args:
-            asking_section: If this check is coming from a Config child, which
-                one? This section will not be asked if it has the value.
-            item: The configuration value key.
-
-        Raises:
-            AttributeError if no config classes have the config key. The body
-                will contain what sections were checked.
-        """
-        for key, val in self._configs.items():
-            if key == asking_section:
-                continue
-
-            if item in dir(val):
-                return getattr(val, item)
-
-        raise AttributeError(item, "not found in %s" % (list(self._configs.keys()),))
+            setattr(self, config_class.section, conf)
 
     def invoke_all(self, func_name: str, *args, **kwargs) -> MutableMapping[str, Any]:
         """
@@ -373,9 +323,11 @@ class RootConfig:
         """
         res = OrderedDict()
 
-        for name, config in self._configs.items():
+        for config_class in self.config_classes:
+            config = getattr(self, config_class.section)
+
             if hasattr(config, func_name):
-                res[name] = getattr(config, func_name)(*args, **kwargs)
+                res[config_class.section] = getattr(config, func_name)(*args, **kwargs)
 
         return res
 

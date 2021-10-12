@@ -1,0 +1,1 @@
+Fix a long-standing bug where a user's per-room nickname/avatar would overwrite their profile in the user directory when a room was made public.

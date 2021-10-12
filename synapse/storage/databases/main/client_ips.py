@@ -353,7 +353,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
-        self.user_ips_max_age = hs.config.user_ips_max_age
+        self.user_ips_max_age = hs.config.server.user_ips_max_age
 
         if hs.config.worker.run_background_tasks and self.user_ips_max_age:
             self._clock.looping_call(self._prune_old_user_ips, 5 * 1000)

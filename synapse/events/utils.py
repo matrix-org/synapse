@@ -372,7 +372,7 @@ class EventClientSerializer:
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.experimental_msc1849_support_enabled = (
-            hs.config.experimental_msc1849_support_enabled
+            hs.config.server.experimental_msc1849_support_enabled
         )
 
     async def serialize_event(

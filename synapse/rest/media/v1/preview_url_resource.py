@@ -22,7 +22,7 @@ import re
 import shutil
 import sys
 import traceback
-from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Tuple, Union
 from urllib import parse as urlparse
 
 import attr
@@ -73,6 +73,7 @@ OG_TAG_VALUE_MAXLEN = 1000
 
 ONE_HOUR = 60 * 60 * 1000
 ONE_DAY = 24 * ONE_HOUR
+IMAGE_CACHE_EXPIRY_MS = 2 * ONE_DAY
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -295,22 +296,32 @@ class PreviewUrlResource(DirectServeJsonResource):
                 body = file.read()
 
             encoding = get_html_media_encoding(body, media_info.media_type)
-            og = decode_and_calc_og(body, media_info.uri, encoding)
+            tree = decode_body(body, encoding)
+            if tree is not None:
+                # Check if this HTML document points to oEmbed information and
+                # defer to that.
+                oembed_url = self._oembed.autodiscover_from_html(tree)
+                og = {}
+                if oembed_url:
+                    oembed_info = await self._download_url(oembed_url, user)
+                    og, expiration_ms = await self._handle_oembed_response(
+                        url, oembed_info, expiration_ms
+                    )
 
-            await self._precache_image_url(user, media_info, og)
+                # If there was no oEmbed URL (or oEmbed parsing failed), attempt
+                # to generate the Open Graph information from the HTML.
+                if not oembed_url or not og:
+                    og = _calc_og(tree, media_info.uri)
 
-        elif oembed_url and _is_json(media_info.media_type):
-            # Handle an oEmbed response.
-            with open(media_info.filename, "rb") as file:
-                body = file.read()
+                await self._precache_image_url(user, media_info, og)
+            else:
+                og = {}
 
-            oembed_response = self._oembed.parse_oembed_response(url, body)
-            og = oembed_response.open_graph_result
-
-            # Use the cache age from the oEmbed result, instead of the HTTP response.
-            if oembed_response.cache_age is not None:
-                expiration_ms = oembed_response.cache_age
-
+        elif oembed_url:
+            # Handle the oEmbed information.
+            og, expiration_ms = await self._handle_oembed_response(
+                url, media_info, expiration_ms
+            )
             await self._precache_image_url(user, media_info, og)
 
         else:
@@ -478,6 +489,39 @@ class PreviewUrlResource(DirectServeJsonResource):
         else:
             del og["og:image"]
 
+    async def _handle_oembed_response(
+        self, url: str, media_info: MediaInfo, expiration_ms: int
+    ) -> Tuple[JsonDict, int]:
+        """
+        Parse the downloaded oEmbed info.
+
+        Args:
+            url: The URL which is being previewed (not the one which was
+                requested).
+            media_info: The media being previewed.
+            expiration_ms: The length of time, in milliseconds, the media is valid for.
+
+        Returns:
+            A tuple of:
+                The Open Graph dictionary, if the oEmbed info can be parsed.
+                The (possibly updated) length of time, in milliseconds, the media is valid for.
+        """
+        # If JSON was not returned, there's nothing to do.
+        if not _is_json(media_info.media_type):
+            return {}, expiration_ms
+
+        with open(media_info.filename, "rb") as file:
+            body = file.read()
+
+        oembed_response = self._oembed.parse_oembed_response(url, body)
+        open_graph_result = oembed_response.open_graph_result
+
+        # Use the cache age from the oEmbed result, if one was given.
+        if open_graph_result and oembed_response.cache_age is not None:
+            expiration_ms = oembed_response.cache_age
+
+        return open_graph_result, expiration_ms
+
     def _start_expire_url_cache_data(self) -> Deferred:
         return run_as_background_process(
             "expire_url_cache_data", self._expire_url_cache_data
@@ -496,6 +540,27 @@ class PreviewUrlResource(DirectServeJsonResource):
             logger.info("Still running DB updates; skipping expiry")
             return
 
+        def try_remove_parent_dirs(dirs: Iterable[str]) -> None:
+            """Attempt to remove the given chain of parent directories
+
+            Args:
+                dirs: The list of directory paths to delete, with children appearing
+                    before their parents.
+            """
+            for dir in dirs:
+                try:
+                    os.rmdir(dir)
+                except FileNotFoundError:
+                    # Already deleted, continue with deleting the rest
+                    pass
+                except OSError as e:
+                    # Failed, skip deleting the rest of the parent dirs
+                    if e.errno != errno.ENOTEMPTY:
+                        logger.warning(
+                            "Failed to remove media directory: %r: %s", dir, e
+                        )
+                    break
+
         # First we delete expired url cache entries
         media_ids = await self.store.get_expired_url_cache(now)
 
@@ -504,20 +569,16 @@ class PreviewUrlResource(DirectServeJsonResource):
             fname = self.filepaths.url_cache_filepath(media_id)
             try:
                 os.remove(fname)
+            except FileNotFoundError:
+                pass  # If the path doesn't exist, meh
             except OSError as e:
-                # If the path doesn't exist, meh
-                if e.errno != errno.ENOENT:
-                    logger.warning("Failed to remove media: %r: %s", media_id, e)
-                    continue
+                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                continue
 
             removed_media.append(media_id)
 
-            try:
-                dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
-                for dir in dirs:
-                    os.rmdir(dir)
-            except Exception:
-                pass
+            dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
+            try_remove_parent_dirs(dirs)
 
         await self.store.delete_url_cache(removed_media)
 
@@ -530,7 +591,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         # These may be cached for a bit on the client (i.e., they
         # may have a room open with a preview url thing open).
         # So we wait a couple of days before deleting, just in case.
-        expire_before = now - 2 * ONE_DAY
+        expire_before = now - IMAGE_CACHE_EXPIRY_MS
         media_ids = await self.store.get_url_cache_media_before(expire_before)
 
         removed_media = []
@@ -538,36 +599,30 @@ class PreviewUrlResource(DirectServeJsonResource):
             fname = self.filepaths.url_cache_filepath(media_id)
             try:
                 os.remove(fname)
+            except FileNotFoundError:
+                pass  # If the path doesn't exist, meh
             except OSError as e:
-                # If the path doesn't exist, meh
-                if e.errno != errno.ENOENT:
-                    logger.warning("Failed to remove media: %r: %s", media_id, e)
-                    continue
+                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                continue
 
-            try:
-                dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
-                for dir in dirs:
-                    os.rmdir(dir)
-            except Exception:
-                pass
+            dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
+            try_remove_parent_dirs(dirs)
 
             thumbnail_dir = self.filepaths.url_cache_thumbnail_directory(media_id)
             try:
                 shutil.rmtree(thumbnail_dir)
+            except FileNotFoundError:
+                pass  # If the path doesn't exist, meh
             except OSError as e:
-                # If the path doesn't exist, meh
-                if e.errno != errno.ENOENT:
-                    logger.warning("Failed to remove media: %r: %s", media_id, e)
-                    continue
+                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                continue
 
             removed_media.append(media_id)
 
-            try:
-                dirs = self.filepaths.url_cache_thumbnail_dirs_to_delete(media_id)
-                for dir in dirs:
-                    os.rmdir(dir)
-            except Exception:
-                pass
+            dirs = self.filepaths.url_cache_thumbnail_dirs_to_delete(media_id)
+            # Note that one of the directories to be deleted has already been
+            # removed by the `rmtree` above.
+            try_remove_parent_dirs(dirs)
 
         await self.store.delete_url_cache_media(removed_media)
 
@@ -619,26 +674,22 @@ def get_html_media_encoding(body: bytes, content_type: str) -> str:
     return "utf-8"
 
 
-def decode_and_calc_og(
-    body: bytes, media_uri: str, request_encoding: Optional[str] = None
-) -> JsonDict:
+def decode_body(
+    body: bytes, request_encoding: Optional[str] = None
+) -> Optional["etree.Element"]:
     """
-    Calculate metadata for an HTML document.
-
-    This uses lxml to parse the HTML document into the OG response. If errors
-    occur during processing of the document, an empty response is returned.
+    This uses lxml to parse the HTML document.
 
     Args:
         body: The HTML document, as bytes.
-        media_url: The URI used to download the body.
         request_encoding: The character encoding of the body, as a string.
 
     Returns:
-        The OG response as a dictionary.
+        The parsed HTML body, or None if an error occurred during processed.
     """
     # If there's no body, nothing useful is going to be found.
     if not body:
-        return {}
+        return None
 
     from lxml import etree
 
@@ -650,25 +701,22 @@ def decode_and_calc_og(
         parser = etree.HTMLParser(recover=True, encoding="utf-8")
     except Exception as e:
         logger.warning("Unable to create HTML parser: %s" % (e,))
-        return {}
+        return None
 
-    def _attempt_calc_og(body_attempt: Union[bytes, str]) -> Dict[str, Optional[str]]:
-        # Attempt to parse the body. If this fails, log and return no metadata.
-        tree = etree.fromstring(body_attempt, parser)
-
-        # The data was successfully parsed, but no tree was found.
-        if tree is None:
-            return {}
-
-        return _calc_og(tree, media_uri)
+    def _attempt_decode_body(
+        body_attempt: Union[bytes, str]
+    ) -> Optional["etree.Element"]:
+        # Attempt to parse the body. Returns None if the body was successfully
+        # parsed, but no tree was found.
+        return etree.fromstring(body_attempt, parser)
 
     # Attempt to parse the body. If this fails, log and return no metadata.
     try:
-        return _attempt_calc_og(body)
+        return _attempt_decode_body(body)
     except UnicodeDecodeError:
         # blindly try decoding the body as utf-8, which seems to fix
         # the charset mismatches on https://google.com
-        return _attempt_calc_og(body.decode("utf-8", "ignore"))
+        return _attempt_decode_body(body.decode("utf-8", "ignore"))
 
 
 def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:

@@ -39,7 +39,7 @@ from twisted.web.resource import IResource
 
 from synapse.api.auth import Auth
 from synapse.api.filtering import Filtering
-from synapse.api.ratelimiting import Ratelimiter
+from synapse.api.ratelimiting import Ratelimiter, RequestRatelimiter
 from synapse.appservice.api import ApplicationServiceApi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
 from synapse.config.homeserver import HomeServerConfig
@@ -97,6 +97,7 @@ from synapse.handlers.room import (
     RoomCreationHandler,
     RoomShutdownHandler,
 )
+from synapse.handlers.room_batch import RoomBatchHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
@@ -436,6 +437,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_room_creation_handler(self) -> RoomCreationHandler:
         return RoomCreationHandler(self)
+
+    @cache_in_self
+    def get_room_batch_handler(self) -> RoomBatchHandler:
+        return RoomBatchHandler(self)
 
     @cache_in_self
     def get_room_shutdown_handler(self) -> RoomShutdownHandler:
@@ -816,3 +821,12 @@ class HomeServer(metaclass=abc.ABCMeta):
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"
         return self.config.worker.send_federation
+
+    @cache_in_self
+    def get_request_ratelimiter(self) -> RequestRatelimiter:
+        return RequestRatelimiter(
+            self.get_datastore(),
+            self.get_clock(),
+            self.config.ratelimiting.rc_message,
+            self.config.ratelimiting.rc_admin_redaction,
+        )
