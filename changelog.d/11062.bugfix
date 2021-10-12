@@ -1,0 +1,1 @@
+Fix error during logging of oEmbed errors, introduced in v1.44.0.
