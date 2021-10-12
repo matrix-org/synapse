@@ -10,7 +10,6 @@ Features
 
 - Add [MSC3069](https://github.com/matrix-org/matrix-doc/pull/3069) support to `/account/whoami`. ([\#9655](https://github.com/matrix-org/synapse/issues/9655))
 - Support autodiscovery of oEmbed previews. ([\#10822](https://github.com/matrix-org/synapse/issues/10822))
-- Ensure `(room_id, next_batch_id)` is unique across [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) insertion events in rooms to avoid cross-talk/conflicts between batches. ([\#10877](https://github.com/matrix-org/synapse/issues/10877))
 - Add a `user_may_send_3pid_invite` spam checker callback for modules to allow or deny 3PID invites. ([\#10894](https://github.com/matrix-org/synapse/issues/10894))
 - Add a spam checker callback to allow or deny room joins. ([\#10910](https://github.com/matrix-org/synapse/issues/10910))
 - Include an `update_synapse_database` script in the distribution. Contributed by @Fizzadar at Beeper. ([\#10954](https://github.com/matrix-org/synapse/issues/10954))
@@ -23,7 +22,7 @@ Bugfixes
 - Fix a minor bug in the response to `/_matrix/client/r0/voip/turnServer`. Contributed by @lukaslihotzki. ([\#10922](https://github.com/matrix-org/synapse/issues/10922))
 - Fix a bug where empty `yyyy-mm-dd/` directories would be left behind in the media store's `url_cache_thumbnails/` directory. ([\#10924](https://github.com/matrix-org/synapse/issues/10924))
 - Fix a bug introduced in Synapse v1.40.0 where the signature checks for room version 8 and 9 could be applied to earlier room versions in some situations. ([\#10927](https://github.com/matrix-org/synapse/issues/10927))
-- Fixes a long-standing bug wherein deactivated users still count towards the mau limit. ([\#10947](https://github.com/matrix-org/synapse/issues/10947))
+- Fix a long-standing bug wherein deactivated users still count towards the monthly active users limit. ([\#10947](https://github.com/matrix-org/synapse/issues/10947))
 - Fix a long-standing bug which meant that events received over federation were sometimes incorrectly accepted into the room state. ([\#10956](https://github.com/matrix-org/synapse/issues/10956))
 - Fix a long-standing bug where rebuilding the user directory wouldn't exclude support and deactivated users. ([\#10960](https://github.com/matrix-org/synapse/issues/10960))
 - Fix [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) `/batch_send` endpoint rejecting subsequent batches with unknown batch ID error in existing room versions from the room creator. ([\#10962](https://github.com/matrix-org/synapse/issues/10962))
@@ -33,6 +32,7 @@ Bugfixes
 - Fix a long-standing bug where local users' per-room nicknames/avatars were visible to anyone who could see you in the user directory. ([\#11002](https://github.com/matrix-org/synapse/issues/11002))
 - Fix a long-standing bug where a user's per-room nickname/avatar would overwrite their profile in the user directory when a room was made public. ([\#11003](https://github.com/matrix-org/synapse/issues/11003))
 - Work around a regression, introduced in Synapse v1.39.0, that caused `SynapseError`s raised by the experimental third-party rules module callback `check_event_allowed` to be ignored. ([\#11042](https://github.com/matrix-org/synapse/issues/11042))
+- Fix a bug in [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) insertion events in rooms that could cause cross-talk/conflicts between batches. ([\#10877](https://github.com/matrix-org/synapse/issues/10877))
 
 
 Improved Documentation
