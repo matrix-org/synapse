@@ -26,6 +26,7 @@ from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
+from synapse.storage.roommember import ProfileInfo
 from synapse.storage.types import Connection
 from synapse.types import JsonDict
 from synapse.util import json_encoder
@@ -63,6 +64,12 @@ class ApplicationServiceWorkerStore(SQLBaseStore):
             hs.hostname, hs.config.appservice.app_service_config_files
         )
         self.exclusive_user_regex = _make_exclusive_regex(self.services_cache)
+        # Appservice senders aren't registered in the users table. We need to
+        # create their user directory entries here.
+        for service in self.services_cache:
+            hs.get_user_directory_handler().handle_local_profile_change(
+                service.sender, ProfileInfo(None, None)
+            )
 
         super().__init__(database, db_conn, hs)
 
