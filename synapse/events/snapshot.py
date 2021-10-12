@@ -269,8 +269,10 @@ class EventContext:
         ``rejected`` is set.
 
         Returns:
-            Returns None if we haven't cached the state or if state_group is None,
-            which happens when the associated event is an outlier.
+            Returns None if we haven't cached the state or if state_group is None
+            (which happens when the associated event is an outlier).
+
+            Otherwise, returns the the current state IDs.
         """
         if self.rejected:
             raise RuntimeError("Attempt to access state_ids of rejected event")
