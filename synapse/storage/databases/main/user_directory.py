@@ -411,6 +411,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         # in the deactivated user check, because the sender doesn't have an
         # entry in the `users` table.
         if self.get_app_service_by_user_id(user) is not None:
+            logger.error("DMR: appservice sender, include")
             return True
 
         # We're opting to exclude appservice users (anyone matching the user
@@ -420,15 +421,19 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         # contacted.
         if self.get_if_app_services_interested_in_user(user):
             # TODO we might want to make this configurable for each app service
+            logger.error("DMR: appservice user, exclude")
             return False
 
         # Support users are for diagnostics and should not appear in the user directory.
         if await self.is_support_user(user):
+            logger.error("DMR: support user, exclude")
             return False
 
         # Deactivated users aren't contactable, so should not appear in the user directory.
         if await self.get_user_deactivated_status(user):
+            logger.error("DMR: deactivated user, exclude")
             return False
+        logger.error("DMR: joe bloggs, include")
         return True
 
     async def is_room_world_readable_or_publicly_joinable(self, room_id: str) -> bool:

@@ -204,6 +204,9 @@ class UserDirectoryHandler(StateDeltasHandler):
                 )
 
                 is_remote = not self.is_mine_id(state_key)
+                logger.error(
+                    f"DMR: user_id={state_key} room_id={room_id} change={change} is_remote={is_remote}"
+                )
                 if change is MatchChange.now_false:
                     # Need to check if the server left the room entirely, if so
                     # we might need to remove all the users in that room
@@ -229,6 +232,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                     is_remote
                     or await self.store.should_include_local_user_in_dir(state_key)
                 )
+                logger.error(f"DMR: include_in_dir={include_in_dir}")
                 if include_in_dir:
                     if change is MatchChange.no_change:
                         # Handle any profile changes for remote users.
