@@ -155,7 +155,9 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
                 This overrides SynapseError's `error_dict` to nastily inject
                 JSON into the error response.
                 """
-                return super().error_dict() | {"nasty": "very"}
+                result = super().error_dict()
+                result["nasty"] = "very"
+                return result
 
         # patch the rules module with a Mock which will raise our hacky exception
         # type
