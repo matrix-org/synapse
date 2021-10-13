@@ -60,11 +60,11 @@ async def check_3pid_auth(
 ```
 
 Called when a user attempts to register or log in with a third party identifier,
-such as email. It is passed the medium (eg. `"email"`), an address (eg. `"jdoe@example.com"`)
+such as email. It is passed the medium (eg. `email`), an address (eg. `jdoe@example.com`)
 and the user's password.
 
 If the authentication is successful, the module must return the user's Matrix ID (e.g. 
-`"@alice:example.com"`) and optionally a callback to be called with the response to the `/login` request.
+`@alice:example.com`) and optionally a callback to be called with the response to the `/login` request.
 If the module doesn't wish to return a callback, it must return None instead.
 
 If the authentication is unsuccessful, the module must return None.
