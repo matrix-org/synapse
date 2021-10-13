@@ -49,7 +49,9 @@ class Authenticator:
         self.keyring = hs.get_keyring()
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
-        self.federation_domain_whitelist = hs.config.federation_domain_whitelist
+        self.federation_domain_whitelist = (
+            hs.config.federation.federation_domain_whitelist
+        )
         self.notifier = hs.get_notifier()
 
         self.replication_client = None

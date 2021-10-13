@@ -60,7 +60,7 @@ def _make_exclusive_regex(
 class ApplicationServiceWorkerStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
         self.services_cache = load_appservices(
-            hs.hostname, hs.config.app_service_config_files
+            hs.hostname, hs.config.appservice.app_service_config_files
         )
         self.exclusive_user_regex = _make_exclusive_regex(self.services_cache)
 

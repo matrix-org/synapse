@@ -51,8 +51,6 @@ from synapse.types import (
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_left_room
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -88,9 +86,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
         self.third_party_event_rules = hs.get_third_party_event_rules()
-        self._server_notices_mxid = self.config.server_notices_mxid
-        self._enable_lookup = hs.config.enable_3pid_lookup
-        self.allow_per_room_profiles = self.config.allow_per_room_profiles
+        self._server_notices_mxid = self.config.servernotices.server_notices_mxid
+        self._enable_lookup = hs.config.registration.enable_3pid_lookup
+        self.allow_per_room_profiles = self.config.server.allow_per_room_profiles
 
         self._join_rate_limiter_local = Ratelimiter(
             store=self.store,
@@ -118,9 +116,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
         )
 
-        # This is only used to get at the ratelimit function. It's fine there are
-        # multiple of these as it doesn't store state.
-        self.base_handler = BaseHandler(hs)
+        self.request_ratelimiter = hs.get_request_ratelimiter()
 
     @abc.abstractmethod
     async def _remote_join(
@@ -434,6 +430,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         third_party_signed: Optional[dict] = None,
         ratelimit: bool = True,
         content: Optional[dict] = None,
+        new_room: bool = False,
         require_consent: bool = True,
         outlier: bool = False,
         prev_event_ids: Optional[List[str]] = None,
@@ -451,6 +448,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             third_party_signed: Information from a 3PID invite.
             ratelimit: Whether to rate limit the request.
             content: The content of the created event.
+            new_room: Whether the membership update is happening in the context of a room
+                creation.
             require_consent: Whether consent is required.
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
@@ -485,6 +484,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 third_party_signed=third_party_signed,
                 ratelimit=ratelimit,
                 content=content,
+                new_room=new_room,
                 require_consent=require_consent,
                 outlier=outlier,
                 prev_event_ids=prev_event_ids,
@@ -504,6 +504,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         third_party_signed: Optional[dict] = None,
         ratelimit: bool = True,
         content: Optional[dict] = None,
+        new_room: bool = False,
         require_consent: bool = True,
         outlier: bool = False,
         prev_event_ids: Optional[List[str]] = None,
@@ -523,6 +524,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             third_party_signed:
             ratelimit:
             content:
+            new_room: Whether the membership update is happening in the context of a room
+                creation.
             require_consent:
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
@@ -573,6 +576,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 errcode=Codes.BAD_JSON,
             )
 
+        # The event content should *not* include the authorising user as
+        # it won't be properly signed. Strip it out since it might come
+        # back from a client updating a display name / avatar.
+        #
+        # This only applies to restricted rooms, but there should be no reason
+        # for a client to include it. Unconditionally remove it.
+        content.pop(EventContentFields.AUTHORISING_USER, None)
+
         effective_membership_state = action
         if action in ["kick", "unban"]:
             effective_membership_state = "leave"
@@ -617,7 +628,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 is_requester_admin = await self.auth.is_server_admin(requester.user)
 
             if not is_requester_admin:
-                if self.config.block_non_admin_invites:
+                if self.config.server.block_non_admin_invites:
                     logger.info(
                         "Blocking invite: user is not admin and non-admin "
                         "invites disabled"
@@ -668,7 +679,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     " (membership=%s)" % old_membership,
                     errcode=Codes.BAD_STATE,
                 )
-            if old_membership == "ban" and action != "unban":
+            if old_membership == "ban" and action not in ["ban", "unban", "leave"]:
                 raise SynapseError(
                     403,
                     "Cannot %s user who was banned" % (action,),
@@ -717,6 +728,30 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     # This should be an auth check, but guests are a local concept,
                     # so don't really fit into the general auth process.
                     raise AuthError(403, "Guest access not allowed")
+
+            # Figure out whether the user is a server admin to determine whether they
+            # should be able to bypass the spam checker.
+            if (
+                self._server_notices_mxid is not None
+                and requester.user.to_string() == self._server_notices_mxid
+            ):
+                # allow the server notices mxid to join rooms
+                bypass_spam_checker = True
+
+            else:
+                bypass_spam_checker = await self.auth.is_server_admin(requester.user)
+
+            inviter = await self._get_inviter(target.to_string(), room_id)
+            if (
+                not bypass_spam_checker
+                # We assume that if the spam checker allowed the user to create
+                # a room then they're allowed to join it.
+                and not new_room
+                and not await self.spam_checker.user_may_join_room(
+                    target.to_string(), room_id, is_invited=inviter is not None
+                )
+            ):
+                raise SynapseError(403, "Not allowed to join this room")
 
             # Check if a remote join should be performed.
             remote_join, remote_room_hosts = await self._should_perform_remote_join(
@@ -939,7 +974,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # be included in the event content in order to efficiently validate
         # the event.
         content[
-            "join_authorised_via_users_server"
+            EventContentFields.AUTHORISING_USER
         ] = await self.event_auth_handler.get_user_which_could_invite(
             room_id,
             current_state_ids,
@@ -1222,7 +1257,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         Raises:
             ShadowBanError if the requester has been shadow-banned.
         """
-        if self.config.block_non_admin_invites:
+        if self.config.server.block_non_admin_invites:
             is_requester_admin = await self.auth.is_server_admin(requester.user)
             if not is_requester_admin:
                 raise SynapseError(
@@ -1236,7 +1271,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         # We need to rate limit *before* we send out any 3PID invites, so we
         # can't just rely on the standard ratelimiting of events.
-        await self.base_handler.ratelimit(requester)
+        await self.request_ratelimiter.ratelimit(requester)
 
         can_invite = await self.third_party_event_rules.check_threepid_can_be_invited(
             medium, address, room_id
@@ -1260,10 +1295,22 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if invitee:
             # Note that update_membership with an action of "invite" can raise
             # a ShadowBanError, but this was done above already.
+            # We don't check the invite against the spamchecker(s) here (through
+            # user_may_invite) because we'll do it further down the line anyway (in
+            # update_membership_locked).
             _, stream_id = await self.update_membership(
                 requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
             )
         else:
+            # Check if the spamchecker(s) allow this invite to go through.
+            if not await self.spam_checker.user_may_send_3pid_invite(
+                inviter_userid=requester.user.to_string(),
+                medium=medium,
+                address=address,
+                room_id=room_id,
+            ):
+                raise SynapseError(403, "Cannot send threepid invite")
+
             stream_id = await self._make_and_store_3pid_invite(
                 requester,
                 id_server,
@@ -1420,7 +1467,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         Returns: bool of whether the complexity is too great, or None
             if unable to be fetched
         """
-        max_complexity = self.hs.config.limit_remote_rooms.complexity
+        max_complexity = self.hs.config.server.limit_remote_rooms.complexity
         complexity = await self.federation_handler.get_room_complexity(
             remote_room_hosts, room_id
         )
@@ -1436,7 +1483,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         Args:
             room_id: The room ID to check for complexity.
         """
-        max_complexity = self.hs.config.limit_remote_rooms.complexity
+        max_complexity = self.hs.config.server.limit_remote_rooms.complexity
         complexity = await self.store.get_room_complexity(room_id)
 
         return complexity["v1"] > max_complexity
@@ -1460,8 +1507,11 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         if len(remote_room_hosts) == 0:
             raise SynapseError(404, "No known servers")
 
-        check_complexity = self.hs.config.limit_remote_rooms.enabled
-        if check_complexity and self.hs.config.limit_remote_rooms.admins_can_join:
+        check_complexity = self.hs.config.server.limit_remote_rooms.enabled
+        if (
+            check_complexity
+            and self.hs.config.server.limit_remote_rooms.admins_can_join
+        ):
             check_complexity = not await self.auth.is_server_admin(user)
 
         if check_complexity:
@@ -1472,7 +1522,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             if too_complex is True:
                 raise SynapseError(
                     code=400,
-                    msg=self.hs.config.limit_remote_rooms.complexity_error,
+                    msg=self.hs.config.server.limit_remote_rooms.complexity_error,
                     errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
                 )
 
@@ -1507,7 +1557,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             )
             raise SynapseError(
                 code=400,
-                msg=self.hs.config.limit_remote_rooms.complexity_error,
+                msg=self.hs.config.server.limit_remote_rooms.complexity_error,
                 errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
             )
 

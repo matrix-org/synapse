@@ -125,7 +125,7 @@ class ListRoomRestServlet(RestServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
-        search_term = parse_string(request, "search_term")
+        search_term = parse_string(request, "search_term", encoding="utf-8")
         if search_term == "":
             raise SynapseError(
                 400,
@@ -213,7 +213,7 @@ class RoomRestServlet(RestServlet):
         members = await self.store.get_users_in_room(room_id)
         ret["joined_local_devices"] = await self.store.count_devices_by_users(members)
 
-        return (200, ret)
+        return 200, ret
 
     async def on_DELETE(
         self, request: SynapseRequest, room_id: str
@@ -668,4 +668,4 @@ async def _delete_room(
     if purge:
         await pagination_handler.purge_room(room_id, force=force_purge)
 
-    return (200, ret)
+    return 200, ret

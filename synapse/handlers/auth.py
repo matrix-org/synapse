@@ -52,7 +52,6 @@ from synapse.api.errors import (
     UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
-from synapse.handlers._base import BaseHandler
 from synapse.handlers.ui_auth import (
     INTERACTIVE_AUTH_CHECKERS,
     UIAuthSessionDataConstants,
@@ -186,26 +185,27 @@ class LoginTokenAttributes:
     auth_provider_id = attr.ib(type=str)
 
 
-class AuthHandler(BaseHandler):
+class AuthHandler:
     SESSION_EXPIRE_MS = 48 * 60 * 60 * 1000
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
         self.checkers: Dict[str, UserInteractiveAuthChecker] = {}
         for auth_checker_class in INTERACTIVE_AUTH_CHECKERS:
             inst = auth_checker_class(hs)
             if inst.is_enabled():
                 self.checkers[inst.AUTH_TYPE] = inst  # type: ignore
 
-        self.bcrypt_rounds = hs.config.bcrypt_rounds
+        self.bcrypt_rounds = hs.config.registration.bcrypt_rounds
 
         self.password_auth_provider = hs.get_password_auth_provider()
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.macaroon_gen = hs.get_macaroon_generator()
-        self._password_enabled = hs.config.password_enabled
-        self._password_localdb_enabled = hs.config.password_localdb_enabled
+        self._password_enabled = hs.config.auth.password_enabled
+        self._password_localdb_enabled = hs.config.auth.password_localdb_enabled
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
@@ -217,7 +217,7 @@ class AuthHandler(BaseHandler):
         )
 
         # The number of seconds to keep a UI auth session active.
-        self._ui_auth_session_timeout = hs.config.ui_auth_session_timeout
+        self._ui_auth_session_timeout = hs.config.auth.ui_auth_session_timeout
 
         # Ratelimitier for failed /login attempts
         self._failed_login_attempts_ratelimiter = Ratelimiter(
@@ -244,23 +244,25 @@ class AuthHandler(BaseHandler):
         # after the SSO completes and before redirecting them back to their client.
         # It notifies the user they are about to give access to their matrix account
         # to the client.
-        self._sso_redirect_confirm_template = hs.config.sso_redirect_confirm_template
+        self._sso_redirect_confirm_template = (
+            hs.config.sso.sso_redirect_confirm_template
+        )
 
         # The following template is shown during user interactive authentication
         # in the fallback auth scenario. It notifies the user that they are
         # authenticating for an operation to occur on their account.
-        self._sso_auth_confirm_template = hs.config.sso_auth_confirm_template
+        self._sso_auth_confirm_template = hs.config.sso.sso_auth_confirm_template
 
         # The following template is shown during the SSO authentication process if
         # the account is deactivated.
         self._sso_account_deactivated_template = (
-            hs.config.sso_account_deactivated_template
+            hs.config.sso.sso_account_deactivated_template
         )
 
         self._server_name = hs.config.server.server_name
 
         # cast to tuple for use with str.startswith
-        self._whitelisted_sso_clients = tuple(hs.config.sso_client_whitelist)
+        self._whitelisted_sso_clients = tuple(hs.config.sso.sso_client_whitelist)
 
         # A mapping of user ID to extra attributes to include in the login
         # response.
@@ -705,19 +707,19 @@ class AuthHandler(BaseHandler):
         return canonical_id
 
     def _get_params_recaptcha(self) -> dict:
-        return {"public_key": self.hs.config.recaptcha_public_key}
+        return {"public_key": self.hs.config.captcha.recaptcha_public_key}
 
     def _get_params_terms(self) -> dict:
         return {
             "policies": {
                 "privacy_policy": {
-                    "version": self.hs.config.user_consent_version,
+                    "version": self.hs.config.consent.user_consent_version,
                     "en": {
-                        "name": self.hs.config.user_consent_policy_name,
+                        "name": self.hs.config.consent.user_consent_policy_name,
                         "url": "%s_matrix/consent?v=%s"
                         % (
                             self.hs.config.server.public_baseurl,
-                            self.hs.config.user_consent_version,
+                            self.hs.config.consent.user_consent_version,
                         ),
                     },
                 }
@@ -982,7 +984,7 @@ class AuthHandler(BaseHandler):
     def can_change_password(self) -> bool:
         """Get whether users on this server are allowed to change or set a password.
 
-        Both `config.password_enabled` and `config.password_localdb_enabled` must be true.
+        Both `config.auth.password_enabled` and `config.auth.password_localdb_enabled` must be true.
 
         Note that any account (even SSO accounts) are allowed to add passwords if the above
         is true.
@@ -1484,7 +1486,7 @@ class AuthHandler(BaseHandler):
             pw = unicodedata.normalize("NFKC", password)
 
             return bcrypt.hashpw(
-                pw.encode("utf8") + self.hs.config.password_pepper.encode("utf8"),
+                pw.encode("utf8") + self.hs.config.auth.password_pepper.encode("utf8"),
                 bcrypt.gensalt(self.bcrypt_rounds),
             ).decode("ascii")
 
@@ -1508,7 +1510,7 @@ class AuthHandler(BaseHandler):
             pw = unicodedata.normalize("NFKC", password)
 
             return bcrypt.checkpw(
-                pw.encode("utf8") + self.hs.config.password_pepper.encode("utf8"),
+                pw.encode("utf8") + self.hs.config.auth.password_pepper.encode("utf8"),
                 checked_hash,
             )
 
@@ -1800,7 +1802,7 @@ class MacaroonGenerator:
         macaroon = pymacaroons.Macaroon(
             location=self.hs.config.server.server_name,
             identifier="key",
-            key=self.hs.config.macaroon_secret_key,
+            key=self.hs.config.key.macaroon_secret_key,
         )
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
@@ -1809,7 +1811,7 @@ class MacaroonGenerator:
 
 def load_legacy_password_auth_providers(hs: "HomeServer") -> None:
     module_api = hs.get_module_api()
-    for module, config in hs.config.password_providers:
+    for module, config in hs.config.authproviders.password_providers:
         load_single_legacy_password_auth_provider(
             module=module, config=config, api=module_api
         )

@@ -16,6 +16,7 @@ from unittest.mock import Mock
 
 import synapse.types
 from synapse.api.errors import AuthError, SynapseError
+from synapse.rest import admin
 from synapse.types import UserID
 
 from tests import unittest
@@ -24,6 +25,8 @@ from tests.test_utils import make_awaitable
 
 class ProfileTestCase(unittest.HomeserverTestCase):
     """Tests profile management."""
+
+    servlets = [admin.register_servlets]
 
     def make_homeserver(self, reactor, clock):
         self.mock_federation = Mock()
@@ -46,11 +49,11 @@ class ProfileTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
 
-        self.frank = UserID.from_string("@1234ABCD:test")
+        self.frank = UserID.from_string("@1234abcd:test")
         self.bob = UserID.from_string("@4567:test")
         self.alice = UserID.from_string("@alice:remote")
 
-        self.get_success(self.store.create_profile(self.frank.localpart))
+        self.get_success(self.register_user(self.frank.localpart, "frankpassword"))
 
         self.handler = hs.get_profile_handler()
 
@@ -107,7 +110,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
     def test_set_my_name_if_disabled(self):
-        self.hs.config.enable_set_displayname = False
+        self.hs.config.registration.enable_set_displayname = False
 
         # Setting displayname for the first time is allowed
         self.get_success(
@@ -222,7 +225,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
 
     def test_set_my_avatar_if_disabled(self):
-        self.hs.config.enable_set_avatar_url = False
+        self.hs.config.registration.enable_set_avatar_url = False
 
         # Setting displayname for the first time is allowed
         self.get_success(

@@ -77,4 +77,4 @@ class PusherFactory:
             if isinstance(brand, str):
                 return brand
 
-        return self.config.email_app_name
+        return self.config.email.email_app_name

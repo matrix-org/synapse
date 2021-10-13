@@ -34,7 +34,7 @@ from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
-from synapse.api.constants import EduTypes, EventTypes, Membership
+from synapse.api.constants import EduTypes, EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -765,11 +765,11 @@ class FederationServer(FederationBase):
         if (
             room_version.msc3083_join_rules
             and event.membership == Membership.JOIN
-            and "join_authorised_via_users_server" in event.content
+            and EventContentFields.AUTHORISING_USER in event.content
         ):
             # We can only authorise our own users.
             authorising_server = get_domain_from_id(
-                event.content["join_authorised_via_users_server"]
+                event.content[EventContentFields.AUTHORISING_USER]
             )
             if authorising_server != self.server_name:
                 raise SynapseError(
@@ -1008,7 +1008,10 @@ class FederationServer(FederationBase):
             async with lock:
                 logger.info("handling received PDU: %s", event)
                 try:
-                    await self._federation_event_handler.on_receive_pdu(origin, event)
+                    with nested_logging_context(event.event_id):
+                        await self._federation_event_handler.on_receive_pdu(
+                            origin, event
+                        )
                 except FederationError as e:
                     # XXX: Ideally we'd inform the remote we failed to process
                     # the event, but we can't return an error in the transaction

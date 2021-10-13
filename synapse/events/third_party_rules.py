@@ -42,10 +42,10 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
     """Wrapper that loads a third party event rules module configured using the old
     configuration, and registers the hooks they implement.
     """
-    if hs.config.third_party_event_rules is None:
+    if hs.config.thirdpartyrules.third_party_event_rules is None:
         return
 
-    module, config = hs.config.third_party_event_rules
+    module, config = hs.config.thirdpartyrules.third_party_event_rules
 
     api = hs.get_module_api()
     third_party_rules = module(config=config, module_api=api)
@@ -217,6 +217,15 @@ class ThirdPartyEventRules:
         for callback in self._check_event_allowed_callbacks:
             try:
                 res, replacement_data = await callback(event, state_events)
+            except SynapseError as e:
+                # FIXME: Being able to throw SynapseErrors is relied upon by
+                # some modules. PR #10386 accidentally broke this ability.
+                # That said, we aren't keen on exposing this implementation detail
+                # to modules and we should one day have a proper way to do what
+                # is wanted.
+                # This module callback needs a rework so that hacks such as
+                # this one are not necessary.
+                raise e
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue

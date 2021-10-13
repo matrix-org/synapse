@@ -67,7 +67,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         v.satisfy_general(verify_type)
         v.satisfy_general(verify_nonce)
         v.satisfy_general(verify_guest)
-        v.verify(macaroon, self.hs.config.macaroon_secret_key)
+        v.verify(macaroon, self.hs.config.key.macaroon_secret_key)
 
     def test_short_term_login_token_gives_user_id(self):
         token = self.macaroon_generator.generate_short_term_login_token(

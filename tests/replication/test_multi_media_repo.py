@@ -68,7 +68,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         resource = hs.get_media_repository_resource().children[b"download"]
         channel = make_request(
             self.reactor,
-            FakeSite(resource),
+            FakeSite(resource, self.reactor),
             "GET",
             f"/{target}/{media_id}",
             shorthand=False,

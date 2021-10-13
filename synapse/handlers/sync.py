@@ -443,7 +443,7 @@ class SyncHandler:
 
             room_ids = sync_result_builder.joined_room_ids
 
-            typing_source = self.event_sources.sources["typing"]
+            typing_source = self.event_sources.sources.typing
             typing, typing_key = await typing_source.get_new_events(
                 user=sync_config.user,
                 from_key=typing_key,
@@ -465,7 +465,7 @@ class SyncHandler:
 
             receipt_key = since_token.receipt_key if since_token else 0
 
-            receipt_source = self.event_sources.sources["receipt"]
+            receipt_source = self.event_sources.sources.receipt
             receipts, receipt_key = await receipt_source.get_new_events(
                 user=sync_config.user,
                 from_key=receipt_key,
@@ -1415,7 +1415,7 @@ class SyncHandler:
         sync_config = sync_result_builder.sync_config
         user = sync_result_builder.sync_config.user
 
-        presence_source = self.event_sources.sources["presence"]
+        presence_source = self.event_sources.sources.presence
 
         since_token = sync_result_builder.since_token
         presence_key = None

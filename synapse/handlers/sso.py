@@ -184,15 +184,17 @@ class SsoHandler:
         self._server_name = hs.hostname
         self._registration_handler = hs.get_registration_handler()
         self._auth_handler = hs.get_auth_handler()
-        self._error_template = hs.config.sso_error_template
-        self._bad_user_template = hs.config.sso_auth_bad_user_template
+        self._error_template = hs.config.sso.sso_error_template
+        self._bad_user_template = hs.config.sso.sso_auth_bad_user_template
         self._profile_handler = hs.get_profile_handler()
 
         # The following template is shown after a successful user interactive
         # authentication session. It tells the user they can close the window.
-        self._sso_auth_success_template = hs.config.sso_auth_success_template
+        self._sso_auth_success_template = hs.config.sso.sso_auth_success_template
 
-        self._sso_update_profile_information = hs.config.sso_update_profile_information
+        self._sso_update_profile_information = (
+            hs.config.sso.sso_update_profile_information
+        )
 
         # a lock on the mappings
         self._mapping_lock = Linearizer(name="sso_user_mapping", clock=hs.get_clock())
