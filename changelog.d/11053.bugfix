@@ -1,2 +1,2 @@
-Fix a bug introduced in Synapse 1.45rc1 where the user directory would stop updating if it processed an event from a
+Fix a bug introduced in Synapse 1.45.0rc1 where the user directory would stop updating if it processed an event from a
 user not in the `users` table.
