@@ -49,9 +49,17 @@ class ReadMarkerRestServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
         read_event_id = body.get("m.read", None)
-        hidden = body.get(ReadReceiptEventFields.MSC2285_HIDDEN, False)
+        hidden = body.get(ReadReceiptEventFields.HIDDEN, False)
+        hidden_prefix = body.get(ReadReceiptEventFields.MSC2285_HIDDEN, False)
 
         if not isinstance(hidden, bool):
+            raise SynapseError(
+                400,
+                "Param %s must be a boolean, if given" % ReadReceiptEventFields.HIDDEN,
+                Codes.BAD_JSON,
+            )
+
+        if not isinstance(hidden_prefix, bool):
             raise SynapseError(
                 400,
                 "Param %s must be a boolean, if given"
@@ -65,7 +73,7 @@ class ReadMarkerRestServlet(RestServlet):
                 "m.read",
                 user_id=requester.user.to_string(),
                 event_id=read_event_id,
-                hidden=hidden,
+                hidden=hidden or hidden_prefix,
             )
 
         read_marker_event_id = body.get("m.fully_read", None)

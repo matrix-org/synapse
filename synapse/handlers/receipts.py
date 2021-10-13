@@ -201,7 +201,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
                         if hidden is not None:
                             new_users[rr_user_id].pop("hidden")
                             new_users[rr_user_id][
-                                ReadReceiptEventFields.MSC2285_HIDDEN
+                                ReadReceiptEventFields.HIDDEN
                             ] = hidden
 
                 # Set new users unless empty

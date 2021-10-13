@@ -252,3 +252,4 @@ class GuestAccess:
 
 class ReadReceiptEventFields:
     MSC2285_HIDDEN = "org.matrix.msc2285.hidden"
+    HIDDEN = "m.hidden"

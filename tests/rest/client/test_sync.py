@@ -405,7 +405,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         res = self.helper.send(self.room_id, body="hello", tok=self.tok)
 
         # Send a read receipt to tell the server the first user's message was read
-        body = json.dumps({ReadReceiptEventFields.MSC2285_HIDDEN: True}).encode("utf8")
+        body = json.dumps({ReadReceiptEventFields.HIDDEN: True}).encode("utf8")
         channel = self.make_request(
             "POST",
             "/rooms/%s/receipt/m.read/%s" % (self.room_id, res["event_id"]),
@@ -540,7 +540,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(1)
 
         # Send a read receipt to tell the server we've read the latest event.
-        body = json.dumps({ReadReceiptEventFields.MSC2285_HIDDEN: True}).encode("utf8")
+        body = json.dumps({ReadReceiptEventFields.HIDDEN: True}).encode("utf8")
         channel = self.make_request(
             "POST",
             "/rooms/%s/receipt/m.read/%s" % (self.room_id, res["event_id"]),

@@ -53,9 +53,17 @@ class ReceiptRestServlet(RestServlet):
             raise SynapseError(400, "Receipt type must be 'm.read'")
 
         body = parse_json_object_from_request(request, allow_empty_body=True)
-        hidden = body.get(ReadReceiptEventFields.MSC2285_HIDDEN, False)
+        hidden = body.get(ReadReceiptEventFields.HIDDEN, False)
+        hidden_prefix = body.get(ReadReceiptEventFields.MSC2285_HIDDEN, False)
 
         if not isinstance(hidden, bool):
+            raise SynapseError(
+                400,
+                "Param %s must be a boolean, if given" % ReadReceiptEventFields.HIDDEN,
+                Codes.BAD_JSON,
+            )
+
+        if not isinstance(hidden_prefix, bool):
             raise SynapseError(
                 400,
                 "Param %s must be a boolean, if given"
@@ -70,7 +78,7 @@ class ReceiptRestServlet(RestServlet):
             receipt_type,
             user_id=requester.user.to_string(),
             event_id=event_id,
-            hidden=hidden,
+            hidden=hidden or hidden_prefix,
         )
 
         return 200, {}
