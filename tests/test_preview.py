@@ -159,7 +159,7 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        tree = decode_body(html)
+        tree = decode_body(html, "http://example.com/test.html")
         og = _calc_og(tree, "http://example.com/test.html")
 
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
@@ -175,7 +175,7 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        tree = decode_body(html)
+        tree = decode_body(html, "http://example.com/test.html")
         og = _calc_og(tree, "http://example.com/test.html")
 
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
@@ -194,7 +194,7 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        tree = decode_body(html)
+        tree = decode_body(html, "http://example.com/test.html")
         og = _calc_og(tree, "http://example.com/test.html")
 
         self.assertEqual(
@@ -216,7 +216,7 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        tree = decode_body(html)
+        tree = decode_body(html, "http://example.com/test.html")
         og = _calc_og(tree, "http://example.com/test.html")
 
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
@@ -230,7 +230,7 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        tree = decode_body(html)
+        tree = decode_body(html, "http://example.com/test.html")
         og = _calc_og(tree, "http://example.com/test.html")
 
         self.assertEqual(og, {"og:title": None, "og:description": "Some text."})
@@ -245,7 +245,7 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        tree = decode_body(html)
+        tree = decode_body(html, "http://example.com/test.html")
         og = _calc_og(tree, "http://example.com/test.html")
 
         self.assertEqual(og, {"og:title": "Title", "og:description": "Some text."})
@@ -260,7 +260,7 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        tree = decode_body(html)
+        tree = decode_body(html, "http://example.com/test.html")
         og = _calc_og(tree, "http://example.com/test.html")
 
         self.assertEqual(og, {"og:title": None, "og:description": "Some text."})
@@ -268,13 +268,13 @@ class CalcOgTestCase(unittest.TestCase):
     def test_empty(self):
         """Test a body with no data in it."""
         html = b""
-        tree = decode_body(html)
+        tree = decode_body(html, "http://example.com/test.html")
         self.assertIsNone(tree)
 
     def test_no_tree(self):
         """A valid body with no tree in it."""
         html = b"\x00"
-        tree = decode_body(html)
+        tree = decode_body(html, "http://example.com/test.html")
         self.assertIsNone(tree)
 
     def test_invalid_encoding(self):
@@ -287,7 +287,7 @@ class CalcOgTestCase(unittest.TestCase):
         </body>
         </html>
         """
-        tree = decode_body(html, "invalid-encoding")
+        tree = decode_body(html, "http://example.com/test.html", "invalid-encoding")
         og = _calc_og(tree, "http://example.com/test.html")
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
@@ -302,7 +302,7 @@ class CalcOgTestCase(unittest.TestCase):
         </body>
         </html>
         """
-        tree = decode_body(html)
+        tree = decode_body(html, "http://example.com/test.html")
         og = _calc_og(tree, "http://example.com/test.html")
         self.assertEqual(og, {"og:title": "ÿÿ Foo", "og:description": "Some text."})
 
@@ -316,7 +316,7 @@ class CalcOgTestCase(unittest.TestCase):
         </body>
         </html>
         """
-        tree = decode_body(html)
+        tree = decode_body(html, "http://example.com/test.html")
         og = _calc_og(tree, "http://example.com/test.html")
         self.assertEqual(og, {"og:title": "ó", "og:description": "Some text."})
 

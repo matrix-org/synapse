@@ -295,7 +295,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             with open(media_info.filename, "rb") as file:
                 body = file.read()
 
-            tree = decode_body(body, media_info.media_type)
+            tree = decode_body(body, media_info.uri, media_info.media_type)
             if tree is not None:
                 # Check if this HTML document points to oEmbed information and
                 # defer to that.
@@ -679,13 +679,14 @@ def get_html_media_encodings(body: bytes, content_type: Optional[str]) -> Iterab
 
 
 def decode_body(
-    body: bytes, content_type: Optional[str] = None
+    body: bytes, uri: str, content_type: Optional[str] = None
 ) -> Optional["etree.Element"]:
     """
     This uses lxml to parse the HTML document.
 
     Args:
         body: The HTML document, as bytes.
+        uri: The URI used to download the body.
         content_type: The Content-Type header.
 
     Returns:
@@ -698,10 +699,13 @@ def decode_body(
     for encoding in get_html_media_encodings(body, content_type):
         try:
             body_str = body.decode(encoding)
-        except Exception as e:
+        except Exception:
             pass
         else:
             break
+    else:
+        logger.warning("Unable to decode HTML body for %s", uri)
+        return None
 
     from lxml import etree
 
