@@ -139,7 +139,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         )
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
-    def test_third_party_rules_workaround_syanpse_errors_pass_through(self):
+    def test_third_party_rules_workaround_synapse_errors_pass_through(self):
         """
         Tests that the workaround introduced by https://github.com/matrix-org/synapse/pull/11042
         is functional: that SynapseErrors are passed through from check_event_allowed
