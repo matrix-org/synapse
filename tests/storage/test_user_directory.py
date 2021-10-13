@@ -256,7 +256,7 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
         self.assertEqual(users, {u1, u2, u3})
 
-    # The next three tests (test_population_excludes_*) all set up
+    # The next four tests (test_population_excludes_*) all set up
     #   - A normal user included in the user dir
     #   - A public and private room created by that user
     #   - A user excluded from the room dir, belonging to both rooms
@@ -362,6 +362,21 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         self._purge_and_rebuild_user_dir()
 
         # Check the AS user is not in the directory.
+        self._check_room_sharing_tables(user, public, private)
+
+    def test_population_excludes_appservice_sender(self) -> None:
+        user = self.register_user("user", "pass")
+        token = self.login(user, "pass")
+
+        # Join the AS sender to rooms owned by the normal user.
+        public, private = self._create_rooms_and_inject_memberships(
+            user, token, self.appservice.sender
+        )
+
+        # Rebuild the directory.
+        self._purge_and_rebuild_user_dir()
+
+        # Check the AS sender is not in the directory.
         self._check_room_sharing_tables(user, public, private)
 
     def test_population_conceals_private_nickname(self) -> None:
