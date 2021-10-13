@@ -63,7 +63,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             hostname="test",
             id="1234",
             namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
-            sender="@as:test",
+            # Note: this user does not match the regex above, so that tests
+            # can distinguish the sender from the AS user.
+            sender="@as_main:test",
         )
 
         mock_load_appservices = Mock(return_value=[self.appservice])
@@ -122,7 +124,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             {(alice, bob, private), (bob, alice, private)},
         )
 
-    # The next three tests (test_population_excludes_*) all setup
+    # The next four tests (test_excludes_*) all setup
     #   - A normal user included in the user dir
     #   - A public and private room created by that user
     #   - A user excluded from the room dir, belonging to both rooms
@@ -179,6 +181,34 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
         self._check_only_one_user_in_directory(user, public)
 
+    def test_excludes_appservice_sender(self) -> None:
+        user = self.register_user("user", "pass")
+        token = self.login(user, "pass")
+        room = self.helper.create_room_as(user, is_public=True, tok=token)
+        self.helper.join(room, self.appservice.sender, tok=self.appservice.token)
+        self._check_only_one_user_in_directory(user, room)
+
+    def test_user_not_in_users_table(self) -> None:
+        """Unclear how it happens, but on matrix.org we've seen join events
+        for users who aren't in the users table. Test that we don't fall over
+        when processing such a user.
+        """
+        user1 = self.register_user("user1", "pass")
+        token1 = self.login(user1, "pass")
+        room = self.helper.create_room_as(user1, is_public=True, tok=token1)
+
+        # Inject a join event for a user who doesn't exist
+        self.get_success(inject_member_event(self.hs, room, "@not-a-user:test", "join"))
+
+        # Another new user registers and joins the room
+        user2 = self.register_user("user2", "pass")
+        token2 = self.login(user2, "pass")
+        self.helper.join(room, user2, tok=token2)
+
+        # The dodgy event should not have stopped us from processing user2's join.
+        in_public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        self.assertEqual(set(in_public), {(user1, room), (user2, room)})
+
     def _create_rooms_and_inject_memberships(
         self, creator: str, token: str, joiner: str
     ) -> Tuple[str, str]:
@@ -230,7 +260,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
         profile = self.get_success(self.store.get_user_in_directory(support_user_id))
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
         display_name = "display_name"
 
         profile_info = ProfileInfo(avatar_url="avatar_url", display_name=display_name)
@@ -264,7 +294,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # profile is not in directory
         profile = self.get_success(self.store.get_user_in_directory(r_user_id))
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
 
         # update profile after deactivation
         self.get_success(
@@ -273,7 +303,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # profile is furthermore not in directory
         profile = self.get_success(self.store.get_user_in_directory(r_user_id))
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
 
     def test_handle_local_profile_change_with_appservice_user(self) -> None:
         # create user
@@ -283,7 +313,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # profile is not in directory
         profile = self.get_success(self.store.get_user_in_directory(as_user_id))
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
 
         # update profile
         profile_info = ProfileInfo(avatar_url="avatar_url", display_name="4L1c3")
@@ -293,7 +323,28 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # profile is still not in directory
         profile = self.get_success(self.store.get_user_in_directory(as_user_id))
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
+
+    def test_handle_local_profile_change_with_appservice_sender(self) -> None:
+        # profile is not in directory
+        profile = self.get_success(
+            self.store.get_user_in_directory(self.appservice.sender)
+        )
+        self.assertIsNone(profile)
+
+        # update profile
+        profile_info = ProfileInfo(avatar_url="avatar_url", display_name="4L1c3")
+        self.get_success(
+            self.handler.handle_local_profile_change(
+                self.appservice.sender, profile_info
+            )
+        )
+
+        # profile is still not in directory
+        profile = self.get_success(
+            self.store.get_user_in_directory(self.appservice.sender)
+        )
+        self.assertIsNone(profile)
 
     def test_handle_user_deactivated_support_user(self) -> None:
         s_user_id = "@support:test"

@@ -147,6 +147,49 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
 
     @parameterized.expand([(False,), (True,)])
+    def test_get_last_client_ip_by_device(self, after_persisting: bool):
+        """Test `get_last_client_ip_by_device` for persisted and unpersisted data"""
+        self.reactor.advance(12345678)
+
+        user_id = "@user:id"
+        device_id = "MY_DEVICE"
+
+        # Insert a user IP
+        self.get_success(
+            self.store.store_device(
+                user_id,
+                device_id,
+                "display name",
+            )
+        )
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token", "ip", "user_agent", device_id
+            )
+        )
+
+        if after_persisting:
+            # Trigger the storage loop
+            self.reactor.advance(10)
+
+        result = self.get_success(
+            self.store.get_last_client_ip_by_device(user_id, device_id)
+        )
+
+        self.assertEqual(
+            result,
+            {
+                (user_id, device_id): {
+                    "user_id": user_id,
+                    "device_id": device_id,
+                    "ip": "ip",
+                    "user_agent": "user_agent",
+                    "last_seen": 12345678000,
+                },
+            },
+        )
+
+    @parameterized.expand([(False,), (True,)])
     def test_get_user_ip_and_agents(self, after_persisting: bool):
         """Test `get_user_ip_and_agents` for persisted and unpersisted data"""
         self.reactor.advance(12345678)

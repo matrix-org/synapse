@@ -26,6 +26,8 @@ from typing import (
     cast,
 )
 
+from synapse.api.errors import StoreError
+
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -383,7 +385,19 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         """Certain classes of local user are omitted from the user directory.
         Is this user one of them?
         """
-        # App service users aren't usually contactable, so exclude them.
+        # We're opting to exclude the appservice sender (user defined by the
+        # `sender_localpart` in the appservice registration) even though
+        # technically it could be DM-able. In the future, this could potentially
+        # be configurable per-appservice whether the appservice sender can be
+        # contacted.
+        if self.get_app_service_by_user_id(user) is not None:
+            return False
+
+        # We're opting to exclude appservice users (anyone matching the user
+        # namespace regex in the appservice registration) even though technically
+        # they could be DM-able. In the future, this could potentially
+        # be configurable per-appservice whether the appservice users can be
+        # contacted.
         if self.get_if_app_services_interested_in_user(user):
             # TODO we might want to make this configurable for each app service
             return False
@@ -393,8 +407,14 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             return False
 
         # Deactivated users aren't contactable, so should not appear in the user directory.
-        if await self.get_user_deactivated_status(user):
+        try:
+            if await self.get_user_deactivated_status(user):
+                return False
+        except StoreError:
+            # No such user in the users table. No need to do this when calling
+            # is_support_user---that returns False if the user is missing.
             return False
+
         return True
 
     async def is_room_world_readable_or_publicly_joinable(self, room_id: str) -> bool:
