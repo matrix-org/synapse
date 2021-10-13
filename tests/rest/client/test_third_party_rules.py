@@ -164,9 +164,8 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         async def check(ev, state) -> Tuple[bool, Optional[JsonDict]]:
             raise NastyHackException(429, "message")
 
-        callback = Mock(spec=[], side_effect=check)
         self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [
-            callback
+            check
         ]
 
         # Make a request
