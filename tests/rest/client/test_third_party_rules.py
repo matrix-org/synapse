@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import threading
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Dict, Optional, Tuple
 from unittest.mock import Mock
 
 from synapse.api.constants import EventTypes
+from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.rest import admin
 from synapse.rest.client import login, room
-from synapse.types import Requester, StateMap
+from synapse.types import JsonDict, Requester, StateMap
 from synapse.util.frozenutils import unfreeze
 
 from tests import unittest
@@ -137,6 +138,49 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             access_token=self.tok,
         )
         self.assertEquals(channel.result["code"], b"403", channel.result)
+
+    def test_third_party_rules_workaround_syanpse_errors_pass_through(self):
+        """
+        Tests that the workaround introduced by https://github.com/matrix-org/synapse/pull/11042
+        is functional: that SynapseErrors are passed through from check_event_allowed
+        and bubble up to the web resource.
+
+        NEW MODULES SHOULD NOT MAKE USE OF THIS WORKAROUND!
+        This is a temporary workaround!
+        """
+
+        class NastyHackException(SynapseError):
+            def error_dict(self):
+                """
+                This overrides SynapseError's `error_dict` to nastily inject
+                JSON into the error response.
+                """
+                return super().error_dict() | {"nasty": "very"}
+
+        # patch the rules module with a Mock which will raise our hacky exception
+        # type
+        async def check(ev, state) -> Tuple[bool, Optional[JsonDict]]:
+            raise NastyHackException(429, "message")
+
+        callback = Mock(spec=[], side_effect=check)
+        self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [
+            callback
+        ]
+
+        # Make a request
+        channel = self.make_request(
+            "PUT",
+            "/_matrix/client/r0/rooms/%s/send/foo.bar.forbidden/2" % self.room_id,
+            {},
+            access_token=self.tok,
+        )
+        # Check the error code
+        self.assertEquals(channel.result["code"], b"429", channel.result)
+        # Check the JSON body has had the `nasty` key injected
+        self.assertEqual(
+            channel.json_body,
+            {"errcode": "M_UNKNOWN", "error": "message", "nasty": "very"},
+        )
 
     def test_cannot_modify_event(self):
         """cannot accidentally modify an event before it is persisted"""
