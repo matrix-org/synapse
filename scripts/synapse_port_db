@@ -1069,7 +1069,7 @@ class CursesProgress(Progress):
 
         self.stdscr.addstr(0, 0, status, curses.A_BOLD)
 
-        max_len = max([len(t) for t in self.tables.keys()])
+        max_len = max(len(t) for t in self.tables.keys())
 
         left_margin = 5
         middle_space = 1

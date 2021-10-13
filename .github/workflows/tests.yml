@@ -122,6 +122,8 @@ jobs:
           SYNAPSE_POSTGRES_USER: postgres
           SYNAPSE_POSTGRES_PASSWORD: postgres
       - name: Dump logs
+        # Logs are most useful when the command fails, always include them.
+        if: ${{ always() }}
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
         #       It also ignores find's exit code; this is a best effort affair
@@ -146,6 +148,8 @@ jobs:
         env:
           TRIAL_FLAGS: "--jobs=2"
       - name: Dump logs
+        # Logs are most useful when the command fails, always include them.
+        if: ${{ always() }}
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
         #       It also ignores find's exit code; this is a best effort affair
@@ -176,6 +180,8 @@ jobs:
         env:
           TRIAL_FLAGS: "--jobs=2"
       - name: Dump logs
+        # Logs are most useful when the command fails, always include them.
+        if: ${{ always() }}
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
         #       It also ignores find's exit code; this is a best effort affair

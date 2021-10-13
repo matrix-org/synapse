@@ -1,0 +1,1 @@
+Fix inconsistent behavior of `get_last_client_by_ip` when reporting data that has not been stored in the database yet.

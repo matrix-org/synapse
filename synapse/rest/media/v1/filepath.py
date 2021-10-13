@@ -16,12 +16,15 @@
 import functools
 import os
 import re
-from typing import Any, Callable, List
+from typing import Any, Callable, List, TypeVar, cast
 
 NEW_FORMAT_ID_RE = re.compile(r"^\d\d\d\d-\d\d-\d\d")
 
 
-def _wrap_in_base_path(func: Callable[..., str]) -> Callable[..., str]:
+F = TypeVar("F", bound=Callable[..., str])
+
+
+def _wrap_in_base_path(func: F) -> F:
     """Takes a function that returns a relative path and turns it into an
     absolute path based on the location of the primary media store
     """
@@ -31,7 +34,7 @@ def _wrap_in_base_path(func: Callable[..., str]) -> Callable[..., str]:
         path = func(self, *args, **kwargs)
         return os.path.join(self.base_path, path)
 
-    return _wrapped
+    return cast(F, _wrapped)
 
 
 class MediaFilePaths:
