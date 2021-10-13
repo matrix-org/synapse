@@ -209,6 +209,41 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         in_public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
         self.assertEqual(set(in_public), {(user1, room), (user2, room)})
 
+    def test_excludes_users_when_making_room_public(self) -> None:
+        # Create a regular user and a support user.
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        support = "@support1:test"
+        self.get_success(
+            self.store.register_user(
+                user_id=support, password_hash=None, user_type=UserTypes.SUPPORT
+            )
+        )
+
+        # Make a public and private room containing Alice and the support user
+        public, initially_private = self._create_rooms_and_inject_memberships(
+            alice, alice_token, support
+        )
+        self._check_only_one_user_in_directory(alice, public)
+
+        # Alice makes the private room public.
+        self.helper.send_state(
+            initially_private,
+            "m.room.join_rules",
+            {"join_rule": "public"},
+            tok=alice_token,
+        )
+
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        in_public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        in_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+
+        self.assertEqual(users, {alice})
+        self.assertEqual(set(in_public), {(alice, public), (alice, initially_private)})
+        self.assertEqual(in_private, [])
+
     def _create_rooms_and_inject_memberships(
         self, creator: str, token: str, joiner: str
     ) -> Tuple[str, str]:
@@ -232,6 +267,12 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         return public_room, private_room
 
     def _check_only_one_user_in_directory(self, user: str, public: str) -> None:
+        """Check that the user directory DB tables show that:
+
+        - only one user is in the user directory
+        - they belong to exactly one public room
+        - they don't share a private room with anyone.
+        """
         users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
         in_public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
         in_private = self.get_success(
