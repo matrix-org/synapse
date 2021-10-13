@@ -599,14 +599,20 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             auth_provider: identifier for the remote auth provider
             external_id: id on that system
             user_id: complete mxid that it is mapped to
+        Raises:
+            ExternalIDReuseException if the new external_id could not be mapped.
         """
-        await self.db_pool.runInteraction(
-            "record_user_external_id",
-            self._record_user_external_id_txn,
-            auth_provider,
-            external_id,
-            user_id,
-        )
+
+        try:
+            await self.db_pool.runInteraction(
+                "record_user_external_id",
+                self._record_user_external_id_txn,
+                auth_provider,
+                external_id,
+                user_id,
+            )
+        except self.database_engine.module.IntegrityError:
+            raise ExternalIDReuseException()
 
     def _record_user_external_id_txn(
         self,

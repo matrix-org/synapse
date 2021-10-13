@@ -2023,7 +2023,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # must fail
         self.assertEqual(409, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
-        self.assertEqual("External id already in use.", channel.json_body["error"])
+        self.assertEqual("External id is already in use.", channel.json_body["error"])
 
         # other user must not changed
         channel = self.make_request(

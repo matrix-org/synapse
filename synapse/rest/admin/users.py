@@ -282,7 +282,7 @@ class UserRestServletV2(RestServlet):
                         user_id,
                     )
                 except ExternalIDReuseException:
-                    raise SynapseError(409, "External id already in use.")
+                    raise SynapseError(409, "External id is already in use.")
 
             if "avatar_url" in body and isinstance(body["avatar_url"], str):
                 await self.profile_handler.set_avatar_url(
@@ -370,12 +370,15 @@ class UserRestServletV2(RestServlet):
                         )
 
             if external_ids is not None:
-                for auth_provider, external_id in new_external_ids:
-                    await self.store.record_user_external_id(
-                        auth_provider,
-                        external_id,
-                        user_id,
-                    )
+                try:
+                    for auth_provider, external_id in new_external_ids:
+                        await self.store.record_user_external_id(
+                            auth_provider,
+                            external_id,
+                            user_id,
+                        )
+                except ExternalIDReuseException:
+                    raise SynapseError(409, "External id is already in use.")
 
             if "avatar_url" in body and isinstance(body["avatar_url"], str):
                 await self.profile_handler.set_avatar_url(
