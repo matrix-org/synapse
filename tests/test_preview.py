@@ -15,7 +15,7 @@
 from synapse.rest.media.v1.preview_url_resource import (
     _calc_og,
     decode_body,
-    get_html_media_encoding,
+    get_html_media_encodings,
     summarize_paragraphs,
 )
 
@@ -306,11 +306,25 @@ class CalcOgTestCase(unittest.TestCase):
         og = _calc_og(tree, "http://example.com/test.html")
         self.assertEqual(og, {"og:title": "ÿÿ Foo", "og:description": "Some text."})
 
+    def test_windows_1252(self):
+        """A body which uses windows-1252, but doesn't declare that."""
+        html = b"""
+        <html>
+        <head><title>\xf3</title></head>
+        <body>
+        Some text.
+        </body>
+        </html>
+        """
+        tree = decode_body(html)
+        og = _calc_og(tree, "http://example.com/test.html")
+        self.assertEqual(og, {"og:title": "ó", "og:description": "Some text."})
+
 
 class MediaEncodingTestCase(unittest.TestCase):
     def test_meta_charset(self):
         """A character encoding is found via the meta tag."""
-        encoding = get_html_media_encoding(
+        encodings = get_html_media_encodings(
             b"""
         <html>
         <head><meta charset="ascii">
@@ -319,10 +333,10 @@ class MediaEncodingTestCase(unittest.TestCase):
         """,
             "text/html",
         )
-        self.assertEqual(encoding, "ascii")
+        self.assertEqual(list(encodings), ["ascii", "utf-8", "windows-1252"])
 
         # A less well-formed version.
-        encoding = get_html_media_encoding(
+        encodings = get_html_media_encodings(
             b"""
         <html>
         <head>< meta charset = ascii>
@@ -331,11 +345,11 @@ class MediaEncodingTestCase(unittest.TestCase):
         """,
             "text/html",
         )
-        self.assertEqual(encoding, "ascii")
+        self.assertEqual(list(encodings), ["ascii", "utf-8", "windows-1252"])
 
     def test_meta_charset_underscores(self):
         """A character encoding contains underscore."""
-        encoding = get_html_media_encoding(
+        encodings = get_html_media_encodings(
             b"""
         <html>
         <head><meta charset="Shift_JIS">
@@ -344,11 +358,11 @@ class MediaEncodingTestCase(unittest.TestCase):
         """,
             "text/html",
         )
-        self.assertEqual(encoding, "Shift_JIS")
+        self.assertEqual(list(encodings), ["Shift_JIS", "utf-8", "windows-1252"])
 
     def test_xml_encoding(self):
         """A character encoding is found via the meta tag."""
-        encoding = get_html_media_encoding(
+        encodings = get_html_media_encodings(
             b"""
         <?xml version="1.0" encoding="ascii"?>
         <html>
@@ -356,11 +370,11 @@ class MediaEncodingTestCase(unittest.TestCase):
         """,
             "text/html",
         )
-        self.assertEqual(encoding, "ascii")
+        self.assertEqual(list(encodings), ["ascii", "utf-8", "windows-1252"])
 
     def test_meta_xml_encoding(self):
         """Meta tags take precedence over XML encoding."""
-        encoding = get_html_media_encoding(
+        encodings = get_html_media_encodings(
             b"""
         <?xml version="1.0" encoding="ascii"?>
         <html>
@@ -370,7 +384,7 @@ class MediaEncodingTestCase(unittest.TestCase):
         """,
             "text/html",
         )
-        self.assertEqual(encoding, "UTF-16")
+        self.assertEqual(list(encodings), ["UTF-16", "ascii", "utf-8", "windows-1252"])
 
     def test_content_type(self):
         """A character encoding is found via the Content-Type header."""
@@ -384,10 +398,10 @@ class MediaEncodingTestCase(unittest.TestCase):
             'text/html; charset=ascii";',
         )
         for header in headers:
-            encoding = get_html_media_encoding(b"", header)
-            self.assertEqual(encoding, "ascii")
+            encodings = get_html_media_encodings(b"", header)
+            self.assertEqual(list(encodings), ["ascii", "utf-8", "windows-1252"])
 
     def test_fallback(self):
         """A character encoding cannot be found in the body or header."""
-        encoding = get_html_media_encoding(b"", "text/html")
-        self.assertEqual(encoding, "utf-8")
+        encodings = get_html_media_encodings(b"", "text/html")
+        self.assertEqual(list(encodings), ["utf-8", "windows-1252"])
