@@ -66,11 +66,11 @@ class AdminCmdServer(HomeServer):
     DATASTORE_CLASS = AdminCmdSlavedStore
 
 
-async def export_data_command(hs, args):
+async def export_data_command(hs: HomeServer, args):
     """Export data for a user.
 
     Args:
-        hs (HomeServer)
+        hs
         args (argparse.Namespace)
     """
 

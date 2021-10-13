@@ -13,12 +13,16 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING
 
 from synapse.storage.database import DatabasePool, make_conn
 from synapse.storage.databases.main.events import PersistEventsStore
 from synapse.storage.databases.state import StateGroupDataStore
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +36,7 @@ class Databases:
         main (DataStore)
     """
 
-    def __init__(self, main_store_class, hs):
+    def __init__(self, main_store_class, hs: "HomeServer"):
         # Note we pass in the main store class here as workers use a different main
         # store.
 

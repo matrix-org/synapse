@@ -294,7 +294,7 @@ def listen_ssl(
     return r
 
 
-def refresh_certificate(hs):
+def refresh_certificate(hs: "HomeServer"):
     """
     Refresh the TLS certificates that Synapse is using by re-reading them from
     disk and updating the TLS context factories to use them.
@@ -419,11 +419,11 @@ async def start(hs: "HomeServer"):
         atexit.register(gc.freeze)
 
 
-def setup_sentry(hs):
+def setup_sentry(hs: "HomeServer"):
     """Enable sentry integration, if enabled in configuration
 
     Args:
-        hs (synapse.server.HomeServer)
+        hs
     """
 
     if not hs.config.metrics.sentry_enabled:
@@ -449,7 +449,7 @@ def setup_sentry(hs):
         scope.set_tag("worker_name", name)
 
 
-def setup_sdnotify(hs):
+def setup_sdnotify(hs: "HomeServer"):
     """Adds process state hooks to tell systemd what we are up to."""
 
     # Tell systemd our state, if we're using it. This will silently fail if

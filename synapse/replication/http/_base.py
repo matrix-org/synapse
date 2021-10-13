@@ -156,7 +156,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         pass
 
     @classmethod
-    def make_client(cls, hs):
+    def make_client(cls, hs: "HomeServer"):
         """Create a client that makes requests.
 
         Returns a callable that accepts the same parameters as

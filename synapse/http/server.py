@@ -22,6 +22,7 @@ import urllib
 from http import HTTPStatus
 from inspect import isawaitable
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -60,6 +61,9 @@ from synapse.logging.opentracing import trace_servlet
 from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
 from synapse.util.iterutils import chunk_seq
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -363,7 +367,7 @@ class JsonResource(DirectServeJsonResource):
         "_PathEntry", ["pattern", "callback", "servlet_classname"]
     )
 
-    def __init__(self, hs, canonical_json=True, extract_context=False):
+    def __init__(self, hs: "HomeServer", canonical_json=True, extract_context=False):
         super().__init__(canonical_json, extract_context)
         self.clock = hs.get_clock()
         self.path_regexs = {}
