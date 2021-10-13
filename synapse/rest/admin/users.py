@@ -35,6 +35,7 @@ from synapse.rest.admin._base import (
     assert_user_is_admin,
 )
 from synapse.rest.client._base import client_patterns
+from synapse.storage.databases.main.registration import ExternalIDReuseException
 from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.types import JsonDict, UserID
 
@@ -282,11 +283,14 @@ class UserRestServletV2(RestServlet):
                 add_external_ids = new_external_ids - cur_external_ids
                 del_external_ids = cur_external_ids - new_external_ids
 
-                await self.store.record_and_remove_user_external_id(
-                    add_external_ids,
-                    del_external_ids,
-                    user_id,
-                )
+                try:
+                    await self.store.record_and_remove_user_external_id(
+                        add_external_ids,
+                        del_external_ids,
+                        user_id,
+                    )
+                except ExternalIDReuseException:
+                    raise SynapseError(409, "External id already in use.")
 
             if "avatar_url" in body and isinstance(body["avatar_url"], str):
                 await self.profile_handler.set_avatar_url(

@@ -44,6 +44,12 @@ THIRTY_MINUTES_IN_MS = 30 * 60 * 1000
 logger = logging.getLogger(__name__)
 
 
+class ExternalIDReuseException(Exception):
+    """Exception if writing an external id for a user fails,
+    because this external id is given to an other user."""
+    pass
+
+
 @attr.s(frozen=True, slots=True)
 class TokenLookupResult:
     """Result of looking up an access token.
@@ -673,7 +679,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 set with tuple of auth_provider and external_id to remove
             user_id: complete mxid that it is mapped to
         Raises:
-            StoreError if the new external_id could not be mapped.
+            ExternalIDReuseException if the new external_id could not be mapped.
         """
 
         def _record_and_remove_user_external_id_txn(
@@ -701,7 +707,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 _record_and_remove_user_external_id_txn,
             )
         except self.database_engine.module.IntegrityError:
-            raise StoreError(409, "External id already in use.")
+            raise ExternalIDReuseException()
 
     async def get_user_by_external_id(
         self, auth_provider: str, external_id: str
