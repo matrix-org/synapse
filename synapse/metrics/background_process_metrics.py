@@ -302,7 +302,7 @@ def wrap_as_background_process(desc: str) -> Callable[[F], F]:
     """
 
     # NB: Return type is incorrect and should be F with a Deferred[Optional[R]] return
-    #     We can't expression the return types correctly until Python 3.10.
+    #     We can't express the return types correctly until Python 3.10.
     def wrap_as_background_process_inner(func: F) -> F:
         @wraps(func)
         def wrap_as_background_process_inner_2(
