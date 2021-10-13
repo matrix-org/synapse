@@ -229,12 +229,12 @@ class UserRestServletV2(RestServlet):
         if not isinstance(deactivate, bool):
             raise SynapseError(400, "'deactivated' parameter is not of type boolean")
 
-        # convert List[Dict[str, str]] into Set[Tuple[str, str]]
+        # convert List[Dict[str, str]] into List[Tuple[str, str]]
         if external_ids is not None:
-            new_external_ids = {
+            new_external_ids = [
                 (external_id["auth_provider"], external_id["external_id"])
                 for external_id in external_ids
-            }
+            ]
 
         # convert List[Dict[str, str]] into Set[Tuple[str, str]]
         if threepids is not None:
@@ -276,17 +276,9 @@ class UserRestServletV2(RestServlet):
                     )
 
             if external_ids is not None:
-                # get changed external_ids (added and removed)
-                cur_external_ids = set(
-                    await self.store.get_external_ids_by_user(user_id)
-                )
-                add_external_ids = new_external_ids - cur_external_ids
-                del_external_ids = cur_external_ids - new_external_ids
-
                 try:
-                    await self.store.record_and_remove_user_external_id(
-                        add_external_ids,
-                        del_external_ids,
+                    await self.store.replace_user_external_id(
+                        new_external_ids,
                         user_id,
                     )
                 except ExternalIDReuseException:
