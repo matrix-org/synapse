@@ -159,14 +159,11 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
                 result["nasty"] = "very"
                 return result
 
-        # patch the rules module with a Mock which will raise our hacky exception
-        # type
+        # add a callback that will raise our hacky exception
         async def check(ev, state) -> Tuple[bool, Optional[JsonDict]]:
             raise NastyHackException(429, "message")
 
-        self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [
-            check
-        ]
+        self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [check]
 
         # Make a request
         channel = self.make_request(
