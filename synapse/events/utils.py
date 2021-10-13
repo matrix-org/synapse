@@ -385,9 +385,7 @@ class EventClientSerializer:
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
-        self.experimental_msc1849_support_enabled = (
-            hs.config.server.experimental_msc1849_support_enabled
-        )
+        self._msc1849_enabled = hs.config.experimental.msc1849_enabled
 
     async def serialize_event(
         self,
@@ -418,7 +416,7 @@ class EventClientSerializer:
         # we need to bundle in with the event.
         # Do not bundle relations if the event has been redacted
         if not event.internal_metadata.is_redacted() and (
-            self.experimental_msc1849_support_enabled and bundle_aggregations
+            self._msc1849_enabled and bundle_aggregations
         ):
             annotations = await self.store.get_aggregation_groups_for_event(event_id)
             references = await self.store.get_relations_for_event(

@@ -376,11 +376,6 @@ class ServerConfig(Config):
         # (other than those sent by local server admins)
         self.block_non_admin_invites = config.get("block_non_admin_invites", False)
 
-        # Whether to enable experimental MSC1849 (aka relations) support
-        self.experimental_msc1849_support_enabled = config.get(
-            "experimental_msc1849_support_enabled", True
-        )
-
         # Options to control access by tracking MAU
         self.limit_usage_by_mau = config.get("limit_usage_by_mau", False)
         self.max_mau_value = 0
