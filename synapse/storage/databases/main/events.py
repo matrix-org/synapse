@@ -1710,6 +1710,7 @@ class PersistEventsStore:
             RelationTypes.ANNOTATION,
             RelationTypes.REFERENCE,
             RelationTypes.REPLACE,
+            RelationTypes.THREAD,
         ):
             # Unknown relation type
             return
