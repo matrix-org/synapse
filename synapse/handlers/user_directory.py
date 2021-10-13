@@ -282,21 +282,25 @@ class UserDirectoryHandler(StateDeltasHandler):
         event_id: str,
         state_key: str,
     ) -> None:
+        """Process a single room membershp event.
+
+        We have to do two things:
+
+        1. Update the room-sharing tables.
+           This applies to remote users and non-excluded local users.
+        2. Update the user_directory and user_directory_search tables.
+           This applies to remote users only, because we only become aware of
+           the (and any profile changes) by listening to these events.
+           The rest of the application knows exactly when local users are
+           created or their profile changed---it will directly call methods
+           on this class.
+        """
         joined = await self._get_key_change(
             prev_event_id,
             event_id,
             key_name="membership",
             public_value=Membership.JOIN,
         )
-        # We have to do two things:
-        # 1. Update the room-sharing tables.
-        #    This applies to remote users and non-excluded local users.
-        # 2. Update the user_directory and user_directory_search tables.
-        #    This applies to remote users only, because we only become aware of
-        #    the (and any profile changes) by listening to these events.
-        #    The rest of the application knows exactly when local users are
-        #    created or their profile changed---it will directly call methods
-        #    on this class.
 
         # Both cases ignore excluded local users, so start by discarding them.
         is_remote = not self.is_mine_id(state_key)
