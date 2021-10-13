@@ -29,18 +29,18 @@ async def check_auth(
 ]
 ```
 
-The login type and field names are the things that should be provided by the user in their
+The login type and field names should be provided by the user in the
 request to the `/login` API. [The spec](https://matrix.org/docs/spec/client_server/latest#authentication-types)
 defines some types, however user defined ones are also allowed.
 
-It is passed the user field provided by the client (which might not be in `@username:server` form), 
+The callback is passed the `user` field provided by the client (which might not be in `@username:server` form), 
 the login type, and a dictionary of login secrets passed by the client.
 
 If the authentication is successful, the module must return the user's Matrix ID (e.g. 
 `@alice:example.com`) and optionally a callback to be called with the response to the `/login` request.
-If the module doesn't wish to return a callback, it must return None instead.
+If the module doesn't wish to return a callback, it must return `None` instead.
 
-If the authentication is unsuccessful, the module must return None.
+If the authentication is unsuccessful, the module must return `None`.
 
 ### `check_3pid_auth`
 
