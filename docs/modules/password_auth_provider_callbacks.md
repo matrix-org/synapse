@@ -18,7 +18,7 @@ callbacks, which should be of the following form:
 
 ```python
 async def check_auth(
-    username: str,
+    user: str,
     login_type: str,
     login_dict: "synapse.module_api.JsonDict",
 ) -> Optional[
@@ -30,15 +30,17 @@ async def check_auth(
 ```
 
 The login type and field names should be provided by the user in the
-request to the `/login` API. [The spec](https://matrix.org/docs/spec/client_server/latest#authentication-types)
+request to the `/login` API. [The Matrix specification](https://matrix.org/docs/spec/client_server/latest#authentication-types)
 defines some types, however user defined ones are also allowed.
 
-The callback is passed the `user` field provided by the client (which might not be in `@username:server` form), 
-the login type, and a dictionary of login secrets passed by the client.
+The callback is passed the `user` field provided by the client (which might not be in
+`@username:server` form), the login type, and a dictionary of login secrets passed by
+the client.
 
 If the authentication is successful, the module must return the user's Matrix ID (e.g. 
-`@alice:example.com`) and optionally a callback to be called with the response to the `/login` request.
-If the module doesn't wish to return a callback, it must return `None` instead.
+`@alice:example.com`) and optionally a callback to be called with the response to the
+`/login` request. If the module doesn't wish to return a callback, it must return `None`
+instead.
 
 If the authentication is unsuccessful, the module must return `None`.
 
