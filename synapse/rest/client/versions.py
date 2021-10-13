@@ -91,7 +91,7 @@ class VersionsRestServlet(RestServlet):
                     # Supports the busy presence state described in MSC3026.
                     "org.matrix.msc3026.busy_presence": self.config.experimental.msc3026_enabled,
                     # Supports receiving hidden read receipts as per MSC2285
-                    "org.matrix.msc2285": self.config.experimental.msc2285_enabled,
+                    "org.matrix.msc2285": True,
                 },
             },
         )

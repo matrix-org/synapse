@@ -155,9 +155,7 @@ class ReceiptsHandler:
         if not is_new:
             return
 
-        if self.federation_sender and not (
-            self.hs.config.experimental.msc2285_enabled and hidden
-        ):
+        if self.federation_sender and not hidden:
             await self.federation_sender.send_read_receipt(receipt)
 
 
@@ -233,8 +231,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
             room_ids, from_key=from_key, to_key=to_key
         )
 
-        if self.config.experimental.msc2285_enabled:
-            events = ReceiptEventSource.filter_out_hidden(events, user.to_string())
+        events = ReceiptEventSource.filter_out_hidden(events, user.to_string())
 
         return events, to_key
 
