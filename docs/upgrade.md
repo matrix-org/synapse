@@ -187,8 +187,8 @@ of this endpoint modifying the media store.
 
 The current third-party rules module interface is deprecated in favour of the new generic
 modules system introduced in Synapse v1.37.0. Authors of third-party rules modules can refer
-to [this documentation](modules.md#porting-an-existing-module-that-uses-the-old-interface)
-to update their modules. Synapse administrators can refer to [this documentation](modules.md#using-modules)
+to [this documentation](modules/porting_legacy_module.md)
+to update their modules. Synapse administrators can refer to [this documentation](modules/index.md)
 to update their configuration once the modules they are using have been updated.
 
 We plan to remove support for the current third-party rules interface in September 2021.
@@ -237,9 +237,9 @@ SQLite databases are unaffected by this change.
 
 The current spam checker interface is deprecated in favour of a new generic modules system.
 Authors of spam checker modules can refer to [this
-documentation](modules.md#porting-an-existing-module-that-uses-the-old-interface)
+documentation](modules/porting_legacy_module.md
 to update their modules. Synapse administrators can refer to [this
-documentation](modules.md#using-modules)
+documentation](modules/index.md)
 to update their configuration once the modules they are using have been updated.
 
 We plan to remove support for the current spam checker interface in August 2021.
