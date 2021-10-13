@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import threading
-from typing import Dict
+from typing import TYPE_CHECKING, Dict
 from unittest.mock import Mock
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
-from synapse.module_api import ModuleApi
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.types import Requester, StateMap
@@ -26,11 +25,14 @@ from synapse.util.frozenutils import unfreeze
 
 from tests import unittest
 
+if TYPE_CHECKING:
+    from synapse.module_api import ModuleApi
+
 thread_local = threading.local()
 
 
 class LegacyThirdPartyRulesTestModule:
-    def __init__(self, config: Dict, module_api: ModuleApi):
+    def __init__(self, config: Dict, module_api: "ModuleApi"):
         # keep a record of the "current" rules module, so that the test can patch
         # it if desired.
         thread_local.rules_module = self
@@ -50,7 +52,7 @@ class LegacyThirdPartyRulesTestModule:
 
 
 class LegacyDenyNewRooms(LegacyThirdPartyRulesTestModule):
-    def __init__(self, config: Dict, module_api: ModuleApi):
+    def __init__(self, config: Dict, module_api: "ModuleApi"):
         super().__init__(config, module_api)
 
     def on_create_room(
@@ -60,7 +62,7 @@ class LegacyDenyNewRooms(LegacyThirdPartyRulesTestModule):
 
 
 class LegacyChangeEvents(LegacyThirdPartyRulesTestModule):
-    def __init__(self, config: Dict, module_api: ModuleApi):
+    def __init__(self, config: Dict, module_api: "ModuleApi"):
         super().__init__(config, module_api)
 
     async def check_event_allowed(self, event: EventBase, state: StateMap[EventBase]):
