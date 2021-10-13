@@ -101,10 +101,10 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
     def test_basic_paginate_relations(self):
         """Tests that calling pagination API correctly the latest relations."""
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction")
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
         self.assertEquals(200, channel.code, channel.json_body)
 
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction")
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "b")
         self.assertEquals(200, channel.code, channel.json_body)
         annotation_id = channel.json_body["event_id"]
 
@@ -141,8 +141,10 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         """
 
         expected_event_ids = []
-        for _ in range(10):
-            channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction")
+        for idx in range(10):
+            channel = self._send_relation(
+                RelationTypes.ANNOTATION, "m.reaction", chr(ord("a") + idx)
+            )
             self.assertEquals(200, channel.code, channel.json_body)
             expected_event_ids.append(channel.json_body["event_id"])
 
@@ -559,7 +561,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             {
                 "m.relates_to": {
                     "event_id": self.parent_id,
-                    "key": None,
                     "rel_type": "m.reference",
                 }
             },
