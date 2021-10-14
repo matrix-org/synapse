@@ -238,18 +238,10 @@ class FederationHandler:
             )
             return False
 
-        logger.debug(
-            "room_id: %s, backfill: current_depth: %s, max_depth: %s, extrems: %s",
-            room_id,
-            current_depth,
-            max_depth,
-            sorted_extremeties_tuple,
-        )
-
         # We ignore extremities that have a greater depth than our current depth
         # as:
         #    1. we don't really care about getting events that have happened
-        #       before our current position; and
+        #       after our current position; and
         #    2. we have likely previously tried and failed to backfill from that
         #       extremity, so to avoid getting "stuck" requesting the same
         #       backfill repeatedly we drop those extremities.
@@ -257,9 +249,19 @@ class FederationHandler:
             t for t in sorted_extremeties_tuple if int(t[1]) <= current_depth
         ]
 
+        logger.debug(
+            "room_id: %s, backfill: current_depth: %s, limit: %s, max_depth: %s, extrems: %s filtered_sorted_extremeties_tuple: %s",
+            room_id,
+            current_depth,
+            limit,
+            max_depth,
+            sorted_extremeties_tuple,
+            filtered_sorted_extremeties_tuple,
+        )
+
         # However, we need to check that the filtered extremities are non-empty.
         # If they are empty then either we can a) bail or b) still attempt to
-        # backill. We opt to try backfilling anyway just in case we do get
+        # backfill. We opt to try backfilling anyway just in case we do get
         # relevant events.
         if filtered_sorted_extremeties_tuple:
             sorted_extremeties_tuple = filtered_sorted_extremeties_tuple
@@ -389,7 +391,7 @@ class FederationHandler:
             for key, state_dict in states.items()
         }
 
-        for e_id, _ in sorted_extremeties_tuple:
+        for e_id in event_ids:
             likely_extremeties_domains = get_domains_from_state(states[e_id])
 
             success = await try_backfill(
