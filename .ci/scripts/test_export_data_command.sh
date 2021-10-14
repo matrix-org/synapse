@@ -8,7 +8,7 @@ cd `dirname $0`/../..
 echo "--- Install dependencies"
 
 # Install dependencies for this test.
-pip install psycopg2 coverage coverage-enable-subprocess
+pip install psycopg2
 
 # Install Synapse itself. This won't update any libraries.
 pip install -e .
@@ -21,7 +21,7 @@ python -m synapse.app.homeserver --generate-keys -c .ci/sqlite-config.yaml
 echo "--- Prepare test database"
 
 # Make sure the SQLite3 database is using the latest schema and has no pending background update.
-scripts/update_synapse_database --database-config .ci/sqlite-config.yaml
+scripts/update_synapse_database --database-config .ci/sqlite-config.yaml --run-background-updates
 
 # Create the PostgreSQL database.
 .ci/scripts/postgres_exec.py "CREATE DATABASE synapse"
