@@ -1,1 +1,0 @@
-Add [MSC3069](https://github.com/matrix-org/matrix-doc/pull/3069) support to `/account/whoami`.

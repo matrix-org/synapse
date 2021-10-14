@@ -53,7 +53,6 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.federation.federation_client import InvalidResponseError
-from synapse.handlers._base import BaseHandler
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
     make_deferred_yieldable,
@@ -78,15 +77,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class FederationHandler(BaseHandler):
+class FederationHandler:
     """Handles general incoming federation requests
 
     Incoming events are *not* handled here, for which see FederationEventHandler.
     """
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
         self.hs = hs
 
         self.store = hs.get_datastore()
@@ -99,6 +96,7 @@ class FederationHandler(BaseHandler):
         self.is_mine_id = hs.is_mine_id
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.event_builder_factory = hs.get_event_builder_factory()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self.config = hs.config
