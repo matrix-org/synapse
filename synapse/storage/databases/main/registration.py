@@ -669,7 +669,6 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         """
 
         def _remove_user_external_ids_txn(
-            self,
             txn: LoggingTransaction,
             user_id: str,
         ) -> None:
