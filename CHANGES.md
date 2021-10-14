@@ -1,7 +1,7 @@
 Synapse 1.45.0rc2 (2021-10-14)
 ==============================
 
-**Note:** This release candidate [fixes](https://github.com/matrix-org/synapse/issues/11053) the user directory [bug](https://github.com/matrix-org/synapse/issues/11025) present in 1.45.0rc1. However, the [performance issue](https://github.com/matrix-org/synapse/issues/11049) mentioned in that release is yet to be resolved.
+**Note:** This release candidate [fixes](https://github.com/matrix-org/synapse/issues/11053) the user directory [bug](https://github.com/matrix-org/synapse/issues/11025) present in 1.45.0rc1. However, the [performance issue](https://github.com/matrix-org/synapse/issues/11049) which appeared in that release is yet to be resolved.
 
 Bugfixes
 --------
