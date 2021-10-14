@@ -41,3 +41,6 @@ class ExperimentalConfig(Config):
 
         # MSC3266 (room summary api)
         self.msc3266_enabled: bool = experimental.get("msc3266_enabled", False)
+
+        # MSC3440 (thread relation)
+        self.msc3440_enabled: bool = experimental.get("msc3440_enabled", False)

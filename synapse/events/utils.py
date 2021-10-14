@@ -388,6 +388,7 @@ class EventClientSerializer:
         self.experimental_msc1849_support_enabled = (
             hs.config.server.experimental_msc1849_support_enabled
         )
+        self._msc3440_enabled = hs.config.experimental.msc3440_enabled
 
     async def serialize_event(
         self,
@@ -465,21 +466,22 @@ class EventClientSerializer:
                 }
 
             # If this event is the start of a thread, include a summary of the replies.
-            (
-                thread_count,
-                thread_senders,
-                latest_thread_event,
-            ) = await self.store.get_thread_summary(event_id)
-            if latest_thread_event:
-                r = serialized_event["unsigned"].setdefault("m.relations", {})
-                r[RelationTypes.THREAD] = {
-                    # Don't bundle aggregations as this could recurse forever.
-                    "latest_event": await self.serialize_event(
-                        latest_thread_event, time_now, bundle_aggregations=False
-                    ),
-                    "senders": thread_senders,
-                    "count": thread_count,
-                }
+            if self._msc3440_enabled:
+                (
+                    thread_count,
+                    thread_senders,
+                    latest_thread_event,
+                ) = await self.store.get_thread_summary(event_id)
+                if latest_thread_event:
+                    r = serialized_event["unsigned"].setdefault("m.relations", {})
+                    r[RelationTypes.THREAD] = {
+                        # Don't bundle aggregations as this could recurse forever.
+                        "latest_event": await self.serialize_event(
+                            latest_thread_event, time_now, bundle_aggregations=False
+                        ),
+                        "senders": thread_senders,
+                        "count": thread_count,
+                    }
 
         return serialized_event
 

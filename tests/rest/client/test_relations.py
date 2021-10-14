@@ -388,6 +388,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEquals(400, channel.code, channel.json_body)
 
+    @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
     def test_aggregation_get_event(self):
         """Test that annotations, references, and threads get correctly bundled when
         getting the parent event.
