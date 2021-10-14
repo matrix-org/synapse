@@ -14,10 +14,9 @@
  */
 
 
---- Remove messages from the device_inbox table which where sent to an
---- allready deleted device.
---- This schould run as background task, it may take a little bit longer
---- to finish.
+-- Remove messages from the device_inbox table which were orphaned
+-- when a device was deleted using Synapse earlier than 1.46.0.
+-- This runs as background task, but may take a bit to finish.
 
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
   (6402, 'remove_deleted_devices_from_device_inbox', '{}');
