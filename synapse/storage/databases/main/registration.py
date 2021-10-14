@@ -652,34 +652,6 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="remove_user_external_id",
         )
 
-    async def remove_user_external_ids(
-        self, auth_provider: str, external_id: str, user_id: str
-    ) -> None:
-        """Remove all mappings from external user ids to a mxid
-
-        If these mappings are not found, this method does nothing.
-
-        Args:
-            user_id: complete mxid that it is mapped to
-        """
-        await self.db_pool.runInteraction(
-            "remove_user_external_ids",
-            self._remove_user_external_ids_txn,
-            user_id,
-        )
-
-    def _remove_user_external_ids_txn(
-        self,
-        txn: LoggingTransaction,
-        user_id: str,
-    ) -> None:
-
-        self.db_pool.simple_delete_txn(
-            txn,
-            table="user_external_ids",
-            keyvalues={"user_id": user_id},
-        )
-
     async def replace_user_external_id(
         self,
         record_external_ids: List[Tuple[str, str]],
@@ -696,10 +668,28 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             ExternalIDReuseException if the new external_id could not be mapped.
         """
 
+        def _remove_user_external_ids_txn(
+            self,
+            txn: LoggingTransaction,
+            user_id: str,
+        ) -> None:
+            """Remove all mappings from external user ids to a mxid
+            If these mappings are not found, this method does nothing.
+
+            Args:
+                user_id: complete mxid that it is mapped to
+            """
+
+            self.db_pool.simple_delete_txn(
+                txn,
+                table="user_external_ids",
+                keyvalues={"user_id": user_id},
+            )
+
         def _replace_user_external_id_txn(
             txn: LoggingTransaction,
         ):
-            self._remove_user_external_ids_txn(txn, user_id)
+            _remove_user_external_ids_txn(txn, user_id)
 
             for auth_provider, external_id in record_external_ids:
                 self._record_user_external_id_txn(
