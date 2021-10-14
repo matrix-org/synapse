@@ -287,13 +287,13 @@ class RelationsWorkerStore(SQLBaseStore):
             # Fetch the count of threaded events and the latest event ID.
             # TODO Should this only allow m.room.message events.
             sql = """
-                SELECT COUNT(DISTINCT event_id), event_id
+                SELECT event_id
                 FROM event_relations
                 INNER JOIN events USING (event_id)
                 WHERE
                     relates_to_id = ?
                     AND relation_type = ?
-                ORDER BY MAX(stream_ordering)
+                ORDER BY stream_ordering DESC
                 LIMIT 1
             """
 
@@ -302,7 +302,17 @@ class RelationsWorkerStore(SQLBaseStore):
             if row is None:
                 return 0, (), None
 
-            count, latest_event_id = row
+            latest_event_id = row[0]
+
+            sql = """
+                SELECT COUNT(event_id)
+                FROM event_relations
+                WHERE
+                    relates_to_id = ?
+                    AND relation_type = ?
+            """
+            txn.execute(sql, (event_id, RelationTypes.THREAD))
+            count = txn.fetchone()[0]
 
             # Fetch the threaded event senders.
             sql = """
