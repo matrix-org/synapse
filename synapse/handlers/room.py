@@ -76,8 +76,6 @@ from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.visibility import filter_events_for_client
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -88,15 +86,18 @@ id_server_scheme = "https://"
 FIVE_MINUTES_IN_MS = 5 * 60 * 1000
 
 
-class RoomCreationHandler(BaseHandler):
+class RoomCreationHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.hs = hs
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
         self.config = hs.config
+        self.request_ratelimiter = hs.get_request_ratelimiter()
 
         # Room state based off defined presets
         self._presets_dict: Dict[str, Dict[str, Any]] = {
@@ -162,7 +163,7 @@ class RoomCreationHandler(BaseHandler):
         Raises:
             ShadowBanError if the requester is shadow-banned.
         """
-        await self.ratelimit(requester)
+        await self.request_ratelimiter.ratelimit(requester)
 
         user_id = requester.user.to_string()
 
@@ -464,17 +465,35 @@ class RoomCreationHandler(BaseHandler):
         # the room has been created
         # Calculate the minimum power level needed to clone the room
         event_power_levels = power_levels.get("events", {})
+        if not isinstance(event_power_levels, dict):
+            event_power_levels = {}
         state_default = power_levels.get("state_default", 50)
+        try:
+            state_default_int = int(state_default)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            state_default_int = 50
         ban = power_levels.get("ban", 50)
-        needed_power_level = max(state_default, ban, max(event_power_levels.values()))
+        try:
+            ban = int(ban)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            ban = 50
+        needed_power_level = max(
+            state_default_int, ban, max(event_power_levels.values())
+        )
 
         # Get the user's current power level, this matches the logic in get_user_power_level,
         # but without the entire state map.
         user_power_levels = power_levels.setdefault("users", {})
+        if not isinstance(user_power_levels, dict):
+            user_power_levels = {}
         users_default = power_levels.get("users_default", 0)
         current_power_level = user_power_levels.get(user_id, users_default)
+        try:
+            current_power_level_int = int(current_power_level)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            current_power_level_int = 0
         # Raise the requester's power level in the new room if necessary
-        if current_power_level < needed_power_level:
+        if current_power_level_int < needed_power_level:
             user_power_levels[user_id] = needed_power_level
 
         await self._send_events_for_new_room(
@@ -665,7 +684,7 @@ class RoomCreationHandler(BaseHandler):
             raise SynapseError(403, "You are not permitted to create rooms")
 
         if ratelimit:
-            await self.ratelimit(requester)
+            await self.request_ratelimiter.ratelimit(requester)
 
         room_version_id = config.get(
             "room_version", self.config.server.default_room_version.identifier
@@ -860,6 +879,7 @@ class RoomCreationHandler(BaseHandler):
                     "invite",
                     ratelimit=False,
                     content=content,
+                    new_room=True,
                 )
 
         for invite_3pid in invite_3pid_list:
@@ -962,6 +982,7 @@ class RoomCreationHandler(BaseHandler):
             "join",
             ratelimit=ratelimit,
             content=creator_join_profile,
+            new_room=True,
         )
 
         # We treat the power levels override specially as this needs to be one

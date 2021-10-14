@@ -20,7 +20,7 @@ import inspect
 import logging
 import secrets
 import time
-from typing import Callable, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Callable, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union
 from unittest.mock import Mock, patch
 
 from canonicaljson import json
@@ -46,7 +46,7 @@ from synapse.logging.context import (
     set_current_context,
 )
 from synapse.server import HomeServer
-from synapse.types import UserID, create_requester
+from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.ratelimitutils import FederationRateLimiter
@@ -317,6 +317,15 @@ class HomeserverTestCase(TestCase):
             self.reactor.advance(0.01)
             time.sleep(0.01)
 
+    def wait_for_background_updates(self) -> None:
+        """Block until all background database updates have completed."""
+        while not self.get_success(
+            self.store.db_pool.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
+            )
+
     def make_homeserver(self, reactor, clock):
         """
         Make and return a homeserver.
@@ -392,7 +401,7 @@ class HomeserverTestCase(TestCase):
         self,
         method: Union[bytes, str],
         path: Union[bytes, str],
-        content: Union[bytes, dict] = b"",
+        content: Union[bytes, str, JsonDict] = b"",
         access_token: Optional[str] = None,
         request: Type[T] = SynapseRequest,
         shorthand: bool = True,
@@ -449,7 +458,7 @@ class HomeserverTestCase(TestCase):
             client_ip,
         )
 
-    def setup_test_homeserver(self, *args, **kwargs):
+    def setup_test_homeserver(self, *args: Any, **kwargs: Any) -> HomeServer:
         """
         Set up the test homeserver, meant to be called by the overridable
         make_homeserver. It automatically passes through the test class's
@@ -560,7 +569,7 @@ class HomeserverTestCase(TestCase):
         Returns:
             The MXID of the new user.
         """
-        self.hs.config.registration_shared_secret = "shared"
+        self.hs.config.registration.registration_shared_secret = "shared"
 
         # Create the user
         channel = self.make_request("GET", "/_synapse/admin/v1/register")
@@ -595,6 +604,35 @@ class HomeserverTestCase(TestCase):
 
         user_id = channel.json_body["user_id"]
         return user_id
+
+    def register_appservice_user(
+        self,
+        username: str,
+        appservice_token: str,
+    ) -> str:
+        """Register an appservice user as an application service.
+        Requires the client-facing registration API be registered.
+
+        Args:
+            username: the user to be registered by an application service.
+                Should be a full username, i.e. ""@localpart:hostname" as opposed to just "localpart"
+            appservice_token: the acccess token for that application service.
+
+        Raises: if the request to '/register' does not return 200 OK.
+
+        Returns: the MXID of the new user.
+        """
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/register",
+            {
+                "username": username,
+                "type": "m.login.application_service",
+            },
+            access_token=appservice_token,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        return channel.json_body["user_id"]
 
     def login(
         self,

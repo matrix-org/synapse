@@ -403,10 +403,10 @@ class HttpPusher(Pusher):
             rejected = resp["rejected"]
         return rejected
 
-    async def _send_badge(self, badge):
+    async def _send_badge(self, badge: int) -> None:
         """
         Args:
-            badge (int): number of unread messages
+            badge: number of unread messages
         """
         logger.debug("Sending updated badge count %d to %s", badge, self.name)
         d = {

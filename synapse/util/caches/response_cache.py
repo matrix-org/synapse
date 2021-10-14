@@ -104,8 +104,8 @@ class ResponseCache(Generic[KV]):
             return None
 
     def _set(
-        self, context: ResponseCacheContext[KV], deferred: defer.Deferred
-    ) -> defer.Deferred:
+        self, context: ResponseCacheContext[KV], deferred: "defer.Deferred[RV]"
+    ) -> "defer.Deferred[RV]":
         """Set the entry for the given key to the given deferred.
 
         *deferred* should run its callbacks in the sentinel logcontext (ie,
@@ -126,7 +126,7 @@ class ResponseCache(Generic[KV]):
         key = context.cache_key
         self.pending_result_cache[key] = result
 
-        def on_complete(r):
+        def on_complete(r: RV) -> RV:
             # if this cache has a non-zero timeout, and the callback has not cleared
             # the should_cache bit, we leave it in the cache for now and schedule
             # its removal later.

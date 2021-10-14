@@ -487,6 +487,10 @@ def _upgrade_existing_database(
                 spec = importlib.util.spec_from_file_location(
                     module_name, absolute_path
                 )
+                if spec is None:
+                    raise RuntimeError(
+                        f"Could not build a module spec for {module_name} at {absolute_path}"
+                    )
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)  # type: ignore
 
@@ -545,6 +549,8 @@ def _apply_module_schemas(
         database_engine:
         config: application config
     """
+    # This is the old way for password_auth_provider modules to make changes
+    # to the database. This should instead be done using the module API
     for (mod, _config) in config.authproviders.password_providers:
         if not hasattr(mod, "get_db_schema_files"):
             continue
