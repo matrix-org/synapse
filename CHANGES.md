@@ -1,3 +1,26 @@
+Synapse 1.45.0rc2 (2021-10-14)
+==============================
+
+**Note:** This release candidate [fixes](https://github.com/matrix-org/synapse/issues/11053) the user directory [bug](https://github.com/matrix-org/synapse/issues/11025) present in 1.45.0rc1. However, the [performance issue](https://github.com/matrix-org/synapse/issues/11049) which appeared in v1.44.0 is yet to be resolved.
+
+Bugfixes
+--------
+
+- Fix a long-standing bug when using multiple event persister workers where events were not correctly sent down `/sync` due to a race. ([\#11045](https://github.com/matrix-org/synapse/issues/11045))
+- Fix a bug introduced in Synapse 1.45.0rc1 where the user directory would stop updating if it processed an event from a
+  user not in the `users` table. ([\#11053](https://github.com/matrix-org/synapse/issues/11053))
+- Fix a bug introduced in Synapse v1.44.0 when logging errors during oEmbed processing. ([\#11061](https://github.com/matrix-org/synapse/issues/11061))
+
+
+Internal Changes
+----------------
+
+- Add an 'approximate difference' method to `StateFilter`. ([\#10825](https://github.com/matrix-org/synapse/issues/10825))
+- Fix inconsistent behavior of `get_last_client_by_ip` when reporting data that has not been stored in the database yet. ([\#10970](https://github.com/matrix-org/synapse/issues/10970))
+- Fix a bug introduced in Synapse 1.21.0 that causes opentracing and Prometheus metrics for replication requests to be measured incorrectly. ([\#10996](https://github.com/matrix-org/synapse/issues/10996))
+- Ensure that cache config tests do not share state. ([\#11036](https://github.com/matrix-org/synapse/issues/11036))
+
+
 Synapse 1.45.0rc1 (2021-10-12)
 ==============================
 
