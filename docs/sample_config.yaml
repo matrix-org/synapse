@@ -2671,7 +2671,7 @@ state_compressor:
   #
   #chunk_size: 1000
 
-  # The number of chunks to compress on each run. Defaults to 50.
+  # The number of chunks to compress on each run. Defaults to 100.
   #
   #number_of_chunks: 1
 
