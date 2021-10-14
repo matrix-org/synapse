@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import codecs
 import datetime
 import errno
 import fnmatch
@@ -22,7 +23,7 @@ import re
 import shutil
 import sys
 import traceback
-from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Set, Tuple, Union
 from urllib import parse as urlparse
 
 import attr
@@ -631,6 +632,11 @@ class PreviewUrlResource(DirectServeJsonResource):
             logger.debug("No media removed from url cache")
 
 
+def _normalise_encoding(encoding: str) -> str:
+    """Use the Python codec's name as the normalised entry."""
+    return codecs.lookup(encoding).name
+
+
 def get_html_media_encodings(body: bytes, content_type: Optional[str]) -> Iterable[str]:
     """
     Get potential encoding of the body based on the (presumably) HTML body or the content-type header.
@@ -652,30 +658,42 @@ def get_html_media_encodings(body: bytes, content_type: Optional[str]) -> Iterab
     Returns:
         The character encoding of the body, as a string.
     """
+    # There's no point in returning an encoding more than once.
+    attempted_encodings: Set[str] = set()
+
     # Limit searches to the first 1kb, since it ought to be at the top.
     body_start = body[:1024]
 
     # Check if it has an encoding set in a meta tag.
     match = _charset_match.search(body_start)
     if match:
-        yield match.group(1).decode("ascii")
+        encoding = _normalise_encoding(match.group(1).decode("ascii"))
+        attempted_encodings.add(encoding)
+        yield encoding
 
     # TODO Support <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 
     # Check if it has an XML document with an encoding.
     match = _xml_encoding_match.match(body_start)
     if match:
-        yield match.group(1).decode("ascii")
+        encoding = _normalise_encoding(match.group(1).decode("ascii"))
+        if encoding not in attempted_encodings:
+            attempted_encodings.add(encoding)
+            yield encoding
 
     # Check the HTTP Content-Type header for a character set.
     if content_type:
         content_match = _content_type_match.match(content_type)
         if content_match:
-            yield content_match.group(1)
+            encoding = _normalise_encoding(content_match.group(1))
+            if encoding not in attempted_encodings:
+                attempted_encodings.add(encoding)
+                yield encoding
 
     # Finally, fallback to UTF-8, then windows-1252.
-    yield "utf-8"
-    yield "windows-1252"
+    for fallback in ("utf-8", "windows-1252"):
+        if fallback not in attempted_encodings:
+            yield fallback
 
 
 def decode_body(

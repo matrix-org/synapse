@@ -358,7 +358,7 @@ class MediaEncodingTestCase(unittest.TestCase):
         """,
             "text/html",
         )
-        self.assertEqual(list(encodings), ["Shift_JIS", "utf-8", "windows-1252"])
+        self.assertEqual(list(encodings), ["shift_jis", "utf-8", "windows-1252"])
 
     def test_xml_encoding(self):
         """A character encoding is found via the meta tag."""
@@ -384,7 +384,7 @@ class MediaEncodingTestCase(unittest.TestCase):
         """,
             "text/html",
         )
-        self.assertEqual(list(encodings), ["UTF-16", "ascii", "utf-8", "windows-1252"])
+        self.assertEqual(list(encodings), ["utf-16", "ascii", "utf-8", "windows-1252"])
 
     def test_content_type(self):
         """A character encoding is found via the Content-Type header."""
@@ -404,4 +404,18 @@ class MediaEncodingTestCase(unittest.TestCase):
     def test_fallback(self):
         """A character encoding cannot be found in the body or header."""
         encodings = get_html_media_encodings(b"", "text/html")
+        self.assertEqual(list(encodings), ["utf-8", "windows-1252"])
+
+    def test_duplicates(self):
+        """Ensure each encoding is only attempted once."""
+        encodings = get_html_media_encodings(
+            b"""
+        <?xml version="1.0" encoding="utf8"?>
+        <html>
+        <head><meta charset="UTF-8">
+        </head>
+        </html>
+        """,
+            'text/html; charset="UTF_8"',
+        )
         self.assertEqual(list(encodings), ["utf-8", "windows-1252"])
