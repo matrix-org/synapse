@@ -307,7 +307,7 @@ class CalcOgTestCase(unittest.TestCase):
         self.assertEqual(og, {"og:title": "ÿÿ Foo", "og:description": "Some text."})
 
     def test_windows_1252(self):
-        """A body which uses windows-1252, but doesn't declare that."""
+        """A body which uses cp1252, but doesn't declare that."""
         html = b"""
         <html>
         <head><title>\xf3</title></head>
@@ -333,7 +333,7 @@ class MediaEncodingTestCase(unittest.TestCase):
         """,
             "text/html",
         )
-        self.assertEqual(list(encodings), ["ascii", "utf-8", "windows-1252"])
+        self.assertEqual(list(encodings), ["ascii", "utf-8", "cp1252"])
 
         # A less well-formed version.
         encodings = get_html_media_encodings(
@@ -345,7 +345,7 @@ class MediaEncodingTestCase(unittest.TestCase):
         """,
             "text/html",
         )
-        self.assertEqual(list(encodings), ["ascii", "utf-8", "windows-1252"])
+        self.assertEqual(list(encodings), ["ascii", "utf-8", "cp1252"])
 
     def test_meta_charset_underscores(self):
         """A character encoding contains underscore."""
@@ -358,7 +358,7 @@ class MediaEncodingTestCase(unittest.TestCase):
         """,
             "text/html",
         )
-        self.assertEqual(list(encodings), ["shift_jis", "utf-8", "windows-1252"])
+        self.assertEqual(list(encodings), ["shift_jis", "utf-8", "cp1252"])
 
     def test_xml_encoding(self):
         """A character encoding is found via the meta tag."""
@@ -370,7 +370,7 @@ class MediaEncodingTestCase(unittest.TestCase):
         """,
             "text/html",
         )
-        self.assertEqual(list(encodings), ["ascii", "utf-8", "windows-1252"])
+        self.assertEqual(list(encodings), ["ascii", "utf-8", "cp1252"])
 
     def test_meta_xml_encoding(self):
         """Meta tags take precedence over XML encoding."""
@@ -384,7 +384,7 @@ class MediaEncodingTestCase(unittest.TestCase):
         """,
             "text/html",
         )
-        self.assertEqual(list(encodings), ["utf-16", "ascii", "utf-8", "windows-1252"])
+        self.assertEqual(list(encodings), ["utf-16", "ascii", "utf-8", "cp1252"])
 
     def test_content_type(self):
         """A character encoding is found via the Content-Type header."""
@@ -399,12 +399,12 @@ class MediaEncodingTestCase(unittest.TestCase):
         )
         for header in headers:
             encodings = get_html_media_encodings(b"", header)
-            self.assertEqual(list(encodings), ["ascii", "utf-8", "windows-1252"])
+            self.assertEqual(list(encodings), ["ascii", "utf-8", "cp1252"])
 
     def test_fallback(self):
         """A character encoding cannot be found in the body or header."""
         encodings = get_html_media_encodings(b"", "text/html")
-        self.assertEqual(list(encodings), ["utf-8", "windows-1252"])
+        self.assertEqual(list(encodings), ["utf-8", "cp1252"])
 
     def test_duplicates(self):
         """Ensure each encoding is only attempted once."""
@@ -418,4 +418,17 @@ class MediaEncodingTestCase(unittest.TestCase):
         """,
             'text/html; charset="UTF_8"',
         )
-        self.assertEqual(list(encodings), ["utf-8", "windows-1252"])
+        self.assertEqual(list(encodings), ["utf-8", "cp1252"])
+
+    def test_unknown_invalid(self):
+        """A character encoding should be ignored if it is unknown or invalid."""
+        encodings = get_html_media_encodings(
+            b"""
+        <html>
+        <head><meta charset="invalid">
+        </head>
+        </html>
+        """,
+            'text/html; charset="invalid"',
+        )
+        self.assertEqual(list(encodings), ["utf-8", "cp1252"])

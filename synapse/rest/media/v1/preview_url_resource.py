@@ -632,9 +632,12 @@ class PreviewUrlResource(DirectServeJsonResource):
             logger.debug("No media removed from url cache")
 
 
-def _normalise_encoding(encoding: str) -> str:
+def _normalise_encoding(encoding: str) -> Optional[str]:
     """Use the Python codec's name as the normalised entry."""
-    return codecs.lookup(encoding).name
+    try:
+        return codecs.lookup(encoding).name
+    except LookupError:
+        return None
 
 
 def get_html_media_encodings(body: bytes, content_type: Optional[str]) -> Iterable[str]:
@@ -668,8 +671,9 @@ def get_html_media_encodings(body: bytes, content_type: Optional[str]) -> Iterab
     match = _charset_match.search(body_start)
     if match:
         encoding = _normalise_encoding(match.group(1).decode("ascii"))
-        attempted_encodings.add(encoding)
-        yield encoding
+        if encoding:
+            attempted_encodings.add(encoding)
+            yield encoding
 
     # TODO Support <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 
@@ -677,7 +681,7 @@ def get_html_media_encodings(body: bytes, content_type: Optional[str]) -> Iterab
     match = _xml_encoding_match.match(body_start)
     if match:
         encoding = _normalise_encoding(match.group(1).decode("ascii"))
-        if encoding not in attempted_encodings:
+        if encoding and encoding not in attempted_encodings:
             attempted_encodings.add(encoding)
             yield encoding
 
@@ -686,12 +690,12 @@ def get_html_media_encodings(body: bytes, content_type: Optional[str]) -> Iterab
         content_match = _content_type_match.match(content_type)
         if content_match:
             encoding = _normalise_encoding(content_match.group(1))
-            if encoding not in attempted_encodings:
+            if encoding and encoding not in attempted_encodings:
                 attempted_encodings.add(encoding)
                 yield encoding
 
     # Finally, fallback to UTF-8, then windows-1252.
-    for fallback in ("utf-8", "windows-1252"):
+    for fallback in ("utf-8", "cp1252"):
         if fallback not in attempted_encodings:
             yield fallback
 
