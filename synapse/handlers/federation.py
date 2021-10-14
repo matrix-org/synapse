@@ -318,7 +318,7 @@ class FederationHandler:
             for dom in domains:
                 try:
                     await self._federation_event_handler.backfill(
-                        dom, room_id, limit=100, extremities=extremities.keys()
+                        dom, room_id, limit=100, extremities=extremities
                     )
                     # If this succeeded then we probably already have the
                     # appropriate stuff.
