@@ -194,9 +194,9 @@ def start(config_options):
     config.server.update_user_directory = False
     config.worker.run_background_tasks = False
     config.worker.start_pushers = False
-    config.pusher_shard_config.instances = []
+    config.worker.pusher_shard_config.instances = []
     config.worker.send_federation = False
-    config.federation_shard_config.instances = []
+    config.worker.federation_shard_config.instances = []
 
     synapse.events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
 
