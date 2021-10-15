@@ -32,6 +32,7 @@ from synapse.config import (
     server_notices,
     spam_checker,
     sso,
+    state_compressor,
     stats,
     third_party_event_rules,
     tls,
@@ -91,6 +92,7 @@ class RootConfig:
     modules: modules.ModulesConfig
     caches: cache.CacheConfig
     federation: federation.FederationConfig
+    statecompressor: state_compressor.StateCompressorConfig
 
     config_classes: List = ...
     def __init__(self) -> None: ...

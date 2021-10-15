@@ -395,6 +395,7 @@ class DatabasePool:
         hs,
         database_config: DatabaseConnectionConfig,
         engine: BaseDatabaseEngine,
+        db_conn: LoggingDatabaseConnection,
     ):
         self.hs = hs
         self._clock = hs.get_clock()
@@ -426,6 +427,17 @@ class DatabasePool:
         # unsafe to use native upserts.
         if isinstance(self.engine, Sqlite3Engine):
             self._unsafe_to_upsert_tables.add("user_directory_search")
+
+        # We store the connection info for later use when using postgres
+        # (primarily to allow things like the state auto compressor to connect
+        # to the DB).
+        self.postgres_connection_info_parameters: Optional[Dict] = None
+        if isinstance(self.engine, PostgresEngine):
+            self.postgres_connection_info_parameters = dict(db_conn.info.dsn_parameters)
+            # For some reason it doesn't always include the host, so explicitly
+            # include the things we care about from the info object
+            self.postgres_connection_info_parameters["host"] = db_conn.info.host
+            self.postgres_connection_info_parameters["user"] = db_conn.info.user
 
         if self.engine.can_native_upsert:
             # Check ASAP (and then later, every 1s) to see if we have finished

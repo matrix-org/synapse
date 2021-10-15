@@ -2620,3 +2620,38 @@ redis:
   # Optional password if configured on the Redis instance
   #
   #password: <secret_password>
+
+
+## State compressor ##
+
+# The state compressor is an experimental tool which attempts to
+# reduce the number of rows in the state_groups_state table
+# of postgres databases.
+#
+# For more information please see
+# https://matrix-org.github.io/synapse/latest/state_compressor.html
+#
+state_compressor:
+  # Whether the state compressor should run (defaults to false)
+  # Uncomment to enable it - Note, this requires the 'auto-compressor'
+  # library to be installed
+  #
+  #enabled: true
+
+  # The (rough) number of state groups to load at one time. Defaults
+  # to 500.
+  #
+  #chunk_size: 1000
+
+  # The number of chunks to compress on each run. Defaults to 100.
+  #
+  #number_of_chunks: 1
+
+  # The default level sizes for the compressor to use. Defaults to
+  # 100,50,25.
+  #
+  #default_levels: 128,64,32.
+
+  # How frequently to run the state compressor. Defaults to 1d
+  #
+  #time_between_runs: 1w

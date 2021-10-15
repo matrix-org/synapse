@@ -49,6 +49,7 @@ from synapse.metrics.jemalloc import setup_jemalloc_stats
 from synapse.util.caches.lrucache import setup_expire_lru_cache_entries
 from synapse.util.daemonize import daemonize_process
 from synapse.util.rlimit import change_resource_limit
+from synapse.util.state_compressor import setup_state_compressor
 from synapse.util.versionstring import get_version_string
 
 if TYPE_CHECKING:
@@ -384,6 +385,9 @@ async def start(hs: "HomeServer"):
 
     # If we've configured an expiry time for caches, start the background job now.
     setup_expire_lru_cache_entries(hs)
+
+    # Schedule the state compressor to run
+    setup_state_compressor(hs)
 
     # It is now safe to start your Synapse.
     hs.start_listening()
