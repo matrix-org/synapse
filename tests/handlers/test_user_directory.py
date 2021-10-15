@@ -109,18 +109,14 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             tok=alice_token,
         )
 
-        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
-        in_public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
-        in_private = self.get_success(
-            self.user_dir_helper.get_users_who_share_private_rooms()
+        # The user directory should reflect the room memberships above.
+        users, in_public, in_private = self.get_success(
+            self.user_dir_helper.get_tables()
         )
-
         self.assertEqual(users, {alice, bob})
+        self.assertEqual(in_public, {(alice, public), (bob, public), (alice, public2)})
         self.assertEqual(
-            set(in_public), {(alice, public), (bob, public), (alice, public2)}
-        )
-        self.assertEqual(
-            self.user_dir_helper._compress_shared(in_private),
+            in_private,
             {(alice, bob, private), (bob, alice, private)},
         )
 
@@ -234,15 +230,12 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             tok=alice_token,
         )
 
-        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
-        in_public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
-        in_private = self.get_success(
-            self.user_dir_helper.get_users_who_share_private_rooms()
+        users, in_public, in_private = self.get_success(
+            self.user_dir_helper.get_tables()
         )
-
         self.assertEqual(users, {alice})
-        self.assertEqual(set(in_public), {(alice, public), (alice, initially_private)})
-        self.assertEqual(in_private, [])
+        self.assertEqual(in_public, {(alice, public), (alice, initially_private)})
+        self.assertEqual(in_private, set())
 
     def _create_rooms_and_inject_memberships(
         self, creator: str, token: str, joiner: str
@@ -273,15 +266,12 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         - they belong to exactly one public room
         - they don't share a private room with anyone.
         """
-        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
-        in_public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
-        in_private = self.get_success(
-            self.user_dir_helper.get_users_who_share_private_rooms()
+        users, in_public, in_private = self.get_success(
+            self.user_dir_helper.get_tables()
         )
-
         self.assertEqual(users, {user})
-        self.assertEqual(set(in_public), {(user, public)})
-        self.assertEqual(in_private, [])
+        self.assertEqual(in_public, {(user, public)})
+        self.assertEqual(in_private, set())
 
     def test_handle_local_profile_change_with_support_user(self) -> None:
         support_user_id = "@support:test"
@@ -622,11 +612,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self.user_dir_helper.get_users_in_public_rooms()
         )
 
-        self.assertEqual(
-            self.user_dir_helper._compress_shared(shares_private),
-            {(u1, u2, room), (u2, u1, room)},
-        )
-        self.assertEqual(public_users, [])
+        self.assertEqual(shares_private, {(u1, u2, room), (u2, u1, room)})
+        self.assertEqual(public_users, set())
 
         # We get one search result when searching for user2 by user1.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
@@ -651,8 +638,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self.user_dir_helper.get_users_in_public_rooms()
         )
 
-        self.assertEqual(self.user_dir_helper._compress_shared(shares_private), set())
-        self.assertEqual(public_users, [])
+        self.assertEqual(shares_private, set())
+        self.assertEqual(public_users, set())
 
         # User1 now gets no search results for any of the other users.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
@@ -686,11 +673,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self.user_dir_helper.get_users_in_public_rooms()
         )
 
-        self.assertEqual(
-            self.user_dir_helper._compress_shared(shares_private),
-            {(u1, u2, room), (u2, u1, room)},
-        )
-        self.assertEqual(public_users, [])
+        self.assertEqual(shares_private, {(u1, u2, room), (u2, u1, room)})
+        self.assertEqual(public_users, set())
 
         # We get one search result when searching for user2 by user1.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
@@ -745,11 +729,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self.user_dir_helper.get_users_in_public_rooms()
         )
 
-        self.assertEqual(
-            self.user_dir_helper._compress_shared(shares_private),
-            {(u1, u2, room), (u2, u1, room)},
-        )
-        self.assertEqual(public_users, [])
+        self.assertEqual(shares_private, {(u1, u2, room), (u2, u1, room)})
+        self.assertEqual(public_users, set())
 
         # Configure a spam checker.
         spam_checker = self.hs.get_spam_checker()
@@ -781,8 +762,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         # No users share rooms
-        self.assertEqual(public_users, [])
-        self.assertEqual(self.user_dir_helper._compress_shared(shares_private), set())
+        self.assertEqual(public_users, set())
+        self.assertEqual(shares_private, set())
 
         # Despite not sharing a room, search_all_users means we get a search
         # result.
