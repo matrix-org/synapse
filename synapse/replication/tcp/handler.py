@@ -312,7 +312,6 @@ class ReplicationCommandHandler:
 
             # First create the connection for sending commands.
             outbound_redis_connection = hs.get_outbound_redis_connection()
-            assert outbound_redis_connection is not None
 
             # Now create the factory/connection for the subscription stream.
             self._factory = RedisDirectTcpReplicationClientFactory(
