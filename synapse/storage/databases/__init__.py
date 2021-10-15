@@ -13,8 +13,9 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, List, Optional, Type, TypeVar
 
+from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool, make_conn
 from synapse.storage.databases.main.events import PersistEventsStore
 from synapse.storage.databases.state import StateGroupDataStore
@@ -27,7 +28,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class Databases:
+DataStoreT = TypeVar("DataStoreT", bound=SQLBaseStore, covariant=True)
+
+
+class Databases(Generic[DataStoreT]):
     """The various databases.
 
     These are low level interfaces to physical databases.
@@ -36,14 +40,19 @@ class Databases:
         main (DataStore)
     """
 
-    def __init__(self, main_store_class, hs: "HomeServer"):
+    databases: List[DatabasePool]
+    main: DataStoreT
+    state: StateGroupDataStore
+    persist_events: PersistEventsStore
+
+    def __init__(self, main_store_class: Type[DataStoreT], hs: "HomeServer"):
         # Note we pass in the main store class here as workers use a different main
         # store.
 
         self.databases = []
-        main = None
-        state = None
-        persist_events = None
+        main: Optional[DataStoreT] = None
+        state: Optional[StateGroupDataStore] = None
+        persist_events: Optional[PersistEventsStore] = None
 
         for database_config in hs.config.database.databases:
             db_name = database_config.name
