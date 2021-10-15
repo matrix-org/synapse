@@ -1692,7 +1692,7 @@ class FederationEventHandler:
 
         if not backfilled and not context.rejected:
             min_depth = await self._store.get_min_depth(event.room_id)
-            if min_depth is None or min_depth <= event.depth:
+            if min_depth is None or min_depth > event.depth:
                 # XXX richvdh 2021/10/07: I don't really understand what this
                 # condition is doing. I think it's trying not to send pushes
                 # for events that predate our join - but that's not really what
