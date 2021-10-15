@@ -1061,12 +1061,12 @@ class FederationServer(FederationBase):
 
                 origin, event = next
 
-            lock_ = await self.store.try_acquire_lock(
+            new_lock = await self.store.try_acquire_lock(
                 _INBOUND_EVENT_HANDLING_LOCK_NAME, room_id
             )
-            if not lock_:
+            if not new_lock:
                 return
-            lock = lock_
+            lock = new_lock
 
     def __str__(self) -> str:
         return "<ReplicationLayer(%s)>" % self.server_name
