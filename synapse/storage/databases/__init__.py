@@ -37,13 +37,16 @@ class Databases(Generic[DataStoreT]):
     These are low level interfaces to physical databases.
 
     Attributes:
-        main (DataStore)
+        databases
+        main
+        state
+        persist_events
     """
 
     databases: List[DatabasePool]
     main: DataStoreT
     state: StateGroupDataStore
-    persist_events: PersistEventsStore
+    persist_events: Optional[PersistEventsStore]
 
     def __init__(self, main_store_class: Type[DataStoreT], hs: "HomeServer"):
         # Note we pass in the main store class here as workers use a different main
