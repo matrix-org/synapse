@@ -312,6 +312,7 @@ class ReplicationCommandHandler:
 
             # First create the connection for sending commands.
             outbound_redis_connection = hs.get_outbound_redis_connection()
+            assert outbound_redis_connection is not None
 
             # Now create the factory/connection for the subscription stream.
             self._factory = RedisDirectTcpReplicationClientFactory(
@@ -321,6 +322,8 @@ class ReplicationCommandHandler:
                 hs.config.redis.redis_host,  # type: ignore[arg-type]
                 hs.config.redis.redis_port,
                 self._factory,
+                timeout=30,
+                bindAddress=None,
             )
         else:
             client_name = hs.get_instance_name()
@@ -331,6 +334,8 @@ class ReplicationCommandHandler:
                 host,  # type: ignore[arg-type]
                 port,
                 self._factory,
+                timeout=30,
+                bindAddress=None,
             )
 
     def get_streams(self) -> Dict[str, Stream]:
