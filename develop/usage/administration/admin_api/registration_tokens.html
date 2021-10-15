@@ -306,7 +306,7 @@ token will be returned as a registration token object in the response body.</p>
 <p>The request body must be a JSON object and can contain the following fields:</p>
 <ul>
 <li><code>token</code>: The registration token. A string of no more than 64 characters that
-consists only of characters matched by the regex <code>[A-Za-z0-9-_]</code>.
+consists only of characters matched by the regex <code>[A-Za-z0-9._~-]</code>.
 Default: randomly generated.</li>
 <li><code>uses_allowed</code>: The integer number of times the token can be used to complete
 a registration before it becomes invalid.
