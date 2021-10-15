@@ -266,16 +266,13 @@ class UserDirectoryHandler(StateDeltasHandler):
         for user_id in users_in_room:
             await self.store.remove_user_who_share_room(user_id, room_id)
 
-        # Then, re-add them to the tables.
+        # Then, re-add all remote users and some local users to the tables.
         # NOTE: this is not the most efficient method, as _track_user_joined_room sets
         # up local_user -> other_user and other_user_whos_local -> local_user,
         # which when ran over an entire room, will result in the same values
         # being added multiple times. The batching upserts shouldn't make this
         # too bad, though.
         for user_id in users_in_room:
-            # Check for inclusion here rather than when constructing
-            # users_in_room so that we clean up entries that were erroneously
-            # added.
             if not self.is_mine_id(
                 user_id
             ) or await self.store.should_include_local_user_in_dir(user_id):
