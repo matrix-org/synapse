@@ -237,6 +237,56 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(in_public, {(alice, public), (alice, initially_private)})
         self.assertEqual(in_private, set())
 
+    def test_switching_from_private_to_public_to_private(self) -> None:
+        """Check we update the room sharing tables when switching a room
+        from private to public, then back again to private."""
+        # Alice and Bob share a private room.
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        bob = self.register_user("bob", "pass")
+        bob_token = self.login(bob, "pass")
+        room = self.helper.create_room_as(alice, is_public=False, tok=alice_token)
+        self.helper.invite(room, alice, bob, tok=alice_token)
+        self.helper.join(room, bob, tok=bob_token)
+
+        # The user directory should reflect this.
+        def check_user_dir_for_private_room():
+            users, in_public, in_private = self.get_success(
+                self.user_dir_helper.get_tables()
+            )
+            self.assertEqual(users, {alice, bob})
+            self.assertEqual(in_public, set())
+            self.assertEqual(in_private, {(alice, bob, room), (bob, alice, room)})
+
+        check_user_dir_for_private_room()
+
+        # Alice makes the room public.
+        self.helper.send_state(
+            room,
+            "m.room.join_rules",
+            {"join_rule": "public"},
+            tok=alice_token,
+        )
+
+        # The user directory should be updated accordingly
+        users, in_public, in_private = self.get_success(
+            self.user_dir_helper.get_tables()
+        )
+        self.assertEqual(users, {alice, bob})
+        self.assertEqual(in_public, {(alice, room), (bob, room)})
+        self.assertEqual(in_private, set())
+
+        # Alice makes the room private.
+        self.helper.send_state(
+            room,
+            "m.room.join_rules",
+            {"join_rule": "invite"},
+            tok=alice_token,
+        )
+
+        # The user directory should be updated accordingly
+        check_user_dir_for_private_room()
+
     def _create_rooms_and_inject_memberships(
         self, creator: str, token: str, joiner: str
     ) -> Tuple[str, str]:
