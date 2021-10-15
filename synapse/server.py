@@ -800,7 +800,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ExternalCache(self)
 
     @cache_in_self
-    def get_outbound_redis_connection(self) -> RedisProtocol:
+    def get_outbound_redis_connection(self) -> "RedisProtocol":
         """
         The Redis connection used for replication.
 
