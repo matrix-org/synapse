@@ -17,7 +17,7 @@ import logging
 import re
 import urllib
 from inspect import signature
-from typing import TYPE_CHECKING, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Tuple
 
 from prometheus_client import Counter, Gauge
 
@@ -207,6 +207,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                     txn_id = random_string(10)
                     url_args.append(txn_id)
 
+                request_func: Callable[..., Awaitable[Any]]
                 if cls.METHOD == "POST":
                     request_func = client.post_json_get_json
                 elif cls.METHOD == "PUT":
