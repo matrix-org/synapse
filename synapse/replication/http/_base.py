@@ -207,9 +207,10 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                     txn_id = random_string(10)
                     url_args.append(txn_id)
 
-                request_func: Callable[..., Awaitable[Any]]
                 if cls.METHOD == "POST":
-                    request_func = client.post_json_get_json
+                    request_func: Callable[
+                        ..., Awaitable[Any]
+                    ] = client.post_json_get_json
                 elif cls.METHOD == "PUT":
                     request_func = client.put_json
                 elif cls.METHOD == "GET":
