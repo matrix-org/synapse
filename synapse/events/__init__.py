@@ -45,7 +45,11 @@ class DictProperty:
     def __init__(self, key: str):
         self.key = key
 
-    def __get__(self, instance, owner=None):
+    def __get__(
+        self,
+        instance: Optional[Union["_EventInternalMetadata", "EventBase"]],
+        owner: Optional[Type[Union["_EventInternalMetadata", "EventBase"]]] = None,
+    ) -> Any:
         # if the property is accessed as a class property rather than an instance
         # property, return the property itself rather than the value
         if instance is None:
@@ -65,10 +69,12 @@ class DictProperty:
                 "'%s' has no '%s' property" % (type(instance), self.key)
             ) from e1.__context__
 
-    def __set__(self, instance, v):
+    def __set__(
+        self, instance: Union["_EventInternalMetadata", "EventBase"], v: Any
+    ) -> None:
         instance._dict[self.key] = v
 
-    def __delete__(self, instance):
+    def __delete__(self, instance: Any) -> None:
         try:
             del instance._dict[self.key]
         except KeyError as e1:
@@ -90,7 +96,11 @@ class DefaultDictProperty(DictProperty):
         super().__init__(key)
         self.default = default
 
-    def __get__(self, instance, owner=None):
+    def __get__(
+        self,
+        instance: Optional[Union["_EventInternalMetadata", "EventBase"]],
+        owner: Optional[Type[Union["_EventInternalMetadata", "EventBase"]]] = None,
+    ) -> Any:
         if instance is None:
             return self
         return instance._dict.get(self.key, self.default)
@@ -243,7 +253,7 @@ class EventBase(metaclass=abc.ABCMeta):
     redacts: Optional[str] = DefaultDictProperty("redacts", None)  # type: ignore[assignment]
     room_id: str = DictProperty("room_id")  # type: ignore[assignment]
     sender: str = DictProperty("sender")  # type: ignore[assignment]
-    state_key = DictProperty("state_key")  # type: ignore[assignment]
+    state_key: str = DictProperty("state_key")  # type: ignore[assignment]
     type: str = DictProperty("type")  # type: ignore[assignment]
     user_id: str = DictProperty("sender")  # type: ignore[assignment]
 
