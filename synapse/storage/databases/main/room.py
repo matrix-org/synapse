@@ -409,7 +409,8 @@ class RoomWorkerStore(SQLBaseStore):
             limit: maximum amount of rooms to retrieve
             order_by: the sort order of the returned list
             reverse_order: whether to reverse the room list
-            search_term: a string to filter room names by
+            search_term: a string to filter room names,
+                canonical alias and room ids by
         Returns:
             A list of room dicts and an integer representing the total number of
             rooms that exist given this query
@@ -417,14 +418,22 @@ class RoomWorkerStore(SQLBaseStore):
         # Filter room names by a string
         where_statement = ""
         if search_term:
-            where_statement = "WHERE LOWER(state.name) LIKE ?"
+            where_statement = """
+                WHERE LOWER(state.name) LIKE ?
+                OR LOWER(state.canonical_alias) LIKE ?
+                OR LOWER(state.room_id) LIKE ?
+            """
 
             # Our postgres db driver converts ? -> %s in SQL strings as that's the
             # placeholder for postgres.
             # HOWEVER, if you put a % into your SQL then everything goes wibbly.
             # To get around this, we're going to surround search_term with %'s
             # before giving it to the database in python instead
-            search_term = "%" + search_term.lower() + "%"
+            search_term = [
+                "%" + search_term.lower() + "%",
+                "#%" + search_term.lower() + "%:%",
+                "!%" + search_term.lower() + "%:%",
+            ]
 
         # Set ordering
         if RoomSortOrder(order_by) == RoomSortOrder.SIZE:
@@ -517,10 +526,10 @@ class RoomWorkerStore(SQLBaseStore):
 
         def _get_rooms_paginate_txn(txn):
             # Execute the data query
-            sql_values = (limit, start)
+            sql_values = [limit, start]
             if search_term:
                 # Add the search term into the WHERE clause
-                sql_values = (search_term,) + sql_values
+                sql_values = search_term + sql_values
             txn.execute(info_sql, sql_values)
 
             # Refactor room query data into a structured dictionary
@@ -548,7 +557,7 @@ class RoomWorkerStore(SQLBaseStore):
             # Execute the count query
 
             # Add the search term into the WHERE clause if present
-            sql_values = (search_term,) if search_term else ()
+            sql_values = search_term if search_term else ()
             txn.execute(count_sql, sql_values)
 
             room_count = txn.fetchone()

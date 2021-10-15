@@ -39,8 +39,9 @@ The following query parameters are available:
   - `state_events` - Rooms are ordered by number of state events. Largest to smallest.
 * `dir` - Direction of room order. Either `f` for forwards or `b` for backwards. Setting
           this value to `b` will reverse the above sort order. Defaults to `f`.
-* `search_term` - Filter rooms by their room name. Search term can be contained in any
-                  part of the room name. Defaults to no filtering.
+* `search_term` - Filter rooms by their room name, canonical alias and room id.
+                  Search term can be contained in any part of the room name and
+                  local part of canonical alias or room id. Defaults to no filtering.
 
 **Response**
 
