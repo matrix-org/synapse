@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, Set, Tuple
 from unittest import mock
 from unittest.mock import Mock, patch
 
@@ -282,7 +282,9 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         self, normal_user: str, public_room: str, private_room: str
     ) -> None:
         # After rebuilding the directory, we should only see the normal user.
-        users, in_public, in_private = self.get_success(self.user_dir_helper.get_tables())
+        users, in_public, in_private = self.get_success(
+            self.user_dir_helper.get_tables()
+        )
         self.assertEqual(users, {normal_user})
         self.assertEqual(in_public, {(normal_user, public_room)})
         self.assertEqual(in_private, set())

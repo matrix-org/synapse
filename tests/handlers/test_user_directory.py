@@ -250,7 +250,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.helper.join(room, bob, tok=bob_token)
 
         # The user directory should reflect this.
-        def check_user_dir_for_private_room():
+        def check_user_dir_for_private_room() -> None:
             users, in_public, in_private = self.get_success(
                 self.user_dir_helper.get_tables()
             )
