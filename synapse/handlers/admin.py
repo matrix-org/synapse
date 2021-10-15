@@ -163,9 +163,7 @@ class AdminHandler:
 
                 from_key = events[-1].internal_metadata.after
 
-                events = await filter_events_for_client(
-                    self.storage, user_id, events, filter_send_to_client=False
-                )
+                events = await filter_events_for_client(self.storage, user_id, events)
 
                 writer.write_events(room_id, events)
 
