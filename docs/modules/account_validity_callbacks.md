@@ -22,6 +22,11 @@ If the module returns `True`, the current request will be denied with the error 
 `ORG_MATRIX_EXPIRED_ACCOUNT` and the HTTP status code 403. Note that this doesn't
 invalidate the user's access token.
 
+If multiple modules implement this callback, the first callback returning `bool` (i.e.
+not `None`) causes the returned value to be used to determine whether the user is expired,
+and the subsequent implementations of this callback to be ignored. If all callbacks return
+`None`, the user is considered not expired.
+
 ### `on_user_registration`
 
 ```python
@@ -31,3 +36,5 @@ async def on_user_registration(user: str) -> None
 Called after successfully registering a user, in case the module needs to perform extra
 operations to keep track of them. (e.g. add them to a database table). The user is
 represented by their Matrix user ID.
+
+If multiple modules implement this callback, Synapse runs them all in order.

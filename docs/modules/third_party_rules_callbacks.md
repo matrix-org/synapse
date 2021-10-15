@@ -44,6 +44,11 @@ dictionary, and modify the returned dictionary accordingly.
 Note that replacing the event only works for events sent by local users, not for events
 received over federation.
 
+If multiple modules implement this callback, the first callback returning `False`, or
+`True` but with a replacement dictionary for the event, causes the event to be denied,
+and the subsequent implementations of this callback to be ignored. If all callbacks
+return `True` with no replacement content then the event is allowed.
+
 ### `on_create_room`
 
 ```python
@@ -63,6 +68,11 @@ the request is a server admin.
 Modules can modify the `request_content` (by e.g. adding events to its `initial_state`),
 or deny the room's creation by raising a `module_api.errors.SynapseError`.
 
+If multiple modules implement this callback, the first callback raising an exception
+causes the room creation to be denied, and the subsequent implementations of this callback
+to be ignored. If none of the callbacks raise an exception then the room creation is
+allowed.
+
 ### `check_threepid_can_be_invited`
 
 ```python
@@ -75,6 +85,10 @@ async def check_threepid_can_be_invited(
 
 Called when processing an invite via a third-party identifier (i.e. email or phone number).
 The module must return a boolean indicating whether the invite can go through.
+
+If multiple modules implement this callback, the first callback returning `False` causes
+the invite to be denied, and the subsequent implementations of this callback to be
+ignored. If all callbacks return `True` then the invite is allowed.
 
 ### `check_visibility_can_be_modified`
 
@@ -89,6 +103,10 @@ async def check_visibility_can_be_modified(
 Called when changing the visibility of a room in the local public room directory. The
 visibility is a string that's either "public" or "private". The module must return a
 boolean indicating whether the change can go through.
+
+If multiple modules implement this callback, the first callback returning `False` causes
+the visibility change to be denied, and the subsequent implementations of this callback
+to be ignored. If all callbacks return `True` then the visibility change is allowed.
 
 ## Example
 

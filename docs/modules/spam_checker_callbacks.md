@@ -19,6 +19,10 @@ either a `bool` to indicate whether the event must be rejected because of spam, 
 to indicate the event must be rejected because of spam and to give a rejection reason to
 forward to clients.
 
+If multiple modules implement this callback, the first callback returning either `True`
+or a `str` causes the event to be denied, and the subsequent implementations of this
+callback to be ignored. If all callbacks return `False` then the event is allowed.
+
 ### `user_may_join_room`
 
 ```python
@@ -34,6 +38,10 @@ currently has a pending invite in the room.
 This callback isn't called if the join is performed by a server administrator, or in the
 context of a room creation.
 
+If multiple modules implement this callback, the first callback returning `False` causes
+the room join to be denied, and the subsequent implementations of this callback to be
+ignored. If all callbacks return `True` then the room join is allowed.
+
 ### `user_may_invite`
 
 ```python
@@ -43,6 +51,10 @@ async def user_may_invite(inviter: str, invitee: str, room_id: str) -> bool
 Called when processing an invitation. The module must return a `bool` indicating whether
 the inviter can invite the invitee to the given room. Both inviter and invitee are
 represented by their Matrix user ID (e.g. `@alice:example.com`).
+
+If multiple modules implement this callback, the first callback returning `False` causes
+the invite to be denied, and the subsequent implementations of this callback to be
+ignored. If all callbacks return `True` then the invite is allowed.
 
 ### `user_may_send_3pid_invite`
 
@@ -79,6 +91,10 @@ await user_may_send_3pid_invite(
 **Note**: If the third-party identifier is already associated with a matrix user ID,
 [`user_may_invite`](#user_may_invite) will be used instead.
 
+If multiple modules implement this callback, the first callback returning `False` causes
+the invite to be denied, and the subsequent implementations of this callback to be
+ignored. If all callbacks return `True` then the invite is allowed.
+
 ### `user_may_create_room`
 
 ```python
@@ -87,6 +103,10 @@ async def user_may_create_room(user: str) -> bool
 
 Called when processing a room creation request. The module must return a `bool` indicating
 whether the given user (represented by their Matrix user ID) is allowed to create a room.
+
+If multiple modules implement this callback, the first callback returning `False` causes
+the room creation to be denied, and the subsequent implementations of this callback to be
+ignored. If all callbacks return `True` then the room creation is allowed.
 
 ### `user_may_create_room_with_invites`
 
@@ -117,6 +137,10 @@ corresponding list(s) will be empty.
 since no invites are sent when cloning a room. To cover this case, modules also need to
 implement `user_may_create_room`.
 
+If multiple modules implement this callback, the first callback returning `False` causes
+the room creation to be denied, and the subsequent implementations of this callback to be
+ignored. If all callbacks return `True` then the room creation is allowed.
+
 ### `user_may_create_room_alias`
 
 ```python
@@ -127,6 +151,10 @@ Called when trying to associate an alias with an existing room. The module must 
 `bool` indicating whether the given user (represented by their Matrix user ID) is allowed
 to set the given alias.
 
+If multiple modules implement this callback, the first callback returning `False` causes
+the room alias to be denied, and the subsequent implementations of this callback to be
+ignored. If all callbacks return `True` then the room alias is allowed.
+
 ### `user_may_publish_room`
 
 ```python
@@ -136,6 +164,11 @@ async def user_may_publish_room(user: str, room_id: str) -> bool
 Called when trying to publish a room to the homeserver's public rooms directory. The
 module must return a `bool` indicating whether the given user (represented by their
 Matrix user ID) is allowed to publish the given room.
+
+If multiple modules implement this callback, the first callback returning `False` causes
+the publication of the room to be denied, and the subsequent implementations of this
+callback to be ignored. If all callbacks return `True` then the publication of the room
+is allowed.
 
 ### `check_username_for_spam`
 
@@ -153,6 +186,11 @@ is represented as a dictionary with the following keys:
 
 The module is given a copy of the original dictionary, so modifying it from within the
 module cannot modify a user's profile when included in user directory search results.
+
+If multiple modules implement this callback, the first callback returning `True` causes
+the username to be excluded from user search, and the subsequent implementations of this
+callback to be ignored. If all callbacks return `False` then the username is included in
+the user search results.
 
 ### `check_registration_for_spam`
 
@@ -179,6 +217,12 @@ The arguments passed to this callback are:
   used during the registration process.
 * `auth_provider_id`: The identifier of the SSO authentication provider, if any.
 
+If multiple modules implement this callback, the first callback returning a
+`RegistrationBehaviour` different than `RegistrationBehaviour.ALLOW` causes the
+registration to be denied, and the subsequent implementations of this callback to be
+ignored. If all callbacks return `RegistrationBehaviour.ALLOW` then the registration is
+allowed.
+
 ### `check_media_file_for_spam`
 
 ```python
@@ -190,6 +234,10 @@ async def check_media_file_for_spam(
 
 Called when storing a local or remote file. The module must return a boolean indicating
 whether the given file can be stored in the homeserver's media store.
+
+If multiple modules implement this callback, the first callback returning `True` causes
+the file to be denied, and the subsequent implementations of this callback to be ignored.
+If all callbacks return `False` then the file is allowed.
 
 ## Example
 
