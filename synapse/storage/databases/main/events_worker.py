@@ -15,7 +15,6 @@
 import logging
 import threading
 from typing import (
-    TYPE_CHECKING,
     Collection,
     Container,
     Dict,
@@ -68,9 +67,6 @@ from synapse.util.caches.lrucache import LruCache
 from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import Measure
 
-if TYPE_CHECKING:
-    from synapse.server import HomeServer
-
 logger = logging.getLogger(__name__)
 
 
@@ -108,7 +104,7 @@ class EventsWorkerStore(SQLBaseStore):
     # options controlling this.
     USE_DEDICATED_DB_THREADS_FOR_EVENT_FETCHING = True
 
-    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
+    def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
         if isinstance(database.engine, PostgresEngine):
