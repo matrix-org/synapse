@@ -1,1 +1,1 @@
-Fix a bug which allowed hidden devices to receive send-to-device events.
+Fix a bug which allowed hidden devices to receive send-to-device events, resulting in unnecessary database bloat.
