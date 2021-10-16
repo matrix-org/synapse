@@ -23,7 +23,7 @@ from synapse.util.caches import register_cache
 
 logger = logging.getLogger(__name__)
 
-SENTINEL = object()  # type: Any
+SENTINEL: Any = object()
 
 T = TypeVar("T")
 KT = TypeVar("KT")
@@ -35,10 +35,10 @@ class TTLCache(Generic[KT, VT]):
 
     def __init__(self, cache_name: str, timer: Callable[[], float] = time.time):
         # map from key to _CacheEntry
-        self._data = {}  # type: Dict[KT, _CacheEntry]
+        self._data: Dict[KT, _CacheEntry] = {}
 
         # the _CacheEntries, sorted by expiry time
-        self._expiry_list = SortedList()  # type: SortedList[_CacheEntry]
+        self._expiry_list: SortedList[_CacheEntry] = SortedList()
 
         self._timer = timer
 
@@ -159,12 +159,12 @@ class TTLCache(Generic[KT, VT]):
             del self._expiry_list[0]
 
 
-@attr.s(frozen=True, slots=True)
-class _CacheEntry:
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class _CacheEntry:  # Should be Generic[KT, VT]. See python-attrs/attrs#313
     """TTLCache entry"""
 
     # expiry_time is the first attribute, so that entries are sorted by expiry.
-    expiry_time = attr.ib(type=float)
-    ttl = attr.ib(type=float)
-    key = attr.ib()
-    value = attr.ib()
+    expiry_time: float
+    ttl: float
+    key: Any  # should be KT
+    value: Any  # should be VT

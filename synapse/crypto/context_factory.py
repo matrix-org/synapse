@@ -74,8 +74,8 @@ class ServerContextFactory(ContextFactory):
         context.set_options(
             SSL.OP_NO_SSLv2 | SSL.OP_NO_SSLv3 | SSL.OP_NO_TLSv1 | SSL.OP_NO_TLSv1_1
         )
-        context.use_certificate_chain_file(config.tls_certificate_file)
-        context.use_privatekey(config.tls_private_key)
+        context.use_certificate_chain_file(config.tls.tls_certificate_file)
+        context.use_privatekey(config.tls.tls_private_key)
 
         # https://hynek.me/articles/hardening-your-web-servers-ssl-ciphers/
         context.set_cipher_list(
@@ -102,7 +102,7 @@ class FederationPolicyForHTTPS:
         self._config = config
 
         # Check if we're using a custom list of a CA certificates
-        trust_root = config.federation_ca_trust_root
+        trust_root = config.tls.federation_ca_trust_root
         if trust_root is None:
             # Use CA root certs provided by OpenSSL
             trust_root = platformTrust()
@@ -113,7 +113,7 @@ class FederationPolicyForHTTPS:
         # moving to TLS 1.2 by default, we want to respect the config option if
         # it is set to 1.0 (which the alternate option, raiseMinimumTo, will not
         # let us do).
-        minTLS = _TLS_VERSION_MAP[config.federation_client_minimum_tls_version]
+        minTLS = _TLS_VERSION_MAP[config.tls.federation_client_minimum_tls_version]
 
         _verify_ssl = CertificateOptions(
             trustRoot=trust_root, insecurelyLowerMinimumTo=minTLS
@@ -125,10 +125,10 @@ class FederationPolicyForHTTPS:
         self._no_verify_ssl_context = _no_verify_ssl.getContext()
         self._no_verify_ssl_context.set_info_callback(_context_info_cb)
 
-        self._should_verify = self._config.federation_verify_certificates
+        self._should_verify = self._config.tls.federation_verify_certificates
 
         self._federation_certificate_verification_whitelist = (
-            self._config.federation_certificate_verification_whitelist
+            self._config.tls.federation_certificate_verification_whitelist
         )
 
     def get_options(self, host: bytes):

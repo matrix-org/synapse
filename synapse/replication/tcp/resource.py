@@ -40,7 +40,7 @@ class ReplicationStreamProtocolFactory(Factory):
     def __init__(self, hs):
         self.command_handler = hs.get_tcp_replication()
         self.clock = hs.get_clock()
-        self.server_name = hs.config.server_name
+        self.server_name = hs.config.server.server_name
 
         # If we've created a `ReplicationStreamProtocolFactory` then we're
         # almost certainly registering a replication listener, so let's ensure
@@ -71,7 +71,7 @@ class ReplicationStreamer:
         self.notifier = hs.get_notifier()
         self._instance_name = hs.get_instance_name()
 
-        self._replication_torture_level = hs.config.replication_torture_level
+        self._replication_torture_level = hs.config.server.replication_torture_level
 
         self.notifier.add_replication_callback(self.on_notifier_poke)
 

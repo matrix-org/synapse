@@ -19,7 +19,7 @@ from parameterized import parameterized
 from synapse.events import make_event_from_dict
 from synapse.federation.federation_server import server_matches_acl_event
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 
 from tests import unittest
 
@@ -120,7 +120,7 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
 
         self.assertEqual(
             channel.json_body["room_version"],
-            self.hs.config.default_room_version.identifier,
+            self.hs.config.server.default_room_version.identifier,
         )
 
         members = set(

@@ -1,4 +1,4 @@
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,15 +21,16 @@ from unittest.mock import Mock
 from urllib import parse
 
 import attr
-from parameterized import parameterized_class
+from parameterized import parameterized, parameterized_class
 from PIL import Image as Image
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
 
+from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.logging.context import make_deferred_yieldable
 from synapse.rest import admin
-from synapse.rest.client.v1 import login
+from synapse.rest.client import login
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.rest.media.v1.media_storage import MediaStorage
@@ -37,6 +38,7 @@ from synapse.rest.media.v1.storage_provider import FileStorageProviderBackend
 
 from tests import unittest
 from tests.server import FakeSite, make_request
+from tests.test_utils import SMALL_PNG
 from tests.utils import default_config
 
 
@@ -51,7 +53,7 @@ class MediaStorageTests(unittest.HomeserverTestCase):
         self.primary_base_path = os.path.join(self.test_dir, "primary")
         self.secondary_base_path = os.path.join(self.test_dir, "secondary")
 
-        hs.config.media_store_path = self.primary_base_path
+        hs.config.media.media_store_path = self.primary_base_path
 
         storage_providers = [FileStorageProviderBackend(hs, self.secondary_base_path)]
 
@@ -133,11 +135,7 @@ class _TestImage:
         # smoll png
         (
             _TestImage(
-                unhexlify(
-                    b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-                    b"0000001f15c4890000000a49444154789c63000100000500010d"
-                    b"0a2db40000000049454e44ae426082"
-                ),
+                SMALL_PNG,
                 b"image/png",
                 b".png",
                 unhexlify(
@@ -254,7 +252,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         channel = make_request(
             self.reactor,
-            FakeSite(self.download_resource),
+            FakeSite(self.download_resource, self.reactor),
             "GET",
             self.media_id,
             shorthand=False,
@@ -309,7 +307,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         correctly decode it as the UTF-8 string, and use filename* in the
         response.
         """
-        filename = parse.quote("\u2603".encode("utf8")).encode("ascii")
+        filename = parse.quote("\u2603".encode()).encode("ascii")
         channel = self._req(
             b"inline; filename*=utf-8''" + filename + self.test_image.extension
         )
@@ -386,7 +384,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         params = "?width=32&height=32&method=scale"
         channel = make_request(
             self.reactor,
-            FakeSite(self.thumbnail_resource),
+            FakeSite(self.thumbnail_resource, self.reactor),
             "GET",
             self.media_id + params,
             shorthand=False,
@@ -415,7 +413,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         channel = make_request(
             self.reactor,
-            FakeSite(self.thumbnail_resource),
+            FakeSite(self.thumbnail_resource, self.reactor),
             "GET",
             self.media_id + params,
             shorthand=False,
@@ -435,7 +433,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         params = "?width=32&height=32&method=" + method
         channel = make_request(
             self.reactor,
-            FakeSite(self.thumbnail_resource),
+            FakeSite(self.thumbnail_resource, self.reactor),
             "GET",
             self.media_id + params,
             shorthand=False,
@@ -471,6 +469,43 @@ class MediaRepoTests(unittest.HomeserverTestCase):
                     "error": "Not found [b'example.com', b'12345']",
                 },
             )
+
+    @parameterized.expand([("crop", 16), ("crop", 64), ("scale", 16), ("scale", 64)])
+    def test_same_quality(self, method, desired_size):
+        """Test that choosing between thumbnails with the same quality rating succeeds.
+
+        We are not particular about which thumbnail is chosen."""
+        self.assertIsNotNone(
+            self.thumbnail_resource._select_thumbnail(
+                desired_width=desired_size,
+                desired_height=desired_size,
+                desired_method=method,
+                desired_type=self.test_image.content_type,
+                # Provide two identical thumbnails which are guaranteed to have the same
+                # quality rating.
+                thumbnail_infos=[
+                    {
+                        "thumbnail_width": 32,
+                        "thumbnail_height": 32,
+                        "thumbnail_method": method,
+                        "thumbnail_type": self.test_image.content_type,
+                        "thumbnail_length": 256,
+                        "filesystem_id": f"thumbnail1{self.test_image.extension}",
+                    },
+                    {
+                        "thumbnail_width": 32,
+                        "thumbnail_height": 32,
+                        "thumbnail_method": method,
+                        "thumbnail_type": self.test_image.content_type,
+                        "thumbnail_length": 256,
+                        "filesystem_id": f"thumbnail2{self.test_image.extension}",
+                    },
+                ],
+                file_id=f"image{self.test_image.extension}",
+                url_cache=None,
+                server_name=None,
+            )
+        )
 
     def test_x_robots_tag_header(self):
         """
@@ -535,6 +570,8 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
         self.download_resource = self.media_repo.children[b"download"]
         self.upload_resource = self.media_repo.children[b"upload"]
 
+        load_legacy_spam_checkers(hs)
+
     def default_config(self):
         config = default_config("test")
 
@@ -553,15 +590,8 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
 
     def test_upload_innocent(self):
         """Attempt to upload some innocent data that should be allowed."""
-
-        image_data = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
-
         self.helper.upload_media(
-            self.upload_resource, image_data, tok=self.tok, expect_code=200
+            self.upload_resource, SMALL_PNG, tok=self.tok, expect_code=200
         )
 
     def test_upload_ban(self):

@@ -58,7 +58,7 @@ class OIDCConfig(Config):
                     "Multiple OIDC providers have the idp_id %r." % idp_id
                 )
 
-        public_baseurl = self.public_baseurl
+        public_baseurl = self.root.server.public_baseurl
         if public_baseurl is None:
             raise ConfigError("oidc_config requires a public_baseurl to be set")
         self.oidc_callback_url = public_baseurl + "_synapse/client/oidc/callback"
@@ -166,7 +166,7 @@ class OIDCConfig(Config):
         #
         #       module: The class name of a custom mapping module. Default is
         #           {mapping_provider!r}.
-        #           See https://github.com/matrix-org/synapse/blob/master/docs/sso_mapping_providers.md#openid-mapping-providers
+        #           See https://matrix-org.github.io/synapse/latest/sso_mapping_providers.html#openid-mapping-providers
         #           for information on implementing a custom mapping provider.
         #
         #       config: Configuration for the mapping provider module. This section will
@@ -217,7 +217,7 @@ class OIDCConfig(Config):
         #     - attribute: groups
         #       value: "admin"
         #
-        # See https://github.com/matrix-org/synapse/blob/master/docs/openid.md
+        # See https://matrix-org.github.io/synapse/latest/openid.html
         # for information on how to configure these options.
         #
         # For backwards compatibility, it is also possible to configure a single OIDC
@@ -272,12 +272,6 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
         "idp_name": {"type": "string"},
         "idp_icon": {"type": "string"},
         "idp_brand": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255,
-            "pattern": "^[a-z][a-z0-9_.-]*$",
-        },
-        "idp_unstable_brand": {
             "type": "string",
             "minLength": 1,
             "maxLength": 255,
@@ -460,7 +454,7 @@ def _parse_oidc_config_dict(
             ) from e
 
     client_secret_jwt_key_config = oidc_config.get("client_secret_jwt_key")
-    client_secret_jwt_key = None  # type: Optional[OidcProviderClientSecretJwtKey]
+    client_secret_jwt_key: Optional[OidcProviderClientSecretJwtKey] = None
     if client_secret_jwt_key_config is not None:
         keyfile = client_secret_jwt_key_config.get("key_file")
         if keyfile:
@@ -483,7 +477,6 @@ def _parse_oidc_config_dict(
         idp_name=oidc_config.get("idp_name", "OIDC"),
         idp_icon=idp_icon,
         idp_brand=oidc_config.get("idp_brand"),
-        unstable_idp_brand=oidc_config.get("unstable_idp_brand"),
         discover=oidc_config.get("discover", True),
         issuer=oidc_config["issuer"],
         client_id=oidc_config["client_id"],
@@ -530,9 +523,6 @@ class OidcProviderConfig:
 
     # Optional brand identifier for this IdP.
     idp_brand = attr.ib(type=Optional[str])
-
-    # Optional brand identifier for the unstable API (see MSC2858).
-    unstable_idp_brand = attr.ib(type=Optional[str])
 
     # whether the OIDC discovery mechanism is used to discover endpoints
     discover = attr.ib(type=bool)

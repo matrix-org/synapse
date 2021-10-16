@@ -19,17 +19,19 @@ from synapse.push.rulekinds import PRIORITY_CLASS_INVERSE_MAP, PRIORITY_CLASS_MA
 from synapse.types import UserID
 
 
-def format_push_rules_for_user(user: UserID, ruleslist) -> Dict[str, Dict[str, list]]:
+def format_push_rules_for_user(
+    user: UserID, ruleslist: List
+) -> Dict[str, Dict[str, list]]:
     """Converts a list of rawrules and a enabled map into nested dictionaries
     to match the Matrix client-server format for push rules"""
 
     # We're going to be mutating this a lot, so do a deep copy
     ruleslist = copy.deepcopy(ruleslist)
 
-    rules = {
+    rules: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
         "global": {},
         "device": {},
-    }  # type: Dict[str, Dict[str, List[Dict[str, Any]]]]
+    }
 
     rules["global"] = _add_empty_priority_class_arrays(rules["global"])
 

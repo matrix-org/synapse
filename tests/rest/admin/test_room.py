@@ -22,128 +22,11 @@ from parameterized import parameterized_class
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import Codes
-from synapse.rest.client.v1 import directory, events, login, room
+from synapse.rest.client import directory, events, login, room
 
 from tests import unittest
 
 """Tests admin REST events for /rooms paths."""
-
-
-class ShutdownRoomTestCase(unittest.HomeserverTestCase):
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-        login.register_servlets,
-        events.register_servlets,
-        room.register_servlets,
-        room.register_deprecated_servlets,
-    ]
-
-    def prepare(self, reactor, clock, hs):
-        self.event_creation_handler = hs.get_event_creation_handler()
-        hs.config.user_consent_version = "1"
-
-        consent_uri_builder = Mock()
-        consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
-        self.event_creation_handler._consent_uri_builder = consent_uri_builder
-
-        self.store = hs.get_datastore()
-
-        self.admin_user = self.register_user("admin", "pass", admin=True)
-        self.admin_user_tok = self.login("admin", "pass")
-
-        self.other_user = self.register_user("user", "pass")
-        self.other_user_token = self.login("user", "pass")
-
-        # Mark the admin user as having consented
-        self.get_success(self.store.user_set_consent_version(self.admin_user, "1"))
-
-    def test_shutdown_room_consent(self):
-        """Test that we can shutdown rooms with local users who have not
-        yet accepted the privacy policy. This used to fail when we tried to
-        force part the user from the old room.
-        """
-        self.event_creation_handler._block_events_without_consent_error = None
-
-        room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_token)
-
-        # Assert one user in room
-        users_in_room = self.get_success(self.store.get_users_in_room(room_id))
-        self.assertEqual([self.other_user], users_in_room)
-
-        # Enable require consent to send events
-        self.event_creation_handler._block_events_without_consent_error = "Error"
-
-        # Assert that the user is getting consent error
-        self.helper.send(
-            room_id, body="foo", tok=self.other_user_token, expect_code=403
-        )
-
-        # Test that the admin can still send shutdown
-        url = "/_synapse/admin/v1/shutdown_room/" + room_id
-        channel = self.make_request(
-            "POST",
-            url.encode("ascii"),
-            json.dumps({"new_room_user_id": self.admin_user}),
-            access_token=self.admin_user_tok,
-        )
-
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-
-        # Assert there is now no longer anyone in the room
-        users_in_room = self.get_success(self.store.get_users_in_room(room_id))
-        self.assertEqual([], users_in_room)
-
-    def test_shutdown_room_block_peek(self):
-        """Test that a world_readable room can no longer be peeked into after
-        it has been shut down.
-        """
-
-        self.event_creation_handler._block_events_without_consent_error = None
-
-        room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_token)
-
-        # Enable world readable
-        url = "rooms/%s/state/m.room.history_visibility" % (room_id,)
-        channel = self.make_request(
-            "PUT",
-            url.encode("ascii"),
-            json.dumps({"history_visibility": "world_readable"}),
-            access_token=self.other_user_token,
-        )
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-
-        # Test that the admin can still send shutdown
-        url = "/_synapse/admin/v1/shutdown_room/" + room_id
-        channel = self.make_request(
-            "POST",
-            url.encode("ascii"),
-            json.dumps({"new_room_user_id": self.admin_user}),
-            access_token=self.admin_user_tok,
-        )
-
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-
-        # Assert we can no longer peek into the room
-        self._assert_peek(room_id, expect_code=403)
-
-    def _assert_peek(self, room_id, expect_code):
-        """Assert that the admin user can (or cannot) peek into the room."""
-
-        url = "rooms/%s/initialSync" % (room_id,)
-        channel = self.make_request(
-            "GET", url.encode("ascii"), access_token=self.admin_user_tok
-        )
-        self.assertEqual(
-            expect_code, int(channel.result["code"]), msg=channel.result["body"]
-        )
-
-        url = "events?timeout=0&room_id=" + room_id
-        channel = self.make_request(
-            "GET", url.encode("ascii"), access_token=self.admin_user_tok
-        )
-        self.assertEqual(
-            expect_code, int(channel.result["code"]), msg=channel.result["body"]
-        )
 
 
 @parameterized_class(
@@ -164,7 +47,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.event_creation_handler = hs.get_event_creation_handler()
-        hs.config.user_consent_version = "1"
+        hs.config.consent.user_consent_version = "1"
 
         consent_uri_builder = Mock()
         consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
@@ -535,7 +418,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
                 )
             )
 
-            self.assertEqual(count, 0, msg="Rows not purged in {}".format(table))
+            self.assertEqual(count, 0, msg=f"Rows not purged in {table}")
 
     def _assert_peek(self, room_id, expect_code):
         """Assert that the admin user can (or cannot) peek into the room."""
@@ -555,51 +438,6 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             expect_code, int(channel.result["code"]), msg=channel.result["body"]
         )
-
-
-class PurgeRoomTestCase(unittest.HomeserverTestCase):
-    """Test /purge_room admin API."""
-
-    servlets = [
-        synapse.rest.admin.register_servlets,
-        login.register_servlets,
-        room.register_servlets,
-    ]
-
-    def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
-
-        self.admin_user = self.register_user("admin", "pass", admin=True)
-        self.admin_user_tok = self.login("admin", "pass")
-
-    def test_purge_room(self):
-        room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
-
-        # All users have to have left the room.
-        self.helper.leave(room_id, user=self.admin_user, tok=self.admin_user_tok)
-
-        url = "/_synapse/admin/v1/purge_room"
-        channel = self.make_request(
-            "POST",
-            url.encode("ascii"),
-            {"room_id": room_id},
-            access_token=self.admin_user_tok,
-        )
-
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-
-        # Test that the following tables have been purged of all rows related to the room.
-        for table in PURGE_TABLES:
-            count = self.get_success(
-                self.store.db_pool.simple_select_one_onecol(
-                    table=table,
-                    keyvalues={"room_id": room_id},
-                    retcol="COUNT(*)",
-                    desc="test_purge_room",
-                )
-            )
-
-            self.assertEqual(count, 0, msg="Rows not purged in {}".format(table))
 
 
 class RoomTestCase(unittest.HomeserverTestCase):
@@ -1103,6 +941,33 @@ class RoomTestCase(unittest.HomeserverTestCase):
         _search_test(None, "bar")
         _search_test(None, "", expected_http_code=400)
 
+    def test_search_term_non_ascii(self):
+        """Test that searching for a room with non-ASCII characters works correctly"""
+
+        # Create test room
+        room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+        room_name = "ж"
+
+        # Set the name for the room
+        self.helper.send_state(
+            room_id,
+            "m.room.name",
+            {"name": room_name},
+            tok=self.admin_user_tok,
+        )
+
+        # make the request and test that the response is what we wanted
+        search_term = urllib.parse.quote("ж", "utf-8")
+        url = "/_synapse/admin/v1/rooms?search_term=%s" % (search_term,)
+        channel = self.make_request(
+            "GET",
+            url.encode("ascii"),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(room_id, channel.json_body.get("rooms")[0].get("room_id"))
+        self.assertEqual("ж", channel.json_body.get("rooms")[0].get("name"))
+
     def test_single_room(self):
         """Test that a single room can be requested correctly"""
         # Create two test rooms
@@ -1280,7 +1145,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.public_room_id = self.helper.create_room_as(
             self.creator, tok=self.creator_tok, is_public=True
         )
-        self.url = "/_synapse/admin/v1/join/{}".format(self.public_room_id)
+        self.url = f"/_synapse/admin/v1/join/{self.public_room_id}"
 
     def test_requester_is_no_admin(self):
         """
@@ -1420,7 +1285,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         private_room_id = self.helper.create_room_as(
             self.creator, tok=self.creator_tok, is_public=False
         )
-        url = "/_synapse/admin/v1/join/{}".format(private_room_id)
+        url = f"/_synapse/admin/v1/join/{private_room_id}"
         body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
@@ -1463,7 +1328,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 
         # Join user to room.
 
-        url = "/_synapse/admin/v1/join/{}".format(private_room_id)
+        url = f"/_synapse/admin/v1/join/{private_room_id}"
         body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
@@ -1493,7 +1358,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         private_room_id = self.helper.create_room_as(
             self.admin_user, tok=self.admin_user_tok, is_public=False
         )
-        url = "/_synapse/admin/v1/join/{}".format(private_room_id)
+        url = f"/_synapse/admin/v1/join/{private_room_id}"
         body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
@@ -1633,7 +1498,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
+            f"/_synapse/admin/v1/rooms/{room_id}/make_room_admin",
             content={},
             access_token=self.admin_user_tok,
         )
@@ -1660,7 +1525,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
+            f"/_synapse/admin/v1/rooms/{room_id}/make_room_admin",
             content={},
             access_token=self.admin_user_tok,
         )
@@ -1686,7 +1551,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
+            f"/_synapse/admin/v1/rooms/{room_id}/make_room_admin",
             content={"user_id": self.second_user_id},
             access_token=self.admin_user_tok,
         )
@@ -1720,7 +1585,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
+            f"/_synapse/admin/v1/rooms/{room_id}/make_room_admin",
             content={},
             access_token=self.admin_user_tok,
         )
@@ -1753,7 +1618,6 @@ PURGE_TABLES = [
     "room_memberships",
     "room_stats_state",
     "room_stats_current",
-    "room_stats_historical",
     "room_stats_earliest_token",
     "rooms",
     "stream_ordering_to_exterm",

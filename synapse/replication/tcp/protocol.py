@@ -102,7 +102,7 @@ tcp_outbound_commands_counter = Counter(
 
 # A list of all connected protocols. This allows us to send metrics about the
 # connections.
-connected_connections = []  # type: List[BaseReplicationStreamProtocol]
+connected_connections: "List[BaseReplicationStreamProtocol]" = []
 
 
 logger = logging.getLogger(__name__)
@@ -146,15 +146,15 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
     # The transport is going to be an ITCPTransport, but that doesn't have the
     # (un)registerProducer methods, those are only on the implementation.
-    transport = None  # type: Connection
+    transport: Connection
 
     delimiter = b"\n"
 
     # Valid commands we expect to receive
-    VALID_INBOUND_COMMANDS = []  # type: Collection[str]
+    VALID_INBOUND_COMMANDS: Collection[str] = []
 
     # Valid commands we can send
-    VALID_OUTBOUND_COMMANDS = []  # type: Collection[str]
+    VALID_OUTBOUND_COMMANDS: Collection[str] = []
 
     max_line_buffer = 10000
 
@@ -165,7 +165,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         self.last_received_command = self.clock.time_msec()
         self.last_sent_command = 0
         # When we requested the connection be closed
-        self.time_we_closed = None  # type: Optional[int]
+        self.time_we_closed: Optional[int] = None
 
         self.received_ping = False  # Have we received a ping from the other side
 
@@ -175,16 +175,20 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         self.conn_id = random_string(5)  # To dedupe in case of name clashes.
 
         # List of pending commands to send once we've established the connection
-        self.pending_commands = []  # type: List[Command]
+        self.pending_commands: List[Command] = []
 
         # The LoopingCall for sending pings.
-        self._send_ping_loop = None  # type: Optional[task.LoopingCall]
+        self._send_ping_loop: Optional[task.LoopingCall] = None
 
         # a logcontext which we use for processing incoming commands. We declare it as a
         # background process so that the CPU stats get reported to prometheus.
-        self._logging_context = BackgroundProcessLoggingContext(
-            "replication-conn", self.conn_id
-        )
+        with PreserveLoggingContext():
+            # thanks to `PreserveLoggingContext()`, the new logcontext is guaranteed to
+            # capture the sentinel context as its containing context and won't prevent
+            # GC of / unintentionally reactivate what would be the current context.
+            self._logging_context = BackgroundProcessLoggingContext(
+                "replication-conn", self.conn_id
+            )
 
     def connectionMade(self):
         logger.info("[%s] Connection established", self.id())
@@ -434,8 +438,12 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         if self.transport:
             self.transport.unregisterProducer()
 
-        # mark the logging context as finished
-        self._logging_context.__exit__(None, None, None)
+        # mark the logging context as finished by triggering `__exit__()`
+        with PreserveLoggingContext():
+            with self._logging_context:
+                pass
+            # the sentinel context is now active, which may not be correct.
+            # PreserveLoggingContext() will restore the correct logging context.
 
     def __str__(self):
         addr = None

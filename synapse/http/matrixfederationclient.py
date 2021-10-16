@@ -43,6 +43,7 @@ from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
 from twisted.internet.interfaces import IReactorTime
 from twisted.internet.task import _EPSILON, Cooperator
+from twisted.web.client import ResponseFailed
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IBodyProducer, IResponse
 
@@ -58,21 +59,16 @@ from synapse.api.errors import (
 from synapse.http import QuieterFileBodyProducer
 from synapse.http.client import (
     BlacklistingAgentWrapper,
-    BlacklistingReactorWrapper,
     BodyExceededMaxSize,
     ByteWriteable,
     encode_query_args,
     read_body_with_max_size,
 )
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
-from synapse.logging.context import make_deferred_yieldable
-from synapse.logging.opentracing import (
-    inject_active_span_byte_dict,
-    set_tag,
-    start_active_span,
-    tags,
-)
-from synapse.types import ISynapseReactor, JsonDict
+from synapse.logging import opentracing
+from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.logging.opentracing import set_tag, start_active_span, tags
+from synapse.types import JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
@@ -109,7 +105,7 @@ class ByteParser(ByteWriteable, Generic[T], abc.ABC):
     the parsed data.
     """
 
-    CONTENT_TYPE = abc.abstractproperty()  # type: str  # type: ignore
+    CONTENT_TYPE: str = abc.abstractproperty()  # type: ignore
     """The expected content type of the response, e.g. `application/json`. If
     the content type doesn't match we fail the request.
     """
@@ -266,6 +262,15 @@ async def _handle_response(
             request.uri.decode("ascii"),
         )
         raise RequestSendFailed(e, can_retry=True) from e
+    except ResponseFailed as e:
+        logger.warning(
+            "{%s} [%s] Failed to read response - %s %s",
+            request.txn_id,
+            request.destination,
+            request.method,
+            request.uri.decode("ascii"),
+        )
+        raise RequestSendFailed(e, can_retry=True) from e
     except Exception as e:
         logger.warning(
             "{%s} [%s] Error reading response %s %s: %s",
@@ -319,29 +324,26 @@ class MatrixFederationHttpClient:
         self.signing_key = hs.signing_key
         self.server_name = hs.hostname
 
-        # We need to use a DNS resolver which filters out blacklisted IP
-        # addresses, to prevent DNS rebinding.
-        self.reactor = BlacklistingReactorWrapper(
-            hs.get_reactor(), None, hs.config.federation_ip_range_blacklist
-        )  # type: ISynapseReactor
+        self.reactor = hs.get_reactor()
 
         user_agent = hs.version_string
-        if hs.config.user_agent_suffix:
-            user_agent = "%s %s" % (user_agent, hs.config.user_agent_suffix)
+        if hs.config.server.user_agent_suffix:
+            user_agent = "%s %s" % (user_agent, hs.config.server.user_agent_suffix)
         user_agent = user_agent.encode("ascii")
 
         federation_agent = MatrixFederationAgent(
             self.reactor,
             tls_client_options_factory,
             user_agent,
-            hs.config.federation_ip_range_blacklist,
+            hs.config.server.federation_ip_range_whitelist,
+            hs.config.server.federation_ip_range_blacklist,
         )
 
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
         # blacklist via IP literals in server names
         self.agent = BlacklistingAgentWrapper(
             federation_agent,
-            ip_blacklist=hs.config.federation_ip_range_blacklist,
+            ip_blacklist=hs.config.server.federation_ip_range_blacklist,
         )
 
         self.clock = hs.get_clock()
@@ -463,8 +465,9 @@ class MatrixFederationHttpClient:
             _sec_timeout = self.default_timeout
 
         if (
-            self.hs.config.federation_domain_whitelist is not None
-            and request.destination not in self.hs.config.federation_domain_whitelist
+            self.hs.config.federation.federation_domain_whitelist is not None
+            and request.destination
+            not in self.hs.config.federation.federation_domain_whitelist
         ):
             raise FederationDeniedError(request.destination)
 
@@ -496,8 +499,8 @@ class MatrixFederationHttpClient:
         )
 
         # Inject the span into the headers
-        headers_dict = {}  # type: Dict[bytes, List[bytes]]
-        inject_active_span_byte_dict(headers_dict, request.destination)
+        headers_dict: Dict[bytes, List[bytes]] = {}
+        opentracing.inject_header_dict(headers_dict, request.destination)
 
         headers_dict[b"User-Agent"] = [self.version_string_bytes]
 
@@ -525,9 +528,9 @@ class MatrixFederationHttpClient:
                             destination_bytes, method_bytes, url_to_sign_bytes, json
                         )
                         data = encode_canonical_json(json)
-                        producer = QuieterFileBodyProducer(
+                        producer: Optional[IBodyProducer] = QuieterFileBodyProducer(
                             BytesIO(data), cooperator=self._cooperator
-                        )  # type: Optional[IBodyProducer]
+                        )
                     else:
                         producer = None
                         auth_headers = self.build_auth_headers(
@@ -551,20 +554,29 @@ class MatrixFederationHttpClient:
                         with Measure(self.clock, "outbound_request"):
                             # we don't want all the fancy cookie and redirect handling
                             # that treq.request gives: just use the raw Agent.
-                            request_deferred = self.agent.request(
+
+                            # To preserve the logging context, the timeout is treated
+                            # in a similar way to `defer.gatherResults`:
+                            # * Each logging context-preserving fork is wrapped in
+                            #   `run_in_background`. In this case there is only one,
+                            #   since the timeout fork is not logging-context aware.
+                            # * The `Deferred` that joins the forks back together is
+                            #   wrapped in `make_deferred_yieldable` to restore the
+                            #   logging context regardless of the path taken.
+                            request_deferred = run_in_background(
+                                self.agent.request,
                                 method_bytes,
                                 url_bytes,
                                 headers=Headers(headers_dict),
                                 bodyProducer=producer,
                             )
-
                             request_deferred = timeout_deferred(
                                 request_deferred,
                                 timeout=_sec_timeout,
                                 reactor=self.reactor,
                             )
 
-                            response = await request_deferred
+                            response = await make_deferred_yieldable(request_deferred)
                     except DNSLookupError as e:
                         raise RequestSendFailed(e, can_retry=retry_on_dns_fail) from e
                     except Exception as e:
@@ -1139,6 +1151,24 @@ class MatrixFederationHttpClient:
                 msg,
             )
             raise SynapseError(502, msg, Codes.TOO_LARGE)
+        except defer.TimeoutError as e:
+            logger.warning(
+                "{%s} [%s] Timed out reading response - %s %s",
+                request.txn_id,
+                request.destination,
+                request.method,
+                request.uri.decode("ascii"),
+            )
+            raise RequestSendFailed(e, can_retry=True) from e
+        except ResponseFailed as e:
+            logger.warning(
+                "{%s} [%s] Failed to read response - %s %s",
+                request.txn_id,
+                request.destination,
+                request.method,
+                request.uri.decode("ascii"),
+            )
+            raise RequestSendFailed(e, can_retry=True) from e
         except Exception as e:
             logger.warning(
                 "{%s} [%s] Error reading response: %s",
@@ -1157,7 +1187,7 @@ class MatrixFederationHttpClient:
             request.method,
             request.uri.decode("ascii"),
         )
-        return (length, headers)
+        return length, headers
 
 
 def _flatten_response_never_received(e):

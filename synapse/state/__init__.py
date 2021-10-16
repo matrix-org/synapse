@@ -16,6 +16,7 @@ import heapq
 import logging
 from collections import defaultdict, namedtuple
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -52,6 +53,10 @@ from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import Measure, measure_func
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+    from synapse.storage.databases.main import DataStore
+
 logger = logging.getLogger(__name__)
 metrics_logger = logging.getLogger("synapse.state.metrics")
 
@@ -74,7 +79,7 @@ _NEXT_STATE_ID = 1
 POWER_KEY = (EventTypes.PowerLevels, "")
 
 
-def _gen_state_id():
+def _gen_state_id() -> str:
     global _NEXT_STATE_ID
     s = "X%d" % (_NEXT_STATE_ID,)
     _NEXT_STATE_ID += 1
@@ -109,11 +114,11 @@ class _StateCacheEntry:
         # `state_id` is either a state_group (and so an int) or a string. This
         # ensures we don't accidentally persist a state_id as a stateg_group
         if state_group:
-            self.state_id = state_group
+            self.state_id: Union[str, int] = state_group
         else:
             self.state_id = _gen_state_id()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.state)
 
 
@@ -122,7 +127,7 @@ class StateHandler:
     where necessary
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.state_store = hs.get_storage().state
@@ -258,7 +263,9 @@ class StateHandler:
     async def compute_event_context(
         self, event: EventBase, old_state: Optional[Iterable[EventBase]] = None
     ) -> EventContext:
-        """Build an EventContext structure for the event.
+        """Build an EventContext structure for a non-outlier event.
+
+        (for an outlier, call EventContext.for_outlier directly)
 
         This works out what the current state should be for the event, and
         generates a new state group if necessary.
@@ -273,35 +280,7 @@ class StateHandler:
             The event context.
         """
 
-        if event.internal_metadata.is_outlier():
-            # If this is an outlier, then we know it shouldn't have any current
-            # state. Certainly store.get_current_state won't return any, and
-            # persisting the event won't store the state group.
-
-            # FIXME: why do we populate current_state_ids? I thought the point was
-            # that we weren't supposed to have any state for outliers?
-            if old_state:
-                prev_state_ids = {(s.type, s.state_key): s.event_id for s in old_state}
-                if event.is_state():
-                    current_state_ids = dict(prev_state_ids)
-                    key = (event.type, event.state_key)
-                    current_state_ids[key] = event.event_id
-                else:
-                    current_state_ids = prev_state_ids
-            else:
-                current_state_ids = {}
-                prev_state_ids = {}
-
-            # We don't store state for outliers, so we don't generate a state
-            # group for it.
-            context = EventContext.with_state(
-                state_group=None,
-                state_group_before_event=None,
-                current_state_ids=current_state_ids,
-                prev_state_ids=prev_state_ids,
-            )
-
-            return context
+        assert not event.internal_metadata.is_outlier()
 
         #
         # first of all, figure out the state before the event
@@ -309,9 +288,9 @@ class StateHandler:
 
         if old_state:
             # if we're given the state before the event, then we use that
-            state_ids_before_event = {
+            state_ids_before_event: StateMap[str] = {
                 (s.type, s.state_key): s.event_id for s in old_state
-            }  # type: StateMap[str]
+            }
             state_group_before_event = None
             state_group_before_event_prev_group = None
             deltas_to_state_group_before_event = None
@@ -507,29 +486,31 @@ class StateResolutionHandler:
     be storage-independent.
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
 
         self.resolve_linearizer = Linearizer(name="state_resolve_lock")
 
         # dict of set of event_ids -> _StateCacheEntry.
-        self._state_cache = ExpiringCache(
+        self._state_cache: ExpiringCache[
+            FrozenSet[int], _StateCacheEntry
+        ] = ExpiringCache(
             cache_name="state_cache",
             clock=self.clock,
             max_len=100000,
             expiry_ms=EVICTION_TIMEOUT_SECONDS * 1000,
             iterable=True,
             reset_expiry_on_get=True,
-        )  # type: ExpiringCache[FrozenSet[int], _StateCacheEntry]
+        )
 
         #
         # stuff for tracking time spent on state-res by room
         #
 
         # tracks the amount of work done on state res per room
-        self._state_res_metrics = defaultdict(
+        self._state_res_metrics: DefaultDict[str, _StateResMetrics] = defaultdict(
             _StateResMetrics
-        )  # type: DefaultDict[str, _StateResMetrics]
+        )
 
         self.clock.looping_call(self._report_metrics, 120 * 1000)
 
@@ -634,16 +615,20 @@ class StateResolutionHandler:
         """
         try:
             with Measure(self.clock, "state._resolve_events") as m:
-                v = KNOWN_ROOM_VERSIONS[room_version]
-                if v.state_res == StateResolutionVersions.V1:
+                room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+                if room_version_obj.state_res == StateResolutionVersions.V1:
                     return await v1.resolve_events_with_store(
-                        room_id, state_sets, event_map, state_res_store.get_events
+                        room_id,
+                        room_version_obj,
+                        state_sets,
+                        event_map,
+                        state_res_store.get_events,
                     )
                 else:
                     return await v2.resolve_events_with_store(
                         self.clock,
                         room_id,
-                        room_version,
+                        room_version_obj,
                         state_sets,
                         event_map,
                         state_res_store,
@@ -651,13 +636,15 @@ class StateResolutionHandler:
         finally:
             self._record_state_res_metrics(room_id, m.get_resource_usage())
 
-    def _record_state_res_metrics(self, room_id: str, rusage: ContextResourceUsage):
+    def _record_state_res_metrics(
+        self, room_id: str, rusage: ContextResourceUsage
+    ) -> None:
         room_metrics = self._state_res_metrics[room_id]
         room_metrics.cpu_time += rusage.ru_utime + rusage.ru_stime
         room_metrics.db_time += rusage.db_txn_duration_sec
         room_metrics.db_events += rusage.evt_db_fetch_count
 
-    def _report_metrics(self):
+    def _report_metrics(self) -> None:
         if not self._state_res_metrics:
             # no state res has happened since the last iteration: don't bother logging.
             return
@@ -700,9 +687,9 @@ class StateResolutionHandler:
         items = self._state_res_metrics.items()
 
         # log the N biggest rooms
-        biggest = heapq.nlargest(
+        biggest: List[Tuple[str, _StateResMetrics]] = heapq.nlargest(
             n_to_log, items, key=lambda i: extract_key(i[1])
-        )  # type: List[Tuple[str, _StateResMetrics]]
+        )
         metrics_logger.debug(
             "%i biggest rooms for state-res by %s: %s",
             len(biggest),
@@ -754,7 +741,7 @@ def _make_state_cache_entry(
 
     # failing that, look for the closest match.
     prev_group = None
-    delta_ids = None  # type: Optional[StateMap[str]]
+    delta_ids: Optional[StateMap[str]] = None
 
     for old_group, old_state in state_groups_ids.items():
         n_delta_ids = {k: v for k, v in new_state.items() if old_state.get(k) != v}
@@ -767,16 +754,13 @@ def _make_state_cache_entry(
     )
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class StateResolutionStore:
     """Interface that allows state resolution algorithms to access the database
     in well defined way.
-
-    Args:
-        store (DataStore)
     """
 
-    store = attr.ib()
+    store: "DataStore"
 
     def get_events(
         self, event_ids: Iterable[str], allow_rejected: bool = False

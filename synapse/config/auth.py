@@ -88,7 +88,7 @@ class AuthConfig(Config):
               #
               #require_lowercase: true
 
-              # Whether a password must contain at least one lowercase letter.
+              # Whether a password must contain at least one uppercase letter.
               # Defaults to 'false'.
               #
               #require_uppercase: true
@@ -102,6 +102,10 @@ class AuthConfig(Config):
             # validation to be re-used.  This weakens the protections afforded by
             # the user-interactive authentication process, by allowing for multiple
             # (and potentially different) operations to use the same validation session.
+            #
+            # This is ignored for potentially "dangerous" operations (including
+            # deactivating an account, modifying an account password, and
+            # adding a 3PID).
             #
             # Uncomment below to allow for credential validation to last for 15
             # seconds.

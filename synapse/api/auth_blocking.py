@@ -30,13 +30,15 @@ class AuthBlocking:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
 
-        self._server_notices_mxid = hs.config.server_notices_mxid
-        self._hs_disabled = hs.config.hs_disabled
-        self._hs_disabled_message = hs.config.hs_disabled_message
-        self._admin_contact = hs.config.admin_contact
-        self._max_mau_value = hs.config.max_mau_value
-        self._limit_usage_by_mau = hs.config.limit_usage_by_mau
-        self._mau_limits_reserved_threepids = hs.config.mau_limits_reserved_threepids
+        self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
+        self._hs_disabled = hs.config.server.hs_disabled
+        self._hs_disabled_message = hs.config.server.hs_disabled_message
+        self._admin_contact = hs.config.server.admin_contact
+        self._max_mau_value = hs.config.server.max_mau_value
+        self._limit_usage_by_mau = hs.config.server.limit_usage_by_mau
+        self._mau_limits_reserved_threepids = (
+            hs.config.server.mau_limits_reserved_threepids
+        )
         self._server_name = hs.hostname
         self._track_appservice_user_ips = hs.config.appservice.track_appservice_user_ips
 
@@ -79,7 +81,7 @@ class AuthBlocking:
                 # We never block the server from doing actions on behalf of
                 # users.
                 return
-            elif requester.app_service and not self._track_appservice_user_ips:
+            if requester.app_service and not self._track_appservice_user_ips:
                 # If we're authenticated as an appservice then we only block
                 # auth if `track_appservice_user_ips` is set, as that option
                 # implicitly means that application services are part of MAU

@@ -84,8 +84,8 @@ class DeviceMessageHandler:
         self._ratelimiter = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
-            rate_hz=hs.config.rc_key_requests.per_second,
-            burst_count=hs.config.rc_key_requests.burst_count,
+            rate_hz=hs.config.ratelimiting.rc_key_requests.per_second,
+            burst_count=hs.config.ratelimiting.rc_key_requests.burst_count,
         )
 
     async def on_direct_to_device_edu(self, origin: str, content: JsonDict) -> None:
@@ -203,7 +203,7 @@ class DeviceMessageHandler:
         log_kv({"number_of_to_device_messages": len(messages)})
         set_tag("sender", sender_user_id)
         local_messages = {}
-        remote_messages = {}  # type: Dict[str, Dict[str, Dict[str, JsonDict]]]
+        remote_messages: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
         for user_id, by_device in messages.items():
             # Ratelimit local cross-user key requests by the sending device.
             if (

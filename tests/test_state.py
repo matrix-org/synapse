@@ -106,7 +106,7 @@ class StateGroupStore:
         }
 
     async def get_state_group_delta(self, name):
-        return (None, None)
+        return None, None
 
     def register_events(self, events):
         for e in events:
@@ -168,6 +168,7 @@ class StateTestCase(unittest.TestCase):
                 "get_state_handler",
                 "get_clock",
                 "get_state_resolution_handler",
+                "get_account_validity_handler",
                 "hostname",
             ]
         )
@@ -199,7 +200,7 @@ class StateTestCase(unittest.TestCase):
 
         self.store.register_events(graph.walk())
 
-        context_store = {}  # type: dict[str, EventContext]
+        context_store: dict[str, EventContext] = {}
 
         for event in graph.walk():
             context = yield defer.ensureDeferred(

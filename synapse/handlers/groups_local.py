@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, List, Set
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Iterable, List, Set
 
 from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
 from synapse.types import GroupID, JsonDict, get_domain_from_id
@@ -25,12 +25,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _create_rerouter(func_name):
+def _create_rerouter(func_name: str) -> Callable[..., Awaitable[JsonDict]]:
     """Returns an async function that looks at the group id and calls the function
     on federation or the local group server if the group is local
     """
 
-    async def f(self, group_id, *args, **kwargs):
+    async def f(
+        self: "GroupsLocalWorkerHandler", group_id: str, *args: Any, **kwargs: Any
+    ) -> JsonDict:
         if not GroupID.is_valid(group_id):
             raise SynapseError(400, "%s is not a legal group ID" % (group_id,))
 
@@ -214,7 +216,7 @@ class GroupsLocalWorkerHandler:
     async def bulk_get_publicised_groups(
         self, user_ids: Iterable[str], proxy: bool = True
     ) -> JsonDict:
-        destinations = {}  # type: Dict[str, Set[str]]
+        destinations: Dict[str, Set[str]] = {}
         local_users = set()
 
         for user_id in user_ids:
@@ -227,7 +229,7 @@ class GroupsLocalWorkerHandler:
             raise SynapseError(400, "Some user_ids are not local")
 
         results = {}
-        failed_results = []  # type: List[str]
+        failed_results: List[str] = []
         for destination, dest_user_ids in destinations.items():
             try:
                 r = await self.transport_client.bulk_get_publicised_groups(

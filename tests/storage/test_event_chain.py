@@ -20,7 +20,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.storage.databases.main.events import _LinkMap
 from synapse.types import create_requester
 
@@ -578,12 +578,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
         # Ugh, have to reset this flag
         self.store.db_pool.updates._all_done = False
 
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         # Test that the `has_auth_chain_index` has been set
         self.assertTrue(self.get_success(self.store.has_auth_chain_index(room_id)))
@@ -619,12 +614,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
         # Ugh, have to reset this flag
         self.store.db_pool.updates._all_done = False
 
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         # Test that the `has_auth_chain_index` has been set
         self.assertTrue(self.get_success(self.store.has_auth_chain_index(room_id1)))

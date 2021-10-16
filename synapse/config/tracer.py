@@ -81,7 +81,7 @@ class TracerConfig(Config):
             #enabled: true
 
             # The list of homeservers we wish to send and receive span contexts and span baggage.
-            # See docs/opentracing.rst.
+            # See https://matrix-org.github.io/synapse/latest/opentracing.html.
             #
             # This is a list of regexes which are matched against the server_name of the
             # homeserver.

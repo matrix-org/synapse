@@ -15,9 +15,12 @@
 
 from unittest.mock import Mock
 
+from parameterized import parameterized
+
 import synapse.rest.admin
 from synapse.http.site import XForwardedForRequest
-from synapse.rest.client.v1 import login
+from synapse.rest.client import login
+from synapse.types import UserID
 
 from tests import unittest
 from tests.server import make_request
@@ -143,6 +146,80 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
             ],
         )
 
+    @parameterized.expand([(False,), (True,)])
+    def test_get_last_client_ip_by_device(self, after_persisting: bool):
+        """Test `get_last_client_ip_by_device` for persisted and unpersisted data"""
+        self.reactor.advance(12345678)
+
+        user_id = "@user:id"
+        device_id = "MY_DEVICE"
+
+        # Insert a user IP
+        self.get_success(
+            self.store.store_device(
+                user_id,
+                device_id,
+                "display name",
+            )
+        )
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token", "ip", "user_agent", device_id
+            )
+        )
+
+        if after_persisting:
+            # Trigger the storage loop
+            self.reactor.advance(10)
+
+        result = self.get_success(
+            self.store.get_last_client_ip_by_device(user_id, device_id)
+        )
+
+        self.assertEqual(
+            result,
+            {
+                (user_id, device_id): {
+                    "user_id": user_id,
+                    "device_id": device_id,
+                    "ip": "ip",
+                    "user_agent": "user_agent",
+                    "last_seen": 12345678000,
+                },
+            },
+        )
+
+    @parameterized.expand([(False,), (True,)])
+    def test_get_user_ip_and_agents(self, after_persisting: bool):
+        """Test `get_user_ip_and_agents` for persisted and unpersisted data"""
+        self.reactor.advance(12345678)
+
+        user_id = "@user:id"
+        user = UserID.from_string(user_id)
+
+        # Insert a user IP
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token", "ip", "user_agent", "MY_DEVICE"
+            )
+        )
+
+        if after_persisting:
+            # Trigger the storage loop
+            self.reactor.advance(10)
+
+        self.assertEqual(
+            self.get_success(self.store.get_user_ip_and_agents(user)),
+            [
+                {
+                    "access_token": "access_token",
+                    "ip": "ip",
+                    "user_agent": "user_agent",
+                    "last_seen": 12345678000,
+                },
+            ],
+        )
+
     @override_config({"limit_usage_by_mau": False, "max_mau_value": 50})
     def test_disabled_monthly_active_user(self):
         user_id = "@user:server"
@@ -208,12 +285,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
     def test_devices_last_seen_bg_update(self):
         # First make sure we have completed all updates.
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         user_id = "@user:id"
         device_id = "MY_DEVICE"
@@ -277,12 +349,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         self.store.db_pool.updates._all_done = False
 
         # Now let's actually drive the updates to completion
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         # We should now get the correct result again
         result = self.get_success(
@@ -303,12 +370,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
     def test_old_user_ips_pruned(self):
         # First make sure we have completed all updates.
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         user_id = "@user:id"
         device_id = "MY_DEVICE"

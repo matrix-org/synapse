@@ -1,0 +1,65 @@
+name: Deploy the documentation
+
+on:
+  push:
+    branches:
+      # For bleeding-edge documentation
+      - develop
+      # For documentation specific to a release
+      - 'release-v*'
+      # stable docs
+      - master
+
+  workflow_dispatch:
+
+jobs:
+  pages:
+    name: GitHub Pages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup mdbook
+        uses: peaceiris/actions-mdbook@4b5ef36b314c2599664ca107bb8c02412548d79d # v1.1.14
+        with:
+          mdbook-version: '0.4.9'
+
+      - name: Build the documentation
+        # mdbook will only create an index.html if we're including docs/README.md in SUMMARY.md.
+        # However, we're using docs/README.md for other purposes and need to pick a new page
+        # as the default. Let's opt for the welcome page instead.
+        run: |
+          mdbook build
+          cp book/welcome_and_overview.html book/index.html
+
+      # Figure out the target directory.
+      #
+      # The target directory depends on the name of the branch
+      #
+      - name: Get the target directory name
+        id: vars
+        run: |
+          # first strip the 'refs/heads/' prefix with some shell foo
+          branch="${GITHUB_REF#refs/heads/}"
+
+          case $branch in
+              release-*)
+                  # strip 'release-' from the name for release branches.
+                  branch="${branch#release-}"
+                  ;;
+              master)
+                  # deploy to "latest" for the master branch.
+                  branch="latest"
+                  ;;
+          esac
+
+          # finally, set the 'branch-version' var.
+          echo "::set-output name=branch-version::$branch"
+          
+      # Deploy to the target directory.
+      - name: Deploy to gh pages
+        uses: peaceiris/actions-gh-pages@068dc23d9710f1ba62e86896f84735d869951305 # v3.8.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./book
+          destination_dir: ./${{ steps.vars.outputs.branch-version }}

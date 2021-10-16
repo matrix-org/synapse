@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from os import path
+from typing import Optional
 
 from synapse.config import ConfigError
 
@@ -22,7 +23,7 @@ DEFAULT_CONFIG = """\
 # User Consent configuration
 #
 # for detailed instructions, see
-# https://github.com/matrix-org/synapse/blob/master/docs/consent_tracking.md
+# https://matrix-org.github.io/synapse/latest/consent_tracking.html
 #
 # Parts of this section are required if enabling the 'consent' resource under
 # 'listeners', in particular 'template_dir' and 'version'.
@@ -78,8 +79,8 @@ class ConsentConfig(Config):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self.user_consent_version = None
-        self.user_consent_template_dir = None
+        self.user_consent_version: Optional[str] = None
+        self.user_consent_template_dir: Optional[str] = None
         self.user_consent_server_notice_content = None
         self.user_consent_server_notice_to_guests = False
         self.block_events_without_consent_error = None
@@ -94,7 +95,9 @@ class ConsentConfig(Config):
             return
         self.user_consent_version = str(consent_config["version"])
         self.user_consent_template_dir = self.abspath(consent_config["template_dir"])
-        if not path.isdir(self.user_consent_template_dir):
+        if not isinstance(self.user_consent_template_dir, str) or not path.isdir(
+            self.user_consent_template_dir
+        ):
             raise ConfigError(
                 "Could not find template directory '%s'"
                 % (self.user_consent_template_dir,)

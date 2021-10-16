@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.storage.databases.main import stats
 
 from tests import unittest
@@ -88,16 +88,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
     def _get_current_stats(self, stats_type, stat_id):
         table, id_col = stats.TYPE_TO_TABLE[stats_type]
 
-        cols = list(stats.ABSOLUTE_STATS_FIELDS[stats_type]) + list(
-            stats.PER_SLICE_FIELDS[stats_type]
-        )
-
-        end_ts = self.store.quantise_stats_time(self.reactor.seconds() * 1000)
+        cols = list(stats.ABSOLUTE_STATS_FIELDS[stats_type])
 
         return self.get_success(
             self.store.db_pool.simple_select_one(
-                table + "_historical",
-                {id_col: stat_id, end_ts: end_ts},
+                table + "_current",
+                {id_col: stat_id},
                 cols,
                 allow_none=True,
             )
@@ -107,12 +103,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         # Do the initial population of the stats via the background update
         self._add_background_updates()
 
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
     def test_initial_room(self):
         """
@@ -122,7 +113,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertEqual(len(r), 0)
 
         # Disable stats
-        self.hs.config.stats_enabled = False
+        self.hs.config.stats.stats_enabled = False
         self.handler.stats_enabled = False
 
         u1 = self.register_user("u1", "pass")
@@ -138,132 +129,18 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertEqual(len(r), 0)
 
         # Enable stats
-        self.hs.config.stats_enabled = True
+        self.hs.config.stats.stats_enabled = True
         self.handler.stats_enabled = True
 
         # Do the initial population of the user directory via the background update
         self._add_background_updates()
 
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         r = self.get_success(self.get_all_room_state())
 
         self.assertEqual(len(r), 1)
         self.assertEqual(r[0]["topic"], "foo")
-
-    def test_initial_earliest_token(self):
-        """
-        Ingestion via notify_new_event will ignore tokens that the background
-        update have already processed.
-        """
-
-        self.reactor.advance(86401)
-
-        self.hs.config.stats_enabled = False
-        self.handler.stats_enabled = False
-
-        u1 = self.register_user("u1", "pass")
-        u1_token = self.login("u1", "pass")
-
-        u2 = self.register_user("u2", "pass")
-        u2_token = self.login("u2", "pass")
-
-        u3 = self.register_user("u3", "pass")
-        u3_token = self.login("u3", "pass")
-
-        room_1 = self.helper.create_room_as(u1, tok=u1_token)
-        self.helper.send_state(
-            room_1, event_type="m.room.topic", body={"topic": "foo"}, tok=u1_token
-        )
-
-        # Begin the ingestion by creating the temp tables. This will also store
-        # the position that the deltas should begin at, once they take over.
-        self.hs.config.stats_enabled = True
-        self.handler.stats_enabled = True
-        self.store.db_pool.updates._all_done = False
-        self.get_success(
-            self.store.db_pool.simple_update_one(
-                table="stats_incremental_position",
-                keyvalues={},
-                updatevalues={"stream_id": 0},
-            )
-        )
-
-        self.get_success(
-            self.store.db_pool.simple_insert(
-                "background_updates",
-                {"update_name": "populate_stats_prepare", "progress_json": "{}"},
-            )
-        )
-
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
-
-        # Now, before the table is actually ingested, add some more events.
-        self.helper.invite(room=room_1, src=u1, targ=u2, tok=u1_token)
-        self.helper.join(room=room_1, user=u2, tok=u2_token)
-
-        # orig_delta_processor = self.store.
-
-        # Now do the initial ingestion.
-        self.get_success(
-            self.store.db_pool.simple_insert(
-                "background_updates",
-                {"update_name": "populate_stats_process_rooms", "progress_json": "{}"},
-            )
-        )
-        self.get_success(
-            self.store.db_pool.simple_insert(
-                "background_updates",
-                {
-                    "update_name": "populate_stats_cleanup",
-                    "progress_json": "{}",
-                    "depends_on": "populate_stats_process_rooms",
-                },
-            )
-        )
-
-        self.store.db_pool.updates._all_done = False
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
-
-        self.reactor.advance(86401)
-
-        # Now add some more events, triggering ingestion. Because of the stream
-        # position being set to before the events sent in the middle, a simpler
-        # implementation would reprocess those events, and say there were four
-        # users, not three.
-        self.helper.invite(room=room_1, src=u1, targ=u3, tok=u1_token)
-        self.helper.join(room=room_1, user=u3, tok=u3_token)
-
-        # self.handler.notify_new_event()
-
-        # We need to let the delta processor advance…
-        self.reactor.advance(10 * 60)
-
-        # Get the slices! There should be two -- day 1, and day 2.
-        r = self.get_success(self.store.get_statistics_for_subject("room", room_1, 0))
-
-        self.assertEqual(len(r), 2)
-
-        # The oldest has 2 joined members
-        self.assertEqual(r[-1]["joined_members"], 2)
-
-        # The newest has 3
-        self.assertEqual(r[0]["joined_members"], 3)
 
     def test_create_user(self):
         """
@@ -296,22 +173,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertIsNotNone(r1stats)
         self.assertIsNotNone(r2stats)
 
-        # contains the default things you'd expect in a fresh room
-        self.assertEqual(
-            r1stats["total_events"],
-            EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM,
-            "Wrong number of total_events in new room's stats!"
-            " You may need to update this if more state events are added to"
-            " the room creation process.",
-        )
-        self.assertEqual(
-            r2stats["total_events"],
-            EXPT_NUM_STATE_EVTS_IN_FRESH_PRIVATE_ROOM,
-            "Wrong number of total_events in new room's stats!"
-            " You may need to update this if more state events are added to"
-            " the room creation process.",
-        )
-
         self.assertEqual(
             r1stats["current_state_events"], EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM
         )
@@ -326,24 +187,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertEqual(r2stats["joined_members"], 1)
         self.assertEqual(r2stats["invited_members"], 0)
         self.assertEqual(r2stats["banned_members"], 0)
-
-    def test_send_message_increments_total_events(self):
-        """
-        When we send a message, it increments total_events.
-        """
-
-        self._perform_background_initial_update()
-
-        u1 = self.register_user("u1", "pass")
-        u1token = self.login("u1", "pass")
-        r1 = self.helper.create_room_as(u1, tok=u1token)
-        r1stats_ante = self._get_current_stats("room", r1)
-
-        self.helper.send(r1, "hiss", tok=u1token)
-
-        r1stats_post = self._get_current_stats("room", r1)
-
-        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
 
     def test_updating_profile_information_does_not_increase_joined_members_count(self):
         """
@@ -378,7 +221,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
     def test_send_state_event_nonoverwriting(self):
         """
-        When we send a non-overwriting state event, it increments total_events AND current_state_events
+        When we send a non-overwriting state event, it increments current_state_events
         """
 
         self._perform_background_initial_update()
@@ -399,44 +242,14 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         r1stats_post = self._get_current_stats("room", r1)
 
-        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
             1,
         )
 
-    def test_send_state_event_overwriting(self):
-        """
-        When we send an overwriting state event, it increments total_events ONLY
-        """
-
-        self._perform_background_initial_update()
-
-        u1 = self.register_user("u1", "pass")
-        u1token = self.login("u1", "pass")
-        r1 = self.helper.create_room_as(u1, tok=u1token)
-
-        self.helper.send_state(
-            r1, "cat.hissing", {"value": True}, tok=u1token, state_key="tabby"
-        )
-
-        r1stats_ante = self._get_current_stats("room", r1)
-
-        self.helper.send_state(
-            r1, "cat.hissing", {"value": False}, tok=u1token, state_key="tabby"
-        )
-
-        r1stats_post = self._get_current_stats("room", r1)
-
-        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
-        self.assertEqual(
-            r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
-            0,
-        )
-
     def test_join_first_time(self):
         """
-        When a user joins a room for the first time, total_events, current_state_events and
+        When a user joins a room for the first time, current_state_events and
         joined_members should increase by exactly 1.
         """
 
@@ -455,7 +268,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         r1stats_post = self._get_current_stats("room", r1)
 
-        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
             1,
@@ -466,7 +278,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
     def test_join_after_leave(self):
         """
-        When a user joins a room after being previously left, total_events and
+        When a user joins a room after being previously left,
         joined_members should increase by exactly 1.
         current_state_events should not increase.
         left_members should decrease by exactly 1.
@@ -490,7 +302,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         r1stats_post = self._get_current_stats("room", r1)
 
-        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
             0,
@@ -504,7 +315,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
     def test_invited(self):
         """
-        When a user invites another user, current_state_events, total_events and
+        When a user invites another user, current_state_events and
         invited_members should increase by exactly 1.
         """
 
@@ -522,7 +333,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         r1stats_post = self._get_current_stats("room", r1)
 
-        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
             1,
@@ -533,7 +343,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
     def test_join_after_invite(self):
         """
-        When a user joins a room after being invited, total_events and
+        When a user joins a room after being invited and
         joined_members should increase by exactly 1.
         current_state_events should not increase.
         invited_members should decrease by exactly 1.
@@ -556,7 +366,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         r1stats_post = self._get_current_stats("room", r1)
 
-        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
             0,
@@ -570,7 +379,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
     def test_left(self):
         """
-        When a user leaves a room after joining, total_events and
+        When a user leaves a room after joining and
         left_members should increase by exactly 1.
         current_state_events should not increase.
         joined_members should decrease by exactly 1.
@@ -593,7 +402,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         r1stats_post = self._get_current_stats("room", r1)
 
-        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
             0,
@@ -607,7 +415,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
     def test_banned(self):
         """
-        When a user is banned from a room after joining, total_events and
+        When a user is banned from a room after joining and
         left_members should increase by exactly 1.
         current_state_events should not increase.
         banned_members should decrease by exactly 1.
@@ -630,7 +438,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         r1stats_post = self._get_current_stats("room", r1)
 
-        self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
         self.assertEqual(
             r1stats_post["current_state_events"] - r1stats_ante["current_state_events"],
             0,
@@ -652,7 +459,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         behaviour eventually to still keep current rows.
         """
 
-        self.hs.config.stats_enabled = False
+        self.hs.config.stats.stats_enabled = False
         self.handler.stats_enabled = False
 
         u1 = self.register_user("u1", "pass")
@@ -664,7 +471,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertIsNone(self._get_current_stats("room", r1))
         self.assertIsNone(self._get_current_stats("user", u1))
 
-        self.hs.config.stats_enabled = True
+        self.hs.config.stats.stats_enabled = True
         self.handler.stats_enabled = True
 
         self._perform_background_initial_update()
@@ -751,12 +558,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
 
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         r1stats_complete = self._get_current_stats("room", r1)
         u1stats_complete = self._get_current_stats("user", u1)

@@ -15,7 +15,7 @@
 
 from synapse.api.constants import Membership
 from synapse.rest.admin import register_servlets_for_client_rest_resource
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.types import UserID, create_requester
 
 from tests import unittest
@@ -169,12 +169,7 @@ class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
 
     def test_can_rerun_update(self):
         # First make sure we have completed all updates.
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         # Now let's create a room, which will insert a membership
         user = UserID("alice", "test")
@@ -197,9 +192,4 @@ class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
         self.store.db_pool.updates._all_done = False
 
         # Now let's actually drive the updates to completion
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()

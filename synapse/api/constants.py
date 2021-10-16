@@ -62,7 +62,13 @@ class JoinRules:
     INVITE = "invite"
     PRIVATE = "private"
     # As defined for MSC3083.
-    MSC3083_RESTRICTED = "restricted"
+    RESTRICTED = "restricted"
+
+
+class RestrictedJoinRuleTypes:
+    """Understood types for the allow rules in restricted join rules."""
+
+    ROOM_MEMBERSHIP = "m.room_membership"
 
 
 class LoginType:
@@ -73,6 +79,7 @@ class LoginType:
     TERMS = "m.login.terms"
     SSO = "m.login.sso"
     DUMMY = "m.login.dummy"
+    REGISTRATION_TOKEN = "org.matrix.msc3231.login.registration_token"
 
 
 # This is used in the `type` parameter for /register when called by
@@ -112,12 +119,22 @@ class EventTypes:
 
     SpaceChild = "m.space.child"
     SpaceParent = "m.space.parent"
-    MSC1772_SPACE_CHILD = "org.matrix.msc1772.space.child"
-    MSC1772_SPACE_PARENT = "org.matrix.msc1772.space.parent"
+
+    MSC2716_INSERTION = "org.matrix.msc2716.insertion"
+    MSC2716_BATCH = "org.matrix.msc2716.batch"
+    MSC2716_MARKER = "org.matrix.msc2716.marker"
 
 
 class ToDeviceEventTypes:
     RoomKeyRequest = "m.room_key_request"
+
+
+class DeviceKeyAlgorithms:
+    """Spec'd algorithms for the generation of per-device keys"""
+
+    ED25519 = "ed25519"
+    CURVE25519 = "curve25519"
+    SIGNED_CURVE25519 = "signed_curve25519"
 
 
 class EduTypes:
@@ -180,7 +197,34 @@ class EventContentFields:
 
     # cf https://github.com/matrix-org/matrix-doc/pull/1772
     ROOM_TYPE = "type"
-    MSC1772_ROOM_TYPE = "org.matrix.msc1772.type"
+
+    # Whether a room can federate.
+    FEDERATE = "m.federate"
+
+    # The creator of the room, as used in `m.room.create` events.
+    ROOM_CREATOR = "creator"
+
+    # Used in m.room.guest_access events.
+    GUEST_ACCESS = "guest_access"
+
+    # Used on normal messages to indicate they were historically imported after the fact
+    MSC2716_HISTORICAL = "org.matrix.msc2716.historical"
+    # For "insertion" events to indicate what the next batch ID should be in
+    # order to connect to it
+    MSC2716_NEXT_BATCH_ID = "org.matrix.msc2716.next_batch_id"
+    # Used on "batch" events to indicate which insertion event it connects to
+    MSC2716_BATCH_ID = "org.matrix.msc2716.batch_id"
+    # For "marker" events
+    MSC2716_MARKER_INSERTION = "org.matrix.msc2716.marker.insertion"
+
+    # The authorising user for joining a restricted room.
+    AUTHORISING_USER = "join_authorised_via_users_server"
+
+
+class RoomTypes:
+    """Understood values of the room_type field of m.room.create events."""
+
+    SPACE = "m.space"
 
 
 class RoomEncryptionAlgorithms:
@@ -198,3 +242,13 @@ class HistoryVisibility:
     JOINED = "joined"
     SHARED = "shared"
     WORLD_READABLE = "world_readable"
+
+
+class GuestAccess:
+    CAN_JOIN = "can_join"
+    # anything that is not "can_join" is considered "forbidden", but for completeness:
+    FORBIDDEN = "forbidden"
+
+
+class ReadReceiptEventFields:
+    MSC2285_HIDDEN = "org.matrix.msc2285.hidden"

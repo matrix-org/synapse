@@ -3,7 +3,7 @@
 ## Historical Note
 This document was originally written to guide server admins through the upgrade
 path towards Synapse 1.0. Specifically,
-[MSC1711](https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md)
+[MSC1711](https://github.com/matrix-org/matrix-doc/blob/main/proposals/1711-x509-for-federation.md)
 required that all servers present valid TLS certificates on their federation
 API. Admins were encouraged to achieve compliance from version 0.99.0 (released
 in February 2019) ahead of version 1.0 (released June 2019) enforcing the
@@ -14,7 +14,7 @@ upgraded, however it may be of use to those with old installs returning to the
 project.
 
 If you are setting up a server from scratch you almost certainly should look at
-the [installation guide](../INSTALL.md) instead.
+the [installation guide](setup/installation.md) instead.
 
 ## Introduction
 The goal of Synapse 0.99.0 is to act as a stepping stone to Synapse 1.0.0. It
@@ -101,15 +101,6 @@ In this case, your `server_name` points to the host where your Synapse is
 running. There is no need to create a `.well-known` URI or an SRV record, but
 you will need to give Synapse a valid, signed, certificate.
 
-The easiest way to do that is with Synapse's built-in ACME (Let's Encrypt)
-support. Full details are in [ACME.md](./ACME.md) but, in a nutshell:
-
- 1. Allow Synapse to listen on port 80 with `authbind`, or forward it from a
-    reverse proxy.
- 2. Enable acme support in `homeserver.yaml`.
- 3. Move your old certificates out of the way.
- 4. Restart Synapse.
-
 ### If you do have an SRV record currently
 
 If you are using an SRV record, your matrix domain (`server_name`) may not
@@ -130,15 +121,9 @@ In this situation, you have three choices for how to proceed:
 #### Option 1: give Synapse a certificate for your matrix domain
 
 Synapse 1.0 will expect your server to present a TLS certificate for your
-`server_name` (`example.com` in the above example). You can achieve this by
-doing one of the following:
-
- * Acquire a certificate for the `server_name` yourself (for example, using
-   `certbot`), and give it and the key to Synapse via `tls_certificate_path`
-   and `tls_private_key_path`, or:
-
- * Use Synapse's [ACME support](./ACME.md), and forward port 80 on the
-   `server_name` domain to your Synapse instance.
+`server_name` (`example.com` in the above example). You can achieve this by acquiring a
+certificate for the `server_name` yourself (for example, using `certbot`), and giving it
+and the key to Synapse via `tls_certificate_path` and `tls_private_key_path`.
 
 #### Option 2: run Synapse behind a reverse proxy
 
@@ -147,7 +132,7 @@ your domain, you can simply route all traffic through the reverse proxy by
 updating the SRV record appropriately (or removing it, if the proxy listens on
 8448).
 
-See [reverse_proxy.md](reverse_proxy.md) for information on setting up a
+See [the reverse proxy documentation](reverse_proxy.md) for information on setting up a
 reverse proxy.
 
 #### Option 3: add a .well-known file to delegate your matrix traffic
@@ -161,10 +146,9 @@ You can do this with a `.well-known` file as follows:
     with Synapse 0.34 and earlier.
 
   2. Give Synapse a certificate corresponding to the target domain
-    (`customer.example.net` in the above example). You can either use Synapse's
-    built-in [ACME support](./ACME.md) for this (via the `domain` parameter in
-    the `acme` section), or acquire a certificate yourself and give it to
-    Synapse via `tls_certificate_path` and `tls_private_key_path`.
+    (`customer.example.net` in the above example). You can do this by acquire a 
+    certificate for the target domain and giving it to Synapse via `tls_certificate_path`
+    and `tls_private_key_path`.
 
  3. Restart Synapse to ensure the new certificate is loaded.
 
@@ -298,7 +282,7 @@ coffin of the Perspectives project (which was already pretty dead). So, the
 Spec Core Team decided that a better approach would be to mandate valid TLS
 certificates for federation alongside the rest of the Web. More details can be
 found in
-[MSC1711](https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md#background-the-failure-of-the-perspectives-approach).
+[MSC1711](https://github.com/matrix-org/matrix-doc/blob/main/proposals/1711-x509-for-federation.md#background-the-failure-of-the-perspectives-approach).
 
 This results in a breaking change, which is disruptive, but absolutely critical
 for the security model. However, the existence of Let's Encrypt as a trivial
@@ -319,7 +303,7 @@ We no longer actively recommend against using a reverse proxy. Many admins will
 find it easier to direct federation traffic to a reverse proxy and manage their
 own TLS certificates, and this is a supported configuration.
 
-See [reverse_proxy.md](reverse_proxy.md) for information on setting up a
+See [the reverse proxy documentation](reverse_proxy.md) for information on setting up a
 reverse proxy.
 
 ### Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?

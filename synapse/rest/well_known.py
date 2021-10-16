@@ -13,35 +13,35 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING, Optional
 
 from twisted.web.resource import Resource
+from twisted.web.server import Request
 
 from synapse.http.server import set_cors_headers
+from synapse.types import JsonDict
 from synapse.util import json_encoder
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
 class WellKnownBuilder:
-    """Utility to construct the well-known response
-
-    Args:
-        hs (synapse.server.HomeServer):
-    """
-
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self._config = hs.config
 
-    def get_well_known(self):
+    def get_well_known(self) -> Optional[JsonDict]:
         # if we don't have a public_baseurl, we can't help much here.
-        if self._config.public_baseurl is None:
+        if self._config.server.public_baseurl is None:
             return None
 
-        result = {"m.homeserver": {"base_url": self._config.public_baseurl}}
+        result = {"m.homeserver": {"base_url": self._config.server.public_baseurl}}
 
-        if self._config.default_identity_server:
+        if self._config.registration.default_identity_server:
             result["m.identity_server"] = {
-                "base_url": self._config.default_identity_server
+                "base_url": self._config.registration.default_identity_server
             }
 
         return result
@@ -52,11 +52,11 @@ class WellKnownResource(Resource):
 
     isLeaf = 1
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         Resource.__init__(self)
         self._well_known_builder = WellKnownBuilder(hs)
 
-    def render_GET(self, request):
+    def render_GET(self, request: Request) -> bytes:
         set_cors_headers(request)
         r = self._well_known_builder.get_well_known()
         if not r:

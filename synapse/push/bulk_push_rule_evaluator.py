@@ -104,7 +104,7 @@ class BulkPushRuleEvaluator:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastore()
-        self.auth = hs.get_auth()
+        self._event_auth_handler = hs.get_event_auth_handler()
 
         # Used by `RulesForRoom` to ensure only one thing mutates the cache at a
         # time. Keyed off room_id.
@@ -172,7 +172,7 @@ class BulkPushRuleEvaluator:
             # not having a power level event is an extreme edge case
             auth_events = {POWER_KEY: await self.store.get_event(pl_event_id)}
         else:
-            auth_events_ids = self.auth.compute_auth_events(
+            auth_events_ids = self._event_auth_handler.compute_auth_events(
                 event, prev_state_ids, for_verification=False
             )
             auth_events_dict = await self.store.get_events(auth_events_ids)
@@ -194,7 +194,7 @@ class BulkPushRuleEvaluator:
         count_as_unread = _should_count_as_unread(event, context)
 
         rules_by_user = await self._get_rules_for_event(event, context)
-        actions_by_user = {}  # type: Dict[str, List[Union[dict, str]]]
+        actions_by_user: Dict[str, List[Union[dict, str]]] = {}
 
         room_members = await self.store.get_joined_users_from_context(event, context)
 
@@ -207,7 +207,7 @@ class BulkPushRuleEvaluator:
             event, len(room_members), sender_power_level, power_levels
         )
 
-        condition_cache = {}  # type: Dict[str, bool]
+        condition_cache: Dict[str, bool] = {}
 
         # If the event is not a state event check if any users ignore the sender.
         if not event.is_state():
@@ -290,6 +290,12 @@ def _condition_checker(
     return True
 
 
+MemberMap = Dict[str, Tuple[str, str]]
+Rule = Dict[str, dict]
+RulesByUser = Dict[str, List[Rule]]
+StateGroup = Union[object, int]
+
+
 @attr.s(slots=True)
 class RulesForRoomData:
     """The data stored in the cache by `RulesForRoom`.
@@ -299,16 +305,16 @@ class RulesForRoomData:
     """
 
     # event_id -> (user_id, state)
-    member_map = attr.ib(type=Dict[str, Tuple[str, str]], factory=dict)
+    member_map = attr.ib(type=MemberMap, factory=dict)
     # user_id -> rules
-    rules_by_user = attr.ib(type=Dict[str, List[Dict[str, dict]]], factory=dict)
+    rules_by_user = attr.ib(type=RulesByUser, factory=dict)
 
     # The last state group we updated the caches for. If the state_group of
     # a new event comes along, we know that we can just return the cached
     # result.
     # On invalidation of the rules themselves (if the user changes them),
     # we invalidate everything and set state_group to `object()`
-    state_group = attr.ib(type=Union[object, int], factory=object)
+    state_group = attr.ib(type=StateGroup, factory=object)
 
     # A sequence number to keep track of when we're allowed to update the
     # cache. We bump the sequence number when we invalidate the cache. If
@@ -532,7 +538,13 @@ class RulesForRoom:
 
         self.update_cache(sequence, members, ret_rules_by_user, state_group)
 
-    def update_cache(self, sequence, members, rules_by_user, state_group) -> None:
+    def update_cache(
+        self,
+        sequence: int,
+        members: MemberMap,
+        rules_by_user: RulesByUser,
+        state_group: StateGroup,
+    ) -> None:
         if sequence == self.data.sequence:
             self.data.member_map.update(members)
             self.data.rules_by_user = rules_by_user

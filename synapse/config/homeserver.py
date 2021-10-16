@@ -1,5 +1,4 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,6 +29,8 @@ from .jwt import JWTConfig
 from .key import KeyConfig
 from .logger import LoggingConfig
 from .metrics import MetricsConfig
+from .modules import ModulesConfig
+from .oembed import OembedConfig
 from .oidc import OIDCConfig
 from .password_auth_providers import PasswordAuthProviderConfig
 from .push import PushConfig
@@ -37,6 +38,7 @@ from .ratelimiting import RatelimitConfig
 from .redis import RedisConfig
 from .registration import RegistrationConfig
 from .repository import ContentRepositoryConfig
+from .retention import RetentionConfig
 from .room import RoomConfig
 from .room_directory import RoomDirectoryConfig
 from .saml2 import SAML2Config
@@ -56,7 +58,9 @@ from .workers import WorkerConfig
 class HomeServerConfig(RootConfig):
 
     config_classes = [
+        ModulesConfig,
         ServerConfig,
+        RetentionConfig,
         TlsConfig,
         FederationConfig,
         CacheConfig,
@@ -64,6 +68,7 @@ class HomeServerConfig(RootConfig):
         LoggingConfig,
         RatelimitConfig,
         ContentRepositoryConfig,
+        OembedConfig,
         CaptchaConfig,
         VoipConfig,
         RegistrationConfig,

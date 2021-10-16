@@ -1,6 +1,4 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2017-2018 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,13 +34,12 @@ from typing import (
 )
 
 import twisted.internet.tcp
-from twisted.internet import defer
-from twisted.mail.smtp import sendmail
 from twisted.web.iweb import IPolicyForHTTPS
+from twisted.web.resource import IResource
 
 from synapse.api.auth import Auth
 from synapse.api.filtering import Filtering
-from synapse.api.ratelimiting import Ratelimiter
+from synapse.api.ratelimiting import Ratelimiter, RequestRatelimiter
 from synapse.appservice.api import ApplicationServiceApi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
 from synapse.config.homeserver import HomeServerConfig
@@ -66,10 +63,9 @@ from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionR
 from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
 from synapse.handlers.account_data import AccountDataHandler
 from synapse.handlers.account_validity import AccountValidityHandler
-from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.admin import AdminHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
-from synapse.handlers.auth import AuthHandler, MacaroonGenerator
+from synapse.handlers.auth import AuthHandler, MacaroonGenerator, PasswordAuthProvider
 from synapse.handlers.cas import CasHandler
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
@@ -80,6 +76,7 @@ from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
 from synapse.handlers.event_auth import EventAuthHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.federation import FederationHandler
+from synapse.handlers.federation_event import FederationEventHandler
 from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
 from synapse.handlers.identity import IdentityHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
@@ -100,13 +97,14 @@ from synapse.handlers.room import (
     RoomCreationHandler,
     RoomShutdownHandler,
 )
+from synapse.handlers.room_batch import RoomBatchHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
+from synapse.handlers.room_summary import RoomSummaryHandler
 from synapse.handlers.search import SearchHandler
 from synapse.handlers.send_email import SendEmailHandler
 from synapse.handlers.set_password import SetPasswordHandler
-from synapse.handlers.space_summary import SpaceSummaryHandler
 from synapse.handlers.sso import SsoHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
@@ -249,15 +247,47 @@ class HomeServer(metaclass=abc.ABCMeta):
         # the key we use to sign events and requests
         self.signing_key = config.key.signing_key[0]
         self.config = config
-        self._listening_services = []  # type: List[twisted.internet.tcp.Port]
-        self.start_time = None  # type: Optional[int]
+        self._listening_services: List[twisted.internet.tcp.Port] = []
+        self.start_time: Optional[int] = None
 
         self._instance_id = random_string(5)
         self._instance_name = config.worker.instance_name
 
         self.version_string = version_string
 
-        self.datastores = None  # type: Optional[Databases]
+        self.datastores: Optional[Databases] = None
+
+        self._module_web_resources: Dict[str, IResource] = {}
+        self._module_web_resources_consumed = False
+
+    def register_module_web_resource(self, path: str, resource: IResource):
+        """Allows a module to register a web resource to be served at the given path.
+
+        If multiple modules register a resource for the same path, the module that
+        appears the highest in the configuration file takes priority.
+
+        Args:
+            path: The path to register the resource for.
+            resource: The resource to attach to this path.
+
+        Raises:
+            SynapseError(500): A module tried to register a web resource after the HTTP
+                listeners have been started.
+        """
+        if self._module_web_resources_consumed:
+            raise RuntimeError(
+                "Tried to register a web resource from a module after startup",
+            )
+
+        # Don't register a resource that's already been registered.
+        if path not in self._module_web_resources.keys():
+            self._module_web_resources[path] = resource
+        else:
+            logger.warning(
+                "Module tried to register a web resource for path %s but another module"
+                " has already registered a resource for this path.",
+                path,
+            )
 
     def get_instance_id(self) -> str:
         """A unique ID for this synapse process instance.
@@ -284,7 +314,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         # Register background tasks required by this server. This must be done
         # somewhat manually due to the background tasks not being registered
         # unless handlers are instantiated.
-        if self.config.run_background_tasks:
+        if self.config.worker.run_background_tasks:
             self.setup_background_tasks()
 
     def start_listening(self) -> None:
@@ -341,8 +371,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         return Ratelimiter(
             store=self.get_datastore(),
             clock=self.get_clock(),
-            rate_hz=self.config.rc_registration.per_second,
-            burst_count=self.config.rc_registration.burst_count,
+            rate_hz=self.config.ratelimiting.rc_registration.per_second,
+            burst_count=self.config.ratelimiting.rc_registration.burst_count,
         )
 
     @cache_in_self
@@ -363,7 +393,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_http_client_context_factory(self) -> IPolicyForHTTPS:
-        if self.config.use_insecure_ssl_client_just_for_testing_do_not_use:
+        if self.config.tls.use_insecure_ssl_client_just_for_testing_do_not_use:
             return InsecureInterceptableContextFactory()
         return RegularPolicyForHTTPS()
 
@@ -389,8 +419,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         return SimpleHttpClient(
             self,
-            ip_whitelist=self.config.ip_range_whitelist,
-            ip_blacklist=self.config.ip_range_blacklist,
+            ip_whitelist=self.config.server.ip_range_whitelist,
+            ip_blacklist=self.config.server.ip_range_blacklist,
             use_proxy=True,
         )
 
@@ -409,12 +439,12 @@ class HomeServer(metaclass=abc.ABCMeta):
         return RoomCreationHandler(self)
 
     @cache_in_self
-    def get_room_shutdown_handler(self) -> RoomShutdownHandler:
-        return RoomShutdownHandler(self)
+    def get_room_batch_handler(self) -> RoomBatchHandler:
+        return RoomBatchHandler(self)
 
     @cache_in_self
-    def get_sendmail(self) -> Callable[..., defer.Deferred]:
-        return sendmail
+    def get_room_shutdown_handler(self) -> RoomShutdownHandler:
+        return RoomShutdownHandler(self)
 
     @cache_in_self
     def get_state_handler(self) -> StateHandler:
@@ -473,7 +503,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_device_handler(self):
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return DeviceWorkerHandler(self)
         else:
             return DeviceHandler(self)
@@ -493,10 +523,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_e2e_room_keys_handler(self) -> E2eRoomKeysHandler:
         return E2eRoomKeysHandler(self)
-
-    @cache_in_self
-    def get_acme_handler(self) -> AcmeHandler:
-        return AcmeHandler(self)
 
     @cache_in_self
     def get_admin_handler(self) -> AdminHandler:
@@ -525,6 +551,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_federation_handler(self) -> FederationHandler:
         return FederationHandler(self)
+
+    @cache_in_self
+    def get_federation_event_handler(self) -> FederationEventHandler:
+        return FederationEventHandler(self)
 
     @cache_in_self
     def get_identity_handler(self) -> IdentityHandler:
@@ -596,7 +626,7 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_federation_sender(self) -> AbstractFederationSender:
         if self.should_send_federation():
             return FederationSender(self)
-        elif not self.config.worker_app:
+        elif not self.config.worker.worker_app:
             return FederationRemoteSendQueue(self)
         else:
             raise Exception("Workers cannot send federation traffic")
@@ -625,14 +655,14 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_groups_local_handler(
         self,
     ) -> Union[GroupsLocalWorkerHandler, GroupsLocalHandler]:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return GroupsLocalWorkerHandler(self)
         else:
             return GroupsLocalHandler(self)
 
     @cache_in_self
     def get_groups_server_handler(self):
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return GroupsServerWorkerHandler(self)
         else:
             return GroupsServerHandler(self)
@@ -651,15 +681,19 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_spam_checker(self) -> SpamChecker:
-        return SpamChecker(self)
+        return SpamChecker()
 
     @cache_in_self
     def get_third_party_event_rules(self) -> ThirdPartyEventRules:
         return ThirdPartyEventRules(self)
 
     @cache_in_self
+    def get_password_auth_provider(self) -> PasswordAuthProvider:
+        return PasswordAuthProvider()
+
+    @cache_in_self
     def get_room_member_handler(self) -> RoomMemberHandler:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return RoomMemberWorkerHandler(self)
         return RoomMemberMasterHandler(self)
 
@@ -669,13 +703,13 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_server_notices_manager(self) -> ServerNoticesManager:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             raise Exception("Workers cannot send server notices")
         return ServerNoticesManager(self)
 
     @cache_in_self
     def get_server_notices_sender(self) -> WorkerServerNoticesSender:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return WorkerServerNoticesSender(self)
         return ServerNoticesSender(self)
 
@@ -741,7 +775,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_federation_ratelimiter(self) -> FederationRateLimiter:
-        return FederationRateLimiter(self.get_clock(), config=self.config.rc_federation)
+        return FederationRateLimiter(
+            self.get_clock(), config=self.config.ratelimiting.rc_federation
+        )
 
     @cache_in_self
     def get_module_api(self) -> ModuleApi:
@@ -752,8 +788,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         return AccountDataHandler(self)
 
     @cache_in_self
-    def get_space_summary_handler(self) -> SpaceSummaryHandler:
-        return SpaceSummaryHandler(self)
+    def get_room_summary_handler(self) -> RoomSummaryHandler:
+        return RoomSummaryHandler(self)
 
     @cache_in_self
     def get_event_auth_handler(self) -> EventAuthHandler:
@@ -774,18 +810,27 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         logger.info(
             "Connecting to redis (host=%r port=%r) for external cache",
-            self.config.redis_host,
-            self.config.redis_port,
+            self.config.redis.redis_host,
+            self.config.redis.redis_port,
         )
 
         return lazyConnection(
             hs=self,
-            host=self.config.redis_host,
-            port=self.config.redis_port,
+            host=self.config.redis.redis_host,
+            port=self.config.redis.redis_port,
             password=self.config.redis.redis_password,
             reconnect=True,
         )
 
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"
-        return self.config.send_federation
+        return self.config.worker.send_federation
+
+    @cache_in_self
+    def get_request_ratelimiter(self) -> RequestRatelimiter:
+        return RequestRatelimiter(
+            self.get_datastore(),
+            self.get_clock(),
+            self.config.ratelimiting.rc_message,
+            self.config.ratelimiting.rc_admin_redaction,
+        )
