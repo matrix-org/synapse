@@ -26,17 +26,18 @@ from synapse.storage.state import StateFilter
 from synapse.types import JsonDict, UserID
 from synapse.visibility import filter_events_for_client
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class SearchHandler(BaseHandler):
+class SearchHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
+        self.state_handler = hs.get_state_handler()
+        self.clock = hs.get_clock()
+        self.hs = hs
         self._event_serializer = hs.get_event_client_serializer()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
@@ -105,7 +106,7 @@ class SearchHandler(BaseHandler):
             dict to be returned to the client with results of search
         """
 
-        if not self.hs.config.enable_search:
+        if not self.hs.config.server.enable_search:
             raise SynapseError(400, "Search is disabled on this homeserver")
 
         batch_group = None
@@ -192,7 +193,7 @@ class SearchHandler(BaseHandler):
         # If doing a subset of all rooms seearch, check if any of the rooms
         # are from an upgraded room, and search their contents as well
         if search_filter.rooms:
-            historical_room_ids = []  # type: List[str]
+            historical_room_ids: List[str] = []
             for room_id in search_filter.rooms:
                 # Add any previous rooms to the search if they exist
                 ids = await self.get_old_rooms_from_upgraded_room(room_id)
@@ -216,9 +217,9 @@ class SearchHandler(BaseHandler):
         rank_map = {}  # event_id -> rank of event
         allowed_events = []
         # Holds result of grouping by room, if applicable
-        room_groups = {}  # type: Dict[str, JsonDict]
+        room_groups: Dict[str, JsonDict] = {}
         # Holds result of grouping by sender, if applicable
-        sender_group = {}  # type: Dict[str, JsonDict]
+        sender_group: Dict[str, JsonDict] = {}
 
         # Holds the next_batch for the entire result set if one of those exists
         global_next_batch = None
@@ -262,7 +263,7 @@ class SearchHandler(BaseHandler):
                 s["results"].append(e.event_id)
 
         elif order_by == "recent":
-            room_events = []  # type: List[EventBase]
+            room_events: List[EventBase] = []
             i = 0
 
             pagination_token = batch_token

@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 METRICS_PREFIX = "/_synapse/metrics"
 
 running_on_pypy = platform.python_implementation() == "PyPy"
-all_gauges = {}  # type: Dict[str, Union[LaterGauge, InFlightGauge]]
+all_gauges: "Dict[str, Union[LaterGauge, InFlightGauge]]" = {}
 
 HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 
@@ -130,7 +130,7 @@ class InFlightGauge:
         )
 
         # Counts number of in flight blocks for a given set of label values
-        self._registrations = {}  # type: Dict
+        self._registrations: Dict = {}
 
         # Protects access to _registrations
         self._lock = threading.Lock()
@@ -248,7 +248,7 @@ class GaugeBucketCollector:
 
         # We initially set this to None. We won't report metrics until
         # this has been initialised after a successful data update
-        self._metric = None  # type: Optional[GaugeHistogramMetricFamily]
+        self._metric: Optional[GaugeHistogramMetricFamily] = None
 
         registry.register(self)
 

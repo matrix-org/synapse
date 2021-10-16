@@ -19,6 +19,8 @@ import logging
 import os
 import signal
 import sys
+from types import FrameType, TracebackType
+from typing import NoReturn, Type
 
 
 def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -> None:
@@ -31,13 +33,13 @@ def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -
     # If pidfile already exists, we should read pid from there; to overwrite it, if
     # locking will fail, because locking attempt somehow purges the file contents.
     if os.path.isfile(pid_file):
-        with open(pid_file, "r") as pid_fh:
+        with open(pid_file) as pid_fh:
             old_pid = pid_fh.read()
 
     # Create a lockfile so that only one instance of this daemon is running at any time.
     try:
         lock_fh = open(pid_file, "w")
-    except IOError:
+    except OSError:
         print("Unable to create the pidfile.")
         sys.exit(1)
 
@@ -45,7 +47,7 @@ def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -
         # Try to get an exclusive lock on the file. This will fail if another process
         # has the file locked.
         fcntl.flock(lock_fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except IOError:
+    except OSError:
         print("Unable to lock on the pidfile.")
         # We need to overwrite the pidfile if we got here.
         #
@@ -97,7 +99,9 @@ def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -
     # (we don't normally expect reactor.run to raise any exceptions, but this will
     # also catch any other uncaught exceptions before we get that far.)
 
-    def excepthook(type_, value, traceback):
+    def excepthook(
+        type_: Type[BaseException], value: BaseException, traceback: TracebackType
+    ) -> None:
         logger.critical("Unhanded exception", exc_info=(type_, value, traceback))
 
     sys.excepthook = excepthook
@@ -113,20 +117,20 @@ def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -
     try:
         lock_fh.write("%s" % (os.getpid()))
         lock_fh.flush()
-    except IOError:
+    except OSError:
         logger.error("Unable to write pid to the pidfile.")
         print("Unable to write pid to the pidfile.")
         sys.exit(1)
 
     # write a log line on SIGTERM.
-    def sigterm(signum, frame):
+    def sigterm(signum: signal.Signals, frame: FrameType) -> NoReturn:
         logger.warning("Caught signal %s. Stopping daemon." % signum)
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, sigterm)
 
     # Cleanup pid file at exit.
-    def exit():
+    def exit() -> None:
         logger.warning("Stopping daemon.")
         os.remove(pid_file)
         sys.exit(0)

@@ -14,20 +14,41 @@
 import itertools
 import logging
 from queue import Empty, PriorityQueue
-from typing import Collection, Dict, Iterable, List, Set, Tuple
+from typing import Collection, Dict, Iterable, List, Optional, Set, Tuple
 
+from prometheus_client import Counter, Gauge
+
+from synapse.api.constants import MAX_DEPTH
 from synapse.api.errors import StoreError
-from synapse.events import EventBase
+from synapse.api.room_versions import EventFormatVersions, RoomVersion
+from synapse.events import EventBase, make_event_from_dict
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
+from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Cursor
+from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.iterutils import batch_iter
+
+oldest_pdu_in_federation_staging = Gauge(
+    "synapse_federation_server_oldest_inbound_pdu_in_staging",
+    "The age in seconds since we received the oldest pdu in the federation staging area",
+)
+
+number_pdus_in_federation_queue = Gauge(
+    "synapse_federation_server_number_inbound_pdu_in_staging",
+    "The total number of events in the inbound federation staging",
+)
+
+pdus_pruned_from_federation_queue = Counter(
+    "synapse_federation_server_number_inbound_pdu_pruned",
+    "The number of events in the inbound federation staging that have been "
+    "pruned due to the queue getting too long",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,15 +62,17 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             hs.get_clock().looping_call(
                 self._delete_old_forward_extrem_cache, 60 * 60 * 1000
             )
 
         # Cache of event ID to list of auth event IDs and their depths.
-        self._event_auth_cache = LruCache(
+        self._event_auth_cache: LruCache[str, List[Tuple[str, int]]] = LruCache(
             500000, "_event_auth_cache", size_callback=len
-        )  # type: LruCache[str, List[Tuple[str, int]]]
+        )
+
+        self._clock.looping_call(self._get_stats_for_federation_staging, 30 * 1000)
 
     async def get_auth_chain(
         self, room_id: str, event_ids: Collection[str], include_given: bool = False
@@ -120,10 +143,10 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         initial_events = set(event_ids)
 
         # All the events that we've found that are reachable from the events.
-        seen_events = set()  # type: Set[str]
+        seen_events: Set[str] = set()
 
         # A map from chain ID to max sequence number of the given events.
-        event_chains = {}  # type: Dict[int, int]
+        event_chains: Dict[int, int] = {}
 
         sql = """
             SELECT event_id, chain_id, sequence_number
@@ -165,7 +188,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         """
 
         # A map from chain ID to max sequence number *reachable* from any event ID.
-        chains = {}  # type: Dict[int, int]
+        chains: Dict[int, int] = {}
 
         # Add all linked chains reachable from initial set of chains.
         for batch in batch_iter(event_chains, 1000):
@@ -336,14 +359,14 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         initial_events = set(state_sets[0]).union(*state_sets[1:])
 
         # Map from event_id -> (chain ID, seq no)
-        chain_info = {}  # type: Dict[str, Tuple[int, int]]
+        chain_info: Dict[str, Tuple[int, int]] = {}
 
         # Map from chain ID -> seq no -> event Id
-        chain_to_event = {}  # type: Dict[int, Dict[int, str]]
+        chain_to_event: Dict[int, Dict[int, str]] = {}
 
         # All the chains that we've found that are reachable from the state
         # sets.
-        seen_chains = set()  # type: Set[int]
+        seen_chains: Set[int] = set()
 
         sql = """
             SELECT event_id, chain_id, sequence_number
@@ -375,9 +398,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         # Corresponds to `state_sets`, except as a map from chain ID to max
         # sequence number reachable from the state set.
-        set_to_chain = []  # type: List[Dict[int, int]]
+        set_to_chain: List[Dict[int, int]] = []
         for state_set in state_sets:
-            chains = {}  # type: Dict[int, int]
+            chains: Dict[int, int] = {}
             set_to_chain.append(chains)
 
             for event_id in state_set:
@@ -429,7 +452,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         # Mapping from chain ID to the range of sequence numbers that should be
         # pulled from the database.
-        chain_to_gap = {}  # type: Dict[int, Tuple[int, int]]
+        chain_to_gap: Dict[int, Tuple[int, int]] = {}
 
         for chain_id in seen_chains:
             min_seq_no = min(chains.get(chain_id, 0) for chains in set_to_chain)
@@ -538,7 +561,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         }
 
         # The sorted list of events whose auth chains we should walk.
-        search = []  # type: List[Tuple[int, str]]
+        search: List[Tuple[int, str]] = []
 
         # We need to get the depth of the initial events for sorting purposes.
         sql = """
@@ -561,7 +584,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         search.sort()
 
         # Map from event to its auth events
-        event_to_auth_events = {}  # type: Dict[str, Set[str]]
+        event_to_auth_events: Dict[str, Set[str]] = {}
 
         base_sql = """
             SELECT a.event_id, auth_id, depth
@@ -648,30 +671,100 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # Return all events where not all sets can reach them.
         return {eid for eid, n in event_to_missing_sets.items() if n}
 
-    async def get_oldest_events_with_depth_in_room(self, room_id):
+    async def get_oldest_event_ids_with_depth_in_room(self, room_id) -> Dict[str, int]:
+        """Gets the oldest events(backwards extremities) in the room along with the
+        aproximate depth.
+
+        We use this function so that we can compare and see if someones current
+        depth at their current scrollback is within pagination range of the
+        event extremeties. If the current depth is close to the depth of given
+        oldest event, we can trigger a backfill.
+
+        Args:
+            room_id: Room where we want to find the oldest events
+
+        Returns:
+            Map from event_id to depth
+        """
+
+        def get_oldest_event_ids_with_depth_in_room_txn(txn, room_id):
+            # Assemble a dictionary with event_id -> depth for the oldest events
+            # we know of in the room. Backwards extremeties are the oldest
+            # events we know of in the room but we only know of them because
+            # some other event referenced them by prev_event and aren't peristed
+            # in our database yet (meaning we don't know their depth
+            # specifically). So we need to look for the aproximate depth from
+            # the events connected to the current backwards extremeties.
+            sql = """
+                SELECT b.event_id, MAX(e.depth) FROM events as e
+                /**
+                 * Get the edge connections from the event_edges table
+                 * so we can see whether this event's prev_events points
+                 * to a backward extremity in the next join.
+                 */
+                INNER JOIN event_edges as g
+                ON g.event_id = e.event_id
+                /**
+                 * We find the "oldest" events in the room by looking for
+                 * events connected to backwards extremeties (oldest events
+                 * in the room that we know of so far).
+                 */
+                INNER JOIN event_backward_extremities as b
+                ON g.prev_event_id = b.event_id
+                WHERE b.room_id = ? AND g.is_state is ?
+                GROUP BY b.event_id
+            """
+
+            txn.execute(sql, (room_id, False))
+
+            return dict(txn)
+
         return await self.db_pool.runInteraction(
-            "get_oldest_events_with_depth_in_room",
-            self.get_oldest_events_with_depth_in_room_txn,
+            "get_oldest_event_ids_with_depth_in_room",
+            get_oldest_event_ids_with_depth_in_room_txn,
             room_id,
         )
 
-    def get_oldest_events_with_depth_in_room_txn(self, txn, room_id):
-        sql = (
-            "SELECT b.event_id, MAX(e.depth) FROM events as e"
-            " INNER JOIN event_edges as g"
-            " ON g.event_id = e.event_id"
-            " INNER JOIN event_backward_extremities as b"
-            " ON g.prev_event_id = b.event_id"
-            " WHERE b.room_id = ? AND g.is_state is ?"
-            " GROUP BY b.event_id"
+    async def get_insertion_event_backwards_extremities_in_room(
+        self, room_id
+    ) -> Dict[str, int]:
+        """Get the insertion events we know about that we haven't backfilled yet.
+
+        We use this function so that we can compare and see if someones current
+        depth at their current scrollback is within pagination range of the
+        insertion event. If the current depth is close to the depth of given
+        insertion event, we can trigger a backfill.
+
+        Args:
+            room_id: Room where we want to find the oldest events
+
+        Returns:
+            Map from event_id to depth
+        """
+
+        def get_insertion_event_backwards_extremities_in_room_txn(txn, room_id):
+            sql = """
+                SELECT b.event_id, MAX(e.depth) FROM insertion_events as i
+                /* We only want insertion events that are also marked as backwards extremities */
+                INNER JOIN insertion_event_extremities as b USING (event_id)
+                /* Get the depth of the insertion event from the events table */
+                INNER JOIN events AS e USING (event_id)
+                WHERE b.room_id = ?
+                GROUP BY b.event_id
+            """
+
+            txn.execute(sql, (room_id,))
+
+            return dict(txn)
+
+        return await self.db_pool.runInteraction(
+            "get_insertion_event_backwards_extremities_in_room",
+            get_insertion_event_backwards_extremities_in_room_txn,
+            room_id,
         )
 
-        txn.execute(sql, (room_id, False))
-
-        return dict(txn)
-
-    async def get_max_depth_of(self, event_ids: List[str]) -> int:
-        """Returns the max depth of a set of event IDs
+    async def get_max_depth_of(self, event_ids: List[str]) -> Tuple[str, int]:
+        """Returns the event ID and depth for the event that has the max depth from a set of event IDs
 
         Args:
             event_ids: The event IDs to calculate the max depth of.
@@ -680,14 +773,53 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             table="events",
             column="event_id",
             iterable=event_ids,
-            retcols=("depth",),
+            retcols=(
+                "event_id",
+                "depth",
+            ),
             desc="get_max_depth_of",
         )
 
         if not rows:
-            return 0
+            return None, 0
         else:
-            return max(row["depth"] for row in rows)
+            max_depth_event_id = ""
+            current_max_depth = 0
+            for row in rows:
+                if row["depth"] > current_max_depth:
+                    max_depth_event_id = row["event_id"]
+                    current_max_depth = row["depth"]
+
+            return max_depth_event_id, current_max_depth
+
+    async def get_min_depth_of(self, event_ids: List[str]) -> Tuple[str, int]:
+        """Returns the event ID and depth for the event that has the min depth from a set of event IDs
+
+        Args:
+            event_ids: The event IDs to calculate the max depth of.
+        """
+        rows = await self.db_pool.simple_select_many_batch(
+            table="events",
+            column="event_id",
+            iterable=event_ids,
+            retcols=(
+                "event_id",
+                "depth",
+            ),
+            desc="get_min_depth_of",
+        )
+
+        if not rows:
+            return None, 0
+        else:
+            min_depth_event_id = ""
+            current_min_depth = MAX_DEPTH
+            for row in rows:
+                if row["depth"] < current_min_depth:
+                    min_depth_event_id = row["event_id"]
+                    current_min_depth = row["depth"]
+
+            return min_depth_event_id, current_min_depth
 
     async def get_prev_events_for_room(self, room_id: str) -> List[str]:
         """
@@ -880,15 +1012,46 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # We want to make sure that we do a breadth-first, "depth" ordered
         # search.
 
-        query = (
-            "SELECT depth, prev_event_id FROM event_edges"
-            " INNER JOIN events"
-            " ON prev_event_id = events.event_id"
-            " WHERE event_edges.event_id = ?"
-            " AND event_edges.is_state = ?"
-            " LIMIT ?"
-        )
+        # Look for the prev_event_id connected to the given event_id
+        query = """
+            SELECT depth, prev_event_id FROM event_edges
+            /* Get the depth of the prev_event_id from the events table */
+            INNER JOIN events
+            ON prev_event_id = events.event_id
+            /* Find an event which matches the given event_id */
+            WHERE event_edges.event_id = ?
+            AND event_edges.is_state = ?
+            LIMIT ?
+        """
 
+        # Look for the "insertion" events connected to the given event_id
+        connected_insertion_event_query = """
+            SELECT e.depth, i.event_id FROM insertion_event_edges AS i
+            /* Get the depth of the insertion event from the events table */
+            INNER JOIN events AS e USING (event_id)
+            /* Find an insertion event which points via prev_events to the given event_id */
+            WHERE i.insertion_prev_event_id = ?
+            LIMIT ?
+        """
+
+        # Find any batch connections of a given insertion event
+        batch_connection_query = """
+            SELECT e.depth, c.event_id FROM insertion_events AS i
+            /* Find the batch that connects to the given insertion event */
+            INNER JOIN batch_events AS c
+            ON i.next_batch_id = c.batch_id
+            /* Get the depth of the batch start event from the events table */
+            INNER JOIN events AS e USING (event_id)
+            /* Find an insertion event which matches the given event_id */
+            WHERE i.event_id = ?
+            LIMIT ?
+        """
+
+        # In a PriorityQueue, the lowest valued entries are retrieved first.
+        # We're using depth as the priority in the queue.
+        # Depth is lowest at the oldest-in-time message and highest and
+        # newest-in-time message. We add events to the queue with a negative depth so that
+        # we process the newest-in-time messages first going backwards in time.
         queue = PriorityQueue()
 
         for event_id in event_list:
@@ -914,9 +1077,47 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
             event_results.add(event_id)
 
-            txn.execute(query, (event_id, False, limit - len(event_results)))
+            # Try and find any potential historical batches of message history.
+            #
+            # First we look for an insertion event connected to the current
+            # event (by prev_event). If we find any, we need to go and try to
+            # find any batch events connected to the insertion event (by
+            # batch_id). If we find any, we'll add them to the queue and
+            # navigate up the DAG like normal in the next iteration of the loop.
+            txn.execute(
+                connected_insertion_event_query, (event_id, limit - len(event_results))
+            )
+            connected_insertion_event_id_results = txn.fetchall()
+            logger.debug(
+                "_get_backfill_events: connected_insertion_event_query %s",
+                connected_insertion_event_id_results,
+            )
+            for row in connected_insertion_event_id_results:
+                connected_insertion_event_depth = row[0]
+                connected_insertion_event = row[1]
+                queue.put((-connected_insertion_event_depth, connected_insertion_event))
 
-            for row in txn:
+                # Find any batch connections for the given insertion event
+                txn.execute(
+                    batch_connection_query,
+                    (connected_insertion_event, limit - len(event_results)),
+                )
+                batch_start_event_id_results = txn.fetchall()
+                logger.debug(
+                    "_get_backfill_events: batch_start_event_id_results %s",
+                    batch_start_event_id_results,
+                )
+                for row in batch_start_event_id_results:
+                    if row[1] not in event_results:
+                        queue.put((-row[0], row[1]))
+
+            txn.execute(query, (event_id, False, limit - len(event_results)))
+            prev_event_id_results = txn.fetchall()
+            logger.debug(
+                "_get_backfill_events: prev_event_ids %s", prev_event_id_results
+            )
+
+            for row in prev_event_id_results:
                 if row[1] not in event_results:
                     queue.put((-row[0], row[1]))
 
@@ -1003,6 +1204,299 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             "_delete_old_forward_extrem_cache",
             _delete_old_forward_extrem_cache_txn,
         )
+
+    async def insert_insertion_extremity(self, event_id: str, room_id: str) -> None:
+        await self.db_pool.simple_upsert(
+            table="insertion_event_extremities",
+            keyvalues={"event_id": event_id},
+            values={
+                "event_id": event_id,
+                "room_id": room_id,
+            },
+            insertion_values={},
+            desc="insert_insertion_extremity",
+            lock=False,
+        )
+
+    async def insert_received_event_to_staging(
+        self, origin: str, event: EventBase
+    ) -> None:
+        """Insert a newly received event from federation into the staging area."""
+
+        # We use an upsert here to handle the case where we see the same event
+        # from the same server multiple times.
+        await self.db_pool.simple_upsert(
+            table="federation_inbound_events_staging",
+            keyvalues={
+                "origin": origin,
+                "event_id": event.event_id,
+            },
+            values={},
+            insertion_values={
+                "room_id": event.room_id,
+                "received_ts": self._clock.time_msec(),
+                "event_json": json_encoder.encode(event.get_dict()),
+                "internal_metadata": json_encoder.encode(
+                    event.internal_metadata.get_dict()
+                ),
+            },
+            desc="insert_received_event_to_staging",
+        )
+
+    async def remove_received_event_from_staging(
+        self,
+        origin: str,
+        event_id: str,
+    ) -> Optional[int]:
+        """Remove the given event from the staging area.
+
+        Returns:
+            The received_ts of the row that was deleted, if any.
+        """
+        if self.db_pool.engine.supports_returning:
+
+            def _remove_received_event_from_staging_txn(txn):
+                sql = """
+                    DELETE FROM federation_inbound_events_staging
+                    WHERE origin = ? AND event_id = ?
+                    RETURNING received_ts
+                """
+
+                txn.execute(sql, (origin, event_id))
+                return txn.fetchone()
+
+            row = await self.db_pool.runInteraction(
+                "remove_received_event_from_staging",
+                _remove_received_event_from_staging_txn,
+                db_autocommit=True,
+            )
+            if row is None:
+                return None
+
+            return row[0]
+
+        else:
+
+            def _remove_received_event_from_staging_txn(txn):
+                received_ts = self.db_pool.simple_select_one_onecol_txn(
+                    txn,
+                    table="federation_inbound_events_staging",
+                    keyvalues={
+                        "origin": origin,
+                        "event_id": event_id,
+                    },
+                    retcol="received_ts",
+                    allow_none=True,
+                )
+                self.db_pool.simple_delete_txn(
+                    txn,
+                    table="federation_inbound_events_staging",
+                    keyvalues={
+                        "origin": origin,
+                        "event_id": event_id,
+                    },
+                )
+
+                return received_ts
+
+            return await self.db_pool.runInteraction(
+                "remove_received_event_from_staging",
+                _remove_received_event_from_staging_txn,
+            )
+
+    async def get_next_staged_event_id_for_room(
+        self,
+        room_id: str,
+    ) -> Optional[Tuple[str, str]]:
+        """Get the next event ID in the staging area for the given room."""
+
+        def _get_next_staged_event_id_for_room_txn(txn):
+            sql = """
+                SELECT origin, event_id
+                FROM federation_inbound_events_staging
+                WHERE room_id = ?
+                ORDER BY received_ts ASC
+                LIMIT 1
+            """
+
+            txn.execute(sql, (room_id,))
+
+            return txn.fetchone()
+
+        return await self.db_pool.runInteraction(
+            "get_next_staged_event_id_for_room", _get_next_staged_event_id_for_room_txn
+        )
+
+    async def get_next_staged_event_for_room(
+        self,
+        room_id: str,
+        room_version: RoomVersion,
+    ) -> Optional[Tuple[str, EventBase]]:
+        """Get the next event in the staging area for the given room."""
+
+        def _get_next_staged_event_for_room_txn(txn):
+            sql = """
+                SELECT event_json, internal_metadata, origin
+                FROM federation_inbound_events_staging
+                WHERE room_id = ?
+                ORDER BY received_ts ASC
+                LIMIT 1
+            """
+            txn.execute(sql, (room_id,))
+
+            return txn.fetchone()
+
+        row = await self.db_pool.runInteraction(
+            "get_next_staged_event_for_room", _get_next_staged_event_for_room_txn
+        )
+
+        if not row:
+            return None
+
+        event_d = db_to_json(row[0])
+        internal_metadata_d = db_to_json(row[1])
+        origin = row[2]
+
+        event = make_event_from_dict(
+            event_dict=event_d,
+            room_version=room_version,
+            internal_metadata_dict=internal_metadata_d,
+        )
+
+        return origin, event
+
+    async def prune_staged_events_in_room(
+        self,
+        room_id: str,
+        room_version: RoomVersion,
+    ) -> bool:
+        """Checks if there are lots of staged events for the room, and if so
+        prune them down.
+
+        Returns:
+            Whether any events were pruned
+        """
+
+        # First check the size of the queue.
+        count = await self.db_pool.simple_select_one_onecol(
+            table="federation_inbound_events_staging",
+            keyvalues={"room_id": room_id},
+            retcol="COALESCE(COUNT(*), 0)",
+            desc="prune_staged_events_in_room_count",
+        )
+
+        if count < 100:
+            return False
+
+        # If the queue is too large, then we want clear the entire queue,
+        # keeping only the forward extremities (i.e. the events not referenced
+        # by other events in the queue). We do this so that we can always
+        # backpaginate in all the events we have dropped.
+        rows = await self.db_pool.simple_select_list(
+            table="federation_inbound_events_staging",
+            keyvalues={"room_id": room_id},
+            retcols=("event_id", "event_json"),
+            desc="prune_staged_events_in_room_fetch",
+        )
+
+        # Find the set of events referenced by those in the queue, as well as
+        # collecting all the event IDs in the queue.
+        referenced_events: Set[str] = set()
+        seen_events: Set[str] = set()
+        for row in rows:
+            event_id = row["event_id"]
+            seen_events.add(event_id)
+            event_d = db_to_json(row["event_json"])
+
+            # We don't bother parsing the dicts into full blown event objects,
+            # as that is needlessly expensive.
+
+            # We haven't checked that the `prev_events` have the right format
+            # yet, so we check as we go.
+            prev_events = event_d.get("prev_events", [])
+            if not isinstance(prev_events, list):
+                logger.info("Invalid prev_events for %s", event_id)
+                continue
+
+            if room_version.event_format == EventFormatVersions.V1:
+                for prev_event_tuple in prev_events:
+                    if not isinstance(prev_event_tuple, list) or len(prev_events) != 2:
+                        logger.info("Invalid prev_events for %s", event_id)
+                        break
+
+                    prev_event_id = prev_event_tuple[0]
+                    if not isinstance(prev_event_id, str):
+                        logger.info("Invalid prev_events for %s", event_id)
+                        break
+
+                    referenced_events.add(prev_event_id)
+            else:
+                for prev_event_id in prev_events:
+                    if not isinstance(prev_event_id, str):
+                        logger.info("Invalid prev_events for %s", event_id)
+                        break
+
+                    referenced_events.add(prev_event_id)
+
+        to_delete = referenced_events & seen_events
+        if not to_delete:
+            return False
+
+        pdus_pruned_from_federation_queue.inc(len(to_delete))
+        logger.info(
+            "Pruning %d events in room %s from federation queue",
+            len(to_delete),
+            room_id,
+        )
+
+        await self.db_pool.simple_delete_many(
+            table="federation_inbound_events_staging",
+            keyvalues={"room_id": room_id},
+            iterable=to_delete,
+            column="event_id",
+            desc="prune_staged_events_in_room_delete",
+        )
+
+        return True
+
+    async def get_all_rooms_with_staged_incoming_events(self) -> List[str]:
+        """Get the room IDs of all events currently staged."""
+        return await self.db_pool.simple_select_onecol(
+            table="federation_inbound_events_staging",
+            keyvalues={},
+            retcol="DISTINCT room_id",
+            desc="get_all_rooms_with_staged_incoming_events",
+        )
+
+    @wrap_as_background_process("_get_stats_for_federation_staging")
+    async def _get_stats_for_federation_staging(self):
+        """Update the prometheus metrics for the inbound federation staging area."""
+
+        def _get_stats_for_federation_staging_txn(txn):
+            txn.execute(
+                "SELECT coalesce(count(*), 0) FROM federation_inbound_events_staging"
+            )
+            (count,) = txn.fetchone()
+
+            txn.execute(
+                "SELECT min(received_ts) FROM federation_inbound_events_staging"
+            )
+
+            (received_ts,) = txn.fetchone()
+
+            # If there is nothing in the staging area default it to 0.
+            age = 0
+            if received_ts is not None:
+                age = self._clock.time_msec() - received_ts
+
+            return count, age
+
+        count, age = await self.db_pool.runInteraction(
+            "_get_stats_for_federation_staging", _get_stats_for_federation_staging_txn
+        )
+
+        number_pdus_in_federation_queue.set(count)
+        oldest_pdu_in_federation_staging.set(age)
 
 
 class EventFederationStore(EventFederationWorkerStore):

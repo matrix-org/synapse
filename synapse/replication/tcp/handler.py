@@ -105,12 +105,12 @@ class ReplicationCommandHandler:
             hs.get_instance_name() in hs.config.worker.writers.presence
         )
 
-        self._streams = {
+        self._streams: Dict[str, Stream] = {
             stream.NAME: stream(hs) for stream in STREAMS_MAP.values()
-        }  # type: Dict[str, Stream]
+        }
 
         # List of streams that this instance is the source of
-        self._streams_to_replicate = []  # type: List[Stream]
+        self._streams_to_replicate: List[Stream] = []
 
         for stream in self._streams.values():
             if hs.config.redis.redis_enabled and stream.NAME == CachesStream.NAME:
@@ -168,10 +168,13 @@ class ReplicationCommandHandler:
                 continue
 
             # Only add any other streams if we're on master.
-            if hs.config.worker_app is not None:
+            if hs.config.worker.worker_app is not None:
                 continue
 
-            if stream.NAME == FederationStream.NAME and hs.config.send_federation:
+            if (
+                stream.NAME == FederationStream.NAME
+                and hs.config.worker.send_federation
+            ):
                 # We only support federation stream if federation sending
                 # has been disabled on the master.
                 continue
@@ -180,14 +183,14 @@ class ReplicationCommandHandler:
 
         # Map of stream name to batched updates. See RdataCommand for info on
         # how batching works.
-        self._pending_batches = {}  # type: Dict[str, List[Any]]
+        self._pending_batches: Dict[str, List[Any]] = {}
 
         # The factory used to create connections.
-        self._factory = None  # type: Optional[ReconnectingClientFactory]
+        self._factory: Optional[ReconnectingClientFactory] = None
 
         # The currently connected connections. (The list of places we need to send
         # outgoing replication commands to.)
-        self._connections = []  # type: List[IReplicationConnection]
+        self._connections: List[IReplicationConnection] = []
 
         LaterGauge(
             "synapse_replication_tcp_resource_total_connections",
@@ -200,7 +203,7 @@ class ReplicationCommandHandler:
         # them in order in a separate background process.
 
         # the streams which are currently being processed by _unsafe_process_queue
-        self._processing_streams = set()  # type: Set[str]
+        self._processing_streams: Set[str] = set()
 
         # for each stream, a queue of commands that are awaiting processing, and the
         # connection that they arrived on.
@@ -210,7 +213,7 @@ class ReplicationCommandHandler:
 
         # For each connection, the incoming stream names that have received a POSITION
         # from that connection.
-        self._streams_by_connection = {}  # type: Dict[IReplicationConnection, Set[str]]
+        self._streams_by_connection: Dict[IReplicationConnection, Set[str]] = {}
 
         LaterGauge(
             "synapse_replication_tcp_command_queue",
@@ -222,10 +225,10 @@ class ReplicationCommandHandler:
             },
         )
 
-        self._is_master = hs.config.worker_app is None
+        self._is_master = hs.config.worker.worker_app is None
 
         self._federation_sender = None
-        if self._is_master and not hs.config.send_federation:
+        if self._is_master and not hs.config.worker.send_federation:
             self._federation_sender = hs.get_federation_sender()
 
         self._server_notices_sender = None
@@ -315,16 +318,20 @@ class ReplicationCommandHandler:
                 hs, outbound_redis_connection
             )
             hs.get_reactor().connectTCP(
-                hs.config.redis.redis_host.encode(),
+                hs.config.redis.redis_host,  # type: ignore[arg-type]
                 hs.config.redis.redis_port,
                 self._factory,
             )
         else:
             client_name = hs.get_instance_name()
             self._factory = DirectTcpReplicationClientFactory(hs, client_name, self)
-            host = hs.config.worker_replication_host
-            port = hs.config.worker_replication_port
-            hs.get_reactor().connectTCP(host.encode(), port, self._factory)
+            host = hs.config.worker.worker_replication_host
+            port = hs.config.worker.worker_replication_port
+            hs.get_reactor().connectTCP(
+                host,  # type: ignore[arg-type]
+                port,
+                self._factory,
+            )
 
     def get_streams(self) -> Dict[str, Stream]:
         """Get a map from stream name to all streams."""
@@ -571,7 +578,7 @@ class ReplicationCommandHandler:
     def on_REMOTE_SERVER_UP(
         self, conn: IReplicationConnection, cmd: RemoteServerUpCommand
     ):
-        """"Called when get a new REMOTE_SERVER_UP command."""
+        """Called when get a new REMOTE_SERVER_UP command."""
         self._replication_data_handler.on_remote_server_up(cmd.data)
 
         self._notifier.notify_remote_server_up(cmd.data)

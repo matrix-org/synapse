@@ -43,30 +43,30 @@ class ConfigLoadingTestCase(unittest.TestCase):
     def test_generates_and_loads_macaroon_secret_key(self):
         self.generate_config()
 
-        with open(self.file, "r") as f:
+        with open(self.file) as f:
             raw = yaml.safe_load(f)
         self.assertIn("macaroon_secret_key", raw)
 
         config = HomeServerConfig.load_config("", ["-c", self.file])
         self.assertTrue(
-            hasattr(config, "macaroon_secret_key"),
+            hasattr(config.key, "macaroon_secret_key"),
             "Want config to have attr macaroon_secret_key",
         )
-        if len(config.macaroon_secret_key) < 5:
+        if len(config.key.macaroon_secret_key) < 5:
             self.fail(
                 "Want macaroon secret key to be string of at least length 5,"
-                "was: %r" % (config.macaroon_secret_key,)
+                "was: %r" % (config.key.macaroon_secret_key,)
             )
 
         config = HomeServerConfig.load_or_generate_config("", ["-c", self.file])
         self.assertTrue(
-            hasattr(config, "macaroon_secret_key"),
+            hasattr(config.key, "macaroon_secret_key"),
             "Want config to have attr macaroon_secret_key",
         )
-        if len(config.macaroon_secret_key) < 5:
+        if len(config.key.macaroon_secret_key) < 5:
             self.fail(
                 "Want macaroon secret key to be string of at least length 5,"
-                "was: %r" % (config.macaroon_secret_key,)
+                "was: %r" % (config.key.macaroon_secret_key,)
             )
 
     def test_load_succeeds_if_macaroon_secret_key_missing(self):
@@ -74,8 +74,12 @@ class ConfigLoadingTestCase(unittest.TestCase):
         config1 = HomeServerConfig.load_config("", ["-c", self.file])
         config2 = HomeServerConfig.load_config("", ["-c", self.file])
         config3 = HomeServerConfig.load_or_generate_config("", ["-c", self.file])
-        self.assertEqual(config1.macaroon_secret_key, config2.macaroon_secret_key)
-        self.assertEqual(config1.macaroon_secret_key, config3.macaroon_secret_key)
+        self.assertEqual(
+            config1.key.macaroon_secret_key, config2.key.macaroon_secret_key
+        )
+        self.assertEqual(
+            config1.key.macaroon_secret_key, config3.key.macaroon_secret_key
+        )
 
     def test_disable_registration(self):
         self.generate_config()
@@ -84,16 +88,16 @@ class ConfigLoadingTestCase(unittest.TestCase):
         )
         # Check that disable_registration clobbers enable_registration.
         config = HomeServerConfig.load_config("", ["-c", self.file])
-        self.assertFalse(config.enable_registration)
+        self.assertFalse(config.registration.enable_registration)
 
         config = HomeServerConfig.load_or_generate_config("", ["-c", self.file])
-        self.assertFalse(config.enable_registration)
+        self.assertFalse(config.registration.enable_registration)
 
         # Check that either config value is clobbered by the command line.
         config = HomeServerConfig.load_or_generate_config(
             "", ["-c", self.file, "--enable-registration"]
         )
-        self.assertTrue(config.enable_registration)
+        self.assertTrue(config.registration.enable_registration)
 
     def test_stats_enabled(self):
         self.generate_config_and_remove_lines_containing("enable_metrics")
@@ -101,7 +105,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
 
         # The default Metrics Flags are off by default.
         config = HomeServerConfig.load_config("", ["-c", self.file])
-        self.assertFalse(config.metrics_flags.known_servers)
+        self.assertFalse(config.metrics.metrics_flags.known_servers)
 
     def generate_config(self):
         with redirect_stdout(StringIO()):
@@ -120,7 +124,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
     def generate_config_and_remove_lines_containing(self, needle):
         self.generate_config()
 
-        with open(self.file, "r") as f:
+        with open(self.file) as f:
             contents = f.readlines()
         contents = [line for line in contents if needle not in line]
         with open(self.file, "w") as f:

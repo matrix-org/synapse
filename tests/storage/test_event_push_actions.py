@@ -69,6 +69,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             event.room_id = room_id
             event.event_id = "$test:example.com"
             event.internal_metadata.stream_ordering = stream
+            event.internal_metadata.is_outlier.return_value = False
             event.depth = stream
 
             self.get_success(

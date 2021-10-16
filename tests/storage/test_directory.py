@@ -59,5 +59,5 @@ class DirectoryStoreTestCase(HomeserverTestCase):
         self.assertEqual(self.room.to_string(), room_id)
 
         self.assertIsNone(
-            (self.get_success(self.store.get_association_from_room_alias(self.alias)))
+            self.get_success(self.store.get_association_from_room_alias(self.alias))
         )

@@ -60,7 +60,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             self._clock.looping_call(self._cleanup_transactions, 30 * 60 * 1000)
 
     @wrap_as_background_process("cleanup_transactions")
@@ -134,16 +134,18 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             response_dict: The response, to be encoded into JSON.
         """
 
-        await self.db_pool.simple_insert(
+        await self.db_pool.simple_upsert(
             table="received_transactions",
-            values={
+            keyvalues={
                 "transaction_id": transaction_id,
                 "origin": origin,
+            },
+            values={},
+            insertion_values={
                 "response_code": code,
                 "response_json": db_binary_type(encode_canonical_json(response_dict)),
                 "ts": self._clock.time_msec(),
             },
-            or_ignore=True,
             desc="set_received_txn_response",
         )
 

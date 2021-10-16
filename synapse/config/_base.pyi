@@ -5,17 +5,20 @@ from synapse.config import (
     api,
     appservice,
     auth,
+    cache,
     captcha,
     cas,
     consent,
     database,
     emailconfig,
     experimental,
+    federation,
     groups,
     jwt,
     key,
     logger,
     metrics,
+    modules,
     oidc,
     password_auth_providers,
     push,
@@ -23,6 +26,7 @@ from synapse.config import (
     redis,
     registration,
     repository,
+    retention,
     room_directory,
     saml2,
     server,
@@ -85,6 +89,10 @@ class RootConfig:
     thirdpartyrules: third_party_event_rules.ThirdPartyRulesConfig
     tracer: tracer.TracerConfig
     redis: redis.RedisConfig
+    modules: modules.ModulesConfig
+    caches: cache.CacheConfig
+    federation: federation.FederationConfig
+    retention: retention.RetentionConfig
 
     config_classes: List = ...
     def __init__(self) -> None: ...
@@ -111,7 +119,6 @@ class RootConfig:
         database_conf: Optional[Any] = ...,
         tls_certificate_path: Optional[str] = ...,
         tls_private_key_path: Optional[str] = ...,
-        acme_domain: Optional[str] = ...,
     ): ...
     @classmethod
     def load_or_generate_config(cls, description: Any, argv: Any): ...

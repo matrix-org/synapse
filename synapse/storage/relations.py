@@ -73,7 +73,7 @@ class RelationPaginationToken:
             t, s = string.split("-")
             return RelationPaginationToken(int(t), int(s))
         except ValueError:
-            raise SynapseError(400, "Invalid token")
+            raise SynapseError(400, "Invalid relation pagination token")
 
     def to_string(self) -> str:
         return "%d-%d" % (self.topological, self.stream)
@@ -103,7 +103,7 @@ class AggregationPaginationToken:
             c, s = string.split("-")
             return AggregationPaginationToken(int(c), int(s))
         except ValueError:
-            raise SynapseError(400, "Invalid token")
+            raise SynapseError(400, "Invalid aggregation pagination token")
 
     def to_string(self) -> str:
         return "%d-%d" % (self.count, self.stream)

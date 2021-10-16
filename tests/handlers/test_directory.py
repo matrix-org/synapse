@@ -19,7 +19,7 @@ import synapse
 import synapse.api.errors
 from synapse.api.constants import EventTypes
 from synapse.config.room_directory import RoomDirectoryConfig
-from synapse.rest.client.v1 import directory, login, room
+from synapse.rest.client import directory, login, room
 from synapse.types import RoomAlias, create_requester
 
 from tests import unittest
@@ -27,7 +27,7 @@ from tests.test_utils import make_awaitable
 
 
 class DirectoryTestCase(unittest.HomeserverTestCase):
-    """ Tests the directory service. """
+    """Tests the directory service."""
 
     def make_homeserver(self, reactor, clock):
         self.mock_federation = Mock()
@@ -405,7 +405,9 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
         rd_config = RoomDirectoryConfig()
         rd_config.read_config(config)
 
-        self.hs.config.is_alias_creation_allowed = rd_config.is_alias_creation_allowed
+        self.hs.config.roomdirectory.is_alias_creation_allowed = (
+            rd_config.is_alias_creation_allowed
+        )
 
         return hs
 

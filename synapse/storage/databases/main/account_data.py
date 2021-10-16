@@ -324,7 +324,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             user_id, int(stream_id)
         )
         if not changed:
-            return ({}, {})
+            return {}, {}
 
         return await self.db_pool.runInteraction(
             "get_updated_account_data_for_user", get_updated_account_data_for_user_txn
@@ -494,7 +494,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             txn,
             table="ignored_users",
             column="ignored_user_id",
-            iterable=previously_ignored_users - currently_ignored_users,
+            values=previously_ignored_users - currently_ignored_users,
             keyvalues={"ignorer_user_id": user_id},
         )
 

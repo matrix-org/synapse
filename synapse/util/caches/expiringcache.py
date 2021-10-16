@@ -22,12 +22,12 @@ from typing_extensions import Literal
 from synapse.config import cache as cache_config
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util import Clock
-from synapse.util.caches import register_cache
+from synapse.util.caches import EvictionReason, register_cache
 
 logger = logging.getLogger(__name__)
 
 
-SENTINEL = object()  # type: Any
+SENTINEL: Any = object()
 
 
 T = TypeVar("T")
@@ -71,7 +71,7 @@ class ExpiringCache(Generic[KT, VT]):
         self._expiry_ms = expiry_ms
         self._reset_expiry_on_get = reset_expiry_on_get
 
-        self._cache = OrderedDict()  # type: OrderedDict[KT, _CacheEntry]
+        self._cache: OrderedDict[KT, _CacheEntry] = OrderedDict()
 
         self.iterable = iterable
 
@@ -98,9 +98,9 @@ class ExpiringCache(Generic[KT, VT]):
         while self._max_size and len(self) > self._max_size:
             _key, value = self._cache.popitem(last=False)
             if self.iterable:
-                self.metrics.inc_evictions(len(value.value))
+                self.metrics.inc_evictions(EvictionReason.size, len(value.value))
             else:
-                self.metrics.inc_evictions()
+                self.metrics.inc_evictions(EvictionReason.size)
 
     def __getitem__(self, key: KT) -> VT:
         try:
@@ -175,9 +175,9 @@ class ExpiringCache(Generic[KT, VT]):
         for k in keys_to_delete:
             value = self._cache.pop(k)
             if self.iterable:
-                self.metrics.inc_evictions(len(value.value))
+                self.metrics.inc_evictions(EvictionReason.time, len(value.value))
             else:
-                self.metrics.inc_evictions()
+                self.metrics.inc_evictions(EvictionReason.time)
 
         logger.debug(
             "[%s] _prune_cache before: %d, after len: %d",

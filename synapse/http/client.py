@@ -160,7 +160,7 @@ class _IPBlacklistingResolver:
     def resolveHostName(
         self, recv: IResolutionReceiver, hostname: str, portNumber: int = 0
     ) -> IResolutionReceiver:
-        addresses = []  # type: List[IAddress]
+        addresses: List[IAddress] = []
 
         def _callback() -> None:
             has_bad_ip = False
@@ -321,8 +321,11 @@ class SimpleHttpClient:
 
         self.user_agent = hs.version_string
         self.clock = hs.get_clock()
-        if hs.config.user_agent_suffix:
-            self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix)
+        if hs.config.server.user_agent_suffix:
+            self.user_agent = "%s %s" % (
+                self.user_agent,
+                hs.config.server.user_agent_suffix,
+            )
 
         # We use this for our body producers to ensure that they use the correct
         # reactor.
@@ -333,9 +336,9 @@ class SimpleHttpClient:
         if self._ip_blacklist:
             # If we have an IP blacklist, we need to use a DNS resolver which
             # filters out blacklisted IP addresses, to prevent DNS rebinding.
-            self.reactor = BlacklistingReactorWrapper(
+            self.reactor: ISynapseReactor = BlacklistingReactorWrapper(
                 hs.get_reactor(), self._ip_whitelist, self._ip_blacklist
-            )  # type: ISynapseReactor
+            )
         else:
             self.reactor = hs.get_reactor()
 
@@ -349,14 +352,14 @@ class SimpleHttpClient:
         pool.maxPersistentPerHost = max((100 * hs.config.caches.global_factor, 5))
         pool.cachedConnectionTimeout = 2 * 60
 
-        self.agent = ProxyAgent(
+        self.agent: IAgent = ProxyAgent(
             self.reactor,
             hs.get_reactor(),
             connectTimeout=15,
             contextFactory=self.hs.get_http_client_context_factory(),
             pool=pool,
             use_proxy=use_proxy,
-        )  # type: IAgent
+        )
 
         if self._ip_blacklist:
             # If we have an IP blacklist, we then install the blacklisting Agent
@@ -411,7 +414,7 @@ class SimpleHttpClient:
                         cooperator=self._cooperator,
                     )
 
-                request_deferred = treq.request(
+                request_deferred: defer.Deferred = treq.request(
                     method,
                     uri,
                     agent=self.agent,
@@ -421,7 +424,7 @@ class SimpleHttpClient:
                     # response bodies.
                     unbuffered=True,
                     **self._extra_treq_args,
-                )  # type: defer.Deferred
+                )
 
                 # we use our own timeout mechanism rather than treq's as a workaround
                 # for https://twistedmatrix.com/trac/ticket/9534.
@@ -772,7 +775,7 @@ class BodyExceededMaxSize(Exception):
 class _DiscardBodyWithMaxSizeProtocol(protocol.Protocol):
     """A protocol which immediately errors upon receiving data."""
 
-    transport = None  # type: Optional[ITCPTransport]
+    transport: Optional[ITCPTransport] = None
 
     def __init__(self, deferred: defer.Deferred):
         self.deferred = deferred
@@ -798,7 +801,7 @@ class _DiscardBodyWithMaxSizeProtocol(protocol.Protocol):
 class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
     """A protocol which reads body to a stream, erroring if the body exceeds a maximum size."""
 
-    transport = None  # type: Optional[ITCPTransport]
+    transport: Optional[ITCPTransport] = None
 
     def __init__(
         self, stream: ByteWriteable, deferred: defer.Deferred, max_size: Optional[int]
@@ -847,7 +850,7 @@ class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
 
 def read_body_with_max_size(
     response: IResponse, stream: ByteWriteable, max_size: Optional[int]
-) -> defer.Deferred:
+) -> "defer.Deferred[int]":
     """
     Read a HTTP response body to a file-object. Optionally enforcing a maximum file size.
 
@@ -862,7 +865,7 @@ def read_body_with_max_size(
     Returns:
         A Deferred which resolves to the length of the read body.
     """
-    d = defer.Deferred()
+    d: "defer.Deferred[int]" = defer.Deferred()
 
     # If the Content-Length header gives a size larger than the maximum allowed
     # size, do not bother downloading the body.
@@ -909,7 +912,7 @@ class InsecureInterceptableContextFactory(ssl.ContextFactory):
 
     def __init__(self):
         self._context = SSL.Context(SSL.SSLv23_METHOD)
-        self._context.set_verify(VERIFY_NONE, lambda *_: None)
+        self._context.set_verify(VERIFY_NONE, lambda *_: False)
 
     def getContext(self, hostname=None, port=None):
         return self._context

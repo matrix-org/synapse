@@ -12,10 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import TYPE_CHECKING
 
 import saml2.metadata
 
 from twisted.web.resource import Resource
+from twisted.web.server import Request
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class SAML2MetadataResource(Resource):
@@ -23,11 +28,11 @@ class SAML2MetadataResource(Resource):
 
     isLeaf = 1
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         Resource.__init__(self)
-        self.sp_config = hs.config.saml2_sp_config
+        self.sp_config = hs.config.saml2.saml2_sp_config
 
-    def render_GET(self, request):
+    def render_GET(self, request: Request) -> bytes:
         metadata_xml = saml2.metadata.create_metadata_string(
             configfile=None, config=self.sp_config
         )

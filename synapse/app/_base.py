@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import atexit
 import gc
 import logging
 import os
@@ -21,12 +22,14 @@ import socket
 import sys
 import traceback
 import warnings
-from typing import Awaitable, Callable, Iterable
+from typing import TYPE_CHECKING, Awaitable, Callable, Iterable
 
 from cryptography.utils import CryptographyDeprecationWarning
 from typing_extensions import NoReturn
 
+import twisted
 from twisted.internet import defer, error, reactor
+from twisted.logger import LoggingFile, LogLevel
 from twisted.protocols.tls import TLSMemoryBIOFactory
 
 import synapse
@@ -34,14 +37,22 @@ from synapse.api.constants import MAX_PDU_SIZE
 from synapse.app import check_bind_error
 from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config.homeserver import HomeServerConfig
+from synapse.config.server import ManholeConfig
 from synapse.crypto import context_factory
+from synapse.events.presence_router import load_legacy_presence_router
+from synapse.events.spamcheck import load_legacy_spam_checkers
+from synapse.events.third_party_rules import load_legacy_third_party_event_rules
+from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.logging.context import PreserveLoggingContext
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
-from synapse.util.async_helpers import Linearizer
+from synapse.util.caches.lrucache import setup_expire_lru_cache_entries
 from synapse.util.daemonize import daemonize_process
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -72,15 +83,15 @@ def start_worker_reactor(appname, config, run_command=reactor.run):
         run_command (Callable[]): callable that actually runs the reactor
     """
 
-    logger = logging.getLogger(config.worker_app)
+    logger = logging.getLogger(config.worker.worker_app)
 
     start_reactor(
         appname,
-        soft_file_limit=config.soft_file_limit,
-        gc_thresholds=config.gc_thresholds,
-        pid_file=config.worker_pid_file,
-        daemonize=config.worker_daemonize,
-        print_pidfile=config.print_pidfile,
+        soft_file_limit=config.server.soft_file_limit,
+        gc_thresholds=config.server.gc_thresholds,
+        pid_file=config.worker.worker_pid_file,
+        daemonize=config.worker.worker_daemonize,
+        print_pidfile=config.server.print_pidfile,
         logger=logger,
         run_command=run_command,
     )
@@ -112,8 +123,6 @@ def start_reactor(
         run_command (Callable[]): callable that actually runs the reactor
     """
 
-    install_dns_limiter(reactor)
-
     def run():
         logger.info("Running")
         setup_jemalloc_stats()
@@ -141,12 +150,36 @@ def start_reactor(
 
 def quit_with_error(error_string: str) -> NoReturn:
     message_lines = error_string.split("\n")
-    line_length = max(len(line) for line in message_lines if len(line) < 80) + 2
+    line_length = min(max(len(line) for line in message_lines), 80) + 2
     sys.stderr.write("*" * line_length + "\n")
     for line in message_lines:
         sys.stderr.write(" %s\n" % (line.rstrip(),))
     sys.stderr.write("*" * line_length + "\n")
     sys.exit(1)
+
+
+def handle_startup_exception(e: Exception) -> NoReturn:
+    # Exceptions that occur between setting up the logging and forking or starting
+    # the reactor are written to the logs, followed by a summary to stderr.
+    logger.exception("Exception during startup")
+    quit_with_error(
+        f"Error during initialisation:\n   {e}\nThere may be more information in the logs."
+    )
+
+
+def redirect_stdio_to_logs() -> None:
+    streams = [("stdout", LogLevel.info), ("stderr", LogLevel.error)]
+
+    for (stream, level) in streams:
+        oldStream = getattr(sys, stream)
+        loggingFile = LoggingFile(
+            logger=twisted.logger.Logger(namespace=stream),
+            level=level,
+            encoding=getattr(oldStream, "encoding", None),
+        )
+        setattr(sys, stream, loggingFile)
+
+    print("Redirected stdout/stderr to logs")
 
 
 def register_start(cb: Callable[..., Awaitable], *args, **kwargs) -> None:
@@ -199,7 +232,12 @@ def listen_metrics(bind_addresses, port):
         start_http_server(port, addr=host, registry=RegistryProxy)
 
 
-def listen_manhole(bind_addresses: Iterable[str], port: int, manhole_globals: dict):
+def listen_manhole(
+    bind_addresses: Iterable[str],
+    port: int,
+    manhole_settings: ManholeConfig,
+    manhole_globals: dict,
+):
     # twisted.conch.manhole 21.1.0 uses "int_from_bytes", which produces a confusing
     # warning. It's fixed by https://github.com/twisted/twisted/pull/1522), so
     # suppress the warning for now.
@@ -214,7 +252,7 @@ def listen_manhole(bind_addresses: Iterable[str], port: int, manhole_globals: di
     listen_tcp(
         bind_addresses,
         port,
-        manhole(username="matrix", password="rabbithole", globals=manhole_globals),
+        manhole(settings=manhole_settings, globals=manhole_globals),
     )
 
 
@@ -261,10 +299,10 @@ def refresh_certificate(hs):
     Refresh the TLS certificates that Synapse is using by re-reading them from
     disk and updating the TLS context factories to use them.
     """
-    if not hs.config.has_tls_listener():
+    if not hs.config.server.has_tls_listener():
         return
 
-    hs.config.read_certificate_from_disk()
+    hs.config.tls.read_certificate_from_disk()
     hs.tls_server_context_factory = context_factory.ServerContextFactory(hs.config)
 
     if hs._listening_services:
@@ -288,12 +326,11 @@ def refresh_certificate(hs):
         logger.info("Context factories updated.")
 
 
-async def start(hs: "synapse.server.HomeServer"):
+async def start(hs: "HomeServer"):
     """
     Start a Synapse server or worker.
 
-    Should be called once the reactor is running and (if we're using ACME) the
-    TLS certificates are in place.
+    Should be called once the reactor is running.
 
     Will start the main HTTP listeners and do some other startup tasks, and then
     notify systemd.
@@ -334,6 +371,20 @@ async def start(hs: "synapse.server.HomeServer"):
     # Start the tracer
     synapse.logging.opentracing.init_tracer(hs)  # type: ignore[attr-defined] # noqa
 
+    # Instantiate the modules so they can register their web resources to the module API
+    # before we start the listeners.
+    module_api = hs.get_module_api()
+    for module, config in hs.config.modules.loaded_modules:
+        module(config=config, api=module_api)
+
+    load_legacy_spam_checkers(hs)
+    load_legacy_third_party_event_rules(hs)
+    load_legacy_presence_router(hs)
+    load_legacy_password_auth_providers(hs)
+
+    # If we've configured an expiry time for caches, start the background job now.
+    setup_expire_lru_cache_entries(hs)
+
     # It is now safe to start your Synapse.
     hs.start_listening()
     hs.get_datastore().db_pool.start_profiling()
@@ -349,7 +400,7 @@ async def start(hs: "synapse.server.HomeServer"):
 
     # If background tasks are running on the main process, start collecting the
     # phone home stats.
-    if hs.config.run_background_tasks:
+    if hs.config.worker.run_background_tasks:
         start_phone_stats_home(hs)
 
     # We now freeze all allocated objects in the hopes that (almost)
@@ -361,6 +412,12 @@ async def start(hs: "synapse.server.HomeServer"):
         gc.collect()
         gc.freeze()
 
+    # Speed up shutdowns by freezing all allocated objects. This moves everything
+    # into the permanent generation and excludes them from the final GC.
+    # Unfortunately only works on Python 3.7
+    if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
+        atexit.register(gc.freeze)
+
 
 def setup_sentry(hs):
     """Enable sentry integration, if enabled in configuration
@@ -369,18 +426,24 @@ def setup_sentry(hs):
         hs (synapse.server.HomeServer)
     """
 
-    if not hs.config.sentry_enabled:
+    if not hs.config.metrics.sentry_enabled:
         return
 
     import sentry_sdk
 
-    sentry_sdk.init(dsn=hs.config.sentry_dsn, release=get_version_string(synapse))
+    sentry_sdk.init(
+        dsn=hs.config.metrics.sentry_dsn, release=get_version_string(synapse)
+    )
 
     # We set some default tags that give some context to this instance
     with sentry_sdk.configure_scope() as scope:
-        scope.set_tag("matrix_server_name", hs.config.server_name)
+        scope.set_tag("matrix_server_name", hs.config.server.server_name)
 
-        app = hs.config.worker_app if hs.config.worker_app else "synapse.app.homeserver"
+        app = (
+            hs.config.worker.worker_app
+            if hs.config.worker.worker_app
+            else "synapse.app.homeserver"
+        )
         name = hs.get_instance_name()
         scope.set_tag("worker_app", app)
         scope.set_tag("worker_name", name)
@@ -396,107 +459,6 @@ def setup_sdnotify(hs):
     hs.get_reactor().addSystemEventTrigger(
         "before", "shutdown", sdnotify, b"STOPPING=1"
     )
-
-
-def install_dns_limiter(reactor, max_dns_requests_in_flight=100):
-    """Replaces the resolver with one that limits the number of in flight DNS
-    requests.
-
-    This is to workaround https://twistedmatrix.com/trac/ticket/9620, where we
-    can run out of file descriptors and infinite loop if we attempt to do too
-    many DNS queries at once
-
-    XXX: I'm confused by this. reactor.nameResolver does not use twisted.names unless
-    you explicitly install twisted.names as the resolver; rather it uses a GAIResolver
-    backed by the reactor's default threadpool (which is limited to 10 threads). So
-    (a) I don't understand why twisted ticket 9620 is relevant, and (b) I don't
-    understand why we would run out of FDs if we did too many lookups at once.
-    -- richvdh 2020/08/29
-    """
-    new_resolver = _LimitedHostnameResolver(
-        reactor.nameResolver, max_dns_requests_in_flight
-    )
-
-    reactor.installNameResolver(new_resolver)
-
-
-class _LimitedHostnameResolver:
-    """Wraps a IHostnameResolver, limiting the number of in-flight DNS lookups."""
-
-    def __init__(self, resolver, max_dns_requests_in_flight):
-        self._resolver = resolver
-        self._limiter = Linearizer(
-            name="dns_client_limiter", max_count=max_dns_requests_in_flight
-        )
-
-    def resolveHostName(
-        self,
-        resolutionReceiver,
-        hostName,
-        portNumber=0,
-        addressTypes=None,
-        transportSemantics="TCP",
-    ):
-        # We need this function to return `resolutionReceiver` so we do all the
-        # actual logic involving deferreds in a separate function.
-
-        # even though this is happening within the depths of twisted, we need to drop
-        # our logcontext before starting _resolve, otherwise: (a) _resolve will drop
-        # the logcontext if it returns an incomplete deferred; (b) _resolve will
-        # call the resolutionReceiver *with* a logcontext, which it won't be expecting.
-        with PreserveLoggingContext():
-            self._resolve(
-                resolutionReceiver,
-                hostName,
-                portNumber,
-                addressTypes,
-                transportSemantics,
-            )
-
-        return resolutionReceiver
-
-    @defer.inlineCallbacks
-    def _resolve(
-        self,
-        resolutionReceiver,
-        hostName,
-        portNumber=0,
-        addressTypes=None,
-        transportSemantics="TCP",
-    ):
-
-        with (yield self._limiter.queue(())):
-            # resolveHostName doesn't return a Deferred, so we need to hook into
-            # the receiver interface to get told when resolution has finished.
-
-            deferred = defer.Deferred()
-            receiver = _DeferredResolutionReceiver(resolutionReceiver, deferred)
-
-            self._resolver.resolveHostName(
-                receiver, hostName, portNumber, addressTypes, transportSemantics
-            )
-
-            yield deferred
-
-
-class _DeferredResolutionReceiver:
-    """Wraps a IResolutionReceiver and simply resolves the given deferred when
-    resolution is complete
-    """
-
-    def __init__(self, receiver, deferred):
-        self._receiver = receiver
-        self._deferred = deferred
-
-    def resolutionBegan(self, resolutionInProgress):
-        self._receiver.resolutionBegan(resolutionInProgress)
-
-    def addressResolved(self, address):
-        self._receiver.addressResolved(address)
-
-    def resolutionComplete(self):
-        self._deferred.callback(())
-        self._receiver.resolutionComplete()
 
 
 sdnotify_sockaddr = os.getenv("NOTIFY_SOCKET")

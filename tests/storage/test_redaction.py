@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Optional
+from typing import List, Optional
 
 from canonicaljson import json
 
@@ -232,9 +232,14 @@ class RedactionTestCase(unittest.HomeserverTestCase):
                 self._base_builder = base_builder
                 self._event_id = event_id
 
-            async def build(self, prev_event_ids, auth_event_ids):
+            async def build(
+                self,
+                prev_event_ids: List[str],
+                auth_event_ids: Optional[List[str]],
+                depth: Optional[int] = None,
+            ):
                 built_event = await self._base_builder.build(
-                    prev_event_ids, auth_event_ids
+                    prev_event_ids=prev_event_ids, auth_event_ids=auth_event_ids
                 )
 
                 built_event._event_id = self._event_id
@@ -250,6 +255,10 @@ class RedactionTestCase(unittest.HomeserverTestCase):
             @property
             def type(self):
                 return self._base_builder.type
+
+            @property
+            def internal_metadata(self):
+                return self._base_builder.internal_metadata
 
         event_1, context_1 = self.get_success(
             self.event_creation_handler.create_new_client_event(

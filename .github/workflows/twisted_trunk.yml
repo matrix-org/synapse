@@ -1,0 +1,92 @@
+name: Twisted Trunk
+
+on:
+  schedule:
+    - cron: 0 8 * * *
+
+  workflow_dispatch:
+
+jobs:
+  mypy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - run: .ci/patch_for_twisted_trunk.sh
+      - run: pip install tox
+      - run: tox -e mypy
+
+  trial:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - run: sudo apt-get -qq install xmlsec1
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.6
+      - run: .ci/patch_for_twisted_trunk.sh
+      - run: pip install tox
+      - run: tox -e py
+        env:
+          TRIAL_FLAGS: "--jobs=2"
+
+      - name: Dump logs
+        # Logs are most useful when the command fails, always include them.
+        if: ${{ always() }}
+        # Note: Dumps to workflow logs instead of using actions/upload-artifact
+        #       This keeps logs colocated with failing jobs
+        #       It also ignores find's exit code; this is a best effort affair
+        run: >-
+          find _trial_temp -name '*.log'
+          -exec echo "::group::{}" \;
+          -exec cat {} \;
+          -exec echo "::endgroup::" \;
+          || true
+
+  sytest:
+    runs-on: ubuntu-latest
+    container:
+      image: matrixdotorg/sytest-synapse:buster
+      volumes:
+        - ${{ github.workspace }}:/src
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Patch dependencies
+        run: .ci/patch_for_twisted_trunk.sh
+        working-directory: /src
+      - name: Run SyTest
+        run: /bootstrap.sh synapse
+        working-directory: /src
+      - name: Summarise results.tap
+        if: ${{ always() }}
+        run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
+      - name: Upload SyTest logs
+        uses: actions/upload-artifact@v2
+        if: ${{ always() }}
+        with:
+          name: Sytest Logs - ${{ job.status }} - (${{ join(matrix.*, ', ') }})
+          path: |
+            /logs/results.tap
+            /logs/**/*.log*
+
+  # open an issue if the build fails, so we know about it.
+  open-issue:
+    if: failure()
+    needs:
+      - mypy
+      - trial
+      - sytest
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: JasonEtco/create-an-issue@5d9504915f79f9cc6d791934b8ef34f2353dd74d # v2.5.0, 2020-12-06
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          update_existing: true
+          filename: .ci/twisted_trunk_build_failed_issue_template.md

@@ -136,7 +136,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             user_id, last_stream_id
         )
         if not has_changed:
-            return ([], current_stream_id)
+            return [], current_stream_id
 
         def get_new_messages_for_device_txn(txn):
             sql = (
@@ -203,9 +203,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             "delete_messages_for_device", delete_messages_for_device_txn
         )
 
-        log_kv(
-            {"message": "deleted {} messages for device".format(count), "count": count}
-        )
+        log_kv({"message": f"deleted {count} messages for device", "count": count})
 
         # Update the cache, ensuring that we only ever increase the value
         last_deleted_stream_id = self._last_device_delete_cache.get(
@@ -242,11 +240,11 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         )
         if not has_changed or last_stream_id == current_stream_id:
             log_kv({"message": "No new messages in stream"})
-            return ([], current_stream_id)
+            return [], current_stream_id
 
         if limit <= 0:
             # This can happen if we run out of room for EDUs in the transaction.
-            return ([], last_stream_id)
+            return [], last_stream_id
 
         @trace
         def get_new_messages_for_remote_destination_txn(txn):

@@ -25,8 +25,6 @@ from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, UserID
 from synapse.visibility import filter_events_for_client
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -34,11 +32,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class EventStreamHandler(BaseHandler):
+class EventStreamHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.store = hs.get_datastore()
         self.clock = hs.get_clock()
+        self.hs = hs
 
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
@@ -93,7 +91,7 @@ class EventStreamHandler(BaseHandler):
 
             # When the user joins a new room, or another user joins a currently
             # joined room, we need to send down presence for those users.
-            to_add = []  # type: List[JsonDict]
+            to_add: List[JsonDict] = []
             for event in events:
                 if not isinstance(event, EventBase):
                     continue
@@ -103,9 +101,9 @@ class EventStreamHandler(BaseHandler):
                     # Send down presence.
                     if event.state_key == auth_user_id:
                         # Send down presence for everyone in the room.
-                        users = await self.store.get_users_in_room(
+                        users: Iterable[str] = await self.store.get_users_in_room(
                             event.room_id
-                        )  # type: Iterable[str]
+                        )
                     else:
                         users = [event.state_key]
 
@@ -138,9 +136,9 @@ class EventStreamHandler(BaseHandler):
             return chunk
 
 
-class EventHandler(BaseHandler):
+class EventHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
         self.storage = hs.get_storage()
 
     async def get_event(

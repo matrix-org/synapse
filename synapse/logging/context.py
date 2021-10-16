@@ -25,7 +25,7 @@ See doc/log_contexts.rst for details on how this works.
 import inspect
 import logging
 import threading
-import types
+import typing
 import warnings
 from typing import TYPE_CHECKING, Optional, Tuple, TypeVar, Union
 
@@ -52,7 +52,7 @@ try:
 
     is_thread_resource_usage_supported = True
 
-    def get_thread_resource_usage() -> "Optional[resource._RUsage]":
+    def get_thread_resource_usage() -> "Optional[resource.struct_rusage]":
         return resource.getrusage(RUSAGE_THREAD)
 
 
@@ -61,7 +61,7 @@ except Exception:
     # won't track resource usage.
     is_thread_resource_usage_supported = False
 
-    def get_thread_resource_usage() -> "Optional[resource._RUsage]":
+    def get_thread_resource_usage() -> "Optional[resource.struct_rusage]":
         return None
 
 
@@ -113,13 +113,13 @@ class ContextResourceUsage:
             self.reset()
         else:
             # FIXME: mypy can't infer the types set via reset() above, so specify explicitly for now
-            self.ru_utime = copy_from.ru_utime  # type: float
-            self.ru_stime = copy_from.ru_stime  # type: float
-            self.db_txn_count = copy_from.db_txn_count  # type: int
+            self.ru_utime: float = copy_from.ru_utime
+            self.ru_stime: float = copy_from.ru_stime
+            self.db_txn_count: int = copy_from.db_txn_count
 
-            self.db_txn_duration_sec = copy_from.db_txn_duration_sec  # type: float
-            self.db_sched_duration_sec = copy_from.db_sched_duration_sec  # type: float
-            self.evt_db_fetch_count = copy_from.evt_db_fetch_count  # type: int
+            self.db_txn_duration_sec: float = copy_from.db_txn_duration_sec
+            self.db_sched_duration_sec: float = copy_from.db_sched_duration_sec
+            self.evt_db_fetch_count: int = copy_from.evt_db_fetch_count
 
     def copy(self) -> "ContextResourceUsage":
         return ContextResourceUsage(copy_from=self)
@@ -226,10 +226,10 @@ class _Sentinel:
     def copy_to(self, record):
         pass
 
-    def start(self, rusage: "Optional[resource._RUsage]"):
+    def start(self, rusage: "Optional[resource.struct_rusage]"):
         pass
 
-    def stop(self, rusage: "Optional[resource._RUsage]"):
+    def stop(self, rusage: "Optional[resource.struct_rusage]"):
         pass
 
     def add_database_transaction(self, duration_sec):
@@ -289,12 +289,12 @@ class LoggingContext:
 
         # The thread resource usage when the logcontext became active. None
         # if the context is not currently active.
-        self.usage_start = None  # type: Optional[resource._RUsage]
+        self.usage_start: Optional[resource.struct_rusage] = None
 
         self.main_thread = get_thread_id()
         self.request = None
         self.tag = ""
-        self.scope = None  # type: Optional[_LogContextScope]
+        self.scope: Optional["_LogContextScope"] = None
 
         # keep track of whether we have hit the __exit__ block for this context
         # (suggesting that the the thing that created the context thinks it should
@@ -410,7 +410,7 @@ class LoggingContext:
         # we also track the current scope:
         record.scope = self.scope
 
-    def start(self, rusage: "Optional[resource._RUsage]") -> None:
+    def start(self, rusage: "Optional[resource.struct_rusage]") -> None:
         """
         Record that this logcontext is currently running.
 
@@ -435,7 +435,7 @@ class LoggingContext:
         else:
             self.usage_start = rusage
 
-    def stop(self, rusage: "Optional[resource._RUsage]") -> None:
+    def stop(self, rusage: "Optional[resource.struct_rusage]") -> None:
         """
         Record that this logcontext is no longer running.
 
@@ -490,7 +490,7 @@ class LoggingContext:
 
         return res
 
-    def _get_cputime(self, current: "resource._RUsage") -> Tuple[float, float]:
+    def _get_cputime(self, current: "resource.struct_rusage") -> Tuple[float, float]:
         """Get the cpu usage time between start() and the given rusage
 
         Args:
@@ -745,7 +745,7 @@ def run_in_background(f, *args, **kwargs) -> defer.Deferred:
         # by synchronous exceptions, so let's turn them into Failures.
         return defer.fail()
 
-    if isinstance(res, types.CoroutineType):
+    if isinstance(res, typing.Coroutine):
         res = defer.ensureDeferred(res)
 
     # At this point we should have a Deferred, if not then f was a synchronous
