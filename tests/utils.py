@@ -477,6 +477,9 @@ class MockClock:
     def time_msec(self):
         return self.time() * 1000
 
+    def real_time_msec(self):
+        return int(time.time() * 1000)
+
     def call_later(self, delay, callback, *args, **kwargs):
         ctx = current_context()
 

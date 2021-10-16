@@ -231,6 +231,20 @@ class PurgeMediaCacheRestServlet(RestServlet):
         before_ts = parse_integer(request, "before_ts", required=True)
         logger.info("before_ts: %r", before_ts)
 
+        if before_ts < 0:
+            raise SynapseError(
+                400,
+                "Query parameter before_ts must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+        elif before_ts < 30000000000:  # Dec 1970 in milliseconds, Aug 2920 in seconds
+            raise SynapseError(
+                400,
+                "Query parameter before_ts you provided is from the year 1970. "
+                + "Double check that you are providing a timestamp in milliseconds.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
         ret = await self.media_repository.delete_old_remote_media(before_ts)
 
         return 200, ret
@@ -292,6 +306,13 @@ class DeleteMediaByDateSize(RestServlet):
             raise SynapseError(
                 400,
                 "Query parameter before_ts must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+        elif before_ts < 30000000000:  # Dec 1970 in milliseconds, Aug 2920 in seconds
+            raise SynapseError(
+                400,
+                "Query parameter before_ts you provided is from the year 1970. "
+                + "Double check that you are providing a timestamp in milliseconds.",
                 errcode=Codes.INVALID_PARAM,
             )
         if size_gt < 0:
