@@ -1130,7 +1130,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             desc="delete_device",
         )
 
-        await self.db_pool.simple_delete_one(
+        await self.db_pool.simple_delete_many(
             table="device_inbox",
             keyvalues={"user_id": user_id, "device_id": device_id},
             desc="delete_device",
