@@ -26,7 +26,6 @@ from synapse.rest.media.v1.filepath import MediaFilePaths
 from tests import unittest
 from tests.server import FakeSite, make_request
 from tests.test_utils import SMALL_PNG
-from tests.utils import MockClock
 
 VALID_TIMESTAMP = 1609459200000  # 2021-01-01 in milliseconds
 INVALID_TIMESTAMP_IN_S = 1893456000  # 2030-01-01 in seconds
@@ -207,7 +206,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
         self.url = "/_synapse/admin/v1/media/%s/delete" % self.server_name
 
-        self.clock = MockClock()
+        # Move clock up to somewhat realistic time
+        self.reactor.advance(1000000000)
 
     def test_no_auth(self):
         """
@@ -339,7 +339,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.assertTrue(os.path.exists(local_path))
 
         # timestamp after upload/create
-        now_ms = self.clock.real_time_msec()
+        now_ms = self.clock.time_msec()
         channel = self.make_request(
             "POST",
             self.url + "?before_ts=" + str(now_ms),
@@ -360,7 +360,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         """
 
         # timestamp before upload
-        now_ms = self.clock.real_time_msec()
+        now_ms = self.clock.time_msec()
         server_and_media_id = self._create_media()
 
         self._access_media(server_and_media_id)
@@ -376,7 +376,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self._access_media(server_and_media_id)
 
         # timestamp after upload
-        now_ms = self.clock.real_time_msec()
+        now_ms = self.clock.time_msec()
         channel = self.make_request(
             "POST",
             self.url + "?before_ts=" + str(now_ms),
@@ -400,7 +400,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self._access_media(server_and_media_id)
 
-        now_ms = self.clock.real_time_msec()
+        now_ms = self.clock.time_msec()
         channel = self.make_request(
             "POST",
             self.url + "?before_ts=" + str(now_ms) + "&size_gt=67",
@@ -411,7 +411,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self._access_media(server_and_media_id)
 
-        now_ms = self.clock.real_time_msec()
+        now_ms = self.clock.time_msec()
         channel = self.make_request(
             "POST",
             self.url + "?before_ts=" + str(now_ms) + "&size_gt=66",
@@ -444,7 +444,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)
 
-        now_ms = self.clock.real_time_msec()
+        now_ms = self.clock.time_msec()
         channel = self.make_request(
             "POST",
             self.url + "?before_ts=" + str(now_ms) + "&keep_profiles=true",
@@ -455,7 +455,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self._access_media(server_and_media_id)
 
-        now_ms = self.clock.real_time_msec()
+        now_ms = self.clock.time_msec()
         channel = self.make_request(
             "POST",
             self.url + "?before_ts=" + str(now_ms) + "&keep_profiles=false",
@@ -489,7 +489,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)
 
-        now_ms = self.clock.real_time_msec()
+        now_ms = self.clock.time_msec()
         channel = self.make_request(
             "POST",
             self.url + "?before_ts=" + str(now_ms) + "&keep_profiles=true",
@@ -500,7 +500,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self._access_media(server_and_media_id)
 
-        now_ms = self.clock.real_time_msec()
+        now_ms = self.clock.time_msec()
         channel = self.make_request(
             "POST",
             self.url + "?before_ts=" + str(now_ms) + "&keep_profiles=false",
@@ -808,8 +808,6 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
 
         self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
         self.url = "/_synapse/admin/v1/purge_media_cache"
-
-        self.clock = MockClock()
 
     def test_no_auth(self):
         """
