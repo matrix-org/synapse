@@ -1256,6 +1256,10 @@ class FederationEventHandler:
 
         Returns:
             The updated context object.
+
+        Raises:
+            AuthError if we were unable to find copies of the event's auth events.
+               (Most other failures just cause us to set `context.rejected`.)
         """
         # This method should only be used for non-outliers
         assert not event.internal_metadata.outlier
@@ -1272,7 +1276,26 @@ class FederationEventHandler:
             context.rejected = RejectedReason.AUTH_ERROR
             return context
 
-        # calculate what the auth events *should* be, to use as a basis for auth.
+        # next, check that we have all of the event's auth events.
+        #
+        # Note that this can raise AuthError, which we want to propagate to the
+        # caller rather than swallow with `context.rejected` (since we cannot be
+        # certain that there is a permanent problem with the event).
+        claimed_auth_events = await self._load_or_fetch_auth_events_for_event(
+            origin, event
+        )
+
+        # ... and check that the event passes auth at those auth events.
+        try:
+            check_auth_rules_for_event(room_version_obj, event, claimed_auth_events)
+        except AuthError as e:
+            logger.warning(
+                "While checking auth of %r against auth_events: %s", event, e
+            )
+            context.rejected = RejectedReason.AUTH_ERROR
+            return context
+
+        # now check auth against what we think the auth events *should* be.
         prev_state_ids = await context.get_prev_state_ids()
         auth_events_ids = self._event_auth_handler.compute_auth_events(
             event, prev_state_ids, for_verification=True
@@ -1472,6 +1495,9 @@ class FederationEventHandler:
         # if we have missing events, we need to fetch those events from somewhere.
         #
         # we start by checking if they are in the store, and then try calling /event_auth/.
+        #
+        # TODO: this code is now redundant, since it should be impossible for us to
+        #   get here without already having the auth events.
         if missing_auth:
             have_events = await self._store.have_seen_events(
                 event.room_id, missing_auth
@@ -1575,7 +1601,7 @@ class FederationEventHandler:
         logger.info(
             "After state res: updating auth_events with new state %s",
             {
-                (d.type, d.state_key): d.event_id
+                d
                 for d in new_state.values()
                 if auth_events.get((d.type, d.state_key)) != d
             },
@@ -1588,6 +1614,75 @@ class FederationEventHandler:
         )
 
         return context, auth_events
+
+    async def _load_or_fetch_auth_events_for_event(
+        self, destination: str, event: EventBase
+    ) -> Collection[EventBase]:
+        """Fetch this event's auth_events, from database or remote
+
+        Loads any of the auth_events that we already have from the database/cache. If
+        there are any that are missing, calls /event_auth to get the complete auth
+        chain for the event (and then attempts to load the auth_events again).
+
+        If any of the auth_events cannot be found, raises an AuthError. This can happen
+        for a number of reasons; eg: the events don't exist, or we were unable to talk
+        to `destination`, or we couldn't validate the signature on the event (which
+        in turn has multiple potential causes).
+
+        Args:
+            destination: where to send the /event_auth request. Typically the server
+               that sent us `event` in the first place.
+            event: the event whose auth_events we want
+
+        Returns:
+            all of the events in `event.auth_events`, after deduplication
+
+        Raises:
+            AuthError if we were unable to fetch the auth_events for any reason.
+        """
+        event_auth_event_ids = set(event.auth_event_ids())
+        event_auth_events = await self._store.get_events(
+            event_auth_event_ids, allow_rejected=True
+        )
+        missing_auth_event_ids = event_auth_event_ids.difference(
+            event_auth_events.keys()
+        )
+        if not missing_auth_event_ids:
+            return event_auth_events.values()
+
+        logger.info(
+            "Event %s refers to unknown auth events %s: fetching auth chain",
+            event,
+            missing_auth_event_ids,
+        )
+        try:
+            await self._get_remote_auth_chain_for_event(
+                destination, event.room_id, event.event_id
+            )
+        except Exception as e:
+            logger.warning("Failed to get auth chain for %s: %s", event, e)
+            # in this case, it's very likely we still won't have all the auth
+            # events - but we pick that up below.
+
+        # try to fetch the auth events we missed list time.
+        extra_auth_events = await self._store.get_events(
+            missing_auth_event_ids, allow_rejected=True
+        )
+        missing_auth_event_ids.difference_update(extra_auth_events.keys())
+        event_auth_events.update(extra_auth_events)
+        if not missing_auth_event_ids:
+            return event_auth_events.values()
+
+        # we still don't have all the auth events.
+        logger.warning(
+            "Missing auth events for %s: %s",
+            event,
+            shortstr(missing_auth_event_ids),
+        )
+        # the fact we can't find the auth event doesn't mean it doesn't
+        # exist, which means it is premature to store `event` as rejected.
+        # instead we raise an AuthError, which will make the caller ignore it.
+        raise AuthError(code=HTTPStatus.FORBIDDEN, msg="Auth events could not be found")
 
     async def _get_remote_auth_chain_for_event(
         self, destination: str, room_id: str, event_id: str
