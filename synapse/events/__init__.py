@@ -348,7 +348,7 @@ class EventBase(metaclass=abc.ABCMeta):
         return self.__repr__()
 
     def __repr__(self):
-        rejection = "REJECTED, " if self.rejected_reason else ""
+        rejection = f"REJECTED={self.rejected_reason}, " if self.rejected_reason else ""
 
         return (
             f"<{self.__class__.__name__} "
