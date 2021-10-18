@@ -1489,7 +1489,7 @@ def format_user_presence_state(
     The "user_id" is optional so that this function can be used to format presence
     updates for client /sync responses and for federation /send requests.
     """
-    content = {"presence": state.state}
+    content: JsonDict = {"presence": state.state}
     if include_user_id:
         content["user_id"] = state.user_id
     if state.last_active_ts:
