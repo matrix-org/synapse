@@ -44,6 +44,15 @@ instead.
 
 If the authentication is unsuccessful, the module must return `None`.
 
+If multiple modules register an auth checker for the same login type but with different
+fields, Synapse will refuse to start.
+
+If multiple modules register an auth checker for the same login type with the same fields,
+then the callbacks will be executed in order, until one returns a Matrix User ID (and
+optionally a callback). In that case, the return value of that callback will be accepted
+and subsequent callbacks will not be fired. If every callback returns `None`, then the
+authentication fails.
+
 ### `check_3pid_auth`
 
 ```python
@@ -67,7 +76,13 @@ If the authentication is successful, the module must return the user's Matrix ID
 `@alice:example.com`) and optionally a callback to be called with the response to the `/login` request.
 If the module doesn't wish to return a callback, it must return None instead.
 
-If the authentication is unsuccessful, the module must return None.
+If the authentication is unsuccessful, the module must return `None`.
+
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `None`, Synapse falls through to the next one. The value of the first
+callback that does not return `None` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback. If every callback return `None`,
+the authentication is denied.
 
 ### `on_logged_out`
 
@@ -81,6 +96,8 @@ async def on_logged_out(
 Called during a logout request for a user. It is passed the qualified user ID, the ID of the
 deactivated device (if any: access tokens are occasionally created without an associated
 device ID), and the (now deactivated) access token.
+
+If multiple modules implement this callback, Synapse runs them all in order.
 
 ## Example
 

@@ -24,6 +24,10 @@ must return a dictionary that maps from Matrix user IDs (which can be local or r
 
 Synapse will then attempt to send the specified presence updates to each user when possible.
 
+If multiple modules implement this callback, Synapse merges all the dictionaries returned
+by the callbacks. If multiple callbacks return a dictionary containing the same key,
+Synapse concatenates the sets associated with this key from each dictionary. 
+
 ### `get_interested_users`
 
 ```python
@@ -43,6 +47,12 @@ query. The returned users can be local or remote.
 
 Alternatively the callback can return `synapse.module_api.PRESENCE_ALL_USERS`
 to indicate that the user should receive updates from all known users.
+
+If multiple modules implement this callback, they will be considered in order. Synapse
+calls each callback one by one, and use a concatenation of all the `set`s returned by the
+callbacks. If one callback returns `synapse.module_api.PRESENCE_ALL_USERS`, Synapse uses
+this value instead. If this happens, Synapse does not call any of the subsequent
+implementations of this callback.
 
 ## Example
 
