@@ -914,6 +914,51 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self.hs.get_storage().persistence.persist_event(event, context)
         )
 
+    def test_local_user_leaving_room_remains_in_user_directory(self) -> None:
+        """We've chosen to simplify the user directory's implementation by
+        always including local users. Ensure this invariant is maintained when
+        a local user
+        - leaves a room, and
+        - leaves the last room they're in which is visible to this server.
+        """
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        bob = self.register_user("bob", "pass")
+        bob_token = self.login(bob, "pass")
+
+        # Alice makes two public rooms, which Bob joins.
+        room1 = self.helper.create_room_as(alice, is_public=True, tok=alice_token)
+        room2 = self.helper.create_room_as(alice, is_public=True, tok=alice_token)
+        self.helper.join(room1, bob, tok=bob_token)
+        self.helper.join(room2, bob, tok=bob_token)
+
+        # The user directory tables are updated.
+        users, in_public, in_private = self.get_success(
+            self.user_dir_helper.get_tables()
+        )
+        self.assertEqual(users, {alice, bob})
+        self.assertEqual(in_public, {(alice, room1), (alice, room2), (bob, room1), (bob, room2)})
+        self.assertEqual(in_private, set())
+
+        # Alice leaves one room. She should still be in the directory.
+        self.helper.leave(room1, alice, tok=alice_token)
+        users, in_public, in_private = self.get_success(
+            self.user_dir_helper.get_tables()
+        )
+        self.assertEqual(users, {alice, bob})
+        self.assertEqual(in_public, {(alice, room2), (bob, room1), (bob, room2)})
+        self.assertEqual(in_private, set())
+
+        # Alice leaves the other. She should still be in the directory.
+        self.helper.leave(room2, alice, tok=alice_token)
+        self.wait_for_background_updates()
+        users, in_public, in_private = self.get_success(
+            self.user_dir_helper.get_tables()
+        )
+        self.assertEqual(users, {alice, bob})
+        self.assertEqual(in_public, {(bob, room1), (bob, room2)})
+        self.assertEqual(in_private, set())
+
 
 class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
     servlets = [
