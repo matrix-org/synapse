@@ -416,6 +416,18 @@ class FederationEventHandler:
         events = await self._federation_client.backfill(
             dest, room_id, limit=limit, extremities=extremities
         )
+        logger.info(
+            "from remote server: got backfill response events=%s",
+            [
+                {
+                    "event_id": ev.event_id,
+                    "type": ev["type"],
+                    "depth": ev["depth"],
+                    "content": ev["content"].get("body", None),
+                }
+                for ev in events
+            ],
+        )
 
         if not events:
             return

@@ -14,7 +14,7 @@
 import itertools
 import logging
 from queue import Empty, PriorityQueue
-from typing import Collection, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Collection, Dict, Iterable, List, Optional, Set, OrderedDict, Tuple
 
 from prometheus_client import Counter, Gauge
 
@@ -1007,7 +1007,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
     def _get_backfill_events(self, txn, room_id, event_list, limit):
         logger.debug("_get_backfill_events: %s, %r, %s", room_id, event_list, limit)
 
-        event_results = set()
+        event_results = OrderedDict()
 
         # We want to make sure that we do a breadth-first, "depth" ordered
         # search.
@@ -1120,7 +1120,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     event_id,
                 )
 
-            event_results.add(event_id)
+            event_results[event_id] = event_id
 
             # Try and find any potential historical batches of message history.
             #
@@ -1181,7 +1181,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 if row[2] not in event_results:
                     queue.put((-row[0], -row[1], row[2]))
 
-        return event_results
+        return event_results.values()
 
     async def get_missing_events(self, room_id, earliest_events, latest_events, limit):
         ids = await self.db_pool.runInteraction(
