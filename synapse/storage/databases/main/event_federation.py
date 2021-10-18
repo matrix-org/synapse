@@ -906,7 +906,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             desc="get_latest_event_ids_in_room",
         )
 
-    async def get_min_depth(self, room_id: str) -> int:
+    async def get_min_depth(self, room_id: str) -> Optional[int]:
         """For the given room, get the minimum depth we have seen for it."""
         return await self.db_pool.runInteraction(
             "get_min_depth", self._get_min_depth_interaction, room_id
