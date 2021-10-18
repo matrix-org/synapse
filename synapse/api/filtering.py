@@ -231,24 +231,24 @@ class FilterCollection:
     def include_redundant_members(self) -> bool:
         return self._room_state_filter.include_redundant_members()
 
-    def filter_presence(self, events):
+    def filter_presence(
+        self, events: Iterable[UserPresenceState]
+    ) -> List[UserPresenceState]:
         return self._presence_filter.filter(events)
 
-    def filter_account_data(self, events):
+    def filter_account_data(self, events: Iterable[JsonDict]) -> List[JsonDict]:
         return self._account_data.filter(events)
 
-    def filter_room_state(self, events):
+    def filter_room_state(self, events: Iterable[EventBase]) -> List[EventBase]:
         return self._room_state_filter.filter(self._room_filter.filter(events))
 
-    def filter_room_timeline(self, events: Iterable[FilterEvent]) -> List[FilterEvent]:
+    def filter_room_timeline(self, events: Iterable[EventBase]) -> List[EventBase]:
         return self._room_timeline_filter.filter(self._room_filter.filter(events))
 
-    def filter_room_ephemeral(self, events: Iterable[FilterEvent]) -> List[FilterEvent]:
+    def filter_room_ephemeral(self, events: Iterable[JsonDict]) -> List[JsonDict]:
         return self._room_ephemeral_filter.filter(self._room_filter.filter(events))
 
-    def filter_room_account_data(
-        self, events: Iterable[FilterEvent]
-    ) -> List[FilterEvent]:
+    def filter_room_account_data(self, events: Iterable[JsonDict]) -> List[JsonDict]:
         return self._room_account_data.filter(self._room_filter.filter(events))
 
     def blocks_all_presence(self) -> bool:
