@@ -1,0 +1,1 @@
+Move test helpers from `tests` package to `synapse.tests` so that they can be exposed to Synapse modules for testing.
