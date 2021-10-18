@@ -309,7 +309,7 @@ class Filter:
         # except for presence which actually gets passed around as its own
         # namedtuple type.
         if isinstance(event, UserPresenceState):
-            sender = event.user_id
+            sender: Optional[str] = event.user_id
             room_id = None
             ev_type = "m.presence"
             contains_url = False
