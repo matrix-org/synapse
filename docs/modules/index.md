@@ -31,7 +31,7 @@ that appears first (i.e. is the highest in the list). This means:
 
 * If several modules register the same callback, the callback registered by the module
   that appears first is used.
-* If several modules try register a handler for the same HTTP path, only the handler
+* If several modules try to register a handler for the same HTTP path, only the handler
   registered by the module that appears first is used. Handlers registered by the other
   module(s) are ignored and Synapse will log a warning message about them.
 
