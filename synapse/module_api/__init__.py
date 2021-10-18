@@ -45,6 +45,7 @@ from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.rest.client.login import LoginResponse
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
@@ -83,6 +84,8 @@ __all__ = [
     "DirectServeJsonResource",
     "ModuleApi",
     "PRESENCE_ALL_USERS",
+    "LoginResponse",
+    "JsonDict",
 ]
 
 logger = logging.getLogger(__name__)
@@ -139,6 +142,7 @@ class ModuleApi:
         self._spam_checker = hs.get_spam_checker()
         self._account_validity_handler = hs.get_account_validity_handler()
         self._third_party_event_rules = hs.get_third_party_event_rules()
+        self._password_auth_provider = hs.get_password_auth_provider()
         self._presence_router = hs.get_presence_router()
 
     #################################################################################
@@ -163,6 +167,11 @@ class ModuleApi:
     def register_presence_router_callbacks(self):
         """Registers callbacks for presence router capabilities."""
         return self._presence_router.register_presence_router_callbacks
+
+    @property
+    def register_password_auth_provider_callbacks(self):
+        """Registers callbacks for password auth provider capabilities."""
+        return self._password_auth_provider.register_password_auth_provider_callbacks
 
     def register_web_resource(self, path: str, resource: IResource):
         """Registers a web resource to be served at the given path.
@@ -773,9 +782,9 @@ class ModuleApi:
             # Sanitize some of the data. We don't want to return tokens.
             return [
                 UserIpAndAgent(
-                    ip=str(data["ip"]),
-                    user_agent=str(data["user_agent"]),
-                    last_seen=int(data["last_seen"]),
+                    ip=data["ip"],
+                    user_agent=data["user_agent"],
+                    last_seen=data["last_seen"],
                 )
                 for data in raw_data
             ]

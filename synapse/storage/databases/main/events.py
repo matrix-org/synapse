@@ -2069,12 +2069,14 @@ class PersistEventsStore:
 
             state_groups[event.event_id] = context.state_group
 
-        self.db_pool.simple_insert_many_txn(
+        self.db_pool.simple_upsert_many_txn(
             txn,
             table="event_to_state_groups",
-            values=[
-                {"state_group": state_group_id, "event_id": event_id}
-                for event_id, state_group_id in state_groups.items()
+            key_names=["event_id"],
+            key_values=[[event_id] for event_id, _ in state_groups.items()],
+            value_names=["state_group"],
+            value_values=[
+                [state_group_id] for _, state_group_id in state_groups.items()
             ],
         )
 

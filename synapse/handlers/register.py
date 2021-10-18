@@ -41,8 +41,6 @@ from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, UserID, create_requester
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -85,9 +83,10 @@ class LoginDict(TypedDict):
     refresh_token: Optional[str]
 
 
-class RegistrationHandler(BaseHandler):
+class RegistrationHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
+        self.clock = hs.get_clock()
         self.hs = hs
         self.auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
@@ -515,7 +514,7 @@ class RegistrationHandler(BaseHandler):
                 # we don't have a local user in the room to craft up an invite with.
                 requires_invite = await self.store.is_host_joined(
                     room_id,
-                    self.server_name,
+                    self._server_name,
                 )
 
                 if requires_invite:

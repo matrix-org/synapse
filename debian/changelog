@@ -1,9 +1,18 @@
-matrix-synapse-py3 (1.44.0~rc2+nmu1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (1.45.0~rc2) stable; urgency=medium
+
+  * New synapse release 1.45.0~rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 14 Oct 2021 10:58:24 +0100
+
+matrix-synapse-py3 (1.45.0~rc1) stable; urgency=medium
 
   [ Nick @ Beeper ]
   * Include an `update_synapse_database` script in the distribution.
 
- -- root <root@f7b8a71098d3>  Mon, 04 Oct 2021 13:29:26 +0000
+  [ Synapse Packaging team ]
+  * New synapse release 1.45.0~rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 12 Oct 2021 10:46:27 +0100
 
 matrix-synapse-py3 (1.44.0) stable; urgency=medium
 
