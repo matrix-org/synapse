@@ -940,7 +940,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self.user_dir_helper.get_tables()
         )
         self.assertEqual(users, {alice, bob})
-        self.assertEqual(in_public, {(alice, room1), (alice, room2), (bob, room1), (bob, room2)})
+        self.assertEqual(
+            in_public, {(alice, room1), (alice, room2), (bob, room1), (bob, room2)}
+        )
         self.assertEqual(in_private, set())
 
         # Alice leaves one room. She should still be in the directory.
