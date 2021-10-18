@@ -920,6 +920,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         a local user
         - leaves a room, and
         - leaves the last room they're in which is visible to this server.
+
+        This is user-visible if the "search_all_users" config option is on: the
+        local user who left a room would no longer be searchable if this test fails!
         """
         alice = self.register_user("alice", "pass")
         alice_token = self.login(alice, "pass")
