@@ -24,8 +24,8 @@ cause the current operation to fail (e.g. if a callback checking an event return
 value that should cause the event to be denied), Synapse will fail the operation and
 ignore any subsequent callbacks that should have been run after this one.
 
-The documentation for each callback mentions Synapse's behaviour if multiple modules
-implement it.
+The documentation for each callback mentions how Synapse behaves when
+multiple modules implement it.
 
 ## Handling the module's configuration
 
