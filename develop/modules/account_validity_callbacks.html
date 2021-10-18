@@ -198,12 +198,17 @@ represented by their Matrix user ID (e.g. <code>@alice:example.com</code>).</p>
 <p>If the module returns <code>True</code>, the current request will be denied with the error code
 <code>ORG_MATRIX_EXPIRED_ACCOUNT</code> and the HTTP status code 403. Note that this doesn't
 invalidate the user's access token.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>None</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>None</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="on_user_registration"><a class="header" href="#on_user_registration"><code>on_user_registration</code></a></h3>
 <pre><code class="language-python">async def on_user_registration(user: str) -&gt; None
 </code></pre>
 <p>Called after successfully registering a user, in case the module needs to perform extra
 operations to keep track of them. (e.g. add them to a database table). The user is
 represented by their Matrix user ID.</p>
+<p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 
                     </main>
 

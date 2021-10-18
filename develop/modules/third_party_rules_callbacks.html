@@ -216,6 +216,10 @@ that, it is recommended the module calls <code>event.get_dict()</code> to get th
 dictionary, and modify the returned dictionary accordingly.</p>
 <p>Note that replacing the event only works for events sent by local users, not for events
 received over federation.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="on_create_room"><a class="header" href="#on_create_room"><code>on_create_room</code></a></h3>
 <pre><code class="language-python">async def on_create_room(
     requester: &quot;synapse.types.Requester&quot;,
@@ -230,6 +234,11 @@ for a list of possible parameters), and a boolean indicating whether the user pe
 the request is a server admin.</p>
 <p>Modules can modify the <code>request_content</code> (by e.g. adding events to its <code>initial_state</code>),
 or deny the room's creation by raising a <code>module_api.errors.SynapseError</code>.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns without raising an exception, Synapse falls through to the next one. The
+room creation will be forbidden as soon as one of the callbacks raises an exception. If
+this happens, Synapse will not call any of the subsequent implementations of this
+callback.</p>
 <h3 id="check_threepid_can_be_invited"><a class="header" href="#check_threepid_can_be_invited"><code>check_threepid_can_be_invited</code></a></h3>
 <pre><code class="language-python">async def check_threepid_can_be_invited(
     medium: str,
@@ -239,6 +248,10 @@ or deny the room's creation by raising a <code>module_api.errors.SynapseError</c
 </code></pre>
 <p>Called when processing an invite via a third-party identifier (i.e. email or phone number).
 The module must return a boolean indicating whether the invite can go through.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="check_visibility_can_be_modified"><a class="header" href="#check_visibility_can_be_modified"><code>check_visibility_can_be_modified</code></a></h3>
 <pre><code class="language-python">async def check_visibility_can_be_modified(
     room_id: str,
@@ -249,6 +262,10 @@ The module must return a boolean indicating whether the invite can go through.</
 <p>Called when changing the visibility of a room in the local public room directory. The
 visibility is a string that's either &quot;public&quot; or &quot;private&quot;. The module must return a
 boolean indicating whether the change can go through.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h2 id="example"><a class="header" href="#example">Example</a></h2>
 <p>The example below is a module that implements the third-party rules callback
 <code>check_event_allowed</code> to censor incoming messages as dictated by a third-party service.</p>

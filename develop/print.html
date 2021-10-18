@@ -7634,6 +7634,10 @@ operating system, the server admin needs to run <code>VACUUM FULL;</code> (or
 <a href="https://www.postgresql.org/docs/current/sql-vacuum.html">PostgreSQL documentation</a>).</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="modules"><a class="header" href="#modules">Modules</a></h1>
 <p>Synapse supports extending its functionality by configuring external modules.</p>
+<p><strong>Note</strong>: When using third-party modules, you effectively allow someone else to run
+custom code on your Synapse homeserver. Server admins are encouraged to verify the
+provenance of the modules they use on their homeserver and make sure the modules aren't
+running malicious code on their instance.</p>
 <h2 id="using-modules"><a class="header" href="#using-modules">Using modules</a></h2>
 <p>To use a module on Synapse, add it to the <code>modules</code> section of the configuration file:</p>
 <pre><code class="language-yaml">modules:
@@ -7645,18 +7649,30 @@ operating system, the server admin needs to run <code>VACUUM FULL;</code> (or
 </code></pre>
 <p>Each module is defined by a path to a Python class as well as a configuration. This
 information for a given module should be available in the module's own documentation.</p>
-<p><strong>Note</strong>: When using third-party modules, you effectively allow someone else to run
-custom code on your Synapse homeserver. Server admins are encouraged to verify the
-provenance of the modules they use on their homeserver and make sure the modules aren't
-running malicious code on their instance.</p>
-<p>Also note that we are currently in the process of migrating module interfaces to this
-system. While some interfaces might be compatible with it, others still require
-configuring modules in another part of Synapse's configuration file.</p>
+<h2 id="using-multiple-modules"><a class="header" href="#using-multiple-modules">Using multiple modules</a></h2>
+<p>The order in which modules are listed in this section is important. When processing an
+action that can be handled by several modules, Synapse will always prioritise the module
+that appears first (i.e. is the highest in the list). This means:</p>
+<ul>
+<li>If several modules register the same callback, the callback registered by the module
+that appears first is used.</li>
+<li>If several modules try to register a handler for the same HTTP path, only the handler
+registered by the module that appears first is used. Handlers registered by the other
+module(s) are ignored and Synapse will log a warning message about them.</li>
+</ul>
+<p>Note that Synapse doesn't allow multiple modules implementing authentication checkers via
+the password auth provider feature for the same login type with different fields. If this
+happens, Synapse will refuse to start.</p>
+<h2 id="current-status"><a class="header" href="#current-status">Current status</a></h2>
+<p>We are currently in the process of migrating module interfaces to this system. While some
+interfaces might be compatible with it, others still require configuring modules in
+another part of Synapse's configuration file.</p>
 <p>Currently, only the following pre-existing interfaces are compatible with this new system:</p>
 <ul>
 <li>spam checker</li>
 <li>third-party rules</li>
 <li>presence router</li>
+<li>password auth providers</li>
 </ul>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="writing-a-module"><a class="header" href="#writing-a-module">Writing a module</a></h1>
 <p>A module is a Python class that uses Synapse's module API to interact with the
@@ -7668,6 +7684,17 @@ either the output of the module's <code>parse_config</code> static method (see b
 configuration associated with the module in Synapse's configuration file.</p>
 <p>See the documentation for the <code>ModuleApi</code> class
 <a href="https://github.com/matrix-org/synapse/blob/master/synapse/module_api/__init__.py">here</a>.</p>
+<h2 id="when-synapse-runs-with-several-modules-configured"><a class="header" href="#when-synapse-runs-with-several-modules-configured">When Synapse runs with several modules configured</a></h2>
+<p>If Synapse is running with other modules configured, the order each module appears in
+within the <code>modules</code> section of the Synapse configuration file might restrict what it can
+or cannot register. See <a href="modules/index.html#using-multiple-modules">this section</a> for more
+information.</p>
+<p>On top of the rules listed in the link above, if a callback returns a value that should
+cause the current operation to fail (e.g. if a callback checking an event returns with a
+value that should cause the event to be denied), Synapse will fail the operation and
+ignore any subsequent callbacks that should have been run after this one.</p>
+<p>The documentation for each callback mentions how Synapse behaves when
+multiple modules implement it.</p>
 <h2 id="handling-the-modules-configuration"><a class="header" href="#handling-the-modules-configuration">Handling the module's configuration</a></h2>
 <p>A module can implement the following static method:</p>
 <pre><code class="language-python">@staticmethod
@@ -7721,6 +7748,10 @@ Synapse instances. Spam checker callbacks can be registered using the module API
 either a <code>bool</code> to indicate whether the event must be rejected because of spam, or a <code>str</code>
 to indicate the event must be rejected because of spam and to give a rejection reason to
 forward to clients.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>False</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>False</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_join_room"><a class="header" href="#user_may_join_room"><code>user_may_join_room</code></a></h3>
 <pre><code class="language-python">async def user_may_join_room(user: str, room: str, is_invited: bool) -&gt; bool
 </code></pre>
@@ -7731,12 +7762,20 @@ whether the user can join the room. The user is represented by their Matrix user
 currently has a pending invite in the room.</p>
 <p>This callback isn't called if the join is performed by a server administrator, or in the
 context of a room creation.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_invite"><a class="header" href="#user_may_invite"><code>user_may_invite</code></a></h3>
 <pre><code class="language-python">async def user_may_invite(inviter: str, invitee: str, room_id: str) -&gt; bool
 </code></pre>
 <p>Called when processing an invitation. The module must return a <code>bool</code> indicating whether
 the inviter can invite the invitee to the given room. Both inviter and invitee are
 represented by their Matrix user ID (e.g. <code>@alice:example.com</code>).</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_send_3pid_invite"><a class="header" href="#user_may_send_3pid_invite"><code>user_may_send_3pid_invite</code></a></h3>
 <pre><code class="language-python">async def user_may_send_3pid_invite(
     inviter: str,
@@ -7763,11 +7802,19 @@ for more information regarding third-party identifiers.</p>
 </code></pre>
 <p><strong>Note</strong>: If the third-party identifier is already associated with a matrix user ID,
 <a href="modules/spam_checker_callbacks.html#user_may_invite"><code>user_may_invite</code></a> will be used instead.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_create_room"><a class="header" href="#user_may_create_room"><code>user_may_create_room</code></a></h3>
 <pre><code class="language-python">async def user_may_create_room(user: str) -&gt; bool
 </code></pre>
 <p>Called when processing a room creation request. The module must return a <code>bool</code> indicating
 whether the given user (represented by their Matrix user ID) is allowed to create a room.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_create_room_with_invites"><a class="header" href="#user_may_create_room_with_invites"><code>user_may_create_room_with_invites</code></a></h3>
 <pre><code class="language-python">async def user_may_create_room_with_invites(
     user: str,
@@ -7789,18 +7836,30 @@ corresponding list(s) will be empty.</p>
 <p><strong>Note</strong>: This callback is not called when a room is cloned (e.g. during a room upgrade)
 since no invites are sent when cloning a room. To cover this case, modules also need to
 implement <code>user_may_create_room</code>.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_create_room_alias"><a class="header" href="#user_may_create_room_alias"><code>user_may_create_room_alias</code></a></h3>
 <pre><code class="language-python">async def user_may_create_room_alias(user: str, room_alias: &quot;synapse.types.RoomAlias&quot;) -&gt; bool
 </code></pre>
 <p>Called when trying to associate an alias with an existing room. The module must return a
 <code>bool</code> indicating whether the given user (represented by their Matrix user ID) is allowed
 to set the given alias.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_publish_room"><a class="header" href="#user_may_publish_room"><code>user_may_publish_room</code></a></h3>
 <pre><code class="language-python">async def user_may_publish_room(user: str, room_id: str) -&gt; bool
 </code></pre>
 <p>Called when trying to publish a room to the homeserver's public rooms directory. The
 module must return a <code>bool</code> indicating whether the given user (represented by their
 Matrix user ID) is allowed to publish the given room.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="check_username_for_spam"><a class="header" href="#check_username_for_spam"><code>check_username_for_spam</code></a></h3>
 <pre><code class="language-python">async def check_username_for_spam(user_profile: Dict[str, str]) -&gt; bool
 </code></pre>
@@ -7814,6 +7873,10 @@ is represented as a dictionary with the following keys:</p>
 </ul>
 <p>The module is given a copy of the original dictionary, so modifying it from within the
 module cannot modify a user's profile when included in user directory search results.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>False</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>False</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="check_registration_for_spam"><a class="header" href="#check_registration_for_spam"><code>check_registration_for_spam</code></a></h3>
 <pre><code class="language-python">async def check_registration_for_spam(
     email_threepid: Optional[dict],
@@ -7835,6 +7898,11 @@ second item is an IP address. These user agents and IP addresses are the ones th
 used during the registration process.</li>
 <li><code>auth_provider_id</code>: The identifier of the SSO authentication provider, if any.</li>
 </ul>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>RegistrationBehaviour.ALLOW</code>, Synapse falls through to the next one.
+The value of the first callback that does not return <code>RegistrationBehaviour.ALLOW</code> will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.</p>
 <h3 id="check_media_file_for_spam"><a class="header" href="#check_media_file_for_spam"><code>check_media_file_for_spam</code></a></h3>
 <pre><code class="language-python">async def check_media_file_for_spam(
     file_wrapper: &quot;synapse.rest.media.v1.media_storage.ReadableFileWrapper&quot;,
@@ -7843,6 +7911,10 @@ used during the registration process.</li>
 </code></pre>
 <p>Called when storing a local or remote file. The module must return a boolean indicating
 whether the given file can be stored in the homeserver's media store.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>False</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>False</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h2 id="example"><a class="header" href="#example">Example</a></h2>
 <p>The example below is a module that implements the spam checker callback
 <code>check_event_for_spam</code> to deny any message sent by users whose Matrix user IDs are
@@ -7920,6 +7992,10 @@ that, it is recommended the module calls <code>event.get_dict()</code> to get th
 dictionary, and modify the returned dictionary accordingly.</p>
 <p>Note that replacing the event only works for events sent by local users, not for events
 received over federation.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="on_create_room"><a class="header" href="#on_create_room"><code>on_create_room</code></a></h3>
 <pre><code class="language-python">async def on_create_room(
     requester: &quot;synapse.types.Requester&quot;,
@@ -7934,6 +8010,11 @@ for a list of possible parameters), and a boolean indicating whether the user pe
 the request is a server admin.</p>
 <p>Modules can modify the <code>request_content</code> (by e.g. adding events to its <code>initial_state</code>),
 or deny the room's creation by raising a <code>module_api.errors.SynapseError</code>.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns without raising an exception, Synapse falls through to the next one. The
+room creation will be forbidden as soon as one of the callbacks raises an exception. If
+this happens, Synapse will not call any of the subsequent implementations of this
+callback.</p>
 <h3 id="check_threepid_can_be_invited"><a class="header" href="#check_threepid_can_be_invited"><code>check_threepid_can_be_invited</code></a></h3>
 <pre><code class="language-python">async def check_threepid_can_be_invited(
     medium: str,
@@ -7943,6 +8024,10 @@ or deny the room's creation by raising a <code>module_api.errors.SynapseError</c
 </code></pre>
 <p>Called when processing an invite via a third-party identifier (i.e. email or phone number).
 The module must return a boolean indicating whether the invite can go through.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="check_visibility_can_be_modified"><a class="header" href="#check_visibility_can_be_modified"><code>check_visibility_can_be_modified</code></a></h3>
 <pre><code class="language-python">async def check_visibility_can_be_modified(
     room_id: str,
@@ -7953,6 +8038,10 @@ The module must return a boolean indicating whether the invite can go through.</
 <p>Called when changing the visibility of a room in the local public room directory. The
 visibility is a string that's either &quot;public&quot; or &quot;private&quot;. The module must return a
 boolean indicating whether the change can go through.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h2 id="example-1"><a class="header" href="#example-1">Example</a></h2>
 <p>The example below is a module that implements the third-party rules callback
 <code>check_event_allowed</code> to censor incoming messages as dictated by a third-party service.</p>
@@ -8000,6 +8089,9 @@ be used to instruct the server to forward that presence state to specific users.
 must return a dictionary that maps from Matrix user IDs (which can be local or remote) to the
 <code>UserPresenceState</code> changes that they should be forwarded.</p>
 <p>Synapse will then attempt to send the specified presence updates to each user when possible.</p>
+<p>If multiple modules implement this callback, Synapse merges all the dictionaries returned
+by the callbacks. If multiple callbacks return a dictionary containing the same key,
+Synapse concatenates the sets associated with this key from each dictionary. </p>
 <h3 id="get_interested_users"><a class="header" href="#get_interested_users"><code>get_interested_users</code></a></h3>
 <pre><code class="language-python">async def get_interested_users(
     user_id: str
@@ -8014,6 +8106,11 @@ should return the Matrix user IDs of the users whose presence state they are all
 query. The returned users can be local or remote. </p>
 <p>Alternatively the callback can return <code>synapse.module_api.PRESENCE_ALL_USERS</code>
 to indicate that the user should receive updates from all known users.</p>
+<p>If multiple modules implement this callback, they will be considered in order. Synapse
+calls each callback one by one, and use a concatenation of all the <code>set</code>s returned by the
+callbacks. If one callback returns <code>synapse.module_api.PRESENCE_ALL_USERS</code>, Synapse uses
+this value instead. If this happens, Synapse does not call any of the subsequent
+implementations of this callback.</p>
 <h2 id="example-2"><a class="header" href="#example-2">Example</a></h2>
 <p>The example below is a module that implements both presence router callbacks, and ensures
 that <code>@alice:example.org</code> receives all presence updates from <code>@bob:example.com</code> and
@@ -8071,12 +8168,17 @@ represented by their Matrix user ID (e.g. <code>@alice:example.com</code>).</p>
 <p>If the module returns <code>True</code>, the current request will be denied with the error code
 <code>ORG_MATRIX_EXPIRED_ACCOUNT</code> and the HTTP status code 403. Note that this doesn't
 invalidate the user's access token.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>None</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>None</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="on_user_registration"><a class="header" href="#on_user_registration"><code>on_user_registration</code></a></h3>
 <pre><code class="language-python">async def on_user_registration(user: str) -&gt; None
 </code></pre>
 <p>Called after successfully registering a user, in case the module needs to perform extra
 operations to keep track of them. (e.g. add them to a database table). The user is
 represented by their Matrix user ID.</p>
+<p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="password-auth-provider-callbacks"><a class="header" href="#password-auth-provider-callbacks">Password auth provider callbacks</a></h1>
 <p>Password auth providers offer a way for server administrators to integrate
 their Synapse installation with an external authentication system. The callbacks can be
@@ -8110,6 +8212,13 @@ the client.</p>
 <code>/login</code> request. If the module doesn't wish to return a callback, it must return <code>None</code>
 instead.</p>
 <p>If the authentication is unsuccessful, the module must return <code>None</code>.</p>
+<p>If multiple modules register an auth checker for the same login type but with different
+fields, Synapse will refuse to start.</p>
+<p>If multiple modules register an auth checker for the same login type with the same fields,
+then the callbacks will be executed in order, until one returns a Matrix User ID (and
+optionally a callback). In that case, the return value of that callback will be accepted
+and subsequent callbacks will not be fired. If every callback returns <code>None</code>, then the
+authentication fails.</p>
 <h3 id="check_3pid_auth"><a class="header" href="#check_3pid_auth"><code>check_3pid_auth</code></a></h3>
 <pre><code class="language-python">async def check_3pid_auth(
     medium: str, 
@@ -8128,7 +8237,12 @@ and the user's password.</p>
 <p>If the authentication is successful, the module must return the user's Matrix ID (e.g. 
 <code>@alice:example.com</code>) and optionally a callback to be called with the response to the <code>/login</code> request.
 If the module doesn't wish to return a callback, it must return None instead.</p>
-<p>If the authentication is unsuccessful, the module must return None.</p>
+<p>If the authentication is unsuccessful, the module must return <code>None</code>.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>None</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>None</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback. If every callback return <code>None</code>,
+the authentication is denied.</p>
 <h3 id="on_logged_out"><a class="header" href="#on_logged_out"><code>on_logged_out</code></a></h3>
 <pre><code class="language-python">async def on_logged_out(
     user_id: str,
@@ -8139,6 +8253,7 @@ If the module doesn't wish to return a callback, it must return None instead.</p
 <p>Called during a logout request for a user. It is passed the qualified user ID, the ID of the
 deactivated device (if any: access tokens are occasionally created without an associated
 device ID), and the (now deactivated) access token.</p>
+<p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 <h2 id="example-3"><a class="header" href="#example-3">Example</a></h2>
 <p>The example module below implements authentication checkers for two different login types: </p>
 <ul>

@@ -199,6 +199,9 @@ be used to instruct the server to forward that presence state to specific users.
 must return a dictionary that maps from Matrix user IDs (which can be local or remote) to the
 <code>UserPresenceState</code> changes that they should be forwarded.</p>
 <p>Synapse will then attempt to send the specified presence updates to each user when possible.</p>
+<p>If multiple modules implement this callback, Synapse merges all the dictionaries returned
+by the callbacks. If multiple callbacks return a dictionary containing the same key,
+Synapse concatenates the sets associated with this key from each dictionary. </p>
 <h3 id="get_interested_users"><a class="header" href="#get_interested_users"><code>get_interested_users</code></a></h3>
 <pre><code class="language-python">async def get_interested_users(
     user_id: str
@@ -213,6 +216,11 @@ should return the Matrix user IDs of the users whose presence state they are all
 query. The returned users can be local or remote. </p>
 <p>Alternatively the callback can return <code>synapse.module_api.PRESENCE_ALL_USERS</code>
 to indicate that the user should receive updates from all known users.</p>
+<p>If multiple modules implement this callback, they will be considered in order. Synapse
+calls each callback one by one, and use a concatenation of all the <code>set</code>s returned by the
+callbacks. If one callback returns <code>synapse.module_api.PRESENCE_ALL_USERS</code>, Synapse uses
+this value instead. If this happens, Synapse does not call any of the subsequent
+implementations of this callback.</p>
 <h2 id="example"><a class="header" href="#example">Example</a></h2>
 <p>The example below is a module that implements both presence router callbacks, and ensures
 that <code>@alice:example.org</code> receives all presence updates from <code>@bob:example.com</code> and

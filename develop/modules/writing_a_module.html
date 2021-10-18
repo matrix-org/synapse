@@ -192,6 +192,17 @@ either the output of the module's <code>parse_config</code> static method (see b
 configuration associated with the module in Synapse's configuration file.</p>
 <p>See the documentation for the <code>ModuleApi</code> class
 <a href="https://github.com/matrix-org/synapse/blob/master/synapse/module_api/__init__.py">here</a>.</p>
+<h2 id="when-synapse-runs-with-several-modules-configured"><a class="header" href="#when-synapse-runs-with-several-modules-configured">When Synapse runs with several modules configured</a></h2>
+<p>If Synapse is running with other modules configured, the order each module appears in
+within the <code>modules</code> section of the Synapse configuration file might restrict what it can
+or cannot register. See <a href="index.html#using-multiple-modules">this section</a> for more
+information.</p>
+<p>On top of the rules listed in the link above, if a callback returns a value that should
+cause the current operation to fail (e.g. if a callback checking an event returns with a
+value that should cause the event to be denied), Synapse will fail the operation and
+ignore any subsequent callbacks that should have been run after this one.</p>
+<p>The documentation for each callback mentions how Synapse behaves when
+multiple modules implement it.</p>
 <h2 id="handling-the-modules-configuration"><a class="header" href="#handling-the-modules-configuration">Handling the module's configuration</a></h2>
 <p>A module can implement the following static method:</p>
 <pre><code class="language-python">@staticmethod
