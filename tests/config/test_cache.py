@@ -20,10 +20,12 @@ from tests.unittest import TestCase
 
 class CacheConfigTests(TestCase):
     def setUp(self):
-        # Reset caches before each test
+        # Reset caches before each test since there's global state involved.
         self.config = CacheConfig()
+        self.config.reset()
 
     def tearDown(self):
+        # Also reset the caches after each test to leave state pristine.
         self.config.reset()
 
     def test_individual_caches_from_environ(self):

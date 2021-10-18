@@ -892,7 +892,7 @@ def safe_text(raw_text: str) -> jinja2.Markup:
         A Markup object ready to safely use in a Jinja template.
     """
     return jinja2.Markup(
-        bleach.linkify(bleach.clean(raw_text, tags=[], attributes={}, strip=False))
+        bleach.linkify(bleach.clean(raw_text, tags=[], attributes=[], strip=False))
     )
 
 

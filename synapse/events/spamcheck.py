@@ -77,7 +77,7 @@ CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK = Callable[
 ]
 
 
-def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
+def load_legacy_spam_checkers(hs: "synapse.server.HomeServer") -> None:
     """Wrapper that loads spam checkers configured using the old configuration, and
     registers the spam checker hooks they implement.
     """
@@ -129,9 +129,9 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
                         request_info: Collection[Tuple[str, str]],
                         auth_provider_id: Optional[str],
                     ) -> Union[Awaitable[RegistrationBehaviour], RegistrationBehaviour]:
-                        # We've already made sure f is not None above, but mypy doesn't
-                        # do well across function boundaries so we need to tell it f is
-                        # definitely not None.
+                        # Assertion required because mypy can't prove we won't
+                        # change `f` back to `None`. See
+                        # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
                         assert f is not None
 
                         return f(
@@ -146,9 +146,10 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
                         "Bad signature for callback check_registration_for_spam",
                     )
 
-            def run(*args, **kwargs):
-                # mypy doesn't do well across function boundaries so we need to tell it
-                # wrapped_func is definitely not None.
+            def run(*args: Any, **kwargs: Any) -> Awaitable:
+                # Assertion required because mypy can't prove we won't change `f`
+                # back to `None`. See
+                # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
                 assert wrapped_func is not None
 
                 return maybe_awaitable(wrapped_func(*args, **kwargs))
@@ -165,7 +166,7 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
 
 
 class SpamChecker:
-    def __init__(self):
+    def __init__(self) -> None:
         self._check_event_for_spam_callbacks: List[CHECK_EVENT_FOR_SPAM_CALLBACK] = []
         self._user_may_join_room_callbacks: List[USER_MAY_JOIN_ROOM_CALLBACK] = []
         self._user_may_invite_callbacks: List[USER_MAY_INVITE_CALLBACK] = []
@@ -209,7 +210,7 @@ class SpamChecker:
             CHECK_REGISTRATION_FOR_SPAM_CALLBACK
         ] = None,
         check_media_file_for_spam: Optional[CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK] = None,
-    ):
+    ) -> None:
         """Register callbacks from module for each hook."""
         if check_event_for_spam is not None:
             self._check_event_for_spam_callbacks.append(check_event_for_spam)
@@ -275,7 +276,9 @@ class SpamChecker:
 
         return False
 
-    async def user_may_join_room(self, user_id: str, room_id: str, is_invited: bool):
+    async def user_may_join_room(
+        self, user_id: str, room_id: str, is_invited: bool
+    ) -> bool:
         """Checks if a given users is allowed to join a room.
         Not called when a user creates a room.
 
@@ -285,7 +288,7 @@ class SpamChecker:
             is_invited: Whether the user is invited into the room
 
         Returns:
-            bool: Whether the user may join the room
+            Whether the user may join the room
         """
         for callback in self._user_may_join_room_callbacks:
             if await callback(user_id, room_id, is_invited) is False:

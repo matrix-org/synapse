@@ -807,6 +807,14 @@ def trace(func=None, opname=None):
                         result.addCallbacks(call_back, err_back)
 
                     else:
+                        if inspect.isawaitable(result):
+                            logger.error(
+                                "@trace may not have wrapped %s correctly! "
+                                "The function is not async but returned a %s.",
+                                func.__qualname__,
+                                type(result).__name__,
+                            )
+
                         scope.__exit__(None, None, None)
 
                     return result
