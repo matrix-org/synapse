@@ -46,6 +46,7 @@ from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client.login import LoginResponse
+from synapse.storage import DataStore
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
@@ -61,6 +62,7 @@ from synapse.util import Clock
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
+    from synapse.app.generic_worker import GenericWorkerSlavedStore
     from synapse.server import HomeServer
 
 """
@@ -111,7 +113,9 @@ class ModuleApi:
     def __init__(self, hs: "HomeServer", auth_handler):
         self._hs = hs
 
-        self._store = hs.get_datastore()
+        # TODO: Fix this type hint once the types for the data stores have been ironed
+        #       out.
+        self._store: Union[DataStore, "GenericWorkerSlavedStore"] = hs.get_datastore()
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
