@@ -12,8 +12,8 @@ if [ -f $PID_FILE ]; then
 fi
 
 for port in 8080 8081 8082; do
-    rm -rf $DIR/$port
+    rm -rf ${DIR:?}/$port
     rm -rf $DIR/media_store.$port
 done
 
-rm -rf $DIR/etc
+rm -rf ${DIR:?}/etc
