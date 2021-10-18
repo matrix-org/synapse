@@ -4,7 +4,7 @@ DIR="$( cd "$( dirname "$0" )" && pwd )"
 
 CWD=$(pwd)
 
-cd "$DIR/.."
+cd "$DIR/.." || exit
 
 mkdir -p demo/etc
 
@@ -18,7 +18,7 @@ for port in 8080 8081 8082; do
 
     https_port=$((port + 400))
     mkdir -p demo/$port
-    pushd demo/$port
+    pushd demo/$port || exit
 
     #rm $DIR/etc/$port.config
     python3 -m synapse.app.homeserver \
@@ -152,7 +152,7 @@ for port in 8080 8081 8082; do
         --config-path "$DIR/etc/$port.config" \
         -D \
 
-    popd
+    popd || exit
 done
 
-cd "$CWD"
+cd "$CWD" || exit
