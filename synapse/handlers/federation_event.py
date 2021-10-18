@@ -1203,7 +1203,7 @@ class FederationEventHandler:
 
         def prep(event: EventBase) -> Optional[Tuple[EventBase, EventContext]]:
             with nested_logging_context(suffix=event.event_id):
-                auth = {}
+                auth = []
                 for auth_event_id in event.auth_event_ids():
                     ae = persisted_events.get(auth_event_id)
                     if not ae:
@@ -1216,7 +1216,7 @@ class FederationEventHandler:
                         # exist, which means it is premature to reject `event`. Instead we
                         # just ignore it for now.
                         return None
-                    auth[(ae.type, ae.state_key)] = ae
+                    auth.append(ae)
 
                 context = EventContext.for_outlier()
                 try:
@@ -1305,7 +1305,9 @@ class FederationEventHandler:
             auth_events_for_auth = calculated_auth_event_map
 
         try:
-            check_auth_rules_for_event(room_version_obj, event, auth_events_for_auth)
+            check_auth_rules_for_event(
+                room_version_obj, event, auth_events_for_auth.values()
+            )
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR
@@ -1403,11 +1405,9 @@ class FederationEventHandler:
         current_state_ids_list = [
             e for k, e in current_state_ids.items() if k in auth_types
         ]
-
-        auth_events_map = await self._store.get_events(current_state_ids_list)
-        current_auth_events = {
-            (e.type, e.state_key): e for e in auth_events_map.values()
-        }
+        current_auth_events = await self._store.get_events_as_list(
+            current_state_ids_list
+        )
 
         try:
             check_auth_rules_for_event(room_version_obj, event, current_auth_events)
