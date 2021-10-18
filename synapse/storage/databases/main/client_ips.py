@@ -481,7 +481,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
     async def get_user_ip_and_agents(
         self, user: UserID, since_ts: int = 0
     ) -> List[LastConnectionInfo]:
-        """Fetch the IPs and user agents for a user since a given timestamp.
+        """Fetch the IPs and user agents for a user since the given timestamp.
 
         The result might be slightly out of date as client IPs are inserted in batches.
 
@@ -674,7 +674,7 @@ class ClientIpStore(ClientIpWorkerStore, MonthlyActiveUsersStore):
     async def get_user_ip_and_agents(
         self, user: UserID, since_ts: int = 0
     ) -> List[LastConnectionInfo]:
-        """Fetch the IPs and user agents for a user since a given timestamp.
+        """Fetch the IPs and user agents for a user since the given timestamp.
 
         Args:
             user: The user for which to fetch IP addresses and user agents.
