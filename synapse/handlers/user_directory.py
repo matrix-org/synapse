@@ -266,14 +266,17 @@ class UserDirectoryHandler(StateDeltasHandler):
         for user_id in users_in_room:
             await self.store.remove_user_who_share_room(user_id, room_id)
 
-        # Then, re-add them to the tables.
+        # Then, re-add all remote users and some local users to the tables.
         # NOTE: this is not the most efficient method, as _track_user_joined_room sets
         # up local_user -> other_user and other_user_whos_local -> local_user,
         # which when ran over an entire room, will result in the same values
         # being added multiple times. The batching upserts shouldn't make this
         # too bad, though.
         for user_id in users_in_room:
-            await self._track_user_joined_room(room_id, user_id)
+            if not self.is_mine_id(
+                user_id
+            ) or await self.store.should_include_local_user_in_dir(user_id):
+                await self._track_user_joined_room(room_id, user_id)
 
     async def _handle_room_membership_event(
         self,
@@ -364,8 +367,8 @@ class UserDirectoryHandler(StateDeltasHandler):
         """Someone's just joined a room. Update `users_in_public_rooms` or
         `users_who_share_private_rooms` as appropriate.
 
-        The caller is responsible for ensuring that the given user is not excluded
-        from the user directory.
+        The caller is responsible for ensuring that the given user should be
+        included in the user directory.
         """
         is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
