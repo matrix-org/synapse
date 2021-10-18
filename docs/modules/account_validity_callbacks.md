@@ -22,10 +22,10 @@ If the module returns `True`, the current request will be denied with the error 
 `ORG_MATRIX_EXPIRED_ACCOUNT` and the HTTP status code 403. Note that this doesn't
 invalidate the user's access token.
 
-If multiple modules implement this callback, the first callback returning `bool` (i.e.
-not `None`) causes the returned value to be used to determine whether the user is expired,
-and the subsequent implementations of this callback to be ignored. If all callbacks return
-`None`, the user is considered not expired.
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `None`, Synapse falls through to the next one. The value of the first
+callback that does not return `None` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
 
 ### `on_user_registration`
 
