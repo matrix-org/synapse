@@ -355,15 +355,6 @@ class EventSizeError(SynapseError):
         super().__init__(413, msg, Codes.TOO_LARGE)
 
 
-class EventStreamError(SynapseError):
-    """An error raised when there a problem with the event stream."""
-
-    def __init__(self, *args, **kwargs):
-        if "errcode" not in kwargs:
-            kwargs["errcode"] = Codes.BAD_PAGINATION
-        super().__init__(*args, **kwargs)
-
-
 class LoginError(SynapseError):
     """An error raised when there was a problem logging in."""
 
