@@ -262,14 +262,10 @@ class InteractiveAuthIncompleteError(Exception):
 class UnrecognizedRequestError(SynapseError):
     """An error indicating we don't understand the request you're trying to make"""
 
-    def __init__(self, *args, **kwargs):
-        if "errcode" not in kwargs:
-            kwargs["errcode"] = Codes.UNRECOGNIZED
-        if len(args) == 0:
-            message = "Unrecognized request"
-        else:
-            message = args[0]
-        super().__init__(400, message, **kwargs)
+    def __init__(
+        self, msg: str = "Unrecognized request", errcode: str = Codes.UNRECOGNIZED
+    ):
+        super().__init__(400, msg, errcode)
 
 
 class NotFoundError(SynapseError):
@@ -284,10 +280,8 @@ class AuthError(SynapseError):
     other poorly-defined times.
     """
 
-    def __init__(self, *args, **kwargs):
-        if "errcode" not in kwargs:
-            kwargs["errcode"] = Codes.FORBIDDEN
-        super().__init__(*args, **kwargs)
+    def __init__(self, code: int, msg: str, errcode: str = Codes.FORBIDDEN):
+        super().__init__(code, msg, errcode)
 
 
 class InvalidClientCredentialsError(SynapseError):
@@ -357,10 +351,8 @@ class ResourceLimitError(SynapseError):
 class EventSizeError(SynapseError):
     """An error raised when an event is too big."""
 
-    def __init__(self, *args, **kwargs):
-        if "errcode" not in kwargs:
-            kwargs["errcode"] = Codes.TOO_LARGE
-        super().__init__(413, *args, **kwargs)
+    def __init__(self, msg: str):
+        super().__init__(413, msg, Codes.TOO_LARGE)
 
 
 class EventStreamError(SynapseError):
@@ -443,10 +435,8 @@ class UnsupportedRoomVersionError(SynapseError):
 class ThreepidValidationError(SynapseError):
     """An error raised when there was a problem authorising an event."""
 
-    def __init__(self, *args, **kwargs):
-        if "errcode" not in kwargs:
-            kwargs["errcode"] = Codes.FORBIDDEN
-        super().__init__(*args, **kwargs)
+    def __init__(self, msg: str, errcode: str = Codes.FORBIDDEN):
+        super().__init__(400, msg, errcode)
 
 
 class IncompatibleRoomVersionError(SynapseError):
