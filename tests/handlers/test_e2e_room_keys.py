@@ -18,8 +18,7 @@ import copy
 from unittest import mock
 
 from synapse.api.errors import SynapseError
-
-from tests import unittest
+from synapse.tests import unittest
 
 # sample room_key data for use in the tests
 room_keys = {

@@ -23,11 +23,10 @@ from synapse.rest.client import login, room, sync
 from synapse.server_notices.resource_limits_server_notices import (
     ResourceLimitsServerNotices,
 )
-
-from tests import unittest
-from tests.test_utils import make_awaitable
-from tests.unittest import override_config
-from tests.utils import default_config
+from synapse.tests import unittest
+from synapse.tests.test_utils import make_awaitable
+from synapse.tests.unittest import override_config
+from synapse.tests.utils import default_config
 
 
 class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):

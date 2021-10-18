@@ -18,8 +18,7 @@ from synapse.app.generic_worker import GenericWorkerServer
 from synapse.replication.tcp.commands import FederationAckCommand
 from synapse.replication.tcp.protocol import IReplicationConnection
 from synapse.replication.tcp.streams.federation import FederationStream
-
-from tests.unittest import HomeserverTestCase
+from synapse.tests.unittest import HomeserverTestCase
 
 
 class FederationAckTestCase(HomeserverTestCase):

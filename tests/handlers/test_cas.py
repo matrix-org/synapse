@@ -14,9 +14,8 @@
 from unittest.mock import Mock
 
 from synapse.handlers.cas import CasResponse
-
-from tests.test_utils import simple_async_mock
-from tests.unittest import HomeserverTestCase, override_config
+from synapse.tests.test_utils import simple_async_mock
+from synapse.tests.unittest import HomeserverTestCase, override_config
 
 # These are a few constants that are used as config parameters in the tests.
 BASE_URL = "https://synapse/"

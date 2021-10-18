@@ -19,9 +19,8 @@ from frozendict import frozendict
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.storage.state import StateFilter
+from synapse.tests.unittest import HomeserverTestCase, TestCase
 from synapse.types import RoomID, UserID
-
-from tests.unittest import HomeserverTestCase, TestCase
 
 logger = logging.getLogger(__name__)
 

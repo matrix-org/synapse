@@ -7,10 +7,9 @@ from synapse.federation.sender import PerDestinationQueue, TransactionManager
 from synapse.federation.units import Edu
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.tests.test_utils import event_injection, make_awaitable
+from synapse.tests.unittest import FederatingHomeserverTestCase, override_config
 from synapse.util.retryutils import NotRetryingDestination
-
-from tests.test_utils import event_injection, make_awaitable
-from tests.unittest import FederatingHomeserverTestCase, override_config
 
 
 class FederationCatchUpTestCases(FederatingHomeserverTestCase):

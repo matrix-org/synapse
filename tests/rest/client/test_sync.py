@@ -22,13 +22,13 @@ from synapse.api.constants import (
     RelationTypes,
 )
 from synapse.rest.client import knock, login, read_marker, receipts, room, sync
+from synapse.tests import unittest
+from synapse.tests.unittest import override_config
 
-from tests import unittest
 from tests.federation.transport.test_knocking import (
     KnockingStrippedStateEventHelperMixin,
 )
 from tests.server import TimedOutException
-from tests.unittest import override_config
 
 
 class FilterTestCase(unittest.HomeserverTestCase):

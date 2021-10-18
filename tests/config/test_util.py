@@ -14,8 +14,7 @@
 
 from synapse.config import ConfigError
 from synapse.config._util import validate_config
-
-from tests.unittest import TestCase
+from synapse.tests.unittest import TestCase
 
 
 class ValidateConfigTestCase(TestCase):

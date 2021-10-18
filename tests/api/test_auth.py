@@ -27,11 +27,10 @@ from synapse.api.errors import (
 )
 from synapse.appservice import ApplicationService
 from synapse.storage.databases.main.registration import TokenLookupResult
+from synapse.tests import unittest
+from synapse.tests.test_utils import simple_async_mock
+from synapse.tests.utils import mock_getRawHeaders
 from synapse.types import Requester
-
-from tests import unittest
-from tests.test_utils import simple_async_mock
-from tests.utils import mock_getRawHeaders
 
 
 class AuthTestCase(unittest.HomeserverTestCase):

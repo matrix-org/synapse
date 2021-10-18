@@ -17,8 +17,7 @@
 import synapse.api.errors
 import synapse.handlers.device
 import synapse.storage
-
-from tests import unittest
+from synapse.tests import unittest
 
 user1 = "@boris:aaa"
 user2 = "@theresa:bbb"

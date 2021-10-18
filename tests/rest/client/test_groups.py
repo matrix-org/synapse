@@ -13,9 +13,8 @@
 # limitations under the License.
 
 from synapse.rest.client import groups, room
-
-from tests import unittest
-from tests.unittest import override_config
+from synapse.tests import unittest
+from synapse.tests.unittest import override_config
 
 
 class GroupsTestCase(unittest.HomeserverTestCase):

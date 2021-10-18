@@ -16,8 +16,7 @@ import yaml
 
 from synapse.config._base import ConfigError
 from synapse.config.server import ServerConfig, generate_ip_set, is_threepid_reserved
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class ServerConfigTestCase(unittest.TestCase):

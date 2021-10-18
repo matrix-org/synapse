@@ -22,8 +22,9 @@ from twisted.internet.address import IPv4Address
 from twisted.internet.defer import ensureDeferred
 from twisted.mail import interfaces, smtp
 
+from synapse.tests.unittest import HomeserverTestCase
+
 from tests.server import FakeTransport
-from tests.unittest import HomeserverTestCase
 
 
 @implementer(interfaces.IMessageDelivery)

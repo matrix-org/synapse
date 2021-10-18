@@ -23,11 +23,11 @@ from twisted.web.server import Request
 from synapse.rest import admin
 from synapse.rest.client import login
 from synapse.server import HomeServer
+from synapse.tests.test_utils import SMALL_PNG
 
 from tests.http import TestServerTLSConnectionFactory, get_test_ca_cert_file
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.server import FakeChannel, FakeSite, FakeTransport, make_request
-from tests.test_utils import SMALL_PNG
 
 logger = logging.getLogger(__name__)
 

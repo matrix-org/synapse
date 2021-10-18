@@ -18,9 +18,8 @@ from twisted.internet import defer
 
 from synapse.handlers.presence import PresenceHandler
 from synapse.rest.client import presence
+from synapse.tests import unittest
 from synapse.types import UserID
-
-from tests import unittest
 
 
 class PresenceTestCase(unittest.HomeserverTestCase):

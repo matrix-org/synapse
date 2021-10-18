@@ -23,11 +23,15 @@ from synapse.handlers.presence import UserPresenceState
 from synapse.module_api import ModuleApi
 from synapse.rest import admin
 from synapse.rest.client import login, presence, room
+from synapse.tests.test_utils import simple_async_mock
+from synapse.tests.unittest import (
+    FederatingHomeserverTestCase,
+    TestCase,
+    override_config,
+)
 from synapse.types import JsonDict, StreamToken, create_requester
 
 from tests.handlers.test_sync import generate_sync_config
-from tests.test_utils import simple_async_mock
-from tests.unittest import FederatingHomeserverTestCase, TestCase, override_config
 
 
 @attr.s

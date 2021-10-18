@@ -28,9 +28,8 @@ from synapse.state.v2 import (
     lexicographical_topological_sort,
     resolve_events_with_store,
 )
+from synapse.tests import unittest
 from synapse.types import EventID
-
-from tests import unittest
 
 ALICE = "@alice:example.com"
 BOB = "@bob:example.com"

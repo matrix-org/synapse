@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from synapse.config.homeserver import HomeServerConfig
-
-from tests.unittest import TestCase
-from tests.utils import default_config
+from synapse.tests.unittest import TestCase
+from synapse.tests.utils import default_config
 
 
 class RatelimitConfigTestCase(TestCase):

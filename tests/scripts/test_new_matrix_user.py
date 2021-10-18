@@ -15,8 +15,7 @@
 from unittest.mock import Mock
 
 from synapse._scripts.register_new_matrix_user import request_registration
-
-from tests.unittest import TestCase
+from synapse.tests.unittest import TestCase
 
 
 class RegisterTestCase(TestCase):

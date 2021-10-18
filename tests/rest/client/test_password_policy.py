@@ -18,8 +18,7 @@ from synapse.api.constants import LoginType
 from synapse.api.errors import Codes
 from synapse.rest import admin
 from synapse.rest.client import account, login, password_policy, register
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class PasswordPolicyTestCase(unittest.HomeserverTestCase):

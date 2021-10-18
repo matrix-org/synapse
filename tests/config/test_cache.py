@@ -13,9 +13,8 @@
 # limitations under the License.
 
 from synapse.config.cache import CacheConfig, add_resizable_cache
+from synapse.tests.unittest import TestCase
 from synapse.util.caches.lrucache import LruCache
-
-from tests.unittest import TestCase
 
 
 class CacheConfigTests(TestCase):

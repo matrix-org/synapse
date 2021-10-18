@@ -14,8 +14,7 @@
 
 from synapse.server import HomeServer
 from synapse.storage.databases.main.lock import _LOCK_TIMEOUT_MS
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class LockTestCase(unittest.HomeserverTestCase):

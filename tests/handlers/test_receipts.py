@@ -16,9 +16,8 @@
 from typing import List
 
 from synapse.api.constants import ReadReceiptEventFields
+from synapse.tests import unittest
 from synapse.types import JsonDict
-
-from tests import unittest
 
 
 class ReceiptsTestCase(unittest.HomeserverTestCase):

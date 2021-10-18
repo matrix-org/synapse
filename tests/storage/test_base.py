@@ -21,9 +21,8 @@ from twisted.internet import defer
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import create_engine
-
-from tests import unittest
-from tests.utils import TestHomeServer, default_config
+from synapse.tests import unittest
+from synapse.tests.utils import TestHomeServer, default_config
 
 
 class SQLBaseStoreTestCase(unittest.TestCase):

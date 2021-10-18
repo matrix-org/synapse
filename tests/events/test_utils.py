@@ -20,9 +20,8 @@ from synapse.events.utils import (
     prune_event,
     serialize_event,
 )
+from synapse.tests import unittest
 from synapse.util.frozenutils import freeze
-
-from tests import unittest
 
 
 def MockEvent(**kwargs):

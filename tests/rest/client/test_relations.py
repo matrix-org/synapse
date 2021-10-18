@@ -19,8 +19,8 @@ from typing import Dict, List, Optional, Tuple
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.rest import admin
 from synapse.rest.client import login, register, relations, room
+from synapse.tests import unittest
 
-from tests import unittest
 from tests.server import FakeChannel
 
 

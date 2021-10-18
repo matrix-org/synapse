@@ -34,9 +34,8 @@ from synapse.handlers.presence import (
 )
 from synapse.rest import admin
 from synapse.rest.client import room
+from synapse.tests import unittest
 from synapse.types import UserID, get_domain_from_id
-
-from tests import unittest
 
 
 class PresenceUpdateTestCase(unittest.HomeserverTestCase):

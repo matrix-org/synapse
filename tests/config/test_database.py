@@ -15,8 +15,7 @@
 import yaml
 
 from synapse.config.database import DatabaseConfig
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class DatabaseConfigTestCase(unittest.TestCase):

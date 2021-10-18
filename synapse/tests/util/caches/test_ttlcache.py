@@ -14,9 +14,8 @@
 
 from unittest.mock import Mock
 
+from synapse.tests import unittest
 from synapse.util.caches.ttlcache import TTLCache
-
-from tests import unittest
 
 
 class CacheTestCase(unittest.TestCase):

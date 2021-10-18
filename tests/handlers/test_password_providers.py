@@ -23,11 +23,11 @@ import synapse
 from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.module_api import ModuleApi
 from synapse.rest.client import devices, login
+from synapse.tests import unittest
+from synapse.tests.unittest import override_config
 from synapse.types import JsonDict
 
-from tests import unittest
 from tests.server import FakeChannel
-from tests.unittest import override_config
 
 # (possibly experimental) login flows we expect to appear in the list after the normal
 # ones

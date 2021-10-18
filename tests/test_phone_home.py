@@ -16,8 +16,7 @@ import resource
 from unittest import mock
 
 from synapse.app.phone_stats_home import phone_stats_home
-
-from tests.unittest import HomeserverTestCase
+from synapse.tests.unittest import HomeserverTestCase
 
 
 class PhoneHomeStatsTestCase(HomeserverTestCase):

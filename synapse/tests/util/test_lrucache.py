@@ -15,11 +15,10 @@
 
 from unittest.mock import Mock
 
+from synapse.tests import unittest
+from synapse.tests.unittest import override_config
 from synapse.util.caches.lrucache import LruCache, setup_expire_lru_cache_entries
 from synapse.util.caches.treecache import TreeCache
-
-from tests import unittest
-from tests.unittest import override_config
 
 
 class LruCacheTestCase(unittest.HomeserverTestCase):

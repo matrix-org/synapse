@@ -17,12 +17,10 @@ from unittest.mock import Mock
 from twisted.internet import defer
 
 from synapse.handlers.appservice import ApplicationServicesHandler
+from synapse.tests import unittest
+from synapse.tests.test_utils import make_awaitable
+from synapse.tests.utils import MockClock
 from synapse.types import RoomStreamToken
-
-from tests.test_utils import make_awaitable
-from tests.utils import MockClock
-
-from .. import unittest
 
 
 class AppServiceHandlerTestCase(unittest.TestCase):

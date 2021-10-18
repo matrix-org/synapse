@@ -46,15 +46,15 @@ from synapse.logging.context import (
     set_current_context,
 )
 from synapse.server import HomeServer
+from synapse.tests.test_utils import event_injection, setup_awaitable_errors
+from synapse.tests.test_utils.logging_setup import setup_logging
+from synapse.tests.utils import default_config, setupdb
 from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests.server import FakeChannel, get_clock, make_request, setup_test_homeserver
-from tests.test_utils import event_injection, setup_awaitable_errors
-from tests.test_utils.logging_setup import setup_logging
-from tests.utils import default_config, setupdb
 
 setupdb()
 setup_logging()

@@ -16,10 +16,9 @@ from unittest.mock import Mock
 from twisted.internet import defer
 
 from synapse.api.constants import UserTypes
-
-from tests import unittest
-from tests.test_utils import make_awaitable
-from tests.unittest import default_config, override_config
+from synapse.tests import unittest
+from synapse.tests.test_utils import make_awaitable
+from synapse.tests.unittest import default_config, override_config
 
 FORTY_DAYS = 40 * 24 * 60 * 60
 

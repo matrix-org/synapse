@@ -16,11 +16,10 @@ import json
 
 from synapse.rest import admin
 from synapse.rest.client import directory, login, room
+from synapse.tests import unittest
+from synapse.tests.unittest import override_config
 from synapse.types import RoomAlias
 from synapse.util.stringutils import random_string
-
-from tests import unittest
-from tests.unittest import override_config
 
 
 class DirectoryTestCase(unittest.HomeserverTestCase):

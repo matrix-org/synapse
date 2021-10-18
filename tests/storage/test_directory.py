@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.tests.unittest import HomeserverTestCase
 from synapse.types import RoomAlias, RoomID
-
-from tests.unittest import HomeserverTestCase
 
 
 class DirectoryStoreTestCase(HomeserverTestCase):

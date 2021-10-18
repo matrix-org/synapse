@@ -14,8 +14,7 @@
 import sys
 
 from synapse.logging.formatter import LogFormatter
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class TestException(Exception):

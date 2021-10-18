@@ -17,8 +17,7 @@ from http import HTTPStatus
 from synapse.api.errors import Codes
 from synapse.rest import admin
 from synapse.rest.client import keys, login
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class KeyQueryTestCase(unittest.HomeserverTestCase):

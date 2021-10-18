@@ -18,9 +18,8 @@ from unittest.mock import Mock
 
 from synapse.config import ConfigError
 from synapse.config._base import Config
+from synapse.tests import unittest
 from synapse.util.stringutils import random_string
-
-from tests import unittest
 
 
 class BaseConfigTestCase(unittest.TestCase):

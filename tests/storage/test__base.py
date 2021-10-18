@@ -15,7 +15,7 @@
 
 import secrets
 
-from tests import unittest
+from synapse.tests import unittest
 
 
 class UpsertManyTests(unittest.HomeserverTestCase):

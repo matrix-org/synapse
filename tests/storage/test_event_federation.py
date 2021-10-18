@@ -15,15 +15,13 @@
 import attr
 from parameterized import parameterized
 
+import synapse.tests.unittest
 from synapse.api.room_versions import RoomVersions
 from synapse.events import _EventInternalMetadata
 from synapse.util import json_encoder
 
-import tests.unittest
-import tests.utils
 
-
-class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
+class EventFederationWorkerStoreTestCase(synapse.tests.unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
 

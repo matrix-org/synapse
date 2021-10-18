@@ -19,13 +19,13 @@ from twisted.internet.defer import succeed
 from synapse.api.errors import FederationError
 from synapse.events import make_event_from_dict
 from synapse.logging.context import LoggingContext
+from synapse.tests import unittest
+from synapse.tests.test_utils import make_awaitable
 from synapse.types import UserID, create_requester
 from synapse.util import Clock
 from synapse.util.retryutils import NotRetryingDestination
 
-from tests import unittest
 from tests.server import ThreadedMemoryReactorClock, setup_test_homeserver
-from tests.test_utils import make_awaitable
 
 
 class MessageAcceptTests(unittest.HomeserverTestCase):

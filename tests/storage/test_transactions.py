@@ -13,9 +13,8 @@
 # limitations under the License.
 
 from synapse.storage.databases.main.transactions import DestinationRetryTimings
+from synapse.tests.unittest import HomeserverTestCase
 from synapse.util.retryutils import MAX_RETRY_INTERVAL
-
-from tests.unittest import HomeserverTestCase
 
 
 class TransactionStoreTestCase(HomeserverTestCase):

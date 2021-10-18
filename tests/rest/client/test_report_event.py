@@ -16,8 +16,7 @@ import json
 
 import synapse.rest.admin
 from synapse.rest.client import login, report_event, room
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class ReportEventTestCase(unittest.HomeserverTestCase):

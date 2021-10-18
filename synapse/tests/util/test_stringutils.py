@@ -13,9 +13,8 @@
 # limitations under the License.
 
 from synapse.api.errors import SynapseError
+from synapse.tests import unittest
 from synapse.util.stringutils import assert_valid_client_secret, base62_encode
-
-from .. import unittest
 
 
 class StringUtilsTestCase(unittest.TestCase):

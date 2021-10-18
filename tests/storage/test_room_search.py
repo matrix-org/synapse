@@ -15,8 +15,7 @@
 import synapse.rest.admin
 from synapse.rest.client import login, room
 from synapse.storage.engines import PostgresEngine
-
-from tests.unittest import HomeserverTestCase
+from synapse.tests.unittest import HomeserverTestCase
 
 
 class NullByteInsertionTest(HomeserverTestCase):

@@ -18,8 +18,7 @@ from unittest.mock import Mock
 
 import synapse.rest.admin
 from synapse.rest.client import events, login, room
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):

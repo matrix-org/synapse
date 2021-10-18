@@ -16,9 +16,8 @@ from functools import partial
 
 from twisted.internet import defer
 
+from synapse.tests.unittest import TestCase
 from synapse.util.caches.deferred_cache import DeferredCache
-
-from tests.unittest import TestCase
 
 
 class DeferredCacheTestCase(TestCase):

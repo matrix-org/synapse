@@ -15,9 +15,8 @@
 
 from unittest.mock import Mock, patch
 
+from synapse.tests import unittest
 from synapse.util.distributor import Distributor
-
-from . import unittest
 
 
 class DistributorTestCase(unittest.TestCase):

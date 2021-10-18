@@ -15,8 +15,7 @@
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.storage.databases.main import stats
-
-from tests import unittest
+from synapse.tests import unittest
 
 # The expected number of state events in a fresh public room.
 EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM = 5

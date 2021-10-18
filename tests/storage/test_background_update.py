@@ -1,8 +1,7 @@
 from unittest.mock import Mock
 
 from synapse.storage.background_updates import BackgroundUpdater
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class BackgroundUpdateTestCase(unittest.HomeserverTestCase):

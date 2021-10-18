@@ -35,11 +35,11 @@ from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.rest.media.v1.media_storage import MediaStorage
 from synapse.rest.media.v1.storage_provider import FileStorageProviderBackend
+from synapse.tests import unittest
+from synapse.tests.test_utils import SMALL_PNG
+from synapse.tests.utils import default_config
 
-from tests import unittest
 from tests.server import FakeSite, make_request
-from tests.test_utils import SMALL_PNG
-from tests.utils import default_config
 
 
 class MediaStorageTests(unittest.HomeserverTestCase):

@@ -18,8 +18,7 @@ import string
 import synapse.rest.admin
 from synapse.api.errors import Codes
 from synapse.rest.client import login
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):

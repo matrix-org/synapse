@@ -22,11 +22,9 @@ from synapse.appservice.scheduler import (
     _TransactionController,
 )
 from synapse.logging.context import make_deferred_yieldable
-
-from tests import unittest
-from tests.test_utils import simple_async_mock
-
-from ..utils import MockClock
+from synapse.tests import unittest
+from synapse.tests.test_utils import simple_async_mock
+from synapse.tests.utils import MockClock
 
 
 class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):

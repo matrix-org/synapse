@@ -16,9 +16,8 @@ from typing import List, Optional
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import IncorrectDatabaseSetup
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
-
-from tests.unittest import HomeserverTestCase
-from tests.utils import USE_POSTGRES_FOR_TESTS
+from synapse.tests.unittest import HomeserverTestCase
+from synapse.tests.utils import USE_POSTGRES_FOR_TESTS
 
 
 class MultiWriterIdGeneratorTestCase(HomeserverTestCase):

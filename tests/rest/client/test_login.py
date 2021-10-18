@@ -27,14 +27,14 @@ from synapse.appservice import ApplicationService
 from synapse.rest.client import devices, login, logout, register
 from synapse.rest.client.account import WhoamiRestServlet
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
+from synapse.tests import unittest
+from synapse.tests.test_utils.html_parsers import TestHtmlParser
+from synapse.tests.unittest import HomeserverTestCase, override_config, skip_unless
 from synapse.types import create_requester
 
-from tests import unittest
 from tests.handlers.test_oidc import HAS_OIDC
 from tests.handlers.test_saml import has_saml2
 from tests.rest.client.utils import TEST_OIDC_AUTH_ENDPOINT, TEST_OIDC_CONFIG
-from tests.test_utils.html_parsers import TestHtmlParser
-from tests.unittest import HomeserverTestCase, override_config, skip_unless
 
 try:
     import jwt

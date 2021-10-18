@@ -23,8 +23,7 @@ from twisted.internet.defer import Deferred
 import synapse.rest.admin
 from synapse.api.errors import Codes, SynapseError
 from synapse.rest.client import login, room
-
-from tests.unittest import HomeserverTestCase
+from synapse.tests.unittest import HomeserverTestCase
 
 
 @attr.s

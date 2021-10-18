@@ -18,19 +18,18 @@ from unittest.mock import Mock
 from twisted.internet import defer
 from twisted.internet.defer import succeed
 
+import synapse.tests.unittest
 from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent
+from synapse.tests.utils import create_room, setup_test_homeserver
 from synapse.visibility import filter_events_for_server
-
-import tests.unittest
-from tests.utils import create_room, setup_test_homeserver
 
 logger = logging.getLogger(__name__)
 
 TEST_ROOM_ID = "!TEST:ROOM"
 
 
-class FilterEventsForServerTestCase(tests.unittest.TestCase):
+class FilterEventsForServerTestCase(synapse.tests.unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         self.hs = yield setup_test_homeserver(self.addCleanup)

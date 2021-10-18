@@ -16,8 +16,7 @@ import json
 
 import synapse.rest.admin
 from synapse.rest.client import login, room
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class IdentityTestCase(unittest.HomeserverTestCase):

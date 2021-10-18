@@ -1,9 +1,8 @@
 import synapse
 from synapse.api.constants import EventTypes, RoomEncryptionAlgorithms
 from synapse.rest.client import login, room
-
-from tests import unittest
-from tests.unittest import override_config
+from synapse.tests import unittest
+from synapse.tests.unittest import override_config
 
 
 class EncryptedByDefaultTestCase(unittest.HomeserverTestCase):

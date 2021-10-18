@@ -23,8 +23,7 @@ import synapse.rest.admin
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import Codes
 from synapse.rest.client import directory, events, login, room
-
-from tests import unittest
+from synapse.tests import unittest
 
 """Tests admin REST events for /rooms paths."""
 

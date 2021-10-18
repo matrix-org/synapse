@@ -44,10 +44,9 @@ from twisted.web.resource import IResource
 from twisted.web.server import Request, Site
 
 from synapse.http.site import SynapseRequest
+from synapse.tests.utils import setup_test_homeserver as _sth
 from synapse.types import JsonDict
 from synapse.util import Clock
-
-from tests.utils import setup_test_homeserver as _sth
 
 logger = logging.getLogger(__name__)
 

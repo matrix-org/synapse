@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests import unittest
-from tests.utils import MockClock
+from synapse.tests import unittest
+from synapse.tests.utils import MockClock
 
 
 class MockClockTestCase(unittest.TestCase):

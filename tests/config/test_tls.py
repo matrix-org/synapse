@@ -20,8 +20,7 @@ from OpenSSL import SSL
 from synapse.config._base import Config, RootConfig
 from synapse.config.tls import ConfigError, TlsConfig
 from synapse.crypto.context_factory import FederationPolicyForHTTPS
-
-from tests.unittest import TestCase
+from synapse.tests.unittest import TestCase
 
 
 class FakeServer(Config):

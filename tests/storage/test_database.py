@@ -14,8 +14,7 @@
 
 from synapse.storage.database import make_tuple_comparison_clause
 from synapse.storage.engines import BaseDatabaseEngine
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 def _stub_db_engine(**kwargs) -> BaseDatabaseEngine:

@@ -43,12 +43,12 @@ from synapse.http.federation.well_known_resolver import (
     _cache_period_from_headers,
 )
 from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext, current_context
+from synapse.tests import unittest
+from synapse.tests.utils import default_config
 from synapse.util.caches.ttlcache import TTLCache
 
-from tests import unittest
 from tests.http import TestServerTLSConnectionFactory, get_test_ca_cert_file
 from tests.server import FakeTransport, ThreadedMemoryReactorClock
-from tests.utils import default_config
 
 logger = logging.getLogger(__name__)
 

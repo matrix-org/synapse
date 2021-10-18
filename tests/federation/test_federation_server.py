@@ -20,8 +20,7 @@ from synapse.events import make_event_from_dict
 from synapse.federation.federation_server import server_matches_acl_event
 from synapse.rest import admin
 from synapse.rest.client import login, room
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class FederationServerTests(unittest.FederatingHomeserverTestCase):

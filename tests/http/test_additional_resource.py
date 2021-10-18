@@ -15,9 +15,9 @@
 
 from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import respond_with_json
+from synapse.tests.unittest import HomeserverTestCase
 
 from tests.server import FakeSite, make_request
-from tests.unittest import HomeserverTestCase
 
 
 class _AsyncTestCustomEndpoint:

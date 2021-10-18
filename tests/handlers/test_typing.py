@@ -22,11 +22,10 @@ from twisted.web.resource import Resource
 
 from synapse.api.errors import AuthError
 from synapse.federation.transport.server import TransportLayerServer
+from synapse.tests import unittest
+from synapse.tests.test_utils import make_awaitable
+from synapse.tests.unittest import override_config
 from synapse.types import UserID, create_requester
-
-from tests import unittest
-from tests.test_utils import make_awaitable
-from tests.unittest import override_config
 
 # Some local users to test with
 U_APPLE = UserID.from_string("@apple:test")

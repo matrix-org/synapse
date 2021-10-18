@@ -18,9 +18,8 @@ from unittest.mock import Mock
 import attr
 
 from synapse.api.errors import RedirectException
-
-from tests.test_utils import simple_async_mock
-from tests.unittest import HomeserverTestCase, override_config
+from synapse.tests.test_utils import simple_async_mock
+from synapse.tests.unittest import HomeserverTestCase, override_config
 
 # Check if we have the dependencies to run the tests.
 try:

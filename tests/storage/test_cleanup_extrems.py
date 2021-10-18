@@ -19,9 +19,8 @@ import synapse.rest.admin
 from synapse.api.constants import EventTypes
 from synapse.rest.client import login, room
 from synapse.storage import prepare_database
+from synapse.tests.unittest import HomeserverTestCase
 from synapse.types import UserID, create_requester
-
-from tests.unittest import HomeserverTestCase
 
 
 class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):

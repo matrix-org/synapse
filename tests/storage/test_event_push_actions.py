@@ -14,7 +14,7 @@
 
 from unittest.mock import Mock
 
-from tests.unittest import HomeserverTestCase
+from synapse.tests.unittest import HomeserverTestCase
 
 USER_ID = "@user:example.com"
 

@@ -18,9 +18,9 @@ from parameterized import parameterized
 from synapse.app.generic_worker import GenericWorkerServer
 from synapse.app.homeserver import SynapseHomeServer
 from synapse.config.server import parse_listener_def
+from synapse.tests.unittest import HomeserverTestCase
 
 from tests.server import make_request
-from tests.unittest import HomeserverTestCase
 
 
 class FederationReaderOpenIDListenerTests(HomeserverTestCase):

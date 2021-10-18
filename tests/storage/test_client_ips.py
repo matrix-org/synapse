@@ -20,12 +20,12 @@ from parameterized import parameterized
 import synapse.rest.admin
 from synapse.http.site import XForwardedForRequest
 from synapse.rest.client import login
+from synapse.tests import unittest
+from synapse.tests.test_utils import make_awaitable
+from synapse.tests.unittest import override_config
 from synapse.types import UserID
 
-from tests import unittest
 from tests.server import make_request
-from tests.test_utils import make_awaitable
-from tests.unittest import override_config
 
 
 class ClientIpStoreTestCase(unittest.HomeserverTestCase):

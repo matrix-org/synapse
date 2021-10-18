@@ -19,8 +19,7 @@ from unpaddedbase64 import decode_base64
 from synapse.api.room_versions import RoomVersions
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events import make_event_from_dict
-
-from tests import unittest
+from synapse.tests import unittest
 
 # Perform these tests using given secret key so we get entirely deterministic
 # signatures output that we can test against.

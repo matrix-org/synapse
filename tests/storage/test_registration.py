@@ -14,8 +14,7 @@
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import ThreepidValidationError
-
-from tests.unittest import HomeserverTestCase
+from synapse.tests.unittest import HomeserverTestCase
 
 
 class RegistrationStoreTestCase(HomeserverTestCase):

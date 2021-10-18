@@ -22,10 +22,8 @@ from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.state import StateHandler, StateResolutionHandler
-
-from tests import unittest
-
-from .utils import MockClock, default_config
+from synapse.tests import unittest
+from synapse.tests.utils import MockClock, default_config
 
 _next_event_id = 1000
 

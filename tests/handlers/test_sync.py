@@ -14,6 +14,7 @@
 
 from typing import Optional
 
+import synapse.tests.unittest
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.errors import Codes, ResourceLimitError
 from synapse.api.filtering import DEFAULT_FILTER_COLLECTION
@@ -24,11 +25,8 @@ from synapse.rest.client import knock, login, room
 from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
 
-import tests.unittest
-import tests.utils
 
-
-class SyncTestCase(tests.unittest.HomeserverTestCase):
+class SyncTestCase(synapse.tests.unittest.HomeserverTestCase):
     """Tests Sync Handler."""
 
     servlets = [

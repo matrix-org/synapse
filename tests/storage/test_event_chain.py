@@ -22,9 +22,8 @@ from synapse.events import EventBase
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.storage.databases.main.events import _LinkMap
+from synapse.tests.unittest import HomeserverTestCase
 from synapse.types import create_requester
-
-from tests.unittest import HomeserverTestCase
 
 
 class EventChainStoreTestCase(HomeserverTestCase):

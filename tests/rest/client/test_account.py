@@ -27,10 +27,10 @@ from synapse.api.errors import Codes, HttpResponseException
 from synapse.appservice import ApplicationService
 from synapse.rest.client import account, login, register, room
 from synapse.rest.synapse.client.password_reset import PasswordResetSubmitTokenResource
+from synapse.tests import unittest
+from synapse.tests.unittest import override_config
 
-from tests import unittest
 from tests.server import FakeSite, make_request
-from tests.unittest import override_config
 
 
 class PasswordResetTestCase(unittest.HomeserverTestCase):

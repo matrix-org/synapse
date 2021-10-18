@@ -18,8 +18,7 @@ from synapse.rest.media.v1.preview_url_resource import (
     get_html_media_encodings,
     summarize_paragraphs,
 )
-
-from . import unittest
+from synapse.tests import unittest
 
 try:
     import lxml

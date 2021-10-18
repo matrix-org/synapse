@@ -25,13 +25,13 @@ from synapse.appservice import ApplicationService
 from synapse.rest.client import login, register, room, user_directory
 from synapse.server import HomeServer
 from synapse.storage.roommember import ProfileInfo
+from synapse.tests import unittest
+from synapse.tests.test_utils.event_injection import inject_member_event
+from synapse.tests.unittest import override_config
 from synapse.types import create_requester
 from synapse.util import Clock
 
-from tests import unittest
 from tests.storage.test_user_directory import GetUserDirectoryTables
-from tests.test_utils.event_injection import inject_member_event
-from tests.unittest import override_config
 
 
 class UserDirectoryTestCase(unittest.HomeserverTestCase):

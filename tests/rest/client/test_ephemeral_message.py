@@ -14,8 +14,7 @@
 from synapse.api.constants import EventContentFields, EventTypes
 from synapse.rest import admin
 from synapse.rest.client import room
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class EphemeralMessageTestCase(unittest.HomeserverTestCase):

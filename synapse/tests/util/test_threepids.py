@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.tests.unittest import HomeserverTestCase
 from synapse.util.threepids import canonicalise_email
-
-from tests.unittest import HomeserverTestCase
 
 
 class CanonicaliseEmailTests(HomeserverTestCase):

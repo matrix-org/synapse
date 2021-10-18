@@ -13,8 +13,7 @@
 # limitations under the License.
 
 from synapse.rest.media.v1._base import get_filename_from_headers
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class GetFileNameFromHeadersTests(unittest.TestCase):

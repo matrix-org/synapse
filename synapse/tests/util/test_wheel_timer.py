@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.tests import unittest
 from synapse.util.wheel_timer import WheelTimer
-
-from .. import unittest
 
 
 class WheelTimerTestCase(unittest.TestCase):

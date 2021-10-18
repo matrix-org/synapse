@@ -18,8 +18,7 @@ from twisted.internet.interfaces import IProtocol
 from twisted.test.proto_helpers import StringTransport
 
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
-
-from tests.unittest import HomeserverTestCase
+from synapse.tests.unittest import HomeserverTestCase
 
 
 class RemoteServerUpTestCase(HomeserverTestCase):

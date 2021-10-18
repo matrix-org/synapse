@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests import unittest
+from synapse.tests import unittest
 
 # sample room_key data for use in the tests
 room_key = {

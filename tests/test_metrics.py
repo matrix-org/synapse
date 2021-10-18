@@ -14,9 +14,8 @@
 # limitations under the License.
 
 from synapse.metrics import REGISTRY, InFlightGauge, generate_latest
+from synapse.tests import unittest
 from synapse.util.caches.deferred_cache import DeferredCache
-
-from tests import unittest
 
 
 def get_sample_labels_value(sample):

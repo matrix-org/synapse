@@ -19,8 +19,7 @@ import synapse.rest.admin
 from synapse.logging.context import make_deferred_yieldable
 from synapse.push import PusherConfigException
 from synapse.rest.client import login, receipts, room
-
-from tests.unittest import HomeserverTestCase, override_config
+from synapse.tests.unittest import HomeserverTestCase, override_config
 
 
 class HTTPPusherTests(HomeserverTestCase):

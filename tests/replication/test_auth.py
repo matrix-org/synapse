@@ -14,10 +14,10 @@
 import logging
 
 from synapse.rest.client import register
+from synapse.tests.unittest import override_config
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.server import FakeChannel, make_request
-from tests.unittest import override_config
 
 logger = logging.getLogger(__name__)
 

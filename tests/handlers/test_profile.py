@@ -17,10 +17,9 @@ from unittest.mock import Mock
 import synapse.types
 from synapse.api.errors import AuthError, SynapseError
 from synapse.rest import admin
+from synapse.tests import unittest
+from synapse.tests.test_utils import make_awaitable
 from synapse.types import UserID
-
-from tests import unittest
-from tests.test_utils import make_awaitable
 
 
 class ProfileTestCase(unittest.HomeserverTestCase):

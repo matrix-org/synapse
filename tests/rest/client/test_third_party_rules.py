@@ -21,10 +21,9 @@ from synapse.events import EventBase
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.tests import unittest
 from synapse.types import JsonDict, Requester, StateMap
 from synapse.util.frozenutils import unfreeze
-
-from tests import unittest
 
 if TYPE_CHECKING:
     from synapse.module_api import ModuleApi

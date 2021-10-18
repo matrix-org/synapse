@@ -15,10 +15,10 @@ from parameterized import parameterized
 
 from twisted.internet import defer
 
+from synapse.tests.unittest import TestCase
 from synapse.util.caches.response_cache import ResponseCache, ResponseCacheContext
 
 from tests.server import get_clock
-from tests.unittest import TestCase
 
 
 class ResponseCacheTestCase(TestCase):

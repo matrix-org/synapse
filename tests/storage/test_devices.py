@@ -13,8 +13,7 @@
 # limitations under the License.
 
 import synapse.api.errors
-
-from tests.unittest import HomeserverTestCase
+from synapse.tests.unittest import HomeserverTestCase
 
 
 class DeviceStoreTestCase(HomeserverTestCase):

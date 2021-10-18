@@ -17,10 +17,9 @@ from canonicaljson import json
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
+from synapse.tests import unittest
+from synapse.tests.utils import create_room
 from synapse.types import RoomID, UserID
-
-from tests import unittest
-from tests.utils import create_room
 
 
 class RedactionTestCase(unittest.HomeserverTestCase):

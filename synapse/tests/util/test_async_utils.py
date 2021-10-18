@@ -21,9 +21,8 @@ from synapse.logging.context import (
     PreserveLoggingContext,
     current_context,
 )
+from synapse.tests.unittest import TestCase
 from synapse.util.async_helpers import timeout_deferred
-
-from tests.unittest import TestCase
 
 
 class TimeoutDeferredTest(TestCase):

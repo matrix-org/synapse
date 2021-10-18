@@ -16,8 +16,7 @@ from twisted.internet.address import IPv6Address
 from twisted.test.proto_helpers import StringTransport
 
 from synapse.app.homeserver import SynapseHomeServer
-
-from tests.unittest import HomeserverTestCase
+from synapse.tests.unittest import HomeserverTestCase
 
 
 class SynapseRequestTestCase(HomeserverTestCase):

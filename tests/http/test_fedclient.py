@@ -31,9 +31,9 @@ from synapse.http.matrixfederationclient import (
     MatrixFederationRequest,
 )
 from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext, current_context
+from synapse.tests.unittest import HomeserverTestCase
 
 from tests.server import FakeTransport
-from tests.unittest import HomeserverTestCase
 
 
 def check_logcontext(context):

@@ -29,8 +29,8 @@ from synapse.replication.tcp.resource import (
     ServerReplicationStreamProtocol,
 )
 from synapse.server import HomeServer
+from synapse.tests import unittest
 
-from tests import unittest
 from tests.server import FakeTransport
 
 try:

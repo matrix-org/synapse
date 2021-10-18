@@ -18,8 +18,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent
 from synapse.push import push_rule_evaluator
 from synapse.push.push_rule_evaluator import PushRuleEvaluatorForEvent
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):

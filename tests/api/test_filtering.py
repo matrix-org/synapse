@@ -21,8 +21,7 @@ from synapse.api.constants import EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
 from synapse.events import make_event_from_dict
-
-from tests import unittest
+from synapse.tests import unittest
 
 user_localpart = "test_user"
 

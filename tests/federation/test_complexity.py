@@ -17,10 +17,9 @@ from unittest.mock import Mock
 from synapse.api.errors import Codes, SynapseError
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.tests import unittest
+from synapse.tests.test_utils import make_awaitable
 from synapse.types import UserID
-
-from tests import unittest
-from tests.test_utils import make_awaitable
 
 
 class RoomComplexityTests(unittest.FederatingHomeserverTestCase):

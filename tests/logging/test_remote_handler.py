@@ -14,10 +14,10 @@
 from twisted.test.proto_helpers import AccumulatingProtocol
 
 from synapse.logging import RemoteHandler
+from synapse.tests.unittest import TestCase
 
 from tests.logging import LoggerCleanupMixin
 from tests.server import FakeTransport, get_clock
-from tests.unittest import TestCase
 
 
 def connect_logging_client(reactor, client_id):

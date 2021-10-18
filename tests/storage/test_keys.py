@@ -17,9 +17,8 @@ import unpaddedbase64
 
 from twisted.internet.defer import Deferred
 
+import synapse.tests.unittest
 from synapse.storage.keys import FetchKeyResult
-
-import tests.unittest
 
 
 def decode_verify_key_base64(key_id: str, key_base64: str):
@@ -35,7 +34,7 @@ KEY_2 = decode_verify_key_base64(
 )
 
 
-class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
+class KeyStoreTestCase(synapse.tests.unittest.HomeserverTestCase):
     def test_get_server_verify_keys(self):
         store = self.hs.get_datastore()
 

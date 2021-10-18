@@ -14,8 +14,7 @@
 import synapse
 from synapse.api.errors import Codes
 from synapse.rest.client import login, push_rule, room
-
-from tests.unittest import HomeserverTestCase
+from synapse.tests.unittest import HomeserverTestCase
 
 
 class PushRuleAttributesTestCase(HomeserverTestCase):

@@ -23,9 +23,8 @@ from synapse.rest.client import (
     room,
     room_upgrade_rest_servlet,
 )
+from synapse.tests import unittest
 from synapse.types import UserID
-
-from tests import unittest
 
 
 class _ShadowBannedBase(unittest.HomeserverTestCase):

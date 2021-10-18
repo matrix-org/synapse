@@ -21,8 +21,7 @@ from twisted.internet.error import DNSLookupError
 from synapse.http import RequestTimedOutError
 from synapse.http.client import SimpleHttpClient
 from synapse.server import HomeServer
-
-from tests.unittest import HomeserverTestCase
+from synapse.tests.unittest import HomeserverTestCase
 
 
 class SimpleHttpClientTests(HomeserverTestCase):

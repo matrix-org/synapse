@@ -22,10 +22,10 @@ import synapse.rest.admin
 from synapse.api.errors import Codes
 from synapse.rest.client import login, profile, room
 from synapse.rest.media.v1.filepath import MediaFilePaths
+from synapse.tests import unittest
+from synapse.tests.test_utils import SMALL_PNG
 
-from tests import unittest
 from tests.server import FakeSite, make_request
-from tests.test_utils import SMALL_PNG
 
 
 class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):

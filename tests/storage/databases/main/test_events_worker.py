@@ -17,9 +17,8 @@ from synapse.logging.context import LoggingContext
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
+from synapse.tests import unittest
 from synapse.util.async_helpers import yieldable_gather_results
-
-from tests import unittest
 
 
 class HaveSeenEventsTestCase(unittest.HomeserverTestCase):

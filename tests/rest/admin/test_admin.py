@@ -24,10 +24,10 @@ from synapse.http.server import JsonResource
 from synapse.logging.context import make_deferred_yieldable
 from synapse.rest.admin import VersionServlet
 from synapse.rest.client import groups, login, room
+from synapse.tests import unittest
+from synapse.tests.test_utils import SMALL_PNG
 
-from tests import unittest
 from tests.server import FakeSite, make_request
-from tests.test_utils import SMALL_PNG
 
 
 class VersionTestCase(unittest.HomeserverTestCase):

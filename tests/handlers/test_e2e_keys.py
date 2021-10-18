@@ -19,8 +19,7 @@ from signedjson import key as key, sign as sign
 
 from synapse.api.constants import RoomEncryptionAlgorithms
 from synapse.api.errors import Codes, SynapseError
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):

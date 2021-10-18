@@ -37,10 +37,9 @@ from synapse.logging.context import (
     make_deferred_yieldable,
 )
 from synapse.storage.keys import FetchKeyResult
-
-from tests import unittest
-from tests.test_utils import make_awaitable
-from tests.unittest import logcontext_clean
+from synapse.tests import unittest
+from synapse.tests.test_utils import make_awaitable
+from synapse.tests.unittest import logcontext_clean
 
 
 class MockPerspectiveServer:

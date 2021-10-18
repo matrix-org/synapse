@@ -24,13 +24,11 @@ from synapse.api.errors import (
 )
 from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.spam_checker_api import RegistrationBehaviour
+from synapse.tests import unittest
+from synapse.tests.test_utils import make_awaitable
+from synapse.tests.unittest import override_config
+from synapse.tests.utils import mock_getRawHeaders
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
-
-from tests.test_utils import make_awaitable
-from tests.unittest import override_config
-from tests.utils import mock_getRawHeaders
-
-from .. import unittest
 
 
 class TestSpamChecker:

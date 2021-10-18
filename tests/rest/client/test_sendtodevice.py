@@ -14,8 +14,7 @@
 
 from synapse.rest import admin
 from synapse.rest.client import login, sendtodevice, sync
-
-from tests.unittest import HomeserverTestCase, override_config
+from synapse.tests.unittest import HomeserverTestCase, override_config
 
 
 class SendToDeviceTestCase(HomeserverTestCase):

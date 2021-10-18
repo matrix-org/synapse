@@ -16,10 +16,9 @@ from unittest.mock import Mock
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
 
+from synapse.tests.test_utils import get_awaitable_result
+from synapse.tests.unittest import TestCase
 from synapse.util.caches.cached_call import CachedCall, RetryOnExceptionCachedCall
-
-from tests.test_utils import get_awaitable_result
-from tests.unittest import TestCase
 
 
 class CachedCallTestCase(TestCase):

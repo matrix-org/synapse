@@ -11,9 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from synapse.tests.unittest import TestCase
 from synapse.util import glob_to_regex
-
-from tests.unittest import TestCase
 
 
 class GlobToRegexTestCase(TestCase):

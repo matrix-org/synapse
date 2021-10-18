@@ -14,8 +14,7 @@
 
 from synapse.api.errors import NotFoundError, SynapseError
 from synapse.rest.client import room
-
-from tests.unittest import HomeserverTestCase
+from synapse.tests.unittest import HomeserverTestCase
 
 
 class PurgeTests(HomeserverTestCase):

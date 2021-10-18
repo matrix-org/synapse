@@ -10,9 +10,8 @@ from synapse.logging.context import (
     nested_logging_context,
     run_in_background,
 )
+from synapse.tests import unittest
 from synapse.util import Clock
-
-from .. import unittest
 
 
 class LoggingContextTestCase(unittest.TestCase):

@@ -30,9 +30,8 @@ from synapse.handlers.room_summary import _child_events_comparison_key, _RoomEnt
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
+from synapse.tests import unittest
 from synapse.types import JsonDict, UserID
-
-from tests import unittest
 
 
 def _create_event(room_id: str, order: Optional[Any] = None, origin_server_ts: int = 0):

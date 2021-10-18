@@ -17,9 +17,8 @@ import pymacaroons
 
 from synapse.api.errors import AuthError, ResourceLimitError
 from synapse.rest import admin
-
-from tests import unittest
-from tests.test_utils import make_awaitable
+from synapse.tests import unittest
+from synapse.tests.test_utils import make_awaitable
 
 
 class AuthTestCase(unittest.HomeserverTestCase):

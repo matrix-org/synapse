@@ -1,9 +1,8 @@
 import synapse
 from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.rest.client import login, room
-
-from tests import unittest
-from tests.unittest import HomeserverTestCase
+from synapse.tests import unittest
+from synapse.tests.unittest import HomeserverTestCase
 
 FIVE_MINUTES_IN_SECONDS = 300
 ONE_DAY_IN_SECONDS = 86400

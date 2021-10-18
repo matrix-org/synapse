@@ -16,8 +16,7 @@ import os
 
 import synapse.rest.admin
 from synapse.rest.client import login, room, sync
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class ConsentNoticesTests(unittest.HomeserverTestCase):

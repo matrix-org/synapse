@@ -18,8 +18,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.federation.federation_base import event_from_pdu_json
 from synapse.rest import admin
 from synapse.rest.client import login, room
-
-from tests.unittest import HomeserverTestCase
+from synapse.tests.unittest import HomeserverTestCase
 
 
 class ExtremPruneTestCase(HomeserverTestCase):

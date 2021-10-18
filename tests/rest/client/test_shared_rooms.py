@@ -13,8 +13,8 @@
 # limitations under the License.
 import synapse.rest.admin
 from synapse.rest.client import login, room, shared_rooms
+from synapse.tests import unittest
 
-from tests import unittest
 from tests.server import FakeChannel
 
 

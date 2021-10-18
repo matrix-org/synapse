@@ -1,8 +1,7 @@
 from synapse.api.ratelimiting import LimitExceededError, Ratelimiter
 from synapse.appservice import ApplicationService
+from synapse.tests import unittest
 from synapse.types import create_requester
-
-from tests import unittest
 
 
 class TestRatelimiter(unittest.HomeserverTestCase):

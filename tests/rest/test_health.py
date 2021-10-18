@@ -14,8 +14,7 @@
 
 
 from synapse.rest.health import HealthResource
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class HealthCheckTests(unittest.HomeserverTestCase):

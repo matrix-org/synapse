@@ -17,10 +17,9 @@ from twisted.internet import defer, reactor
 from twisted.internet.defer import CancelledError
 
 from synapse.logging.context import LoggingContext, current_context
+from synapse.tests import unittest
 from synapse.util import Clock
 from synapse.util.async_helpers import Linearizer
-
-from tests import unittest
 
 
 class LinearizerTestCase(unittest.TestCase):

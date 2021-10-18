@@ -27,10 +27,9 @@ from synapse.storage.databases.main.appservice import (
     ApplicationServiceStore,
     ApplicationServiceTransactionStore,
 )
-
-from tests import unittest
-from tests.test_utils import make_awaitable
-from tests.utils import setup_test_homeserver
+from synapse.tests import unittest
+from synapse.tests.test_utils import make_awaitable
+from synapse.tests.utils import setup_test_homeserver
 
 
 class ApplicationServiceStoreTestCase(unittest.TestCase):

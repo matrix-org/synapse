@@ -17,8 +17,7 @@ from unittest.mock import Mock
 from twisted.internet import defer
 
 from synapse.appservice import ApplicationService
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 def _regex(regex, exclusive=True):

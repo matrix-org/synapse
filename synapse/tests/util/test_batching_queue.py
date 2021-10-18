@@ -14,6 +14,7 @@
 from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable
+from synapse.tests.unittest import TestCase
 from synapse.util.batching_queue import (
     BatchingQueue,
     number_in_flight,
@@ -22,7 +23,6 @@ from synapse.util.batching_queue import (
 )
 
 from tests.server import get_clock
-from tests.unittest import TestCase
 
 
 class BatchingQueueTestCase(TestCase):

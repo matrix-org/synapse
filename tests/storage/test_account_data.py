@@ -15,8 +15,7 @@
 from typing import Iterable, Set
 
 from synapse.api.constants import AccountDataTypes
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class IgnoredUsersTestCase(unittest.HomeserverTestCase):

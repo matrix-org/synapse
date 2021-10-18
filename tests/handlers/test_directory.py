@@ -20,10 +20,9 @@ import synapse.api.errors
 from synapse.api.constants import EventTypes
 from synapse.config.room_directory import RoomDirectoryConfig
 from synapse.rest.client import directory, login, room
+from synapse.tests import unittest
+from synapse.tests.test_utils import make_awaitable
 from synapse.types import RoomAlias, create_requester
-
-from tests import unittest
-from tests.test_utils import make_awaitable
 
 
 class DirectoryTestCase(unittest.HomeserverTestCase):

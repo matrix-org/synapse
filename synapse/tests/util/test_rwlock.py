@@ -14,9 +14,8 @@
 
 from twisted.internet import defer
 
+from synapse.tests import unittest
 from synapse.util.async_helpers import ReadWriteLock
-
-from tests import unittest
 
 
 class ReadWriteLockTestCase(unittest.TestCase):

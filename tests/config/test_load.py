@@ -21,8 +21,7 @@ import yaml
 
 from synapse.config import ConfigError
 from synapse.config.homeserver import HomeServerConfig
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class ConfigLoadingTestCase(unittest.TestCase):

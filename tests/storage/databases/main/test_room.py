@@ -15,8 +15,7 @@
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.storage.databases.main.room import _BackgroundUpdates
-
-from tests.unittest import HomeserverTestCase
+from synapse.tests.unittest import HomeserverTestCase
 
 
 class RoomBackgroundUpdateStoreTestCase(HomeserverTestCase):

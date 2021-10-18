@@ -18,9 +18,8 @@
 from unittest.mock import Mock
 
 from synapse.rest.client import room
+from synapse.tests import unittest
 from synapse.types import UserID
-
-from tests import unittest
 
 PATH_PREFIX = "/_matrix/client/api/v1"
 

@@ -20,8 +20,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_json_value_from_request,
 )
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 def make_request(content):

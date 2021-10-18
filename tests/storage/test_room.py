@@ -14,9 +14,8 @@
 
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import RoomVersions
+from synapse.tests.unittest import HomeserverTestCase
 from synapse.types import RoomAlias, RoomID, UserID
-
-from tests.unittest import HomeserverTestCase
 
 
 class RoomStoreTestCase(HomeserverTestCase):

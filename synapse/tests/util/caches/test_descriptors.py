@@ -26,11 +26,10 @@ from synapse.logging.context import (
     current_context,
     make_deferred_yieldable,
 )
+from synapse.tests import unittest
+from synapse.tests.test_utils import get_awaitable_result
 from synapse.util.caches import descriptors
 from synapse.util.caches.descriptors import cached, lru_cache
-
-from tests import unittest
-from tests.test_utils import get_awaitable_result
 
 logger = logging.getLogger(__name__)
 

@@ -18,10 +18,9 @@ from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.rest.client import login, profile, register, sync
-
-from tests import unittest
-from tests.unittest import override_config
-from tests.utils import default_config
+from synapse.tests import unittest
+from synapse.tests.unittest import override_config
+from synapse.tests.utils import default_config
 
 
 class TestMauLimit(unittest.HomeserverTestCase):

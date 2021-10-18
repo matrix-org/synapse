@@ -14,8 +14,7 @@
 
 
 from synapse.rest.well_known import WellKnownResource
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class WellKnownTests(unittest.HomeserverTestCase):

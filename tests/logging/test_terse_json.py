@@ -21,10 +21,10 @@ from twisted.web.server import Request
 from synapse.http.site import SynapseRequest
 from synapse.logging._terse_json import JsonFormatter, TerseJsonFormatter
 from synapse.logging.context import LoggingContext, LoggingContextFilter
+from synapse.tests.unittest import TestCase
 
 from tests.logging import LoggerCleanupMixin
 from tests.server import FakeChannel
-from tests.unittest import TestCase
 
 
 class TerseJsonTestCase(LoggerCleanupMixin, TestCase):

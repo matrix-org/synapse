@@ -13,9 +13,8 @@
 # limitations under the License.
 
 from synapse.metrics import REGISTRY, generate_latest
+from synapse.tests.unittest import HomeserverTestCase
 from synapse.types import UserID, create_requester
-
-from tests.unittest import HomeserverTestCase
 
 
 class ExtremStatisticsTestCase(HomeserverTestCase):

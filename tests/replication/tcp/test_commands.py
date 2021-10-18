@@ -16,8 +16,7 @@ from synapse.replication.tcp.commands import (
     ReplicateCommand,
     parse_command_from_line,
 )
-
-from tests.unittest import TestCase
+from synapse.tests.unittest import TestCase
 
 
 class ParseCommandTestCase(TestCase):

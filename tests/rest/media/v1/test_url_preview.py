@@ -22,12 +22,12 @@ from twisted.test.proto_helpers import AccumulatingProtocol
 
 from synapse.config.oembed import OEmbedEndpointConfig
 from synapse.rest.media.v1.preview_url_resource import IMAGE_CACHE_EXPIRY_MS
+from synapse.tests import unittest
+from synapse.tests.test_utils import SMALL_PNG
+from synapse.tests.utils import MockClock
 from synapse.util.stringutils import parse_and_validate_mxc_uri
 
-from tests import unittest
 from tests.server import FakeTransport
-from tests.test_utils import SMALL_PNG
-from tests.utils import MockClock
 
 try:
     import lxml

@@ -17,8 +17,7 @@ import json
 import synapse.rest.admin
 from synapse.api.errors import Codes
 from synapse.rest.client import login, report_event, room
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class EventReportsTestCase(unittest.HomeserverTestCase):

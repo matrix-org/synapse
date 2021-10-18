@@ -17,10 +17,10 @@ from unittest.mock import patch
 from synapse.api.room_versions import RoomVersion
 from synapse.rest import admin
 from synapse.rest.client import login, room, sync
+from synapse.tests.utils import USE_POSTGRES_FOR_TESTS
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.server import make_request
-from tests.utils import USE_POSTGRES_FOR_TESTS
 
 logger = logging.getLogger(__name__)
 

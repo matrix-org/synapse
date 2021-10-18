@@ -15,10 +15,9 @@
 
 from twisted.internet import defer
 
+from synapse.tests import unittest
+from synapse.tests.utils import setup_test_homeserver
 from synapse.types import UserID
-
-from tests import unittest
-from tests.utils import setup_test_homeserver
 
 
 class DataStoreTestCase(unittest.TestCase):

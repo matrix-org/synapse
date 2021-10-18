@@ -24,10 +24,9 @@ from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.roommember import ProfileInfo
+from synapse.tests.test_utils.event_injection import inject_member_event
+from synapse.tests.unittest import HomeserverTestCase, override_config
 from synapse.util import Clock
-
-from tests.test_utils.event_injection import inject_member_event
-from tests.unittest import HomeserverTestCase, override_config
 
 ALICE = "@alice:a"
 BOB = "@bob:b"

@@ -20,10 +20,13 @@ from synapse.events import builder
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
+from synapse.tests.test_utils import event_injection
+from synapse.tests.unittest import (
+    FederatingHomeserverTestCase,
+    TestCase,
+    override_config,
+)
 from synapse.types import RoomAlias
-
-from tests.test_utils import event_injection
-from tests.unittest import FederatingHomeserverTestCase, TestCase, override_config
 
 
 class KnockingStrippedStateEventHelperMixin(TestCase):

@@ -18,10 +18,9 @@ import synapse.rest.admin
 from synapse.api.errors import Codes
 from synapse.rest.client import login, room, sync
 from synapse.storage.roommember import RoomsForUser
+from synapse.tests import unittest
+from synapse.tests.unittest import override_config
 from synapse.types import JsonDict
-
-from tests import unittest
-from tests.unittest import override_config
 
 
 class ServerNoticeTestCase(unittest.HomeserverTestCase):

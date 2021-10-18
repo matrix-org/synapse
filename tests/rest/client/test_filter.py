@@ -16,8 +16,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import Codes
 from synapse.rest.client import filter
-
-from tests import unittest
+from synapse.tests import unittest
 
 PATH_PREFIX = "/_matrix/client/v2_alpha"
 

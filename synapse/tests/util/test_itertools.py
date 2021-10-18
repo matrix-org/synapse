@@ -13,9 +13,8 @@
 # limitations under the License.
 from typing import Dict, Iterable, List, Sequence
 
+from synapse.tests.unittest import TestCase
 from synapse.util.iterutils import chunk_seq, sorted_topologically
-
-from tests.unittest import TestCase
 
 
 class ChunkSeqTests(TestCase):

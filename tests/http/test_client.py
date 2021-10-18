@@ -30,9 +30,9 @@ from synapse.http.client import (
     BodyExceededMaxSize,
     read_body_with_max_size,
 )
+from synapse.tests.unittest import TestCase
 
 from tests.server import FakeTransport, get_clock
-from tests.unittest import TestCase
 
 
 class ReadBodyWithMaxSizeTests(TestCase):

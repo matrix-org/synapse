@@ -14,8 +14,7 @@
 
 from synapse.rest import admin
 from synapse.rest.client import login, room, sync
-
-from tests.unittest import HomeserverTestCase
+from synapse.tests.unittest import HomeserverTestCase
 
 
 class RedactionsTestCase(HomeserverTestCase):

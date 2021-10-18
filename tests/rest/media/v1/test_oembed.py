@@ -18,10 +18,9 @@ from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.rest.media.v1.oembed import OEmbedProvider
 from synapse.server import HomeServer
+from synapse.tests.unittest import HomeserverTestCase
 from synapse.types import JsonDict
 from synapse.util import Clock
-
-from tests.unittest import HomeserverTestCase
 
 
 class OEmbedTests(HomeserverTestCase):

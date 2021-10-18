@@ -22,9 +22,9 @@ from synapse.config.server import parse_listener_def
 from synapse.http.server import DirectServeHtmlResource, JsonResource, OptionsResource
 from synapse.http.site import SynapseSite
 from synapse.logging.context import make_deferred_yieldable
+from synapse.tests import unittest
 from synapse.util import Clock
 
-from tests import unittest
 from tests.server import (
     FakeSite,
     ThreadedMemoryReactorClock,

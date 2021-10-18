@@ -21,13 +21,13 @@ from synapse.api.constants import LoginType
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
 from synapse.rest.client import account, auth, devices, login, register
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
+from synapse.tests import unittest
+from synapse.tests.unittest import override_config, skip_unless
 from synapse.types import JsonDict, UserID
 
-from tests import unittest
 from tests.handlers.test_oidc import HAS_OIDC
 from tests.rest.client.utils import TEST_OIDC_CONFIG
 from tests.server import FakeChannel
-from tests.unittest import override_config, skip_unless
 
 
 class DummyRecaptchaChecker(UserInteractiveAuthChecker):

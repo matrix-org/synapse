@@ -19,8 +19,7 @@ import synapse.rest.admin
 import synapse.storage
 from synapse.api.constants import EventTypes
 from synapse.rest.client import login, room
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class ExfiltrateData(unittest.HomeserverTestCase):

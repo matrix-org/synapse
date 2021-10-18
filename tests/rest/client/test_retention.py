@@ -16,9 +16,8 @@ from unittest.mock import Mock
 from synapse.api.constants import EventTypes
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.tests import unittest
 from synapse.visibility import filter_events_for_client
-
-from tests import unittest
 
 one_hour_ms = 3600000
 one_day_ms = one_hour_ms * 24

@@ -28,12 +28,12 @@ from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
 from synapse.api.room_versions import RoomVersions
 from synapse.rest.client import devices, login, logout, profile, room, sync
 from synapse.rest.media.v1.filepath import MediaFilePaths
+from synapse.tests import unittest
+from synapse.tests.test_utils import SMALL_PNG, make_awaitable
+from synapse.tests.unittest import override_config
 from synapse.types import JsonDict, UserID
 
-from tests import unittest
 from tests.server import FakeSite, make_request
-from tests.test_utils import SMALL_PNG, make_awaitable
-from tests.unittest import override_config
 
 
 class UserRegisterTestCase(unittest.HomeserverTestCase):

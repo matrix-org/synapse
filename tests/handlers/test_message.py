@@ -19,10 +19,9 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.tests import unittest
 from synapse.types import create_requester
 from synapse.util.stringutils import random_string
-
-from tests import unittest
 
 logger = logging.getLogger(__name__)
 

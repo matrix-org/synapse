@@ -1,6 +1,5 @@
+from synapse.tests import unittest
 from synapse.util.caches.stream_change_cache import StreamChangeCache
-
-from tests import unittest
 
 
 class StreamChangeCacheTests(unittest.HomeserverTestCase):

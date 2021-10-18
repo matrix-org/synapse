@@ -19,9 +19,8 @@ from typing import Any, Dict, List, Optional
 import synapse.rest.admin
 from synapse.api.errors import Codes
 from synapse.rest.client import login
-
-from tests import unittest
-from tests.test_utils import SMALL_PNG
+from synapse.tests import unittest
+from synapse.tests.test_utils import SMALL_PNG
 
 
 class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):

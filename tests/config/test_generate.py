@@ -20,8 +20,7 @@ from contextlib import redirect_stdout
 from io import StringIO
 
 from synapse.config.homeserver import HomeServerConfig
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class ConfigGenerationTestCase(unittest.TestCase):

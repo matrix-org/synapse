@@ -28,11 +28,11 @@ from twisted.web.resource import Resource
 from twisted.web.server import Site
 
 from synapse.api.constants import Membership
+from synapse.tests.test_utils import FakeResponse
+from synapse.tests.test_utils.html_parsers import TestHtmlParser
 from synapse.types import JsonDict
 
 from tests.server import FakeChannel, FakeSite, make_request
-from tests.test_utils import FakeResponse
-from tests.test_utils.html_parsers import TestHtmlParser
 
 
 @attr.s

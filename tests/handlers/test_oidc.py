@@ -20,11 +20,14 @@ import pymacaroons
 
 from synapse.handlers.sso import MappingException
 from synapse.server import HomeServer
+from synapse.tests.test_utils import (
+    FakeResponse,
+    get_awaitable_result,
+    simple_async_mock,
+)
+from synapse.tests.unittest import HomeserverTestCase, override_config
 from synapse.types import UserID
 from synapse.util.macaroons import get_value_from_macaroon
-
-from tests.test_utils import FakeResponse, get_awaitable_result, simple_async_mock
-from tests.unittest import HomeserverTestCase, override_config
 
 try:
     import authlib  # noqa: F401

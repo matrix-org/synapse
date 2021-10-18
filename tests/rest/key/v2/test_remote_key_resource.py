@@ -26,12 +26,12 @@ from synapse.crypto.keyring import PerspectivesKeyFetcher
 from synapse.http.site import SynapseRequest
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.storage.keys import FetchKeyResult
+from synapse.tests import unittest
+from synapse.tests.utils import default_config
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.stringutils import random_string
 
-from tests import unittest
 from tests.server import FakeChannel
-from tests.utils import default_config
 
 
 class BaseRemoteKeyResourceTestCase(unittest.HomeserverTestCase):

@@ -14,11 +14,11 @@
 from typing import Optional
 
 from synapse.config.homeserver import HomeServerConfig
+from synapse.tests.unittest import TestCase
+from synapse.tests.utils import default_config
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests.server import get_clock
-from tests.unittest import TestCase
-from tests.utils import default_config
 
 
 class FederationRateLimiterTestCase(TestCase):

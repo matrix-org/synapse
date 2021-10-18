@@ -16,11 +16,10 @@
 from synapse.api.constants import Membership
 from synapse.rest.admin import register_servlets_for_client_rest_resource
 from synapse.rest.client import login, room
+from synapse.tests import unittest
+from synapse.tests.test_utils import event_injection
+from synapse.tests.utils import TestHomeServer
 from synapse.types import UserID, create_requester
-
-from tests import unittest
-from tests.test_utils import event_injection
-from tests.utils import TestHomeServer
 
 
 class RoomMemberStoreTestCase(unittest.HomeserverTestCase):

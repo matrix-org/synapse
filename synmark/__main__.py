@@ -22,10 +22,9 @@ from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.logger import globalLogBeginner, textFileLogObserver
 from twisted.python.failure import Failure
 
+from synapse.tests.utils import setupdb
 from synmark import make_reactor
 from synmark.suites import SUITES
-
-from tests.utils import setupdb
 
 
 def make_test(main):

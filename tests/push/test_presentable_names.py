@@ -18,9 +18,8 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent
 from synapse.push.presentable_names import calculate_room_name
+from synapse.tests import unittest
 from synapse.types import StateKey, StateMap
-
-from tests import unittest
 
 
 class MockDataStore:

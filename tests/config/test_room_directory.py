@@ -15,8 +15,7 @@
 import yaml
 
 from synapse.config.room_directory import RoomDirectoryConfig
-
-from tests import unittest
+from synapse.tests import unittest
 
 
 class RoomDirectoryConfigTestCase(unittest.TestCase):

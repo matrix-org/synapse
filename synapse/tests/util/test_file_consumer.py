@@ -19,9 +19,8 @@ from unittest.mock import NonCallableMock
 
 from twisted.internet import defer, reactor
 
+from synapse.tests import unittest
 from synapse.util.file_consumer import BackgroundFileConsumer
-
-from tests import unittest
 
 
 class FileConsumerTests(unittest.TestCase):

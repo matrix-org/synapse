@@ -11,14 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from synapse.tests.unittest import HomeserverTestCase
 from synapse.util.retryutils import (
     MIN_RETRY_INTERVAL,
     RETRY_MULTIPLIER,
     NotRetryingDestination,
     get_retry_limiter,
 )
-
-from tests.unittest import HomeserverTestCase
 
 
 class RetryLimiterTestCase(HomeserverTestCase):

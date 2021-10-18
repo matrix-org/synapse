@@ -31,10 +31,10 @@ from twisted.web.http import HTTPChannel
 from synapse.http.client import BlacklistingReactorWrapper
 from synapse.http.connectproxyclient import ProxyCredentials
 from synapse.http.proxyagent import ProxyAgent, parse_proxy
+from synapse.tests.unittest import TestCase
 
 from tests.http import TestServerTLSConnectionFactory, get_test_https_policy
 from tests.server import FakeTransport, ThreadedMemoryReactorClock
-from tests.unittest import TestCase
 
 logger = logging.getLogger(__name__)
 

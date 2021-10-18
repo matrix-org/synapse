@@ -18,8 +18,8 @@ import synapse.rest.admin
 from synapse.api.urls import ConsentURIBuilder
 from synapse.rest.client import login, room
 from synapse.rest.consent import consent_resource
+from synapse.tests import unittest
 
-from tests import unittest
 from tests.server import FakeSite, make_request
 
 
