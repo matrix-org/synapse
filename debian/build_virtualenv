@@ -57,7 +57,7 @@ case "$DEB_BUILD_OPTIONS" in
         # Copy tests to a temporary directory so that we can put them on the
         # PYTHONPATH without putting the uninstalled synapse on the pythonpath.
         tmpdir=`mktemp -d`
-        trap "rm -r $tmpdir" EXIT
+        trap 'rm -r $tmpdir' EXIT
 
         cp -r tests "$tmpdir"
 
