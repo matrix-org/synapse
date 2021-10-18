@@ -1014,19 +1014,22 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         # Look for the prev_event_id connected to the given event_id
         query = """
-            SELECT depth, prev_event_id FROM event_edges
-            /* Get the depth of the prev_event_id from the events table */
+            SELECT depth, stream_ordering, prev_event_id FROM event_edges
+            /* Get the depth and stream_ordering of the prev_event_id from the events table */
             INNER JOIN events
             ON prev_event_id = events.event_id
-            /* Find an event which matches the given event_id */
+            /* Look for an edge which matches the given event_id */
             WHERE event_edges.event_id = ?
             AND event_edges.is_state = ?
+            /* Because we can have many events at the same depth,
+             * we want to also tie-break and sort on stream_ordering */
+            ORDER BY depth DESC, stream_ordering DESC
             LIMIT ?
         """
 
         # Look for the "insertion" events connected to the given event_id
         connected_insertion_event_query = """
-            SELECT e.depth, i.event_id FROM insertion_event_edges AS i
+            SELECT e.depth, e.stream_ordering, i.event_id FROM insertion_event_edges AS i
             /* Get the depth of the insertion event from the events table */
             INNER JOIN events AS e USING (event_id)
             /* Find an insertion event which points via prev_events to the given event_id */
@@ -1036,7 +1039,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         # Find any batch connections of a given insertion event
         batch_connection_query = """
-            SELECT e.depth, c.event_id FROM insertion_events AS i
+            SELECT e.depth, e.stream_ordering, c.event_id FROM insertion_events AS i
             /* Find the batch that connects to the given insertion event */
             INNER JOIN batch_events AS c
             ON i.next_batch_id = c.batch_id
@@ -1055,25 +1058,67 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         queue = PriorityQueue()
 
         for event_id in event_list:
-            depth = self.db_pool.simple_select_one_onecol_txn(
+            event_lookup_result = self.db_pool.simple_select_one_txn(
                 txn,
                 table="events",
                 keyvalues={"event_id": event_id, "room_id": room_id},
-                retcol="depth",
+                retcols=(
+                    "depth",
+                    "stream_ordering",
+                ),
                 allow_none=True,
             )
 
-            if depth:
-                queue.put((-depth, event_id))
+            if event_lookup_result["depth"]:
+                queue.put(
+                    (
+                        -event_lookup_result["depth"],
+                        -event_lookup_result["stream_ordering"],
+                        event_id,
+                    )
+                )
 
         while not queue.empty() and len(event_results) < limit:
             try:
-                _, event_id = queue.get_nowait()
+                _, _, event_id = queue.get_nowait()
             except Empty:
                 break
 
             if event_id in event_results:
                 continue
+
+            event_lookup_result = self.db_pool.simple_select_one_txn(
+                txn,
+                table="events",
+                keyvalues={"event_id": event_id},
+                retcols=["type", "depth", "stream_ordering", "content"],
+                allow_none=True,
+            )
+
+            event_json_lookup_result = self.db_pool.simple_select_one_onecol_txn(
+                txn,
+                table="event_json",
+                keyvalues={"event_id": event_id},
+                retcol="json",
+                allow_none=True,
+            )
+
+            ev = db_to_json(event_json_lookup_result)
+
+            if event_lookup_result:
+                logger.info(
+                    "_get_backfill_events: event_results add event_id=%s type=%s depth=%s stream_ordering=%s content=%s",
+                    event_id,
+                    ev["type"],
+                    ev["depth"],
+                    event_lookup_result["stream_ordering"],
+                    ev["content"].get("body", None),
+                )
+            else:
+                logger.info(
+                    "_get_backfill_events: event_results event_id=%s failed to lookup",
+                    event_id,
+                )
 
             event_results.add(event_id)
 
@@ -1094,8 +1139,15 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             )
             for row in connected_insertion_event_id_results:
                 connected_insertion_event_depth = row[0]
-                connected_insertion_event = row[1]
-                queue.put((-connected_insertion_event_depth, connected_insertion_event))
+                connected_insertion_event_stream_ordering = row[1]
+                connected_insertion_event = row[2]
+                queue.put(
+                    (
+                        -connected_insertion_event_depth,
+                        -connected_insertion_event_stream_ordering,
+                        connected_insertion_event,
+                    )
+                )
 
                 # Find any batch connections for the given insertion event
                 txn.execute(
@@ -1108,18 +1160,26 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     batch_start_event_id_results,
                 )
                 for row in batch_start_event_id_results:
-                    if row[1] not in event_results:
-                        queue.put((-row[0], row[1]))
+                    if row[2] not in event_results:
+                        queue.put((-row[0], -row[1], row[2]))
 
             txn.execute(query, (event_id, False, limit - len(event_results)))
             prev_event_id_results = txn.fetchall()
-            logger.debug(
+            logger.info(
                 "_get_backfill_events: prev_event_ids %s", prev_event_id_results
             )
 
+            # TODO: Find out why stream_ordering is all out of order compared to
+            # when we persisted the events
+
+            # TODO: We should probably skip adding the event itself if we
+            # branched off onto the insertion event first above. Need to make this a
+            # bit smart so it doesn't skip over the event altogether if we're at
+            # the end of the historical messages.
+
             for row in prev_event_id_results:
-                if row[1] not in event_results:
-                    queue.put((-row[0], row[1]))
+                if row[2] not in event_results:
+                    queue.put((-row[0], -row[1], row[2]))
 
         return event_results
 

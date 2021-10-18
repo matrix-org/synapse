@@ -353,12 +353,19 @@ class RoomBatchHandler:
         # Events are sorted by (topological_ordering, stream_ordering)
         # where topological_ordering is just depth.
         for (event, context) in reversed(events_to_persist):
-            await self.event_creation_handler.handle_new_client_event(
+            result_event = await self.event_creation_handler.handle_new_client_event(
                 await self.create_requester_for_user_id_from_app_service(
                     event["sender"], app_service_requester.app_service
                 ),
                 event=event,
                 context=context,
+            )
+            logger.info(
+                "result_event depth=%s stream_ordering=%s event_id=%s body=%s",
+                result_event.depth,
+                result_event.internal_metadata.stream_ordering,
+                result_event.event_id,
+                result_event.content.get("body", None),
             )
 
         return event_ids

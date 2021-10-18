@@ -283,13 +283,13 @@ def format_event_for_client_v1(d: JsonDict) -> JsonDict:
 
 def format_event_for_client_v2(d: JsonDict) -> JsonDict:
     drop_keys = (
-        "auth_events",
-        "prev_events",
-        "hashes",
-        "signatures",
-        "depth",
-        "origin",
-        "prev_state",
+        # "auth_events",
+        # "prev_events",
+        # "hashes",
+        # "signatures",
+        # "depth",
+        # "origin",
+        # "prev_state",
     )
     for key in drop_keys:
         d.pop(key, None)
@@ -339,6 +339,9 @@ def serialize_event(
     d = {k: v for k, v in e.get_dict().items()}
 
     d["event_id"] = e.event_id
+
+    # TODO: Remove
+    d["stream_ordering"] = e.internal_metadata.stream_ordering
 
     if "age_ts" in d["unsigned"]:
         d["unsigned"]["age"] = time_now_ms - d["unsigned"]["age_ts"]
