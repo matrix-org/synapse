@@ -348,12 +348,16 @@ class EventBase(metaclass=abc.ABCMeta):
         return self.__repr__()
 
     def __repr__(self):
-        return "<%s event_id=%r, type=%r, state_key=%r, outlier=%s>" % (
-            self.__class__.__name__,
-            self.event_id,
-            self.get("type", None),
-            self.get("state_key", None),
-            self.internal_metadata.is_outlier(),
+        rejection = f"REJECTED={self.rejected_reason}, " if self.rejected_reason else ""
+
+        return (
+            f"<{self.__class__.__name__} "
+            f"{rejection}"
+            f"event_id={self.event_id}, "
+            f"type={self.get('type')}, "
+            f"state_key={self.get('state_key')}, "
+            f"outlier={self.internal_metadata.is_outlier()}"
+            ">"
         )
 
 
