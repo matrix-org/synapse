@@ -586,7 +586,6 @@ class RoomMessageListRestServlet(RestServlet):
             event_filter=event_filter,
         )
 
-        logger.info("/messages rest end msgs=%s", msgs)
         return 200, msgs
 
 

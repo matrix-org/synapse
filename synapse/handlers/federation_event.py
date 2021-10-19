@@ -449,7 +449,9 @@ class FederationEventHandler:
             # persist the backfilled events without constantly have to go fetch
             # missing prev_events which are probably included in the same
             # backfill chunk.
-            reversed(events),
+            # TODO: If we try to reverse this list, the stream_ordering will be backwards
+            # reversed(events),
+            events,
             backfilled=True,
         )
 
@@ -1271,7 +1273,12 @@ class FederationEventHandler:
             return event, context
 
         events_to_persist = (x for x in (prep(event) for event in fetched_events) if x)
-        await self.persist_events_and_notify(room_id, tuple(events_to_persist))
+        await self.persist_events_and_notify(
+            room_id,
+            tuple(events_to_persist),
+            # TODO: Maybe this to get fetched missing events during backfill as backfill also :/
+            backfilled=True,
+        )
 
     async def _check_event_auth(
         self,

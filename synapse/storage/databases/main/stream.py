@@ -1166,7 +1166,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
             "order": order,
         }
 
-        logger.info("stream: getting events sql=%s args=%s", sql, args)
         txn.execute(sql, args)
 
         # Filter the result set.
@@ -1237,7 +1236,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
             event_filter,
         )
 
-        logger.info("paginate_room_events event_ids(%d)=%s", len(rows), [r.event_id for r in rows])
         events = await self.get_events_as_list(
             [r.event_id for r in rows], get_prev_content=True
         )
