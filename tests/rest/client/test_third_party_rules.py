@@ -15,7 +15,7 @@ import threading
 from typing import TYPE_CHECKING, Dict, Optional, Tuple
 from unittest.mock import Mock
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
@@ -25,6 +25,7 @@ from synapse.types import JsonDict, Requester, StateMap
 from synapse.util.frozenutils import unfreeze
 
 from tests import unittest
+from tests.test_utils import make_awaitable
 
 if TYPE_CHECKING:
     from synapse.module_api import ModuleApi
@@ -89,8 +90,9 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor, clock, homeserver):
-        # Create a user and room to play with during the tests
+        # Create some users and a room to play with during the tests
         self.user_id = self.register_user("kermit", "monkey")
+        self.invitee = self.register_user("invitee", "hackme")
         self.tok = self.login("kermit", "monkey")
 
         # Some tests might prevent room creation on purpose.
@@ -423,6 +425,32 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
 
             self.assertEqual(channel.code, 200)
             self.assertEqual(channel.json_body["i"], i)
+
+    def test_on_new_event(self):
+        """Test that the on_new_event callback is called on new events"""
+        on_new_event = Mock(make_awaitable(None))
+        self.hs.get_third_party_event_rules()._on_new_event_callbacks.append(
+            on_new_event
+        )
+
+        # Send a message event to the room and check that the callback is called.
+        self.helper.send(room_id=self.room_id, tok=self.tok)
+        self.assertEqual(on_new_event.call_count, 1)
+
+        # Check that the callback is also called on membership updates.
+        self.helper.invite(
+            room=self.room_id,
+            src=self.user_id,
+            targ=self.invitee,
+            tok=self.tok,
+        )
+
+        self.assertEqual(on_new_event.call_count, 2)
+
+        args, _ = on_new_event.call_args
+
+        self.assertEqual(args[0].membership, Membership.INVITE)
+        self.assertEqual(args[0].state_key, self.invitee)
 
     def _update_power_levels(self, event_default: int = 0):
         """Updates the room's power levels.

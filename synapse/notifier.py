@@ -220,6 +220,8 @@ class Notifier:
         # down.
         self.remote_server_up_callbacks: List[Callable[[str], None]] = []
 
+        self._third_party_rules = hs.get_third_party_event_rules()
+
         self.clock = hs.get_clock()
         self.appservice_handler = hs.get_application_service_handler()
         self._pusher_pool = hs.get_pusherpool()
@@ -267,14 +269,16 @@ class Notifier:
         """
         self.replication_callbacks.append(cb)
 
-    def on_new_room_event(
+    async def on_new_room_event(
         self,
         event: EventBase,
         event_pos: PersistedEventPosition,
         max_room_stream_token: RoomStreamToken,
         extra_users: Optional[Collection[UserID]] = None,
     ):
-        """Unwraps event and calls `on_new_room_event_args`."""
+        """Unwraps event and calls `on_new_room_event_args`.
+        Also notifies modules listening on new events via the `on_new_event` callback.
+        """
         self.on_new_room_event_args(
             event_pos=event_pos,
             room_id=event.room_id,
@@ -284,6 +288,8 @@ class Notifier:
             max_room_stream_token=max_room_stream_token,
             extra_users=extra_users or [],
         )
+
+        await self._third_party_rules.on_new_event(event)
 
     def on_new_room_event_args(
         self,
