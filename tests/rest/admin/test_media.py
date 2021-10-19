@@ -279,7 +279,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
-            "Query parameter before_ts must be a string representing a positive integer.",
+            "Query parameter before_ts must be a positive integer.",
             channel.json_body["error"],
         )
 
@@ -848,7 +848,7 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
-            "Query parameter before_ts must be a string representing a positive integer.",
+            "Query parameter before_ts must be a positive integer.",
             channel.json_body["error"],
         )
 

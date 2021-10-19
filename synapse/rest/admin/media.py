@@ -234,7 +234,7 @@ class PurgeMediaCacheRestServlet(RestServlet):
         if before_ts < 0:
             raise SynapseError(
                 400,
-                "Query parameter before_ts must be a string representing a positive integer.",
+                "Query parameter before_ts must be a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
         elif before_ts < 30000000000:  # Dec 1970 in milliseconds, Aug 2920 in seconds
@@ -305,7 +305,7 @@ class DeleteMediaByDateSize(RestServlet):
         if before_ts < 0:
             raise SynapseError(
                 400,
-                "Query parameter before_ts must be a string representing a positive integer.",
+                "Query parameter before_ts must be a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
         elif before_ts < 30000000000:  # Dec 1970 in milliseconds, Aug 2920 in seconds
