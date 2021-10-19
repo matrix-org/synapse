@@ -362,6 +362,7 @@ class FederationEventHandler:
         # need to.
         await self._event_creation_handler.cache_joined_hosts_for_event(event, context)
 
+        await self._check_for_soft_fail(event, None, origin=origin)
         await self._run_push_actions_and_persist_event(event, context)
         return event, context
 
@@ -1013,10 +1014,18 @@ class FederationEventHandler:
             logger.exception("Unexpected AuthError from _check_event_auth")
             raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
 
+        if not backfilled and not context.rejected:
+            # For new (non-backfilled and non-outlier) events we check if the event
+            # passes auth based on the current state. If it doesn't then we
+            # "soft-fail" the event.
+            await self._check_for_soft_fail(event, state, origin=origin)
+
         await self._run_push_actions_and_persist_event(event, context, backfilled)
 
-        if backfilled:
+        if backfilled or context.rejected:
             return
+
+        await self._maybe_kick_guest_users(event)
 
         # For encrypted messages we check that we know about the sending device,
         # if we don't then we mark the device cache for that user as stale.
@@ -1445,10 +1454,6 @@ class FederationEventHandler:
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR
-            return context
-
-        await self._check_for_soft_fail(event, state, backfilled, origin=origin)
-        await self._maybe_kick_guest_users(event)
 
         return context
 
@@ -1468,7 +1473,6 @@ class FederationEventHandler:
         self,
         event: EventBase,
         state: Optional[Iterable[EventBase]],
-        backfilled: bool,
         origin: str,
     ) -> None:
         """Checks if we should soft fail the event; if so, marks the event as
@@ -1477,15 +1481,8 @@ class FederationEventHandler:
         Args:
             event
             state: The state at the event if we don't have all the event's prev events
-            backfilled: Whether the event is from backfill
             origin: The host the event originates from.
         """
-        # For new (non-backfilled and non-outlier) events we check if the event
-        # passes auth based on the current state. If it doesn't then we
-        # "soft-fail" the event.
-        if backfilled or event.internal_metadata.is_outlier():
-            return
-
         extrem_ids_list = await self._store.get_latest_event_ids_in_room(event.room_id)
         extrem_ids = set(extrem_ids_list)
         prev_event_ids = set(event.prev_event_ids())
