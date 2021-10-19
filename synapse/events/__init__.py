@@ -53,6 +53,11 @@ USE_FROZEN_DICTS = strtobool(os.environ.get("SYNAPSE_USE_FROZEN_DICTS", "0"))
 T = TypeVar("T")
 
 
+# DictProperty (and DefaultDictPropery) require the classes they're used with to
+# have a _dict property to pull properties from.
+_DictPropertyInstance = Union["_EventInternalMetadata", "EventBase"]
+
+
 class DictProperty(Generic[T]):
     """An object property which delegates to the `_dict` within its parent object."""
 
@@ -65,22 +70,22 @@ class DictProperty(Generic[T]):
     def __get__(
         self,
         instance: Literal[None],
-        owner: Optional[Type[Union["_EventInternalMetadata", "EventBase"]]] = None,
+        owner: Optional[Type[_DictPropertyInstance]] = None,
     ) -> "DictProperty":
         ...
 
     @overload
     def __get__(
         self,
-        instance: Union["_EventInternalMetadata", "EventBase"],
-        owner: Optional[Type[Union["_EventInternalMetadata", "EventBase"]]] = None,
+        instance: _DictPropertyInstance,
+        owner: Optional[Type[_DictPropertyInstance]] = None,
     ) -> T:
         ...
 
     def __get__(
         self,
-        instance: Optional[Union["_EventInternalMetadata", "EventBase"]],
-        owner: Optional[Type[Union["_EventInternalMetadata", "EventBase"]]] = None,
+        instance: Optional[_DictPropertyInstance],
+        owner: Optional[Type[_DictPropertyInstance]] = None,
     ) -> Union[T, "DictProperty"]:
         # if the property is accessed as a class property rather than an instance
         # property, return the property itself rather than the value
@@ -101,14 +106,10 @@ class DictProperty(Generic[T]):
                 "'%s' has no '%s' property" % (type(instance), self.key)
             ) from e1.__context__
 
-    def __set__(
-        self, instance: Union["_EventInternalMetadata", "EventBase"], v: T
-    ) -> None:
+    def __set__(self, instance: _DictPropertyInstance, v: T) -> None:
         instance._dict[self.key] = v
 
-    def __delete__(
-        self, instance: Union["_EventInternalMetadata", "EventBase"]
-    ) -> None:
+    def __delete__(self, instance: _DictPropertyInstance) -> None:
         try:
             del instance._dict[self.key]
         except KeyError as e1:
@@ -134,22 +135,22 @@ class DefaultDictProperty(DictProperty, Generic[T]):
     def __get__(
         self,
         instance: Literal[None],
-        owner: Optional[Type[Union["_EventInternalMetadata", "EventBase"]]] = None,
+        owner: Optional[Type[_DictPropertyInstance]] = None,
     ) -> "DefaultDictProperty":
         ...
 
     @overload
     def __get__(
         self,
-        instance: Union["_EventInternalMetadata", "EventBase"],
-        owner: Optional[Type[Union["_EventInternalMetadata", "EventBase"]]] = None,
+        instance: _DictPropertyInstance,
+        owner: Optional[Type[_DictPropertyInstance]] = None,
     ) -> T:
         ...
 
     def __get__(
         self,
-        instance: Optional[Union["_EventInternalMetadata", "EventBase"]],
-        owner: Optional[Type[Union["_EventInternalMetadata", "EventBase"]]] = None,
+        instance: Optional[_DictPropertyInstance],
+        owner: Optional[Type[_DictPropertyInstance]] = None,
     ) -> Union[T, "DefaultDictProperty"]:
         if instance is None:
             return self
