@@ -1,7 +1,14 @@
 Synapse 1.45.0rc2 (2021-10-14)
 ==============================
 
-**Note:** This release candidate [fixes](https://github.com/matrix-org/synapse/issues/11053) the user directory [bug](https://github.com/matrix-org/synapse/issues/11025) present in 1.45.0rc1. However, the [performance issue](https://github.com/matrix-org/synapse/issues/11049) which appeared in v1.44.0 is yet to be resolved.
+This release candidate [fixes](https://github.com/matrix-org/synapse/issues/11053) a user directory [bug](https://github.com/matrix-org/synapse/issues/11025) present in 1.45.0rc1.
+
+Known Issues
+------------
+
+- A suspected [performance regression](https://github.com/matrix-org/synapse/issues/11049) which was first reported after the release of v1.44.0 remains unresolved.
+
+  We have not been able to identify a probable cause. Affected users report that setting up a federation sender worker appears to alleviate symptoms of the regression.
 
 Bugfixes
 --------
@@ -24,9 +31,13 @@ Internal Changes
 Synapse 1.45.0rc1 (2021-10-12)
 ==============================
 
-**Note:** We are aware of [a performance issue](https://github.com/matrix-org/synapse/issues/11049) introduced in Synapse v1.44.0, as well as [a bug](https://github.com/matrix-org/synapse/issues/11025) with the user directory when using application services. While this release candidate doesn't fix either of those issues, a second release candidate is expected to come out in a few days to address them.
+**Note:** Media storage providers module that read from Synapse's configuration need changes as of this version, see the [upgrade notes](https://matrix-org.github.io/synapse/develop/upgrade#upgrading-to-v1450) for more information.
 
-Media storage providers module that read from Synapse's configuration need changes as of this version, see the [upgrade notes](https://matrix-org.github.io/synapse/develop/upgrade#upgrading-to-v1450) for more information.
+Known Issues
+------------
+
+- We are investigating [a performance issue](https://github.com/matrix-org/synapse/issues/11049) which was reported after the release of v1.44.0.
+- We are aware of [a bug](https://github.com/matrix-org/synapse/issues/11025) with the user directory when using application services. A second release candidate is expected which will resolve this.
 
 Features
 --------
