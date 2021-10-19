@@ -1609,21 +1609,12 @@ class FederationEventHandler:
         # necessary?
         different_events = await self._store.get_events_as_list(different_auth)
 
+        # double-check they're all in the same room - we should already have checked
+        # this but it doesn't hurt to check again.
         for d in different_events:
-            if d.room_id != event.room_id:
-                logger.warning(
-                    "Event %s refers to auth_event %s which is in a different room",
-                    event.event_id,
-                    d.event_id,
-                )
-
-                # don't attempt to resolve the claimed auth events against our own
-                # in this case: just use our own auth events.
-                #
-                # XXX: should we reject the event in this case? It feels like we should,
-                # but then shouldn't we also do so if we've failed to fetch any of the
-                # auth events?
-                return context, calculated_auth_event_map
+            assert (
+                d.room_id == event.room_id
+            ), f"Event {event.event_id} refers to auth_event {d.event_id} which is in a different room"
 
         # now we state-resolve between our own idea of the auth events, and the remote's
         # idea of them.
