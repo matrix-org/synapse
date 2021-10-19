@@ -169,6 +169,14 @@ class PersistEventsStore:
 
         async with stream_ordering_manager as stream_orderings:
             for (event, _), stream in zip(events_and_contexts, stream_orderings):
+                logger.info(
+                    "_persist_events_and_state_updates backfilled=%s event_id=%s depth=%s stream_ordering=%s content=%s",
+                    backfilled,
+                    event.event_id,
+                    event.depth,
+                    stream,
+                    event["content"].get("body", None),
+                )
                 event.internal_metadata.stream_ordering = stream
 
             await self.db_pool.runInteraction(

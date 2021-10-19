@@ -1141,13 +1141,14 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 connected_insertion_event_depth = row[0]
                 connected_insertion_event_stream_ordering = row[1]
                 connected_insertion_event = row[2]
-                queue.put(
-                    (
-                        -connected_insertion_event_depth,
-                        -connected_insertion_event_stream_ordering,
-                        connected_insertion_event,
+                if connected_insertion_event not in event_results:
+                    queue.put(
+                        (
+                            -connected_insertion_event_depth,
+                            -connected_insertion_event_stream_ordering,
+                            connected_insertion_event,
+                        )
                     )
-                )
 
                 # Find any batch connections for the given insertion event
                 txn.execute(
@@ -1168,9 +1169,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             logger.info(
                 "_get_backfill_events: prev_event_ids %s", prev_event_id_results
             )
-
-            # TODO: Find out why stream_ordering is all out of order compared to
-            # when we persisted the events
 
             # TODO: We should probably skip adding the event itself if we
             # branched off onto the insertion event first above. Need to make this a

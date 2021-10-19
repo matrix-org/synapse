@@ -561,6 +561,7 @@ class RoomMessageListRestServlet(RestServlet):
         pagination_config = await PaginationConfig.from_request(
             self.store, request, default_limit=10
         )
+        logger.info("/messages rest start pagination_config=%s", pagination_config)
         # Twisted will have processed the args by now.
         assert request.args is not None
         as_client_event = b"raw" not in request.args
@@ -585,6 +586,7 @@ class RoomMessageListRestServlet(RestServlet):
             event_filter=event_filter,
         )
 
+        logger.info("/messages rest end msgs=%s", msgs)
         return 200, msgs
 
 

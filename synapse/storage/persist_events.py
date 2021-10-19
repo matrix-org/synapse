@@ -309,6 +309,11 @@ class EventsPersistenceStorage:
             matched the transcation ID; the existing event is returned in such
             a case.
         """
+        # logger.info(
+        #     "persist_events backfilled=%s events_and_contexts=%s",
+        #     backfilled,
+        #     events_and_contexts,
+        # )
         partitioned: Dict[str, List[Tuple[EventBase, EventContext]]] = {}
         for event, ctx in events_and_contexts:
             partitioned.setdefault(event.room_id, []).append((event, ctx))

@@ -441,7 +441,37 @@ class FederationEventHandler:
                     f"room {ev.room_id}, when we were backfilling in {room_id}"
                 )
 
-        await self._process_pulled_events(dest, events, backfilled=True)
+        await self._process_pulled_events(
+            dest,
+            # The /backfill response should start from `?v` and include the
+            # events that preceded it (so the list will be newest -> oldest). We
+            # reverse that order so the messages are oldest -> newest and we can
+            # persist the backfilled events without constantly have to go fetch
+            # missing prev_events which are probably included in the same
+            # backfill chunk.
+            reversed(events),
+            backfilled=True,
+        )
+
+        for ev in events:
+            event_after_persisted = await self._store.get_event(
+                ev.event_id, allow_none=True
+            )
+
+            if event_after_persisted:
+                logger.info(
+                    "from remote server: processed backfilled event_id=%s type=%s depth=%s stream_ordering=%s content=%s",
+                    ev.event_id,
+                    event_after_persisted["type"],
+                    event_after_persisted["depth"],
+                    event_after_persisted.internal_metadata.stream_ordering,
+                    event_after_persisted["content"].get("body", None),
+                )
+            else:
+                logger.info(
+                    "from remote server: processed backfilled event_id=%s failed to lookup",
+                    ev.event_id,
+                )
 
     async def _get_missing_events_for_pdu(
         self, origin: str, pdu: EventBase, prevs: Set[str], min_depth: int
