@@ -22,6 +22,7 @@ import attr
 from signedjson.key import (
     decode_verify_key_bytes,
     encode_verify_key_base64,
+    get_verify_key,
     is_signing_algorithm_supported,
 )
 from signedjson.sign import (
@@ -177,6 +178,48 @@ class Keyring:
             clock=hs.get_clock(),
             process_batch_callback=self._inner_fetch_key_requests,
         )
+        self.signing_key = hs.signing_key
+        self.hostname = hs.hostname
+
+    def verify_json_locally(self, server_name: str, json_object: JsonDict):
+        verify_key = get_verify_key(self.signing_key)
+        verified = False
+
+        try:
+            verify_signed_json(
+                json_object,
+                server_name,
+                verify_key,
+            )
+            verified = True
+
+        except SignatureVerifyException as e:
+            logger.debug(
+                "Error verifying signature for %s:%s:%s with key %s: %s",
+                server_name,
+                verify_key.alg,
+                verify_key.version,
+                encode_verify_key_base64(verify_key),
+                str(e),
+            )
+            raise SynapseError(
+                401,
+                "Invalid signature for server %s with key %s:%s: %s"
+                % (
+                    server_name,
+                    verify_key.alg,
+                    verify_key.version,
+                    str(e),
+                ),
+                Codes.UNAUTHORIZED,
+            )
+
+        if not verified:
+            raise SynapseError(
+                401,
+                "Unable to verify request",
+                Codes.UNAUTHORIZED,
+            )
 
     async def verify_json_for_server(
         self,
@@ -196,6 +239,10 @@ class Keyring:
             validity_time: timestamp at which we require the signing key to
                 be valid. (0 implies we don't care)
         """
+        # if we are the originating server don't fetch verify key for self over federation
+        if server_name == self.hostname:
+            return self.verify_json_locally(server_name, json_object)
+
         request = VerifyJsonRequest.from_json_object(
             server_name,
             json_object,
