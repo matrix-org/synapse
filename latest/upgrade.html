@@ -260,6 +260,12 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1450"><a class="header" href="#upgrading-to-v1450">Upgrading to v1.45.0</a></h1>
+<h2 id="changes-required-to-media-storage-provider-modules-when-reading-from-the-synapse-configuration-object"><a class="header" href="#changes-required-to-media-storage-provider-modules-when-reading-from-the-synapse-configuration-object">Changes required to media storage provider modules when reading from the Synapse configuration object</a></h2>
+<p>Media storage provider modules that read from the Synapse configuration object (i.e. that
+read the value of <code>hs.config.[...]</code>) now need to specify the configuration section they're
+reading from. This means that if a module reads the value of e.g. <code>hs.config.media_store_path</code>,
+it needs to replace it with <code>hs.config.media.media_store_path</code>.</p>
 <h1 id="upgrading-to-v1440"><a class="header" href="#upgrading-to-v1440">Upgrading to v1.44.0</a></h1>
 <h2 id="the-url-preview-cache-is-no-longer-mirrored-to-storage-providers"><a class="header" href="#the-url-preview-cache-is-no-longer-mirrored-to-storage-providers">The URL preview cache is no longer mirrored to storage providers</a></h2>
 <p>The <code>url_cache/</code> and <code>url_cache_thumbnails/</code> directories in the media store are

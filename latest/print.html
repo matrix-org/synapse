@@ -181,8 +181,90 @@
                         </div>
 
                         <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
-<p>Welcome to the documentation repository for Synapse, the reference
-<a href="https://matrix.org">Matrix</a> homeserver implementation.</p>
+<p>Welcome to the documentation repository for Synapse, a 
+<a href="https://matrix.org">Matrix</a> homeserver implementation developed by the matrix.org core 
+team.</p>
+<h2 id="installing-and-using-synapse"><a class="header" href="#installing-and-using-synapse">Installing and using Synapse</a></h2>
+<p>This documentation covers topics for <strong>installation</strong>, <strong>configuration</strong> and
+<strong>maintainence</strong> of your Synapse process:</p>
+<ul>
+<li>
+<p>Learn how to <a href="setup/installation.html">install</a> and
+<a href="usage/configuration/index.html">configure</a> your own instance, perhaps with <a href="usage/configuration/user_authentication/index.html">Single
+Sign-On</a>.</p>
+</li>
+<li>
+<p>See how to <a href="upgrade.html">upgrade</a> between Synapse versions.</p>
+</li>
+<li>
+<p>Administer your instance using the <a href="usage/administration/admin_api/index.html">Admin
+API</a>, installing <a href="modules/index.html">pluggable
+modules</a>, or by accessing the <a href="manhole.html">manhole</a>.</p>
+</li>
+<li>
+<p>Learn how to <a href="usage/administration/request_log.html">read log lines</a>, configure
+<a href="usage/configuration/logging_sample_config.html">logging</a> or set up <a href="structured_logging.html">structured
+logging</a>.</p>
+</li>
+<li>
+<p>Scale Synapse through additional <a href="workers.html">worker processes</a>.</p>
+</li>
+<li>
+<p>Set up <a href="metrics-howto.html">monitoring and metrics</a> to keep an eye on your
+Synapse instance's performance.</p>
+</li>
+</ul>
+<h2 id="developing-on-synapse"><a class="header" href="#developing-on-synapse">Developing on Synapse</a></h2>
+<p>Contributions are welcome! Synapse is primarily written in
+<a href="https://python.org">Python</a>. As a developer, you may be interested in the
+following documentation:</p>
+<ul>
+<li>
+<p>Read the <a href="development/contributing_guide.html">Contributing Guide</a>. It is meant
+to walk new contributors through the process of developing and submitting a
+change to the Synapse codebase (which is <a href="https://github.com/matrix-org/synapse">hosted on
+GitHub</a>).</p>
+</li>
+<li>
+<p>Set up your <a href="development/contributing_guide.html#2-what-do-i-need">development
+environment</a>, then learn
+how to <a href="development/contributing_guide.html#run-the-linters">lint</a> and
+<a href="development/contributing_guide.html#8-test-test-test">test</a> your code.</p>
+</li>
+<li>
+<p>Look at <a href="https://github.com/matrix-org/synapse/issues">the issue tracker</a> for
+bugs to fix or features to add. If you're new, it may be best to start with
+those labeled <a href="https://github.com/matrix-org/synapse/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22">good first
+issue</a>.</p>
+</li>
+<li>
+<p>Understand <a href="development/internal_documentation/index.html">how Synapse is
+built</a>, how to <a href="development/database_schema.html">migrate
+database schemas</a>, learn about
+<a href="federate.html">federation</a> and how to <a href="federate.html#running-a-demo-federation-of-synapses">set up a local
+federation</a> for development.</p>
+</li>
+<li>
+<p>We like to keep our <code>git</code> history clean. <a href="development/git.html">Learn</a> how to
+do so!</p>
+</li>
+<li>
+<p>And finally, contribute to this documentation! The source for which is
+<a href="https://github.com/matrix-org/synapse/tree/develop/docs">located here</a>.</p>
+</li>
+</ul>
+<h2 id="donating-to-synapse-development"><a class="header" href="#donating-to-synapse-development">Donating to Synapse development</a></h2>
+<p>Want to help keep Synapse going but don't know how to code? Synapse is a
+<a href="https://matrix.org">Matrix.org Foundation</a> project. Consider becoming a
+supportor on <a href="https://liberapay.com/matrixdotorg">Liberapay</a>,
+<a href="https://patreon.com/matrixdotorg">Patreon</a> or through
+<a href="https://paypal.me/matrixdotorg">PayPal</a> via a one-time donation.</p>
+<p>If you are an organisation or enterprise and would like to sponsor development,
+reach out to us over email at: support (at) matrix.org</p>
+<h2 id="reporting-a-security-vulnerability"><a class="header" href="#reporting-a-security-vulnerability">Reporting a security vulnerability</a></h2>
+<p>If you've found a security issue in Synapse or any other Matrix.org Foundation
+project, please report it to us in accordance with our <a href="https://www.matrix.org/security-disclosure-policy/">Security Disclosure
+Policy</a>. Thank you!</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="installation-instructions"><a class="header" href="#installation-instructions">Installation Instructions</a></h1>
 <h2 id="choosing-your-server-name"><a class="header" href="#choosing-your-server-name">Choosing your server name</a></h2>
 <p>It is important to choose the name for your server before you install Synapse,
@@ -1488,6 +1570,12 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1450"><a class="header" href="#upgrading-to-v1450">Upgrading to v1.45.0</a></h1>
+<h2 id="changes-required-to-media-storage-provider-modules-when-reading-from-the-synapse-configuration-object"><a class="header" href="#changes-required-to-media-storage-provider-modules-when-reading-from-the-synapse-configuration-object">Changes required to media storage provider modules when reading from the Synapse configuration object</a></h2>
+<p>Media storage provider modules that read from the Synapse configuration object (i.e. that
+read the value of <code>hs.config.[...]</code>) now need to specify the configuration section they're
+reading from. This means that if a module reads the value of e.g. <code>hs.config.media_store_path</code>,
+it needs to replace it with <code>hs.config.media.media_store_path</code>.</p>
 <h1 id="upgrading-to-v1440"><a class="header" href="#upgrading-to-v1440">Upgrading to v1.44.0</a></h1>
 <h2 id="the-url-preview-cache-is-no-longer-mirrored-to-storage-providers"><a class="header" href="#the-url-preview-cache-is-no-longer-mirrored-to-storage-providers">The URL preview cache is no longer mirrored to storage providers</a></h2>
 <p>The <code>url_cache/</code> and <code>url_cache_thumbnails/</code> directories in the media store are
@@ -2614,7 +2702,7 @@ in the local HS will automatically rejoin the room.</p>
 <h2 id="historical-note"><a class="header" href="#historical-note">Historical Note</a></h2>
 <p>This document was originally written to guide server admins through the upgrade
 path towards Synapse 1.0. Specifically,
-<a href="https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md">MSC1711</a>
+<a href="https://github.com/matrix-org/matrix-doc/blob/main/proposals/1711-x509-for-federation.md">MSC1711</a>
 required that all servers present valid TLS certificates on their federation
 API. Admins were encouraged to achieve compliance from version 0.99.0 (released
 in February 2019) ahead of version 1.0 (released June 2019) enforcing the
@@ -2849,7 +2937,7 @@ coffin of the Perspectives project (which was already pretty dead). So, the
 Spec Core Team decided that a better approach would be to mandate valid TLS
 certificates for federation alongside the rest of the Web. More details can be
 found in
-<a href="https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md#background-the-failure-of-the-perspectives-approach">MSC1711</a>.</p>
+<a href="https://github.com/matrix-org/matrix-doc/blob/main/proposals/1711-x509-for-federation.md#background-the-failure-of-the-perspectives-approach">MSC1711</a>.</p>
 <p>This results in a breaking change, which is disruptive, but absolutely critical
 for the security model. However, the existence of Let's Encrypt as a trivial
 way to replace the old self-signed certificates with valid CA-signed ones helps
@@ -7655,12 +7743,48 @@ Synapse instances. Spam checker callbacks can be registered using the module API
 either a <code>bool</code> to indicate whether the event must be rejected because of spam, or a <code>str</code>
 to indicate the event must be rejected because of spam and to give a rejection reason to
 forward to clients.</p>
+<h3 id="user_may_join_room"><a class="header" href="#user_may_join_room"><code>user_may_join_room</code></a></h3>
+<pre><code class="language-python">async def user_may_join_room(user: str, room: str, is_invited: bool) -&gt; bool
+</code></pre>
+<p>Called when a user is trying to join a room. The module must return a <code>bool</code> to indicate
+whether the user can join the room. The user is represented by their Matrix user ID (e.g.
+<code>@alice:example.com</code>) and the room is represented by its Matrix ID (e.g.
+<code>!room:example.com</code>). The module is also given a boolean to indicate whether the user
+currently has a pending invite in the room.</p>
+<p>This callback isn't called if the join is performed by a server administrator, or in the
+context of a room creation.</p>
 <h3 id="user_may_invite"><a class="header" href="#user_may_invite"><code>user_may_invite</code></a></h3>
 <pre><code class="language-python">async def user_may_invite(inviter: str, invitee: str, room_id: str) -&gt; bool
 </code></pre>
 <p>Called when processing an invitation. The module must return a <code>bool</code> indicating whether
 the inviter can invite the invitee to the given room. Both inviter and invitee are
 represented by their Matrix user ID (e.g. <code>@alice:example.com</code>).</p>
+<h3 id="user_may_send_3pid_invite"><a class="header" href="#user_may_send_3pid_invite"><code>user_may_send_3pid_invite</code></a></h3>
+<pre><code class="language-python">async def user_may_send_3pid_invite(
+    inviter: str,
+    medium: str,
+    address: str,
+    room_id: str,
+) -&gt; bool
+</code></pre>
+<p>Called when processing an invitation using a third-party identifier (also called a 3PID,
+e.g. an email address or a phone number). The module must return a <code>bool</code> indicating
+whether the inviter can invite the invitee to the given room.</p>
+<p>The inviter is represented by their Matrix user ID (e.g. <code>@alice:example.com</code>), and the
+invitee is represented by its medium (e.g. &quot;email&quot;) and its address
+(e.g. <code>alice@example.com</code>). See <a href="https://matrix.org/docs/spec/appendices#pid-types">the Matrix specification</a>
+for more information regarding third-party identifiers.</p>
+<p>For example, a call to this callback to send an invitation to the email address
+<code>alice@example.com</code> would look like this:</p>
+<pre><code class="language-python">await user_may_send_3pid_invite(
+    &quot;@bob:example.com&quot;,  # The inviter's user ID
+    &quot;email&quot;,  # The medium of the 3PID to invite
+    &quot;alice@example.com&quot;,  # The address of the 3PID to invite
+    &quot;!some_room:example.com&quot;,  # The ID of the room to send the invite into
+)
+</code></pre>
+<p><strong>Note</strong>: If the third-party identifier is already associated with a matrix user ID,
+<a href="modules/spam_checker_callbacks.html#user_may_invite"><code>user_may_invite</code></a> will be used instead.</p>
 <h3 id="user_may_create_room"><a class="header" href="#user_may_create_room"><code>user_may_create_room</code></a></h3>
 <pre><code class="language-python">async def user_may_create_room(user: str) -&gt; bool
 </code></pre>
@@ -9112,7 +9236,8 @@ def generate_mac(nonce, user, password, admin=False, user_type=None):
 </code></pre>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="registration-tokens"><a class="header" href="#registration-tokens">Registration Tokens</a></h1>
 <p>This API allows you to manage tokens which can be used to authenticate
-registration requests, as proposed in <a href="https://github.com/govynnus/matrix-doc/blob/token-registration/proposals/3231-token-authenticated-registration.md">MSC3231</a>.
+registration requests, as proposed in
+<a href="https://github.com/matrix-org/matrix-doc/blob/main/proposals/3231-token-authenticated-registration.md">MSC3231</a>.
 To use it, you will need to enable the <code>registration_requires_token</code> config
 option, and authenticate by providing an <code>access_token</code> for a server admin:
 see <a href="usage/administration/admin_api/../../usage/administration/admin_api">Admin API</a>.
@@ -11410,14 +11535,14 @@ setup a <em>virtualenv</em>, as follows:</p>
 <pre><code class="language-sh">cd path/where/you/have/cloned/the/repository
 python3 -m venv ./env
 source ./env/bin/activate
-pip install -e &quot;.[all,lint,mypy,test]&quot;
+pip install -e &quot;.[all,dev]&quot;
 pip install tox
 </code></pre>
 <p>This will install the developer dependencies for the project.</p>
 <h2 id="under-windows"><a class="header" href="#under-windows">Under Windows</a></h2>
 <p>TBD</p>
 <h1 id="5-get-in-touch"><a class="header" href="#5-get-in-touch">5. Get in touch.</a></h1>
-<p>Join our developer community on Matrix: #synapse-dev:matrix.org !</p>
+<p>Join our developer community on Matrix: <a href="https://matrix.to/#/#synapse-dev:matrix.org">#synapse-dev:matrix.org</a>!</p>
 <h1 id="6-pick-an-issue"><a class="header" href="#6-pick-an-issue">6. Pick an issue.</a></h1>
 <p>Fix your favorite problem or perhaps find a <a href="https://github.com/matrix-org/synapse/issues?q=is%3Aopen+is%3Aissue+label%3A%22Good+First+Issue%22">Good First Issue</a>
 to work on.</p>
@@ -12781,10 +12906,9 @@ code.</p>
 rather than a developer who's intending to change to code, should instead be placed
 under the Usage section of the documentation.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="how-to-test-saml-as-a-developer-without-a-server"><a class="header" href="#how-to-test-saml-as-a-developer-without-a-server">How to test SAML as a developer without a server</a></h1>
-<p>https://capriza.github.io/samling/samling.html (https://github.com/capriza/samling) is a great
-resource for being able to tinker with the SAML options within Synapse without needing to
-deploy and configure a complicated software stack.</p>
-<p>To make Synapse (and therefore Riot) use it:</p>
+<p>https://fujifish.github.io/samling/samling.html (https://github.com/fujifish/samling) is a great resource for being able to tinker with the 
+SAML options within Synapse without needing to deploy and configure a complicated software stack.</p>
+<p>To make Synapse (and therefore Element) use it:</p>
 <ol>
 <li>Use the samling.html URL above or deploy your own and visit the IdP Metadata tab.</li>
 <li>Copy the XML to your clipboard.</li>
@@ -12806,9 +12930,9 @@ the XML from step 2 as the contents.</li>
 the dependencies are installed and ready to go.</li>
 <li>Restart Synapse.</li>
 </ol>
-<p>Then in Riot:</p>
+<p>Then in Element:</p>
 <ol>
-<li>Visit the login page with a Riot pointing at your homeserver.</li>
+<li>Visit the login page and point Element towards your homeserver using the <code>public_baseurl</code> above.</li>
 <li>Click the Single Sign-On button.</li>
 <li>On the samling page, enter a Name Identifier and add a SAML Attribute for <code>uid=your_localpart</code>.
 The response must also be signed.</li>
