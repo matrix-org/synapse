@@ -64,7 +64,6 @@ perf_logger = logging.getLogger("synapse.storage.TIME")
 sql_scheduling_timer = Histogram("synapse_storage_schedule_time", "sec")
 
 sql_query_timer = Histogram("synapse_storage_query_time", "sec", ["verb"])
-sql_txn_timer = Histogram("synapse_storage_transaction_time", "sec", ["desc"])
 
 
 # Unique indexes which have been added in background updates. Maps from table name
@@ -639,7 +638,6 @@ class DatabasePool:
 
             self._current_txn_total_time += duration
             self._txn_perf_counters.update(desc, duration)
-            sql_txn_timer.labels(desc).observe(duration)
 
     async def runInteraction(
         self,

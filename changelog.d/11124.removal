@@ -1,0 +1,1 @@
+Remove the `synapse_storage_transaction_time_bucket` metric due to the high cardinality of the metric putting undue strain on Prometheus deployments. This metric is not used in Synapse's included Grafana dashboards.
