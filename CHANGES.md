@@ -3,6 +3,13 @@ Synapse 1.45.0 (2021-10-19)
 
 No functional changes since Synapse 1.45.0rc2.
 
+Known Issues
+------------
+
+- A suspected [performance regression](https://github.com/matrix-org/synapse/issues/11049) which was first reported after the release of v1.44.0 remains unresolved.
+
+  We have not been able to identify a probable cause. Affected users report that setting up a federation sender worker appears to alleviate symptoms of the regression.
+
 Improved Documentation
 ----------------------
 
