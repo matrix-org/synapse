@@ -441,7 +441,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                 },
                 RelationTypes.THREAD: {
                     "count": 2,
-                    "senders": [self.user_id],
                     "latest_event": {
                         "age": 100,
                         "content": {

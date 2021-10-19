@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import Iterable, Optional, Tuple
+from typing import Optional, Tuple
 
 import attr
 
@@ -272,7 +272,7 @@ class RelationsWorkerStore(SQLBaseStore):
     @cached()
     async def get_thread_summary(
         self, event_id: str
-    ) -> Tuple[int, Iterable[str], Optional[EventBase]]:
+    ) -> Tuple[int, Optional[EventBase]]:
         """Get the number of threaded replies, the senders of those replies, and
         the latest reply (if any) for the given event.
 
@@ -283,7 +283,7 @@ class RelationsWorkerStore(SQLBaseStore):
             The number of items in the thread and the most recent response, if any.
         """
 
-        def _get_thread_summary_txn(txn) -> Tuple[int, Iterable[str], Optional[str]]:
+        def _get_thread_summary_txn(txn) -> Tuple[int, Optional[str]]:
             # Fetch the count of threaded events and the latest event ID.
             # TODO Should this only allow m.room.message events.
             sql = """
@@ -300,7 +300,7 @@ class RelationsWorkerStore(SQLBaseStore):
             txn.execute(sql, (event_id, RelationTypes.THREAD))
             row = txn.fetchone()
             if row is None:
-                return 0, (), None
+                return 0, None
 
             latest_event_id = row[0]
 
@@ -314,23 +314,9 @@ class RelationsWorkerStore(SQLBaseStore):
             txn.execute(sql, (event_id, RelationTypes.THREAD))
             count = txn.fetchone()[0]
 
-            # Fetch the threaded event senders.
-            sql = """
-                SELECT DISTINCT sender
-                FROM event_relations
-                INNER JOIN events USING (event_id)
-                WHERE
-                    relates_to_id = ?
-                    AND relation_type = ?
-            """
-            txn.execute(sql, (event_id, RelationTypes.THREAD))
+            return count, latest_event_id
 
-            # There must be at least one result.
-            senders = [row[0] for row in txn.fetchall()]
-
-            return count, senders, latest_event_id
-
-        count, senders, latest_event_id = await self.db_pool.runInteraction(
+        count, latest_event_id = await self.db_pool.runInteraction(
             "get_thread_summary", _get_thread_summary_txn
         )
 
@@ -338,7 +324,7 @@ class RelationsWorkerStore(SQLBaseStore):
         if latest_event_id:
             latest_event = await self.get_event(latest_event_id, allow_none=True)
 
-        return count, senders, latest_event
+        return count, latest_event
 
     async def has_user_annotated_event(
         self, parent_id: str, event_type: str, aggregation_key: str, sender: str

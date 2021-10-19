@@ -467,7 +467,6 @@ class EventClientSerializer:
             if self._msc3440_enabled:
                 (
                     thread_count,
-                    thread_senders,
                     latest_thread_event,
                 ) = await self.store.get_thread_summary(event_id)
                 if latest_thread_event:
@@ -477,7 +476,6 @@ class EventClientSerializer:
                         "latest_event": await self.serialize_event(
                             latest_thread_event, time_now, bundle_aggregations=False
                         ),
-                        "senders": thread_senders,
                         "count": thread_count,
                     }
 
