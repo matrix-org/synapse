@@ -360,10 +360,10 @@ The following actions are **NOT** performed. The list may be incomplete.
 
 - Remove mappings of SSO IDs
 - [Delete media uploaded](#delete-media-uploaded-by-a-user) by user (included avatar images)
-- Delete send and received messages
-- Delete E2E cross signing keys
-- Remove creation timestamp
-- [Remove overwritten ratelimit](#override-ratelimiting-for-users)
+- Delete sent and received messages
+- Delete E2E cross-signing keys
+- Remove the user's creation (registration) timestamp
+- [Remove rate limit overrides](#override-ratelimiting-for-users)
 
 ## Reset password
 
