@@ -17,10 +17,12 @@ from unittest.mock import Mock
 
 import attr
 import canonicaljson
+import nacl
 import signedjson.key
 import signedjson.sign
 from nacl.signing import SigningKey
 from signedjson.key import encode_verify_key_base64, get_verify_key
+from unpaddedbase64 import decode_base64
 
 from twisted.internet.defer import Deferred, ensureDeferred
 
@@ -196,6 +198,28 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         d = kr.verify_json_for_server("server9", json1, 500)
         # self.assertFalse(d.called)
         self.get_success(d)
+
+    def test_verify_json_locally(self):
+        kr = keyring.Keyring(self.hs)
+        json1 = {}
+        signedjson.sign.sign_json(json1, self.hs.hostname, self.hs.signing_key)
+
+        # Test that verify_json_locally fails on an unsigned object
+        with self.assertRaises(SynapseError):
+            kr.verify_json_locally(self.hs.hostname, {})
+
+        # Test that verify_json_locally succeeds on a object signed by ourselves
+        kr.verify_json_locally(self.hs.hostname, json1)
+
+        # Test that verify_json_locally fails on object not signed by origin
+        json2 = {"fake": "json"}
+        fake_sign_seed = decode_base64("YJDBA9Xnr2sVqXD9Vj7XVUnmFZcZrlw8Md7kMW+3XA1")
+        other_key = nacl.signing.SigningKey(fake_sign_seed)
+        other_key.alg = "ed25519"
+        other_key.version = "a_lPym"
+        signedjson.sign.sign_json(json2, "other_server", other_key)
+        with self.assertRaises(SynapseError):
+            kr.verify_json_locally("other_server", json2)
 
     def test_verify_json_for_server_with_null_valid_until_ms(self):
         """Tests that we correctly handle key requests for keys we've stored
