@@ -1,3 +1,14 @@
+Synapse 1.45.0 (2021-10-19)
+===========================
+
+No functional changes since Synapse 1.45.0rc2.
+
+Improved Documentation
+----------------------
+
+- Reword changelog to clarify concerns about a suspected performance regression in 1.44. ([\#11117](https://github.com/matrix-org/synapse/issues/11117))
+
+
 Synapse 1.45.0rc2 (2021-10-14)
 ==============================
 
