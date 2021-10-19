@@ -1595,77 +1595,12 @@ class FederationEventHandler:
         # take a copy of calculated_auth_event_map before we modify it.
         auth_events: MutableStateMap[EventBase] = dict(calculated_auth_event_map)
 
+        # check for events which are in the event's claimed auth_events, but not
+        # in our calculated event map.
         event_auth_events = set(event.auth_event_ids())
-
-        # missing_auth is the set of the event's auth_events which we don't yet have
-        # in auth_events.
-        missing_auth = event_auth_events.difference(
-            e.event_id for e in auth_events.values()
-        )
-
-        # if we have missing events, we need to fetch those events from somewhere.
-        #
-        # we start by checking if they are in the store, and then try calling /event_auth/.
-        #
-        # TODO: this code is now redundant, since it should be impossible for us to
-        #   get here without already having the auth events.
-        if missing_auth:
-            have_events = await self._store.have_seen_events(
-                event.room_id, missing_auth
-            )
-            logger.debug("Events %s are in the store", have_events)
-            missing_auth.difference_update(have_events)
-
-        # missing_auth is now the set of event_ids which:
-        #  a. are listed in event.auth_events, *and*
-        #  b. are *not* part of our calculated auth events based on room state, *and*
-        #  c. are *not* yet in our database.
-
-        if missing_auth:
-            # If we don't have all the auth events, we need to get them.
-            logger.info("auth_events contains unknown events: %s", missing_auth)
-            try:
-                await self._get_remote_auth_chain_for_event(
-                    origin, event.room_id, event.event_id
-                )
-            except Exception:
-                logger.exception("Failed to get auth chain")
-            else:
-                # load any auth events we might have persisted from the database. This
-                # has the side-effect of correctly setting the rejected_reason on them.
-                auth_events.update(
-                    {
-                        (ae.type, ae.state_key): ae
-                        for ae in await self._store.get_events_as_list(
-                            missing_auth, allow_rejected=True
-                        )
-                    }
-                )
-
-        # auth_events now contains
-        #   1. our *calculated* auth events based on the room state, plus:
-        #   2. any events which:
-        #       a. are listed in `event.auth_events`, *and*
-        #       b. are not part of our calculated auth events, *and*
-        #       c. were not in our database before the call to /event_auth
-        #       d. have since been added to our database (most likely by /event_auth).
-
         different_auth = event_auth_events.difference(
             e.event_id for e in auth_events.values()
         )
-
-        # different_auth is the set of events which *are* in `event.auth_events`, but
-        # which are *not* in `auth_events`. Comparing with (2.) above, this means
-        # exclusively the set of `event.auth_events` which we already had in our
-        # database before any call to /event_auth.
-        #
-        # I'm reasonably sure that the fact that events returned by /event_auth are
-        # blindly added to auth_events (and hence excluded from different_auth) is a bug
-        # - though it's a very long-standing one (see
-        # https://github.com/matrix-org/synapse/commit/78015948a7febb18e000651f72f8f58830a55b93#diff-0bc92da3d703202f5b9be2d3f845e375f5b1a6bc6ba61705a8af9be1121f5e42R786
-        # from Jan 2015 which seems to add it, though it actually just moves it from
-        # elsewhere (before that, it gets lost in a mess of huge "various bug fixes"
-        # PRs).
 
         if not different_auth:
             return context, auth_events
