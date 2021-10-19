@@ -74,7 +74,9 @@ class DictProperty:
     ) -> None:
         instance._dict[self.key] = v
 
-    def __delete__(self, instance: Any) -> None:
+    def __delete__(
+        self, instance: Union["_EventInternalMetadata", "EventBase"]
+    ) -> None:
         try:
             del instance._dict[self.key]
         except KeyError as e1:
