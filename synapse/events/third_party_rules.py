@@ -327,7 +327,7 @@ class ThirdPartyEventRules:
 
         return True
 
-    async def on_new_event(self, event: EventBase):
+    async def on_new_event(self, event: EventBase) -> None:
         """Let modules act on events after they've been sent (e.g. auto-accepting
         invites, etc.)
 
@@ -339,9 +339,9 @@ class ThirdPartyEventRules:
         """
         # Bail out early without hitting the store if we don't have any callback
         if len(self._on_new_event_callbacks) == 0:
-            return True
+            return
 
-        state_events = self._get_state_map_for_room(event.room_id)
+        state_events = await self._get_state_map_for_room(event.room_id)
 
         for callback in self._on_new_event_callbacks:
             try:
