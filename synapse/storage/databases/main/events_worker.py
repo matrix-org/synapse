@@ -55,8 +55,9 @@ from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import BackfillStream
 from synapse.replication.tcp.streams.events import EventsStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.engines import PostgresEngine
+from synapse.storage.types import Connection
 from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
 from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import JsonDict, get_domain_from_id
@@ -727,7 +728,7 @@ class EventsWorkerStore(SQLBaseStore):
             for e in state_to_include.values()
         ]
 
-    def _do_fetch(self, conn) -> None:
+    def _do_fetch(self, conn: Connection) -> None:
         """Takes a database connection and waits for requests for events from
         the _event_fetch_list queue.
         """
@@ -755,12 +756,12 @@ class EventsWorkerStore(SQLBaseStore):
             self._fetch_event_list(conn, event_list)
 
     def _fetch_event_list(
-        self, conn, event_list: List[Tuple[List[str], defer.Deferred]]
+        self, conn: Connection, event_list: List[Tuple[List[str], defer.Deferred]]
     ) -> None:
         """Handle a load of requests from the _event_fetch_list queue
 
         Args:
-            conn (twisted.enterprise.adbapi.Connection): database connection
+            conn: database connection
 
             event_list:
                 The fetch requests. Each entry consists of a list of event
@@ -992,13 +993,15 @@ class EventsWorkerStore(SQLBaseStore):
 
         return row_map
 
-    def _fetch_event_rows(self, txn, event_ids: Iterable[str]) -> Dict[str, _EventRow]:
+    def _fetch_event_rows(
+        self, txn: LoggingTransaction, event_ids: Iterable[str]
+    ) -> Dict[str, _EventRow]:
         """Fetch event rows from the database
 
         Events which are not found are omitted from the result.
 
         Args:
-            txn (twisted.enterprise.adbapi.Connection):
+            txn: The database transaction.
             event_ids: event IDs to fetch
 
         Returns:
