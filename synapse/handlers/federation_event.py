@@ -1628,19 +1628,23 @@ class FederationEventHandler:
         new_state = await self._state_handler.resolve_events(
             room_version, (local_state, remote_state), event
         )
+        different_state = {
+            (d.type, d.state_key): d
+            for d in new_state.values()
+            if calculated_auth_event_map.get((d.type, d.state_key)) != d
+        }
+        if not different_state:
+            logger.info("State res returned no new state")
+            return context, calculated_auth_event_map
 
         logger.info(
             "After state res: updating auth_events with new state %s",
-            {
-                d
-                for d in new_state.values()
-                if calculated_auth_event_map.get((d.type, d.state_key)) != d
-            },
+            different_state.values(),
         )
 
         # take a copy of calculated_auth_event_map before we modify it.
         auth_events: MutableStateMap[EventBase] = dict(calculated_auth_event_map)
-        auth_events.update(new_state)
+        auth_events.update(different_state)
 
         context = await self._update_context_for_auth_events(
             event, context, auth_events
