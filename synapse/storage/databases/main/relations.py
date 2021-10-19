@@ -293,7 +293,7 @@ class RelationsWorkerStore(SQLBaseStore):
                 WHERE
                     relates_to_id = ?
                     AND relation_type = ?
-                ORDER BY stream_ordering DESC
+                ORDER BY depth DESC, stream_ordering DESC
                 LIMIT 1
             """
 
@@ -305,7 +305,7 @@ class RelationsWorkerStore(SQLBaseStore):
             latest_event_id = row[0]
 
             sql = """
-                SELECT COUNT(event_id)
+                SELECT COALESCE(COUNT(event_id), 0)
                 FROM event_relations
                 WHERE
                     relates_to_id = ?
