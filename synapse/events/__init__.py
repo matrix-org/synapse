@@ -16,7 +16,20 @@
 
 import abc
 import os
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
+from typing import (
+    Any,
+    Dict,
+    Generic,
+    Iterable,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    overload,
+)
 
 from unpaddedbase64 import encode_base64
 
@@ -37,7 +50,10 @@ from synapse.util.stringutils import strtobool
 USE_FROZEN_DICTS = strtobool(os.environ.get("SYNAPSE_USE_FROZEN_DICTS", "0"))
 
 
-class DictProperty:
+T = TypeVar("T")
+
+
+class DictProperty(Generic[T]):
     """An object property which delegates to the `_dict` within its parent object."""
 
     __slots__ = ["key"]
@@ -45,11 +61,27 @@ class DictProperty:
     def __init__(self, key: str):
         self.key = key
 
+    @overload
+    def __get__(
+        self,
+        instance: Literal[None],
+        owner: Optional[Type[Union["_EventInternalMetadata", "EventBase"]]] = None,
+    ) -> "DictProperty":
+        ...
+
+    @overload
+    def __get__(
+        self,
+        instance: Union["_EventInternalMetadata", "EventBase"],
+        owner: Optional[Type[Union["_EventInternalMetadata", "EventBase"]]] = None,
+    ) -> T:
+        ...
+
     def __get__(
         self,
         instance: Optional[Union["_EventInternalMetadata", "EventBase"]],
         owner: Optional[Type[Union["_EventInternalMetadata", "EventBase"]]] = None,
-    ) -> Any:
+    ) -> Union[T, "DictProperty"]:
         # if the property is accessed as a class property rather than an instance
         # property, return the property itself rather than the value
         if instance is None:
@@ -70,7 +102,7 @@ class DictProperty:
             ) from e1.__context__
 
     def __set__(
-        self, instance: Union["_EventInternalMetadata", "EventBase"], v: Any
+        self, instance: Union["_EventInternalMetadata", "EventBase"], v: T
     ) -> None:
         instance._dict[self.key] = v
 
@@ -85,7 +117,7 @@ class DictProperty:
             ) from e1.__context__
 
 
-class DefaultDictProperty(DictProperty):
+class DefaultDictProperty(DictProperty, Generic[T]):
     """An extension of DictProperty which provides a default if the property is
     not present in the parent's _dict.
 
@@ -94,15 +126,31 @@ class DefaultDictProperty(DictProperty):
 
     __slots__ = ["default"]
 
-    def __init__(self, key: str, default: Any):
+    def __init__(self, key: str, default: T):
         super().__init__(key)
         self.default = default
+
+    @overload
+    def __get__(
+        self,
+        instance: Literal[None],
+        owner: Optional[Type[Union["_EventInternalMetadata", "EventBase"]]] = None,
+    ) -> "DefaultDictProperty":
+        ...
+
+    @overload
+    def __get__(
+        self,
+        instance: Union["_EventInternalMetadata", "EventBase"],
+        owner: Optional[Type[Union["_EventInternalMetadata", "EventBase"]]] = None,
+    ) -> T:
+        ...
 
     def __get__(
         self,
         instance: Optional[Union["_EventInternalMetadata", "EventBase"]],
         owner: Optional[Type[Union["_EventInternalMetadata", "EventBase"]]] = None,
-    ) -> Any:
+    ) -> Union[T, "DefaultDictProperty"]:
         if instance is None:
             return self
         return instance._dict.get(self.key, self.default)
@@ -123,25 +171,22 @@ class _EventInternalMetadata:
         # in the DAG)
         self.outlier = False
 
-    # Tell mypy to ignore the types of properties defined by DictProperty until
-    # that is properly annotated.
-
-    out_of_band_membership: bool = DictProperty("out_of_band_membership")  # type: ignore[assignment]
-    send_on_behalf_of: str = DictProperty("send_on_behalf_of")  # type: ignore[assignment]
-    recheck_redaction: bool = DictProperty("recheck_redaction")  # type: ignore[assignment]
-    soft_failed: bool = DictProperty("soft_failed")  # type: ignore[assignment]
-    proactively_send: bool = DictProperty("proactively_send")  # type: ignore[assignment]
-    redacted: bool = DictProperty("redacted")  # type: ignore[assignment]
-    txn_id: str = DictProperty("txn_id")  # type: ignore[assignment]
-    token_id: int = DictProperty("token_id")  # type: ignore[assignment]
-    historical: bool = DictProperty("historical")  # type: ignore[assignment]
+    out_of_band_membership: DictProperty[bool] = DictProperty("out_of_band_membership")
+    send_on_behalf_of: DictProperty[str] = DictProperty("send_on_behalf_of")
+    recheck_redaction: DictProperty[bool] = DictProperty("recheck_redaction")
+    soft_failed: DictProperty[bool] = DictProperty("soft_failed")
+    proactively_send: DictProperty[bool] = DictProperty("proactively_send")
+    redacted: DictProperty[bool] = DictProperty("redacted")
+    txn_id: DictProperty[str] = DictProperty("txn_id")
+    token_id: DictProperty[int] = DictProperty("token_id")
+    historical: DictProperty[bool] = DictProperty("historical")
 
     # XXX: These are set by StreamWorkerStore._set_before_and_after.
     # I'm pretty sure that these are never persisted to the database, so shouldn't
     # be here
-    before: RoomStreamToken = DictProperty("before")  # type: ignore[assignment]
-    after: RoomStreamToken = DictProperty("after")  # type: ignore[assignment]
-    order: Tuple[int, int] = DictProperty("order")  # type: ignore[assignment]
+    before: DictProperty[RoomStreamToken] = DictProperty("before")
+    after: DictProperty[RoomStreamToken] = DictProperty("after")
+    order: DictProperty[Tuple[int, int]] = DictProperty("order")
 
     def get_dict(self) -> JsonDict:
         return dict(self._dict)
@@ -244,20 +289,17 @@ class EventBase(metaclass=abc.ABCMeta):
 
         self.internal_metadata = _EventInternalMetadata(internal_metadata_dict)
 
-    # Tell mypy to ignore the types of properties defined by DictProperty until
-    # that is properly annotated.
-
-    depth: int = DictProperty("depth")  # type: ignore[assignment]
-    content: JsonDict = DictProperty("content")  # type: ignore[assignment]
-    hashes: Dict[str, str] = DictProperty("hashes")  # type: ignore[assignment]
-    origin: str = DictProperty("origin")  # type: ignore[assignment]
-    origin_server_ts: int = DictProperty("origin_server_ts")  # type: ignore[assignment]
-    redacts: Optional[str] = DefaultDictProperty("redacts", None)  # type: ignore[assignment]
-    room_id: str = DictProperty("room_id")  # type: ignore[assignment]
-    sender: str = DictProperty("sender")  # type: ignore[assignment]
-    state_key: str = DictProperty("state_key")  # type: ignore[assignment]
-    type: str = DictProperty("type")  # type: ignore[assignment]
-    user_id: str = DictProperty("sender")  # type: ignore[assignment]
+    depth: DictProperty[int] = DictProperty("depth")
+    content: DictProperty[JsonDict] = DictProperty("content")
+    hashes: DictProperty[Dict[str, str]] = DictProperty("hashes")
+    origin: DictProperty[str] = DictProperty("origin")
+    origin_server_ts: DictProperty[int] = DictProperty("origin_server_ts")
+    redacts: DefaultDictProperty[Optional[str]] = DefaultDictProperty("redacts", None)
+    room_id: DictProperty[str] = DictProperty("room_id")
+    sender: DictProperty[str] = DictProperty("sender")
+    state_key: DictProperty[str] = DictProperty("state_key")
+    type: DictProperty[str] = DictProperty("type")
+    user_id: DictProperty[str] = DictProperty("sender")
 
     @property
     def event_id(self) -> str:
