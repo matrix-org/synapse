@@ -6,14 +6,14 @@ No functional changes since Synapse 1.45.0rc2.
 Known Issues
 ------------
 
-- A suspected [performance regression](https://github.com/matrix-org/synapse/issues/11049) which was first reported after the release of v1.44.0 remains unresolved.
+- A suspected [performance regression](https://github.com/matrix-org/synapse/issues/11049) which was first reported after the release of 1.44.0 remains unresolved.
 
   We have not been able to identify a probable cause. Affected users report that setting up a federation sender worker appears to alleviate symptoms of the regression.
 
 Improved Documentation
 ----------------------
 
-- Reword changelog to clarify concerns about a suspected performance regression in 1.44. ([\#11117](https://github.com/matrix-org/synapse/issues/11117))
+- Reword changelog to clarify concerns about a suspected performance regression in 1.44.0. ([\#11117](https://github.com/matrix-org/synapse/issues/11117))
 
 
 Synapse 1.45.0rc2 (2021-10-14)
@@ -24,7 +24,7 @@ This release candidate [fixes](https://github.com/matrix-org/synapse/issues/1105
 Known Issues
 ------------
 
-- A suspected [performance regression](https://github.com/matrix-org/synapse/issues/11049) which was first reported after the release of v1.44.0 remains unresolved.
+- A suspected [performance regression](https://github.com/matrix-org/synapse/issues/11049) which was first reported after the release of 1.44.0 remains unresolved.
 
   We have not been able to identify a probable cause. Affected users report that setting up a federation sender worker appears to alleviate symptoms of the regression.
 
@@ -34,7 +34,7 @@ Bugfixes
 - Fix a long-standing bug when using multiple event persister workers where events were not correctly sent down `/sync` due to a race. ([\#11045](https://github.com/matrix-org/synapse/issues/11045))
 - Fix a bug introduced in Synapse 1.45.0rc1 where the user directory would stop updating if it processed an event from a
   user not in the `users` table. ([\#11053](https://github.com/matrix-org/synapse/issues/11053))
-- Fix a bug introduced in Synapse v1.44.0 when logging errors during oEmbed processing. ([\#11061](https://github.com/matrix-org/synapse/issues/11061))
+- Fix a bug introduced in Synapse 1.44.0 when logging errors during oEmbed processing. ([\#11061](https://github.com/matrix-org/synapse/issues/11061))
 
 
 Internal Changes
@@ -54,7 +54,7 @@ Synapse 1.45.0rc1 (2021-10-12)
 Known Issues
 ------------
 
-- We are investigating [a performance issue](https://github.com/matrix-org/synapse/issues/11049) which was reported after the release of v1.44.0.
+- We are investigating [a performance issue](https://github.com/matrix-org/synapse/issues/11049) which was reported after the release of 1.44.0.
 - We are aware of [a bug](https://github.com/matrix-org/synapse/issues/11025) with the user directory when using application services. A second release candidate is expected which will resolve this.
 
 Features
