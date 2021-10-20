@@ -1,1 +1,0 @@
-Fetch verify key locally rather than trying to do so over federation if host and origin are the same.

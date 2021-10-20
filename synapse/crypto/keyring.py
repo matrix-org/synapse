@@ -178,28 +178,33 @@ class Keyring:
             clock=hs.get_clock(),
             process_batch_callback=self._inner_fetch_key_requests,
         )
-        self.signing_key = hs.signing_key
+        self.verify_key = get_verify_key(hs.signing_key)
         self.hostname = hs.hostname
 
-    def verify_json_locally(self, server_name: str, json_object: JsonDict):
-        verify_key = get_verify_key(self.signing_key)
-        verified = False
+    def verify_json_locally(self, server_name: str, json_object: JsonDict) -> None:
+        """Verify that a JSON object has been signed by this homeserver
 
+        Completes if the the object was correctly signed, otherwise raises.
+
+        Args:
+            server_name: name of the server which must have signed this object
+
+            json_object: object to be checked
+        """
         try:
             verify_signed_json(
                 json_object,
                 server_name,
-                verify_key,
+                self.verify_key,
             )
-            verified = True
 
-        except SignatureVerifyException as e:
+        except Exception as e:
             logger.debug(
                 "Error verifying signature for %s:%s:%s with key %s: %s",
                 server_name,
-                verify_key.alg,
-                verify_key.version,
-                encode_verify_key_base64(verify_key),
+                self.verify_key.alg,
+                self.verify_key.version,
+                encode_verify_key_base64(self.verify_key),
                 str(e),
             )
             raise SynapseError(
@@ -207,17 +212,10 @@ class Keyring:
                 "Invalid signature for server %s with key %s:%s: %s"
                 % (
                     server_name,
-                    verify_key.alg,
-                    verify_key.version,
+                    self.verify_key.alg,
+                    self.verify_key.version,
                     str(e),
                 ),
-                Codes.UNAUTHORIZED,
-            )
-
-        if not verified:
-            raise SynapseError(
-                401,
-                "Unable to verify request",
                 Codes.UNAUTHORIZED,
             )
 
