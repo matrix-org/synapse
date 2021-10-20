@@ -481,6 +481,11 @@ class TypingNotificationEventSource(EventSource[int, JsonDict]):
             for room_id in handler._room_serials.keys():
                 if handler._room_serials[room_id] <= from_key:
                     continue
+
+                # TODO: This doesn't seem to honour an appservice's registration of room or
+                #   namespace aliases. For instance, if an appservice registered a room namespace
+                #   that matched this room, but it didn't have any members in the room, then that
+                #   appservice wouldn't receive the typing event.
                 if not await service.matches_user_in_member_list(
                     room_id, handler.store
                 ):
