@@ -390,9 +390,8 @@ class UserDirectoryHandler(StateDeltasHandler):
 
             # First, if they're our user then we need to update for every user
             if self.is_mine_id(user_id):
-                if await self.store.should_include_local_user_in_dir(user_id):
-                    for other_user_id in other_users_in_room:
-                        to_insert.add((user_id, other_user_id))
+                for other_user_id in other_users_in_room:
+                    to_insert.add((user_id, other_user_id))
 
             # Next we need to update for every local user in the room
             for other_user_id in other_users_in_room:
