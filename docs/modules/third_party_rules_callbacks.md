@@ -125,8 +125,8 @@ as the state of the room _after_ the event. This means that if the event is a st
 it will be included in this state.
 
 Note that this callback is called when the event has already been processed and stored
-into the room, which means this callback cannot be used to deny persisting the event. To deny an incoming
-event, see [`check_event_for_spam`](http://localhost:3000/modules/spam_checker_callbacks.html#check_event_for_spam).
+into the room, which means this callback cannot be used to deny persisting the event. To
+deny an incoming event, see [`check_event_for_spam`](spam_checker_callbacks.md#check_event_for_spam) instead.
 
 If multiple modules implement this callback, Synapse runs them all in order.
 
