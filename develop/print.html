@@ -9324,9 +9324,9 @@ See also <a href="admin_api/media_admin_api.html#purge-remote-media-api">Purge R
 <p>URL Parameters</p>
 <ul>
 <li><code>server_name</code>: string - The name of your local server (e.g <code>matrix.org</code>).</li>
-<li><code>before_ts</code>: string representing a positive integer - Unix timestamp in ms.
+<li><code>before_ts</code>: string representing a positive integer - Unix timestamp in milliseconds.
 Files that were last used before this timestamp will be deleted. It is the timestamp of
-last access and not the timestamp creation.</li>
+last access, not the timestamp when the file was created.</li>
 <li><code>size_gt</code>: Optional - string representing a positive integer - Size of the media in bytes.
 Files that are larger will be deleted. Defaults to <code>0</code>.</li>
 <li><code>keep_profiles</code>: Optional - string representing a boolean - Switch to also delete files
@@ -9359,7 +9359,7 @@ If <code>false</code> these files will be deleted. Defaults to <code>true</code>
 </code></pre>
 <p>URL Parameters</p>
 <ul>
-<li><code>unix_timestamp_in_ms</code>: string representing a positive integer - Unix timestamp in ms.
+<li><code>unix_timestamp_in_ms</code>: string representing a positive integer - Unix timestamp in milliseconds.
 All cached media that was last accessed before this timestamp will be removed.</li>
 </ul>
 <p>Response:</p>
