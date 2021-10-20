@@ -4,7 +4,7 @@ Synapse 1.45.1 (2021-10-20)
 Bugfixes
 --------
 
-- Revert change to counting of deactivated users towards the monthly active users limit, introduced in 1.45.0rc1 ([\#10947](https://github.com/matrix-org/synapse/issues/10947)). ([\#11127](https://github.com/matrix-org/synapse/issues/11127))
+- Revert change to counting of deactivated users towards the monthly active users limit, introduced in 1.45.0rc1. ([\#11127](https://github.com/matrix-org/synapse/issues/11127))
 
 
 Synapse 1.45.0 (2021-10-19)
