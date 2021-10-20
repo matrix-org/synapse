@@ -1646,7 +1646,7 @@ class FederationEventHandler:
         )
 
         # take a copy of calculated_auth_event_map before we modify it.
-        auth_events: MutableStateMap[EventBase] = dict(calculated_auth_event_map)
+        auth_events = dict(calculated_auth_event_map)
         auth_events.update(different_state)
         return auth_events
 
