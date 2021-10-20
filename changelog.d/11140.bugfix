@@ -1,0 +1,1 @@
+Fix a long-standing bug that caused duplicate presence updates to be sent to application services.
