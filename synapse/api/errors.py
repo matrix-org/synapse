@@ -596,10 +596,3 @@ class ShadowBanError(Exception):
 
     This should be caught and a proper "fake" success response sent to the user.
     """
-
-
-class ModuleFailureError(Exception):
-    """
-    Raised when a module raises an exception. If this is raised in the context of an
-    HTTP(S) request, it will translate into a 500 response with a generic Matrix error.
-    """

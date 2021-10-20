@@ -14,7 +14,7 @@
 import logging
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Optional, Tuple
 
-from synapse.api.errors import ModuleFailureError, SynapseError
+from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.types import Requester, StateMap
@@ -347,8 +347,7 @@ class ThirdPartyEventRules:
             try:
                 await callback(event, state_events)
             except Exception as e:
-                logger.error("Failed to run module API callback %s: %s", callback, e)
-                raise ModuleFailureError(e)
+                logger.exception("Failed to run module API callback %s: %s", callback, e)
 
     async def _get_state_map_for_room(self, room_id: str) -> StateMap[EventBase]:
         """Given a room ID, return the state events of that room.

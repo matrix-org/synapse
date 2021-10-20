@@ -17,7 +17,8 @@ from unittest.mock import Mock
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
-from synapse.events import EventBase
+from synapse.api.room_versions import RoomVersions
+from synapse.events import EventBase, FrozenEventV3
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.rest import admin
 from synapse.rest.client import login, room
@@ -75,7 +76,7 @@ class LegacyChangeEvents(LegacyThirdPartyRulesTestModule):
         return d
 
 
-class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
+class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
     servlets = [
         admin.register_servlets,
         login.register_servlets,
@@ -86,6 +87,25 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         hs = self.setup_test_homeserver()
 
         load_legacy_third_party_event_rules(hs)
+
+        # We're not going to be properly signing events as our remote homeserver is fake,
+        # therefore disable event signature checks.
+        # Note that these checks are not relevant to this test case.
+
+        # Have this homeserver auto-approve all event signature checking.
+        async def approve_all_signature_checking(_, pdu):
+            return pdu
+
+        hs.get_federation_server()._check_sigs_and_hash = (
+            approve_all_signature_checking
+        )
+
+        # Have this homeserver skip event auth checks. This is necessary due to
+        # event auth checks ensuring that events were signed by the sender's homeserver.
+        async def _check_event_auth(origin, event, context, *args, **kwargs):
+            return context
+
+        hs.get_federation_event_handler()._check_event_auth = _check_event_auth
 
         return hs
 
@@ -451,6 +471,48 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(args[0].membership, Membership.INVITE)
         self.assertEqual(args[0].state_key, self.invitee)
+
+        # Check that the invitee's membership is correct in the state that's passed down
+        # to the callback.
+        self.assertEqual(
+            args[1][(EventTypes.Member, self.invitee)].membership,
+            Membership.INVITE,
+        )
+
+        # Send an event over federation and check that the callback is also called.
+        self._send_event_over_federation()
+        self.assertEqual(on_new_event.call_count, 3)
+
+    def _send_event_over_federation(self) -> None:
+        """Send a dummy event over federation and check that the request succeeds."""
+        body = {
+            "origin": self.hs.config.server.server_name,
+            "origin_server_ts": self.clock.time_msec(),
+            "pdus": [
+                {
+                    "sender": self.user_id,
+                    "type": EventTypes.Message,
+                    "state_key": "",
+                    "content": {"body": "hello world", "msgtype": "m.text"},
+                    "room_id": self.room_id,
+                    "depth": 0,
+                    "origin_server_ts": self.clock.time_msec(),
+                    "prev_events": [],
+                    "auth_events": [],
+                    "signatures": {},
+                    "unsigned": {},
+                }
+            ],
+        }
+
+        channel = self.make_request(
+            method="PUT",
+            path="/_matrix/federation/v1/send/1",
+            content=body,
+            federation_auth_origin=self.hs.config.server.server_name.encode("utf8"),
+        )
+
+        self.assertEqual(channel.code, 200, channel.result)
 
     def _update_power_levels(self, event_default: int = 0):
         """Updates the room's power levels.
