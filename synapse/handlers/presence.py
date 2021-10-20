@@ -1483,11 +1483,38 @@ def should_notify(old_state: UserPresenceState, new_state: UserPresenceState) ->
 def format_user_presence_state(
     state: UserPresenceState, now: int, include_user_id: bool = True
 ) -> JsonDict:
-    """Convert UserPresenceState to a format that can be sent down to clients
+    """Convert UserPresenceState to a JSON format that can be sent down to clients
     and to other servers.
 
-    The "user_id" is optional so that this function can be used to format presence
-    updates for client /sync responses and for federation /send requests.
+    Args:
+        state: The user presence state to format.
+        now: The current timestamp since the epoch in ms.
+        include_user_id: Whether to include `user_id` in the returned dictionary.
+            As this function can be used both to format presence updates for client /sync
+            responses and for federation /send requests, only the latter needs the include
+            the `user_id` field.
+
+    Returns:
+        A JSON dictionary with the following keys:
+            * presence: The presence state as a str.
+            * user_id: Optional. Included if `include_user_id` is truthy. The canonical
+                Matrix ID of the user.
+            * last_active_ago: Optional. Included if `last_active_ts` is set on `state`.
+                The timestamp that the user was last active.
+            * status_msg: Optional. Included if `status_msg` is set on `state`. The user's
+                status.
+            * currently_active: Optional. Included only if `state.state` is "online". Set to
+                the value of `state.currently_active`.
+
+        Example:
+
+        {
+            "presence": "online",
+            "user_id": "@alice:example.com",
+            "last_active_ago": 16783813918,
+            "status_msg": "Hello world!",
+            "currently_active": True
+        }
     """
     content: JsonDict = {"presence": state.state}
     if include_user_id:
