@@ -9,6 +9,8 @@ The available account validity callbacks are:
 
 ### `is_user_expired`
 
+_First introduced in Synapse v1.39.0_
+
 ```python
 async def is_user_expired(user: str) -> Optional[bool]
 ```
@@ -28,6 +30,8 @@ callback that does not return `None` will be used. If this happens, Synapse will
 any of the subsequent implementations of this callback.
 
 ### `on_user_registration`
+
+_First introduced in Synapse v1.39.0_
 
 ```python
 async def on_user_registration(user: str) -> None

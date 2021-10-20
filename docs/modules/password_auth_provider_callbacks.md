@@ -8,6 +8,8 @@ registered by using the Module API's `register_password_auth_provider_callbacks`
 
 ### `auth_checkers`
 
+_First introduced in Synapse v1.46.0_
+
 ```
  auth_checkers: Dict[Tuple[str,Tuple], Callable]
 ```
@@ -55,6 +57,8 @@ authentication fails.
 
 ### `check_3pid_auth`
 
+_First introduced in Synapse v1.46.0_
+
 ```python
 async def check_3pid_auth(
     medium: str, 
@@ -85,6 +89,8 @@ any of the subsequent implementations of this callback. If every callback return
 the authentication is denied.
 
 ### `on_logged_out`
+
+_First introduced in Synapse v1.46.0_
 
 ```python
 async def on_logged_out(
