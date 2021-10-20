@@ -373,11 +373,10 @@ class UserDirectoryHandler(StateDeltasHandler):
         is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
         )
-        other_users_in_room = await self.store.get_users_in_room(room_id)
-
         if is_public:
             await self.store.add_users_in_public_rooms(room_id, (user_id,))
         else:
+            other_users_in_room = await self.store.get_users_in_room(room_id)
             to_insert = set()
 
             # First, if they're our user then we need to update for every user
