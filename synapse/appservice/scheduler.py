@@ -48,7 +48,16 @@ This is all tied together by the AppServiceScheduler which DIs the required
 components.
 """
 import logging
-from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional, Set
+from typing import (
+    TYPE_CHECKING,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Set,
+)
 
 from synapse.appservice import ApplicationService, ApplicationServiceState
 from synapse.appservice.api import ApplicationServiceApi
@@ -103,7 +112,7 @@ class ApplicationServiceScheduler:
         self.queuer.enqueue_event(service, event)
 
     def submit_ephemeral_events_for_as(
-        self, service: ApplicationService, events: List[JsonDict]
+        self, service: ApplicationService, events: Iterable[JsonDict]
     ) -> None:
         self.queuer.enqueue_ephemeral(service, events)
 
@@ -141,7 +150,7 @@ class _ServiceQueuer:
         self._start_background_request(service)
 
     def enqueue_ephemeral(
-        self, service: ApplicationService, events: List[JsonDict]
+        self, service: ApplicationService, events: Iterable[JsonDict]
     ) -> None:
         self.queued_ephemeral.setdefault(service.id, []).extend(events)
         self._start_background_request(service)

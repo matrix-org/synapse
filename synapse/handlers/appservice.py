@@ -383,7 +383,7 @@ class ApplicationServicesHandler:
         service: ApplicationService,
         users: Collection[Union[str, UserID]],
         new_token: Optional[int],
-    ) -> List[JsonDict]:
+    ) -> Set[JsonDict]:
         """
         Return the latest presence updates that the given application service should receive.
 
@@ -438,7 +438,7 @@ class ApplicationServicesHandler:
                 for event in presence_events
             )
 
-        return list(events)
+        return events
 
     async def query_user_exists(self, user_id: str) -> bool:
         """Check if any application service knows this user_id exists.
