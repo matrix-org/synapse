@@ -17,8 +17,7 @@ from unittest.mock import Mock
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
-from synapse.api.room_versions import RoomVersions
-from synapse.events import EventBase, FrozenEventV3
+from synapse.events import EventBase
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.rest import admin
 from synapse.rest.client import login, room
@@ -96,9 +95,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         async def approve_all_signature_checking(_, pdu):
             return pdu
 
-        hs.get_federation_server()._check_sigs_and_hash = (
-            approve_all_signature_checking
-        )
+        hs.get_federation_server()._check_sigs_and_hash = approve_all_signature_checking
 
         # Have this homeserver skip event auth checks. This is necessary due to
         # event auth checks ensuring that events were signed by the sender's homeserver.
