@@ -10,6 +10,8 @@ The available third party rules callbacks are:
 
 ### `check_event_allowed`
 
+_First introduced in Synapse v1.39.0_
+
 ```python
 async def check_event_allowed(
     event: "synapse.events.EventBase",
@@ -51,6 +53,8 @@ any of the subsequent implementations of this callback.
 
 ### `on_create_room`
 
+_First introduced in Synapse v1.39.0_
+
 ```python
 async def on_create_room(
     requester: "synapse.types.Requester",
@@ -76,6 +80,8 @@ callback.
 
 ### `check_threepid_can_be_invited`
 
+_First introduced in Synapse v1.39.0_
+
 ```python
 async def check_threepid_can_be_invited(
     medium: str,
@@ -93,6 +99,8 @@ callback that does not return `True` will be used. If this happens, Synapse will
 any of the subsequent implementations of this callback.
 
 ### `check_visibility_can_be_modified`
+
+_First introduced in Synapse v1.39.0_
 
 ```python
 async def check_visibility_can_be_modified(
