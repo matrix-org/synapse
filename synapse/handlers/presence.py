@@ -1502,8 +1502,7 @@ def format_user_presence_state(
                 The timestamp that the user was last active.
             * status_msg: Optional. Included if `status_msg` is set on `state`. The user's
                 status.
-            * currently_active: Optional. Included only if `state.state` is "online". Set to
-                the value of `state.currently_active`.
+            * currently_active: Optional. Included only if `state.state` is "online".
 
         Example:
 
