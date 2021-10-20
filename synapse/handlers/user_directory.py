@@ -381,6 +381,10 @@ class UserDirectoryHandler(StateDeltasHandler):
                 other
                 for other in users_in_room
                 if other != user_id
+                and (
+                    not self.is_mine_id(other)
+                    or await self.store.should_include_local_user_in_dir(other)
+                )
             ]
             to_insert = set()
 
@@ -392,10 +396,7 @@ class UserDirectoryHandler(StateDeltasHandler):
 
             # Next we need to update for every local user in the room
             for other_user_id in other_users_in_room:
-                include_other_user = self.is_mine_id(
-                    other_user_id
-                ) and await self.store.should_include_local_user_in_dir(other_user_id)
-                if include_other_user:
+                if self.is_mine_id(other_user_id):
                     to_insert.add((other_user_id, user_id))
 
             if to_insert:
