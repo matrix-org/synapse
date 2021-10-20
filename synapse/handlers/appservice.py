@@ -367,7 +367,8 @@ class ApplicationServicesHandler:
 
             # TODO: Make presence_events a Set. These presence events should be de-duplicated.
             presence_events, _ = await presence_source.get_new_events(
-                user=user, from_key=from_key,
+                user=user,
+                from_key=from_key,
             )
             time_now = self.clock.time_msec()
             events.extend(
