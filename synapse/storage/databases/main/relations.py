@@ -293,7 +293,7 @@ class RelationsWorkerStore(SQLBaseStore):
                 WHERE
                     relates_to_id = ?
                     AND relation_type = ?
-                ORDER BY depth DESC, stream_ordering DESC
+                ORDER BY topological_ordering DESC, stream_ordering DESC
                 LIMIT 1
             """
 
