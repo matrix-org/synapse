@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse v1.44.0 when logging errors during oEmbed processing.
