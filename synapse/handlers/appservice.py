@@ -185,19 +185,25 @@ class ApplicationServicesHandler:
         new_token: Optional[int],
         users: Optional[Collection[Union[str, UserID]]] = None,
     ) -> None:
-        """This is called by the notifier in the background
-        when a ephemeral event handled by the homeserver.
+        """
+        This is called by the notifier in the background when
+        an ephemeral event is handled by the homeserver.
 
-        This will determine which appservices
-        are interested in the event, and submit them.
-
-        Events will only be pushed to appservices
-        that have opted into ephemeral events
+        This will determine which appservices are
+        interested in the event, and submit them.
 
         Args:
             stream_key: The stream the event came from.
-            new_token: The latest stream token
-            users: The user(s) involved with the event.
+
+                When `stream_key` is "typing_key", "receipt_key" or "presence_key", events
+                will only be pushed to appservices that have opted into ephemeral events.
+                Appservices will only receive ephemeral events that fall within their
+                registered user and room namespaces.
+
+                Any other value for `stream_key` will cause this function to return early.
+
+            new_token: The latest stream token.
+            users: The users that should be informed of the new event, if any.
         """
         if not self.notify_appservices:
             return
@@ -232,21 +238,34 @@ class ApplicationServicesHandler:
             for service in services:
                 # Only handle typing if we have the latest token
                 if stream_key == "typing_key" and new_token is not None:
+                    # Note that we don't persist the token (via set_type_stream_id_for_appservice)
+                    # for typing_key due to performance reasons and due to their highly
+                    # ephemeral nature.
+                    #
+                    # Instead we simply grab the latest typing update in _handle_typing
+                    # and, if it applies to this application service, send it off.
                     events = await self._handle_typing(service, new_token)
                     if events:
                         self.scheduler.submit_ephemeral_events_for_as(service, events)
-                    # We don't persist the token for typing_key for performance reasons
+
                 elif stream_key == "receipt_key":
                     events = await self._handle_receipts(service)
                     if events:
                         self.scheduler.submit_ephemeral_events_for_as(service, events)
+
+                    # Persist the latest handled stream token for this appservice
+                    # TODO: We seem to update the stream token for each appservice,
+                    #  even if sending the ephemeral events to the appservice failed.
                     await self.store.set_type_stream_id_for_appservice(
                         service, "read_receipt", new_token
                     )
+
                 elif stream_key == "presence_key":
                     events = await self._handle_presence(service, users)
                     if events:
                         self.scheduler.submit_ephemeral_events_for_as(service, events)
+
+                    # Persist the latest handled stream token for this appservice
                     await self.store.set_type_stream_id_for_appservice(
                         service, "presence", new_token
                     )
