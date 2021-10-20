@@ -28,6 +28,8 @@ any of the subsequent implementations of this callback.
 
 ### `user_may_join_room`
 
+_First introduced in Synapse v1.37.0_
+
 ```python
 async def user_may_join_room(user: str, room: str, is_invited: bool) -> bool
 ```
@@ -64,6 +66,8 @@ callback that does not return `True` will be used. If this happens, Synapse will
 any of the subsequent implementations of this callback.
 
 ### `user_may_send_3pid_invite`
+
+_First introduced in Synapse v1.45.0_
 
 ```python
 async def user_may_send_3pid_invite(
@@ -120,6 +124,8 @@ callback that does not return `True` will be used. If this happens, Synapse will
 any of the subsequent implementations of this callback.
 
 ### `user_may_create_room_with_invites`
+
+_First introduced in Synapse v1.44.0_
 
 ```python
 async def user_may_create_room_with_invites(
