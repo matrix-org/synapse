@@ -467,9 +467,14 @@ class TypingNotificationEventSource(EventSource[int, JsonDict]):
         Args:
             from_key: the stream position at which events should be fetched from
             service: The appservice which may be interested
+
+        Returns:
+            A two-tuple containing the following:
+                * A list of json dictionaries derived from typing events that the
+                  appservice may be interested in.
+                * The latest known room serial.
         """
         with Measure(self.clock, "typing.get_new_events_as"):
-            from_key = int(from_key)
             handler = self.get_typing_handler()
 
             events = []

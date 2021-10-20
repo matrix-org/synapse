@@ -273,18 +273,49 @@ class ApplicationServicesHandler:
     async def _handle_typing(
         self, service: ApplicationService, new_token: int
     ) -> List[JsonDict]:
+        """
+        Given an application service, determine which events it should receive
+        from the given typing event stream token and now.
+
+        Args:
+            service: The application service to check for which events it should receive.
+            new_token: The latest typing event stream token.
+
+        Returns:
+            A list of JSON dictionaries containing data derived from the typing events that
+            should be sent to the given application service.
+        """
         typing_source = self.event_sources.sources.typing
         # Get the typing events from just before current
         typing, _ = await typing_source.get_new_events_as(
             service=service,
             # For performance reasons, we don't persist the previous
-            # token in the DB and instead fetch the latest typing information
+            # token in the DB and instead fetch the latest typing event
             # for appservices.
+            # TODO: It'd probably be more efficient to simply fetch the
+            #  typing event with the given 'new_token' stream token and
+            #  checking if the given service was interested, rather than
+            #  iterating over all typing events and only grabbing the
+            #  latest one.
             from_key=new_token - 1,
         )
         return typing
 
     async def _handle_receipts(self, service: ApplicationService) -> List[JsonDict]:
+        """
+        Given an application service, determine which events it should receive
+        from those between the last-recorded typing event stream token for this
+        appservice and the latest one.
+
+        Args:
+            service: The application service to check for which events it should receive.
+            new_token: A typing event stream token. Typing events between this token and
+                the current event stream token will be checked.
+
+        Returns:
+            A list of JSON dictionaries containing data derived from the typing events that
+            should be sent to the given application service.
+        """
         from_key = await self.store.get_type_stream_id_for_appservice(
             service, "read_receipt"
         )
@@ -297,6 +328,19 @@ class ApplicationServicesHandler:
     async def _handle_presence(
         self, service: ApplicationService, users: Collection[Union[str, UserID]]
     ) -> List[JsonDict]:
+        """
+        Given an application service and a list of users who should be receiving
+        presence updates, return a list of presence updates destined for the
+        application service.
+
+        Args:
+            service: The application service that ephemeral events are being sent to.
+            users: The users that should receive the presence update.
+
+        Returns:
+            A list of json dictionaries containing data derived from the presence events
+            that should be sent to the given application service.
+        """
         events: List[JsonDict] = []
         presence_source = self.event_sources.sources.presence
         from_key = await self.store.get_type_stream_id_for_appservice(
