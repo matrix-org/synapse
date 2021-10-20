@@ -1,0 +1,1 @@
+Partially address occasional bursts of old read receipt and presence data being sent to application services that have opted in to receiving them.
