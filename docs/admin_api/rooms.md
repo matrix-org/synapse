@@ -38,10 +38,14 @@ The following query parameters are available:
   - `history_visibility` - Rooms are ordered alphabetically by visibility of history of the room.
   - `state_events` - Rooms are ordered by number of state events. Largest to smallest.
 * `dir` - Direction of room order. Either `f` for forwards or `b` for backwards. Setting
-          this value to `b` will reverse the above sort order. Defaults to `f`.
+  this value to `b` will reverse the above sort order. Defaults to `f`.
 * `search_term` - Filter rooms by their room name, canonical alias and room id.
-                  Search term can be contained in any part of the room name and
-                  local part of canonical alias or room id. Defaults to no filtering.
+  Specifically, rooms are selected if the search term is contained in
+  - the room's name,
+  - the local part of the room's canonical alias, or
+  - the local part of the room's id.
+
+  Defaults to no filtering.
 
 **Response**
 

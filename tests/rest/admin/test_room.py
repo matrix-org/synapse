@@ -895,7 +895,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
                 r = rooms[0]
                 self.assertEqual(expected_room_id, r["room_id"])
 
-        # Perform search tests
+        # Test searching by room name
         _search_test(room_id_1, "something")
         _search_test(room_id_1, "thing")
 

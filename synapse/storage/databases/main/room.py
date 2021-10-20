@@ -417,6 +417,7 @@ class RoomWorkerStore(SQLBaseStore):
         """
         # Filter room names by a string
         where_statement = ""
+        search_pattern = ""
         if search_term:
             where_statement = """
                 WHERE LOWER(state.name) LIKE ?
@@ -429,7 +430,7 @@ class RoomWorkerStore(SQLBaseStore):
             # HOWEVER, if you put a % into your SQL then everything goes wibbly.
             # To get around this, we're going to surround search_term with %'s
             # before giving it to the database in python instead
-            search_term = [
+            search_pattern = [
                 "%" + search_term.lower() + "%",
                 "#%" + search_term.lower() + "%:%",
                 "!%" + search_term.lower() + "%:%",
@@ -527,9 +528,9 @@ class RoomWorkerStore(SQLBaseStore):
         def _get_rooms_paginate_txn(txn):
             # Execute the data query
             sql_values = [limit, start]
-            if search_term:
+            if search_pattern:
                 # Add the search term into the WHERE clause
-                sql_values = search_term + sql_values
+                sql_values = search_pattern + sql_values
             txn.execute(info_sql, sql_values)
 
             # Refactor room query data into a structured dictionary
@@ -557,7 +558,7 @@ class RoomWorkerStore(SQLBaseStore):
             # Execute the count query
 
             # Add the search term into the WHERE clause if present
-            sql_values = search_term if search_term else ()
+            sql_values = search_pattern if search_pattern else ()
             txn.execute(count_sql, sql_values)
 
             room_count = txn.fetchone()
