@@ -1,1 +1,0 @@
-Revert change to counting of deactivated users towards the monthly active users limit ([\#10947](https://github.com/matrix-org/synapse/issues/10947)).
