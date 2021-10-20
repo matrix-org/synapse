@@ -347,7 +347,6 @@ The following actions are performed when deactivating an user:
 - Remove the user from the user directory
 - Reject all pending invites
 - Remove all account validity information related to the user
-- Remove from monthly active users
 
 The following additional actions are performed during deactivation if `erase`
 is set to `true`:
@@ -364,6 +363,7 @@ The following actions are **NOT** performed. The list may be incomplete.
 - Delete E2E cross-signing keys
 - Remove the user's creation (registration) timestamp
 - [Remove rate limit overrides](#override-ratelimiting-for-users)
+- Remove from monthly active users
 
 ## Reset password
 
