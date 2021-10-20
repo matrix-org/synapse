@@ -465,8 +465,8 @@ class TypingNotificationEventSource(EventSource[int, JsonDict]):
         may be interested in.
 
         Args:
-            from_key: the stream position at which events should be fetched from
-            service: The appservice which may be interested
+            from_key: the stream position at which events should be fetched from.
+            service: The appservice which may be interested.
 
         Returns:
             A two-tuple containing the following:

@@ -186,21 +186,22 @@ class ApplicationServicesHandler:
         users: Optional[Collection[Union[str, UserID]]] = None,
     ) -> None:
         """
-        This is called by the notifier in the background when
-        an ephemeral event is handled by the homeserver.
+        This is called by the notifier in the background when an ephemeral event is handled
+        by the homeserver.
 
-        This will determine which appservices are
-        interested in the event, and submit them.
+        This will determine which appservices are interested in the event, and submit them.
 
         Args:
             stream_key: The stream the event came from.
 
-                When `stream_key` is "typing_key", "receipt_key" or "presence_key", events
-                will only be pushed to appservices that have opted into ephemeral events.
+                `stream_key` can "typing_key", "receipt_key" or "presence_key". Any other
+                value for `stream_key` will cause this function to return early.
+
+                Ephemeral events will only be pushed to appservices that have opted into
+                them.
+
                 Appservices will only receive ephemeral events that fall within their
                 registered user and room namespaces.
-
-                Any other value for `stream_key` will cause this function to return early.
 
             new_token: The latest stream token.
             users: The users that should be informed of the new event, if any.
@@ -242,8 +243,8 @@ class ApplicationServicesHandler:
                     # for typing_key due to performance reasons and due to their highly
                     # ephemeral nature.
                     #
-                    # Instead we simply grab the latest typing update in _handle_typing
-                    # and, if it applies to this application service, send it off.
+                    # Instead we simply grab the latest typing updates in _handle_typing
+                    # and, if they apply to this application service, send it off.
                     events = await self._handle_typing(service, new_token)
                     if events:
                         self.scheduler.submit_ephemeral_events_for_as(service, events)
@@ -274,12 +275,16 @@ class ApplicationServicesHandler:
         self, service: ApplicationService, new_token: int
     ) -> List[JsonDict]:
         """
-        Given an application service, determine which events it should receive
-        from the given typing event stream token and now.
+        Return the typing events since the given stream token that the given application
+        service should receive.
+
+        First fetch all typing events between the given typing stream token (non-inclusive)
+        and the latest typing event stream token (inclusive). Then return only those typing
+        events that the given application service may be interested in.
 
         Args:
             service: The application service to check for which events it should receive.
-            new_token: The latest typing event stream token.
+            new_token: A typing event stream token.
 
         Returns:
             A list of JSON dictionaries containing data derived from the typing events that
@@ -292,28 +297,29 @@ class ApplicationServicesHandler:
             # For performance reasons, we don't persist the previous
             # token in the DB and instead fetch the latest typing event
             # for appservices.
-            # TODO: It'd probably be more efficient to simply fetch the
+            # TODO: It'd likely be more efficient to simply fetch the
             #  typing event with the given 'new_token' stream token and
-            #  checking if the given service was interested, rather than
+            #  check if the given service was interested, rather than
             #  iterating over all typing events and only grabbing the
-            #  latest one.
+            #  latest few.
             from_key=new_token - 1,
         )
         return typing
 
     async def _handle_receipts(self, service: ApplicationService) -> List[JsonDict]:
         """
-        Given an application service, determine which events it should receive
-        from those between the last-recorded typing event stream token for this
-        appservice and the latest one.
+        Return the latest read receipts that the given application service should receive.
+
+        First fetch all read receipts between the last receipt stream token that this
+        application service should have previously received (non-inclusive) and the
+        latest read receipt stream token (inclusive). Then from that set, return only
+        those read receipts that the given application service may be interested in.
 
         Args:
             service: The application service to check for which events it should receive.
-            new_token: A typing event stream token. Typing events between this token and
-                the current event stream token will be checked.
 
         Returns:
-            A list of JSON dictionaries containing data derived from the typing events that
+            A list of JSON dictionaries containing data derived from the read receipts that
             should be sent to the given application service.
         """
         from_key = await self.store.get_type_stream_id_for_appservice(
@@ -329,9 +335,12 @@ class ApplicationServicesHandler:
         self, service: ApplicationService, users: Collection[Union[str, UserID]]
     ) -> List[JsonDict]:
         """
-        Given an application service and a list of users who should be receiving
-        presence updates, return a list of presence updates destined for the
-        application service.
+        Return the latest presence updates that the given application service should receive.
+
+        First, filter the given users list to those that the application service is
+        interested in. Then retrieve the latest presence updates since the
+        the last-known previously received presence stream token for the given
+        application service. Return those presence updates.
 
         Args:
             service: The application service that ephemeral events are being sent to.
@@ -353,6 +362,8 @@ class ApplicationServicesHandler:
             interested = await service.is_interested_in_presence(user, self.store)
             if not interested:
                 continue
+
+            # TODO: Make presence_events a Set. These presence events should be de-duplicated.
             presence_events, _ = await presence_source.get_new_events(
                 user=user,
                 service=service,
