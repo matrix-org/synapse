@@ -332,12 +332,12 @@ class ThirdPartyEventRules:
         invites, etc.)
 
         Args:
-            event: The invite event.
+            event: The event.
 
         Raises:
             ModuleFailureError if a callback raised any exception.
         """
-        # Bail out early without hitting the store if we don't have any callback
+        # Bail out early without hitting the store if we don't have any callbacks
         if len(self._on_new_event_callbacks) == 0:
             return
 
