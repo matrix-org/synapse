@@ -381,11 +381,12 @@ class Notifier:
         users: Optional[Collection[Union[str, UserID]]] = None,
     ):
         try:
-            stream_token = None
-            if isinstance(new_token, int):
-                stream_token = new_token
+            # Convert new_token from a RoomStreamToken to an int if necessary
+            if isinstance(new_token, RoomStreamToken):
+                new_token = new_token.stream
+
             self.appservice_handler.notify_interested_services_ephemeral(
-                stream_key, stream_token, users or []
+                stream_key, new_token, users or []
             )
         except Exception:
             logger.exception("Error notifying application services of event")
