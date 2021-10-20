@@ -1276,7 +1276,7 @@ class FederationEventHandler:
         await self.persist_events_and_notify(
             room_id,
             tuple(events_to_persist),
-            # TODO: Maybe this to get fetched missing events during backfill as backfill also :/
+            # TODO: Maybe this to get fetched missing events during backfill as backfilled also :/
             backfilled=True,
         )
 

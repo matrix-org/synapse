@@ -270,6 +270,8 @@ class FederationHandler:
         # request URI to be too long.
         extremities = dict(sorted_extremeties_tuple[:5])
 
+        logger.info("backfill extremities=%s", extremities)
+
         # Now we need to decide which hosts to hit first.
 
         # First we try hosts that are already in the room
