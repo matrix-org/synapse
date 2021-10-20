@@ -189,6 +189,7 @@ Synapse instance. Account validity callbacks can be registered using the module 
 <code>register_account_validity_callbacks</code> method.</p>
 <p>The available account validity callbacks are:</p>
 <h3 id="is_user_expired"><a class="header" href="#is_user_expired"><code>is_user_expired</code></a></h3>
+<p><em>First introduced in Synapse v1.39.0</em></p>
 <pre><code class="language-python">async def is_user_expired(user: str) -&gt; Optional[bool]
 </code></pre>
 <p>Called when processing any authenticated request (except for logout requests). The module
@@ -203,6 +204,7 @@ callback returns <code>None</code>, Synapse falls through to the next one. The v
 callback that does not return <code>None</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
 <h3 id="on_user_registration"><a class="header" href="#on_user_registration"><code>on_user_registration</code></a></h3>
+<p><em>First introduced in Synapse v1.39.0</em></p>
 <pre><code class="language-python">async def on_user_registration(user: str) -&gt; None
 </code></pre>
 <p>Called after successfully registering a user, in case the module needs to perform extra

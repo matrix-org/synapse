@@ -189,6 +189,7 @@ the module API's <code>register_third_party_rules_callbacks</code> method.</p>
 <h2 id="callbacks"><a class="header" href="#callbacks">Callbacks</a></h2>
 <p>The available third party rules callbacks are:</p>
 <h3 id="check_event_allowed"><a class="header" href="#check_event_allowed"><code>check_event_allowed</code></a></h3>
+<p><em>First introduced in Synapse v1.39.0</em></p>
 <pre><code class="language-python">async def check_event_allowed(
     event: &quot;synapse.events.EventBase&quot;,
     state_events: &quot;synapse.types.StateMap&quot;,
@@ -221,6 +222,7 @@ callback returns <code>True</code>, Synapse falls through to the next one. The v
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
 <h3 id="on_create_room"><a class="header" href="#on_create_room"><code>on_create_room</code></a></h3>
+<p><em>First introduced in Synapse v1.39.0</em></p>
 <pre><code class="language-python">async def on_create_room(
     requester: &quot;synapse.types.Requester&quot;,
     request_content: dict,
@@ -240,6 +242,7 @@ room creation will be forbidden as soon as one of the callbacks raises an except
 this happens, Synapse will not call any of the subsequent implementations of this
 callback.</p>
 <h3 id="check_threepid_can_be_invited"><a class="header" href="#check_threepid_can_be_invited"><code>check_threepid_can_be_invited</code></a></h3>
+<p><em>First introduced in Synapse v1.39.0</em></p>
 <pre><code class="language-python">async def check_threepid_can_be_invited(
     medium: str,
     address: str,
@@ -253,6 +256,7 @@ callback returns <code>True</code>, Synapse falls through to the next one. The v
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
 <h3 id="check_visibility_can_be_modified"><a class="header" href="#check_visibility_can_be_modified"><code>check_visibility_can_be_modified</code></a></h3>
+<p><em>First introduced in Synapse v1.39.0</em></p>
 <pre><code class="language-python">async def check_visibility_can_be_modified(
     room_id: str,
     state_events: &quot;synapse.types.StateMap&quot;,

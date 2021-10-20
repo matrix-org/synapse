@@ -7742,6 +7742,7 @@ Synapse instances. Spam checker callbacks can be registered using the module API
 <h2 id="callbacks"><a class="header" href="#callbacks">Callbacks</a></h2>
 <p>The available spam checker callbacks are:</p>
 <h3 id="check_event_for_spam"><a class="header" href="#check_event_for_spam"><code>check_event_for_spam</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
 <pre><code class="language-python">async def check_event_for_spam(event: &quot;synapse.events.EventBase&quot;) -&gt; Union[bool, str]
 </code></pre>
 <p>Called when receiving an event from a client or via federation. The module can return
@@ -7753,6 +7754,7 @@ callback returns <code>False</code>, Synapse falls through to the next one. The 
 callback that does not return <code>False</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_join_room"><a class="header" href="#user_may_join_room"><code>user_may_join_room</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
 <pre><code class="language-python">async def user_may_join_room(user: str, room: str, is_invited: bool) -&gt; bool
 </code></pre>
 <p>Called when a user is trying to join a room. The module must return a <code>bool</code> to indicate
@@ -7767,6 +7769,7 @@ callback returns <code>True</code>, Synapse falls through to the next one. The v
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_invite"><a class="header" href="#user_may_invite"><code>user_may_invite</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
 <pre><code class="language-python">async def user_may_invite(inviter: str, invitee: str, room_id: str) -&gt; bool
 </code></pre>
 <p>Called when processing an invitation. The module must return a <code>bool</code> indicating whether
@@ -7777,6 +7780,7 @@ callback returns <code>True</code>, Synapse falls through to the next one. The v
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_send_3pid_invite"><a class="header" href="#user_may_send_3pid_invite"><code>user_may_send_3pid_invite</code></a></h3>
+<p><em>First introduced in Synapse v1.45.0</em></p>
 <pre><code class="language-python">async def user_may_send_3pid_invite(
     inviter: str,
     medium: str,
@@ -7807,6 +7811,7 @@ callback returns <code>True</code>, Synapse falls through to the next one. The v
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_create_room"><a class="header" href="#user_may_create_room"><code>user_may_create_room</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
 <pre><code class="language-python">async def user_may_create_room(user: str) -&gt; bool
 </code></pre>
 <p>Called when processing a room creation request. The module must return a <code>bool</code> indicating
@@ -7816,6 +7821,7 @@ callback returns <code>True</code>, Synapse falls through to the next one. The v
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_create_room_with_invites"><a class="header" href="#user_may_create_room_with_invites"><code>user_may_create_room_with_invites</code></a></h3>
+<p><em>First introduced in Synapse v1.44.0</em></p>
 <pre><code class="language-python">async def user_may_create_room_with_invites(
     user: str,
     invites: List[str],
@@ -7841,6 +7847,7 @@ callback returns <code>True</code>, Synapse falls through to the next one. The v
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_create_room_alias"><a class="header" href="#user_may_create_room_alias"><code>user_may_create_room_alias</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
 <pre><code class="language-python">async def user_may_create_room_alias(user: str, room_alias: &quot;synapse.types.RoomAlias&quot;) -&gt; bool
 </code></pre>
 <p>Called when trying to associate an alias with an existing room. The module must return a
@@ -7851,6 +7858,7 @@ callback returns <code>True</code>, Synapse falls through to the next one. The v
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_publish_room"><a class="header" href="#user_may_publish_room"><code>user_may_publish_room</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
 <pre><code class="language-python">async def user_may_publish_room(user: str, room_id: str) -&gt; bool
 </code></pre>
 <p>Called when trying to publish a room to the homeserver's public rooms directory. The
@@ -7861,6 +7869,7 @@ callback returns <code>True</code>, Synapse falls through to the next one. The v
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
 <h3 id="check_username_for_spam"><a class="header" href="#check_username_for_spam"><code>check_username_for_spam</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
 <pre><code class="language-python">async def check_username_for_spam(user_profile: Dict[str, str]) -&gt; bool
 </code></pre>
 <p>Called when computing search results in the user directory. The module must return a
@@ -7878,6 +7887,7 @@ callback returns <code>False</code>, Synapse falls through to the next one. The 
 callback that does not return <code>False</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
 <h3 id="check_registration_for_spam"><a class="header" href="#check_registration_for_spam"><code>check_registration_for_spam</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
 <pre><code class="language-python">async def check_registration_for_spam(
     email_threepid: Optional[dict],
     username: Optional[str],
@@ -7904,6 +7914,7 @@ The value of the first callback that does not return <code>RegistrationBehaviour
 be used. If this happens, Synapse will not call any of the subsequent implementations of
 this callback.</p>
 <h3 id="check_media_file_for_spam"><a class="header" href="#check_media_file_for_spam"><code>check_media_file_for_spam</code></a></h3>
+<p><em>First introduced in Synapse v1.37.0</em></p>
 <pre><code class="language-python">async def check_media_file_for_spam(
     file_wrapper: &quot;synapse.rest.media.v1.media_storage.ReadableFileWrapper&quot;,
     file_info: &quot;synapse.rest.media.v1._base.FileInfo&quot;,
@@ -7965,6 +7976,7 @@ the module API's <code>register_third_party_rules_callbacks</code> method.</p>
 <h2 id="callbacks-1"><a class="header" href="#callbacks-1">Callbacks</a></h2>
 <p>The available third party rules callbacks are:</p>
 <h3 id="check_event_allowed"><a class="header" href="#check_event_allowed"><code>check_event_allowed</code></a></h3>
+<p><em>First introduced in Synapse v1.39.0</em></p>
 <pre><code class="language-python">async def check_event_allowed(
     event: &quot;synapse.events.EventBase&quot;,
     state_events: &quot;synapse.types.StateMap&quot;,
@@ -7997,6 +8009,7 @@ callback returns <code>True</code>, Synapse falls through to the next one. The v
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
 <h3 id="on_create_room"><a class="header" href="#on_create_room"><code>on_create_room</code></a></h3>
+<p><em>First introduced in Synapse v1.39.0</em></p>
 <pre><code class="language-python">async def on_create_room(
     requester: &quot;synapse.types.Requester&quot;,
     request_content: dict,
@@ -8016,6 +8029,7 @@ room creation will be forbidden as soon as one of the callbacks raises an except
 this happens, Synapse will not call any of the subsequent implementations of this
 callback.</p>
 <h3 id="check_threepid_can_be_invited"><a class="header" href="#check_threepid_can_be_invited"><code>check_threepid_can_be_invited</code></a></h3>
+<p><em>First introduced in Synapse v1.39.0</em></p>
 <pre><code class="language-python">async def check_threepid_can_be_invited(
     medium: str,
     address: str,
@@ -8029,6 +8043,7 @@ callback returns <code>True</code>, Synapse falls through to the next one. The v
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
 <h3 id="check_visibility_can_be_modified"><a class="header" href="#check_visibility_can_be_modified"><code>check_visibility_can_be_modified</code></a></h3>
+<p><em>First introduced in Synapse v1.39.0</em></p>
 <pre><code class="language-python">async def check_visibility_can_be_modified(
     room_id: str,
     state_events: &quot;synapse.types.StateMap&quot;,
@@ -8079,6 +8094,7 @@ registered using the module API's <code>register_presence_router_callbacks</code
 <h2 id="callbacks-2"><a class="header" href="#callbacks-2">Callbacks</a></h2>
 <p>The available presence router callbacks are:</p>
 <h3 id="get_users_for_states"><a class="header" href="#get_users_for_states"><code>get_users_for_states</code></a></h3>
+<p><em>First introduced in Synapse v1.42.0</em></p>
 <pre><code class="language-python">async def get_users_for_states(
     state_updates: Iterable[&quot;synapse.api.UserPresenceState&quot;],
 ) -&gt; Dict[str, Set[&quot;synapse.api.UserPresenceState&quot;]]
@@ -8093,6 +8109,7 @@ must return a dictionary that maps from Matrix user IDs (which can be local or r
 by the callbacks. If multiple callbacks return a dictionary containing the same key,
 Synapse concatenates the sets associated with this key from each dictionary. </p>
 <h3 id="get_interested_users"><a class="header" href="#get_interested_users"><code>get_interested_users</code></a></h3>
+<p><em>First introduced in Synapse v1.42.0</em></p>
 <pre><code class="language-python">async def get_interested_users(
     user_id: str
 ) -&gt; Union[Set[str], &quot;synapse.module_api.PRESENCE_ALL_USERS&quot;]
@@ -8159,6 +8176,7 @@ Synapse instance. Account validity callbacks can be registered using the module 
 <code>register_account_validity_callbacks</code> method.</p>
 <p>The available account validity callbacks are:</p>
 <h3 id="is_user_expired"><a class="header" href="#is_user_expired"><code>is_user_expired</code></a></h3>
+<p><em>First introduced in Synapse v1.39.0</em></p>
 <pre><code class="language-python">async def is_user_expired(user: str) -&gt; Optional[bool]
 </code></pre>
 <p>Called when processing any authenticated request (except for logout requests). The module
@@ -8173,6 +8191,7 @@ callback returns <code>None</code>, Synapse falls through to the next one. The v
 callback that does not return <code>None</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
 <h3 id="on_user_registration"><a class="header" href="#on_user_registration"><code>on_user_registration</code></a></h3>
+<p><em>First introduced in Synapse v1.39.0</em></p>
 <pre><code class="language-python">async def on_user_registration(user: str) -&gt; None
 </code></pre>
 <p>Called after successfully registering a user, in case the module needs to perform extra
@@ -8185,6 +8204,7 @@ their Synapse installation with an external authentication system. The callbacks
 registered by using the Module API's <code>register_password_auth_provider_callbacks</code> method.</p>
 <h2 id="callbacks-3"><a class="header" href="#callbacks-3">Callbacks</a></h2>
 <h3 id="auth_checkers"><a class="header" href="#auth_checkers"><code>auth_checkers</code></a></h3>
+<p><em>First introduced in Synapse v1.46.0</em></p>
 <pre><code> auth_checkers: Dict[Tuple[str,Tuple], Callable]
 </code></pre>
 <p>A dict mapping from tuples of a login type identifier (such as <code>m.login.password</code>) and a
@@ -8220,6 +8240,7 @@ optionally a callback). In that case, the return value of that callback will be 
 and subsequent callbacks will not be fired. If every callback returns <code>None</code>, then the
 authentication fails.</p>
 <h3 id="check_3pid_auth"><a class="header" href="#check_3pid_auth"><code>check_3pid_auth</code></a></h3>
+<p><em>First introduced in Synapse v1.46.0</em></p>
 <pre><code class="language-python">async def check_3pid_auth(
     medium: str, 
     address: str,
@@ -8244,6 +8265,7 @@ callback that does not return <code>None</code> will be used. If this happens, S
 any of the subsequent implementations of this callback. If every callback return <code>None</code>,
 the authentication is denied.</p>
 <h3 id="on_logged_out"><a class="header" href="#on_logged_out"><code>on_logged_out</code></a></h3>
+<p><em>First introduced in Synapse v1.46.0</em></p>
 <pre><code class="language-python">async def on_logged_out(
     user_id: str,
     device_id: Optional[str],

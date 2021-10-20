@@ -189,6 +189,7 @@ registered using the module API's <code>register_presence_router_callbacks</code
 <h2 id="callbacks"><a class="header" href="#callbacks">Callbacks</a></h2>
 <p>The available presence router callbacks are:</p>
 <h3 id="get_users_for_states"><a class="header" href="#get_users_for_states"><code>get_users_for_states</code></a></h3>
+<p><em>First introduced in Synapse v1.42.0</em></p>
 <pre><code class="language-python">async def get_users_for_states(
     state_updates: Iterable[&quot;synapse.api.UserPresenceState&quot;],
 ) -&gt; Dict[str, Set[&quot;synapse.api.UserPresenceState&quot;]]
@@ -203,6 +204,7 @@ must return a dictionary that maps from Matrix user IDs (which can be local or r
 by the callbacks. If multiple callbacks return a dictionary containing the same key,
 Synapse concatenates the sets associated with this key from each dictionary. </p>
 <h3 id="get_interested_users"><a class="header" href="#get_interested_users"><code>get_interested_users</code></a></h3>
+<p><em>First introduced in Synapse v1.42.0</em></p>
 <pre><code class="language-python">async def get_interested_users(
     user_id: str
 ) -&gt; Union[Set[str], &quot;synapse.module_api.PRESENCE_ALL_USERS&quot;]
