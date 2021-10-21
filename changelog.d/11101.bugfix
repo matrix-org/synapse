@@ -1,0 +1,1 @@
+Show an error when timestamp in seconds is provided to the `/purge_media_cache` Admin API.
