@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,18 +19,25 @@ if __name__ == "__main__":
 
     from synapse.config.homeserver import HomeServerConfig
 
-    action = sys.argv[1]
+    action = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] == "read" else None
+    load_config_args = sys.argv[3:] if action else sys.argv[1:]
+
+    try:
+        config = HomeServerConfig.load_config("", load_config_args)
+    except ConfigError as e:
+        sys.stderr.write("\n" + str(e) + "\n")
+        sys.exit(1)
+
+    print("Config parses OK!")
 
     if action == "read":
         key = sys.argv[2]
-        try:
-            config = HomeServerConfig.load_config("", sys.argv[3:])
-        except ConfigError as e:
-            sys.stderr.write("\n" + str(e) + "\n")
-            sys.exit(1)
+        key_parts = key.split(".")
 
-        print(getattr(config, key))
+        value = config
+        while len(key_parts):
+            value = getattr(value, key_parts[0])
+            key_parts.pop(0)
+
+        print(f"{key}: {value}")
         sys.exit(0)
-    else:
-        sys.stderr.write("Unknown command %r\n" % (action,))
-        sys.exit(1)
