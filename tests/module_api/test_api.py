@@ -385,6 +385,53 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         self.assertTrue(found_update)
 
+    def test_update_membership(self):
+        """Tests that the module API can update the membership of a user in a room."""
+        peter = self.register_user("peter", "hackme")
+        lesley = self.register_user("lesley", "hackme")
+        tok = self.login("peter", "hackme")
+
+        # Make peter create a public room.
+        room_id = self.helper.create_room_as(
+            room_creator=peter,
+            is_public=True,
+            tok=tok
+        )
+
+        # Make lesley join it.
+        self.get_success(
+            defer.ensureDeferred(
+                self.module_api.update_room_membership(lesley, lesley, room_id, "join")
+            )
+        )
+
+        # Check that the membership of lesley in the room is "join".
+        res = self.helper.get_state(
+            room_id=room_id,
+            event_type="m.room.member",
+            state_key=lesley,
+            tok=tok,
+        )
+
+        self.assertEqual(res["membership"], "join")
+
+        # Make peter kick lesley from the room.
+        self.get_success(
+            defer.ensureDeferred(
+                self.module_api.update_room_membership(peter, lesley, room_id, "leave")
+            )
+        )
+
+        # Check that the membership of lesley in the room is "leave".
+        res = self.helper.get_state(
+            room_id=room_id,
+            event_type="m.room.member",
+            state_key=lesley,
+            tok=tok,
+        )
+
+        self.assertEqual(res["membership"], "leave")
+
 
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
     """For testing ModuleApi functionality in a multi-worker setup"""
