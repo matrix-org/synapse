@@ -1057,11 +1057,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # we process the newest-in-time messages first going backwards in time.
         queue = PriorityQueue()
 
-        logger.info(
-            "_get_backfill_events: seeding backfill with event_list(%d)=%s",
-            len(event_list),
-            event_list,
-        )
         for event_id in event_list:
             event_lookup_result = self.db_pool.simple_select_one_txn(
                 txn,
@@ -1073,14 +1068,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     "stream_ordering",
                 ),
                 allow_none=True,
-            )
-
-            logger.info(
-                "_get_backfill_events: seeding backfill with event_id=%s type=%s depth=%s stream_ordering=%s",
-                event_id,
-                event_lookup_result["type"],
-                event_lookup_result["depth"],
-                event_lookup_result["stream_ordering"],
             )
 
             if event_lookup_result["depth"]:
@@ -1102,39 +1089,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             if event_id in event_results:
                 continue
 
-            event_lookup_result = self.db_pool.simple_select_one_txn(
-                txn,
-                table="events",
-                keyvalues={"event_id": event_id},
-                retcols=["type", "depth", "stream_ordering", "content"],
-                allow_none=True,
-            )
-
-            event_json_lookup_result = self.db_pool.simple_select_one_onecol_txn(
-                txn,
-                table="event_json",
-                keyvalues={"event_id": event_id},
-                retcol="json",
-                allow_none=True,
-            )
-
-            ev = db_to_json(event_json_lookup_result)
-
-            if event_lookup_result:
-                logger.info(
-                    "_get_backfill_events: event_results add event_id=%s type=%s depth=%s stream_ordering=%s content=%s",
-                    event_id,
-                    ev["type"],
-                    ev["depth"],
-                    event_lookup_result["stream_ordering"],
-                    ev["content"].get("body", ev["content"]),
-                )
-            else:
-                logger.info(
-                    "_get_backfill_events: event_results event_id=%s failed to lookup",
-                    event_id,
-                )
-
             event_results[event_id] = event_id
 
             # Try and find any potential historical batches of message history.
@@ -1147,7 +1101,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 connected_insertion_event_query, (event_id, limit - len(event_results))
             )
             connected_insertion_event_id_results = txn.fetchall()
-            logger.info(
+            logger.debug(
                 "_get_backfill_events: connected_insertion_event_query %s",
                 connected_insertion_event_id_results,
             )
@@ -1177,7 +1131,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     (event_id, limit - len(event_results)),
                 )
                 batch_start_event_id_results = txn.fetchall()
-                logger.info(
+                logger.debug(
                     "_get_backfill_events: batch_start_event_id_results %s",
                     batch_start_event_id_results,
                 )
@@ -1190,7 +1144,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 (event_id, False, limit - len(event_results)),
             )
             prev_event_id_results = txn.fetchall()
-            logger.info(
+            logger.debug(
                 "_get_backfill_events: prev_event_ids %s", prev_event_id_results
             )
 

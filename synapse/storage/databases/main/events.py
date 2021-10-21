@@ -169,14 +169,6 @@ class PersistEventsStore:
 
         async with stream_ordering_manager as stream_orderings:
             for (event, _), stream in zip(events_and_contexts, stream_orderings):
-                logger.info(
-                    "_persist_events_and_state_updates backfilled=%s event_id=%s depth=%s stream_ordering=%s content=%s",
-                    backfilled,
-                    event.event_id,
-                    event.depth,
-                    stream,
-                    event["content"].get("body", None),
-                )
                 event.internal_metadata.stream_ordering = stream
 
             await self.db_pool.runInteraction(
@@ -2139,38 +2131,6 @@ class PersistEventsStore:
 
         Forward extremities are handled when we first start persisting the events.
         """
-        logger.info(
-            "_update_backward_extremeties events=%s",
-            [
-                {
-                    "event_id": ev.event_id,
-                    "prev_events": ev.prev_event_ids(),
-                    "outlier": ev.internal_metadata.is_outlier(),
-                }
-                for ev in events
-            ],
-        )
-
-        for ev in events:
-            for e_id in ev.prev_event_ids():
-                query = """
-                        SELECT 1 FROM event_edges
-                        INNER JOIN events AS e USING (event_id, room_id)
-                        WHERE event_id = ? AND room_id = ? AND e.outlier = TRUE
-                """
-
-                txn.execute(
-                    query,
-                    (e_id, ev.room_id),
-                )
-                result = txn.fetchall()
-                logger.info(
-                    "_update_backward_extremeties test ev=%s prev_event_id=%s result=%s",
-                    ev.event_id,
-                    e_id,
-                    result,
-                )
-
         # From the events passed in, add all of the prev events as backwards extremities.
         # Ignore any events that are already backwards extrems or outliers.
         query = (
@@ -2199,24 +2159,6 @@ class PersistEventsStore:
                 if not ev.internal_metadata.is_outlier()
             ],
         )
-
-        for ev in events:
-            for e_id in ev.prev_event_ids():
-                query = """
-                        SELECT * FROM event_backward_extremities
-                        WHERE event_id = ? AND room_id = ?
-                """
-
-                txn.execute(
-                    query,
-                    (e_id, ev.room_id),
-                )
-                result = txn.fetchall()
-                logger.info(
-                    "_update_backward_extremeties ended up as prev_event_id=%s result=%s",
-                    e_id,
-                    result,
-                )
 
         # Delete all these events that we've already fetched and now know that their
         # prev events are the new backwards extremeties.

@@ -148,14 +148,14 @@ class FederationHandler:
         insertion_events_to_be_backfilled = (
             await self.store.get_insertion_event_backwards_extremities_in_room(room_id)
         )
-        logger.info(
+        logger.debug(
             "_maybe_backfill_inner: extremities oldest_events_with_depth=%s insertion_events_to_be_backfilled=%s",
             oldest_events_with_depth,
             insertion_events_to_be_backfilled,
         )
 
         if not oldest_events_with_depth and not insertion_events_to_be_backfilled:
-            logger.info("Not backfilling as no extremeties found.")
+            logger.debug("Not backfilling as no extremeties found.")
             return False
 
         # We only want to paginate if we can actually see the events we'll get,
@@ -203,7 +203,7 @@ class FederationHandler:
             redact=False,
             check_history_visibility_only=True,
         )
-        logger.info(
+        logger.debug(
             "_maybe_backfill_inner: filtered_extremities %s", filtered_extremities
         )
 
@@ -230,7 +230,7 @@ class FederationHandler:
         # much larger factor will result in triggering a backfill request much
         # earlier than necessary.
         if current_depth - 2 * limit > max_depth:
-            logger.info(
+            logger.debug(
                 "Not backfilling as we don't need to. %d < %d - 2 * %d",
                 max_depth,
                 current_depth,
@@ -249,7 +249,7 @@ class FederationHandler:
             t for t in sorted_extremeties_tuple if int(t[1]) <= current_depth
         ]
 
-        logger.info(
+        logger.debug(
             "room_id: %s, backfill: current_depth: %s, limit: %s, max_depth: %s, extrems (%d): %s filtered_sorted_extremeties_tuple: %s",
             room_id,
             current_depth,
@@ -270,8 +270,6 @@ class FederationHandler:
         # We don't want to specify too many extremities as it causes the backfill
         # request URI to be too long.
         extremities = dict(sorted_extremeties_tuple[:5])
-
-        logger.info("backfill extremities=%s", extremities)
 
         # Now we need to decide which hosts to hit first.
 
@@ -1061,7 +1059,6 @@ class FederationHandler:
         events = await self.store.get_backfill_events(room_id, pdu_list, limit)
 
         events = await filter_events_for_server(self.storage, origin, events)
-        logger.info("on_backfill_request resultant events(%d)=%s", len(events), events)
 
         return events
 

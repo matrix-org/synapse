@@ -13,10 +13,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def generate_fake_event_id() -> str:
-    return "$fake_" + random_string(43)
-
-
 class RoomBatchHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
@@ -184,7 +180,7 @@ class RoomBatchHandler:
 
         # Make the state events float off on their own so we don't have a
         # bunch of `@mxid joined the room` noise between each batch
-        prev_event_ids_for_state_chain = []  # generate_fake_event_id()
+        prev_event_ids_for_state_chain: List[str] = []
 
         for state_event in state_events_at_start:
             assert_params_in_dict(
@@ -226,15 +222,6 @@ class RoomBatchHandler:
                     # later in the loop here. Otherwise it will be the same
                     # reference and also update in the event when we append later.
                     auth_event_ids=auth_event_ids.copy(),
-                )
-
-                mem_event = await self.store.get_event(event_id)
-                logger.info(
-                    "room_batch mem_event_id=%s depth=%s stream_ordering=%s prev_event_ids=%s",
-                    mem_event.event_id,
-                    mem_event.depth,
-                    mem_event.internal_metadata.stream_ordering,
-                    mem_event.prev_event_ids(),
                 )
             else:
                 # TODO: Add some complement tests that adds state that is not member joins
@@ -362,19 +349,12 @@ class RoomBatchHandler:
         # Events are sorted by (topological_ordering, stream_ordering)
         # where topological_ordering is just depth.
         for (event, context) in reversed(events_to_persist):
-            result_event = await self.event_creation_handler.handle_new_client_event(
+            await self.event_creation_handler.handle_new_client_event(
                 await self.create_requester_for_user_id_from_app_service(
                     event["sender"], app_service_requester.app_service
                 ),
                 event=event,
                 context=context,
-            )
-            logger.info(
-                "result_event depth=%s stream_ordering=%s event_id=%s body=%s",
-                result_event.depth,
-                result_event.internal_metadata.stream_ordering,
-                result_event.event_id,
-                result_event.content.get("body", None),
             )
 
         return event_ids
