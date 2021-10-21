@@ -1001,7 +1001,21 @@ class EventCreationHandler:
             )
 
         self.validator.validate_new(event, self.config)
+        self._validate_event_relation(event)
+        logger.debug("Created event %s", event.event_id)
 
+        return event, context
+
+    def _validate_event_relation(self, event: EventBase) -> None:
+        """
+        Ensure the relation data on a new event is not bogus.
+
+        Args:
+            event: The event being created.
+
+        Raises:
+            SynapseError if the event is invalid.
+        """
         # If this event is an annotation then we check that that the sender
         # can't annotate the same way twice (e.g. stops users from liking an
         # event multiple times).
@@ -1015,10 +1029,6 @@ class EventCreationHandler:
             )
             if already_exists:
                 raise SynapseError(400, "Can't send same reaction twice")
-
-        logger.debug("Created event %s", event.event_id)
-
-        return event, context
 
     @measure_func("handle_new_client_event")
     async def handle_new_client_event(
