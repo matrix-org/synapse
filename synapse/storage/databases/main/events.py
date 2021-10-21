@@ -2139,6 +2139,38 @@ class PersistEventsStore:
 
         Forward extremities are handled when we first start persisting the events.
         """
+        logger.info(
+            "_update_backward_extremeties events=%s",
+            [
+                {
+                    "event_id": ev.event_id,
+                    "prev_events": ev.prev_event_ids(),
+                    "outlier": ev.internal_metadata.is_outlier(),
+                }
+                for ev in events
+            ],
+        )
+
+        for ev in events:
+            for e_id in ev.prev_event_ids():
+                query = """
+                        SELECT 1 FROM event_edges
+                        INNER JOIN events AS e USING (event_id, room_id)
+                        WHERE event_id = ? AND room_id = ? AND e.outlier = TRUE
+                """
+
+                txn.execute(
+                    query,
+                    (e_id, ev.room_id),
+                )
+                result = txn.fetchall()
+                logger.info(
+                    "_update_backward_extremeties test ev=%s prev_event_id=%s result=%s",
+                    ev.event_id,
+                    e_id,
+                    result,
+                )
+
         # From the events passed in, add all of the prev events as backwards extremities.
         # Ignore any events that are already backwards extrems or outliers.
         query = (
@@ -2147,21 +2179,44 @@ class PersistEventsStore:
             "   SELECT 1 FROM event_backward_extremities"
             "   WHERE event_id = ? AND room_id = ?"
             " )"
+            # 1. Don't add an event as a extremity again if we already persisted it
+            # as a non-outlier.
+            # 2. Don't add an outlier as an extremity if it has no prev_events
             " AND NOT EXISTS ("
-            "   SELECT 1 FROM events WHERE event_id = ? AND room_id = ? "
-            "   AND outlier = ?"
+            "   SELECT 1 FROM events"
+            "   LEFT JOIN event_edges edge"
+            "   ON edge.event_id = events.event_id"
+            "   WHERE events.event_id = ? AND events.room_id = ? AND (events.outlier = FALSE OR edge.event_id IS NULL)"
             " )"
         )
 
         txn.execute_batch(
             query,
             [
-                (e_id, ev.room_id, e_id, ev.room_id, e_id, ev.room_id, False)
+                (e_id, ev.room_id, e_id, ev.room_id, e_id, ev.room_id)
                 for ev in events
                 for e_id in ev.prev_event_ids()
                 if not ev.internal_metadata.is_outlier()
             ],
         )
+
+        for ev in events:
+            for e_id in ev.prev_event_ids():
+                query = """
+                        SELECT * FROM event_backward_extremities
+                        WHERE event_id = ? AND room_id = ?
+                """
+
+                txn.execute(
+                    query,
+                    (e_id, ev.room_id),
+                )
+                result = txn.fetchall()
+                logger.info(
+                    "_update_backward_extremeties ended up as prev_event_id=%s result=%s",
+                    e_id,
+                    result,
+                )
 
         # Delete all these events that we've already fetched and now know that their
         # prev events are the new backwards extremeties.
@@ -2175,6 +2230,10 @@ class PersistEventsStore:
                 (ev.event_id, ev.room_id)
                 for ev in events
                 if not ev.internal_metadata.is_outlier()
+                # If we encountered an event with no prev_events, then we might
+                # as well remove it now because it won't ever have anything else
+                # to backfill from.
+                or len(ev.prev_event_ids()) == 0
             ],
         )
 

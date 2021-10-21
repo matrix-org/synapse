@@ -1127,7 +1127,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     ev["type"],
                     ev["depth"],
                     event_lookup_result["stream_ordering"],
-                    ev["content"].get("body", None),
+                    ev["content"].get("body", ev["content"]),
                 )
             else:
                 logger.info(

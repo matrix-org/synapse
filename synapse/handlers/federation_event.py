@@ -417,7 +417,8 @@ class FederationEventHandler:
             dest, room_id, limit=limit, extremities=extremities
         )
         logger.info(
-            "from remote server: got backfill response events=%s",
+            "from remote server: got backfill response events(%d)=%s",
+            len(events),
             [
                 {
                     "event_id": ev.event_id,

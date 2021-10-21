@@ -184,7 +184,7 @@ class RoomBatchHandler:
 
         # Make the state events float off on their own so we don't have a
         # bunch of `@mxid joined the room` noise between each batch
-        prev_event_ids_for_state_chain = [generate_fake_event_id()]
+        prev_event_ids_for_state_chain = []  # generate_fake_event_id()
 
         for state_event in state_events_at_start:
             assert_params_in_dict(
@@ -226,6 +226,15 @@ class RoomBatchHandler:
                     # later in the loop here. Otherwise it will be the same
                     # reference and also update in the event when we append later.
                     auth_event_ids=auth_event_ids.copy(),
+                )
+
+                mem_event = await self.store.get_event(event_id)
+                logger.info(
+                    "room_batch mem_event_id=%s depth=%s stream_ordering=%s prev_event_ids=%s",
+                    mem_event.event_id,
+                    mem_event.depth,
+                    mem_event.internal_metadata.stream_ordering,
+                    mem_event.prev_event_ids(),
                 )
             else:
                 # TODO: Add some complement tests that adds state that is not member joins

@@ -1061,6 +1061,7 @@ class FederationHandler:
         events = await self.store.get_backfill_events(room_id, pdu_list, limit)
 
         events = await filter_events_for_server(self.storage, origin, events)
+        logger.info("on_backfill_request resultant events(%d)=%s", len(events), events)
 
         return events
 

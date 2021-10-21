@@ -200,6 +200,8 @@ class FederationServer(FederationBase):
 
             res = self._transaction_dict_from_pdus(pdus)
 
+            logger.info("on_backfill_request res=%s", res)
+
         return 200, res
 
     async def on_incoming_transaction(

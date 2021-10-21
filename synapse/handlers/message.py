@@ -955,8 +955,10 @@ class EventCreationHandler:
         # event and then try to auth it (which fails with a somewhat confusing "No
         # create event in auth events")
         assert (
-            builder.type == EventTypes.Create or len(prev_event_ids) > 0
-        ), "Attempting to create an event with no prev_events"
+            builder.type == EventTypes.Create
+            or len(prev_event_ids) > 0
+            or len(auth_event_ids) > 0
+        ), "Attempting to create an event with no prev_events or auth_event_ids"
 
         event = await builder.build(
             prev_event_ids=prev_event_ids,
