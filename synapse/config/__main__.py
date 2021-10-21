@@ -38,9 +38,15 @@ if __name__ == "__main__":
         key_parts = key.split(".")
 
         value = config
-        while len(key_parts):
-            value = getattr(value, key_parts[0])
-            key_parts.pop(0)
+        try:
+            while len(key_parts):
+                value = getattr(value, key_parts[0])
+                key_parts.pop(0)
 
-        print(f"{key}: {value}")
-        sys.exit(0)
+            print(f"\n{key}: {value}")
+            sys.exit(0)
+        except AttributeError:
+            print(
+                f"\nNo '{key}' key could be found in the provided configuration file."
+            )
+            sys.exit(1)
