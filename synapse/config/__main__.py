@@ -20,6 +20,9 @@ if __name__ == "__main__":
     from synapse.config.homeserver import HomeServerConfig
 
     action = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] == "read" else None
+    # If we're reading a key in the config file, then `sys.argv[1]` will be `read`  and `sys.argv[2]`
+    # will be the key to read.
+    # We'll want to rework this code if we want to support more actions than just `read`.
     load_config_args = sys.argv[3:] if action else sys.argv[1:]
 
     try:
