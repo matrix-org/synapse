@@ -1001,12 +1001,12 @@ class EventCreationHandler:
             )
 
         self.validator.validate_new(event, self.config)
-        self._validate_event_relation(event)
+        await self._validate_event_relation(event)
         logger.debug("Created event %s", event.event_id)
 
         return event, context
 
-    def _validate_event_relation(self, event: EventBase) -> None:
+    async def _validate_event_relation(self, event: EventBase) -> None:
         """
         Ensure the relation data on a new event is not bogus.
 
@@ -1016,12 +1016,26 @@ class EventCreationHandler:
         Raises:
             SynapseError if the event is invalid.
         """
+
+        relation = event.content.get("m.relates_to")
+        if not relation:
+            return
+
+        relation_type = relation.get("rel_type")
+        if not relation_type:
+            return
+
+        # Ensure the parent is real.
+        relates_to = relation["event_id"]
+        parent_event = await self.store.get_event(relates_to)
+        if not parent_event:
+            # TODO Attempt to fetch the event over federation.
+            raise SynapseError(400, "Can't send relation to unknown event")
+
         # If this event is an annotation then we check that that the sender
         # can't annotate the same way twice (e.g. stops users from liking an
         # event multiple times).
-        relation = event.content.get("m.relates_to", {})
-        if relation.get("rel_type") == RelationTypes.ANNOTATION:
-            relates_to = relation["event_id"]
+        if relation_type == RelationTypes.ANNOTATION:
             aggregation_key = relation["key"]
 
             already_exists = await self.store.has_user_annotated_event(

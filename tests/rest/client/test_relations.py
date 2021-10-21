@@ -91,6 +91,13 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         channel = self._send_relation(RelationTypes.ANNOTATION, EventTypes.Member)
         self.assertEquals(400, channel.code, channel.json_body)
 
+    def test_deny_invalid_event(self):
+        """Test that we deny relations on non-existant events"""
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, EventTypes.Member, parent_id="foo"
+        )
+        self.assertEquals(400, channel.code, channel.json_body)
+
     def test_deny_double_react(self):
         """Test that we deny relations on membership events"""
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="a")
