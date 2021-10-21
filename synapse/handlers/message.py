@@ -1048,6 +1048,13 @@ class EventCreationHandler:
             if already_exists:
                 raise SynapseError(400, "Can't send same reaction twice")
 
+        # If this relation is a thread, then ensure thread head is not part of
+        # a thread already.
+        elif relation_type == RelationTypes.THREAD:
+            already_thread = await self.store.get_event_thread(relates_to)
+            if already_thread:
+                raise SynapseError(400, "Can't fork threads")
+
     @measure_func("handle_new_client_event")
     async def handle_new_client_event(
         self,

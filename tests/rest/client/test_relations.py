@@ -119,6 +119,25 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
         self.assertEquals(400, channel.code, channel.json_body)
 
+    def test_deny_forked_thread(self):
+        """It is invalid to start a thread off a thread."""
+        channel = self._send_relation(
+            RelationTypes.THREAD,
+            "m.room.message",
+            content={"msgtype": "m.text", "body": "foo"},
+            parent_id=self.parent_id,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        parent_id = channel.json_body["event_id"]
+
+        channel = self._send_relation(
+            RelationTypes.THREAD,
+            "m.room.message",
+            content={"msgtype": "m.text", "body": "foo"},
+            parent_id=parent_id,
+        )
+        self.assertEquals(400, channel.code, channel.json_body)
+
     def test_basic_paginate_relations(self):
         """Tests that calling pagination API correctly the latest relations."""
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")

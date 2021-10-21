@@ -436,6 +436,37 @@ class RelationsWorkerStore(SQLBaseStore):
             "get_if_user_has_annotated_event", _get_if_user_has_annotated_event
         )
 
+    async def get_event_thread(self, event_id: str) -> Optional[str]:
+        """Return an event's thread.
+
+        Args:
+            event_id: The event being used as the start of a new thread.
+
+        Returns:
+            The thread ID of the event.
+        """
+
+        sql = """
+            SELECT relates_to_id FROM event_relations
+            WHERE
+                event_id = ?
+                AND relation_type = ?
+            LIMIT 1;
+        """
+
+        def _get_thread_id(txn) -> Optional[str]:
+            txn.execute(
+                sql,
+                (
+                    event_id,
+                    RelationTypes.THREAD,
+                ),
+            )
+
+            return txn.fetchone()
+
+        return await self.db_pool.runInteraction("get_thread_id", _get_thread_id)
+
 
 class RelationsStore(RelationsWorkerStore):
     pass
