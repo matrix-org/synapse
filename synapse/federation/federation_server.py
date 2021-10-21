@@ -196,6 +196,8 @@ class FederationServer(FederationBase):
                 origin, room_id, versions, limit
             )
 
+            logger.info("on_backfill_request pdus(%d)=%s", len(pdus), pdus)
+
             res = self._transaction_dict_from_pdus(pdus)
 
         return 200, res

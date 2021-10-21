@@ -184,7 +184,7 @@ class RoomBatchHandler:
 
         # Make the state events float off on their own so we don't have a
         # bunch of `@mxid joined the room` noise between each batch
-        prev_event_id_for_state_chain = generate_fake_event_id()
+        prev_event_ids_for_state_chain = [generate_fake_event_id()]
 
         for state_event in state_events_at_start:
             assert_params_in_dict(
@@ -221,7 +221,7 @@ class RoomBatchHandler:
                     action=membership,
                     content=event_dict["content"],
                     outlier=True,
-                    prev_event_ids=[prev_event_id_for_state_chain],
+                    prev_event_ids=prev_event_ids_for_state_chain,
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
                     # reference and also update in the event when we append later.
@@ -240,7 +240,7 @@ class RoomBatchHandler:
                     ),
                     event_dict,
                     outlier=True,
-                    prev_event_ids=[prev_event_id_for_state_chain],
+                    prev_event_ids=prev_event_ids_for_state_chain,
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
                     # reference and also update in the event when we append later.
@@ -251,7 +251,7 @@ class RoomBatchHandler:
             state_event_ids_at_start.append(event_id)
             auth_event_ids.append(event_id)
             # Connect all the state in a floating chain
-            prev_event_id_for_state_chain = event_id
+            prev_event_ids_for_state_chain = [event_id]
 
         return state_event_ids_at_start
 

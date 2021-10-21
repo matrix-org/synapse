@@ -1057,6 +1057,11 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # we process the newest-in-time messages first going backwards in time.
         queue = PriorityQueue()
 
+        logger.info(
+            "_get_backfill_events: seeding backfill with event_list(%d)=%s",
+            len(event_list),
+            event_list,
+        )
         for event_id in event_list:
             event_lookup_result = self.db_pool.simple_select_one_txn(
                 txn,
@@ -1068,6 +1073,14 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     "stream_ordering",
                 ),
                 allow_none=True,
+            )
+
+            logger.info(
+                "_get_backfill_events: seeding backfill with event_id=%s type=%s depth=%s stream_ordering=%s",
+                event_id,
+                event_lookup_result["type"],
+                event_lookup_result["depth"],
+                event_lookup_result["stream_ordering"],
             )
 
             if event_lookup_result["depth"]:
