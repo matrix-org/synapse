@@ -656,7 +656,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.helper.join(room, user=u2, tok=u2_token)
 
         # Check we have populated the database correctly.
-        users, public_users, shares_private = self.get_success(self.user_dir_helper.get_tables())
+        users, public_users, shares_private = self.get_success(
+            self.user_dir_helper.get_tables()
+        )
         self.assertEqual(users, {u1, u2, u3})
         self.assertEqual(shares_private, {(u1, u2, room), (u2, u1, room)})
         self.assertEqual(public_users, set())
@@ -677,7 +679,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.helper.leave(room, user=u2, tok=u2_token)
 
         # Check this is reflected in the DB.
-        users, public_users, shares_private = self.get_success(self.user_dir_helper.get_tables())
+        users, public_users, shares_private = self.get_success(
+            self.user_dir_helper.get_tables()
+        )
         self.assertEqual(users, {u1, u2, u3})
         self.assertEqual(shares_private, set())
         self.assertEqual(public_users, set())
