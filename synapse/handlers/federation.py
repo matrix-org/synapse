@@ -146,7 +146,7 @@ class FederationHandler:
             await self.store.get_oldest_event_ids_with_depth_in_room(room_id)
         )
 
-        insertion_events_to_be_backfilled = []
+        insertion_events_to_be_backfilled: Dict[str, int] = {}
         if self.hs.config.experimental.msc2716_enabled:
             insertion_events_to_be_backfilled = (
                 await self.store.get_insertion_event_backwards_extremities_in_room(

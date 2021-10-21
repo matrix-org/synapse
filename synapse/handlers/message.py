@@ -957,7 +957,9 @@ class EventCreationHandler:
         assert (
             builder.type == EventTypes.Create
             or len(prev_event_ids) > 0
-            or len(auth_event_ids) > 0
+            # Allow an event to have empty list of prev_event_ids
+            # only if it has auth_event_ids.
+            or (auth_event_ids and len(auth_event_ids) > 0)
         ), "Attempting to create an event with no prev_events or auth_event_ids"
 
         event = await builder.build(
