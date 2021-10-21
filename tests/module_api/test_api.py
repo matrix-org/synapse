@@ -393,9 +393,7 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         # Make peter create a public room.
         room_id = self.helper.create_room_as(
-            room_creator=peter,
-            is_public=True,
-            tok=tok
+            room_creator=peter, is_public=True, tok=tok
         )
 
         # Make lesley join it.
@@ -435,7 +433,10 @@ class ModuleApiTestCase(HomeserverTestCase):
         # Try to send a membership update from a non-local user and check that it fails.
         d = defer.ensureDeferred(
             self.module_api.update_room_membership(
-                "@nicolas:otherserver.com", lesley, room_id, "invite",
+                "@nicolas:otherserver.com",
+                lesley,
+                room_id,
+                "invite",
             )
         )
 
