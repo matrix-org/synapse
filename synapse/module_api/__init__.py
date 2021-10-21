@@ -33,7 +33,6 @@ import jinja2
 from twisted.internet import defer
 from twisted.web.resource import IResource
 
-from synapse.api.constants import Membership
 from synapse.events import EventBase
 from synapse.events.presence_router import PresenceRouter
 from synapse.http.client import SimpleHttpClient
@@ -608,7 +607,9 @@ class ModuleApi:
         # Try to retrieve the resulting event.
         event = await self._hs.get_datastore().get_event(event_id)
         if event is None:
-            raise RuntimeError("Could not find resulting membership event %s" % event_id)
+            raise RuntimeError(
+                "Could not find resulting membership event %s" % event_id
+            )
 
         return event
 
