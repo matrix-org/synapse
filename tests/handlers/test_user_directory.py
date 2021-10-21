@@ -690,6 +690,14 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(s["results"]), 0)
 
     def test_joining_private_room_with_excluded_user(self) -> None:
+        """
+        When a user excluded from the user directory, E say, joins a private
+        room, E will not appear in the `users_who_share_private_rooms` table.
+
+        When a normal user, U say, joins a private room containing E, then
+        U will appear in the `users_who_share_private_rooms` table, but E will
+        not.
+        """
         # Setup a support and two normal users.
         alice = self.register_user("alice", "pass")
         alice_token = self.login(alice, "pass")
