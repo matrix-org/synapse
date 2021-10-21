@@ -33,6 +33,7 @@ import jinja2
 from twisted.internet import defer
 from twisted.web.resource import IResource
 
+from synapse.api.constants import Membership
 from synapse.events import EventBase
 from synapse.events.presence_router import PresenceRouter
 from synapse.http.client import SimpleHttpClient
@@ -560,8 +561,62 @@ class ModuleApi:
         state = yield defer.ensureDeferred(self._store.get_events(state_ids.values()))
         return state.values()
 
+    async def update_room_membership(
+        self,
+        sender: str,
+        target: str,
+        room_id: str,
+        new_membership: str,
+        content: Optional[dict] = None,
+    ) -> EventBase:
+        """Updates the membership of a user to the given value.
+
+        Added in Synapse v1.46.0.
+
+        Args:
+            sender: The user performing the membership change.
+            target: The user whose membership is changing. This is often the same value
+                as `sender`, but it might differ in some cases (e.g. when kicking a user,
+                the `sender` is the user performing the kick and the `target` is the user
+                being kicked).
+            room_id: The room in which to change the membership.
+            new_membership: The new membership state of `target` after this operation. See
+                https://spec.matrix.org/unstable/client-server-api/#mroommember for the
+                list of allowed values.
+            content: Additional values to include in the resulting event's content.
+
+        Returns:
+            The newly created membership event.
+
+        Raises:
+            RuntimeError if the resulting event could not be found after performing the
+                membership event.
+            ShadowBanError if a shadow-banned requester attempts to send an invite.
+            SynapseError if the module attempts to send a membership event that isn't
+                allowed, either by the server's configuration (e.g. trying to set a
+                per-room display name that's too long) or by the validation rules around
+                membership updates (e.g. the `membership` value is invalid).
+        """
+        event_id, _ = await self._hs.get_room_member_handler().update_membership(
+            requester=create_requester(sender),
+            target=UserID.from_string(target),
+            room_id=room_id,
+            action=new_membership,
+            content=content,
+        )
+
+        # Try to retrieve the resulting event.
+        event = await self._hs.get_datastore().get_event(event_id)
+        if event is None:
+            raise RuntimeError("Could not find resulting membership event %s" % event_id)
+
+        return event
+
     async def create_and_send_event_into_room(self, event_dict: JsonDict) -> EventBase:
-        """Create and send an event into a room. Membership events are currently not supported.
+        """Create and send an event into a room.
+
+        Membership events are not supported by this method. To update a user's membership
+        in a room, please use the `update_room_membership` method instead.
 
         Args:
             event_dict: A dictionary representing the event to send.
