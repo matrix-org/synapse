@@ -24,6 +24,9 @@ class ExperimentalConfig(Config):
     def read_config(self, config: JsonDict, **kwargs):
         experimental = config.get("experimental_features") or {}
 
+        # Whether to enable experimental MSC1849 (aka relations) support
+        self.msc1849_enabled = config.get("experimental_msc1849_support_enabled", True)
+
         # MSC3026 (busy presence state)
         self.msc3026_enabled: bool = experimental.get("msc3026_enabled", False)
 

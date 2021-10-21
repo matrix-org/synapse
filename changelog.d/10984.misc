@@ -1,0 +1,1 @@
+Fix spurious warnings about losing the logging context on the `ReplicationCommandHandler` when losing the replication connection.
