@@ -1002,12 +1002,14 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             limit,
         )
         events = await self.get_events_as_list(event_ids)
-        return sorted(events, key=lambda e: -e.depth)
+        return sorted(
+            events, key=lambda e: (-e.depth, -e.internal_metadata.stream_ordering)
+        )
 
     def _get_backfill_events(self, txn, room_id, event_list, limit):
         logger.debug("_get_backfill_events: %s, %r, %s", room_id, event_list, limit)
 
-        event_results = OrderedDict()
+        event_results = set()
 
         # We want to make sure that we do a breadth-first, "depth" ordered
         # search.
@@ -1089,7 +1091,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             if event_id in event_results:
                 continue
 
-            event_results[event_id] = event_id
+            event_results.add(event_id)
 
             # Try and find any potential historical batches of message history.
             #
@@ -1148,16 +1150,11 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 "_get_backfill_events: prev_event_ids %s", prev_event_id_results
             )
 
-            # TODO: We should probably skip adding the event itself if we
-            # branched off onto the insertion event first above. Need to make this a
-            # bit smart so it doesn't skip over the event altogether if we're at
-            # the end of the historical messages.
-
             for row in prev_event_id_results:
                 if row[2] not in event_results:
                     queue.put((-row[0], -row[1], row[2], row[3]))
 
-        return event_results.values()
+        return event_results
 
     async def get_missing_events(self, room_id, earliest_events, latest_events, limit):
         ids = await self.db_pool.runInteraction(
