@@ -432,6 +432,15 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         self.assertEqual(res["membership"], "leave")
 
+        # Try to send a membership update from a non-local user and check that it fails.
+        d = defer.ensureDeferred(
+            self.module_api.update_room_membership(
+                "@nicolas:otherserver.com", lesley, room_id, "invite",
+            )
+        )
+
+        self.get_failure(d, RuntimeError)
+
 
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
     """For testing ModuleApi functionality in a multi-worker setup"""

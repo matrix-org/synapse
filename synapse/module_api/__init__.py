@@ -573,7 +573,8 @@ class ModuleApi:
         Added in Synapse v1.46.0.
 
         Args:
-            sender: The user performing the membership change.
+            sender: The user performing the membership change. Must be a user local to
+                this homeserver.
             target: The user whose membership is changing. This is often the same value
                 as `sender`, but it might differ in some cases (e.g. when kicking a user,
                 the `sender` is the user performing the kick and the `target` is the user
@@ -588,14 +589,19 @@ class ModuleApi:
             The newly created membership event.
 
         Raises:
-            RuntimeError if the resulting event could not be found after performing the
-                membership event.
+            RuntimeError if the `sender` isn't a local user, or the resulting event could
+                not be found after performing the membership event.
             ShadowBanError if a shadow-banned requester attempts to send an invite.
             SynapseError if the module attempts to send a membership event that isn't
                 allowed, either by the server's configuration (e.g. trying to set a
                 per-room display name that's too long) or by the validation rules around
                 membership updates (e.g. the `membership` value is invalid).
         """
+        if not self.is_mine(sender):
+            raise RuntimeError(
+                "Tried to send an event as a user that isn't local to this homeserver",
+            )
+
         event_id, _ = await self._hs.get_room_member_handler().update_membership(
             requester=create_requester(sender),
             target=UserID.from_string(target),
