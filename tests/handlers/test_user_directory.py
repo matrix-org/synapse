@@ -698,6 +698,42 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user3", 10))
         self.assertEqual(len(s["results"]), 0)
 
+    def test_joining_private_room_with_excluded_user(self) -> None:
+        # Setup a support and two normal users.
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        bob = self.register_user("bob", "pass")
+        bob_token = self.login(bob, "pass")
+        support = "@support1:test"
+        self.get_success(
+            self.store.register_user(
+                user_id=support, password_hash=None, user_type=UserTypes.SUPPORT
+            )
+        )
+
+        # Alice makes a room. Inject the support user into the room.
+        room = self.helper.create_room_as(alice, is_public=False, tok=alice_token)
+        self.get_success(inject_member_event(self.hs, room, support, "join"))
+        # Check the DB state. The support user should not be in the directory.
+        users, in_public, in_private = self.get_success(
+            self.user_dir_helper.get_tables()
+        )
+        self.assertEqual(users, {alice, bob})
+        self.assertEqual(in_public, set())
+        self.assertEqual(in_private, set())
+
+        # Then invite Bob, who accepts.
+        self.helper.invite(room, alice, bob, tok=alice_token)
+        self.helper.join(room, bob, tok=bob_token)
+
+        # Check the DB state. The support user should not be in the directory.
+        users, in_public, in_private = self.get_success(
+            self.user_dir_helper.get_tables()
+        )
+        self.assertEqual(users, {alice, bob})
+        self.assertEqual(in_public, set())
+        self.assertEqual(in_private, {(alice, bob, room), (bob, alice, room)})
+
     def test_spam_checker(self) -> None:
         """
         A user which fails the spam checks will not appear in search results.
