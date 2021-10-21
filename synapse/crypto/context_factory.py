@@ -54,7 +54,7 @@ class ServerContextFactory(ContextFactory):
     per https://github.com/matrix-org/synapse/issues/1691
     """
 
-    def __init__(self, config: "HomeServerConfig"):
+    def __init__(self, config: HomeServerConfig):
         # TODO: once pyOpenSSL exposes TLS_METHOD and SSL_CTX_set_min_proto_version,
         # switch to those (see https://github.com/pyca/cryptography/issues/5379).
         #
@@ -67,7 +67,7 @@ class ServerContextFactory(ContextFactory):
         self.configure_context(self._context, config)
 
     @staticmethod
-    def configure_context(context: SSL.Context, config: "HomeServerConfig") -> None:
+    def configure_context(context: SSL.Context, config: HomeServerConfig) -> None:
         try:
             _ecCurve = crypto.get_elliptic_curve(_defaultCurveName)
             context.set_tmp_ecdh(_ecCurve)
