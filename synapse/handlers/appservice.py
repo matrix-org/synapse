@@ -255,8 +255,6 @@ class ApplicationServicesHandler:
                         self.scheduler.submit_ephemeral_events_for_as(service, events)
 
                     # Persist the latest handled stream token for this appservice
-                    # TODO: We update the stream token for each appservice, even
-                    #  if sending the ephemeral events to the appservice failed.
                     await self.store.set_type_stream_id_for_appservice(
                         service, "read_receipt", new_token
                     )
@@ -267,8 +265,6 @@ class ApplicationServicesHandler:
                         self.scheduler.submit_ephemeral_events_for_as(service, events)
 
                     # Persist the latest handled stream token for this appservice
-                    # TODO: We update the stream token for each appservice, even
-                    #  if sending the ephemeral events to the appservice failed.
                     await self.store.set_type_stream_id_for_appservice(
                         service, "presence", new_token
                     )
