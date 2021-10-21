@@ -17,6 +17,7 @@
 import abc
 import os
 from typing import (
+    TYPE_CHECKING,
     Any,
     Dict,
     Generic,
@@ -39,6 +40,9 @@ from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 from synapse.util.stringutils import strtobool
 
+if TYPE_CHECKING:
+    from synapse.events.builder import EventBuilder
+
 # Whether we should use frozen_dict in FrozenEvent. Using frozen_dicts prevents
 # bugs where we accidentally share e.g. signature dicts. However, converting a
 # dict to frozen_dicts is expensive.
@@ -55,7 +59,15 @@ T = TypeVar("T")
 
 # DictProperty (and DefaultDictPropery) require the classes they're used with to
 # have a _dict property to pull properties from.
-_DictPropertyInstance = Union["_EventInternalMetadata", "EventBase"]
+#
+# TODO _DictPropertyInstance should not include EventBuilder but due to
+# https://github.com/python/mypy/issues/5570 it thinks the DictProperty and
+# DefaultDictProperty get applied to EventBuilder when it is in a Union with
+# EventBase. This is the least invasive hack to get mypy to comply.
+#
+# Note that DictProperty/DefaultDictProperty cannot actually be used with
+# EventBuilder as it lacks a _dict property.
+_DictPropertyInstance = Union["_EventInternalMetadata", "EventBase", "EventBuilder"]
 
 
 class DictProperty(Generic[T]):
@@ -92,6 +104,7 @@ class DictProperty(Generic[T]):
         if instance is None:
             return self
         try:
+            assert isinstance(instance, (EventBase, _EventInternalMetadata))
             return instance._dict[self.key]
         except KeyError as e1:
             # We want this to look like a regular attribute error (mostly so that
@@ -107,9 +120,11 @@ class DictProperty(Generic[T]):
             ) from e1.__context__
 
     def __set__(self, instance: _DictPropertyInstance, v: T) -> None:
+        assert isinstance(instance, (EventBase, _EventInternalMetadata))
         instance._dict[self.key] = v
 
     def __delete__(self, instance: _DictPropertyInstance) -> None:
+        assert isinstance(instance, (EventBase, _EventInternalMetadata))
         try:
             del instance._dict[self.key]
         except KeyError as e1:
@@ -154,6 +169,7 @@ class DefaultDictProperty(DictProperty, Generic[T]):
     ) -> Union[T, "DefaultDictProperty"]:
         if instance is None:
             return self
+        assert isinstance(instance, (EventBase, _EventInternalMetadata))
         return instance._dict.get(self.key, self.default)
 
 
