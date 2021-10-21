@@ -646,22 +646,18 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         u2_token = self.login(u2, "pass")
         u3 = self.register_user("user3", "pass")
 
-        # We do not add users to the directory until they join a room.
+        # u1 can't see u2 until they share a private room, or u1 is in a public room.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 0)
 
+        # Get u1 and u2 into a private room.
         room = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
         self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
         self.helper.join(room, user=u2, tok=u2_token)
 
         # Check we have populated the database correctly.
-        shares_private = self.get_success(
-            self.user_dir_helper.get_users_who_share_private_rooms()
-        )
-        public_users = self.get_success(
-            self.user_dir_helper.get_users_in_public_rooms()
-        )
-
+        users, public_users, shares_private = self.get_success(self.user_dir_helper.get_tables())
+        self.assertEqual(users, {u1, u2, u3})
         self.assertEqual(shares_private, {(u1, u2, room), (u2, u1, room)})
         self.assertEqual(public_users, set())
 
@@ -680,14 +676,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # User 2 then leaves.
         self.helper.leave(room, user=u2, tok=u2_token)
 
-        # Check we have removed the values.
-        shares_private = self.get_success(
-            self.user_dir_helper.get_users_who_share_private_rooms()
-        )
-        public_users = self.get_success(
-            self.user_dir_helper.get_users_in_public_rooms()
-        )
-
+        # Check this is reflected in the DB.
+        users, public_users, shares_private = self.get_success(self.user_dir_helper.get_tables())
+        self.assertEqual(users, {u1, u2, u3})
         self.assertEqual(shares_private, set())
         self.assertEqual(public_users, set())
 
