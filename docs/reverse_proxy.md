@@ -188,7 +188,7 @@ frontend https
   http-request set-header X-Forwarded-For %[src]
 
   # Matrix client traffic
-  acl matrix-host hdr_dom(host) -i matrix.example.com
+  acl matrix-host hdr(host) -i matrix.example.com matrix.example.com:443
   acl matrix-path path_beg /_matrix
   acl matrix-path path_beg /_synapse/client
 
