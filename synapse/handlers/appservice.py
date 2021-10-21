@@ -194,7 +194,7 @@ class ApplicationServicesHandler:
         Args:
             stream_key: The stream the event came from.
 
-                `stream_key` can "typing_key", "receipt_key" or "presence_key". Any other
+                `stream_key` can be "typing_key", "receipt_key" or "presence_key". Any other
                 value for `stream_key` will cause this function to return early.
 
                 Ephemeral events will only be pushed to appservices that have opted into
