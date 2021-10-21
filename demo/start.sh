@@ -8,7 +8,8 @@ cd "$DIR/.." || exit
 
 mkdir -p demo/etc
 
-export PYTHONPATH=$(readlink -f "$(pwd)")
+PYTHONPATH=$(readlink -f "$(pwd)")
+export PYTHONPATH
 
 
 echo $PYTHONPATH
