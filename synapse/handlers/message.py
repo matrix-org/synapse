@@ -1032,6 +1032,10 @@ class EventCreationHandler:
             # TODO Attempt to fetch the event over federation.
             raise SynapseError(400, "Can't send relation to unknown event")
 
+        # And in the same room.
+        if parent_event.room_id != event.room_id:
+            raise SynapseError(400, "Relations must be in the same room")
+
         # If this event is an annotation then we check that that the sender
         # can't annotate the same way twice (e.g. stops users from liking an
         # event multiple times).
