@@ -2146,14 +2146,14 @@ class PersistEventsStore:
             "   SELECT 1 FROM events"
             "   LEFT JOIN event_edges edge"
             "   ON edge.event_id = events.event_id"
-            "   WHERE events.event_id = ? AND events.room_id = ? AND (events.outlier = FALSE OR edge.event_id IS NULL)"
+            "   WHERE events.event_id = ? AND events.room_id = ? AND (events.outlier = ? OR edge.event_id IS NULL)"
             " )"
         )
 
         txn.execute_batch(
             query,
             [
-                (e_id, ev.room_id, e_id, ev.room_id, e_id, ev.room_id)
+                (e_id, ev.room_id, e_id, ev.room_id, e_id, ev.room_id, False)
                 for ev in events
                 for e_id in ev.prev_event_ids()
                 if not ev.internal_metadata.is_outlier()
