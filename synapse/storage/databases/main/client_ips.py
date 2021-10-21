@@ -353,7 +353,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
-        self.user_ips_max_age = hs.config.user_ips_max_age
+        self.user_ips_max_age = hs.config.server.user_ips_max_age
 
         if hs.config.worker.run_background_tasks and self.user_ips_max_age:
             self._clock.looping_call(self._prune_old_user_ips, 5 * 1000)
@@ -538,15 +538,20 @@ class ClientIpStore(ClientIpWorkerStore):
         """
         ret = await super().get_last_client_ip_by_device(user_id, device_id)
 
-        # Update what is retrieved from the database with data which is pending insertion.
+        # Update what is retrieved from the database with data which is pending
+        # insertion, as if it has already been stored in the database.
         for key in self._batch_row_update:
-            uid, access_token, ip = key
+            uid, _access_token, ip = key
             if uid == user_id:
                 user_agent, did, last_seen = self._batch_row_update[key]
+
+                if did is None:
+                    # These updates don't make it to the `devices` table
+                    continue
+
                 if not device_id or did == device_id:
-                    ret[(user_id, device_id)] = {
+                    ret[(user_id, did)] = {
                         "user_id": user_id,
-                        "access_token": access_token,
                         "ip": ip,
                         "user_agent": user_agent,
                         "device_id": did,

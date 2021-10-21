@@ -195,14 +195,14 @@ def start(config_options):
         config.logging.no_redirect_stdio = True
 
     # Explicitly disable background processes
-    config.update_user_directory = False
+    config.server.update_user_directory = False
     config.worker.run_background_tasks = False
-    config.start_pushers = False
+    config.worker.start_pushers = False
     config.pusher_shard_config.instances = []
-    config.send_federation = False
+    config.worker.send_federation = False
     config.federation_shard_config.instances = []
 
-    synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
+    synapse.events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
 
     ss = AdminCmdServer(
         config.server.server_name,

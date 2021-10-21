@@ -37,7 +37,7 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         return self.hs
 
     def test_3pid_lookup_disabled(self):
-        self.hs.config.enable_3pid_lookup = False
+        self.hs.config.registration.enable_3pid_lookup = False
 
         self.register_user("kermit", "monkey")
         tok = self.login("kermit", "monkey")

@@ -470,13 +470,45 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
         register.register_servlets,
     ]
 
+    def default_config(self):
+        config = super().default_config()
+        config["allow_guest_access"] = True
+        return config
+
     def test_GET_whoami(self):
         device_id = "wouldgohere"
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test", device_id=device_id)
 
-        whoami = self.whoami(tok)
-        self.assertEqual(whoami, {"user_id": user_id, "device_id": device_id})
+        whoami = self._whoami(tok)
+        self.assertEqual(
+            whoami,
+            {
+                "user_id": user_id,
+                "device_id": device_id,
+                # Unstable until MSC3069 enters spec
+                "org.matrix.msc3069.is_guest": False,
+            },
+        )
+
+    def test_GET_whoami_guests(self):
+        channel = self.make_request(
+            b"POST", b"/_matrix/client/r0/register?kind=guest", b"{}"
+        )
+        tok = channel.json_body["access_token"]
+        user_id = channel.json_body["user_id"]
+        device_id = channel.json_body["device_id"]
+
+        whoami = self._whoami(tok)
+        self.assertEqual(
+            whoami,
+            {
+                "user_id": user_id,
+                "device_id": device_id,
+                # Unstable until MSC3069 enters spec
+                "org.matrix.msc3069.is_guest": True,
+            },
+        )
 
     def test_GET_whoami_appservices(self):
         user_id = "@as:test"
@@ -484,18 +516,25 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             as_token,
-            self.hs.config.server_name,
+            self.hs.config.server.server_name,
             id="1234",
             namespaces={"users": [{"regex": user_id, "exclusive": True}]},
             sender=user_id,
         )
         self.hs.get_datastore().services_cache.append(appservice)
 
-        whoami = self.whoami(as_token)
-        self.assertEqual(whoami, {"user_id": user_id})
+        whoami = self._whoami(as_token)
+        self.assertEqual(
+            whoami,
+            {
+                "user_id": user_id,
+                # Unstable until MSC3069 enters spec
+                "org.matrix.msc3069.is_guest": False,
+            },
+        )
         self.assertFalse(hasattr(whoami, "device_id"))
 
-    def whoami(self, tok):
+    def _whoami(self, tok):
         channel = self.make_request("GET", "account/whoami", {}, access_token=tok)
         self.assertEqual(channel.code, 200)
         return channel.json_body
@@ -625,7 +664,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
     def test_add_email_if_disabled(self):
         """Test adding email to profile when doing so is disallowed"""
-        self.hs.config.enable_3pid_changes = False
+        self.hs.config.registration.enable_3pid_changes = False
 
         client_secret = "foobar"
         session_id = self._request_token(self.email, client_secret)
@@ -695,7 +734,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
     def test_delete_email_if_disabled(self):
         """Test deleting an email from profile when disallowed"""
-        self.hs.config.enable_3pid_changes = False
+        self.hs.config.registration.enable_3pid_changes = False
 
         # Add a threepid
         self.get_success(

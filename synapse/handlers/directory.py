@@ -31,26 +31,25 @@ from synapse.appservice import ApplicationService
 from synapse.storage.databases.main.directory import RoomAliasMapping
 from synapse.types import JsonDict, Requester, RoomAlias, UserID, get_domain_from_id
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class DirectoryHandler(BaseHandler):
+class DirectoryHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.auth = hs.get_auth()
+        self.hs = hs
         self.state = hs.get_state_handler()
         self.appservice_handler = hs.get_application_service_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.store = hs.get_datastore()
         self.config = hs.config
         self.enable_room_list_search = hs.config.roomdirectory.enable_room_list_search
-        self.require_membership = hs.config.require_membership_for_aliases
+        self.require_membership = hs.config.server.require_membership_for_aliases
         self.third_party_event_rules = hs.get_third_party_event_rules()
+        self.server_name = hs.hostname
 
         self.federation = hs.get_federation_client()
         hs.get_federation_registry().register_query_handler(

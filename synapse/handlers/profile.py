@@ -32,8 +32,6 @@ from synapse.types import (
     get_domain_from_id,
 )
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -43,7 +41,7 @@ MAX_DISPLAYNAME_LEN = 256
 MAX_AVATAR_URL_LEN = 1000
 
 
-class ProfileHandler(BaseHandler):
+class ProfileHandler:
     """Handles fetching and updating user profile information.
 
     ProfileHandler can be instantiated directly on workers and will
@@ -54,7 +52,9 @@ class ProfileHandler(BaseHandler):
     PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
+        self.clock = hs.get_clock()
+        self.hs = hs
 
         self.federation = hs.get_federation_client()
         hs.get_federation_registry().register_query_handler(
@@ -62,6 +62,7 @@ class ProfileHandler(BaseHandler):
         )
 
         self.user_directory_handler = hs.get_user_directory_handler()
+        self.request_ratelimiter = hs.get_request_ratelimiter()
 
         if hs.config.worker.run_background_tasks:
             self.clock.looping_call(
@@ -178,7 +179,7 @@ class ProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's displayname")
 
-        if not by_admin and not self.hs.config.enable_set_displayname:
+        if not by_admin and not self.hs.config.registration.enable_set_displayname:
             profile = await self.store.get_profileinfo(target_user.localpart)
             if profile.display_name:
                 raise SynapseError(
@@ -268,7 +269,7 @@ class ProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
 
-        if not by_admin and not self.hs.config.enable_set_avatar_url:
+        if not by_admin and not self.hs.config.registration.enable_set_avatar_url:
             profile = await self.store.get_profileinfo(target_user.localpart)
             if profile.avatar_url:
                 raise SynapseError(
@@ -346,7 +347,7 @@ class ProfileHandler(BaseHandler):
         if not self.hs.is_mine(target_user):
             return
 
-        await self.ratelimit(requester)
+        await self.request_ratelimiter.ratelimit(requester)
 
         # Do not actually update the room state for shadow-banned users.
         if requester.shadow_banned:
@@ -397,7 +398,7 @@ class ProfileHandler(BaseHandler):
         # when building a membership event. In this case, we must allow the
         # lookup.
         if (
-            not self.hs.config.limit_profile_requests_to_users_who_share_rooms
+            not self.hs.config.server.limit_profile_requests_to_users_who_share_rooms
             or not requester
         ):
             return

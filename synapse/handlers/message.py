@@ -16,6 +16,7 @@
 # limitations under the License.
 import logging
 import random
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
@@ -39,9 +40,11 @@ from synapse.api.errors import (
     NotFoundError,
     ShadowBanError,
     SynapseError,
+    UnsupportedRoomVersionError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.api.urls import ConsentURIBuilder
+from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
@@ -58,8 +61,6 @@ from synapse.util.async_helpers import Linearizer, unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_events_for_client
-
-from ._base import BaseHandler
 
 if TYPE_CHECKING:
     from synapse.events.third_party_rules import ThirdPartyEventRules
@@ -79,7 +80,7 @@ class MessageHandler:
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
-        self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
+        self._ephemeral_events_enabled = hs.config.server.enable_ephemeral_messages
 
         # The scheduled call to self._expire_event. None if no call is currently
         # scheduled.
@@ -413,7 +414,9 @@ class EventCreationHandler:
         self.server_name = hs.hostname
         self.notifier = hs.get_notifier()
         self.config = hs.config
-        self.require_membership_for_aliases = hs.config.require_membership_for_aliases
+        self.require_membership_for_aliases = (
+            hs.config.server.require_membership_for_aliases
+        )
         self._events_shard_config = self.config.worker.events_shard_config
         self._instance_name = hs.get_instance_name()
 
@@ -423,13 +426,12 @@ class EventCreationHandler:
             Membership.JOIN,
             Membership.KNOCK,
         }
-        if self.hs.config.include_profile_data_on_invite:
+        if self.hs.config.server.include_profile_data_on_invite:
             self.membership_types_to_include_profile_data_in.add(Membership.INVITE)
 
         self.send_event = ReplicationSendEventRestServlet.make_client(hs)
 
-        # This is only used to get at ratelimit function
-        self.base_handler = BaseHandler(hs)
+        self.request_ratelimiter = hs.get_request_ratelimiter()
 
         # We arbitrarily limit concurrent event creation for a room to 5.
         # This is to stop us from diverging history *too* much.
@@ -459,11 +461,11 @@ class EventCreationHandler:
         #
         self._rooms_to_exclude_from_dummy_event_insertion: Dict[str, int] = {}
         # The number of forward extremeities before a dummy event is sent.
-        self._dummy_events_threshold = hs.config.dummy_events_threshold
+        self._dummy_events_threshold = hs.config.server.dummy_events_threshold
 
         if (
             self.config.worker.run_background_tasks
-            and self.config.cleanup_extremities_with_dummy_events
+            and self.config.server.cleanup_extremities_with_dummy_events
         ):
             self.clock.looping_call(
                 lambda: run_as_background_process(
@@ -475,7 +477,7 @@ class EventCreationHandler:
 
         self._message_handler = hs.get_message_handler()
 
-        self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
+        self._ephemeral_events_enabled = hs.config.server.enable_ephemeral_messages
 
         self._external_cache = hs.get_external_cache()
 
@@ -549,16 +551,22 @@ class EventCreationHandler:
         await self.auth.check_auth_blocking(requester=requester)
 
         if event_dict["type"] == EventTypes.Create and event_dict["state_key"] == "":
-            room_version = event_dict["content"]["room_version"]
+            room_version_id = event_dict["content"]["room_version"]
+            room_version_obj = KNOWN_ROOM_VERSIONS.get(room_version_id)
+            if not room_version_obj:
+                # this can happen if support is withdrawn for a room version
+                raise UnsupportedRoomVersionError(room_version_id)
         else:
             try:
-                room_version = await self.store.get_room_version_id(
+                room_version_obj = await self.store.get_room_version(
                     event_dict["room_id"]
                 )
             except NotFoundError:
                 raise AuthError(403, "Unknown room")
 
-        builder = self.event_builder_factory.new(room_version, event_dict)
+        builder = self.event_builder_factory.for_room_version(
+            room_version_obj, event_dict
+        )
 
         self.validator.validate_builder(builder)
 
@@ -1064,9 +1072,17 @@ class EventCreationHandler:
             EventTypes.Create,
             "",
         ):
-            room_version = event.content.get("room_version", RoomVersions.V1.identifier)
+            room_version_id = event.content.get(
+                "room_version", RoomVersions.V1.identifier
+            )
+            room_version_obj = KNOWN_ROOM_VERSIONS.get(room_version_id)
+            if not room_version_obj:
+                raise UnsupportedRoomVersionError(
+                    "Attempt to create a room with unsupported room version %s"
+                    % (room_version_id,)
+                )
         else:
-            room_version = await self.store.get_room_version_id(event.room_id)
+            room_version_obj = await self.store.get_room_version(event.room_id)
 
         if event.internal_metadata.is_out_of_band_membership():
             # the only sort of out-of-band-membership events we expect to see here are
@@ -1075,8 +1091,9 @@ class EventCreationHandler:
             assert event.content["membership"] == Membership.LEAVE
         else:
             try:
-                await self._event_auth_handler.check_from_context(
-                    room_version, event, context
+                validate_event_for_room_version(room_version_obj, event)
+                await self._event_auth_handler.check_auth_rules_from_context(
+                    room_version_obj, event, context
                 )
             except AuthError as err:
                 logger.warning("Denying new event %r because %s", event, err)
@@ -1302,7 +1319,7 @@ class EventCreationHandler:
                     original_event and event.sender != original_event.sender
                 )
 
-            await self.base_handler.ratelimit(
+            await self.request_ratelimiter.ratelimit(
                 requester, is_admin_redaction=is_admin_redaction
             )
 
@@ -1455,6 +1472,39 @@ class EventCreationHandler:
             prev_state_ids = await context.get_prev_state_ids()
             if prev_state_ids:
                 raise AuthError(403, "Changing the room create event is forbidden")
+
+        if event.type == EventTypes.MSC2716_INSERTION:
+            room_version = await self.store.get_room_version_id(event.room_id)
+            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+
+            create_event = await self.store.get_create_event_for_room(event.room_id)
+            room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+
+            # Only check an insertion event if the room version
+            # supports it or the event is from the room creator.
+            if room_version_obj.msc2716_historical or (
+                self.config.experimental.msc2716_enabled
+                and event.sender == room_creator
+            ):
+                next_batch_id = event.content.get(
+                    EventContentFields.MSC2716_NEXT_BATCH_ID
+                )
+                conflicting_insertion_event_id = (
+                    await self.store.get_insertion_event_by_batch_id(
+                        event.room_id, next_batch_id
+                    )
+                )
+                if conflicting_insertion_event_id is not None:
+                    # The current insertion event that we're processing is invalid
+                    # because an insertion event already exists in the room with the
+                    # same next_batch_id. We can't allow multiple because the batch
+                    # pointing will get weird, e.g. we can't determine which insertion
+                    # event the batch event is pointing to.
+                    raise SynapseError(
+                        HTTPStatus.BAD_REQUEST,
+                        "Another insertion event already exists with the same next_batch_id",
+                        errcode=Codes.INVALID_PARAM,
+                    )
 
         # Mark any `m.historical` messages as backfilled so they don't appear
         # in `/sync` and have the proper decrementing `stream_ordering` as we import

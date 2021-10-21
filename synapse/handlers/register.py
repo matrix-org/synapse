@@ -41,8 +41,6 @@ from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, UserID, create_requester
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -85,9 +83,10 @@ class LoginDict(TypedDict):
     refresh_token: Optional[str]
 
 
-class RegistrationHandler(BaseHandler):
+class RegistrationHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
+        self.clock = hs.get_clock()
         self.hs = hs
         self.auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
@@ -116,8 +115,8 @@ class RegistrationHandler(BaseHandler):
             self._register_device_client = self.register_device_inner
             self.pusher_pool = hs.get_pusherpool()
 
-        self.session_lifetime = hs.config.session_lifetime
-        self.access_token_lifetime = hs.config.access_token_lifetime
+        self.session_lifetime = hs.config.registration.session_lifetime
+        self.access_token_lifetime = hs.config.registration.access_token_lifetime
 
         init_counters_for_auth_provider("")
 
@@ -340,8 +339,13 @@ class RegistrationHandler(BaseHandler):
             auth_provider=(auth_provider_id or ""),
         ).inc()
 
+        # If the user does not need to consent at registration, auto-join any
+        # configured rooms.
         if not self.hs.config.consent.user_consent_at_registration:
-            if not self.hs.config.auto_join_rooms_for_guests and make_guest:
+            if (
+                not self.hs.config.registration.auto_join_rooms_for_guests
+                and make_guest
+            ):
                 logger.info(
                     "Skipping auto-join for %s because auto-join for guests is disabled",
                     user_id,
@@ -387,7 +391,7 @@ class RegistrationHandler(BaseHandler):
             "preset": self.hs.config.registration.autocreate_auto_join_room_preset,
         }
 
-        # If the configuration providers a user ID to create rooms with, use
+        # If the configuration provides a user ID to create rooms with, use
         # that instead of the first user registered.
         requires_join = False
         if self.hs.config.registration.auto_join_user_id:
@@ -510,7 +514,7 @@ class RegistrationHandler(BaseHandler):
                 # we don't have a local user in the room to craft up an invite with.
                 requires_invite = await self.store.is_host_joined(
                     room_id,
-                    self.server_name,
+                    self._server_name,
                 )
 
                 if requires_invite:
@@ -854,7 +858,7 @@ class RegistrationHandler(BaseHandler):
             # Necessary due to auth checks prior to the threepid being
             # written to the db
             if is_threepid_reserved(
-                self.hs.config.mau_limits_reserved_threepids, threepid
+                self.hs.config.server.mau_limits_reserved_threepids, threepid
             ):
                 await self.store.upsert_monthly_active_user(user_id)
 
