@@ -70,7 +70,7 @@ for port in 8080 8081 8082; do
         echo "tls_private_key_path: \"$DIR/etc/localhost:$https_port.tls.key\"" >> $DIR/etc/$port.config
 
         # Generate tls keys
-        openssl req -x509 -newkey rsa:4096 -keyout $DIR/etc/localhost\:$https_port.tls.key -out $DIR/etc/localhost\:$https_port.tls.crt -days 365 -nodes -subj "/O=matrix"
+        openssl req -x509 -newkey rsa:4096 -keyout $DIR/etc/localhost:$https_port.tls.key -out $DIR/etc/localhost:$https_port.tls.crt -days 365 -nodes -subj "/O=matrix"
 
         # Ignore keys from the trusted keys server
         echo '# Ignore keys from the trusted keys server' >> $DIR/etc/$port.config
