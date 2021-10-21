@@ -12,18 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import sys
+
 from synapse.config._base import ConfigError
+from synapse.config.homeserver import HomeServerConfig
 
-if __name__ == "__main__":
-    import sys
 
-    from synapse.config.homeserver import HomeServerConfig
-
-    action = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] == "read" else None
-    # If we're reading a key in the config file, then `sys.argv[1]` will be `read`  and `sys.argv[2]`
+def main(args):
+    action = args[1] if len(args) > 1 and args[1] == "read" else None
+    # If we're reading a key in the config file, then `args[1]` will be `read`  and `args[2]`
     # will be the key to read.
     # We'll want to rework this code if we want to support more actions than just `read`.
-    load_config_args = sys.argv[3:] if action else sys.argv[1:]
+    load_config_args = args[3:] if action else args[1:]
 
     try:
         config = HomeServerConfig.load_config("", load_config_args)
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     print("Config parses OK!")
 
     if action == "read":
-        key = sys.argv[2]
+        key = args[2]
         key_parts = key.split(".")
 
         value = config
@@ -44,9 +44,12 @@ if __name__ == "__main__":
                 key_parts.pop(0)
 
             print(f"\n{key}: {value}")
-            sys.exit(0)
         except AttributeError:
             print(
                 f"\nNo '{key}' key could be found in the provided configuration file."
             )
             sys.exit(1)
+
+
+if __name__ == "__main__":
+    main(sys.argv)
