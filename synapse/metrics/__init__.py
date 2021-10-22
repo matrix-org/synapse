@@ -67,7 +67,11 @@ class LaterGauge:
     labels = attr.ib(hash=False, type=Optional[Iterable[str]])
     # callback: should either return a value (if there are no labels for this metric),
     # or dict mapping from a label tuple to a value
-    caller = attr.ib(type=Callable[[], Union[Mapping[Tuple[str, ...], float], float]])
+    caller = attr.ib(
+        type=Callable[
+            [], Union[Mapping[Tuple[str, ...], Union[int, float]], Union[int, float]]
+        ]
+    )
 
     def collect(self):
 
@@ -80,7 +84,7 @@ class LaterGauge:
             yield g
             return
 
-        if isinstance(calls, float):
+        if isinstance(calls, (int, float)):
             g.add_metric([], calls)
         else:
             for k, v in calls.items():
