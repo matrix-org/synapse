@@ -227,10 +227,10 @@ class ThirdPartyEventRules:
                 # This module callback needs a rework so that hacks such as
                 # this one are not necessary.
                 raise e
-            except Exception as e:
+            except Exception:
                 raise ModuleFailedException(
                     "Failed to run `check_event_allowed` module API callback"
-                ) from e
+                )
 
             # Return if the event shouldn't be allowed or if the module came up with a
             # replacement dict for the event.
