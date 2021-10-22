@@ -149,7 +149,7 @@ POST /_synapse/admin/v1/registration_tokens/new
 
 The request body must be a JSON object and can contain the following fields:
 - `token`: The registration token. A string of no more than 64 characters that
-  consists only of characters matched by the regex `[A-Za-z0-9-_]`.
+  consists only of characters matched by the regex `[A-Za-z0-9._~-]`.
   Default: randomly generated.
 - `uses_allowed`: The integer number of times the token can be used to complete
   a registration before it becomes invalid.
