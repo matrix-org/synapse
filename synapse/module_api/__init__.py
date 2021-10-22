@@ -601,21 +601,26 @@ class ModuleApi:
                 "Tried to send an event as a user that isn't local to this homeserver",
             )
 
+        requester = create_requester(sender)
+        target_user_id = UserID.from_string(target)
+
         if content is None:
             content = {}
 
         # Set the profile if not already done by the module.
         if "avatar_url" not in content:
-            content["avatar_url"] = self._hs.get_profile_handler().get_avatar_url(target)
+            content["avatar_url"] = self._hs.get_profile_handler().get_avatar_url(
+                requester.user,
+            )
 
         if "displayname" not in content:
             content["displayname"] = self._hs.get_profile_handler().get_displayname(
-                target,
+                target_user_id,
             )
 
         event_id, _ = await self._hs.get_room_member_handler().update_membership(
-            requester=create_requester(sender),
-            target=UserID.from_string(target),
+            requester=requester,
+            target=target_user_id,
             room_id=room_id,
             action=new_membership,
             content=content,
