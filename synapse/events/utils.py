@@ -454,6 +454,7 @@ class EventClientSerializer:
                 return
 
         event_id = event.event_id
+        room_id = event.room_id
 
         # The bundled aggregations to include.
         aggregations = {}
@@ -463,7 +464,7 @@ class EventClientSerializer:
             aggregations[RelationTypes.ANNOTATION] = annotations.to_dict()
 
         references = await self.store.get_relations_for_event(
-            event_id, RelationTypes.REFERENCE, direction="f"
+            event_id, room_id, RelationTypes.REFERENCE, direction="f"
         )
         if references.chunk:
             aggregations[RelationTypes.REFERENCE] = references.to_dict()
