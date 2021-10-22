@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse v1.45.0 breaking the configuration file parsing script.

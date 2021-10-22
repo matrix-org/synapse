@@ -341,6 +341,7 @@ The following actions are performed when deactivating an user:
 - Remove all 3PIDs from the homeserver
 - Delete all devices and E2EE keys
 - Delete all access tokens
+- Delete all pushers
 - Delete the password hash
 - Removal from all rooms the user is a member of
 - Remove the user from the user directory
@@ -354,6 +355,15 @@ is set to `true`:
 - Remove the user's avatar URL
 - Mark the user as erased
 
+The following actions are **NOT** performed. The list may be incomplete.
+
+- Remove mappings of SSO IDs
+- [Delete media uploaded](#delete-media-uploaded-by-a-user) by user (included avatar images)
+- Delete sent and received messages
+- Delete E2E cross-signing keys
+- Remove the user's creation (registration) timestamp
+- [Remove rate limit overrides](#override-ratelimiting-for-users)
+- Remove from monthly active users
 
 ## Reset password
 

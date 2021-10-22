@@ -1,0 +1,1 @@
+Fix a bug where setting a user's external_id via the admin API returns 500 and deletes users existing external mappings if that external ID is already mapped.

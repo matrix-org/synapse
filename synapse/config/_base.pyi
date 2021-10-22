@@ -26,6 +26,7 @@ from synapse.config import (
     redis,
     registration,
     repository,
+    retention,
     room_directory,
     saml2,
     server,
@@ -91,6 +92,7 @@ class RootConfig:
     modules: modules.ModulesConfig
     caches: cache.CacheConfig
     federation: federation.FederationConfig
+    retention: retention.RetentionConfig
 
     config_classes: List = ...
     def __init__(self) -> None: ...
