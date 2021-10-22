@@ -145,15 +145,21 @@ LaterGauge(
 
 
 class RequestMetrics:
-    def start(self, time_sec, name, method):
-        self.start = time_sec
+    def start(self, time_sec: float, name: str, method: str) -> None:
+        self.start_ts = time_sec
         self.start_context = current_context()
         self.name = name
         self.method = method
 
-        # _request_stats records resource usage that we have already added
-        # to the "in flight" metrics.
-        self._request_stats = self.start_context.get_resource_usage()
+        if self.start_context:
+            # _request_stats records resource usage that we have already added
+            # to the "in flight" metrics.
+            self._request_stats = self.start_context.get_resource_usage()
+        else:
+            logger.error(
+                "Tried to start a RequestMetric from the sentinel context.\n%s",
+                "".join(traceback.format_stack()),
+            )
 
         with _in_flight_requests_lock:
             _in_flight_requests.add(self)
@@ -169,12 +175,18 @@ class RequestMetrics:
             tag = context.tag
 
             if context != self.start_context:
-                logger.warning(
+                logger.error(
                     "Context have unexpectedly changed %r, %r",
                     context,
                     self.start_context,
                 )
                 return
+        else:
+            logger.error(
+                "Trying to stop RequestMetrics in the sentinel context.\n%s",
+                "".join(traceback.format_stack()),
+            )
+            return
 
         response_code = str(response_code)
 
@@ -183,7 +195,7 @@ class RequestMetrics:
         response_count.labels(self.method, self.name, tag).inc()
 
         response_timer.labels(self.method, self.name, tag, response_code).observe(
-            time_sec - self.start
+            time_sec - self.start_ts
         )
 
         resource_usage = context.get_resource_usage()
@@ -213,6 +225,12 @@ class RequestMetrics:
 
     def update_metrics(self):
         """Updates the in flight metrics with values from this request."""
+        if not self.start_context:
+            logger.error(
+                "Tried to update a RequestMetric from the sentinel context.\n%s",
+                "".join(traceback.format_stack()),
+            )
+            return
         new_stats = self.start_context.get_resource_usage()
 
         diff = new_stats - self._request_stats
