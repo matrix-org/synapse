@@ -124,7 +124,7 @@ def _get_in_flight_counts() -> Dict[Tuple[str, ...], float]:
         rm.update_metrics()
 
     # Map from (method, name) -> int, the number of in flight requests of that
-    # type. The key type is Tuple[str, str], but we leavethe length unspecified
+    # type. The key type is Tuple[str, str], but we leave the length unspecified
     # for compatability with LaterGauge's annotations.
     counts: Dict[Tuple[str, ...], float] = {}
     for rm in reqs:
