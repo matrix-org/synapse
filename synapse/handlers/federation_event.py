@@ -445,22 +445,22 @@ class FederationEventHandler:
         if room_version.identifier != room_version_id:
             raise SynapseError(400, "Room version mismatch")
 
-        # we should have all of the auth events in the chain.
-        for e in itertools.chain(auth_events, state, [event]):
-            for e_id in e.auth_event_ids():
-                if e_id not in event_map:
-                    logger.info(
-                        "Auth chain incomplete: %s refers to missing event %s", e, e_id
-                    )
-                    raise SynapseError(400, "Auth chain incomplete")
-
         # filter out any events we have already seen
         seen_remotes = await self._store.have_seen_events(room_id, event_map.keys())
         for s in seen_remotes:
             event_map.pop(s, None)
 
         # persist the auth chain and state events.
+        #
         # any invalid events here will be marked as rejected, and we'll carry on.
+        #
+        # any events whose auth events are missing (ie, not in the send_join response,
+        # and not already in our db) will just be ignored. This is correct behaviour,
+        # because the reason that auth_events are missing might be due to us being
+        # unable to validate their signatures. The fact that we can't validate their
+        # signatures right now doesn't mean that we will *never* be able to, so it
+        # is premature to reject them.
+        #
         await self._auth_and_persist_outliers(room_id, event_map.values())
 
         # and now persist the join event itself.
@@ -1304,14 +1304,14 @@ class FederationEventHandler:
                 for auth_event_id in event.auth_event_ids():
                     ae = persisted_events.get(auth_event_id)
                     if not ae:
-                        logger.warning(
-                            "Event %s relies on auth_event %s, which could not be found.",
-                            event,
-                            auth_event_id,
-                        )
                         # the fact we can't find the auth event doesn't mean it doesn't
                         # exist, which means it is premature to reject `event`. Instead we
                         # just ignore it for now.
+                        logger.warning(
+                            "Dropping event %s, which relies on auth_event %s, which could not be found",
+                            event,
+                            auth_event_id,
+                        )
                         return None
                     auth.append(ae)
 
