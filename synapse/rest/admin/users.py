@@ -35,6 +35,7 @@ from synapse.rest.admin._base import (
     assert_user_is_admin,
 )
 from synapse.rest.client._base import client_patterns
+from synapse.storage.databases.main.registration import ExternalIDReuseException
 from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.types import JsonDict, UserID
 
@@ -228,12 +229,12 @@ class UserRestServletV2(RestServlet):
         if not isinstance(deactivate, bool):
             raise SynapseError(400, "'deactivated' parameter is not of type boolean")
 
-        # convert List[Dict[str, str]] into Set[Tuple[str, str]]
+        # convert List[Dict[str, str]] into List[Tuple[str, str]]
         if external_ids is not None:
-            new_external_ids = {
+            new_external_ids = [
                 (external_id["auth_provider"], external_id["external_id"])
                 for external_id in external_ids
-            }
+            ]
 
         # convert List[Dict[str, str]] into Set[Tuple[str, str]]
         if threepids is not None:
@@ -275,28 +276,13 @@ class UserRestServletV2(RestServlet):
                     )
 
             if external_ids is not None:
-                # get changed external_ids (added and removed)
-                cur_external_ids = set(
-                    await self.store.get_external_ids_by_user(user_id)
-                )
-                add_external_ids = new_external_ids - cur_external_ids
-                del_external_ids = cur_external_ids - new_external_ids
-
-                # remove old external_ids
-                for auth_provider, external_id in del_external_ids:
-                    await self.store.remove_user_external_id(
-                        auth_provider,
-                        external_id,
+                try:
+                    await self.store.replace_user_external_id(
+                        new_external_ids,
                         user_id,
                     )
-
-                # add new external_ids
-                for auth_provider, external_id in add_external_ids:
-                    await self.store.record_user_external_id(
-                        auth_provider,
-                        external_id,
-                        user_id,
-                    )
+                except ExternalIDReuseException:
+                    raise SynapseError(409, "External id is already in use.")
 
             if "avatar_url" in body and isinstance(body["avatar_url"], str):
                 await self.profile_handler.set_avatar_url(
@@ -384,12 +370,15 @@ class UserRestServletV2(RestServlet):
                         )
 
             if external_ids is not None:
-                for auth_provider, external_id in new_external_ids:
-                    await self.store.record_user_external_id(
-                        auth_provider,
-                        external_id,
-                        user_id,
-                    )
+                try:
+                    for auth_provider, external_id in new_external_ids:
+                        await self.store.record_user_external_id(
+                            auth_provider,
+                            external_id,
+                            user_id,
+                        )
+                except ExternalIDReuseException:
+                    raise SynapseError(409, "External id is already in use.")
 
             if "avatar_url" in body and isinstance(body["avatar_url"], str):
                 await self.profile_handler.set_avatar_url(
@@ -442,7 +431,7 @@ class UserRegisterServlet(RestServlet):
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         self._clear_old_nonces()
 
-        if not self.hs.config.registration_shared_secret:
+        if not self.hs.config.registration.registration_shared_secret:
             raise SynapseError(400, "Shared secret registration is not enabled")
 
         body = parse_json_object_from_request(request)
@@ -498,7 +487,7 @@ class UserRegisterServlet(RestServlet):
         got_mac = body["mac"]
 
         want_mac_builder = hmac.new(
-            key=self.hs.config.registration_shared_secret.encode(),
+            key=self.hs.config.registration.registration_shared_secret.encode(),
             digestmod=hashlib.sha1,
         )
         want_mac_builder.update(nonce.encode("utf8"))

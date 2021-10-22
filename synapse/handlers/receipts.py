@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
 from synapse.api.constants import ReadReceiptEventFields
 from synapse.appservice import ApplicationService
-from synapse.handlers._base import BaseHandler
 from synapse.streams import EventSource
 from synapse.types import JsonDict, ReadReceipt, UserID, get_domain_from_id
 
@@ -26,10 +25,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ReceiptsHandler(BaseHandler):
+class ReceiptsHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.notifier = hs.get_notifier()
         self.server_name = hs.config.server.server_name
         self.store = hs.get_datastore()
         self.event_auth_handler = hs.get_event_auth_handler()
@@ -243,12 +241,18 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
     async def get_new_events_as(
         self, from_key: int, service: ApplicationService
     ) -> Tuple[List[JsonDict], int]:
-        """Returns a set of new receipt events that an appservice
+        """Returns a set of new read receipt events that an appservice
         may be interested in.
 
         Args:
             from_key: the stream position at which events should be fetched from
             service: The appservice which may be interested
+
+        Returns:
+            A two-tuple containing the following:
+                * A list of json dictionaries derived from read receipts that the
+                  appservice may be interested in.
+                * The current read receipt stream token.
         """
         from_key = int(from_key)
         to_key = self.get_current_key()

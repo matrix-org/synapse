@@ -12,6 +12,21 @@ configuration associated with the module in Synapse's configuration file.
 See the documentation for the `ModuleApi` class
 [here](https://github.com/matrix-org/synapse/blob/master/synapse/module_api/__init__.py).
 
+## When Synapse runs with several modules configured
+
+If Synapse is running with other modules configured, the order each module appears in
+within the `modules` section of the Synapse configuration file might restrict what it can
+or cannot register. See [this section](index.html#using-multiple-modules) for more
+information.
+
+On top of the rules listed in the link above, if a callback returns a value that should
+cause the current operation to fail (e.g. if a callback checking an event returns with a
+value that should cause the event to be denied), Synapse will fail the operation and
+ignore any subsequent callbacks that should have been run after this one.
+
+The documentation for each callback mentions how Synapse behaves when
+multiple modules implement it.
+
 ## Handling the module's configuration
 
 A module can implement the following static method:

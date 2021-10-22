@@ -15,7 +15,6 @@
 
 """Contains handlers for federation events."""
 
-import itertools
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
@@ -27,7 +26,7 @@ from unpaddedbase64 import decode_base64
 from twisted.internet import defer
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, RejectedReason
+from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     CodeMessageException,
@@ -38,13 +37,13 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVersions
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.crypto.event_signing import compute_event_signature
+from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.federation.federation_client import InvalidResponseError
-from synapse.handlers._base import BaseHandler
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
     make_deferred_yieldable,
@@ -69,15 +68,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class FederationHandler(BaseHandler):
+class FederationHandler:
     """Handles general incoming federation requests
 
     Incoming events are *not* handled here, for which see FederationEventHandler.
     """
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
         self.hs = hs
 
         self.store = hs.get_datastore()
@@ -90,6 +87,7 @@ class FederationHandler(BaseHandler):
         self.is_mine_id = hs.is_mine_id
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.event_builder_factory = hs.get_event_builder_factory()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self.config = hs.config
@@ -231,18 +229,10 @@ class FederationHandler(BaseHandler):
             )
             return False
 
-        logger.debug(
-            "room_id: %s, backfill: current_depth: %s, max_depth: %s, extrems: %s",
-            room_id,
-            current_depth,
-            max_depth,
-            sorted_extremeties_tuple,
-        )
-
         # We ignore extremities that have a greater depth than our current depth
         # as:
         #    1. we don't really care about getting events that have happened
-        #       before our current position; and
+        #       after our current position; and
         #    2. we have likely previously tried and failed to backfill from that
         #       extremity, so to avoid getting "stuck" requesting the same
         #       backfill repeatedly we drop those extremities.
@@ -250,9 +240,19 @@ class FederationHandler(BaseHandler):
             t for t in sorted_extremeties_tuple if int(t[1]) <= current_depth
         ]
 
+        logger.debug(
+            "room_id: %s, backfill: current_depth: %s, limit: %s, max_depth: %s, extrems: %s filtered_sorted_extremeties_tuple: %s",
+            room_id,
+            current_depth,
+            limit,
+            max_depth,
+            sorted_extremeties_tuple,
+            filtered_sorted_extremeties_tuple,
+        )
+
         # However, we need to check that the filtered extremities are non-empty.
         # If they are empty then either we can a) bail or b) still attempt to
-        # backill. We opt to try backfilling anyway just in case we do get
+        # backfill. We opt to try backfilling anyway just in case we do get
         # relevant events.
         if filtered_sorted_extremeties_tuple:
             sorted_extremeties_tuple = filtered_sorted_extremeties_tuple
@@ -382,7 +382,7 @@ class FederationHandler(BaseHandler):
             for key, state_dict in states.items()
         }
 
-        for e_id, _ in sorted_extremeties_tuple:
+        for e_id in event_ids:
             likely_extremeties_domains = get_domains_from_state(states[e_id])
 
             success = await try_backfill(
@@ -510,7 +510,7 @@ class FederationHandler(BaseHandler):
                 auth_events=auth_chain,
             )
 
-            max_stream_id = await self._persist_auth_tree(
+            max_stream_id = await self._federation_event_handler.process_remote_join(
                 origin, room_id, auth_chain, state, event, room_version_obj
             )
 
@@ -712,7 +712,7 @@ class FederationHandler(BaseHandler):
 
                 if include_auth_user_id:
                     event_content[
-                        "join_authorised_via_users_server"
+                        EventContentFields.AUTHORISING_USER
                     ] = await self._event_auth_handler.get_user_which_could_invite(
                         room_id,
                         state_ids,
@@ -742,10 +742,9 @@ class FederationHandler(BaseHandler):
 
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
-        await self._event_auth_handler.check_from_context(
-            room_version.identifier, event, context, do_sig_check=False
+        await self._event_auth_handler.check_auth_rules_from_context(
+            room_version, event, context
         )
-
         return event
 
     async def on_invite_request(
@@ -916,8 +915,8 @@ class FederationHandler(BaseHandler):
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_leave_request`
-            await self._event_auth_handler.check_from_context(
-                room_version_obj.identifier, event, context, do_sig_check=False
+            await self._event_auth_handler.check_auth_rules_from_context(
+                room_version_obj, event, context
             )
         except AuthError as e:
             logger.warning("Failed to create new leave %r because %s", event, e)
@@ -978,8 +977,8 @@ class FederationHandler(BaseHandler):
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_knock_request`
-            await self._event_auth_handler.check_from_context(
-                room_version_obj.identifier, event, context, do_sig_check=False
+            await self._event_auth_handler.check_auth_rules_from_context(
+                room_version_obj, event, context
             )
         except AuthError as e:
             logger.warning("Failed to create new knock %r because %s", event, e)
@@ -1087,118 +1086,6 @@ class FederationHandler(BaseHandler):
         else:
             return None
 
-    async def _persist_auth_tree(
-        self,
-        origin: str,
-        room_id: str,
-        auth_events: List[EventBase],
-        state: List[EventBase],
-        event: EventBase,
-        room_version: RoomVersion,
-    ) -> int:
-        """Checks the auth chain is valid (and passes auth checks) for the
-        state and event. Then persists the auth chain and state atomically.
-        Persists the event separately. Notifies about the persisted events
-        where appropriate.
-
-        Will attempt to fetch missing auth events.
-
-        Args:
-            origin: Where the events came from
-            room_id,
-            auth_events
-            state
-            event
-            room_version: The room version we expect this room to have, and
-                will raise if it doesn't match the version in the create event.
-        """
-        events_to_context = {}
-        for e in itertools.chain(auth_events, state):
-            e.internal_metadata.outlier = True
-            events_to_context[e.event_id] = EventContext.for_outlier()
-
-        event_map = {
-            e.event_id: e for e in itertools.chain(auth_events, state, [event])
-        }
-
-        create_event = None
-        for e in auth_events:
-            if (e.type, e.state_key) == (EventTypes.Create, ""):
-                create_event = e
-                break
-
-        if create_event is None:
-            # If the state doesn't have a create event then the room is
-            # invalid, and it would fail auth checks anyway.
-            raise SynapseError(400, "No create event in state")
-
-        room_version_id = create_event.content.get(
-            "room_version", RoomVersions.V1.identifier
-        )
-
-        if room_version.identifier != room_version_id:
-            raise SynapseError(400, "Room version mismatch")
-
-        missing_auth_events = set()
-        for e in itertools.chain(auth_events, state, [event]):
-            for e_id in e.auth_event_ids():
-                if e_id not in event_map:
-                    missing_auth_events.add(e_id)
-
-        for e_id in missing_auth_events:
-            m_ev = await self.federation_client.get_pdu(
-                [origin],
-                e_id,
-                room_version=room_version,
-                outlier=True,
-                timeout=10000,
-            )
-            if m_ev and m_ev.event_id == e_id:
-                event_map[e_id] = m_ev
-            else:
-                logger.info("Failed to find auth event %r", e_id)
-
-        for e in itertools.chain(auth_events, state, [event]):
-            auth_for_e = {
-                (event_map[e_id].type, event_map[e_id].state_key): event_map[e_id]
-                for e_id in e.auth_event_ids()
-                if e_id in event_map
-            }
-            if create_event:
-                auth_for_e[(EventTypes.Create, "")] = create_event
-
-            try:
-                event_auth.check(room_version, e, auth_events=auth_for_e)
-            except SynapseError as err:
-                # we may get SynapseErrors here as well as AuthErrors. For
-                # instance, there are a couple of (ancient) events in some
-                # rooms whose senders do not have the correct sigil; these
-                # cause SynapseErrors in auth.check. We don't want to give up
-                # the attempt to federate altogether in such cases.
-
-                logger.warning("Rejecting %s because %s", e.event_id, err.msg)
-
-                if e == event:
-                    raise
-                events_to_context[e.event_id].rejected = RejectedReason.AUTH_ERROR
-
-        if auth_events or state:
-            await self._federation_event_handler.persist_events_and_notify(
-                room_id,
-                [
-                    (e, events_to_context[e.event_id])
-                    for e in itertools.chain(auth_events, state)
-                ],
-            )
-
-        new_event_context = await self.state_handler.compute_event_context(
-            event, old_state=state
-        )
-
-        return await self._federation_event_handler.persist_events_and_notify(
-            room_id, [(event, new_event_context)]
-        )
-
     async def on_get_missing_events(
         self,
         origin: str,
@@ -1266,8 +1153,9 @@ class FederationHandler(BaseHandler):
             event.internal_metadata.send_on_behalf_of = self.hs.hostname
 
             try:
-                await self._event_auth_handler.check_from_context(
-                    room_version_obj.identifier, event, context
+                validate_event_for_room_version(room_version_obj, event)
+                await self._event_auth_handler.check_auth_rules_from_context(
+                    room_version_obj, event, context
                 )
             except AuthError as e:
                 logger.warning("Denying new third party invite %r because %s", event, e)
@@ -1317,8 +1205,9 @@ class FederationHandler(BaseHandler):
         )
 
         try:
-            await self._event_auth_handler.check_from_context(
-                room_version_obj.identifier, event, context
+            validate_event_for_room_version(room_version_obj, event)
+            await self._event_auth_handler.check_auth_rules_from_context(
+                room_version_obj, event, context
             )
         except AuthError as e:
             logger.warning("Denying third party invite %r because %s", event, e)

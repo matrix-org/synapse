@@ -36,8 +36,6 @@ from synapse.types import JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.caches.response_cache import ResponseCache
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -49,9 +47,10 @@ REMOTE_ROOM_LIST_POLL_INTERVAL = 60 * 1000
 EMPTY_THIRD_PARTY_ID = ThirdPartyInstanceID(None, None)
 
 
-class RoomListHandler(BaseHandler):
+class RoomListHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
+        self.hs = hs
         self.enable_room_list_search = hs.config.roomdirectory.enable_room_list_search
         self.response_cache: ResponseCache[
             Tuple[Optional[int], Optional[str], Optional[ThirdPartyInstanceID]]

@@ -44,6 +44,7 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.api.urls import ConsentURIBuilder
+from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
@@ -60,8 +61,6 @@ from synapse.util.async_helpers import Linearizer, unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_events_for_client
-
-from ._base import BaseHandler
 
 if TYPE_CHECKING:
     from synapse.events.third_party_rules import ThirdPartyEventRules
@@ -432,8 +431,7 @@ class EventCreationHandler:
 
         self.send_event = ReplicationSendEventRestServlet.make_client(hs)
 
-        # This is only used to get at ratelimit function
-        self.base_handler = BaseHandler(hs)
+        self.request_ratelimiter = hs.get_request_ratelimiter()
 
         # We arbitrarily limit concurrent event creation for a room to 5.
         # This is to stop us from diverging history *too* much.
@@ -608,29 +606,6 @@ class EventCreationHandler:
         builder.internal_metadata.outlier = outlier
 
         builder.internal_metadata.historical = historical
-
-        # Strip down the auth_event_ids to only what we need to auth the event.
-        # For example, we don't need extra m.room.member that don't match event.sender
-        if auth_event_ids is not None:
-            # If auth events are provided, prev events must be also.
-            assert prev_event_ids is not None
-
-            temp_event = await builder.build(
-                prev_event_ids=prev_event_ids,
-                auth_event_ids=auth_event_ids,
-                depth=depth,
-            )
-            auth_events = await self.store.get_events_as_list(auth_event_ids)
-            # Create a StateMap[str]
-            auth_event_state_map = {
-                (e.type, e.state_key): e.event_id for e in auth_events
-            }
-            # Actually strip down and use the necessary auth events
-            auth_event_ids = self._event_auth_handler.compute_auth_events(
-                event=temp_event,
-                current_state_ids=auth_event_state_map,
-                for_verification=False,
-            )
 
         event, context = await self.create_new_client_event(
             builder=builder,
@@ -938,6 +913,33 @@ class EventCreationHandler:
             Tuple of created event, context
         """
 
+        # Strip down the auth_event_ids to only what we need to auth the event.
+        # For example, we don't need extra m.room.member that don't match event.sender
+        full_state_ids_at_event = None
+        if auth_event_ids is not None:
+            # If auth events are provided, prev events must be also.
+            assert prev_event_ids is not None
+
+            # Copy the full auth state before it stripped down
+            full_state_ids_at_event = auth_event_ids.copy()
+
+            temp_event = await builder.build(
+                prev_event_ids=prev_event_ids,
+                auth_event_ids=auth_event_ids,
+                depth=depth,
+            )
+            auth_events = await self.store.get_events_as_list(auth_event_ids)
+            # Create a StateMap[str]
+            auth_event_state_map = {
+                (e.type, e.state_key): e.event_id for e in auth_events
+            }
+            # Actually strip down and use the necessary auth events
+            auth_event_ids = self._event_auth_handler.compute_auth_events(
+                event=temp_event,
+                current_state_ids=auth_event_state_map,
+                for_verification=False,
+            )
+
         if prev_event_ids is not None:
             assert (
                 len(prev_event_ids) <= 10
@@ -962,18 +964,20 @@ class EventCreationHandler:
             depth=depth,
         )
 
-        old_state = None
-
         # Pass on the outlier property from the builder to the event
         # after it is created
         if builder.internal_metadata.outlier:
-            event.internal_metadata.outlier = builder.internal_metadata.outlier
-
-            # Calculate the state for outliers that pass in their own `auth_event_ids`
-            if auth_event_ids:
-                old_state = await self.store.get_events_as_list(auth_event_ids)
-
-        context = await self.state.compute_event_context(event, old_state=old_state)
+            event.internal_metadata.outlier = True
+            context = EventContext.for_outlier()
+        elif (
+            event.type == EventTypes.MSC2716_INSERTION
+            and full_state_ids_at_event
+            and builder.internal_metadata.is_historical()
+        ):
+            old_state = await self.store.get_events_as_list(full_state_ids_at_event)
+            context = await self.state.compute_event_context(event, old_state=old_state)
+        else:
+            context = await self.state.compute_event_context(event)
 
         if requester:
             context.app_service = requester.app_service
@@ -1098,8 +1102,9 @@ class EventCreationHandler:
             assert event.content["membership"] == Membership.LEAVE
         else:
             try:
-                await self._event_auth_handler.check_from_context(
-                    room_version_obj.identifier, event, context
+                validate_event_for_room_version(room_version_obj, event)
+                await self._event_auth_handler.check_auth_rules_from_context(
+                    room_version_obj, event, context
                 )
             except AuthError as err:
                 logger.warning("Denying new event %r because %s", event, err)
@@ -1325,7 +1330,7 @@ class EventCreationHandler:
                     original_event and event.sender != original_event.sender
                 )
 
-            await self.base_handler.ratelimit(
+            await self.request_ratelimiter.ratelimit(
                 requester, is_admin_redaction=is_admin_redaction
             )
 

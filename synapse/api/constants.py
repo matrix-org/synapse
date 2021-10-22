@@ -176,6 +176,7 @@ class RelationTypes:
     ANNOTATION = "m.annotation"
     REPLACE = "m.replace"
     REFERENCE = "m.reference"
+    THREAD = "io.element.thread"
 
 
 class LimitBlockingTypes:
@@ -216,6 +217,9 @@ class EventContentFields:
     MSC2716_BATCH_ID = "org.matrix.msc2716.batch_id"
     # For "marker" events
     MSC2716_MARKER_INSERTION = "org.matrix.msc2716.marker.insertion"
+
+    # The authorising user for joining a restricted room.
+    AUTHORISING_USER = "join_authorised_via_users_server"
 
 
 class RoomTypes:

@@ -100,9 +100,13 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
 
         # a logcontext which we use for processing incoming commands. We declare it as a
         # background process so that the CPU stats get reported to prometheus.
-        self._logging_context = BackgroundProcessLoggingContext(
-            "replication_command_handler"
-        )
+        with PreserveLoggingContext():
+            # thanks to `PreserveLoggingContext()`, the new logcontext is guaranteed to
+            # capture the sentinel context as its containing context and won't prevent
+            # GC of / unintentionally reactivate what would be the current context.
+            self._logging_context = BackgroundProcessLoggingContext(
+                "replication_command_handler"
+            )
 
     def connectionMade(self):
         logger.info("Connected to redis")
@@ -182,8 +186,12 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
         super().connectionLost(reason)
         self.synapse_handler.lost_connection(self)
 
-        # mark the logging context as finished
-        self._logging_context.__exit__(None, None, None)
+        # mark the logging context as finished by triggering `__exit__()`
+        with PreserveLoggingContext():
+            with self._logging_context:
+                pass
+            # the sentinel context is now active, which may not be correct.
+            # PreserveLoggingContext() will restore the correct logging context.
 
     def send_command(self, cmd: Command):
         """Send a command if connection has been established.
@@ -364,6 +372,12 @@ def lazyConnection(
     factory.continueTrying = reconnect
 
     reactor = hs.get_reactor()
-    reactor.connectTCP(host.encode(), port, factory, timeout=30, bindAddress=None)
+    reactor.connectTCP(
+        host,  # type: ignore[arg-type]
+        port,
+        factory,
+        timeout=30,
+        bindAddress=None,
+    )
 
     return factory.handler

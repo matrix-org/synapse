@@ -105,8 +105,13 @@ async def _sendmail(
         # set to enable TLS.
         factory = build_sender_factory(hostname=smtphost if enable_tls else None)
 
-    # the IReactorTCP interface claims host has to be a bytes, which seems to be wrong
-    reactor.connectTCP(smtphost, smtpport, factory, timeout=30, bindAddress=None)  # type: ignore[arg-type]
+    reactor.connectTCP(
+        smtphost,  # type: ignore[arg-type]
+        smtpport,
+        factory,
+        timeout=30,
+        bindAddress=None,
+    )
 
     await make_deferred_yieldable(d)
 
