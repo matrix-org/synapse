@@ -566,7 +566,7 @@ class ModuleApi:
         target: str,
         room_id: str,
         new_membership: str,
-        content: Optional[dict] = None,
+        content: Optional[JsonDict] = None,
     ) -> EventBase:
         """Updates the membership of a user to the given value.
 
@@ -589,8 +589,7 @@ class ModuleApi:
             The newly created membership event.
 
         Raises:
-            RuntimeError if the `sender` isn't a local user, or the resulting event could
-                not be found after performing the membership event.
+            RuntimeError if the `sender` isn't a local user.
             ShadowBanError if a shadow-banned requester attempts to send an invite.
             SynapseError if the module attempts to send a membership event that isn't
                 allowed, either by the server's configuration (e.g. trying to set a
@@ -600,6 +599,18 @@ class ModuleApi:
         if not self.is_mine(sender):
             raise RuntimeError(
                 "Tried to send an event as a user that isn't local to this homeserver",
+            )
+
+        if content is None:
+            content = {}
+
+        # Set the profile if not already done by the module.
+        if "avatar_url" not in content:
+            content["avatar_url"] = self._hs.get_profile_handler().get_avatar_url(target)
+
+        if "displayname" not in content:
+            content["displayname"] = self._hs.get_profile_handler().get_displayname(
+                target,
             )
 
         event_id, _ = await self._hs.get_room_member_handler().update_membership(
@@ -612,10 +623,10 @@ class ModuleApi:
 
         # Try to retrieve the resulting event.
         event = await self._hs.get_datastore().get_event(event_id)
-        if event is None:
-            raise RuntimeError(
-                "Could not find resulting membership event %s" % event_id
-            )
+
+        # update_membership is supposed to always return after the event has been
+        # successfully persisted.
+        assert event is not None
 
         return event
 
