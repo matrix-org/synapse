@@ -212,7 +212,7 @@ oidc_providers:
 
 ### Authentik
 
-[Authentik][Authentik] is an open-source IdP solution.
+[Authentik][authentik] is an open-source IdP solution.
 
 1. Create a provider in Authentik, with type OAuth2/OpenID.
 2. The parameters are:
@@ -230,17 +230,17 @@ oidc_providers:
   - idp_id: authentik
     idp_name: authentik
     discover: true
-    issuer: "https://authentik.company/application/o/app-slug/"
-    client_id: "*client id*"
-    client_secret: "*client secret*"
+    issuer: "https://your.authentik.example.org/application/o/your-app-slug/" # TO BE FILLED: domain and slug
+    client_id: "your client id" # TO BE FILLED
+    client_secret: "your client secret" # TO BE FILLED
     scopes:
       - "openid"
       - "profile"
       - "email"
     user_mapping_provider:
       config:
-        localpart_template: "{{ '{{ user.name }}' }}"
-        display_name_template: "{{ '{{ user.name|capitalize }}' }}"
+        localpart_template: "{{ user.preferred_username }}}"
+        display_name_template: "{{ user.preferred_username|capitalize }}" # TO BE FILLED: If your user's have names in Authentik and you want those in Synapse, this should be replaced with user.name|capitalize.
 ```
 
 ### GitHub
