@@ -10794,6 +10794,7 @@ An empty body may be passed for backwards compatibility.</p>
 <li>Remove all 3PIDs from the homeserver</li>
 <li>Delete all devices and E2EE keys</li>
 <li>Delete all access tokens</li>
+<li>Delete all pushers</li>
 <li>Delete the password hash</li>
 <li>Removal from all rooms the user is a member of</li>
 <li>Remove the user from the user directory</li>
@@ -10806,6 +10807,16 @@ is set to <code>true</code>:</p>
 <li>Remove the user's display name</li>
 <li>Remove the user's avatar URL</li>
 <li>Mark the user as erased</li>
+</ul>
+<p>The following actions are <strong>NOT</strong> performed. The list may be incomplete.</p>
+<ul>
+<li>Remove mappings of SSO IDs</li>
+<li><a href="admin_api/user_admin_api.html#delete-media-uploaded-by-a-user">Delete media uploaded</a> by user (included avatar images)</li>
+<li>Delete sent and received messages</li>
+<li>Delete E2E cross-signing keys</li>
+<li>Remove the user's creation (registration) timestamp</li>
+<li><a href="admin_api/user_admin_api.html#override-ratelimiting-for-users">Remove rate limit overrides</a></li>
+<li>Remove from monthly active users</li>
 </ul>
 <h2 id="reset-password"><a class="header" href="#reset-password">Reset password</a></h2>
 <p>Changes the password of another user. This will automatically log the user out of all their devices.</p>
