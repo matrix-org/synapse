@@ -1,5 +1,1 @@
-Limit which clients are allowed to send read receipts without a body (matrix-org #11156)
-
-synapse\rest\client\receipts.py
-
-Added in a regex check.
+Only allow old Element/Riot Android clients to send read receipts without a request body. All other clients must include a request body as required by the specification. Contributed by @rogersheu.
