@@ -19,5 +19,6 @@ EOF
 
 dpkg -i "$deb"
 
-sed -i -e '/port: 8...$/{s/8448/18448/; s/8008/18008/}' -e '$aregistration_shared_secret: secret' /etc/matrix-synapse/homeserver.yaml
+sed -i -e 's/port: 8448$/port: 18448/; s/port: 8008$/port: 18008' /etc/matrix-synapse/homeserver.yaml
+echo 'registration_shared_secret: secret' >> /etc/matrix-synapse/homeserver.yaml
 systemctl restart matrix-synapse
