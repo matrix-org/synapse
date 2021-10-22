@@ -276,12 +276,11 @@ class Notifier:
         max_room_stream_token: RoomStreamToken,
         extra_users: Optional[Collection[UserID]] = None,
     ):
-        """Unwraps event and calls `on_new_room_event_args`.
-        Also notifies modules listening on new events via the `on_new_event` callback.
-        """
-        self.on_new_room_event_args(
+        """Unwraps event and calls `on_new_room_event_args`."""
+        await self.on_new_room_event_args(
             event_pos=event_pos,
             room_id=event.room_id,
+            event_id=event.event_id,
             event_type=event.type,
             state_key=event.get("state_key"),
             membership=event.content.get("membership"),
@@ -289,11 +288,10 @@ class Notifier:
             extra_users=extra_users or [],
         )
 
-        await self._third_party_rules.on_new_event(event)
-
-    def on_new_room_event_args(
+    async def on_new_room_event_args(
         self,
         room_id: str,
+        event_id: str,
         event_type: str,
         state_key: Optional[str],
         membership: Optional[str],
@@ -308,7 +306,10 @@ class Notifier:
         listening to the room, and any listeners for the users in the
         `extra_users` param.
 
-        The events can be peristed out of order. The notifier will wait
+        This also notifies modules listening on new events via the
+        `on_new_event` callback.
+
+        The events can be persisted out of order. The notifier will wait
         until all previous events have been persisted before notifying
         the client streams.
         """
@@ -323,6 +324,8 @@ class Notifier:
             )
         )
         self._notify_pending_new_room_events(max_room_stream_token)
+
+        await self._third_party_rules.on_new_event(event_id)
 
         self.notify_replication()
 

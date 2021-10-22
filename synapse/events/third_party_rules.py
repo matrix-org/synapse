@@ -327,12 +327,12 @@ class ThirdPartyEventRules:
 
         return True
 
-    async def on_new_event(self, event: EventBase) -> None:
+    async def on_new_event(self, event_id: str) -> None:
         """Let modules act on events after they've been sent (e.g. auto-accepting
         invites, etc.)
 
         Args:
-            event: The event.
+            event_id: The ID of the event.
 
         Raises:
             ModuleFailureError if a callback raised any exception.
@@ -341,6 +341,7 @@ class ThirdPartyEventRules:
         if len(self._on_new_event_callbacks) == 0:
             return
 
+        event = await self.store.get_event(event_id)
         state_events = await self._get_state_map_for_room(event.room_id)
 
         for callback in self._on_new_event_callbacks:
