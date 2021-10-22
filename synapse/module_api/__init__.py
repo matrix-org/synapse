@@ -609,12 +609,14 @@ class ModuleApi:
 
         # Set the profile if not already done by the module.
         if "avatar_url" not in content:
-            content["avatar_url"] = self._hs.get_profile_handler().get_avatar_url(
+            content["avatar_url"] = await self._hs.get_profile_handler().get_avatar_url(
                 requester.user,
             )
 
         if "displayname" not in content:
-            content["displayname"] = self._hs.get_profile_handler().get_displayname(
+            content[
+                "displayname"
+            ] = await self._hs.get_profile_handler().get_displayname(
                 target_user_id,
             )
 
