@@ -12,10 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os.path
-import shutil
-import tempfile
-
 import yaml
 
 from synapse.config import ConfigError
@@ -25,13 +21,6 @@ from tests.config.utils import ConfigFileTestCase
 
 
 class ConfigLoadingFileTestCase(ConfigFileTestCase):
-    def setUp(self):
-        self.dir = tempfile.mkdtemp()
-        self.config_file = os.path.join(self.dir, "homeserver.yaml")
-
-    def tearDown(self):
-        shutil.rmtree(self.dir)
-
     def test_load_fails_if_server_name_missing(self):
         self.generate_config_and_remove_lines_containing("server_name")
         with self.assertRaises(ConfigError):
