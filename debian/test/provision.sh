@@ -10,7 +10,7 @@ set -e
 apt-get update
 apt-get install -y lsb-release
 
-deb=`ls "/debs/matrix-synapse-py3_*+$(lsb_release -cs)*.deb" | sort | tail -n1`
+deb=`find /debs -name "matrix-synapse-py3_*+$(lsb_release -cs)*.deb" | sort | tail -n1`
 
 debconf-set-selections <<EOF
 matrix-synapse matrix-synapse/report-stats boolean false
