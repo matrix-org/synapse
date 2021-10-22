@@ -15,6 +15,8 @@
 
 import logging
 import threading
+import traceback
+from typing import Dict, Set, Tuple
 
 from prometheus_client.core import Counter, Histogram
 
@@ -105,19 +107,14 @@ in_flight_requests_db_sched_duration = Counter(
     ["method", "servlet"],
 )
 
-# The set of all in flight requests, set[RequestMetrics]
-_in_flight_requests = set()
+_in_flight_requests: Set["RequestMetrics"] = set()
 
 # Protects the _in_flight_requests set from concurrent access
 _in_flight_requests_lock = threading.Lock()
 
 
-def _get_in_flight_counts():
-    """Returns a count of all in flight requests by (method, server_name)
-
-    Returns:
-        dict[tuple[str, str], int]
-    """
+def _get_in_flight_counts() -> Dict[Tuple[str, ...], float]:
+    """Returns a count of all in flight requests by (method, server_name)"""
     # Cast to a list to prevent it changing while the Prometheus
     # thread is collecting metrics
     with _in_flight_requests_lock:
@@ -127,11 +124,12 @@ def _get_in_flight_counts():
         rm.update_metrics()
 
     # Map from (method, name) -> int, the number of in flight requests of that
-    # type
-    counts = {}
+    # type. The key type is Tuple[str, str], but we leavethe length unspecified
+    # for compatability with LaterGauge's annotations.
+    counts: Dict[Tuple[str, ...], float] = {}
     for rm in reqs:
         key = (rm.method, rm.name)
-        counts[key] = counts.get(key, 0) + 1
+        counts[key] = counts.get(key, 0.0) + 1.0
 
     return counts
 
