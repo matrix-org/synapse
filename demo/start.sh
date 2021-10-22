@@ -12,7 +12,7 @@ PYTHONPATH=$(readlink -f "$(pwd)")
 export PYTHONPATH
 
 
-echo $PYTHONPATH
+echo "$PYTHONPATH"
 
 for port in 8080 8081 8082; do
     echo "Starting server on port $port... "
@@ -28,12 +28,12 @@ for port in 8080 8081 8082; do
         --config-path "$DIR/etc/$port.config" \
         --report-stats no
 
-    if ! grep -F "Customisation made by demo/start.sh" -q  $DIR/etc/$port.config; then
-        printf '\n\n# Customisation made by demo/start.sh\n' >> $DIR/etc/$port.config
+    if ! grep -F "Customisation made by demo/start.sh" -q "$DIR/etc/$port.config"; then
+        printf '\n\n# Customisation made by demo/start.sh\n' >> "$DIR/etc/$port.config"
 
-        echo "public_baseurl: http://localhost:$port/" >> $DIR/etc/$port.config
+        echo "public_baseurl: http://localhost:$port/" >> "$DIR/etc/$port.config"
 
-        echo 'enable_registration: true' >> $DIR/etc/$port.config
+        echo 'enable_registration: true' >> "$DIR/etc/$port.config"
 
         # Warning, this heredoc depends on the interaction of tabs and spaces. Please don't
         # accidentaly bork me with your fancy settings.
@@ -57,26 +57,26 @@ for port in 8080 8081 8082; do
 		        compress: false
 		PORTLISTENERS
 		)
-        echo "${listeners}" >> $DIR/etc/$port.config
+        echo "${listeners}" >> "$DIR/etc/$port.config"
 
         # Disable tls for the servers
-        printf '\n\n# Disable tls on the servers.' >> $DIR/etc/$port.config
-        echo '# DO NOT USE IN PRODUCTION' >> $DIR/etc/$port.config
-        echo 'use_insecure_ssl_client_just_for_testing_do_not_use: true' >> $DIR/etc/$port.config
-        echo 'federation_verify_certificates: false' >> $DIR/etc/$port.config
+        printf '\n\n# Disable tls on the servers.' >> "$DIR/etc/$port.config"
+        echo '# DO NOT USE IN PRODUCTION' >> "$DIR/etc/$port.config"
+        echo 'use_insecure_ssl_client_just_for_testing_do_not_use: true' >> "$DIR/etc/$port.config"
+        echo 'federation_verify_certificates: false' >> "$DIR/etc/$port.config"
 
         # Set tls paths
-        echo "tls_certificate_path: \"$DIR/etc/localhost:$https_port.tls.crt\"" >> $DIR/etc/$port.config
-        echo "tls_private_key_path: \"$DIR/etc/localhost:$https_port.tls.key\"" >> $DIR/etc/$port.config
+        echo "tls_certificate_path: \"$DIR/etc/localhost:$https_port.tls.crt\"" >> "$DIR/etc/$port.config"
+        echo "tls_private_key_path: \"$DIR/etc/localhost:$https_port.tls.key\"" >> "$DIR/etc/$port.config"
 
         # Generate tls keys
-        openssl req -x509 -newkey rsa:4096 -keyout $DIR/etc/localhost:$https_port.tls.key -out $DIR/etc/localhost:$https_port.tls.crt -days 365 -nodes -subj "/O=matrix"
+        openssl req -x509 -newkey rsa:4096 -keyout "$DIR/etc/localhost:$https_port.tls.key" -out "$DIR/etc/localhost:$https_port.tls.crt" -days 365 -nodes -subj "/O=matrix"
 
         # Ignore keys from the trusted keys server
-        echo '# Ignore keys from the trusted keys server' >> $DIR/etc/$port.config
-        echo 'trusted_key_servers:' >> $DIR/etc/$port.config
-        echo '  - server_name: "matrix.org"' >> $DIR/etc/$port.config
-        echo '    accept_keys_insecurely: true' >> $DIR/etc/$port.config
+        echo '# Ignore keys from the trusted keys server' >> "$DIR/etc/$port.config"
+        echo 'trusted_key_servers:' >> "$DIR/etc/$port.config"
+        echo '  - server_name: "matrix.org"' >> "$DIR/etc/$port.config"
+        echo '    accept_keys_insecurely: true' >> "$DIR/etc/$port.config"
 
         # Reduce the blacklist
         blacklist=$(cat <<-BLACK
@@ -91,12 +91,12 @@ for port in 8080 8081 8082; do
 		  - 'fc00::/7'
 		BLACK
 		)
-        echo "${blacklist}" >> $DIR/etc/$port.config
+        echo "${blacklist}" >> "$DIR/etc/$port.config"
     fi
 
     # Check script parameters
     if [ $# -eq 1 ]; then
-        if [ $1 = "--no-rate-limit" ]; then
+        if [ "$1" = "--no-rate-limit" ]; then
 
             # Disable any rate limiting
             ratelimiting=$(cat <<-RC
@@ -138,15 +138,15 @@ for port in 8080 8081 8082; do
 			    burst_count: 1000
 			RC
 			)
-            echo "${ratelimiting}" >> $DIR/etc/$port.config
+            echo "${ratelimiting}" >> "$DIR/etc/$port.config"
         fi
     fi
 
-    if ! grep -F "full_twisted_stacktraces" -q  $DIR/etc/$port.config; then
-        echo "full_twisted_stacktraces: true" >> $DIR/etc/$port.config
+    if ! grep -F "full_twisted_stacktraces" -q  "$DIR/etc/$port.config"; then
+        echo "full_twisted_stacktraces: true" >> "$DIR/etc/$port.config"
     fi
-    if ! grep -F "report_stats" -q  $DIR/etc/$port.config ; then
-        echo "report_stats: false" >> $DIR/etc/$port.config
+    if ! grep -F "report_stats" -q  "$DIR/etc/$port.config" ; then
+        echo "report_stats: false" >> "$DIR/etc/$port.config"
     fi
 
     python3 -m synapse.app.homeserver \

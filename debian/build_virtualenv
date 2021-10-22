@@ -98,7 +98,7 @@ esac
         --output-file="${PACKAGE_BUILD_DIR}/etc/matrix-synapse/log.yaml"
 
 # add a dependency on the right version of python to substvars.
-PYPKG=`basename $SNAKE`
+PYPKG=`basename "$SNAKE"`
 echo "synapse:pydepends=$PYPKG" >> debian/matrix-synapse-py3.substvars
 
 
