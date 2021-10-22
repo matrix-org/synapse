@@ -1,0 +1,5 @@
+Limit which clients are allowed to send read receipts without a body (matrix-org #11156)
+
+synapse\rest\client\receipts.py
+
+Added in a regex check.
