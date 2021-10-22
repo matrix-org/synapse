@@ -54,11 +54,13 @@ class ReceiptRestServlet(RestServlet):
         if receipt_type != "m.read":
             raise SynapseError(400, "Receipt type must be 'm.read'")
 
-        allow_empty_body = False
         user_agent = get_request_user_agent(request)
-        if re.search(".*Riot.*", user_agent) or re.search("Element/1.[012].*", user_agent) or re.search("SchildiChat/1.[012].*", user_agent):
-            allow_empty_body = True
-        
+        pattern = re.compile(r"(?:Element|SchildiChat)/1\.[012]\.")
+
+        allow_empty_body = False
+        if "Android" in user_agent:
+            if pattern.match(user_agent) or "Riot" in user_agent:
+                allow_empty_body = True
         body = parse_json_object_from_request(request, allow_empty_body)
         hidden = body.get(ReadReceiptEventFields.MSC2285_HIDDEN, False)
 
