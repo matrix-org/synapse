@@ -1,0 +1,1 @@
+Fix performance regression when doing large number of hostname lookups at once. Introduced in v1.44.0.
