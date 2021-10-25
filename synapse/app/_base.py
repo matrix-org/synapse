@@ -377,6 +377,7 @@ async def start(hs: "HomeServer"):
     # We want to use a separate thread pool for the resolver so that large
     # numbers of DNS requests don't starve out other users of the threadpool.
     resolver_threadpool = ThreadPool(name="gai_resolver")
+    resolver_threadpool.start()
     reactor.installNameResolver(
         GAIResolver(reactor, getThreadPool=lambda: resolver_threadpool)
     )
