@@ -1818,7 +1818,9 @@ def load_legacy_password_auth_providers(hs: "HomeServer") -> None:
 
 
 def load_single_legacy_password_auth_provider(
-    module: Type, config: JsonDict, api: "ModuleApi",
+    module: Type,
+    config: JsonDict,
+    api: "ModuleApi",
 ) -> None:
     try:
         provider = module(config=config, account_handler=api)

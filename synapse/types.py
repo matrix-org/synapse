@@ -32,7 +32,6 @@ from typing import (
 import attr
 from frozendict import frozendict
 from signedjson.key import decode_verify_key_bytes
-from typing_extensions import TypedDict
 from unpaddedbase64 import decode_base64
 from zope.interface import Interface
 
@@ -797,4 +796,3 @@ class UserInfo:
     is_deactivated: bool
     is_guest: bool
     is_shadow_banned: bool
-
