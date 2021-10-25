@@ -10,6 +10,8 @@ The available presence router callbacks are:
 
 ### `get_users_for_states`
 
+_First introduced in Synapse v1.42.0_
+
 ```python 
 async def get_users_for_states(
     state_updates: Iterable["synapse.api.UserPresenceState"],
@@ -29,6 +31,8 @@ by the callbacks. If multiple callbacks return a dictionary containing the same 
 Synapse concatenates the sets associated with this key from each dictionary. 
 
 ### `get_interested_users`
+
+_First introduced in Synapse v1.42.0_
 
 ```python
 async def get_interested_users(

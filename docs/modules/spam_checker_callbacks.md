@@ -10,6 +10,8 @@ The available spam checker callbacks are:
 
 ### `check_event_for_spam`
 
+_First introduced in Synapse v1.37.0_
+
 ```python
 async def check_event_for_spam(event: "synapse.events.EventBase") -> Union[bool, str]
 ```
@@ -25,6 +27,8 @@ callback that does not return `False` will be used. If this happens, Synapse wil
 any of the subsequent implementations of this callback.
 
 ### `user_may_join_room`
+
+_First introduced in Synapse v1.37.0_
 
 ```python
 async def user_may_join_room(user: str, room: str, is_invited: bool) -> bool
@@ -46,6 +50,8 @@ any of the subsequent implementations of this callback.
 
 ### `user_may_invite`
 
+_First introduced in Synapse v1.37.0_
+
 ```python
 async def user_may_invite(inviter: str, invitee: str, room_id: str) -> bool
 ```
@@ -60,6 +66,8 @@ callback that does not return `True` will be used. If this happens, Synapse will
 any of the subsequent implementations of this callback.
 
 ### `user_may_send_3pid_invite`
+
+_First introduced in Synapse v1.45.0_
 
 ```python
 async def user_may_send_3pid_invite(
@@ -101,6 +109,8 @@ any of the subsequent implementations of this callback.
 
 ### `user_may_create_room`
 
+_First introduced in Synapse v1.37.0_
+
 ```python
 async def user_may_create_room(user: str) -> bool
 ```
@@ -114,6 +124,8 @@ callback that does not return `True` will be used. If this happens, Synapse will
 any of the subsequent implementations of this callback.
 
 ### `user_may_create_room_with_invites`
+
+_First introduced in Synapse v1.44.0_
 
 ```python
 async def user_may_create_room_with_invites(
@@ -149,6 +161,8 @@ any of the subsequent implementations of this callback.
 
 ### `user_may_create_room_alias`
 
+_First introduced in Synapse v1.37.0_
+
 ```python
 async def user_may_create_room_alias(user: str, room_alias: "synapse.types.RoomAlias") -> bool
 ```
@@ -164,6 +178,8 @@ any of the subsequent implementations of this callback.
 
 ### `user_may_publish_room`
 
+_First introduced in Synapse v1.37.0_
+
 ```python
 async def user_may_publish_room(user: str, room_id: str) -> bool
 ```
@@ -178,6 +194,8 @@ callback that does not return `True` will be used. If this happens, Synapse will
 any of the subsequent implementations of this callback.
 
 ### `check_username_for_spam`
+
+_First introduced in Synapse v1.37.0_
 
 ```python
 async def check_username_for_spam(user_profile: Dict[str, str]) -> bool
@@ -200,6 +218,8 @@ callback that does not return `False` will be used. If this happens, Synapse wil
 any of the subsequent implementations of this callback.
 
 ### `check_registration_for_spam`
+
+_First introduced in Synapse v1.37.0_
 
 ```python
 async def check_registration_for_spam(
@@ -231,6 +251,8 @@ be used. If this happens, Synapse will not call any of the subsequent implementa
 this callback.
 
 ### `check_media_file_for_spam`
+
+_First introduced in Synapse v1.37.0_
 
 ```python
 async def check_media_file_for_spam(

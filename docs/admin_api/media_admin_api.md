@@ -257,9 +257,9 @@ POST /_synapse/admin/v1/media/<server_name>/delete?before_ts=<before_ts>
 URL Parameters
 
 * `server_name`: string - The name of your local server (e.g `matrix.org`).
-* `before_ts`: string representing a positive integer - Unix timestamp in ms.
+* `before_ts`: string representing a positive integer - Unix timestamp in milliseconds.
 Files that were last used before this timestamp will be deleted. It is the timestamp of
-last access and not the timestamp creation.
+last access, not the timestamp when the file was created.
 * `size_gt`: Optional - string representing a positive integer - Size of the media in bytes.
 Files that are larger will be deleted. Defaults to `0`.
 * `keep_profiles`: Optional - string representing a boolean - Switch to also delete files
@@ -302,7 +302,7 @@ POST /_synapse/admin/v1/purge_media_cache?before_ts=<unix_timestamp_in_ms>
 
 URL Parameters
 
-* `unix_timestamp_in_ms`: string representing a positive integer - Unix timestamp in ms.
+* `unix_timestamp_in_ms`: string representing a positive integer - Unix timestamp in milliseconds.
 All cached media that was last accessed before this timestamp will be removed.
 
 Response:
