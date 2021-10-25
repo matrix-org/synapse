@@ -28,11 +28,11 @@ from typing import (
     TypeVar,
     Union,
 )
-from typing_extensions import TypedDict
 
 import attr
 from frozendict import frozendict
 from signedjson.key import decode_verify_key_bytes
+from typing_extensions import TypedDict
 from unpaddedbase64 import decode_base64
 from zope.interface import Interface
 
@@ -808,6 +808,7 @@ class LoginResponse(TypedDict, total=False):
     This response may also include the two additional fields from MSC2918 (refresh
     tokens), which are `expires_in_ms` and `refresh_token`.
     """
+
     user_id: str
     access_token: str
     home_server: str
@@ -815,4 +816,3 @@ class LoginResponse(TypedDict, total=False):
     refresh_token: Optional[str]
     device_id: str
     well_known: Optional[Dict[str, Any]]
-
