@@ -181,44 +181,6 @@ class Keyring:
         self.verify_key = get_verify_key(hs.signing_key)
         self.hostname = hs.hostname
 
-    def verify_json_locally(self, server_name: str, json_object: JsonDict) -> None:
-        """Verify that a JSON object has been signed by this homeserver
-
-        Completes if the the object was correctly signed, otherwise raises.
-
-        Args:
-            server_name: name of the server which must have signed this object
-
-            json_object: object to be checked
-        """
-        try:
-            verify_signed_json(
-                json_object,
-                server_name,
-                self.verify_key,
-            )
-
-        except Exception as e:
-            logger.debug(
-                "Error verifying signature for %s:%s:%s with key %s: %s",
-                server_name,
-                self.verify_key.alg,
-                self.verify_key.version,
-                encode_verify_key_base64(self.verify_key),
-                str(e),
-            )
-            raise SynapseError(
-                401,
-                "Invalid signature for server %s with key %s:%s: %s"
-                % (
-                    server_name,
-                    self.verify_key.alg,
-                    self.verify_key.version,
-                    str(e),
-                ),
-                Codes.UNAUTHORIZED,
-            )
-
     async def verify_json_for_server(
         self,
         server_name: str,
@@ -238,8 +200,8 @@ class Keyring:
                 be valid. (0 implies we don't care)
         """
         # if we are the originating server don't fetch verify key for self over federation
-        if server_name == self.hostname:
-            return self.verify_json_locally(server_name, json_object)
+        # if server_name == self.hostname:
+        #     return self.verify_json_locally(server_name, json_object)
 
         request = VerifyJsonRequest.from_json_object(
             server_name,
@@ -307,6 +269,10 @@ class Keyring:
                 Codes.UNAUTHORIZED,
             )
 
+        # If we are the originating server don't fetch verify key for self over federation
+        if verify_request.server_name == self.hostname:
+            return await self.process_request_locally(verify_request)
+
         # Add the keys we need to verify to the queue for retrieval. We queue
         # up requests for the same server so we don't end up with many in flight
         # requests for the same keys.
@@ -364,6 +330,36 @@ class Keyring:
             raise SynapseError(
                 401,
                 f"Failed to find any key to satisfy: {key_request}",
+                Codes.UNAUTHORIZED,
+            )
+
+    async def process_request_locally(self, verify_request: VerifyJsonRequest) -> None:
+        verify_key = self.verify_key
+        json_object = verify_request.get_json_object()
+        try:
+            verify_signed_json(
+                json_object,
+                verify_request.server_name,
+                verify_key,
+            )
+        except SignatureVerifyException as e:
+            logger.debug(
+                "Error verifying signature for %s:%s:%s with key %s: %s",
+                verify_request.server_name,
+                verify_key.alg,
+                verify_key.version,
+                encode_verify_key_base64(verify_key),
+                str(e),
+            )
+            raise SynapseError(
+                401,
+                "Invalid signature for server %s with key %s:%s: %s"
+                % (
+                    verify_request.server_name,
+                    verify_key.alg,
+                    verify_key.version,
+                    str(e),
+                ),
                 Codes.UNAUTHORIZED,
             )
 
