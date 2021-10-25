@@ -1,6 +1,6 @@
 # This is a direct lift from
 # https://github.com/twisted/twisted/blob/release-21.2.0-10091/src/twisted/internet/_resolver.py.
-# We copy it here as we need to instansiate `GAIResolver` manually, but it is a
+# We copy it here as we need to instantiate `GAIResolver` manually, but it is a
 # private class.
 
 
