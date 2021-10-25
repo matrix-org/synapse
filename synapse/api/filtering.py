@@ -340,9 +340,9 @@ class Filter:
             contains_url = isinstance(content.get("url"), str)
             labels = content.get(EventContentFields.LABELS, [])
 
-        return self.check_fields(room_id, sender, ev_type, labels, contains_url)
+        return self._check_fields(room_id, sender, ev_type, labels, contains_url)
 
-    def check_fields(
+    def _check_fields(
         self,
         room_id: Optional[str],
         sender: Optional[str],
