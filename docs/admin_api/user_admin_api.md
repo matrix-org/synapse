@@ -50,7 +50,8 @@ It returns a JSON body like the following:
             "auth_provider": "<provider2>",
             "external_id": "<user_id_provider_2>"
         }
-    ]
+    ],
+    "user_type": null
 }
 ```
 
@@ -97,7 +98,8 @@ with a body of:
     ],
     "avatar_url": "<avatar_url>",
     "admin": false,
-    "deactivated": false
+    "deactivated": false,
+    "user_type": null
 }
 ```
 
@@ -135,6 +137,9 @@ Body parameters:
   unchanged on existing accounts and set to `false` for new accounts.
   A user cannot be erased by deactivating with this API. For details on
   deactivating users see [Deactivate Account](#deactivate-account).
+- `user_type` - string or null, optional. If provided, the user type will be
+  adjusted. If `null` given, the user type will be cleared. Other 
+  possible options are: `bot` and `support`.
 
 If the user already exists then optional parameters default to the current value.
 

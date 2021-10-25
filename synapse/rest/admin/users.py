@@ -326,6 +326,9 @@ class UserRestServletV2(RestServlet):
                         target_user.to_string()
                     )
 
+            if "user_type" in body:
+                await self.store.set_user_type(target_user, user_type)
+
             user = await self.admin_handler.get_user(target_user)
             assert user is not None
 
