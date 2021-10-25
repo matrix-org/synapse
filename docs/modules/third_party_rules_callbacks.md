@@ -121,6 +121,8 @@ any of the subsequent implementations of this callback.
 
 ### `on_new_event`
 
+_First introduced in Synapse v1.47.0_
+
 ```python
 async def on_new_event(
     event: "synapse.events.EventBase",
