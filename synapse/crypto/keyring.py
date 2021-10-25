@@ -199,9 +199,6 @@ class Keyring:
             validity_time: timestamp at which we require the signing key to
                 be valid. (0 implies we don't care)
         """
-        # if we are the originating server don't fetch verify key for self over federation
-        # if server_name == self.hostname:
-        #     return self.verify_json_locally(server_name, json_object)
 
         request = VerifyJsonRequest.from_json_object(
             server_name,
