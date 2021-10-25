@@ -1,7 +1,7 @@
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018-2019 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -232,25 +232,37 @@ class FilterCollection:
     def include_redundant_members(self) -> bool:
         return self._room_state_filter.include_redundant_members
 
-    def filter_presence(
+    async def filter_presence(
         self, events: Iterable[UserPresenceState]
     ) -> List[UserPresenceState]:
-        return self._presence_filter.filter(events)
+        return await self._presence_filter.filter(events)
 
-    def filter_account_data(self, events: Iterable[JsonDict]) -> List[JsonDict]:
-        return self._account_data.filter(events)
+    async def filter_account_data(self, events: Iterable[JsonDict]) -> List[JsonDict]:
+        return await self._account_data.filter(events)
 
-    def filter_room_state(self, events: Iterable[EventBase]) -> List[EventBase]:
-        return self._room_state_filter.filter(self._room_filter.filter(events))
+    async def filter_room_state(self, events: Iterable[EventBase]) -> List[EventBase]:
+        return await self._room_state_filter.filter(
+            await self._room_filter.filter(events)
+        )
 
-    def filter_room_timeline(self, events: Iterable[EventBase]) -> List[EventBase]:
-        return self._room_timeline_filter.filter(self._room_filter.filter(events))
+    async def filter_room_timeline(
+        self, events: Iterable[EventBase]
+    ) -> List[EventBase]:
+        return await self._room_timeline_filter.filter(
+            await self._room_filter.filter(events)
+        )
 
-    def filter_room_ephemeral(self, events: Iterable[JsonDict]) -> List[JsonDict]:
-        return self._room_ephemeral_filter.filter(self._room_filter.filter(events))
+    async def filter_room_ephemeral(self, events: Iterable[JsonDict]) -> List[JsonDict]:
+        return await self._room_ephemeral_filter.filter(
+            await self._room_filter.filter(events)
+        )
 
-    def filter_room_account_data(self, events: Iterable[JsonDict]) -> List[JsonDict]:
-        return self._room_account_data.filter(self._room_filter.filter(events))
+    async def filter_room_account_data(
+        self, events: Iterable[JsonDict]
+    ) -> List[JsonDict]:
+        return await self._room_account_data.filter(
+            await self._room_filter.filter(events)
+        )
 
     def blocks_all_presence(self) -> bool:
         return (
@@ -306,7 +318,7 @@ class Filter:
     def filters_all_rooms(self) -> bool:
         return "*" in self.not_rooms
 
-    def check(self, event: FilterEvent) -> bool:
+    async def check(self, event: FilterEvent) -> bool:
         """Checks whether the filter matches the given event.
 
         Args:
@@ -420,8 +432,8 @@ class Filter:
 
         return room_ids
 
-    def filter(self, events: Iterable[FilterEvent]) -> List[FilterEvent]:
-        return list(filter(self.check, events))
+    async def filter(self, events: Iterable[FilterEvent]) -> List[FilterEvent]:
+        return [event for event in events if await self.check(event)]
 
     def with_room_ids(self, room_ids: Iterable[str]) -> "Filter":
         """Returns a new filter with the given room IDs appended.

@@ -242,7 +242,7 @@ class SearchHandler:
 
             rank_map.update({r["event"].event_id: r["rank"] for r in results})
 
-            filtered_events = search_filter.filter([r["event"] for r in results])
+            filtered_events = await search_filter.filter([r["event"] for r in results])
 
             events = await filter_events_for_client(
                 self.storage, user.to_string(), filtered_events
@@ -292,7 +292,9 @@ class SearchHandler:
 
                 rank_map.update({r["event"].event_id: r["rank"] for r in results})
 
-                filtered_events = search_filter.filter([r["event"] for r in results])
+                filtered_events = await search_filter.filter(
+                    [r["event"] for r in results]
+                )
 
                 events = await filter_events_for_client(
                     self.storage, user.to_string(), filtered_events

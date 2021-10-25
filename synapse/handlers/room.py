@@ -1158,8 +1158,10 @@ class RoomContextHandler:
         )
 
         if event_filter:
-            results["events_before"] = event_filter.filter(results["events_before"])
-            results["events_after"] = event_filter.filter(results["events_after"])
+            results["events_before"] = await event_filter.filter(
+                results["events_before"]
+            )
+            results["events_after"] = await event_filter.filter(results["events_after"])
 
         results["events_before"] = await filter_evts(results["events_before"])
         results["events_after"] = await filter_evts(results["events_after"])
@@ -1195,7 +1197,7 @@ class RoomContextHandler:
 
         state_events = list(state[last_event_id].values())
         if event_filter:
-            state_events = event_filter.filter(state_events)
+            state_events = await event_filter.filter(state_events)
 
         results["state"] = await filter_evts(state_events)
 
