@@ -45,7 +45,6 @@ from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
@@ -53,6 +52,7 @@ from synapse.storage.state import StateFilter
 from synapse.types import (
     DomainSpecificString,
     JsonDict,
+    LoginResponse,
     Requester,
     UserID,
     UserInfo,

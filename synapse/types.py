@@ -28,6 +28,7 @@ from typing import (
     TypeVar,
     Union,
 )
+from typing_extensions import TypedDict
 
 import attr
 from frozendict import frozendict
@@ -796,3 +797,22 @@ class UserInfo:
     is_deactivated: bool
     is_guest: bool
     is_shadow_banned: bool
+
+
+class LoginResponse(TypedDict, total=False):
+    """Represents a response to a POST /login request.
+
+    The description of the fields can be found here:
+    https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-login
+
+    This response may also include the two additional fields from MSC2918 (refresh
+    tokens), which are `expires_in_ms` and `refresh_token`.
+    """
+    user_id: str
+    access_token: str
+    home_server: str
+    expires_in_ms: Optional[int]
+    refresh_token: Optional[str]
+    device_id: str
+    well_known: Optional[Dict[str, Any]]
+
