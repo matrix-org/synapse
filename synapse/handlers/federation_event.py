@@ -361,6 +361,7 @@ class FederationEventHandler:
         # need to.
         await self._event_creation_handler.cache_joined_hosts_for_event(event, context)
 
+        await self._check_for_soft_fail(event, None, origin=origin)
         await self._run_push_actions_and_persist_event(event, context)
         return event, context
 
@@ -402,29 +403,28 @@ class FederationEventHandler:
         """Persists the events returned by a send_join
 
         Checks the auth chain is valid (and passes auth checks) for the
-        state and event. Then persists the auth chain and state atomically.
-        Persists the event separately. Notifies about the persisted events
-        where appropriate.
-
-        Will attempt to fetch missing auth events.
+        state and event. Then persists all of the events.
+        Notifies about the persisted events where appropriate.
 
         Args:
             origin: Where the events came from
-            room_id,
+            room_id:
             auth_events
             state
             event
             room_version: The room version we expect this room to have, and
                 will raise if it doesn't match the version in the create event.
+
+        Returns:
+            The stream ID after which all events have been persisted.
+
+        Raises:
+            SynapseError if the response is in some way invalid.
         """
-        events_to_context = {}
         for e in itertools.chain(auth_events, state):
             e.internal_metadata.outlier = True
-            events_to_context[e.event_id] = EventContext.for_outlier()
 
-        event_map = {
-            e.event_id: e for e in itertools.chain(auth_events, state, [event])
-        }
+        event_map = {e.event_id: e for e in itertools.chain(auth_events, state)}
 
         create_event = None
         for e in auth_events:
@@ -444,64 +444,36 @@ class FederationEventHandler:
         if room_version.identifier != room_version_id:
             raise SynapseError(400, "Room version mismatch")
 
-        missing_auth_events = set()
-        for e in itertools.chain(auth_events, state, [event]):
-            for e_id in e.auth_event_ids():
-                if e_id not in event_map:
-                    missing_auth_events.add(e_id)
+        # filter out any events we have already seen
+        seen_remotes = await self._store.have_seen_events(room_id, event_map.keys())
+        for s in seen_remotes:
+            event_map.pop(s, None)
 
-        for e_id in missing_auth_events:
-            m_ev = await self._federation_client.get_pdu(
-                [origin],
-                e_id,
-                room_version=room_version,
-                outlier=True,
-                timeout=10000,
-            )
-            if m_ev and m_ev.event_id == e_id:
-                event_map[e_id] = m_ev
-            else:
-                logger.info("Failed to find auth event %r", e_id)
+        # persist the auth chain and state events.
+        #
+        # any invalid events here will be marked as rejected, and we'll carry on.
+        #
+        # any events whose auth events are missing (ie, not in the send_join response,
+        # and not already in our db) will just be ignored. This is correct behaviour,
+        # because the reason that auth_events are missing might be due to us being
+        # unable to validate their signatures. The fact that we can't validate their
+        # signatures right now doesn't mean that we will *never* be able to, so it
+        # is premature to reject them.
+        #
+        await self._auth_and_persist_outliers(room_id, event_map.values())
 
-        for e in itertools.chain(auth_events, state, [event]):
-            auth_for_e = [
-                event_map[e_id] for e_id in e.auth_event_ids() if e_id in event_map
-            ]
-            if create_event:
-                auth_for_e.append(create_event)
-
-            try:
-                validate_event_for_room_version(room_version, e)
-                check_auth_rules_for_event(room_version, e, auth_for_e)
-            except SynapseError as err:
-                # we may get SynapseErrors here as well as AuthErrors. For
-                # instance, there are a couple of (ancient) events in some
-                # rooms whose senders do not have the correct sigil; these
-                # cause SynapseErrors in auth.check. We don't want to give up
-                # the attempt to federate altogether in such cases.
-
-                logger.warning("Rejecting %s because %s", e.event_id, err.msg)
-
-                if e == event:
-                    raise
-                events_to_context[e.event_id].rejected = RejectedReason.AUTH_ERROR
-
-        if auth_events or state:
-            await self.persist_events_and_notify(
-                room_id,
-                [
-                    (e, events_to_context[e.event_id])
-                    for e in itertools.chain(auth_events, state)
-                ],
+        # and now persist the join event itself.
+        logger.info("Peristing join-via-remote %s", event)
+        with nested_logging_context(suffix=event.event_id):
+            context = await self._state_handler.compute_event_context(
+                event, old_state=state
             )
 
-        new_event_context = await self._state_handler.compute_event_context(
-            event, old_state=state
-        )
+            context = await self._check_event_auth(origin, event, context)
+            if context.rejected:
+                raise SynapseError(400, "Join event was rejected")
 
-        return await self.persist_events_and_notify(
-            room_id, [(event, new_event_context)]
-        )
+            return await self.persist_events_and_notify(room_id, [(event, context)])
 
     @log_function
     async def backfill(
@@ -974,9 +946,15 @@ class FederationEventHandler:
     ) -> None:
         """Called when we have a new non-outlier event.
 
-        This is called when we have a new event to add to the room DAG - either directly
-        via a /send request, retrieved via get_missing_events after a /send request, or
-        backfilled after a client request.
+        This is called when we have a new event to add to the room DAG. This can be
+        due to:
+           * events received directly via a /send request
+           * events retrieved via get_missing_events after a /send request
+           * events backfilled after a client request.
+
+        It's not currently used for events received from incoming send_{join,knock,leave}
+        requests (which go via on_send_membership_event), nor for joins created by a
+        remote join dance (which go via process_remote_join).
 
         We need to do auth checks and put it through the StateHandler.
 
@@ -1012,10 +990,18 @@ class FederationEventHandler:
             logger.exception("Unexpected AuthError from _check_event_auth")
             raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
 
+        if not backfilled and not context.rejected:
+            # For new (non-backfilled and non-outlier) events we check if the event
+            # passes auth based on the current state. If it doesn't then we
+            # "soft-fail" the event.
+            await self._check_for_soft_fail(event, state, origin=origin)
+
         await self._run_push_actions_and_persist_event(event, context, backfilled)
 
-        if backfilled:
+        if backfilled or context.rejected:
             return
+
+        await self._maybe_kick_guest_users(event)
 
         # For encrypted messages we check that we know about the sending device,
         # if we don't then we mark the device cache for that user as stale.
@@ -1317,14 +1303,14 @@ class FederationEventHandler:
                 for auth_event_id in event.auth_event_ids():
                     ae = persisted_events.get(auth_event_id)
                     if not ae:
-                        logger.warning(
-                            "Event %s relies on auth_event %s, which could not be found.",
-                            event,
-                            auth_event_id,
-                        )
                         # the fact we can't find the auth event doesn't mean it doesn't
                         # exist, which means it is premature to reject `event`. Instead we
                         # just ignore it for now.
+                        logger.warning(
+                            "Dropping event %s, which relies on auth_event %s, which could not be found",
+                            event,
+                            auth_event_id,
+                        )
                         return None
                     auth.append(ae)
 
@@ -1447,10 +1433,6 @@ class FederationEventHandler:
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR
-            return context
-
-        await self._check_for_soft_fail(event, state, backfilled, origin=origin)
-        await self._maybe_kick_guest_users(event)
 
         return context
 
@@ -1470,7 +1452,6 @@ class FederationEventHandler:
         self,
         event: EventBase,
         state: Optional[Iterable[EventBase]],
-        backfilled: bool,
         origin: str,
     ) -> None:
         """Checks if we should soft fail the event; if so, marks the event as
@@ -1479,15 +1460,8 @@ class FederationEventHandler:
         Args:
             event
             state: The state at the event if we don't have all the event's prev events
-            backfilled: Whether the event is from backfill
             origin: The host the event originates from.
         """
-        # For new (non-backfilled and non-outlier) events we check if the event
-        # passes auth based on the current state. If it doesn't then we
-        # "soft-fail" the event.
-        if backfilled or event.internal_metadata.is_outlier():
-            return
-
         extrem_ids_list = await self._store.get_latest_event_ids_in_room(event.room_id)
         extrem_ids = set(extrem_ids_list)
         prev_event_ids = set(event.prev_event_ids())
