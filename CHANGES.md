@@ -1,7 +1,7 @@
 Synapse 1.46.0rc1 (2021-10-26)
 ==============================
 
-The cause of the [performance regression affecting Synapse 1.44](https://github.com/matrix-org/synapse/issues/11049) has been identified and fixed.
+The cause of the [performance regression affecting Synapse 1.44](https://github.com/matrix-org/synapse/issues/11049) has been identified and fixed. ([\#11177](https://github.com/matrix-org/synapse/issues/11177))
 
 Features
 --------
@@ -18,12 +18,12 @@ Bugfixes
 - Newly-created public rooms are now only assigned an alias if the room's creation has not been blocked by permission settings. Contributed by @AndrewFerr. ([\#10930](https://github.com/matrix-org/synapse/issues/10930))
 - Fix a long-standing bug which meant that events received over federation were sometimes incorrectly accepted into the room state. ([\#11001](https://github.com/matrix-org/synapse/issues/11001), [\#11009](https://github.com/matrix-org/synapse/issues/11009), [\#11012](https://github.com/matrix-org/synapse/issues/11012))
 - Fix 500 error on `/messages` when the server accumulates more than 5 backwards extremities at a given depth for a room. ([\#11027](https://github.com/matrix-org/synapse/issues/11027))
-- Fix a bug where setting a user's external_id via the admin API returns 500 and deletes users existing external mappings if that external ID is already mapped. ([\#11051](https://github.com/matrix-org/synapse/issues/11051))
+- Fix a bug where setting a user's `external_id` via the admin API returns 500 and deletes users existing external mappings if that external ID is already mapped. ([\#11051](https://github.com/matrix-org/synapse/issues/11051))
 - Fix a long-standing bug where users excluded from the user directory were added into the directory if they belonged to a room which became public or private. ([\#11075](https://github.com/matrix-org/synapse/issues/11075))
 - Fix a long-standing bug when attempting to preview URLs which are in the `windows-1252` character encoding. ([\#11077](https://github.com/matrix-org/synapse/issues/11077), [\#11089](https://github.com/matrix-org/synapse/issues/11089))
 - Fix broken export-data admin command and add test script checking the command to CI. ([\#11078](https://github.com/matrix-org/synapse/issues/11078))
 - Show an error when timestamp in seconds is provided to the `/purge_media_cache` Admin API. ([\#11101](https://github.com/matrix-org/synapse/issues/11101))
-- Fix local users who left all their rooms being removed from the user directory, even if the "search_all_users" config option was enabled. ([\#11103](https://github.com/matrix-org/synapse/issues/11103))
+- Fix local users who left all their rooms being removed from the user directory, even if the `search_all_users` config option was enabled. ([\#11103](https://github.com/matrix-org/synapse/issues/11103))
 - Fix a bug which caused the module API's `get_user_ip_and_agents` function to always fail on workers. `get_user_ip_and_agents` was introduced in 1.44.0 and did not function correctly on worker processes at the time. ([\#11112](https://github.com/matrix-org/synapse/issues/11112))
 - Identity server connection is no longer ignoring `ip_range_whitelist`. ([\#11120](https://github.com/matrix-org/synapse/issues/11120))
 - Fix a bug introduced in Synapse 1.45.0 breaking the configuration file parsing script. ([\#11145](https://github.com/matrix-org/synapse/issues/11145))
