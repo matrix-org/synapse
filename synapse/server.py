@@ -34,6 +34,7 @@ from typing import (
 )
 
 import twisted.internet.tcp
+from twisted.internet.interfaces import IOpenSSLContextFactory
 from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import Resource
 
@@ -224,6 +225,8 @@ class HomeServer(metaclass=abc.ABCMeta):
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
     # instantiated during setup() for future return by get_datastore()
     DATASTORE_CLASS = abc.abstractproperty()
+
+    tls_server_context_factory: Optional[IOpenSSLContextFactory]
 
     def __init__(
         self,
