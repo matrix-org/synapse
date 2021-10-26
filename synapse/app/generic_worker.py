@@ -131,10 +131,10 @@ class KeyUploadServlet(RestServlet):
 
     PATTERNS = client_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: HomeServer):
         """
         Args:
-            hs (synapse.server.HomeServer): server
+            hs: server
         """
         super().__init__()
         self.auth = hs.get_auth()

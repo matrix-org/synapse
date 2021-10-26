@@ -800,9 +800,14 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ExternalCache(self)
 
     @cache_in_self
-    def get_outbound_redis_connection(self) -> Optional["RedisProtocol"]:
-        if not self.config.redis.redis_enabled:
-            return None
+    def get_outbound_redis_connection(self) -> "RedisProtocol":
+        """
+        The Redis connection used for replication.
+
+        Raises:
+            AssertionError: if Redis is not enabled in the homeserver config.
+        """
+        assert self.config.redis.redis_enabled
 
         # We only want to import redis module if we're using it, as we have
         # `txredisapi` as an optional dependency.

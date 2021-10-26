@@ -119,6 +119,27 @@ callback returns `True`, Synapse falls through to the next one. The value of the
 callback that does not return `True` will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.
 
+### `on_new_event`
+
+_First introduced in Synapse v1.47.0_
+
+```python
+async def on_new_event(
+    event: "synapse.events.EventBase",
+    state_events: "synapse.types.StateMap",
+) -> None:
+```
+
+Called after sending an event into a room. The module is passed the event, as well
+as the state of the room _after_ the event. This means that if the event is a state event,
+it will be included in this state.
+
+Note that this callback is called when the event has already been processed and stored
+into the room, which means this callback cannot be used to deny persisting the event. To
+deny an incoming event, see [`check_event_for_spam`](spam_checker_callbacks.md#check_event_for_spam) instead.
+
+If multiple modules implement this callback, Synapse runs them all in order.
+
 ## Example
 
 The example below is a module that implements the third-party rules callback

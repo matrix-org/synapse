@@ -454,6 +454,10 @@ class DeviceHandler(DeviceWorkerHandler):
     ) -> None:
         """Notify that a user's device(s) has changed. Pokes the notifier, and
         remote servers if the user is local.
+
+        Args:
+            user_id: The Matrix ID of the user who's device list has been updated.
+            device_ids: The device IDs that have changed.
         """
         if not device_ids:
             # No changes to notify about, so this is a no-op.
