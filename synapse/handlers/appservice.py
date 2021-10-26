@@ -182,7 +182,7 @@ class ApplicationServicesHandler:
     def notify_interested_services_ephemeral(
         self,
         stream_key: str,
-        new_token: int,
+        new_token: Union[int, RoomStreamToken],
         users: Optional[Collection[Union[str, UserID]]] = None,
     ) -> None:
         """
@@ -203,7 +203,7 @@ class ApplicationServicesHandler:
                 Appservices will only receive ephemeral events that fall within their
                 registered user and room namespaces.
 
-            new_token: The latest stream token.
+            new_token: The stream token of the event.
             users: The users that should be informed of the new event, if any.
         """
         if not self.notify_appservices:
@@ -211,6 +211,13 @@ class ApplicationServicesHandler:
 
         if stream_key not in ("typing_key", "receipt_key", "presence_key"):
             return
+
+        # Convert new_token from a RoomStreamToken to an int if necessary.
+        # We just use the minimum stream ordering and ignore the vector clock
+        # component. This is safe to do as long as we *always* ignore the vector
+        # clock components.
+        if isinstance(new_token, RoomStreamToken):
+            new_token = new_token.stream
 
         services = [
             service
