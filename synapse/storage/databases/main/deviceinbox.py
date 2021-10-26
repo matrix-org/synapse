@@ -591,7 +591,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
     ) -> int:
         """A background update that deletes all device_inboxes for deleted devices.
 
-        This should only need to be run once (when users upgrade to v1.45.0)
+        This should only need to be run once (when users upgrade to v1.46.0)
 
         Args:
             progress: JsonDict used to store progress of this background update
@@ -604,19 +604,31 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
         def _remove_deleted_devices_from_device_inbox_txn(
             txn: LoggingTransaction,
         ) -> int:
+            """stream_id is not unique
+            we need to use an inclusive `stream_id >= ?` clause,
+            since we might not have deleted all dead device messages for the stream_id
+            returned from the previous query
 
-            sql = """
-                WITH get_devices AS
-                  (SELECT device_inbox.device_id, device_inbox.user_id
-                   FROM device_inbox
-                   WHERE (device_inbox.device_id, device_inbox.user_id)
-                       NOT IN
-                           (SELECT device_id, user_id FROM devices)
-                   LIMIT ?)
-                SELECT DISTINCT * FROM get_devices;
+            Then delete only rows matching the `(user_id, device_id, stream_id)` tuple,
+            to avoid problems of deleting a large number of rows all at once
+            due to a single device having lots of device messages.
             """
 
-            txn.execute(sql, (batch_size,))
+            last_stream_id = progress.get("stream_id", 0)
+
+            sql = """
+                SELECT device_id, user_id, stream_id
+                FROM device_inbox
+                WHERE
+                    stream_id >= ?
+                    AND (device_id, user_id) NOT IN (
+                        SELECT device_id, user_id FROM devices
+                    )
+                ORDER BY stream_id
+                LIMIT ?
+            """
+
+            txn.execute(sql, (last_stream_id, batch_size))
             rows = txn.fetchall()
 
             num_deleted = 0
@@ -624,14 +636,22 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
                 num_deleted += self.db_pool.simple_delete_txn(
                     txn,
                     "device_inbox",
-                    {"device_id": row[0], "user_id": row[1]},
+                    {"device_id": row[0], "user_id": row[1], "stream_id": row[2]},
                 )
 
             if rows:
+                # send more than stream_id to progress
+                # otherwise it can happen in large deployments that
+                # no change of status is visible in the log file
+                # it may be that the stream_id does not change in several runs
                 self.db_pool.updates._background_update_progress_txn(
                     txn,
                     self.REMOVE_DELETED_DEVICES,
-                    {"device_id": rows[-1][0], "user_id": rows[-1][1]},
+                    {
+                        "device_id": rows[-1][0],
+                        "user_id": rows[-1][1],
+                        "stream_id": rows[-1][2],
+                    },
                 )
 
             return num_deleted
@@ -642,10 +662,6 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
         )
 
         # The task is finished when no more lines are deleted.
-        # The `batch_size` only specifies how many devices are cleaned per run.
-        # More than one line is deleted in the deviceinbox per run and device,
-        # so it is possible that the number of deleted lines is larger
-        # than the batch size.
         if not number_deleted:
             await self.db_pool.updates._end_background_update(
                 self.REMOVE_DELETED_DEVICES
