@@ -2285,7 +2285,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
-        self.assertEqual("support", channel.json_body["user_type"])
+        self.assertEqual(UserTypes.SUPPORT, channel.json_body["user_type"])
 
         # Get user
         channel = self.make_request(
@@ -2296,7 +2296,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
-        self.assertEqual("support", channel.json_body["user_type"])
+        self.assertEqual(UserTypes.SUPPORT, channel.json_body["user_type"])
 
         # Change back to a regular user
         channel = self.make_request(

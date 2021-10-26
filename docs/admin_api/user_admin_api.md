@@ -139,7 +139,7 @@ Body parameters:
   deactivating users see [Deactivate Account](#deactivate-account).
 - `user_type` - string or null, optional. If provided, the user type will be
   adjusted. If `null` given, the user type will be cleared. Other 
-  possible options are: `bot` and `support`.
+  allowed options are: `bot` and `support`.
 
 If the user already exists then optional parameters default to the current value.
 
