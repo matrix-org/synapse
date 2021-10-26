@@ -217,13 +217,13 @@ class FilterCollection:
         return self._filter_json
 
     def timeline_limit(self) -> int:
-        return self._room_timeline_filter.limit()
+        return self._room_timeline_filter.limit
 
     def presence_limit(self) -> int:
-        return self._presence_filter.limit()
+        return self._presence_filter.limit
 
     def ephemeral_limit(self) -> int:
-        return self._room_ephemeral_filter.limit()
+        return self._room_ephemeral_filter.limit
 
     def lazy_load_members(self) -> bool:
         return self._room_state_filter.lazy_load_members()
@@ -275,6 +275,8 @@ class FilterCollection:
 class Filter:
     def __init__(self, filter_json: JsonDict):
         self.filter_json = filter_json
+
+        self.limit = filter_json.get("limit", 10)
 
         self.types = filter_json.get("types", None)
         self.not_types = filter_json.get("not_types", [])
@@ -396,9 +398,6 @@ class Filter:
 
     def filter(self, events: Iterable[FilterEvent]) -> List[FilterEvent]:
         return list(filter(self.check, events))
-
-    def limit(self) -> int:
-        return self.filter_json.get("limit", 10)
 
     def lazy_load_members(self) -> bool:
         return self.filter_json.get("lazy_load_members", False)
