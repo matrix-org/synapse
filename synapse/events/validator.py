@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import collections.abc
-from typing import Union
+from typing import Iterable, Union
 
 import jsonschema
 
@@ -28,11 +28,11 @@ from synapse.events.utils import (
     validate_canonicaljson,
 )
 from synapse.federation.federation_server import server_matches_acl_event
-from synapse.types import EventID, RoomID, UserID
+from synapse.types import EventID, JsonDict, RoomID, UserID
 
 
 class EventValidator:
-    def validate_new(self, event: EventBase, config: HomeServerConfig):
+    def validate_new(self, event: EventBase, config: HomeServerConfig) -> None:
         """Validates the event has roughly the right format
 
         Args:
@@ -116,7 +116,7 @@ class EventValidator:
                     errcode=Codes.BAD_JSON,
                 )
 
-    def _validate_retention(self, event: EventBase):
+    def _validate_retention(self, event: EventBase) -> None:
         """Checks that an event that defines the retention policy for a room respects the
         format enforced by the spec.
 
@@ -156,7 +156,7 @@ class EventValidator:
                 errcode=Codes.BAD_JSON,
             )
 
-    def validate_builder(self, event: Union[EventBase, EventBuilder]):
+    def validate_builder(self, event: Union[EventBase, EventBuilder]) -> None:
         """Validates that the builder/event has roughly the right format. Only
         checks values that we expect a proto event to have, rather than all the
         fields an event would have
@@ -204,14 +204,14 @@ class EventValidator:
 
             self._ensure_state_event(event)
 
-    def _ensure_strings(self, d, keys):
+    def _ensure_strings(self, d: JsonDict, keys: Iterable[str]) -> None:
         for s in keys:
             if s not in d:
                 raise SynapseError(400, "'%s' not in content" % (s,))
             if not isinstance(d[s], str):
                 raise SynapseError(400, "'%s' not a string type" % (s,))
 
-    def _ensure_state_event(self, event):
+    def _ensure_state_event(self, event: Union[EventBase, EventBuilder]) -> None:
         if not event.is_state():
             raise SynapseError(400, "'%s' must be state events" % (event.type,))
 
@@ -244,7 +244,9 @@ POWER_LEVELS_SCHEMA = {
 }
 
 
-def _create_power_level_validator():
+# This could return something newer than Draft 7, but that's the current "latest"
+# validator.
+def _create_power_level_validator() -> jsonschema.Draft7Validator:
     validator = jsonschema.validators.validator_for(POWER_LEVELS_SCHEMA)
 
     # by default jsonschema does not consider a frozendict to be an object so

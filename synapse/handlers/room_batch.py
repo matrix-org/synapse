@@ -13,6 +13,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def generate_fake_event_id() -> str:
+    return "$fake_" + random_string(43)
+
+
 class RoomBatchHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
@@ -177,6 +181,11 @@ class RoomBatchHandler:
 
         state_event_ids_at_start = []
         auth_event_ids = initial_auth_event_ids.copy()
+
+        # Make the state events float off on their own so we don't have a
+        # bunch of `@mxid joined the room` noise between each batch
+        prev_event_id_for_state_chain = generate_fake_event_id()
+
         for state_event in state_events_at_start:
             assert_params_in_dict(
                 state_event, ["type", "origin_server_ts", "content", "sender"]
@@ -200,10 +209,6 @@ class RoomBatchHandler:
             # Mark all events as historical
             event_dict["content"][EventContentFields.MSC2716_HISTORICAL] = True
 
-            # Make the state events float off on their own so we don't have a
-            # bunch of `@mxid joined the room` noise between each batch
-            fake_prev_event_id = "$" + random_string(43)
-
             # TODO: This is pretty much the same as some other code to handle inserting state in this file
             if event_dict["type"] == EventTypes.Member:
                 membership = event_dict["content"].get("membership", None)
@@ -216,7 +221,7 @@ class RoomBatchHandler:
                     action=membership,
                     content=event_dict["content"],
                     outlier=True,
-                    prev_event_ids=[fake_prev_event_id],
+                    prev_event_ids=[prev_event_id_for_state_chain],
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
                     # reference and also update in the event when we append later.
@@ -235,7 +240,7 @@ class RoomBatchHandler:
                     ),
                     event_dict,
                     outlier=True,
-                    prev_event_ids=[fake_prev_event_id],
+                    prev_event_ids=[prev_event_id_for_state_chain],
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
                     # reference and also update in the event when we append later.
@@ -245,6 +250,8 @@ class RoomBatchHandler:
 
             state_event_ids_at_start.append(event_id)
             auth_event_ids.append(event_id)
+            # Connect all the state in a floating chain
+            prev_event_id_for_state_chain = event_id
 
         return state_event_ids_at_start
 
@@ -289,6 +296,10 @@ class RoomBatchHandler:
         for ev in events_to_create:
             assert_params_in_dict(ev, ["type", "origin_server_ts", "content", "sender"])
 
+            assert self.hs.is_mine_id(ev["sender"]), "User must be our own: %s" % (
+                ev["sender"],
+            )
+
             event_dict = {
                 "type": ev["type"],
                 "origin_server_ts": ev["origin_server_ts"],
@@ -311,15 +322,24 @@ class RoomBatchHandler:
                 historical=True,
                 depth=inherited_depth,
             )
+
+            assert context._state_group
+
+            # Normally this is done when persisting the event but we have to
+            # pre-emptively do it here because we create all the events first,
+            # then persist them in another pass below. And we want to share
+            # state_groups across the whole batch so this lookup needs to work
+            # for the next event in the batch in this loop.
+            await self.store.store_state_group_id_for_event_id(
+                event_id=event.event_id,
+                state_group_id=context._state_group,
+            )
+
             logger.debug(
                 "RoomBatchSendEventRestServlet inserting event=%s, prev_event_ids=%s, auth_event_ids=%s",
                 event,
                 prev_event_ids,
                 auth_event_ids,
-            )
-
-            assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
-                event.sender,
             )
 
             events_to_persist.append((event, context))

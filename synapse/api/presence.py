@@ -12,49 +12,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
+from typing import Any, Optional
+
+import attr
 
 from synapse.api.constants import PresenceState
+from synapse.types import JsonDict
 
 
-class UserPresenceState(
-    namedtuple(
-        "UserPresenceState",
-        (
-            "user_id",
-            "state",
-            "last_active_ts",
-            "last_federation_update_ts",
-            "last_user_sync_ts",
-            "status_msg",
-            "currently_active",
-        ),
-    )
-):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class UserPresenceState:
     """Represents the current presence state of the user.
 
-    user_id (str)
-    last_active (int): Time in msec that the user last interacted with server.
-    last_federation_update (int): Time in msec since either a) we sent a presence
+    user_id
+    last_active: Time in msec that the user last interacted with server.
+    last_federation_update: Time in msec since either a) we sent a presence
         update to other servers or b) we received a presence update, depending
         on if is a local user or not.
-    last_user_sync (int): Time in msec that the user last *completed* a sync
+    last_user_sync: Time in msec that the user last *completed* a sync
         (or event stream).
-    status_msg (str): User set status message.
+    status_msg: User set status message.
     """
 
-    def as_dict(self):
-        return dict(self._asdict())
+    user_id: str
+    state: str
+    last_active_ts: int
+    last_federation_update_ts: int
+    last_user_sync_ts: int
+    status_msg: Optional[str]
+    currently_active: bool
+
+    def as_dict(self) -> JsonDict:
+        return attr.asdict(self)
 
     @staticmethod
-    def from_dict(d):
+    def from_dict(d: JsonDict) -> "UserPresenceState":
         return UserPresenceState(**d)
 
-    def copy_and_replace(self, **kwargs):
-        return self._replace(**kwargs)
+    def copy_and_replace(self, **kwargs: Any) -> "UserPresenceState":
+        return attr.evolve(self, **kwargs)
 
     @classmethod
-    def default(cls, user_id):
+    def default(cls, user_id: str) -> "UserPresenceState":
         """Returns a default presence state."""
         return cls(
             user_id=user_id,

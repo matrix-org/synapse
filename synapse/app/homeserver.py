@@ -412,7 +412,7 @@ def format_config_error(e: ConfigError) -> Iterator[str]:
         e = e.__cause__
 
 
-def run(hs):
+def run(hs: HomeServer):
     PROFILE_SYNAPSE = False
     if PROFILE_SYNAPSE:
 
