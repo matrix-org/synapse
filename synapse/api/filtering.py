@@ -226,7 +226,7 @@ class FilterCollection:
         return self._room_ephemeral_filter.limit
 
     def lazy_load_members(self) -> bool:
-        return self._room_state_filter.lazy_load_members()
+        return self._room_state_filter.lazy_load_members
 
     def include_redundant_members(self) -> bool:
         return self._room_state_filter.include_redundant_members()
@@ -277,6 +277,7 @@ class Filter:
         self.filter_json = filter_json
 
         self.limit = filter_json.get("limit", 10)
+        self.lazy_load_members = filter_json.get("lazy_load_members", False)
 
         self.types = filter_json.get("types", None)
         self.not_types = filter_json.get("not_types", [])
@@ -398,9 +399,6 @@ class Filter:
 
     def filter(self, events: Iterable[FilterEvent]) -> List[FilterEvent]:
         return list(filter(self.check, events))
-
-    def lazy_load_members(self) -> bool:
-        return self.filter_json.get("lazy_load_members", False)
 
     def include_redundant_members(self) -> bool:
         return self.filter_json.get("include_redundant_members", False)
