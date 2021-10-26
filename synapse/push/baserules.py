@@ -525,7 +525,7 @@ BASE_APPEND_UNDERRIDE_RULES = [
     },
     # Enable notifications for reactions
     {
-        "rule_id": "global/override/.m.rule.reaction",
+        "rule_id": "global/override/com.beeper.reaction",
         "conditions": [
             {
                 "kind": "event_match",
