@@ -1,6 +1,8 @@
 Synapse 1.46.0rc1 (2021-10-26)
 ==============================
 
+The cause of the [performance regression affecting Synapse 1.44](https://github.com/matrix-org/synapse/issues/11049) has been identified and fixed.
+
 Features
 --------
 
@@ -24,8 +26,8 @@ Bugfixes
 - Fix local users who left all their rooms being removed from the user directory, even if the "search_all_users" config option was enabled. ([\#11103](https://github.com/matrix-org/synapse/issues/11103))
 - Fix a bug which caused the module API's `get_user_ip_and_agents` function to always fail on workers. `get_user_ip_and_agents` was introduced in 1.44.0 and did not function correctly on worker processes at the time. ([\#11112](https://github.com/matrix-org/synapse/issues/11112))
 - Identity server connection is no longer ignoring `ip_range_whitelist`. ([\#11120](https://github.com/matrix-org/synapse/issues/11120))
-- Fix a bug introduced in Synapse v1.45.0 breaking the configuration file parsing script. ([\#11145](https://github.com/matrix-org/synapse/issues/11145))
-- Fix a performance regression introduced in v1.44.0 which could cause client requests to time out when making large numbers of outbound requests. ([\#11177](https://github.com/matrix-org/synapse/issues/11177))
+- Fix a bug introduced in Synapse 1.45.0 breaking the configuration file parsing script. ([\#11145](https://github.com/matrix-org/synapse/issues/11145))
+- Fix a performance regression introduced in 1.44.0 which could cause client requests to time out when making large numbers of outbound requests. ([\#11177](https://github.com/matrix-org/synapse/issues/11177))
 
 
 Improved Documentation
