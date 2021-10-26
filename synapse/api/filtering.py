@@ -316,11 +316,12 @@ class Filter:
         # except for presence which actually gets passed around as its own
         # namedtuple type.
         if isinstance(event, UserPresenceState):
-            sender: Optional[str] = event.user_id
-            room_id = None
-            ev_type = "m.presence"
+            user_id = event.user_id
+            literal_keys = {
+                "senders": lambda v: user_id == v,
+                "types": lambda v: "m.presence" == v,
+            }
             contains_url = False
-            labels: List[str] = []
         else:
             sender = event.get("sender", None)
             content = event.get("content") or {}
@@ -340,12 +341,12 @@ class Filter:
             contains_url = isinstance(content.get("url"), str)
             labels = content.get(EventContentFields.LABELS, [])
 
-        literal_keys = {
-            "rooms": lambda v: room_id == v,
-            "senders": lambda v: sender == v,
-            "types": lambda v: _matches_wildcard(ev_type, v),
-            "labels": lambda v: v in labels,
-        }
+            literal_keys = {
+                "rooms": lambda v: room_id == v,
+                "senders": lambda v: sender == v,
+                "types": lambda v: _matches_wildcard(ev_type, v),
+                "labels": lambda v: v in labels,
+            }
 
         return self._check_fields(literal_keys, contains_url)
 
