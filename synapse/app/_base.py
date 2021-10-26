@@ -342,6 +342,14 @@ async def start(hs: "HomeServer"):
     """
     reactor = hs.get_reactor()
 
+    # We want to use a separate thread pool for the resolver so that large
+    # numbers of DNS requests don't starve out other users of the threadpool.
+    resolver_threadpool = ThreadPool(name="gai_resolver")
+    resolver_threadpool.start()
+    reactor.installNameResolver(
+        GAIResolver(reactor, getThreadPool=lambda: resolver_threadpool)
+    )
+
     # Set up the SIGHUP machinery.
     if hasattr(signal, "SIGHUP"):
 
@@ -373,14 +381,6 @@ async def start(hs: "HomeServer"):
 
     # Start the tracer
     synapse.logging.opentracing.init_tracer(hs)  # type: ignore[attr-defined] # noqa
-
-    # We want to use a separate thread pool for the resolver so that large
-    # numbers of DNS requests don't starve out other users of the threadpool.
-    resolver_threadpool = ThreadPool(name="gai_resolver")
-    resolver_threadpool.start()
-    reactor.installNameResolver(
-        GAIResolver(reactor, getThreadPool=lambda: resolver_threadpool)
-    )
 
     # Instantiate the modules so they can register their web resources to the module API
     # before we start the listeners.
