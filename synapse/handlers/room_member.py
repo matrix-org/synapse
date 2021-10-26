@@ -614,15 +614,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     )
                     block_invite = True
 
-                is_published = await self.store.is_room_published(room_id)
-
                 if not await self.spam_checker.user_may_invite(
-                    requester.user.to_string(),
-                    target_id,
-                    third_party_invite=None,
-                    room_id=room_id,
-                    new_room=new_room,
-                    published_room=is_published,
+                    requester.user.to_string(), target_id, room_id
                 ):
                     logger.info("Blocking invite due to spam checker")
                     block_invite = True
@@ -1170,7 +1163,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         id_server: str,
         requester: Requester,
         txn_id: Optional[str],
-        new_room: bool = False,
         id_access_token: Optional[str] = None,
     ) -> int:
         """Invite a 3PID to a room.
@@ -1236,19 +1228,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         invitee = await self.identity_handler.lookup_3pid(
             id_server, medium, address, id_access_token
         )
-
-        is_published = await self.store.is_room_published(room_id)
-
-        if not await self.spam_checker.user_may_invite(
-            requester.user.to_string(),
-            invitee,
-            third_party_invite={"medium": medium, "address": address},
-            room_id=room_id,
-            new_room=new_room,
-            published_room=is_published,
-        ):
-            logger.info("Blocking invite due to spam checker")
-            raise SynapseError(403, "Invites have been disabled on this server")
 
         if invitee:
             # Note that update_membership with an action of "invite" can raise

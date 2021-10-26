@@ -374,19 +374,7 @@ class RoomCreationHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        if (
-            self._server_notices_mxid is not None
-            and requester.user.to_string() == self._server_notices_mxid
-        ):
-            # allow the server notices mxid to create rooms
-            is_requester_admin = True
-
-        else:
-            is_requester_admin = await self.auth.is_server_admin(requester.user)
-
-        if not is_requester_admin and not await self.spam_checker.user_may_create_room(
-            user_id, invite_list=[], third_party_invite_list=[], cloning=True
-        ):
+        if not await self.spam_checker.user_may_create_room(user_id):
             raise SynapseError(403, "You are not permitted to create rooms")
 
         creation_content: JsonDict = {
@@ -861,7 +849,6 @@ class RoomCreationHandler(BaseHandler):
                 id_server,
                 requester,
                 txn_id=None,
-                new_room=True,
                 id_access_token=id_access_token,
             )
 
