@@ -534,7 +534,7 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 "_id": "_reaction",
             }
         ],
-        "actions": ["notify"],
+        "actions": ["notify", {"set_tweak": "highlight", "value": False}],
     },
 ]
 
