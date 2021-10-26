@@ -323,11 +323,11 @@ class Filter:
             labels: List[str] = []
         else:
             sender = event.get("sender", None)
+            content = event.get("content") or {}
             if not sender:
                 # Presence events had their 'sender' in content.user_id, but are
                 # now handled above. We don't know if anything else uses this
                 # form. TODO: Check this and probably remove it.
-                content = event.get("content")
                 # account_data has been allowed to have non-dict content, so
                 # check type first
                 if isinstance(content, dict):
@@ -336,7 +336,6 @@ class Filter:
             room_id = event.get("room_id", None)
             ev_type = event.get("type", None)
 
-            content = event.get("content") or {}
             # check if there is a string url field in the content for filtering purposes
             contains_url = isinstance(content.get("url"), str)
             labels = content.get(EventContentFields.LABELS, [])
