@@ -321,7 +321,7 @@ class Filter:
                 "senders": lambda v: user_id == v,
                 "types": lambda v: "m.presence" == v,
             }
-            contains_url = False
+            return self._check_fields(literal_keys)
         else:
             sender = event.get("sender", None)
             content = event.get("content") or {}
@@ -338,7 +338,6 @@ class Filter:
             ev_type = event.get("type", None)
 
             # check if there is a string url field in the content for filtering purposes
-            contains_url = isinstance(content.get("url"), str)
             labels = content.get(EventContentFields.LABELS, [])
 
             literal_keys = {
@@ -348,13 +347,19 @@ class Filter:
                 "labels": lambda v: v in labels,
             }
 
-        return self._check_fields(literal_keys, contains_url)
+            result = self._check_fields(literal_keys)
+            if not result:
+                return result
 
-    def _check_fields(
-        self,
-        literal_keys: Dict[str, Callable[[str], bool]],
-        contains_url: bool,
-    ) -> bool:
+            contains_url_filter = self.contains_url
+            if contains_url_filter is not None:
+                contains_url = isinstance(content.get("url"), str)
+                if contains_url_filter != contains_url:
+                    return False
+
+            return True
+
+    def _check_fields(self, literal_keys: Dict[str, Callable[[str], bool]]) -> bool:
         """Checks whether the filter matches the given event fields.
 
         Returns:
@@ -371,11 +376,6 @@ class Filter:
             if allowed_values is not None:
                 if not any(map(match_func, allowed_values)):
                     return False
-
-        contains_url_filter = self.contains_url
-        if contains_url_filter is not None:
-            if contains_url_filter != contains_url:
-                return False
 
         return True
 
