@@ -10525,7 +10525,8 @@ server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a
             &quot;auth_provider&quot;: &quot;&lt;provider2&gt;&quot;,
             &quot;external_id&quot;: &quot;&lt;user_id_provider_2&gt;&quot;
         }
-    ]
+    ],
+    &quot;user_type&quot;: null
 }
 </code></pre>
 <p>URL parameters:</p>
@@ -10564,7 +10565,8 @@ specific <code>user_id</code>.</p>
     ],
     &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;,
     &quot;admin&quot;: false,
-    &quot;deactivated&quot;: false
+    &quot;deactivated&quot;: false,
+    &quot;user_type&quot;: null
 }
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
@@ -10607,6 +10609,9 @@ in homeserver configuration.</li>
 unchanged on existing accounts and set to <code>false</code> for new accounts.
 A user cannot be erased by deactivating with this API. For details on
 deactivating users see <a href="admin_api/user_admin_api.html#deactivate-account">Deactivate Account</a>.</li>
+<li><code>user_type</code> - string or null, optional. If provided, the user type will be
+adjusted. If <code>null</code> given, the user type will be cleared. Other 
+allowed options are: <code>bot</code> and <code>support</code>.</li>
 </ul>
 <p>If the user already exists then optional parameters default to the current value.</p>
 <p>In order to re-activate an account <code>deactivated</code> must be set to <code>false</code>. If
