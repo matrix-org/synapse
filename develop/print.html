@@ -8057,6 +8057,20 @@ boolean indicating whether the change can go through.</p>
 callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
+<h3 id="on_new_event"><a class="header" href="#on_new_event"><code>on_new_event</code></a></h3>
+<p><em>First introduced in Synapse v1.47.0</em></p>
+<pre><code class="language-python">async def on_new_event(
+    event: &quot;synapse.events.EventBase&quot;,
+    state_events: &quot;synapse.types.StateMap&quot;,
+) -&gt; None:
+</code></pre>
+<p>Called after sending an event into a room. The module is passed the event, as well
+as the state of the room <em>after</em> the event. This means that if the event is a state event,
+it will be included in this state.</p>
+<p>Note that this callback is called when the event has already been processed and stored
+into the room, which means this callback cannot be used to deny persisting the event. To
+deny an incoming event, see <a href="modules/spam_checker_callbacks.html#check_event_for_spam"><code>check_event_for_spam</code></a> instead.</p>
+<p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 <h2 id="example-1"><a class="header" href="#example-1">Example</a></h2>
 <p>The example below is a module that implements the third-party rules callback
 <code>check_event_allowed</code> to censor incoming messages as dictated by a third-party service.</p>
