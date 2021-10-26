@@ -413,30 +413,6 @@ def format_config_error(e: ConfigError) -> Iterator[str]:
 
 
 def run(hs: HomeServer):
-    PROFILE_SYNAPSE = False
-    if PROFILE_SYNAPSE:
-
-        def profile(func):
-            from cProfile import Profile
-            from threading import current_thread
-
-            def profiled(*args, **kargs):
-                profile = Profile()
-                profile.enable()
-                func(*args, **kargs)
-                profile.disable()
-                ident = current_thread().ident
-                profile.dump_stats(
-                    "/tmp/%s.%s.%i.pstat" % (hs.hostname, func.__name__, ident)
-                )
-
-            return profiled
-
-        from twisted.python.threadpool import ThreadPool
-
-        ThreadPool._worker = profile(ThreadPool._worker)
-        reactor.run = profile(reactor.run)
-
     _base.start_reactor(
         "synapse-homeserver",
         soft_file_limit=hs.config.server.soft_file_limit,
