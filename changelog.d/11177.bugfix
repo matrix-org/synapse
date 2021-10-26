@@ -1,0 +1,1 @@
+Fix a performance regression introduced in v1.44.0 which could cause client requests to time out when making large numbers of outbound requests.

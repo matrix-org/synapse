@@ -31,6 +31,7 @@ import twisted
 from twisted.internet import defer, error, reactor
 from twisted.logger import LoggingFile, LogLevel
 from twisted.protocols.tls import TLSMemoryBIOFactory
+from twisted.python.threadpool import ThreadPool
 
 import synapse
 from synapse.api.constants import MAX_PDU_SIZE
@@ -48,6 +49,7 @@ from synapse.metrics.background_process_metrics import wrap_as_background_proces
 from synapse.metrics.jemalloc import setup_jemalloc_stats
 from synapse.util.caches.lrucache import setup_expire_lru_cache_entries
 from synapse.util.daemonize import daemonize_process
+from synapse.util.gai_resolver import GAIResolver
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
 
@@ -338,9 +340,18 @@ async def start(hs: "HomeServer"):
     Args:
         hs: homeserver instance
     """
+    reactor = hs.get_reactor()
+
+    # We want to use a separate thread pool for the resolver so that large
+    # numbers of DNS requests don't starve out other users of the threadpool.
+    resolver_threadpool = ThreadPool(name="gai_resolver")
+    resolver_threadpool.start()
+    reactor.installNameResolver(
+        GAIResolver(reactor, getThreadPool=lambda: resolver_threadpool)
+    )
+
     # Set up the SIGHUP machinery.
     if hasattr(signal, "SIGHUP"):
-        reactor = hs.get_reactor()
 
         @wrap_as_background_process("sighup")
         def handle_sighup(*args, **kwargs):
