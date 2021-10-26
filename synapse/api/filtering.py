@@ -18,7 +18,8 @@ import json
 from typing import (
     TYPE_CHECKING,
     Awaitable,
-    Container,
+    Callable,
+    Dict,
     Iterable,
     List,
     Optional,
@@ -340,14 +341,18 @@ class Filter:
             contains_url = isinstance(content.get("url"), str)
             labels = content.get(EventContentFields.LABELS, [])
 
-        return self._check_fields(room_id, sender, ev_type, labels, contains_url)
+        literal_keys = {
+            "rooms": lambda v: room_id == v,
+            "senders": lambda v: sender == v,
+            "types": lambda v: _matches_wildcard(ev_type, v),
+            "labels": lambda v: v in labels,
+        }
+
+        return self._check_fields(literal_keys, contains_url)
 
     def _check_fields(
         self,
-        room_id: Optional[str],
-        sender: Optional[str],
-        event_type: Optional[str],
-        labels: Container[str],
+        literal_keys: Dict[str, Callable[[str], bool]],
         contains_url: bool,
     ) -> bool:
         """Checks whether the filter matches the given event fields.
@@ -355,12 +360,6 @@ class Filter:
         Returns:
             True if the event fields match
         """
-        literal_keys = {
-            "rooms": lambda v: room_id == v,
-            "senders": lambda v: sender == v,
-            "types": lambda v: _matches_wildcard(event_type, v),
-            "labels": lambda v: v in labels,
-        }
 
         for name, match_func in literal_keys.items():
             not_name = "not_%s" % (name,)
