@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING, List, Tuple, Optional
 
 from synapse.api.constants import EventContentFields, EventTypes
 from synapse.appservice import ApplicationService
@@ -103,7 +103,7 @@ class RoomBatchHandler:
         return insertion_event
 
     async def create_requester_for_user_id_from_app_service(
-        self, user_id: str, app_service: ApplicationService
+        self, user_id: str, app_service: ApplicationService, also_allow_user: Optional[str] = None,
     ) -> Requester:
         """Creates a new requester for the given user_id
         and validates that the app service is allowed to control
@@ -112,12 +112,13 @@ class RoomBatchHandler:
         Args:
             user_id: The author MXID that the app service is controlling
             app_service: The app service that controls the user
+            also_allow_user: An additional user ID that the appservice can temporarily control
 
         Returns:
             Requester object
         """
 
-        await self.auth.validate_appservice_can_control_user_id(app_service, user_id)
+        await self.auth.validate_appservice_can_control_user_id(app_service, user_id, also_allow_user)
 
         return create_requester(user_id, app_service=app_service)
 
@@ -155,6 +156,7 @@ class RoomBatchHandler:
         room_id: str,
         initial_auth_event_ids: List[str],
         app_service_requester: Requester,
+        also_allow_user: Optional[str],
     ) -> List[str]:
         """Takes all `state_events_at_start` event dictionaries and creates/persists
         them as floating state events which don't resolve into the current room state.
@@ -169,6 +171,7 @@ class RoomBatchHandler:
                 added to the list of auth events for the next state event
                 created.
             app_service_requester: The requester of an application service.
+            also_allow_user: An additional user ID that the appservice can temporarily control
 
         Returns:
             List of state event ID's we just persisted
@@ -209,7 +212,8 @@ class RoomBatchHandler:
                 membership = event_dict["content"].get("membership", None)
                 event_id, _ = await self.room_member_handler.update_membership(
                     await self.create_requester_for_user_id_from_app_service(
-                        state_event["sender"], app_service_requester.app_service
+                        state_event["sender"], app_service_requester.app_service,
+                        also_allow_user,
                     ),
                     target=UserID.from_string(event_dict["state_key"]),
                     room_id=room_id,
@@ -231,7 +235,8 @@ class RoomBatchHandler:
                     _,
                 ) = await self.event_creation_handler.create_and_send_nonmember_event(
                     await self.create_requester_for_user_id_from_app_service(
-                        state_event["sender"], app_service_requester.app_service
+                        state_event["sender"], app_service_requester.app_service,
+                        also_allow_user,
                     ),
                     event_dict,
                     outlier=True,
@@ -256,6 +261,7 @@ class RoomBatchHandler:
         inherited_depth: int,
         auth_event_ids: List[str],
         app_service_requester: Requester,
+        also_allow_user: Optional[str],
     ) -> List[str]:
         """Create and persists all events provided sequentially. Handles the
         complexity of creating events in chronological order so they can
@@ -276,6 +282,7 @@ class RoomBatchHandler:
             auth_event_ids: Define which events allow you to create the given
                 event in the room.
             app_service_requester: The requester of an application service.
+            also_allow_user: An additional user ID that the appservice can temporarily control
 
         Returns:
             List of persisted event IDs
@@ -303,7 +310,7 @@ class RoomBatchHandler:
 
             event, context = await self.event_creation_handler.create_event(
                 await self.create_requester_for_user_id_from_app_service(
-                    ev["sender"], app_service_requester.app_service
+                    ev["sender"], app_service_requester.app_service, also_allow_user,
                 ),
                 event_dict,
                 prev_event_ids=event_dict.get("prev_events"),
@@ -335,7 +342,7 @@ class RoomBatchHandler:
         for (event, context) in reversed(events_to_persist):
             await self.event_creation_handler.handle_new_client_event(
                 await self.create_requester_for_user_id_from_app_service(
-                    event["sender"], app_service_requester.app_service
+                    event["sender"], app_service_requester.app_service, also_allow_user,
                 ),
                 event=event,
                 context=context,
@@ -352,6 +359,7 @@ class RoomBatchHandler:
         inherited_depth: int,
         auth_event_ids: List[str],
         app_service_requester: Requester,
+        also_allow_user: Optional[str],
     ) -> Tuple[List[str], str]:
         """
         Handles creating and persisting all of the historical events as well
@@ -371,6 +379,7 @@ class RoomBatchHandler:
             auth_event_ids: Define which events allow you to create the given
                 event in the room.
             app_service_requester: The requester of an application service.
+            also_allow_user: An additional user ID that the appservice can temporarily control
 
         Returns:
             Tuple containing a list of created events and the next_batch_id
@@ -418,6 +427,7 @@ class RoomBatchHandler:
             inherited_depth=inherited_depth,
             auth_event_ids=auth_event_ids,
             app_service_requester=app_service_requester,
+            also_allow_user=also_allow_user,
         )
 
         return event_ids, next_batch_id

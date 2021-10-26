@@ -244,7 +244,7 @@ class Auth:
             raise MissingClientTokenError()
 
     async def validate_appservice_can_control_user_id(
-        self, app_service: ApplicationService, user_id: str
+        self, app_service: ApplicationService, user_id: str, also_allow_user: Optional[str] = None
     ):
         """Validates that the app service is allowed to control
         the given user.
@@ -252,6 +252,7 @@ class Auth:
         Args:
             app_service: The app service that controls the user
             user_id: The author MXID that the app service is controlling
+            also_allow_user: An additional user ID that the appservice can temporarily control
 
         Raises:
             AuthError: If the application service is not allowed to control the user
@@ -263,7 +264,7 @@ class Auth:
         if app_service.sender == user_id:
             pass
         # Check to make sure the app service is allowed to control the user
-        elif not app_service.is_interested_in_user(user_id):
+        elif not app_service.is_interested_in_user(user_id) and user_id != also_allow_user:
             raise AuthError(
                 403,
                 "Application service cannot masquerade as this user (%s)." % user_id,
