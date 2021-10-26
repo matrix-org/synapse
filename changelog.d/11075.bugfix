@@ -1,1 +1,0 @@
-Fix a long-standing bug where users excluded from the user directory were added into the directory if they belonged to a room which became public or private.
