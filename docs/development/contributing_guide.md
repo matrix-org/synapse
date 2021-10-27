@@ -17,9 +17,8 @@ license - in our case, this is almost always Apache Software License v2 (see
 
 If you are running Windows, the Windows Subsystem for Linux (WSL) is strongly
 recommended for development. More information about WSL can be found at
-<https://docs.microsoft.com/en-us/windows/wsl/install> for Windows 10/11 and
-<https://docs.microsoft.com/en-us/windows/wsl/install-on-server> for
-Windows Server. Running Synapse natively on Windows is not officially supported.
+<https://docs.microsoft.com/en-us/windows/wsl/install>. Running Synapse natively
+on Windows is not officially supported.
 
 The code of Synapse is written in Python 3. To do pretty much anything, you'll need [a recent version of Python 3](https://wiki.python.org/moin/BeginnersGuide/Download).
 
