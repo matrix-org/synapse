@@ -60,5 +60,5 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y devscripts
 
 # Update the Debian changelog.
 ver=${1}
-dch -M -v $(sed -Ee 's/(rc|a|b|c)/~\1/' <<<$ver) "New synapse release $ver."
+dch -M -v "$(sed -Ee 's/(rc|a|b|c)/~\1/' <<<"$ver")" "New synapse release $ver."
 dch -M -r -D stable ""
