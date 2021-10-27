@@ -1,0 +1,1 @@
+Fix a bug introduced in 1.46.0rc1 that prevented Synapse from shutting down cleanly.
