@@ -172,6 +172,27 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         if after_persisting:
             # Trigger the storage loop
             self.reactor.advance(10)
+        else:
+            # Check that the new IP and user agent has not been stored yet
+            db_result = self.get_success(
+                self.store.db_pool.simple_select_list(
+                    table="devices",
+                    keyvalues={},
+                    retcols=("user_id", "ip", "user_agent", "device_id", "last_seen"),
+                ),
+            )
+            self.assertEqual(
+                db_result,
+                [
+                    {
+                        "user_id": user_id,
+                        "device_id": device_id,
+                        "ip": None,
+                        "user_agent": None,
+                        "last_seen": None,
+                    },
+                ],
+            )
 
         result = self.get_success(
             self.store.get_last_client_ip_by_device(user_id, device_id)
@@ -236,10 +257,38 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
             )
         )
 
+        # Check that the new IP and user agent has not been stored yet
+        db_result = self.get_success(
+            self.store.db_pool.simple_select_list(
+                table="devices",
+                keyvalues={},
+                retcols=("user_id", "ip", "user_agent", "device_id", "last_seen"),
+            ),
+        )
+        self.assertCountEqual(
+            db_result,
+            [
+                {
+                    "user_id": user_id,
+                    "device_id": device_id_1,
+                    "ip": "ip_1",
+                    "user_agent": "user_agent_1",
+                    "last_seen": 12345678000,
+                },
+                {
+                    "user_id": user_id,
+                    "device_id": device_id_2,
+                    "ip": "ip_2",
+                    "user_agent": "user_agent_2",
+                    "last_seen": 12345678000,
+                },
+            ],
+        )
+
+        # Check that data from the database and memory are combined together correctly
         result = self.get_success(
             self.store.get_last_client_ip_by_device(user_id, None)
         )
-
         self.assertEqual(
             result,
             {
@@ -278,6 +327,16 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         if after_persisting:
             # Trigger the storage loop
             self.reactor.advance(10)
+        else:
+            # Check that the new IP and user agent has not been stored yet
+            db_result = self.get_success(
+                self.store.db_pool.simple_select_list(
+                    table="user_ips",
+                    keyvalues={},
+                    retcols=("access_token", "ip", "user_agent", "last_seen"),
+                ),
+            )
+            self.assertEqual(db_result, [])
 
         self.assertEqual(
             self.get_success(self.store.get_user_ip_and_agents(user)),
@@ -322,6 +381,33 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
             )
         )
 
+        # Check that the new IP and user agent has not been stored yet
+        db_result = self.get_success(
+            self.store.db_pool.simple_select_list(
+                table="user_ips",
+                keyvalues={},
+                retcols=("access_token", "ip", "user_agent", "last_seen"),
+            ),
+        )
+        self.assertEqual(
+            db_result,
+            [
+                {
+                    "access_token": "access_token",
+                    "ip": "ip_1",
+                    "user_agent": "user_agent_1",
+                    "last_seen": 12345678000,
+                },
+                {
+                    "access_token": "access_token",
+                    "ip": "ip_2",
+                    "user_agent": "user_agent_2",
+                    "last_seen": 12345678000,
+                },
+            ],
+        )
+
+        # Check that data from the database and memory are combined together correctly
         self.assertCountEqual(
             self.get_success(self.store.get_user_ip_and_agents(user)),
             [
