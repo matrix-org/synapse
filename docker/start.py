@@ -180,16 +180,18 @@ def run_generate_config(environ, ownership):
 
 def main(args, environ):
     mode = args[1] if len(args) > 1 else "run"
-    desired_uid = int(environ.get("UID", "991"))
-    desired_gid = int(environ.get("GID", "991"))
-    synapse_worker = environ.get("SYNAPSE_WORKER", "synapse.app.homeserver")
-    if (desired_uid == os.getuid()) and (desired_gid == os.getgid()):
-        ownership = None
-    else:
-        ownership = "{}:{}".format(desired_uid, desired_gid)
 
-    if ownership is None:
-        log("Will not perform chmod/gosu as UserID already matches request")
+    # if we were given an explicit user to switch to, do so
+    ownership = None
+    if "UID" in environ:
+        desired_uid = int(environ["UID"])
+        desired_gid = int(environ.get("GID", "991"))
+        ownership = f"{desired_uid}:{desired_gid}"
+    elif os.getuid() == 0:
+        # otherwise, if we are running as root, use user 991
+        ownership = "991:991"
+
+    synapse_worker = environ.get("SYNAPSE_WORKER", "synapse.app.homeserver")
 
     # In generate mode, generate a configuration and missing keys, then exit
     if mode == "generate":
