@@ -1,1 +1,0 @@
-Fix a long-standing bug when attempting to preview URLs which are in the `windows-1252` character encoding.
