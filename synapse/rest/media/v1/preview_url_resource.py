@@ -732,11 +732,11 @@ def decode_body(
     from lxml import etree
 
     # Create an HTML parser.
-    parser = etree.HTMLParser(recover=True, encoding="utf-8")
+    parser = etree.HTMLParser(recover=True, encoding=encoding)
 
     # Attempt to parse the body. Returns None if the body was successfully
     # parsed, but no tree was found.
-    return etree.fromstring(body_str, parser)
+    return etree.fromstring(body, parser)
 
 
 def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
