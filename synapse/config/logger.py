@@ -18,6 +18,7 @@ import os
 import sys
 import threading
 from string import Template
+from typing import TYPE_CHECKING
 
 import yaml
 from zope.interface import implementer
@@ -37,6 +38,9 @@ from synapse.logging.filter import MetadataFilter
 from synapse.util.versionstring import get_version_string
 
 from ._base import Config, ConfigError
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 DEFAULT_LOG_CONFIG = Template(
     """\
@@ -306,7 +310,10 @@ def _reload_logging_config(log_config_path):
 
 
 def setup_logging(
-    hs, config, use_worker_options=False, logBeginner: LogBeginner = globalLogBeginner
+    hs: "HomeServer",
+    config,
+    use_worker_options=False,
+    logBeginner: LogBeginner = globalLogBeginner,
 ) -> None:
     """
     Set up the logging subsystem.
