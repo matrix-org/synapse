@@ -1,1 +1,0 @@
-Fix 500 error on `/messages` when the server accumulates more than 5 backwards extremities at a given depth for a room.
