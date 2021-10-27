@@ -31,6 +31,7 @@ from signedjson.sign import (
     signature_ids,
     verify_signed_json,
 )
+from signedjson.types import VerifyKey
 from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
@@ -303,7 +304,9 @@ class Keyring:
                 Codes.UNAUTHORIZED,
             )
 
-    async def process_json(self, verify_key, verify_request):
+    async def process_json(
+        self, verify_key: VerifyKey, verify_request: VerifyJsonRequest
+    ) -> None:
         try:
             verify_signed_json(
                 verify_request.get_json_object(),
