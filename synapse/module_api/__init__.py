@@ -46,6 +46,7 @@ from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client.login import LoginResponse
+from synapse.storage import DataStore
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
@@ -61,6 +62,7 @@ from synapse.util import Clock
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
+    from synapse.app.generic_worker import GenericWorkerSlavedStore
     from synapse.server import HomeServer
 
 """
@@ -111,7 +113,9 @@ class ModuleApi:
     def __init__(self, hs: "HomeServer", auth_handler):
         self._hs = hs
 
-        self._store = hs.get_datastore()
+        # TODO: Fix this type hint once the types for the data stores have been ironed
+        #       out.
+        self._store: Union[DataStore, "GenericWorkerSlavedStore"] = hs.get_datastore()
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
@@ -150,27 +154,42 @@ class ModuleApi:
 
     @property
     def register_spam_checker_callbacks(self):
-        """Registers callbacks for spam checking capabilities."""
+        """Registers callbacks for spam checking capabilities.
+
+        Added in Synapse v1.37.0.
+        """
         return self._spam_checker.register_callbacks
 
     @property
     def register_account_validity_callbacks(self):
-        """Registers callbacks for account validity capabilities."""
+        """Registers callbacks for account validity capabilities.
+
+        Added in Synapse v1.39.0.
+        """
         return self._account_validity_handler.register_account_validity_callbacks
 
     @property
     def register_third_party_rules_callbacks(self):
-        """Registers callbacks for third party event rules capabilities."""
+        """Registers callbacks for third party event rules capabilities.
+
+        Added in Synapse v1.39.0.
+        """
         return self._third_party_event_rules.register_third_party_rules_callbacks
 
     @property
     def register_presence_router_callbacks(self):
-        """Registers callbacks for presence router capabilities."""
+        """Registers callbacks for presence router capabilities.
+
+        Added in Synapse v1.42.0.
+        """
         return self._presence_router.register_presence_router_callbacks
 
     @property
     def register_password_auth_provider_callbacks(self):
-        """Registers callbacks for password auth provider capabilities."""
+        """Registers callbacks for password auth provider capabilities.
+
+        Added in Synapse v1.46.0.
+        """
         return self._password_auth_provider.register_password_auth_provider_callbacks
 
     def register_web_resource(self, path: str, resource: IResource):
@@ -180,6 +199,8 @@ class ModuleApi:
 
         If multiple modules register a resource for the same path, the module that
         appears the highest in the configuration file takes priority.
+
+        Added in Synapse v1.37.0.
 
         Args:
             path: The path to register the resource for.
@@ -195,6 +216,8 @@ class ModuleApi:
         """Allows making outbound HTTP requests to remote resources.
 
         An instance of synapse.http.client.SimpleHttpClient
+
+        Added in Synapse v1.22.0.
         """
         return self._http_client
 
@@ -204,21 +227,31 @@ class ModuleApi:
         public room list.
 
         An instance of synapse.module_api.PublicRoomListManager
+
+        Added in Synapse v1.22.0.
         """
         return self._public_room_list_manager
 
     @property
     def public_baseurl(self) -> str:
-        """The configured public base URL for this homeserver."""
+        """The configured public base URL for this homeserver.
+
+        Added in Synapse v1.39.0.
+        """
         return self._hs.config.server.public_baseurl
 
     @property
     def email_app_name(self) -> str:
-        """The application name configured in the homeserver's configuration."""
+        """The application name configured in the homeserver's configuration.
+
+        Added in Synapse v1.39.0.
+        """
         return self._hs.config.email.email_app_name
 
     async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:
         """Get user info by user_id
+
+        Added in Synapse v1.41.0.
 
         Args:
             user_id: Fully qualified user id.
@@ -234,6 +267,8 @@ class ModuleApi:
         allow_expired: bool = False,
     ) -> Requester:
         """Check the access_token provided for a request
+
+        Added in Synapse v1.39.0.
 
         Args:
             req: Incoming HTTP request
@@ -260,6 +295,8 @@ class ModuleApi:
     async def is_user_admin(self, user_id: str) -> bool:
         """Checks if a user is a server admin.
 
+        Added in Synapse v1.39.0.
+
         Args:
             user_id: The Matrix ID of the user to check.
 
@@ -274,6 +311,8 @@ class ModuleApi:
         Takes a user id provided by the user and adds the @ and :domain to
         qualify it, if necessary
 
+        Added in Synapse v0.25.0.
+
         Args:
             username (str): provided user id
 
@@ -287,6 +326,8 @@ class ModuleApi:
     async def get_profile_for_user(self, localpart: str) -> ProfileInfo:
         """Look up the profile info for the user with the given localpart.
 
+        Added in Synapse v1.39.0.
+
         Args:
             localpart: The localpart to look up profile information for.
 
@@ -298,6 +339,8 @@ class ModuleApi:
     async def get_threepids_for_user(self, user_id: str) -> List[Dict[str, str]]:
         """Look up the threepids (email addresses and phone numbers) associated with the
         given Matrix user ID.
+
+        Added in Synapse v1.39.0.
 
         Args:
             user_id: The Matrix user ID to look up threepids for.
@@ -312,6 +355,8 @@ class ModuleApi:
 
     def check_user_exists(self, user_id):
         """Check if user exists.
+
+        Added in Synapse v0.25.0.
 
         Args:
             user_id (str): Complete @user:id
@@ -332,6 +377,8 @@ class ModuleApi:
         return that device to the user. Prefer separate calls to register_user and
         register_device.
 
+        Added in Synapse v0.25.0.
+
         Args:
             localpart (str): The localpart of the new user.
             displayname (str|None): The displayname of the new user.
@@ -351,6 +398,8 @@ class ModuleApi:
         self, localpart, displayname=None, emails: Optional[List[str]] = None
     ):
         """Registers a new user with given localpart and optional displayname, emails.
+
+        Added in Synapse v1.2.0.
 
         Args:
             localpart (str): The localpart of the new user.
@@ -375,6 +424,8 @@ class ModuleApi:
     def register_device(self, user_id, device_id=None, initial_display_name=None):
         """Register a device for a user and generate an access token.
 
+        Added in Synapse v1.2.0.
+
         Args:
             user_id (str): full canonical @user:id
             device_id (str|None): The device ID to check, or None to generate
@@ -398,6 +449,8 @@ class ModuleApi:
     ) -> defer.Deferred:
         """Record a mapping from an external user id to a mxid
 
+        Added in Synapse v1.9.0.
+
         Args:
             auth_provider: identifier for the remote auth provider
             external_id: id on that system
@@ -417,6 +470,8 @@ class ModuleApi:
     ) -> str:
         """Generate a login token suitable for m.login.token authentication
 
+        Added in Synapse v1.9.0.
+
         Args:
             user_id: gives the ID of the user that the token is for
 
@@ -435,6 +490,8 @@ class ModuleApi:
     @defer.inlineCallbacks
     def invalidate_access_token(self, access_token):
         """Invalidate an access token for a user
+
+        Added in Synapse v0.25.0.
 
         Args:
             access_token(str): access token
@@ -466,6 +523,8 @@ class ModuleApi:
     def run_db_interaction(self, desc, func, *args, **kwargs):
         """Run a function with a database connection
 
+        Added in Synapse v0.25.0.
+
         Args:
             desc (str): description for the transaction, for metrics etc
             func (func): function to be run. Passed a database cursor object
@@ -488,6 +547,8 @@ class ModuleApi:
         URL with a token directly if the URL matches with one of the whitelisted clients.
 
         This is deprecated in favor of complete_sso_login_async.
+
+        Added in Synapse v1.11.1.
 
         Args:
             registered_user_id: The MXID that has been registered as a previous step of
@@ -514,6 +575,8 @@ class ModuleApi:
         """Complete a SSO login by redirecting the user to a page to confirm whether they
         want their access token sent to `client_redirect_url`, or redirect them to that
         URL with a token directly if the URL matches with one of the whitelisted clients.
+
+        Added in Synapse v1.13.0.
 
         Args:
             registered_user_id: The MXID that has been registered as a previous step of
@@ -543,6 +606,8 @@ class ModuleApi:
         (This is exposed for compatibility with the old SpamCheckerApi. We should
         probably deprecate it and replace it with an async method in a subclass.)
 
+        Added in Synapse v1.22.0.
+
         Args:
             room_id: The room ID to get state events in.
             types: The event type and state key (using None
@@ -562,6 +627,8 @@ class ModuleApi:
 
     async def create_and_send_event_into_room(self, event_dict: JsonDict) -> EventBase:
         """Create and send an event into a room. Membership events are currently not supported.
+
+        Added in Synapse v1.22.0.
 
         Args:
             event_dict: A dictionary representing the event to send.
@@ -603,6 +670,8 @@ class ModuleApi:
 
         Note that this method can only be run on the process that is configured to write to the
         presence stream. By default this is the main process.
+
+        Added in Synapse v1.32.0.
         """
         if self._hs._instance_name not in self._hs.config.worker.writers.presence:
             raise Exception(
@@ -657,6 +726,8 @@ class ModuleApi:
 
         Waits `msec` initially before calling `f` for the first time.
 
+        Added in Synapse v1.39.0.
+
         Args:
             f: The function to call repeatedly. f can be either synchronous or
                 asynchronous, and must follow Synapse's logcontext rules.
@@ -696,6 +767,8 @@ class ModuleApi:
     ):
         """Send an email on behalf of the homeserver.
 
+        Added in Synapse v1.39.0.
+
         Args:
             recipient: The email address for the recipient.
             subject: The email's subject.
@@ -719,6 +792,8 @@ class ModuleApi:
         By default, Synapse will look for these templates in its configured template
         directory, but another directory to search in can be provided.
 
+        Added in Synapse v1.39.0.
+
         Args:
             filenames: The name of the template files to look for.
             custom_template_directory: An additional directory to look for the files in.
@@ -736,13 +811,13 @@ class ModuleApi:
         """
         Checks whether an ID (user id, room, ...) comes from this homeserver.
 
+        Added in Synapse v1.44.0.
+
         Args:
             id: any Matrix id (e.g. user id, room id, ...), either as a raw id,
                 e.g. string "@user:example.com" or as a parsed UserID, RoomID, ...
         Returns:
             True if id comes from this homeserver, False otherwise.
-
-        Added in Synapse v1.44.0.
         """
         if isinstance(id, DomainSpecificString):
             return self._hs.is_mine(id)
@@ -755,6 +830,8 @@ class ModuleApi:
         """
         Return the list of user IPs and agents for a user.
 
+        Added in Synapse v1.44.0.
+
         Args:
             user_id: the id of a user, local or remote
             since_ts: a timestamp in seconds since the epoch,
@@ -763,8 +840,6 @@ class ModuleApi:
             The list of all UserIpAndAgent that the user has
             used to connect to this homeserver since `since_ts`.
             If the user is remote, this list is empty.
-
-        Added in Synapse v1.44.0.
         """
         # Don't hit the db if this is not a local user.
         is_mine = False
@@ -803,6 +878,8 @@ class PublicRoomListManager:
     async def room_is_in_public_room_list(self, room_id: str) -> bool:
         """Checks whether a room is in the public room list.
 
+        Added in Synapse v1.22.0.
+
         Args:
             room_id: The ID of the room.
 
@@ -819,6 +896,8 @@ class PublicRoomListManager:
     async def add_room_to_public_room_list(self, room_id: str) -> None:
         """Publishes a room to the public room list.
 
+        Added in Synapse v1.22.0.
+
         Args:
             room_id: The ID of the room.
         """
@@ -826,6 +905,8 @@ class PublicRoomListManager:
 
     async def remove_room_from_public_room_list(self, room_id: str) -> None:
         """Removes a room from the public room list.
+
+        Added in Synapse v1.22.0.
 
         Args:
             room_id: The ID of the room.

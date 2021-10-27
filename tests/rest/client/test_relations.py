@@ -101,10 +101,10 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
     def test_basic_paginate_relations(self):
         """Tests that calling pagination API correctly the latest relations."""
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction")
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
         self.assertEquals(200, channel.code, channel.json_body)
 
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction")
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "b")
         self.assertEquals(200, channel.code, channel.json_body)
         annotation_id = channel.json_body["event_id"]
 
@@ -141,8 +141,10 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         """
 
         expected_event_ids = []
-        for _ in range(10):
-            channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction")
+        for idx in range(10):
+            channel = self._send_relation(
+                RelationTypes.ANNOTATION, "m.reaction", chr(ord("a") + idx)
+            )
             self.assertEquals(200, channel.code, channel.json_body)
             expected_event_ids.append(channel.json_body["event_id"])
 
@@ -386,8 +388,9 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEquals(400, channel.code, channel.json_body)
 
+    @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
     def test_aggregation_get_event(self):
-        """Test that annotations and references get correctly bundled when
+        """Test that annotations, references, and threads get correctly bundled when
         getting the parent event.
         """
 
@@ -410,6 +413,13 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.json_body)
         reply_2 = channel.json_body["event_id"]
 
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        self.assertEquals(200, channel.code, channel.json_body)
+        thread_2 = channel.json_body["event_id"]
+
         channel = self.make_request(
             "GET",
             "/rooms/%s/event/%s" % (self.room, self.parent_id),
@@ -428,6 +438,25 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                 },
                 RelationTypes.REFERENCE: {
                     "chunk": [{"event_id": reply_1}, {"event_id": reply_2}]
+                },
+                RelationTypes.THREAD: {
+                    "count": 2,
+                    "latest_event": {
+                        "age": 100,
+                        "content": {
+                            "m.relates_to": {
+                                "event_id": self.parent_id,
+                                "rel_type": RelationTypes.THREAD,
+                            }
+                        },
+                        "event_id": thread_2,
+                        "origin_server_ts": 1600,
+                        "room_id": self.room,
+                        "sender": self.user_id,
+                        "type": "m.room.test",
+                        "unsigned": {"age": 100},
+                        "user_id": self.user_id,
+                    },
                 },
             },
         )
@@ -559,7 +588,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             {
                 "m.relates_to": {
                     "event_id": self.parent_id,
-                    "key": None,
                     "rel_type": "m.reference",
                 }
             },

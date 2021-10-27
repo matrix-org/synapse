@@ -128,9 +128,10 @@ class RelationSendServlet(RestServlet):
 
         content["m.relates_to"] = {
             "event_id": parent_id,
-            "key": aggregation_key,
             "rel_type": relation_type,
         }
+        if aggregation_key is not None:
+            content["m.relates_to"]["key"] = aggregation_key
 
         event_dict = {
             "type": event_type,

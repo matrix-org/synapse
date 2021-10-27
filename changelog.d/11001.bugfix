@@ -1,1 +1,0 @@
- Fix a long-standing bug which meant that events received over federation were sometimes incorrectly accepted into the room state.
