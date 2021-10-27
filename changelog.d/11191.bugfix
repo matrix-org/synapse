@@ -1,0 +1,1 @@
+Fixed a config parse bug causing an error when running the review_recent_signups script. Contributed by @samuel-p.
