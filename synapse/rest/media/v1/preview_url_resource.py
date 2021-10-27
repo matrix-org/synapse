@@ -718,9 +718,12 @@ def decode_body(
     if not body:
         return None
 
+    # The idea here is that multiple encodings are tried until one works.
+    # Unfortunately the result is never used and then LXML will decode the string
+    # again with the found encoding.
     for encoding in get_html_media_encodings(body, content_type):
         try:
-            body_str = body.decode(encoding)
+            body.decode(encoding)
         except Exception:
             pass
         else:
