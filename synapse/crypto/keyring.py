@@ -268,7 +268,7 @@ class Keyring:
 
         # If we are the originating server don't fetch verify key for self over federation
         if verify_request.server_name == self.hostname:
-            return await self.process_request_locally(verify_request)
+            return await self.process_json(self.verify_key, verify_request)
 
         # Add the keys we need to verify to the queue for retrieval. We queue
         # up requests for the same server so we don't end up with many in flight
@@ -293,35 +293,8 @@ class Keyring:
             if key_result.valid_until_ts < verify_request.minimum_valid_until_ts:
                 continue
 
-            verify_key = key_result.verify_key
-            json_object = verify_request.get_json_object()
-            try:
-                verify_signed_json(
-                    json_object,
-                    verify_request.server_name,
-                    verify_key,
-                )
-                verified = True
-            except SignatureVerifyException as e:
-                logger.debug(
-                    "Error verifying signature for %s:%s:%s with key %s: %s",
-                    verify_request.server_name,
-                    verify_key.alg,
-                    verify_key.version,
-                    encode_verify_key_base64(verify_key),
-                    str(e),
-                )
-                raise SynapseError(
-                    401,
-                    "Invalid signature for server %s with key %s:%s: %s"
-                    % (
-                        verify_request.server_name,
-                        verify_key.alg,
-                        verify_key.version,
-                        str(e),
-                    ),
-                    Codes.UNAUTHORIZED,
-                )
+            await self.process_json(key_result.verify_key, verify_request)
+            verified = True
 
         if not verified:
             raise SynapseError(
@@ -330,12 +303,10 @@ class Keyring:
                 Codes.UNAUTHORIZED,
             )
 
-    async def process_request_locally(self, verify_request: VerifyJsonRequest) -> None:
-        verify_key = self.verify_key
-        json_object = verify_request.get_json_object()
+    async def process_json(self, verify_key, verify_request):
         try:
             verify_signed_json(
-                json_object,
+                verify_request.get_json_object(),
                 verify_request.server_name,
                 verify_key,
             )
