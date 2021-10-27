@@ -1,1 +1,1 @@
-Fix a bug introduced in 1.46.0rc1 that prevented Synapse from shutting down cleanly.
+Fix a performance regression introduced in 1.44.0 which could cause client requests to time out when making large numbers of outbound requests.
