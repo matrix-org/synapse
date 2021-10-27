@@ -20,7 +20,12 @@ from typing import List
 
 import attr
 
-from synapse.config._base import Config, RootConfig, find_config_files, read_config_files
+from synapse.config._base import (
+    Config,
+    RootConfig,
+    find_config_files,
+    read_config_files,
+)
 from synapse.config.database import DatabaseConfig
 from synapse.storage.database import DatabasePool, LoggingTransaction, make_conn
 from synapse.storage.engines import create_engine
