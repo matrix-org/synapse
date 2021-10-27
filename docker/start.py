@@ -120,6 +120,7 @@ def generate_config_from_template(config_dir, config_path, environ, ownership):
     ]
 
     if ownership is not None:
+        log(f"Setting ownership on /data to {ownership}")
         subprocess.check_output(["chown", "-R", ownership, "/data"])
         args = ["gosu", ownership] + args
 
@@ -144,12 +145,18 @@ def run_generate_config(environ, ownership):
     config_path = environ.get("SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml")
     data_dir = environ.get("SYNAPSE_DATA_DIR", "/data")
 
+    if ownership is not None:
+        # make sure that synapse has perms to write to the data dir.
+        log(f"Setting ownership on {data_dir} to {ownership}")
+        subprocess.check_output(["chown", ownership, data_dir])
+
     # create a suitable log config from our template
     log_config_file = "%s/%s.log.config" % (config_dir, server_name)
     if not os.path.exists(log_config_file):
         log("Creating log config %s" % (log_config_file,))
         convert("/conf/log.config", log_config_file, environ)
 
+    # generate the main config file, and a signing key.
     args = [
         "python",
         "-m",
@@ -168,15 +175,7 @@ def run_generate_config(environ, ownership):
         "--open-private-ports",
     ]
     # log("running %s" % (args, ))
-
-    if ownership is not None:
-        # make sure that synapse has perms to write to the data dir.
-        subprocess.check_output(["chown", ownership, data_dir])
-
-        args = ["gosu", ownership] + args
-        os.execv("/usr/sbin/gosu", args)
-    else:
-        os.execv("/usr/local/bin/python", args)
+    os.execv("/usr/local/bin/python", args)
 
 
 def main(args, environ):
