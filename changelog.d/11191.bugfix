@@ -1,1 +1,1 @@
-Fixed a config parse bug causing an error when running the review_recent_signups script. Contributed by @samuel-p.
+Fix a bug introduced in Synapse 1.45.0 which prevented the `synapse_review_recent_signups` script from running. Contributed by @samuel-p.
