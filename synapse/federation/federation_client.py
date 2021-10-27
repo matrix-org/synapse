@@ -253,11 +253,11 @@ class FederationClient(FederationBase):
         logger.debug("backfill transaction_data=%r", transaction_data)
 
         if not isinstance(transaction_data, dict):
-            raise ValueError("Backfill transaction_data is not a dict.")
+            raise TypeError("Backfill transaction_data is not a dict.")
 
         transaction_data_pdus = transaction_data.get("pdus")
         if not isinstance(transaction_data_pdus, list):
-            raise ValueError("transaction_data.pdus is not a list.")
+            raise TypeError("transaction_data.pdus is not a list.")
 
         room_version = await self.store.get_room_version(room_id)
 
