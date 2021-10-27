@@ -1,1 +1,0 @@
-Fix local users who left all their rooms being removed from the user directory, even if the "search_all_users" config option was enabled.
