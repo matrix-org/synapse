@@ -1108,7 +1108,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 """
                 SELECT event_id, json FROM event_json
                 LEFT JOIN event_relations USING (event_id)
-                WHERE event_id > ? AND relates_to_id IS NULL
+                WHERE event_id > ? AND event_relations.event_id IS NULL
                 ORDER BY event_id LIMIT ?
                 """,
                 (last_event_id, batch_size),
