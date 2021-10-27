@@ -309,19 +309,23 @@ class Filter:
     def check(self, event: FilterEvent) -> bool:
         """Checks whether the filter matches the given event.
 
+        Args:
+            event: The event, account data, or presence to check against this
+                filter.
+
         Returns:
-            True if the event matches
+            True if the event matches the filter.
         """
         # We usually get the full "events" as dictionaries coming through,
         # except for presence which actually gets passed around as its own
         # namedtuple type.
         if isinstance(event, UserPresenceState):
             user_id = event.user_id
-            literal_keys = {
+            field_matchers = {
                 "senders": lambda v: user_id == v,
                 "types": lambda v: "m.presence" == v,
             }
-            return self._check_fields(literal_keys)
+            return self._check_fields(field_matchers)
         else:
             sender = event.get("sender", None)
             content = event.get("content") or {}
@@ -340,14 +344,14 @@ class Filter:
             # check if there is a string url field in the content for filtering purposes
             labels = content.get(EventContentFields.LABELS, [])
 
-            literal_keys = {
+            field_matchers = {
                 "rooms": lambda v: room_id == v,
                 "senders": lambda v: sender == v,
                 "types": lambda v: _matches_wildcard(ev_type, v),
                 "labels": lambda v: v in labels,
             }
 
-            result = self._check_fields(literal_keys)
+            result = self._check_fields(field_matchers)
             if not result:
                 return result
 
@@ -359,24 +363,38 @@ class Filter:
 
             return True
 
-    def _check_fields(self, literal_keys: Dict[str, Callable[[str], bool]]) -> bool:
+    def _check_fields(self, field_matchers: Dict[str, Callable[[str], bool]]) -> bool:
         """Checks whether the filter matches the given event fields.
+
+        Args:
+            field_matchers: A map of attribute name to callable to use for checking
+                particular fields.
+
+                The attribute name and an inverse (not_<attribute name>) must
+                exist on the Filter.
+
+                The callable should return true if the event's value matches the
+                filter's value.
 
         Returns:
             True if the event fields match
         """
 
-        for name, match_func in literal_keys.items():
+        for name, match_func in field_matchers.items():
+            # If the event matches one of the disallowed values, reject it.
             not_name = "not_%s" % (name,)
             disallowed_values = getattr(self, not_name)
             if any(map(match_func, disallowed_values)):
                 return False
 
+            # Other the event does not match at least one of the allowed values,
+            # reject it.
             allowed_values = getattr(self, name)
             if allowed_values is not None:
                 if not any(map(match_func, allowed_values)):
                     return False
 
+        # Otherwise, accept it.
         return True
 
     def filter_rooms(self, room_ids: Iterable[str]) -> Set[str]:
