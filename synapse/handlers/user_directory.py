@@ -373,31 +373,29 @@ class UserDirectoryHandler(StateDeltasHandler):
         is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
         )
-        other_users_in_room = await self.store.get_users_in_room(room_id)
-
         if is_public:
             await self.store.add_users_in_public_rooms(room_id, (user_id,))
         else:
+            users_in_room = await self.store.get_users_in_room(room_id)
+            other_users_in_room = [
+                other
+                for other in users_in_room
+                if other != user_id
+                and (
+                    not self.is_mine_id(other)
+                    or await self.store.should_include_local_user_in_dir(other)
+                )
+            ]
             to_insert = set()
 
             # First, if they're our user then we need to update for every user
             if self.is_mine_id(user_id):
-                if await self.store.should_include_local_user_in_dir(user_id):
-                    for other_user_id in other_users_in_room:
-                        if user_id == other_user_id:
-                            continue
-
-                        to_insert.add((user_id, other_user_id))
+                for other_user_id in other_users_in_room:
+                    to_insert.add((user_id, other_user_id))
 
             # Next we need to update for every local user in the room
             for other_user_id in other_users_in_room:
-                if user_id == other_user_id:
-                    continue
-
-                include_other_user = self.is_mine_id(
-                    other_user_id
-                ) and await self.store.should_include_local_user_in_dir(other_user_id)
-                if include_other_user:
+                if self.is_mine_id(other_user_id):
                     to_insert.add((other_user_id, user_id))
 
             if to_insert:
@@ -415,16 +413,19 @@ class UserDirectoryHandler(StateDeltasHandler):
             room_id: The room ID that user left or stopped being public that
             user_id
         """
-        logger.debug("Removing user %r", user_id)
+        logger.debug("Removing user %r from room %r", user_id, room_id)
 
         # Remove user from sharing tables
         await self.store.remove_user_who_share_room(user_id, room_id)
 
-        # Are they still in any rooms? If not, remove them entirely.
-        rooms_user_is_in = await self.store.get_user_dir_rooms_user_is_in(user_id)
+        # Additionally, if they're a remote user and we're no longer joined
+        # to any rooms they're in, remove them from the user directory.
+        if not self.is_mine_id(user_id):
+            rooms_user_is_in = await self.store.get_user_dir_rooms_user_is_in(user_id)
 
-        if len(rooms_user_is_in) == 0:
-            await self.store.remove_from_user_dir(user_id)
+            if len(rooms_user_is_in) == 0:
+                logger.debug("Removing user %r from directory", user_id)
+                await self.store.remove_from_user_dir(user_id)
 
     async def _handle_possible_remote_profile_change(
         self,

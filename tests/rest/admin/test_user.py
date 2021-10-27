@@ -1180,9 +1180,8 @@ class UserRestTestCase(unittest.HomeserverTestCase):
                 self.other_user, device_id=None, valid_until_ms=None
             )
         )
-        self.url_other_user = "/_synapse/admin/v2/users/%s" % urllib.parse.quote(
-            self.other_user
-        )
+        self.url_prefix = "/_synapse/admin/v2/users/%s"
+        self.url_other_user = self.url_prefix % self.other_user
 
     def test_requester_is_no_admin(self):
         """
@@ -1738,6 +1737,93 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(0, len(channel.json_body["threepids"]))
         self._check_fields(channel.json_body)
 
+    def test_set_duplicate_threepid(self):
+        """
+        Test setting the same threepid for a second user.
+        First user loses and second user gets mapping of this threepid.
+        """
+
+        # create a user to set a threepid
+        first_user = self.register_user("first_user", "pass")
+        url_first_user = self.url_prefix % first_user
+
+        # Add threepid to first user
+        channel = self.make_request(
+            "PUT",
+            url_first_user,
+            access_token=self.admin_user_tok,
+            content={
+                "threepids": [
+                    {"medium": "email", "address": "bob1@bob.bob"},
+                ],
+            },
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(first_user, channel.json_body["name"])
+        self.assertEqual(1, len(channel.json_body["threepids"]))
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("bob1@bob.bob", channel.json_body["threepids"][0]["address"])
+        self._check_fields(channel.json_body)
+
+        # Add threepids to other user
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content={
+                "threepids": [
+                    {"medium": "email", "address": "bob2@bob.bob"},
+                ],
+            },
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(1, len(channel.json_body["threepids"]))
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("bob2@bob.bob", channel.json_body["threepids"][0]["address"])
+        self._check_fields(channel.json_body)
+
+        # Add two new threepids to other user
+        # one is used by first_user
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content={
+                "threepids": [
+                    {"medium": "email", "address": "bob1@bob.bob"},
+                    {"medium": "email", "address": "bob3@bob.bob"},
+                ],
+            },
+        )
+
+        # other user has this two threepids
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(2, len(channel.json_body["threepids"]))
+        # result does not always have the same sort order, therefore it becomes sorted
+        sorted_result = sorted(
+            channel.json_body["threepids"], key=lambda k: k["address"]
+        )
+        self.assertEqual("email", sorted_result[0]["medium"])
+        self.assertEqual("bob1@bob.bob", sorted_result[0]["address"])
+        self.assertEqual("email", sorted_result[1]["medium"])
+        self.assertEqual("bob3@bob.bob", sorted_result[1]["address"])
+        self._check_fields(channel.json_body)
+
+        # first_user has no threepid anymore
+        channel = self.make_request(
+            "GET",
+            url_first_user,
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(first_user, channel.json_body["name"])
+        self.assertEqual(0, len(channel.json_body["threepids"]))
+        self._check_fields(channel.json_body)
+
     def test_set_external_id(self):
         """
         Test setting external id for an other user.
@@ -1835,6 +1921,129 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(0, len(channel.json_body["external_ids"]))
+
+    def test_set_duplicate_external_id(self):
+        """
+        Test that setting the same external id for a second user fails and
+        external id from user must not be changed.
+        """
+
+        # create a user to use an external id
+        first_user = self.register_user("first_user", "pass")
+        url_first_user = self.url_prefix % first_user
+
+        # Add an external id to first user
+        channel = self.make_request(
+            "PUT",
+            url_first_user,
+            access_token=self.admin_user_tok,
+            content={
+                "external_ids": [
+                    {
+                        "external_id": "external_id1",
+                        "auth_provider": "auth_provider",
+                    },
+                ],
+            },
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(first_user, channel.json_body["name"])
+        self.assertEqual(1, len(channel.json_body["external_ids"]))
+        self.assertEqual(
+            "external_id1", channel.json_body["external_ids"][0]["external_id"]
+        )
+        self.assertEqual(
+            "auth_provider", channel.json_body["external_ids"][0]["auth_provider"]
+        )
+        self._check_fields(channel.json_body)
+
+        # Add an external id to other user
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content={
+                "external_ids": [
+                    {
+                        "external_id": "external_id2",
+                        "auth_provider": "auth_provider",
+                    },
+                ],
+            },
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(1, len(channel.json_body["external_ids"]))
+        self.assertEqual(
+            "external_id2", channel.json_body["external_ids"][0]["external_id"]
+        )
+        self.assertEqual(
+            "auth_provider", channel.json_body["external_ids"][0]["auth_provider"]
+        )
+        self._check_fields(channel.json_body)
+
+        # Add two new external_ids to other user
+        # one is used by first
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content={
+                "external_ids": [
+                    {
+                        "external_id": "external_id1",
+                        "auth_provider": "auth_provider",
+                    },
+                    {
+                        "external_id": "external_id3",
+                        "auth_provider": "auth_provider",
+                    },
+                ],
+            },
+        )
+
+        # must fail
+        self.assertEqual(409, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+        self.assertEqual("External id is already in use.", channel.json_body["error"])
+
+        # other user must not changed
+        channel = self.make_request(
+            "GET",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(1, len(channel.json_body["external_ids"]))
+        self.assertEqual(
+            "external_id2", channel.json_body["external_ids"][0]["external_id"]
+        )
+        self.assertEqual(
+            "auth_provider", channel.json_body["external_ids"][0]["auth_provider"]
+        )
+        self._check_fields(channel.json_body)
+
+        # first user must not changed
+        channel = self.make_request(
+            "GET",
+            url_first_user,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(first_user, channel.json_body["name"])
+        self.assertEqual(1, len(channel.json_body["external_ids"]))
+        self.assertEqual(
+            "external_id1", channel.json_body["external_ids"][0]["external_id"]
+        )
+        self.assertEqual(
+            "auth_provider", channel.json_body["external_ids"][0]["auth_provider"]
+        )
+        self._check_fields(channel.json_body)
 
     def test_deactivate_user(self):
         """
@@ -2060,6 +2269,57 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["admin"])
+
+    def test_set_user_type(self):
+        """
+        Test changing user type.
+        """
+
+        # Set to support type
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content={"user_type": UserTypes.SUPPORT},
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(UserTypes.SUPPORT, channel.json_body["user_type"])
+
+        # Get user
+        channel = self.make_request(
+            "GET",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(UserTypes.SUPPORT, channel.json_body["user_type"])
+
+        # Change back to a regular user
+        channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content={"user_type": None},
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertIsNone(channel.json_body["user_type"])
+
+        # Get user
+        channel = self.make_request(
+            "GET",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertIsNone(channel.json_body["user_type"])
 
     def test_accidental_deactivation_prevention(self):
         """
