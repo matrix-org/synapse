@@ -1,0 +1,1 @@
+Delete not needed messages for hidden devices from `device_inbox` which bloated database.
