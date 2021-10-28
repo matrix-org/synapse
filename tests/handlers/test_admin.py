@@ -19,7 +19,7 @@ import synapse.rest.admin
 import synapse.storage
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.room_versions import RoomVersions
-from synapse.rest.client import login, room, knock
+from synapse.rest.client import knock, login, room
 
 from tests import unittest
 
