@@ -373,9 +373,6 @@ class EventBase(metaclass=abc.ABCMeta):
 
         return template_json
 
-    def __setattr__(self, key: str, value: Any) -> None:
-        raise AttributeError("Unrecognized attribute %s" % (key,))
-
     def __getitem__(self, field: str) -> Optional[Any]:
         return self._dict[field]
 
