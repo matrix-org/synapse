@@ -286,18 +286,6 @@ BASE_APPEND_OVERRIDE_RULES = [
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": True}],
     },
-    {
-        "rule_id": "global/override/.m.rule.reaction",
-        "conditions": [
-            {
-                "kind": "event_match",
-                "key": "type",
-                "pattern": "m.reaction",
-                "_id": "_reaction",
-            }
-        ],
-        "actions": ["dont_notify"],
-    },
 ]
 
 
@@ -532,6 +520,19 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 "pattern": "*",
                 "_id": "_is_state_event",
             },
+        ],
+        "actions": ["notify", {"set_tweak": "highlight", "value": False}],
+    },
+    # Enable notifications for reactions
+    {
+        "rule_id": "global/override/com.beeper.reaction",
+        "conditions": [
+            {
+                "kind": "event_match",
+                "key": "type",
+                "pattern": "m.reaction",
+                "_id": "_reaction",
+            }
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": False}],
     },
