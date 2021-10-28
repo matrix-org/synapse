@@ -31,8 +31,8 @@ from typing import (
     Union,
     overload,
 )
-from typing_extensions import Literal
 
+from typing_extensions import Literal
 from unpaddedbase64 import encode_base64
 
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
