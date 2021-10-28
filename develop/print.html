@@ -6366,6 +6366,40 @@ to install Dex.</p>
         localpart_template: &quot;{{ user.preferred_username }}&quot;
         display_name_template: &quot;{{ user.name }}&quot;
 </code></pre>
+<h3 id="authentik"><a class="header" href="#authentik">Authentik</a></h3>
+<p><a href="https://goauthentik.io/">Authentik</a> is an open-source IdP solution.</p>
+<ol>
+<li>Create a provider in Authentik, with type OAuth2/OpenID.</li>
+<li>The parameters are:</li>
+</ol>
+<ul>
+<li>Client Type: Confidential</li>
+<li>JWT Algorithm: RS256</li>
+<li>Scopes: OpenID, Email and Profile</li>
+<li>RSA Key: Select any available key</li>
+<li>Redirect URIs: <code>[synapse public baseurl]/_synapse/client/oidc/callback</code></li>
+</ul>
+<ol start="3">
+<li>Create an application for synapse in Authentik and link it to the provider.</li>
+<li>Note the slug of your application, Client ID and Client Secret.</li>
+</ol>
+<p>Synapse config:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: authentik
+    idp_name: authentik
+    discover: true
+    issuer: &quot;https://your.authentik.example.org/application/o/your-app-slug/&quot; # TO BE FILLED: domain and slug
+    client_id: &quot;your client id&quot; # TO BE FILLED
+    client_secret: &quot;your client secret&quot; # TO BE FILLED
+    scopes:
+      - &quot;openid&quot;
+      - &quot;profile&quot;
+      - &quot;email&quot;
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.preferred_username }}}&quot;
+        display_name_template: &quot;{{ user.preferred_username|capitalize }}&quot; # TO BE FILLED: If your users have names in Authentik and you want those in Synapse, this should be replaced with user.name|capitalize.
+</code></pre>
 <h3 id="github"><a class="header" href="#github">GitHub</a></h3>
 <p><a href="https://developer.github.com/apps/building-oauth-apps/authorizing-oauth-apps">GitHub</a> is a bit special as it is not an OpenID Connect compliant provider, but
 just a regular OAuth2 provider.</p>
