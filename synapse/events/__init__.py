@@ -23,7 +23,6 @@ from typing import (
     Generic,
     Iterable,
     List,
-    Literal,
     Optional,
     Sequence,
     Tuple,
@@ -32,6 +31,7 @@ from typing import (
     Union,
     overload,
 )
+from typing_extensions import Literal
 
 from unpaddedbase64 import encode_base64
 
