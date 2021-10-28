@@ -692,8 +692,8 @@ class ModuleApi:
                     # federation but the remote server responded with a non-standard
                     # status code.
                     logger.error(
-                        "Got non-404 error status when fetching profile for %s"
-                        % target_user_id.to_string(),
+                        "Got non-404 error status when fetching profile for %s",
+                        target_user_id.to_string(),
                     )
 
             # Set the profile where it needs to be set.
