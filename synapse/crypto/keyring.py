@@ -269,7 +269,8 @@ class Keyring:
 
         # If we are the originating server don't fetch verify key for self over federation
         if verify_request.server_name == self.hostname:
-            return await self.process_json(self.verify_key, verify_request)
+            await self._process_json(self.verify_key, verify_request)
+            return
 
         # Add the keys we need to verify to the queue for retrieval. We queue
         # up requests for the same server so we don't end up with many in flight
@@ -294,7 +295,7 @@ class Keyring:
             if key_result.valid_until_ts < verify_request.minimum_valid_until_ts:
                 continue
 
-            await self.process_json(key_result.verify_key, verify_request)
+            await self._process_json(key_result.verify_key, verify_request)
             verified = True
 
         if not verified:
@@ -304,9 +305,12 @@ class Keyring:
                 Codes.UNAUTHORIZED,
             )
 
-    async def process_json(
+    async def _process_json(
         self, verify_key: VerifyKey, verify_request: VerifyJsonRequest
     ) -> None:
+        """Processes the `VerifyJsonRequest`. Raises if the signature can't be
+        verified.
+        """
         try:
             verify_signed_json(
                 verify_request.get_json_object(),

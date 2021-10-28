@@ -198,6 +198,9 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         self.get_success(d)
 
     def test_verify_for_server_locally(self):
+        """Ensure that locally signed JSON can be verified without fetching keys
+        over federation
+        """
         kr = keyring.Keyring(self.hs)
         json1 = {}
         signedjson.sign.sign_json(json1, self.hs.hostname, self.hs.signing_key)
