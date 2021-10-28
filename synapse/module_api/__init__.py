@@ -681,14 +681,20 @@ class ModuleApi:
                     target_user_id.to_string(),
                 )
             except SynapseError as e:
-                if e.code == 404:
-                    # If the profile couldn't be found, use default values.
-                    profile = {
-                        "displayname": target_user_id.localpart,
-                        "avatar_url": None,
-                    }
-                else:
-                    raise
+                # If the profile couldn't be found, use default values.
+                profile = {
+                    "displayname": target_user_id.localpart,
+                    "avatar_url": None,
+                }
+
+                if e.code != 404:
+                    # If the error isn't 404, it means we tried to fetch the profile over
+                    # federation but the remote server responded with a non-standard
+                    # status code.
+                    logger.error(
+                        "Got non-404 error status when fetching profile for %s"
+                        % target_user_id.to_string(),
+                    )
 
             # Set the profile where it needs to be set.
             if "avatar_url" not in content:
