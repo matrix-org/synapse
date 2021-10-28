@@ -417,6 +417,28 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         self.assertEqual(channel.code, 200, channel.result)
 
+        # Make Peter invite Lesley to the room.
+        self.get_success(
+            defer.ensureDeferred(
+                self.module_api.update_room_membership(peter, lesley, room_id, "invite")
+            )
+        )
+
+        res = self.helper.get_state(
+            room_id=room_id,
+            event_type="m.room.member",
+            state_key=lesley,
+            tok=tok,
+        )
+
+        # Check the membership is correct.
+        self.assertEqual(res["membership"], "invite")
+
+        # Also check that the profile was correctly filled out, and that it's not
+        # Peter's.
+        self.assertEqual(res["displayname"], "Lesley May")
+        self.assertEqual(res["avatar_url"], "some_url")
+
         # Make lesley join it.
         self.get_success(
             defer.ensureDeferred(
@@ -466,6 +488,26 @@ class ModuleApiTestCase(HomeserverTestCase):
         )
 
         self.get_failure(d, RuntimeError)
+
+        # Check that inviting a user that doesn't have a profile falls back to using a
+        # default (localpart + no avatar) profile.
+        simone = "@simone:" + self.hs.config.server.server_name
+        self.get_success(
+            defer.ensureDeferred(
+                self.module_api.update_room_membership(peter, simone, room_id, "invite")
+            )
+        )
+
+        res = self.helper.get_state(
+            room_id=room_id,
+            event_type="m.room.member",
+            state_key=simone,
+            tok=tok,
+        )
+
+        self.assertEqual(res["membership"], "invite")
+        self.assertEqual(res["displayname"], "simone")
+        self.assertIsNone(res["avatar_url"])
 
 
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
