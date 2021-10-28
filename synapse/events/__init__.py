@@ -58,7 +58,7 @@ USE_FROZEN_DICTS = strtobool(os.environ.get("SYNAPSE_USE_FROZEN_DICTS", "0"))
 T = TypeVar("T")
 
 
-# DictProperty (and DefaultDictPropery) require the classes they're used with to
+# DictProperty (and DefaultDictProperty) require the classes they're used with to
 # have a _dict property to pull properties from.
 #
 # TODO _DictPropertyInstance should not include EventBuilder but due to
