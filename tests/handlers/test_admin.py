@@ -231,4 +231,4 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         args = writer.write_knock.call_args[0]
         self.assertEqual(args[0], room_id)
         self.assertEqual(args[1].content["membership"], "knock")
-        self.assertTrue(args[2])
+        self.assertTrue(args[2])  # Assert there is at least one bit of state

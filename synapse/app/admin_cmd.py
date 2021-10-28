@@ -148,6 +148,8 @@ class FileExfiltrationWriter(ExfiltrationWriter):
     def write_knock(self, room_id, event, state):
         self.write_events(room_id, [event])
 
+        # We write the knock state somewhere else as they aren't full events
+        # and are only a subset of the state at the event.
         room_directory = os.path.join(self.base_directory, "rooms", room_id)
         os.makedirs(room_directory, exist_ok=True)
 
