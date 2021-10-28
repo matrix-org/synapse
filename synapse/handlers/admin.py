@@ -132,7 +132,6 @@ class AdminHandler:
 
                 continue
 
-
             # We only want to bother fetching events up to the last time they
             # were joined. We estimate that point by looking at the
             # stream_ordering of the last membership if it wasn't a join.
