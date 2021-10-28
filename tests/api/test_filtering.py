@@ -51,9 +51,8 @@ class FilteringTestCase(unittest.HomeserverTestCase):
             {"presence": {"senders": ["@bar;pik.test.com"]}},
         ]
         for filter in invalid_filters:
-            with self.assertRaises(SynapseError) as check_filter_error:
+            with self.assertRaises(SynapseError):
                 self.filtering.check_valid_filter(filter)
-                self.assertIsInstance(check_filter_error.exception, SynapseError)
 
     def test_valid_filters(self):
         valid_filters = [
