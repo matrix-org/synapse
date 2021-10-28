@@ -56,7 +56,7 @@ from synapse.types import (
     Requester,
     UserID,
     UserInfo,
-    create_requester,
+    create_requester, StateMap,
 )
 from synapse.util import Clock
 from synapse.util.caches.descriptors import cached
@@ -865,6 +865,19 @@ class ModuleApi:
             ]
         else:
             return []
+
+    async def get_room_state(self, room_id: str) -> StateMap[EventBase]:
+        """Returns the current state of the given room.
+
+        The events are returned as a mapping, in which the key for each event is a tuple
+        which first element is the event's type and the second one is its state key.
+
+        Added in Synapse v1.47.0
+        """
+        state_ids = await self._store.get_current_state_ids(room_id)
+        state_events = await self._store.get_events(state_ids.values())
+
+        return {key: state_events[event_id] for key, event_id in state_ids.items()}
 
 
 class PublicRoomListManager:
