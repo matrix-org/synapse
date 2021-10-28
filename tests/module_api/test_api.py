@@ -386,8 +386,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertTrue(found_update)
 
     def test_get_room_state(self):
-        """Tests that a module can retrieve the state of a room through the module API.
-        """
+        """Tests that a module can retrieve the state of a room through the module API."""
         user_id = self.register_user("peter", "hackme")
         tok = self.login("peter", "hackme")
 

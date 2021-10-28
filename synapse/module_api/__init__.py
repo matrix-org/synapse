@@ -54,9 +54,10 @@ from synapse.types import (
     DomainSpecificString,
     JsonDict,
     Requester,
+    StateMap,
     UserID,
     UserInfo,
-    create_requester, StateMap,
+    create_requester,
 )
 from synapse.util import Clock
 from synapse.util.caches.descriptors import cached
