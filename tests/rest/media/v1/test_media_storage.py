@@ -248,7 +248,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         self.media_id = "example.com/12345"
 
-    def _req(self, content_disposition):
+    def _req(self, content_disposition, include_content_type=True):
 
         channel = make_request(
             self.reactor,
@@ -269,10 +269,16 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         )
         self.assertEqual(self.fetches[0][3], {"allow_remote": "false"})
 
-        headers = {
-            b"Content-Length": [b"%d" % (len(self.test_image.data))],
-            b"Content-Type": [self.test_image.content_type],
-        }
+        if include_content_type:
+            headers = {
+                b"Content-Length": [b"%d" % (len(self.test_image.data))],
+                b"Content-Type": [self.test_image.content_type],
+            }
+        else:
+            headers = {
+                b"Content-Length": [b"%d" % (len(self.test_image.data))],
+            }
+
         if content_disposition:
             headers[b"Content-Disposition"] = [content_disposition]
 
@@ -286,44 +292,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         return channel
 
     def test_handle_missing_content_type(self):
-        def _req_missing_headers(content_disposition):
-            channel = make_request(
-                self.reactor,
-                FakeSite(self.download_resource, self.reactor),
-                "GET",
-                self.media_id,
-                shorthand=False,
-                await_result=False,
-            )
-            self.pump()
-
-            # We've made one fetch, to example.com, using the media URL, and asking
-            # the other server not to do a remote fetch
-            self.assertEqual(len(self.fetches), 1)
-            self.assertEqual(self.fetches[0][1], "example.com")
-            self.assertEqual(
-                self.fetches[0][2], "/_matrix/media/r0/download/" + self.media_id
-            )
-            self.assertEqual(self.fetches[0][3], {"allow_remote": "false"})
-
-            headers = {
-                b"Content-Length": [b"%d" % (len(self.test_image.data))],
-            }
-            if content_disposition:
-                headers[b"Content-Disposition"] = [content_disposition]
-
-            self.fetches[0][0].callback(
-                (self.test_image.data, (len(self.test_image.data), headers))
-            )
-
-            self.pump()
-            self.assertEqual(channel.code, 200)
-
-            return channel
-
-        channel = _req_missing_headers(
-            b"inline; filename=out" + self.test_image.extension
-        )
+        channel = self._req(b"inline; filename=out" + self.test_image.extension, False)
         headers = channel.headers
         self.assertEqual(channel.code, 200)
         self.assertEqual(
