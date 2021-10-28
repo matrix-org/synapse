@@ -315,6 +315,10 @@ class EventBase(metaclass=abc.ABCMeta):
     redacts: DefaultDictProperty[Optional[str]] = DefaultDictProperty("redacts", None)
     room_id: DictProperty[str] = DictProperty("room_id")
     sender: DictProperty[str] = DictProperty("sender")
+    # TODO state_key should be Optional[str], this is generally asserted in Synapse
+    # by calling is_state() first (which ensures this), but it is hard (not possible?)
+    # to properly annotate that calling is_state() asserts that state_key exists
+    # and is non-None.
     state_key: DictProperty[str] = DictProperty("state_key")
     type: DictProperty[str] = DictProperty("type")
     user_id: DictProperty[str] = DictProperty("sender")
