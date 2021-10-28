@@ -146,14 +146,16 @@ def matrix_user_id_validator(user_id_str: str) -> UserID:
 
 class Filtering:
     def __init__(self, hs: "HomeServer"):
-        super().__init__()
+        self._hs = hs
         self.store = hs.get_datastore()
+
+        self.DEFAULT_FILTER_COLLECTION = FilterCollection(hs, {})
 
     async def get_user_filter(
         self, user_localpart: str, filter_id: Union[int, str]
     ) -> "FilterCollection":
         result = await self.store.get_user_filter(user_localpart, filter_id)
-        return FilterCollection(result)
+        return FilterCollection(self._hs, result)
 
     def add_user_filter(
         self, user_localpart: str, user_filter: JsonDict
@@ -191,21 +193,22 @@ FilterEvent = TypeVar("FilterEvent", EventBase, UserPresenceState, JsonDict)
 
 
 class FilterCollection:
-    def __init__(self, filter_json: JsonDict):
+    def __init__(self, hs: "HomeServer", filter_json: JsonDict):
         self._filter_json = filter_json
 
         room_filter_json = self._filter_json.get("room", {})
 
         self._room_filter = Filter(
-            {k: v for k, v in room_filter_json.items() if k in ("rooms", "not_rooms")}
+            hs,
+            {k: v for k, v in room_filter_json.items() if k in ("rooms", "not_rooms")},
         )
 
-        self._room_timeline_filter = Filter(room_filter_json.get("timeline", {}))
-        self._room_state_filter = Filter(room_filter_json.get("state", {}))
-        self._room_ephemeral_filter = Filter(room_filter_json.get("ephemeral", {}))
-        self._room_account_data = Filter(room_filter_json.get("account_data", {}))
-        self._presence_filter = Filter(filter_json.get("presence", {}))
-        self._account_data = Filter(filter_json.get("account_data", {}))
+        self._room_timeline_filter = Filter(hs, room_filter_json.get("timeline", {}))
+        self._room_state_filter = Filter(hs, room_filter_json.get("state", {}))
+        self._room_ephemeral_filter = Filter(hs, room_filter_json.get("ephemeral", {}))
+        self._room_account_data = Filter(hs, room_filter_json.get("account_data", {}))
+        self._presence_filter = Filter(hs, filter_json.get("presence", {}))
+        self._account_data = Filter(hs, filter_json.get("account_data", {}))
 
         self.include_leave = filter_json.get("room", {}).get("include_leave", False)
         self.event_fields = filter_json.get("event_fields", [])
@@ -286,7 +289,8 @@ class FilterCollection:
 
 
 class Filter:
-    def __init__(self, filter_json: JsonDict):
+    def __init__(self, hs: "HomeServer", filter_json: JsonDict):
+        self._hs = hs
         self.filter_json = filter_json
 
         self.limit = filter_json.get("limit", 10)
@@ -445,7 +449,7 @@ class Filter:
             filter: A new filter including the given rooms and the old
                     filter's rooms.
         """
-        newFilter = Filter(self.filter_json)
+        newFilter = Filter(self._hs, self.filter_json)
         newFilter.rooms += room_ids
         return newFilter
 
@@ -456,6 +460,3 @@ def _matches_wildcard(actual_value: Optional[str], filter_value: str) -> bool:
         return actual_value.startswith(type_prefix)
     else:
         return actual_value == filter_value
-
-
-DEFAULT_FILTER_COLLECTION = FilterCollection({})

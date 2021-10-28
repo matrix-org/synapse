@@ -583,6 +583,7 @@ class RoomEventContextServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
+        self._hs = hs
         self.clock = hs.get_clock()
         self.room_context_handler = hs.get_room_context_handler()
         self._event_serializer = hs.get_event_client_serializer()
@@ -600,7 +601,9 @@ class RoomEventContextServlet(RestServlet):
         filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter: Optional[Filter] = Filter(json_decoder.decode(filter_json))
+            event_filter: Optional[Filter] = Filter(
+                self._hs, json_decoder.decode(filter_json)
+            )
         else:
             event_filter = None
 

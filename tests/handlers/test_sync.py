@@ -13,10 +13,11 @@
 # limitations under the License.
 
 from typing import Optional
+from unittest.mock import Mock
 
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.errors import Codes, ResourceLimitError
-from synapse.api.filtering import DEFAULT_FILTER_COLLECTION
+from synapse.api.filtering import Filtering
 from synapse.api.room_versions import RoomVersions
 from synapse.handlers.sync import SyncConfig
 from synapse.rest import admin
@@ -197,7 +198,7 @@ def generate_sync_config(
     _request_key += 1
     return SyncConfig(
         user=UserID.from_string(user_id),
-        filter_collection=DEFAULT_FILTER_COLLECTION,
+        filter_collection=Filtering(Mock()).DEFAULT_FILTER_COLLECTION,
         is_guest=False,
         request_key=("request_key", _request_key),
         device_id=device_id,

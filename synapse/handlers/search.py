@@ -180,7 +180,7 @@ class SearchHandler:
                 % (set(group_keys) - {"room_id", "sender"},),
             )
 
-        search_filter = Filter(filter_dict)
+        search_filter = Filter(self.hs, filter_dict)
 
         # TODO: Search through left rooms too
         rooms = await self.store.get_rooms_for_local_user_where_membership_is(
