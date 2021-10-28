@@ -81,6 +81,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.room_batch_handler = hs.get_room_batch_handler()
         self.txns = HttpTransactionCache(hs)
+        self.enable_also_allow_user = hs.config.experimental.msc2716_also_allow_user
 
     async def on_POST(
         self, request: SynapseRequest, room_id: str
@@ -101,6 +102,8 @@ class RoomBatchSendEventRestServlet(RestServlet):
             request.args, "prev_event_id"
         )
         batch_id_from_query = parse_string(request, "batch_id")
+        also_allow_from_query = (parse_string(request, "com.beeper.also_allow_user")
+                                 if self.enable_also_allow_user else None)
 
         if prev_event_ids_from_query is None:
             raise SynapseError(
@@ -141,6 +144,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 room_id=room_id,
                 initial_auth_event_ids=auth_event_ids,
                 app_service_requester=requester,
+                also_allow_user=also_allow_from_query,
             )
         )
         # Update our ongoing auth event ID list with all of the new state we
@@ -213,6 +217,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
             inherited_depth=inherited_depth,
             auth_event_ids=auth_event_ids,
             app_service_requester=requester,
+            also_allow_user=also_allow_from_query,
         )
 
         insertion_event_id = event_ids[0]
