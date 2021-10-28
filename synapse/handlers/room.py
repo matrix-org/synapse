@@ -1156,6 +1156,7 @@ class RoomContextHandler:
         results = await self.store.get_events_around(
             room_id, event_id, before_limit, after_limit, event_filter
         )
+        logger.info("results=%s", results)
 
         if event_filter:
             results["events_before"] = event_filter.filter(results["events_before"])
