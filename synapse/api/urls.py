@@ -38,9 +38,6 @@ class ConsentURIBuilder:
     def __init__(self, hs_config: HomeServerConfig):
         if hs_config.key.form_secret is None:
             raise ConfigError("form_secret not set in config")
-        if hs_config.server.public_baseurl is None:
-            raise ConfigError("public_baseurl not set in config")
-
         self._hmac_secret = hs_config.key.form_secret.encode("utf-8")
         self._public_baseurl = hs_config.server.public_baseurl
 

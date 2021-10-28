@@ -91,6 +91,8 @@ pid_file: DATADIR/homeserver.pid
 # Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
 # 'listeners' below).
 #
+# Defaults to 'https://<server_name>/'.
+#
 #public_baseurl: https://example.com/
 
 # Set the soft limit on the number of file descriptors synapse can use

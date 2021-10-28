@@ -263,10 +263,30 @@ class ServerConfig(Config):
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
 
-        self.public_baseurl = config.get("public_baseurl")
-        if self.public_baseurl is not None:
-            if self.public_baseurl[-1] != "/":
-                self.public_baseurl += "/"
+        # Whether we should serve a "client well-known":
+        #  (a) at .well-known/matrix/client on our client HTTP listener
+        #  (b) in the response to /login
+        #
+        # ... which together help ensure that clients use our public_baseurl instead of
+        # whatever they were told by the user.
+        #
+        # For the sake of backwards compatibility with existing installations, this is
+        # True if public_baseurl is specified explicitly, and otherwise False. (The
+        # reasoning here is that we have no way of knowing that the default
+        # public_baseurl is actually correct for existing installations - many things
+        # will not work correctly, but that's (probably?) better than sending clients
+        # to a completely broken URL.
+        self.serve_client_wellknown = False
+
+        public_baseurl = config.get("public_baseurl")
+        if public_baseurl is None:
+            public_baseurl = f"https://{self.server_name}/"
+            logger.info("Using default public_baseurl %s", public_baseurl)
+        else:
+            self.serve_client_wellknown = True
+            if public_baseurl[-1] != "/":
+                public_baseurl += "/"
+        self.public_baseurl = public_baseurl
 
         # Whether to enable user presence.
         presence_config = config.get("presence") or {}
@@ -771,6 +791,8 @@ class ServerConfig(Config):
         # reverse proxy, this should be the URL to reach Synapse via the proxy.
         # Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
         # 'listeners' below).
+        #
+        # Defaults to 'https://<server_name>/'.
         #
         #public_baseurl: https://example.com/
 
