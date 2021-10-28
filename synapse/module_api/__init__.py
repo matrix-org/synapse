@@ -33,6 +33,7 @@ import jinja2
 from twisted.internet import defer
 from twisted.web.resource import IResource
 
+from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.presence_router import PresenceRouter
 from synapse.http.client import SimpleHttpClient
@@ -673,17 +674,28 @@ class ModuleApi:
             content = {}
 
         # Set the profile if not already done by the module.
-        if "avatar_url" not in content:
-            content["avatar_url"] = await self._hs.get_profile_handler().get_avatar_url(
-                requester.user,
-            )
+        if "avatar_url" not in content or "displayname" not in content:
+            try:
+                # Try to fetch the user's profile.
+                profile = await self._hs.get_profile_handler().get_profile(
+                    target_user_id.to_string(),
+                )
+            except SynapseError as e:
+                if e.code == 404:
+                    # If the profile couldn't be found, use default values.
+                    profile = {
+                        "displayname": target_user_id.localpart,
+                        "avatar_url": None,
+                    }
+                else:
+                    raise
 
-        if "displayname" not in content:
-            content[
-                "displayname"
-            ] = await self._hs.get_profile_handler().get_displayname(
-                target_user_id,
-            )
+            # Set the profile where it needs to be set.
+            if "avatar_url" not in content:
+                content["avatar_url"] = profile["avatar_url"]
+
+            if "displayname" not in content:
+                content["displayname"] = profile["displayname"]
 
         event_id, _ = await self._hs.get_room_member_handler().update_membership(
             requester=requester,
