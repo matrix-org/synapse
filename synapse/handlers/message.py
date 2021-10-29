@@ -1511,7 +1511,7 @@ class EventCreationHandler:
                     EventContentFields.MSC2716_NEXT_BATCH_ID
                 )
                 conflicting_insertion_event_id = (
-                    await self.store.get_insertion_event_by_batch_id(
+                    await self.store.get_insertion_event_id_by_batch_id(
                         event.room_id, next_batch_id
                     )
                 )

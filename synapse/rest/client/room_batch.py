@@ -112,7 +112,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
         # and have the batch connected.
         if batch_id_from_query:
             corresponding_insertion_event_id = (
-                await self.store.get_insertion_event_by_batch_id(
+                await self.store.get_insertion_event_id_by_batch_id(
                     room_id, batch_id_from_query
                 )
             )
