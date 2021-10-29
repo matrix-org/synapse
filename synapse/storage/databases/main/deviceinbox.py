@@ -594,7 +594,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
     ) -> int:
         """A background update that deletes all device_inboxes for deleted devices.
 
-        This should only need to be run once (when users upgrade to v1.46.0)
+        This should only need to be run once (when users upgrade to v1.47.0)
 
         Args:
             progress: JsonDict used to store progress of this background update
