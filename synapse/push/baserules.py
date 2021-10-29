@@ -528,6 +528,11 @@ BASE_APPEND_UNDERRIDE_RULES = [
         "rule_id": "global/override/com.beeper.reaction",
         "conditions": [
             {
+                "kind": "room_member_count",
+                "is": "<20",
+                "_id": "_member_count",
+            },
+            {
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.reaction",
