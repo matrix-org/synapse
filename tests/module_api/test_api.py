@@ -15,7 +15,7 @@ from unittest.mock import Mock
 
 from twisted.internet import defer
 
-from synapse.api.constants import EduTypes
+from synapse.api.constants import EduTypes, EventTypes
 from synapse.events import EventBase
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
@@ -307,6 +307,29 @@ class ModuleApiTestCase(HomeserverTestCase):
                         found_update = True
 
         self.assertTrue(found_update)
+
+    def test_get_room_state(self):
+        """Tests that a module can retrieve the state of a room through the module API."""
+        user_id = self.register_user("peter", "hackme")
+        tok = self.login("peter", "hackme")
+
+        # Create a room and send some custom state in it.
+        room_id = self.helper.create_room_as(tok=tok)
+        self.helper.send_state(room_id, "org.matrix.test", {}, tok=tok)
+
+        # Check that the module API can successfully fetch state for the room.
+        state = self.get_success(
+            defer.ensureDeferred(self.module_api.get_room_state(room_id))
+        )
+
+        # Check that a few standard events are in the returned state.
+        self.assertIn((EventTypes.Create, ""), state)
+        self.assertIn((EventTypes.Member, user_id), state)
+
+        # Check that our custom state event is in the returned state.
+        self.assertEqual(state[("org.matrix.test", "")].sender, user_id)
+        self.assertEqual(state[("org.matrix.test", "")].state_key, "")
+        self.assertEqual(state[("org.matrix.test", "")].content, {})
 
 
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
