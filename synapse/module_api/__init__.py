@@ -33,6 +33,7 @@ import jinja2
 from twisted.internet import defer
 from twisted.web.resource import IResource
 
+from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.presence_router import PresenceRouter
 from synapse.http.client import SimpleHttpClient
@@ -628,8 +629,105 @@ class ModuleApi:
         state = yield defer.ensureDeferred(self._store.get_events(state_ids.values()))
         return state.values()
 
+    async def update_room_membership(
+        self,
+        sender: str,
+        target: str,
+        room_id: str,
+        new_membership: str,
+        content: Optional[JsonDict] = None,
+    ) -> EventBase:
+        """Updates the membership of a user to the given value.
+
+        Added in Synapse v1.46.0.
+
+        Args:
+            sender: The user performing the membership change. Must be a user local to
+                this homeserver.
+            target: The user whose membership is changing. This is often the same value
+                as `sender`, but it might differ in some cases (e.g. when kicking a user,
+                the `sender` is the user performing the kick and the `target` is the user
+                being kicked).
+            room_id: The room in which to change the membership.
+            new_membership: The new membership state of `target` after this operation. See
+                https://spec.matrix.org/unstable/client-server-api/#mroommember for the
+                list of allowed values.
+            content: Additional values to include in the resulting event's content.
+
+        Returns:
+            The newly created membership event.
+
+        Raises:
+            RuntimeError if the `sender` isn't a local user.
+            ShadowBanError if a shadow-banned requester attempts to send an invite.
+            SynapseError if the module attempts to send a membership event that isn't
+                allowed, either by the server's configuration (e.g. trying to set a
+                per-room display name that's too long) or by the validation rules around
+                membership updates (e.g. the `membership` value is invalid).
+        """
+        if not self.is_mine(sender):
+            raise RuntimeError(
+                "Tried to send an event as a user that isn't local to this homeserver",
+            )
+
+        requester = create_requester(sender)
+        target_user_id = UserID.from_string(target)
+
+        if content is None:
+            content = {}
+
+        # Set the profile if not already done by the module.
+        if "avatar_url" not in content or "displayname" not in content:
+            try:
+                # Try to fetch the user's profile.
+                profile = await self._hs.get_profile_handler().get_profile(
+                    target_user_id.to_string(),
+                )
+            except SynapseError as e:
+                # If the profile couldn't be found, use default values.
+                profile = {
+                    "displayname": target_user_id.localpart,
+                    "avatar_url": None,
+                }
+
+                if e.code != 404:
+                    # If the error isn't 404, it means we tried to fetch the profile over
+                    # federation but the remote server responded with a non-standard
+                    # status code.
+                    logger.error(
+                        "Got non-404 error status when fetching profile for %s",
+                        target_user_id.to_string(),
+                    )
+
+            # Set the profile where it needs to be set.
+            if "avatar_url" not in content:
+                content["avatar_url"] = profile["avatar_url"]
+
+            if "displayname" not in content:
+                content["displayname"] = profile["displayname"]
+
+        event_id, _ = await self._hs.get_room_member_handler().update_membership(
+            requester=requester,
+            target=target_user_id,
+            room_id=room_id,
+            action=new_membership,
+            content=content,
+        )
+
+        # Try to retrieve the resulting event.
+        event = await self._hs.get_datastore().get_event(event_id)
+
+        # update_membership is supposed to always return after the event has been
+        # successfully persisted.
+        assert event is not None
+
+        return event
+
     async def create_and_send_event_into_room(self, event_dict: JsonDict) -> EventBase:
-        """Create and send an event into a room. Membership events are currently not supported.
+        """Create and send an event into a room.
+
+        Membership events are not supported by this method. To update a user's membership
+        in a room, please use the `update_room_membership` method instead.
 
         Added in Synapse v1.22.0.
 

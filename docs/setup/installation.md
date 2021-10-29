@@ -356,12 +356,14 @@ make install
 
 ##### Windows
 
-If you wish to run or develop Synapse on Windows, the Windows Subsystem For
-Linux provides a Linux environment on Windows 10 which is capable of using the
-Debian, Fedora, or source installation methods. More information about WSL can
-be found at <https://docs.microsoft.com/en-us/windows/wsl/install-win10> for
-Windows 10 and <https://docs.microsoft.com/en-us/windows/wsl/install-on-server>
-for Windows Server.
+Running Synapse natively on Windows is not officially supported.
+
+If you wish to run or develop Synapse on Windows, the Windows Subsystem for
+Linux provides a Linux environment which is capable of using the Debian, Fedora,
+or source installation methods. More information about WSL can be found at
+<https://docs.microsoft.com/en-us/windows/wsl/install> for Windows 10/11 and
+<https://docs.microsoft.com/en-us/windows/wsl/install-on-server> for
+Windows Server.
 
 ## Setting up Synapse
 
