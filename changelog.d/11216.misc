@@ -1,0 +1,1 @@
+Optimize `UserDirectoryStore.search_user_dir` when search term is empty. Contributed by @sumnerevans.
