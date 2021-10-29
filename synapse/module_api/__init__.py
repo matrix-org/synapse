@@ -999,7 +999,8 @@ class ModuleApi:
             # view of the state.
             state_filter = StateFilter.from_types(event_filter)
             state_ids = await self._store.get_filtered_current_state_ids(
-                room_id, state_filter,
+                room_id,
+                state_filter,
             )
         else:
             # If no filter was provided, get the whole state. We could also reuse the call
