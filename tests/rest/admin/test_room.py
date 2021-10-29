@@ -17,8 +17,6 @@ import urllib.parse
 from typing import List, Optional
 from unittest.mock import Mock
 
-from parameterized import parameterized_class
-
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import Codes
