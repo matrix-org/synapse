@@ -89,6 +89,8 @@ __all__ = [
     "PRESENCE_ALL_USERS",
     "LoginResponse",
     "JsonDict",
+    "EventBase",
+    "StateMap",
 ]
 
 logger = logging.getLogger(__name__)
