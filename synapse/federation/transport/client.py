@@ -1309,15 +1309,15 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
 
         self._coro_state = ijson.items_coro(
             _event_list_parser(room_version, self._response.state),
-            prefix + "state.item",
+            prefix + "state.item", use_float=True
         )
         self._coro_auth = ijson.items_coro(
             _event_list_parser(room_version, self._response.auth_events),
-            prefix + "auth_chain.item",
+            prefix + "auth_chain.item", use_float=True
         )
         self._coro_event = ijson.kvitems_coro(
             _event_parser(self._response.event_dict),
-            prefix + "org.matrix.msc3083.v2.event",
+            prefix + "org.matrix.msc3083.v2.event", use_float=True
         )
 
     def write(self, data: bytes) -> int:
