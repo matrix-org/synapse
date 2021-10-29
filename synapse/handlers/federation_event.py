@@ -702,38 +702,38 @@ class FederationEventHandler:
                         event.event_id
                     )
 
-                    # Maybe we can get lucky and save ourselves a lookup
-                    # by checking the events in the backfill first
-                    insertion_event = event_map[
-                        insertion_event_id
-                    ] or await self._store.get_event(
-                        insertion_event_id, allow_none=True
-                    )
+                    # # Maybe we can get lucky and save ourselves a lookup
+                    # # by checking the events in the backfill first
+                    # insertion_event = event_map[
+                    #     insertion_event_id
+                    # ] or await self._store.get_event(
+                    #     insertion_event_id, allow_none=True
+                    # )
 
-                    if insertion_event:
-                        # Connect the insertion events' `prev_event` successors
-                        # via fake edges pointing to the insertion event itself
-                        # so the insertion event sorts topologically
-                        # behind-in-time the successor. Nestled perfectly
-                        # between the prev_event and the successor.
-                        for insertion_prev_event_id in insertion_event.prev_event_ids():
-                            successor_event_ids = successor_event_id_map[
-                                insertion_prev_event_id
-                            ]
-                            logger.info(
-                                "insertion_event_id=%s successor_event_ids=%s",
-                                insertion_event_id,
-                                successor_event_ids,
-                            )
-                            if successor_event_ids:
-                                for successor_event_id in successor_event_ids:
-                                    # Don't add itself back as a successor
-                                    if successor_event_id != insertion_event_id:
-                                        # Fake edge to point the successor back
-                                        # at the insertion event
-                                        event_id_graph.setdefault(
-                                            successor_event_id, []
-                                        ).append(insertion_event_id)
+                    # if insertion_event:
+                    #     # Connect the insertion events' `prev_event` successors
+                    #     # via fake edges pointing to the insertion event itself
+                    #     # so the insertion event sorts topologically
+                    #     # behind-in-time the successor. Nestled perfectly
+                    #     # between the prev_event and the successor.
+                    #     for insertion_prev_event_id in insertion_event.prev_event_ids():
+                    #         successor_event_ids = successor_event_id_map[
+                    #             insertion_prev_event_id
+                    #         ]
+                    #         logger.info(
+                    #             "insertion_event_id=%s successor_event_ids=%s",
+                    #             insertion_event_id,
+                    #             successor_event_ids,
+                    #         )
+                    #         if successor_event_ids:
+                    #             for successor_event_id in successor_event_ids:
+                    #                 # Don't add itself back as a successor
+                    #                 if successor_event_id != insertion_event_id:
+                    #                     # Fake edge to point the successor back
+                    #                     # at the insertion event
+                    #                     event_id_graph.setdefault(
+                    #                         successor_event_id, []
+                    #                     ).append(insertion_event_id)
 
         # TODO: We also need to add fake edges to connect the oldest-in-time messages
         # in the batch to the event we branched off of, see https://github.com/matrix-org/synapse/pull/11114#discussion_r739300985
@@ -773,17 +773,17 @@ class FederationEventHandler:
 
         # We want to sort these by depth so we process them and
         # tell clients about them in order.
-        # sorted_events = sorted(events, key=lambda x: x.depth)
+        sorted_events = sorted(events, key=lambda x: x.depth)
 
-        # We want to sort topologically so we process them and tell clients
-        # about them in order.
-        sorted_events = []
-        event_ids = [event.event_id for event in events]
-        event_map = {event.event_id: event for event in events}
-        event_id_graph = await self.generateEventIdGraphFromEvents(events)
-        for event_id in sorted_topologically(event_ids, event_id_graph):
-            sorted_events.append(event_map[event_id])
-        sorted_events = reversed(sorted_events)
+        # # We want to sort topologically so we process them and tell clients
+        # # about them in order.
+        # sorted_events = []
+        # event_ids = [event.event_id for event in events]
+        # event_map = {event.event_id: event for event in events}
+        # event_id_graph = await self.generateEventIdGraphFromEvents(events)
+        # for event_id in sorted_topologically(event_ids, event_id_graph):
+        #     sorted_events.append(event_map[event_id])
+        # sorted_events = reversed(sorted_events)
 
         logger.info(
             "backfill sorted_events=%s",
