@@ -71,7 +71,9 @@ class EventValidator:
             # checked, since we trust the portions of the event we created.
             validate_canonicaljson(event.content)
 
-        if not 0 < event.origin_server_ts < 2 ** 53:
+        # Verify that the origin_server_ts is in range, because we allow anyone
+        # to set this, not just appservices.
+        if not 0 < event.origin_server_ts < CANONICALJSON_MAX_INT:
             raise SynapseError(400, "Event timestamp is out of range")
 
         if event.type == EventTypes.Aliases:
