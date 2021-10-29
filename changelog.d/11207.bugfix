@@ -1,0 +1,1 @@
+Linearize appservice ephemeral event handling, fixing serialization errors. Contributed by @Fizzadar at Beeper.
