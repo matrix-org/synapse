@@ -258,17 +258,23 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         services = [interested_service]
 
         self.mock_store.get_app_services.return_value = services
-        self.mock_store.get_type_stream_id_for_appservice.return_value = make_awaitable(579)
+        self.mock_store.get_type_stream_id_for_appservice.return_value = make_awaitable(
+            579
+        )
 
         event = Mock(event_id="event_1")
-        self.event_source.sources.receipt.get_new_events_as.return_value = make_awaitable(([event], None))
+        self.event_source.sources.receipt.get_new_events_as.return_value = (
+            make_awaitable(([event], None))
+        )
 
         self.handler.notify_interested_services_ephemeral("receipt_key", 580)
         self.mock_scheduler.submit_ephemeral_events_for_as.assert_called_once_with(
             interested_service, [event]
         )
         self.mock_store.set_type_stream_id_for_appservice.assert_called_once_with(
-            interested_service, "read_receipt", 580,
+            interested_service,
+            "read_receipt",
+            580,
         )
 
     def test_notify_interested_services_ephemeral_out_of_order(self):
@@ -276,10 +282,14 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         services = [interested_service]
 
         self.mock_store.get_app_services.return_value = services
-        self.mock_store.get_type_stream_id_for_appservice.return_value = make_awaitable(580)
+        self.mock_store.get_type_stream_id_for_appservice.return_value = make_awaitable(
+            580
+        )
 
         event = Mock(event_id="event_1")
-        self.event_source.sources.receipt.get_new_events_as.return_value = make_awaitable(([event], None))
+        self.event_source.sources.receipt.get_new_events_as.return_value = (
+            make_awaitable(([event], None))
+        )
 
         self.handler.notify_interested_services_ephemeral("receipt_key", 579)
         self.mock_scheduler.submit_ephemeral_events_for_as.assert_not_called()
