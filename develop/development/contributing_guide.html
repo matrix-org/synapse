@@ -194,6 +194,10 @@ license the code under the same terms as the project's overall 'outbound'
 license - in our case, this is almost always Apache Software License v2 (see
 <a href="https://github.com/matrix-org/synapse/blob/develop/LICENSE">LICENSE</a>).</p>
 <h1 id="2-what-do-i-need"><a class="header" href="#2-what-do-i-need">2. What do I need?</a></h1>
+<p>If you are running Windows, the Windows Subsystem for Linux (WSL) is strongly
+recommended for development. More information about WSL can be found at
+<a href="https://docs.microsoft.com/en-us/windows/wsl/install">https://docs.microsoft.com/en-us/windows/wsl/install</a>. Running Synapse natively
+on Windows is not officially supported.</p>
 <p>The code of Synapse is written in Python 3. To do pretty much anything, you'll need <a href="https://wiki.python.org/moin/BeginnersGuide/Download">a recent version of Python 3</a>.</p>
 <p>The source code of Synapse is hosted on GitHub. You will also need <a href="https://github.com/git-guides/install-git">a recent version of git</a>.</p>
 <p>For some tests, you will need <a href="https://docs.docker.com/get-docker/">a recent version of Docker</a>.</p>
@@ -208,7 +212,6 @@ git checkout develop
 <p>If you need help getting started with git, this is beyond the scope of the document, but you
 can find many good git tutorials on the web.</p>
 <h1 id="4-install-the-dependencies"><a class="header" href="#4-install-the-dependencies">4. Install the dependencies</a></h1>
-<h2 id="under-unix-macos-linux-bsd-"><a class="header" href="#under-unix-macos-linux-bsd-">Under Unix (macOS, Linux, BSD, ...)</a></h2>
 <p>Once you have installed Python 3 and added the source, please open a terminal and
 setup a <em>virtualenv</em>, as follows:</p>
 <pre><code class="language-sh">cd path/where/you/have/cloned/the/repository
@@ -218,8 +221,6 @@ pip install -e &quot;.[all,dev]&quot;
 pip install tox
 </code></pre>
 <p>This will install the developer dependencies for the project.</p>
-<h2 id="under-windows"><a class="header" href="#under-windows">Under Windows</a></h2>
-<p>TBD</p>
 <h1 id="5-get-in-touch"><a class="header" href="#5-get-in-touch">5. Get in touch.</a></h1>
 <p>Join our developer community on Matrix: <a href="https://matrix.to/#/#synapse-dev:matrix.org">#synapse-dev:matrix.org</a>!</p>
 <h1 id="6-pick-an-issue"><a class="header" href="#6-pick-an-issue">6. Pick an issue.</a></h1>
