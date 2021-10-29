@@ -1,1 +1,0 @@
-Mark the Synapse package as containing type annotations and fix export declarations so that Synapse pluggable modules may be type checked against Synapse.
