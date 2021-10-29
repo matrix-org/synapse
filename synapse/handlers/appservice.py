@@ -183,7 +183,7 @@ class ApplicationServicesHandler:
         self,
         stream_key: str,
         new_token: Optional[int],
-        users: Optional[Collection[Union[str, UserID]]] = None,
+        users: Collection[Union[str, UserID]],
     ) -> None:
         """
         This is called by the notifier in the background when
@@ -200,6 +200,8 @@ class ApplicationServicesHandler:
                 Appservices will only receive ephemeral events that fall within their
                 registered user and room namespaces.
 
+                TODO: Update this bit
+
                 Any other value for `stream_key` will cause this function to return early.
 
             new_token: The latest stream token.
@@ -208,21 +210,38 @@ class ApplicationServicesHandler:
         if not self.notify_appservices:
             return
 
-        if stream_key not in ("typing_key", "receipt_key", "presence_key"):
-            return
+        if stream_key in ("typing_key", "receipt_key", "presence_key"):
+            # Check whether there are any appservices which have registered to receive
+            # ephemeral events.
+            #
+            # Note that whether these events are actually relevant to these appservices
+            # is decided later on.
+            services = [
+                service
+                for service in self.store.get_app_services()
+                if service.supports_ephemeral
+            ]
+            if not services:
+                # Bail out early if none of the target appservices have explicitly registered
+                # to receive these ephemeral events.
+                return
 
-        services = [
-            service
-            for service in self.store.get_app_services()
-            if service.supports_ephemeral
-        ]
-        if not services:
+        elif stream_key == "to_device_key":
+            # Appservices do not need to register explicit support for receiving device list
+            # updates.
+            #
+            # Note that whether these events are actually relevant to these appservices is
+            # decided later on.
+            services = self.store.get_app_services()
+
+        else:
+            # This stream_key is not supported.
             return
 
         # We only start a new background process if necessary rather than
         # optimistically (to cut down on overhead).
         self._notify_interested_services_ephemeral(
-            services, stream_key, new_token, users or []
+            services, stream_key, new_token, users
         )
 
     @wrap_as_background_process("notify_interested_services_ephemeral")
@@ -233,7 +252,7 @@ class ApplicationServicesHandler:
         new_token: Optional[int],
         users: Collection[Union[str, UserID]],
     ) -> None:
-        logger.debug("Checking interested services for %s" % (stream_key))
+        logger.debug("Checking interested services for %s" % stream_key)
         with Measure(self.clock, "notify_interested_services_ephemeral"):
             for service in services:
                 # Only handle typing if we have the latest token
@@ -256,6 +275,8 @@ class ApplicationServicesHandler:
                     # Persist the latest handled stream token for this appservice
                     # TODO: We seem to update the stream token for each appservice,
                     #  even if sending the ephemeral events to the appservice failed.
+                    # This is expected for typing, receipt and presence, but will need
+                    # to be handled for device* streams.
                     await self.store.set_type_stream_id_for_appservice(
                         service, "read_receipt", new_token
                     )
@@ -269,6 +290,104 @@ class ApplicationServicesHandler:
                     await self.store.set_type_stream_id_for_appservice(
                         service, "presence", new_token
                     )
+
+                elif stream_key == "to_device_key" and new_token is not None:
+                    events = await self._handle_to_device(service, new_token, users)
+                    if events:
+                        self.scheduler.submit_ephemeral_events_for_as(service, events)
+
+                    # Persist the latest handled stream token for this appservice
+                    await self.store.set_type_stream_id_for_appservice(
+                        service, "to_device", new_token
+                    )
+
+    async def _handle_to_device(
+        self,
+        service: ApplicationService,
+        new_token: int,
+        users: Collection[Union[str, UserID]],
+    ) -> List[JsonDict]:
+        """
+        Given an application service, determine which events it should receive
+        from those between the last-recorded typing event stream token for this
+        appservice and the given stream token.
+
+        Args:
+            service: The application service to check for which events it should receive.
+            new_token: The latest to-device event stream token.
+            users: The users that should receive new to-device messages.
+
+        Returns:
+            A list of JSON dictionaries containing data derived from the typing events that
+            should be sent to the given application service.
+        """
+        # Get the stream token that this application service has processed up until
+        # TODO: Is 'users' always going to be one user here? Sometimes it's the sender!
+
+        # TODO: DB migration to add a column for to_device to application_services_state table
+        from_key = await self.store.get_type_stream_id_for_appservice(
+            service, "to_device"
+        )
+
+        # Filter out users that this appservice is not interested in
+        users_appservice_is_interested_in: List[str] = []
+        for user in users:
+            if isinstance(user, UserID):
+                user = user.to_string()
+
+            if service.is_interested_in_user(user):
+                users_appservice_is_interested_in.append(user)
+
+        if not users_appservice_is_interested_in:
+            # Return early if the AS was not interested in any of these users
+            return []
+
+        # Retrieve the to-device messages for each user
+        (
+            recipient_user_id_device_id_to_messages,
+            max_stream_token,
+        ) = await self.store.get_new_messages(
+            users_appservice_is_interested_in, from_key, new_token, limit=100
+        )
+
+        logger.info(
+            "*** Users: %s, from: %s, to: %s",
+            users_appservice_is_interested_in,
+            from_key,
+            new_token,
+        )
+        logger.info(
+            "*** Got to-device message: %s", recipient_user_id_device_id_to_messages
+        )
+
+        # TODO: Keep pulling out if max_stream_token != new_token?
+
+        # According to MSC2409, we'll need to add 'to_user_id' and 'to_device_id' fields
+        # to the event JSON so that the application service will know which user/device
+        # combination this messages was intended for.
+        #
+        # So we mangle this dict into a flat list of to-device messages with the relevant
+        # user ID and device ID embedded inside each message dict.
+        message_payload: List[JsonDict] = []
+        for (
+            user_id,
+            device_id,
+        ), messages in recipient_user_id_device_id_to_messages.items():
+            for message_json in messages:
+                # Remove 'message_id' from the to-device message, as it's an internal ID
+                message_json.pop("message_id", None)
+
+                message_payload.append(
+                    {
+                        "to_user_id": user_id,
+                        "to_device_id": device_id,
+                        **message_json,
+                    }
+                )
+
+        logger.info("*** Ended up with messages: %s", message_payload)
+
+        return message_payload
 
     async def _handle_typing(
         self, service: ApplicationService, new_token: int

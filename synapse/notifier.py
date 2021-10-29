@@ -378,7 +378,7 @@ class Notifier:
         self,
         stream_key: str,
         new_token: Union[int, RoomStreamToken],
-        users: Optional[Collection[Union[str, UserID]]] = None,
+        users: Collection[Union[str, UserID]],
     ) -> None:
         """Notify application services of ephemeral event activity.
 
@@ -392,7 +392,7 @@ class Notifier:
             if isinstance(new_token, int):
                 stream_token = new_token
             self.appservice_handler.notify_interested_services_ephemeral(
-                stream_key, stream_token, users or []
+                stream_key, stream_token, users
             )
         except Exception:
             logger.exception("Error notifying application services of event")

@@ -13,15 +13,16 @@
 # limitations under the License.
 
 import logging
-from typing import List, Optional, Tuple
+from typing import Collection, Dict, List, Optional, Tuple
 
 from synapse.logging import issue9533_logger
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.replication.tcp.streams import ToDeviceStream
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, make_in_list_sql_clause
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
+from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.stream_change_cache import StreamChangeCache
@@ -112,31 +113,125 @@ class DeviceInboxWorkerStore(SQLBaseStore):
     def get_to_device_stream_token(self):
         return self._device_inbox_id_gen.get_current_token()
 
+    async def get_new_messages(
+        self,
+        user_ids: Collection[str],
+        from_stream_token: int,
+        to_stream_token: int,
+        limit: int = 100,
+    ) -> Tuple[Dict[Tuple[str, str], List[JsonDict]], int]:
+        """
+        Retrieve to-device messages for a given set of user IDs.
+
+        Only to-device messages with stream tokens between the given boundaries
+        (from < X <= to) are returned.
+
+        Note that multiple messages can have the same stream token. Stream tokens are
+        unique to *messages*, but there might be multiple recipients of a message, and
+        thus multiple entries in the device_inbox table with the same stream token.
+
+        Args:
+            user_ids: The users to retrieve to-device messages for.
+            from_stream_token: The lower boundary of stream token to filter with (exclusive).
+            to_stream_token: The upper boundary of stream token to filter with (inclusive).
+            limit: The maximum number of to-device messages to return.
+
+        Returns:
+            A tuple containing the following:
+                * A list of to-device messages
+        """
+        # Bail out if none of these users have any messages
+        for user_id in user_ids:
+            if self._device_inbox_stream_cache.has_entity_changed(
+                user_id, from_stream_token
+            ):
+                break
+        else:
+            logger.info("*** Bailing out")
+            return {}, to_stream_token
+
+        def get_new_messages_txn(txn):
+            # Build a query to select messages from any of the given users that are between
+            # the given stream token bounds
+            sql = "SELECT stream_id, user_id, device_id, message_json FROM device_inbox"
+
+            # Scope to only the given users. We need to use this method as doing so is
+            # different across database engines.
+            many_clause_sql, many_clause_args = make_in_list_sql_clause(
+                self.database_engine, "user_id", user_ids
+            )
+
+            sql += (
+                " WHERE %s"
+                " AND ? < stream_id AND stream_id <= ?"
+                " ORDER BY stream_id ASC"
+                " LIMIT ?"
+            ) % many_clause_sql
+
+            logger.info("*** %s\n\n%s", many_clause_sql, many_clause_args)
+            logger.info("*** %s", sql)
+            txn.execute(
+                sql, (*many_clause_args, from_stream_token, to_stream_token, limit)
+            )
+
+            # Create a dictionary of (user ID, device ID) -> list of messages that
+            # that device is meant to receive.
+            recipient_user_id_device_id_to_messages = {}
+
+            stream_pos = to_stream_token
+            total_messages_processed = 0
+            for row in txn:
+                # Record the last-processed stream position, to return later.
+                # Note that we process messages here in order of ascending stream token.
+                stream_pos = row[0]
+                recipient_user_id = row[1]
+                recipient_device_id = row[2]
+                message_dict = db_to_json(row[3])
+
+                recipient_user_id_device_id_to_messages.setdefault(
+                    (recipient_user_id, recipient_device_id), []
+                ).append(message_dict)
+                total_messages_processed += 1
+
+            # This is needed (REVIEW: I think) as you can have multiple rows for a
+            # single to-device message (due to multiple recipients).
+            if total_messages_processed < limit:
+                stream_pos = to_stream_token
+
+            return recipient_user_id_device_id_to_messages, stream_pos
+
+        return await self.db_pool.runInteraction(
+            "get_new_messages", get_new_messages_txn
+        )
+
     async def get_new_messages_for_device(
         self,
         user_id: str,
         device_id: Optional[str],
-        last_stream_id: int,
-        current_stream_id: int,
+        last_stream_token: int,
+        current_stream_token: int,
         limit: int = 100,
     ) -> Tuple[List[dict], int]:
         """
         Args:
             user_id: The recipient user_id.
             device_id: The recipient device_id.
-            last_stream_id: The last stream ID checked.
-            current_stream_id: The current position of the to device
+            last_stream_token: The last stream ID checked.
+            current_stream_token: The current position of the to device
                 message stream.
             limit: The maximum number of messages to retrieve.
 
         Returns:
-            A list of messages for the device and where in the stream the messages got to.
+            A tuple containing:
+                * A list of messages for the device
+                * The max stream token of these messages. There may be more to retrieve
+                  if the given limit was reached.
         """
         has_changed = self._device_inbox_stream_cache.has_entity_changed(
-            user_id, last_stream_id
+            user_id, last_stream_token
         )
         if not has_changed:
-            return [], current_stream_id
+            return [], current_stream_token
 
         def get_new_messages_for_device_txn(txn):
             sql = (
@@ -147,14 +242,17 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 " LIMIT ?"
             )
             txn.execute(
-                sql, (user_id, device_id, last_stream_id, current_stream_id, limit)
+                sql,
+                (user_id, device_id, last_stream_token, current_stream_token, limit),
             )
             messages = []
+            stream_pos = current_stream_token
+
             for row in txn:
                 stream_pos = row[0]
                 messages.append(db_to_json(row[1]))
             if len(messages) < limit:
-                stream_pos = current_stream_id
+                stream_pos = current_stream_token
             return messages, stream_pos
 
         return await self.db_pool.runInteraction(
@@ -369,7 +467,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
         Args:
             local_messages_by_user_and_device:
-                Dictionary of user_id to device_id to message.
+                Dictionary of recipient user_id to recipient device_id to message.
             remote_messages_by_destination:
                 Dictionary of destination server_name to the EDU JSON to send.
 
