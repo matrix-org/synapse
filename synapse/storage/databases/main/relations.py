@@ -20,7 +20,7 @@ import attr
 from synapse.api.constants import RelationTypes
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import LoggingTransaction
+from synapse.storage.database import LoggingTransaction, make_in_list_sql_clause
 from synapse.storage.databases.main.stream import generate_pagination_where_clause
 from synapse.storage.relations import (
     AggregationPaginationToken,
@@ -333,6 +333,60 @@ class RelationsWorkerStore(SQLBaseStore):
             latest_event = await self.get_event(latest_event_id, allow_none=True)  # type: ignore[attr-defined]
 
         return count, latest_event
+
+    async def has_event_relations(
+        self,
+        parent_id: str,
+        relation_senders: Optional[List[str]],
+        relation_types: Optional[List[str]],
+    ) -> bool:
+        """Check if an event has a relationship from the given senders of the
+        given types.
+
+        Args:
+            parent_id: The event being annotated
+            relation_senders: The relation senders to check.
+            relation_types: The relation types to check.
+
+        Returns:
+            True if the event has at least one relationship from one of the given senders of the given type.
+        """
+        # If no restrictions are given then the event has the required relations.
+        if not relation_senders and not relation_types:
+            return True
+
+        sql = """
+            SELECT 1 FROM event_relations
+            INNER JOIN events USING (event_id)
+            WHERE
+                relates_to_id = ?
+                AND %s
+            LIMIT 1;
+        """
+
+        def _get_if_event_has_relations(txn) -> bool:
+            clauses: List[str] = []
+            args = [parent_id]
+            if relation_senders:
+                clause, temp_args = make_in_list_sql_clause(
+                    txn.database_engine, "sender", relation_senders
+                )
+                clauses.append(clause)
+                args.extend(temp_args)
+            if relation_types:
+                clause, temp_args = make_in_list_sql_clause(
+                    txn.database_engine, "relation_type", relation_types
+                )
+                clauses.append(clause)
+                args.extend(temp_args)
+
+            txn.execute(sql % " AND ".join(clauses), args)
+
+            return bool(txn.fetchone())
+
+        return await self.db_pool.runInteraction(
+            "get_if_event_has_relations", _get_if_event_has_relations
+        )
 
     async def has_user_annotated_event(
         self, parent_id: str, event_type: str, aggregation_key: str, sender: str

@@ -86,6 +86,9 @@ ROOM_EVENT_FILTER_SCHEMA = {
         # cf https://github.com/matrix-org/matrix-doc/pull/2326
         "org.matrix.labels": {"type": "array", "items": {"type": "string"}},
         "org.matrix.not_labels": {"type": "array", "items": {"type": "string"}},
+        # MSC3440, filtering by event relations.
+        "io.element.relation_senders": {"type": "array", "items": {"type": "string"}},
+        "io.element.relation_types": {"type": "array", "items": {"type": "string"}},
     },
 }
 
@@ -291,6 +294,7 @@ class FilterCollection:
 class Filter:
     def __init__(self, hs: "HomeServer", filter_json: JsonDict):
         self._hs = hs
+        self._store = hs.get_datastore()
         self.filter_json = filter_json
 
         self.limit = filter_json.get("limit", 10)
@@ -312,6 +316,11 @@ class Filter:
 
         self.labels = filter_json.get("org.matrix.labels", None)
         self.not_labels = filter_json.get("org.matrix.not_labels", [])
+
+        self.relation_senders = self.filter_json.get(
+            "io.element.relation_senders", None
+        )
+        self.relation_types = self.filter_json.get("io.element.relation_types", None)
 
     def filters_all_types(self) -> bool:
         return "*" in self.not_types
@@ -379,6 +388,14 @@ class Filter:
                 contains_url = isinstance(content.get("url"), str)
                 if contains_url_filter != contains_url:
                     return False
+
+            # TODO This is wildly inefficient.
+            if isinstance(event, EventBase) and (
+                self.relation_senders or self.relation_types
+            ):
+                return await self._store.has_event_relations(
+                    event.event_id, self.relation_senders, self.relation_types
+                )
 
             return True
 
