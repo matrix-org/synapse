@@ -16,6 +16,7 @@ import itertools
 import logging
 import os.path
 import re
+import urllib.parse
 from textwrap import indent
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
@@ -287,6 +288,20 @@ class ServerConfig(Config):
             if public_baseurl[-1] != "/":
                 public_baseurl += "/"
         self.public_baseurl = public_baseurl
+
+        # check that public_baseurl is valid
+        try:
+            splits = urllib.parse.urlsplit(self.public_baseurl)
+        except Exception as e:
+            raise ConfigError(f"Unable to parse URL: {e}", ("public_baseurl",))
+        if splits.scheme not in ("https", "http"):
+            raise ConfigError(
+                f"Invalid scheme '{splits.scheme}': only https and http are supported"
+            )
+        if splits.query or splits.fragment:
+            raise ConfigError(
+                "public_baseurl cannot contain query parameters or a #-fragment"
+            )
 
         # Whether to enable user presence.
         presence_config = config.get("presence") or {}
