@@ -520,16 +520,6 @@ With all that being said, if you still want to try and recover the room:
 4. If `new_room_user_id` was given, a 'Content Violation' will have been
    created. Consider whether you want to delete that roomm.
 
-## Deprecated endpoint
-
-The previous deprecated API will be removed in a future release, it was:
-
-```
-POST /_synapse/admin/v1/rooms/<room_id>/delete
-```
-
-It behaves the same way than the current endpoint except the path and the method.
-
 # Make Room Admin API
 
 Grants another user the highest power available to a local user who is in the room.
