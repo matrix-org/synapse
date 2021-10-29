@@ -59,7 +59,9 @@ class ApplicationServicesHandler:
         self.current_max = 0
         self.is_processing = False
 
-        self._ephemeral_events_linearizer = Linearizer(name="appservice_ephemeral_events")
+        self._ephemeral_events_linearizer = Linearizer(
+            name="appservice_ephemeral_events"
+        )
 
     def notify_interested_services(self, max_token: RoomStreamToken) -> None:
         """Notifies (pushes) all application services interested in this event.
@@ -260,7 +262,7 @@ class ApplicationServicesHandler:
                     )
                 ):
                     if stream_key == "receipt_key":
-                        events = await self._handle_receipts(service)
+                        events = await self._handle_receipts(service, new_token)
                         if events:
                             self.scheduler.submit_ephemeral_events_for_as(
                                 service, events
@@ -272,7 +274,7 @@ class ApplicationServicesHandler:
                         )
 
                     elif stream_key == "presence_key":
-                        events = await self._handle_presence(service, users)
+                        events = await self._handle_presence(service, users, new_token)
                         if events:
                             self.scheduler.submit_ephemeral_events_for_as(
                                 service, events
@@ -318,7 +320,9 @@ class ApplicationServicesHandler:
         )
         return typing
 
-    async def _handle_receipts(self, service: ApplicationService) -> List[JsonDict]:
+    async def _handle_receipts(
+        self, service: ApplicationService, new_token: Optional[int]
+    ) -> List[JsonDict]:
         """
         Return the latest read receipts that the given application service should receive.
 
@@ -337,6 +341,9 @@ class ApplicationServicesHandler:
         from_key = await self.store.get_type_stream_id_for_appservice(
             service, "read_receipt"
         )
+        if new_token is not None and new_token <= from_key:
+            raise Exception("Rejecting token lower than stored: %s" % (new_token,))
+
         receipts_source = self.event_sources.sources.receipt
         receipts, _ = await receipts_source.get_new_events_as(
             service=service, from_key=from_key
@@ -344,7 +351,10 @@ class ApplicationServicesHandler:
         return receipts
 
     async def _handle_presence(
-        self, service: ApplicationService, users: Collection[Union[str, UserID]]
+        self,
+        service: ApplicationService,
+        users: Collection[Union[str, UserID]],
+        new_token: Optional[int],
     ) -> List[JsonDict]:
         """
         Return the latest presence updates that the given application service should receive.
@@ -367,6 +377,9 @@ class ApplicationServicesHandler:
         from_key = await self.store.get_type_stream_id_for_appservice(
             service, "presence"
         )
+        if new_token is not None and new_token <= from_key:
+            raise Exception("Rejecting token lower than stored: %s" % (new_token,))
+
         for user in users:
             if isinstance(user, str):
                 user = UserID.from_string(user)
