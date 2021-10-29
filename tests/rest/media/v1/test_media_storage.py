@@ -269,15 +269,12 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         )
         self.assertEqual(self.fetches[0][3], {"allow_remote": "false"})
 
+        headers = {
+            b"Content-Length": [b"%d" % (len(self.test_image.data))],
+        }
+
         if include_content_type:
-            headers = {
-                b"Content-Length": [b"%d" % (len(self.test_image.data))],
-                b"Content-Type": [self.test_image.content_type],
-            }
-        else:
-            headers = {
-                b"Content-Length": [b"%d" % (len(self.test_image.data))],
-            }
+            headers[b"Content-Type"] = [self.test_image.content_type]
 
         if content_disposition:
             headers[b"Content-Disposition"] = [content_disposition]
@@ -292,7 +289,10 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         return channel
 
     def test_handle_missing_content_type(self):
-        channel = self._req(b"inline; filename=out" + self.test_image.extension, False)
+        channel = self._req(
+            b"inline; filename=out" + self.test_image.extension,
+            include_content_type=False,
+        )
         headers = channel.headers
         self.assertEqual(channel.code, 200)
         self.assertEqual(

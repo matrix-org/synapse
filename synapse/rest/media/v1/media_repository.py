@@ -214,9 +214,9 @@ class MediaRepository:
 
         self.mark_recently_accessed(None, media_id)
 
-        media_type = media_info.get("media_type")
+        media_type = media_info["media_type"]
         if not media_type:
-            media_type = "application/octect-stream"
+            media_type = "application/octet-stream"
         media_length = media_info["media_length"]
         upload_name = name if name else media_info["upload_name"]
         url_cache = media_info["url_cache"]
@@ -336,7 +336,7 @@ class MediaRepository:
                 raise NotFoundError()
 
             if not media_info["media_type"]:
-                media_info["media_type"] = "application/octect-stream"
+                media_info["media_type"] = "application/octet-stream"
 
             responder = await self.media_storage.fetch_media(file_info)
             if responder:
@@ -360,7 +360,7 @@ class MediaRepository:
 
         file_id = media_info["filesystem_id"]
         if not media_info["media_type"]:
-            media_info["media_type"] = "application/octect-stream"
+            media_info["media_type"] = "application/octet-stream"
         file_info = FileInfo(server_name, file_id)
 
         # We generate thumbnails even if another process downloaded the media
