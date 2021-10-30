@@ -14,7 +14,7 @@
 import itertools
 import logging
 from queue import Empty, PriorityQueue
-from typing import Collection, Dict, Iterable, List, Optional, Set, Tuple, NamedTuple
+from typing import Collection, Dict, Iterable, List, NamedTuple, Optional, Set, Tuple
 
 from prometheus_client import Counter, Gauge
 

@@ -16,8 +16,8 @@
 """Contains handlers for federation events."""
 
 import logging
-from queue import Empty, PriorityQueue
 from http import HTTPStatus
+from queue import Empty, PriorityQueue
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
 
 from signedjson.key import decode_verify_key_bytes
@@ -57,12 +57,12 @@ from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
 )
+from synapse.storage.databases.main.event_federation import BackfillQueueNavigationItem
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import JsonDict, StateMap, get_domain_from_id
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.visibility import filter_events_for_server
-from synapse.storage.databases.main.event_federation import BackfillQueueNavigationItem
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
