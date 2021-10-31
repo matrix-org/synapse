@@ -38,7 +38,7 @@ class WellKnownTests(unittest.HomeserverTestCase):
         self.assertEqual(
             channel.json_body,
             {
-                "m.homeserver": {"base_url": "https://tesths/"},
+                "m.homeserver": {"base_url": "https://tesths"},
                 "m.identity_server": {"base_url": "https://testis"},
             },
         )

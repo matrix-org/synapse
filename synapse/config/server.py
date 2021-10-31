@@ -264,9 +264,10 @@ class ServerConfig(Config):
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
 
         self.public_baseurl = config.get("public_baseurl")
-        if self.public_baseurl is not None:
-            if self.public_baseurl[-1] != "/":
-                self.public_baseurl += "/"
+        # Commented out due to https://github.com/matrix-org/synapse/issues/8308
+        # if self.public_baseurl is not None:
+        #     if self.public_baseurl[-1] != "/":
+        #         self.public_baseurl += "/"
 
         # Whether to enable user presence.
         presence_config = config.get("presence") or {}
