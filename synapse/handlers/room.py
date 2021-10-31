@@ -1276,6 +1276,10 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
 
 
 class RoomShutdownHandler:
+    """This handler shutdown rooms synchronous and is part of the delete room v1 API.
+    It will become deprecated in the future.
+    The handler for asynchronous shudowns is part of the PaginationHandler.
+    """
 
     DEFAULT_MESSAGE = (
         "Sharing illegal content on this server is not permitted and rooms in"
@@ -1289,7 +1293,6 @@ class RoomShutdownHandler:
         self._room_creation_handler = hs.get_room_creation_handler()
         self._replication = hs.get_replication_data_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.state = hs.get_state_handler()
         self.store = hs.get_datastore()
 
     async def shutdown_room(

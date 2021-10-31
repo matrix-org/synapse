@@ -34,7 +34,7 @@ from synapse.rest.admin._base import (
     assert_user_is_admin,
 )
 from synapse.storage.databases.main.room import RoomSortOrder
-from synapse.types import JsonDict, UserID, create_requester
+from synapse.types import JsonDict, RoomID, UserID, create_requester
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
@@ -79,6 +79,108 @@ class DeleteRoomRestServlet(RestServlet):
             self.room_shutdown_handler,
             self.pagination_handler,
         )
+
+
+class RoomRestV2Servlet(RestServlet):
+    """Delete a room from server asynchronously with a background task.
+
+    It is a combination and improvement of shutdown and purge room.
+
+    Shuts down a room by removing all local users from the room.
+    Blocking all future invites and joins to the room is optional.
+
+    If desired any local aliases will be repointed to a new room
+    created by `new_room_user_id` and kicked users will be auto-
+    joined to the new room.
+
+    If 'purge' is true, it will remove all traces of a room from the database.
+    """
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)$", "v2")
+
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+        self.pagination_handler = hs.get_pagination_handler()
+
+    async def on_DELETE(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        content = parse_json_object_from_request(request)
+
+        block = content.get("block", False)
+        if not isinstance(block, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'block' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
+        purge = content.get("purge", True)
+        if not isinstance(purge, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'purge' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
+        force_purge = content.get("force_purge", False)
+        if not isinstance(force_purge, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'force_purge' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
+        if not RoomID.is_valid(room_id):
+            raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
+
+        if not await self.store.get_room(room_id):
+            raise NotFoundError("Unknown room id %s" % (room_id,))
+
+        self.pagination_handler.start_shutdown_and_purge_room(
+            room_id=room_id,
+            new_room_user_id=content.get("new_room_user_id"),
+            new_room_name=content.get("room_name"),
+            message=content.get("message"),
+            requester_user_id=requester.user.to_string(),
+            block=block,
+            purge=purge,
+            force_purge=force_purge,
+        )
+
+        return 200, {}
+
+
+class DeleteRoomStatusRestServlet(RestServlet):
+    """Get the status of the delete room background task."""
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/delete_status$", "v2")
+
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.pagination_handler = hs.get_pagination_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+
+        await assert_requester_is_admin(self.auth, request)
+
+        if not RoomID.is_valid(room_id):
+            raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
+
+        purge_status = self.pagination_handler.get_purge_status(room_id)
+        if purge_status is None:
+            raise NotFoundError("No delete task for room_id '%s' found" % room_id)
+
+        return 200, purge_status.asdict_with_result()
 
 
 class ListRoomRestServlet(RestServlet):

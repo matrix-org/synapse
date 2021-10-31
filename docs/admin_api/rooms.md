@@ -4,6 +4,9 @@
 - [Room Members API](#room-members-api)
 - [Room State API](#room-state-api)
 - [Delete Room API](#delete-room-api)
+  * [Version 1 (old version)](#version-1-old-version)
+  * [Version 2 (new version)](#version-2-new-version)
+  * [Status of deleting rooms](#status-of-deleting-rooms)
   * [Undoing room shutdowns](#undoing-room-shutdowns)
 - [Make Room Admin API](#make-room-admin-api)
 - [Forward Extremities Admin API](#forward-extremities-admin-api)
@@ -403,6 +406,17 @@ several minutes or longer.
 The local server will only have the power to move local user and room aliases to
 the new room. Users on other servers will be unaffected.
 
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see [Admin API](../usage/administration/admin_api).
+
+## Version 1 (old version)
+
+This version works synchronous. That means you get the response if the server has
+finised this action. This may take a long time. If you requests the same action
+a second time, if the server is not finished the first one, can the server hang up.
+This is fixed in Version 2 of this API. The parameters are the same in both APIs.
+This API will become deprecated in the future.
+
 The API is:
 
 ```
@@ -421,9 +435,6 @@ with a body of:
 }
 ```
 
-To use it, you will need to authenticate by providing an ``access_token`` for a
-server admin: see [Admin API](../usage/administration/admin_api).
-
 A response body like the following is returned:
 
 ```json
@@ -438,6 +449,38 @@ A response body like the following is returned:
     ],
     "new_room_id": "!newroomid:example.com"
 }
+```
+
+The parameters and response values have the same expression like in
+[version 2](#version-2-new-version) of the API.
+
+## Version 2 (new version)
+
+This version works asynchronous. That means you get the response from server immediately.
+The server works on that task in background. You can request the status of this action.
+
+The API is:
+
+```
+DELETE /_synapse/admin/v2/rooms/<room_id>
+```
+
+with a body of:
+
+```json
+{
+    "new_room_user_id": "@someuser:example.com",
+    "room_name": "Content Violation Notification",
+    "message": "Bad Room has been shutdown due to content violations on this server. Please review our Terms of Service.",
+    "block": true,
+    "purge": true
+}
+```
+
+An empty JSON dict is returned.
+
+```json
+{}
 ```
 
 **Parameters**
@@ -470,16 +513,60 @@ The following JSON body parameters are available:
 
 The JSON body must not be empty. The body must be at least `{}`.
 
+## Status of deleting rooms
+
+It is possible to query the status of the background task for deleting rooms.
+The status can be queried up to 24 hours after completion of the task
+or a restart of Synapse.
+
+The API is:
+
+```
+GET /_synapse/admin/v2/rooms/<room_id>/delete_status
+```
+
+A response body like the following is returned:
+
+```json
+{
+    "status": "active",
+    "result": {
+        "kicked_users": [
+            "@foobar:example.com"
+        ],
+        "failed_to_kick_users": [],
+        "local_aliases": [
+            "#badroom:example.com",
+            "#evilsaloon:example.com"
+        ],
+        "new_room_id": "!newroomid:example.com"
+    }
+}
+```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+* `room_id` - The ID of the room.
+
 **Response**
 
 The following fields are returned in the JSON response body:
 
-* `kicked_users` - An array of users (`user_id`) that were kicked.
-* `failed_to_kick_users` - An array of users (`user_id`) that that were not kicked.
-* `local_aliases` - An array of strings representing the local aliases that were migrated from
-                    the old room to the new.
-* `new_room_id` - A string representing the room ID of the new room.
-
+* `status` - The status will be one of:
+  - `remove members` - The process is removing users from the `room_id`.
+  - `active` - The process is purging the room from databse.
+  - `complete` - The process has completed successfully.
+  - `failed` - The process is aborted, an error has occurred.
+* `result` - An object containing information about the result of shutting down the room.
+  *Note:* The result is shown after removing the room members. The delete process can
+  still be running. Please pay attention to the `status`.
+  - `kicked_users` - An array of users (`user_id`) that were kicked.
+  - `failed_to_kick_users` - An array of users (`user_id`) that that were not kicked.
+  - `local_aliases` - An array of strings representing the local aliases that were
+  migrated from the old room to the new.
+  - `new_room_id` - A string representing the room ID of the new room.
 
 ## Undoing room deletions
 

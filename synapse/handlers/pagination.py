@@ -19,14 +19,14 @@ import attr
 
 from twisted.python.failure import Failure
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, Membership, RoomCreationPreset
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
-from synapse.types import JsonDict, Requester
+from synapse.types import JsonDict, Requester, create_requester
 from synapse.util.async_helpers import ReadWriteLock
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
@@ -49,18 +49,29 @@ class PurgeStatus:
     STATUS_ACTIVE = 0
     STATUS_COMPLETE = 1
     STATUS_FAILED = 2
+    STATUS_REMOVE_MEMBERS = 3
 
     STATUS_TEXT = {
         STATUS_ACTIVE: "active",
         STATUS_COMPLETE: "complete",
         STATUS_FAILED: "failed",
+        STATUS_REMOVE_MEMBERS: "remove members",
     }
 
     # Tracks whether this request has completed. One of STATUS_{ACTIVE,COMPLETE,FAILED}.
     status: int = STATUS_ACTIVE
 
+    # Saves the result of an action to give it back to REST API
+    result: Dict = {}
+
     def asdict(self) -> JsonDict:
         return {"status": PurgeStatus.STATUS_TEXT[self.status]}
+
+    def asdict_with_result(self) -> JsonDict:
+        return {
+            "status": PurgeStatus.STATUS_TEXT[self.status],
+            "result": self.result,
+        }
 
 
 class PaginationHandler:
@@ -70,6 +81,12 @@ class PaginationHandler:
     paginating during a purge.
     """
 
+    DEFAULT_MESSAGE = (
+        "Sharing illegal content on this server is not permitted and rooms in"
+        " violation will be blocked."
+    )
+    DEFAULT_ROOM_NAME = "Content Violation Notification"
+
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
@@ -78,6 +95,11 @@ class PaginationHandler:
         self.state_store = self.storage.state
         self.clock = hs.get_clock()
         self._server_name = hs.hostname
+
+        self.room_member_handler = hs.get_room_member_handler()
+        self._room_creation_handler = hs.get_room_creation_handler()
+        self._replication = hs.get_replication_data_handler()
+        self.event_creation_handler = hs.get_event_creation_handler()
 
         self.pagination_lock = ReadWriteLock()
         self._purges_in_progress_by_room: Set[str] = set()
@@ -314,6 +336,7 @@ class PaginationHandler:
 
     async def purge_room(self, room_id: str, force: bool = False) -> None:
         """Purge the given room from the database.
+        This function is part the delete room v1 API.
 
         Args:
             room_id: room to be purged
@@ -472,3 +495,312 @@ class PaginationHandler:
             )
 
         return chunk
+
+    async def _shutdown_and_purge_room(
+        self,
+        room_id: str,
+        requester_user_id: str,
+        new_room_user_id: Optional[str] = None,
+        new_room_name: Optional[str] = None,
+        message: Optional[str] = None,
+        block: bool = False,
+        purge: bool = True,
+        force_purge: bool = False,
+    ) -> None:
+        """
+        Shuts down and purge a room. Moves all local users and room aliases
+        automatically to a new room if `new_room_user_id` is set.
+        Otherwise local users only leave the room without any information.
+        After that, the room will be removed from the database.
+
+        The new room will be created with the user specified by the
+        `new_room_user_id` parameter as room administrator and will contain a
+        message explaining what happened. Users invited to the new room will
+        have power level `-10` by default, and thus be unable to speak.
+
+        The local server will only have the power to move local user and room
+        aliases to the new room. Users on other servers will be unaffected.
+
+        Args:
+            room_id: The ID of the room to shut down.
+            requester_user_id:
+                User who requested the action and put the room on the
+                blocking list.
+            new_room_user_id:
+                If set, a new room will be created with this user ID
+                as the creator and admin, and all users in the old room will be
+                moved into that room. If not set, no new room will be created
+                and the users will just be removed from the old room.
+            new_room_name:
+                A string representing the name of the room that new users will
+                be invited to. Defaults to `Content Violation Notification`
+            message:
+                A string containing the first message that will be sent as
+                `new_room_user_id` in the new room. Ideally this will clearly
+                convey why the original room was shut down.
+                Defaults to `Sharing illegal content on this server is not
+                permitted and rooms in violation will be blocked.`
+            block:
+                If set to `true`, this room will be added to a blocking list,
+                preventing future attempts to join the room. Defaults to `false`.
+            purge:
+                If set to `true`, purge the given room from the database.
+            force_purge:
+                If set to `true`, the room will be purged from database
+                also if it fails to remove some users from room.
+
+        Saves a dict containing the following keys in `PurgeStatus`:
+            kicked_users: An array of users (`user_id`) that were kicked.
+            failed_to_kick_users:
+                An array of users (`user_id`) that that were not kicked.
+            local_aliases:
+                An array of strings representing the local aliases that were
+                migrated from the old room to the new.
+            new_room_id: A string representing the room ID of the new room.
+        """
+
+        if not new_room_name:
+            new_room_name = self.DEFAULT_ROOM_NAME
+        if not message:
+            message = self.DEFAULT_MESSAGE
+
+        self._purges_in_progress_by_room.add(room_id)
+        try:
+            with await self.pagination_lock.write(room_id):
+
+                # This will work even if the room is already blocked, but that is
+                # desirable in case the first attempt at blocking the room failed below.
+                if block:
+                    await self.store.block_room(room_id, requester_user_id)
+
+                if new_room_user_id is not None:
+                    room_creator_requester = create_requester(
+                        new_room_user_id, authenticated_entity=requester_user_id
+                    )
+
+                    info, stream_id = await self._room_creation_handler.create_room(
+                        room_creator_requester,
+                        config={
+                            "preset": RoomCreationPreset.PUBLIC_CHAT,
+                            "name": new_room_name,
+                            "power_level_content_override": {"users_default": -10},
+                        },
+                        ratelimit=False,
+                    )
+                    new_room_id = info["room_id"]
+
+                    logger.info(
+                        "[shutdown_and_purge] Shutting down room %r, joining to new room: %r",
+                        room_id,
+                        new_room_id,
+                    )
+
+                    # We now wait for the create room to come back in via replication so
+                    # that we can assume that all the joins/invites have propagated before
+                    # we try and auto join below.
+                    await self._replication.wait_for_stream_position(
+                        self.hs.config.worker.events_shard_config.get_instance(
+                            new_room_id
+                        ),
+                        "events",
+                        stream_id,
+                    )
+                else:
+                    new_room_id = None
+                    logger.info("[shutdown_and_purge] Shutting down room %r", room_id)
+
+                self._purges_by_id[room_id].status = PurgeStatus.STATUS_REMOVE_MEMBERS
+
+                users = await self.store.get_users_in_room(room_id)
+                kicked_users = []
+                failed_to_kick_users = []
+                for user_id in users:
+                    if not self.hs.is_mine_id(user_id):
+                        continue
+
+                    logger.info(
+                        "[shutdown_and_purge] Kicking %r from %r...", user_id, room_id
+                    )
+
+                    try:
+                        # Kick users from room
+                        target_requester = create_requester(
+                            user_id, authenticated_entity=requester_user_id
+                        )
+                        _, stream_id = await self.room_member_handler.update_membership(
+                            requester=target_requester,
+                            target=target_requester.user,
+                            room_id=room_id,
+                            action=Membership.LEAVE,
+                            content={},
+                            ratelimit=False,
+                            require_consent=False,
+                        )
+
+                        # Wait for leave to come in over replication before trying to forget.
+                        await self._replication.wait_for_stream_position(
+                            self.hs.config.worker.events_shard_config.get_instance(
+                                room_id
+                            ),
+                            "events",
+                            stream_id,
+                        )
+
+                        await self.room_member_handler.forget(
+                            target_requester.user, room_id
+                        )
+
+                        # Join users to new room
+                        if new_room_user_id:
+                            await self.room_member_handler.update_membership(
+                                requester=target_requester,
+                                target=target_requester.user,
+                                room_id=new_room_id,
+                                action=Membership.JOIN,
+                                content={},
+                                ratelimit=False,
+                                require_consent=False,
+                            )
+
+                        kicked_users.append(user_id)
+                    except Exception:
+                        logger.exception(
+                            "[shutdown_and_purge] Failed to leave old room and join new room for %r",
+                            user_id,
+                        )
+                        failed_to_kick_users.append(user_id)
+
+                self._purges_by_id[room_id].status = PurgeStatus.STATUS_ACTIVE
+
+                # Send message in new room and move aliases
+                if new_room_user_id:
+                    await self.event_creation_handler.create_and_send_nonmember_event(
+                        room_creator_requester,
+                        {
+                            "type": "m.room.message",
+                            "content": {"body": message, "msgtype": "m.text"},
+                            "room_id": new_room_id,
+                            "sender": new_room_user_id,
+                        },
+                        ratelimit=False,
+                    )
+
+                    aliases_for_room = await self.store.get_aliases_for_room(room_id)
+
+                    await self.store.update_aliases_for_room(
+                        room_id, new_room_id, requester_user_id
+                    )
+                else:
+                    aliases_for_room = []
+
+                self._purges_by_id[room_id].result = {
+                    "kicked_users": kicked_users,
+                    "failed_to_kick_users": failed_to_kick_users,
+                    "local_aliases": aliases_for_room,
+                    "new_room_id": new_room_id,
+                }
+
+                if purge:
+                    logger.info(
+                        "[shutdown_and_purge] starting purge room_id %s", room_id
+                    )
+                    self._purges_by_id[room_id].status = PurgeStatus.STATUS_ACTIVE
+
+                    # first check that we have no users in this room
+                    if not force_purge:
+                        joined = await self.store.is_host_joined(
+                            room_id, self._server_name
+                        )
+                        if joined:
+                            raise SynapseError(
+                                400, "Users are still joined to this room"
+                            )
+
+                    await self.storage.purge_events.purge_room(room_id)
+
+            logger.info("[shutdown_and_purge] complete")
+            self._purges_by_id[room_id].status = PurgeStatus.STATUS_COMPLETE
+        except Exception:
+            f = Failure()
+            logger.error(
+                "[shutdown_and_purge] failed",
+                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+            )
+            self._purges_by_id[room_id].status = PurgeStatus.STATUS_FAILED
+        finally:
+            self._purges_in_progress_by_room.discard(room_id)
+
+            # remove the purge from the list 24 hours after it completes
+            def clear_purge() -> None:
+                del self._purges_by_id[room_id]
+
+            self.hs.get_reactor().callLater(24 * 3600, clear_purge)
+
+    def start_shutdown_and_purge_room(
+        self,
+        room_id: str,
+        requester_user_id: str,
+        new_room_user_id: Optional[str] = None,
+        new_room_name: Optional[str] = None,
+        message: Optional[str] = None,
+        block: bool = False,
+        purge: bool = True,
+        force_purge: bool = False,
+    ) -> None:
+        """Start off shut down and purge on a room.
+
+        Args:
+            room_id: The ID of the room to shut down.
+            requester_user_id:
+                User who requested the action and put the room on the
+                blocking list.
+            new_room_user_id:
+                If set, a new room will be created with this user ID
+                as the creator and admin, and all users in the old room will be
+                moved into that room. If not set, no new room will be created
+                and the users will just be removed from the old room.
+            new_room_name:
+                A string representing the name of the room that new users will
+                be invited to. Defaults to `Content Violation Notification`
+            message:
+                A string containing the first message that will be sent as
+                `new_room_user_id` in the new room. Ideally this will clearly
+                convey why the original room was shut down.
+                Defaults to `Sharing illegal content on this server is not
+                permitted and rooms in violation will be blocked.`
+            block:
+                If set to `true`, this room will be added to a blocking list,
+                preventing future attempts to join the room. Defaults to `false`.
+            purge:
+                If set to `true`, purge the given room from the database.
+            force_purge:
+                If set to `true`, the room will be purged from database
+                also if it fails to remove some users from room.
+        """
+        if room_id in self._purges_in_progress_by_room:
+            raise SynapseError(
+                400, "History purge already in progress for %s" % (room_id,)
+            )
+
+        if new_room_user_id is not None:
+            if not self.hs.is_mine_id(new_room_user_id):
+                raise SynapseError(
+                    400, "User must be our own: %s" % (new_room_user_id,)
+                )
+
+        # we log the purge_id here so that it can be tied back to the
+        # request id in the log lines.
+        logger.info("[shutdown_and_purge] starting shutdown room_id %s", room_id)
+
+        self._purges_by_id[room_id] = PurgeStatus()
+        run_in_background(
+            self._shutdown_and_purge_room,
+            room_id,
+            requester_user_id,
+            new_room_user_id,
+            new_room_name,
+            message,
+            block,
+            purge,
+            force_purge,
+        )
