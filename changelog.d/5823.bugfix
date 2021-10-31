@@ -1,0 +1,1 @@
+Remove trialing slashes form homeserver url so other services don't take it literally.
