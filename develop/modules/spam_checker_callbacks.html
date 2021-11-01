@@ -267,32 +267,6 @@ whether the given user (represented by their Matrix user ID) is allowed to creat
 callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
-<h3 id="user_may_create_room_with_invites"><a class="header" href="#user_may_create_room_with_invites"><code>user_may_create_room_with_invites</code></a></h3>
-<p><em>First introduced in Synapse v1.44.0</em></p>
-<pre><code class="language-python">async def user_may_create_room_with_invites(
-    user: str,
-    invites: List[str],
-    threepid_invites: List[Dict[str, str]],
-) -&gt; bool
-</code></pre>
-<p>Called when processing a room creation request (right after <code>user_may_create_room</code>).
-The module is given the Matrix user ID of the user trying to create a room, as well as a
-list of Matrix users to invite and a list of third-party identifiers (3PID, e.g. email
-addresses) to invite.</p>
-<p>An invited Matrix user to invite is represented by their Matrix user IDs, and an invited
-3PIDs is represented by a dict that includes the 3PID medium (e.g. &quot;email&quot;) through its
-<code>medium</code> key and its address (e.g. &quot;alice@example.com&quot;) through its <code>address</code> key.</p>
-<p>See <a href="https://matrix.org/docs/spec/appendices#pid-types">the Matrix specification</a> for more
-information regarding third-party identifiers.</p>
-<p>If no invite and/or 3PID invite were specified in the room creation request, the
-corresponding list(s) will be empty.</p>
-<p><strong>Note</strong>: This callback is not called when a room is cloned (e.g. during a room upgrade)
-since no invites are sent when cloning a room. To cover this case, modules also need to
-implement <code>user_may_create_room</code>.</p>
-<p>If multiple modules implement this callback, they will be considered in order. If a
-callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
-callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
-any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_create_room_alias"><a class="header" href="#user_may_create_room_alias"><code>user_may_create_room_alias</code></a></h3>
 <p><em>First introduced in Synapse v1.37.0</em></p>
 <pre><code class="language-python">async def user_may_create_room_alias(user: str, room_alias: &quot;synapse.types.RoomAlias&quot;) -&gt; bool

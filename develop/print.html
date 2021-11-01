@@ -1571,6 +1571,15 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1470"><a class="header" href="#upgrading-to-v1470">Upgrading to v1.47.0</a></h1>
+<h2 id="deprecation-of-the-user_may_create_room_with_invites-module-callback"><a class="header" href="#deprecation-of-the-user_may_create_room_with_invites-module-callback">Deprecation of the <code>user_may_create_room_with_invites</code> module callback</a></h2>
+<p>The <code>user_may_create_room_with_invites</code> is deprecated and will be removed in a future
+version of Synapse. Modules implementing this callback can instead implement
+<a href="https://matrix-org.github.io/synapse/latest/modules/spam_checker_callbacks.html#user_may_invite"><code>user_may_invite</code></a>
+and use the <a href="https://github.com/matrix-org/synapse/blob/872f23b95fa980a61b0866c1475e84491991fa20/synapse/module_api/__init__.py#L869-L876"><code>get_room_state</code></a>
+module API method to infer whether the invite is happening in the context of creating a
+room.</p>
+<p>We plan to remove this callback in January 2022.</p>
 <h1 id="upgrading-to-v1450"><a class="header" href="#upgrading-to-v1450">Upgrading to v1.45.0</a></h1>
 <h2 id="changes-required-to-media-storage-provider-modules-when-reading-from-the-synapse-configuration-object"><a class="header" href="#changes-required-to-media-storage-provider-modules-when-reading-from-the-synapse-configuration-object">Changes required to media storage provider modules when reading from the Synapse configuration object</a></h2>
 <p>Media storage provider modules that read from the Synapse configuration object (i.e. that
@@ -7851,32 +7860,6 @@ any of the subsequent implementations of this callback.</p>
 </code></pre>
 <p>Called when processing a room creation request. The module must return a <code>bool</code> indicating
 whether the given user (represented by their Matrix user ID) is allowed to create a room.</p>
-<p>If multiple modules implement this callback, they will be considered in order. If a
-callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
-callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
-any of the subsequent implementations of this callback.</p>
-<h3 id="user_may_create_room_with_invites"><a class="header" href="#user_may_create_room_with_invites"><code>user_may_create_room_with_invites</code></a></h3>
-<p><em>First introduced in Synapse v1.44.0</em></p>
-<pre><code class="language-python">async def user_may_create_room_with_invites(
-    user: str,
-    invites: List[str],
-    threepid_invites: List[Dict[str, str]],
-) -&gt; bool
-</code></pre>
-<p>Called when processing a room creation request (right after <code>user_may_create_room</code>).
-The module is given the Matrix user ID of the user trying to create a room, as well as a
-list of Matrix users to invite and a list of third-party identifiers (3PID, e.g. email
-addresses) to invite.</p>
-<p>An invited Matrix user to invite is represented by their Matrix user IDs, and an invited
-3PIDs is represented by a dict that includes the 3PID medium (e.g. &quot;email&quot;) through its
-<code>medium</code> key and its address (e.g. &quot;alice@example.com&quot;) through its <code>address</code> key.</p>
-<p>See <a href="https://matrix.org/docs/spec/appendices#pid-types">the Matrix specification</a> for more
-information regarding third-party identifiers.</p>
-<p>If no invite and/or 3PID invite were specified in the room creation request, the
-corresponding list(s) will be empty.</p>
-<p><strong>Note</strong>: This callback is not called when a room is cloned (e.g. during a room upgrade)
-since no invites are sent when cloning a room. To cover this case, modules also need to
-implement <code>user_may_create_room</code>.</p>
 <p>If multiple modules implement this callback, they will be considered in order. If a
 callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call

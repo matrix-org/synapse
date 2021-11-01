@@ -260,6 +260,15 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1470"><a class="header" href="#upgrading-to-v1470">Upgrading to v1.47.0</a></h1>
+<h2 id="deprecation-of-the-user_may_create_room_with_invites-module-callback"><a class="header" href="#deprecation-of-the-user_may_create_room_with_invites-module-callback">Deprecation of the <code>user_may_create_room_with_invites</code> module callback</a></h2>
+<p>The <code>user_may_create_room_with_invites</code> is deprecated and will be removed in a future
+version of Synapse. Modules implementing this callback can instead implement
+<a href="https://matrix-org.github.io/synapse/latest/modules/spam_checker_callbacks.html#user_may_invite"><code>user_may_invite</code></a>
+and use the <a href="https://github.com/matrix-org/synapse/blob/872f23b95fa980a61b0866c1475e84491991fa20/synapse/module_api/__init__.py#L869-L876"><code>get_room_state</code></a>
+module API method to infer whether the invite is happening in the context of creating a
+room.</p>
+<p>We plan to remove this callback in January 2022.</p>
 <h1 id="upgrading-to-v1450"><a class="header" href="#upgrading-to-v1450">Upgrading to v1.45.0</a></h1>
 <h2 id="changes-required-to-media-storage-provider-modules-when-reading-from-the-synapse-configuration-object"><a class="header" href="#changes-required-to-media-storage-provider-modules-when-reading-from-the-synapse-configuration-object">Changes required to media storage provider modules when reading from the Synapse configuration object</a></h2>
 <p>Media storage provider modules that read from the Synapse configuration object (i.e. that
