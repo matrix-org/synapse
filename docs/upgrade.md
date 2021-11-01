@@ -87,6 +87,16 @@ process, for example:
 
 # Upgrading to v1.47.0
 
+## Removal of old Room Admin API
+
+The following admin APIs were deprecated in [Synapse 1.34](https://github.com/matrix-org/synapse/blob/v1.34.0/CHANGES.md#deprecations-and-removals)
+(released on 2021-05-17) and have now been removed:
+
+- `POST /_synapse/admin/v1/<room_id>/delete`
+
+Any scripts still using the above APIs should be converted to use the
+[Delete Room API](https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#delete-room-api).
+
 ## Deprecation of the `user_may_create_room_with_invites` module callback
 
 The `user_may_create_room_with_invites` is deprecated and will be removed in a future
