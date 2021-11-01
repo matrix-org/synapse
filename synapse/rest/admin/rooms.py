@@ -13,7 +13,7 @@
 # limitations under the License.
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple, cast
 from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
@@ -241,7 +241,9 @@ class RoomRestServlet(RestServlet):
         if purge:
             await pagination_handler.purge_room(room_id, force=force_purge)
 
-        return 200, ret
+        # Cast safety: I'm casting away the knowledge that this is a TypedDict.
+        # `ret` is an opaque dictionary blob as far as the rest of the app cares.
+        return 200, cast(JsonDict, ret)
 
 
 class RoomMembersRestServlet(RestServlet):

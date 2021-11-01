@@ -30,6 +30,8 @@ from typing import (
     Tuple,
 )
 
+from typing_extensions import TypedDict
+
 from synapse.api.constants import (
     EventContentFields,
     EventTypes,
@@ -1274,6 +1276,13 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
         return self.store.get_room_events_max_id(room_id)
 
 
+class ShutdownRoomResponse(TypedDict):
+    kicked_users: List[str]
+    failed_to_kick_users: List[str]
+    local_aliases: List[str]
+    new_room_id: Optional[str]
+
+
 class RoomShutdownHandler:
 
     DEFAULT_MESSAGE = (
@@ -1299,7 +1308,7 @@ class RoomShutdownHandler:
         new_room_name: Optional[str] = None,
         message: Optional[str] = None,
         block: bool = False,
-    ) -> dict:
+    ) -> ShutdownRoomResponse:
         """
         Shuts down a room. Moves all local users and room aliases automatically
         to a new room if `new_room_user_id` is set. Otherwise local users only
