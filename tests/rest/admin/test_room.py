@@ -913,10 +913,12 @@ class RoomTestCase(unittest.HomeserverTestCase):
         _search_test(None, "bar")
         _search_test(None, "", expected_http_code=400)
 
-        # Test that whole room name return no result, because of domain
-        _search_test(None, room_id_1)
-        # Test search local part of room id
-        _search_test(room_id_1, room_id_1[1:10])
+        # Test that the whole room id returns the room
+        _search_test(room_id_1, room_id_1)
+        # Test that the search by room_id is case sensitive
+        _search_test(None, room_id_1.lower())
+        # Test search part of local part of room id do not match
+        _search_test(None, room_id_1[1:10])
 
         # Test that whole room alias return no result, because of domain
         _search_test(None, "#Room_Alias1:test")

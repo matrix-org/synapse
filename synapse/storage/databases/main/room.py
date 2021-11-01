@@ -411,18 +411,19 @@ class RoomWorkerStore(SQLBaseStore):
             reverse_order: whether to reverse the room list
             search_term: a string to filter room names,
                 canonical alias and room ids by
+                room ids should only match case sensitive and the complete ID
         Returns:
             A list of room dicts and an integer representing the total number of
             rooms that exist given this query
         """
         # Filter room names by a string
         where_statement = ""
-        search_pattern = ""
+        search_pattern = []
         if search_term:
             where_statement = """
                 WHERE LOWER(state.name) LIKE ?
                 OR LOWER(state.canonical_alias) LIKE ?
-                OR LOWER(state.room_id) LIKE ?
+                OR state.room_id = ?
             """
 
             # Our postgres db driver converts ? -> %s in SQL strings as that's the
@@ -433,7 +434,7 @@ class RoomWorkerStore(SQLBaseStore):
             search_pattern = [
                 "%" + search_term.lower() + "%",
                 "#%" + search_term.lower() + "%:%",
-                "!%" + search_term.lower() + "%:%",
+                search_term,
             ]
 
         # Set ordering

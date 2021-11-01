@@ -43,7 +43,7 @@ The following query parameters are available:
   Specifically, rooms are selected if the search term is contained in
   - the room's name,
   - the local part of the room's canonical alias, or
-  - the local part of the room's id.
+  - the complete (local and server part) room's id (case sensitive).
 
   Defaults to no filtering.
 
