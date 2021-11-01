@@ -15,7 +15,7 @@ To make Synapse (and therefore Element) use it:
      sp_config:
        allow_unknown_attributes: true  # Works around a bug with AVA Hashes: https://github.com/IdentityPython/pysaml2/issues/388
        metadata:
-         local: ["samling.xml"]   
+         local: ["samling.xml"]
    ```
 5. Ensure that your `homeserver.yaml` has a setting for `public_baseurl`:
    ```yaml

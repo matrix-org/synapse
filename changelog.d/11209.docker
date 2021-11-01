@@ -1,0 +1,1 @@
+Avoid changing userid when started as a non-root user, and no explicit `UID` is set.
