@@ -239,7 +239,16 @@ class RoomRestServlet(RestServlet):
 
         # Purge room
         if purge:
-            await pagination_handler.purge_room(room_id, force=force_purge)
+            try:
+                await pagination_handler.purge_room(room_id, force=force_purge)
+            except NotFoundError:
+                if block:
+                    # We can block unknown rooms with this endpoint, in which case
+                    # a failed purge is expected.
+                    pass
+                else:
+                    # But otherwise, we expect this purge to have succeeded.
+                    raise
 
         # Cast safety: I'm casting away the knowledge that this is a TypedDict.
         # `ret` is an opaque dictionary blob as far as the rest of the app cares.
