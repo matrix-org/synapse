@@ -784,7 +784,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "DELETE",
             self.url.encode("ascii"),
-            content={"block": False, "purge": False},
+            content={"block": True, "purge": False},
             access_token=self.admin_user_tok,
         )
 
@@ -807,7 +807,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
 
         with self.assertRaises(AssertionError):
             self._is_purged(self.room_id)
-        self._is_blocked(self.room_id, expect=False)
+        self._is_blocked(self.room_id, expect=True)
         self._has_no_members(self.room_id)
 
     def test_shutdown_room_consent(self):
