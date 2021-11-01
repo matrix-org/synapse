@@ -14,8 +14,11 @@
 
 import json
 import urllib.parse
+from http import HTTPStatus
 from typing import List, Optional
 from unittest.mock import Mock
+
+from parameterized import parameterized
 
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, Membership
@@ -280,6 +283,31 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             self._is_purged(self.room_id)
         self._is_blocked(self.room_id, expect=True)
         self._has_no_members(self.room_id)
+
+    @parameterized.expand([(True,), (False,)])
+    def test_block_unknown_room(self, purge: bool) -> None:
+        """
+        We can block an unknown room. In this case, the `purge` argument
+        should be ignored.
+        """
+        room_id = "!unknown:test"
+
+        # The room isn't already in the blocked rooms table
+        self._is_blocked(room_id, expect=False)
+
+        # Request the room be blocked.
+        channel = self.make_request(
+            self.method,
+            f"/_synapse/admin/v1/rooms/{room_id}",
+            {"block": True, "purge": purge},
+            access_token=self.admin_user_tok,
+        )
+
+        # The room is now blocked.
+        self.assertEqual(
+            HTTPStatus.OK, int(channel.result["code"]), msg=channel.result["body"]
+        )
+        self._is_blocked(room_id)
 
     def test_shutdown_room_consent(self):
         """Test that we can shutdown rooms with local users who have not
