@@ -17,12 +17,12 @@ import collections
 import inspect
 import itertools
 import logging
-from collections import Collection
 from contextlib import contextmanager
 from typing import (
     Any,
     Awaitable,
     Callable,
+    Collection,
     Dict,
     Generic,
     Hashable,
