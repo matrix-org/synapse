@@ -775,7 +775,8 @@ class ServerConfig(Config):
         #
         #public_baseurl: https://example.com/
 
-        # Uncomment the following to tell other servers to redirect traffic to port 443.
+        # Uncomment the following to tell other servers to send federation traffic on
+        # port 443.
         #
         # By default, other servers will try to reach our server on port 8448, which can
         # be inconvenient in some environments.
