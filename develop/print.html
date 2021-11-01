@@ -1427,7 +1427,10 @@ Matrix clients!</p>
 entry in the results.</p>
 </li>
 </ul>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="delegation"><a class="header" href="#delegation">Delegation</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="delegation-of-incoming-federation-traffic"><a class="header" href="#delegation-of-incoming-federation-traffic">Delegation of incoming federation traffic</a></h1>
+<p>In the following documentation, we use the term <code>server_name</code> to refer to that setting
+in your homeserver configuration file. It appears at the ends of user ids, and tells
+other homeservers where they can find your server.</p>
 <p>By default, other homeservers will expect to be able to reach yours via
 your <code>server_name</code>, on port 8448. For example, if you set your <code>server_name</code>
 to <code>example.com</code> (so that your user names look like <code>@user:example.com</code>),
@@ -1437,31 +1440,46 @@ other servers will try to connect to yours at <code>https://example.com:8448/</c
 to look like <code>*:example.com</code>, whilst having federation traffic routed
 to a different server and/or port (e.g. <code>synapse.example.com:443</code>).</p>
 <h2 id="well-known-delegation"><a class="header" href="#well-known-delegation">.well-known delegation</a></h2>
-<p>To use this method, you need to be able to alter the
-<code>server_name</code> 's https server to serve the <code>/.well-known/matrix/server</code>
-URL. Having an active server (with a valid TLS certificate) serving your
-<code>server_name</code> domain is out of the scope of this documentation.</p>
-<p>The URL <code>https://&lt;server_name&gt;/.well-known/matrix/server</code> should
-return a JSON structure containing the key <code>m.server</code> like so:</p>
+<p>To use this method, you need to be able to configure the server at
+<code>https://&lt;server_name&gt;</code> to serve a file at
+<code>https://&lt;server_name&gt;/.well-known/matrix/server</code>.  There are two ways to do this, shown below.</p>
+<p>Note that the <code>.well-known</code> file is hosted on the default port for <code>https</code> (port 443).</p>
+<h3 id="external-server"><a class="header" href="#external-server">External server</a></h3>
+<p>For maximum flexibility, you need to configure an external server such as nginx, Apache
+or HAProxy to serve the <code>https://&lt;server_name&gt;/.well-known/matrix/server</code> file. Setting
+up such a server is out of the scope of this documentation, but note that it is often
+possible to configure your <a href="reverse_proxy.html">reverse proxy</a> for this.</p>
+<p>The URL <code>https://&lt;server_name&gt;/.well-known/matrix/server</code> should be configured
+return a JSON structure containing the key <code>m.server</code> like this:</p>
 <pre><code class="language-json">{
     &quot;m.server&quot;: &quot;&lt;synapse.server.name&gt;[:&lt;yourport&gt;]&quot;
 }
 </code></pre>
-<p>In our example, this would mean that URL <code>https://example.com/.well-known/matrix/server</code>
-should return:</p>
+<p>In our example (where we want federation traffic to be routed to
+<code>https://synapse.example.com</code>, on port 443), this would mean that
+<code>https://example.com/.well-known/matrix/server</code> should return:</p>
 <pre><code class="language-json">{
     &quot;m.server&quot;: &quot;synapse.example.com:443&quot;
 }
 </code></pre>
 <p>Note, specifying a port is optional. If no port is specified, then it defaults
 to 8448.</p>
-<p>With .well-known delegation, federating servers will check for a valid TLS
-certificate for the delegated hostname (in our example: <code>synapse.example.com</code>).</p>
+<h3 id="serving-a-well-knownmatrixserver-file-with-synapse"><a class="header" href="#serving-a-well-knownmatrixserver-file-with-synapse">Serving a <code>.well-known/matrix/server</code> file with Synapse</a></h3>
+<p>If you are able to set up your domain so that <code>https://&lt;server_name&gt;</code> is routed to
+Synapse (i.e., the only change needed is to direct federation traffic to port 443
+instead of port 8448), then it is possible to configure Synapse to serve a suitable
+<code>.well-known/matrix/server</code> file. To do so, add the following to your <code>homeserver.yaml</code>
+file:</p>
+<pre><code class="language-yaml">serve_server_wellknown: true
+</code></pre>
+<p><strong>Note</strong>: this <em>only</em> works if <code>https://&lt;server_name&gt;</code> is routed to Synapse, so is
+generally not suitable if Synapse is hosted at a subdomain such as
+<code>https://synapse.example.com</code>.</p>
 <h2 id="srv-dns-record-delegation"><a class="header" href="#srv-dns-record-delegation">SRV DNS record delegation</a></h2>
-<p>It is also possible to do delegation using a SRV DNS record. However, that is
-considered an advanced topic since it's a bit complex to set up, and <code>.well-known</code>
-delegation is already enough in most cases.</p>
-<p>However, if you really need it, you can find some documentation on how such a
+<p>It is also possible to do delegation using a SRV DNS record. However, that is generally
+not recommended, as it can be difficult to configure the TLS certificates correctly in
+this case, and it offers little advantage over <code>.well-known</code> delegation.</p>
+<p>However, if you really need it, you can find some documentation on what such a
 record should look like and how Synapse will use it in <a href="https://matrix.org/docs/spec/server_server/latest#resolving-server-names">the Matrix
 specification</a>.</p>
 <h2 id="delegation-faq"><a class="header" href="#delegation-faq">Delegation FAQ</a></h2>
@@ -1476,23 +1494,11 @@ wouldn't need any delegation set up.</p>
 <p><strong>However</strong>, if your homeserver's APIs aren't accessible on port 8448 and on the
 domain <code>server_name</code> points to, you will need to let other servers know how to
 find it using delegation.</p>
-<h3 id="do-you-still-recommend-against-using-a-reverse-proxy-on-the-federation-port"><a class="header" href="#do-you-still-recommend-against-using-a-reverse-proxy-on-the-federation-port">Do you still recommend against using a reverse proxy on the federation port?</a></h3>
-<p>We no longer actively recommend against using a reverse proxy. Many admins will
-find it easier to direct federation traffic to a reverse proxy and manage their
-own TLS certificates, and this is a supported configuration.</p>
-<p>See <a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a
+<h3 id="should-i-use-a-reverse-proxy-for-federation-traffic"><a class="header" href="#should-i-use-a-reverse-proxy-for-federation-traffic">Should I use a reverse proxy for federation traffic?</a></h3>
+<p>Generally, using a reverse proxy for both the federation and client traffic is a good
+idea, since it saves handling TLS traffic in Synapse. See
+<a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a
 reverse proxy.</p>
-<h3 id="do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy"><a class="header" href="#do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy">Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?</a></h3>
-<p>This is no longer necessary. If you are using a reverse proxy for all of your
-TLS traffic, then you can set <code>no_tls: True</code> in the Synapse config.</p>
-<p>In that case, the only reason Synapse needs the certificate is to populate a legacy
-<code>tls_fingerprints</code> field in the federation API. This is ignored by Synapse 0.99.0
-and later, and the only time pre-0.99 Synapses will check it is when attempting to
-fetch the server keys - and generally this is delegated via <code>matrix.org</code>, which
-is running a modern version of Synapse.</p>
-<h3 id="do-i-need-the-same-certificate-for-the-client-and-federation-port"><a class="header" href="#do-i-need-the-same-certificate-for-the-client-and-federation-port">Do I need the same certificate for the client and federation port?</a></h3>
-<p>No. There is nothing stopping you from using different certificates,
-particularly if you are using a reverse proxy.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="upgrading-synapse"><a class="header" href="#upgrading-synapse">Upgrading Synapse</a></h1>
 <p>Before upgrading check if any special steps are required to upgrade from
 the version you currently have installed to the current version of
@@ -2958,13 +2964,13 @@ Encrypt certificate generation if needed.</p>
 attempt to obtain certificates from Let's Encrypt if you configure it to do
 so.The only requirement is that there is a valid TLS cert present for
 federation end points.</p>
-<h3 id="do-you-still-recommend-against-using-a-reverse-proxy-on-the-federation-port-1"><a class="header" href="#do-you-still-recommend-against-using-a-reverse-proxy-on-the-federation-port-1">Do you still recommend against using a reverse proxy on the federation port?</a></h3>
+<h3 id="do-you-still-recommend-against-using-a-reverse-proxy-on-the-federation-port"><a class="header" href="#do-you-still-recommend-against-using-a-reverse-proxy-on-the-federation-port">Do you still recommend against using a reverse proxy on the federation port?</a></h3>
 <p>We no longer actively recommend against using a reverse proxy. Many admins will
 find it easier to direct federation traffic to a reverse proxy and manage their
 own TLS certificates, and this is a supported configuration.</p>
 <p>See <a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a
 reverse proxy.</p>
-<h3 id="do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy-1"><a class="header" href="#do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy-1">Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?</a></h3>
+<h3 id="do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy"><a class="header" href="#do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy">Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?</a></h3>
 <p>Practically speaking, this is no longer necessary.</p>
 <p>If you are using a reverse proxy for all of your TLS traffic, then you can set
 <code>no_tls: True</code>. In that case, the only reason Synapse needs the certificate is
@@ -2976,7 +2982,7 @@ delegated via <code>matrix.org</code>, which is on 0.99.0.</p>
 <a href="https://github.com/matrix-org/synapse/issues/4554">4554</a> which prevents
 Synapse from starting if you do not give it a TLS certificate. To work around
 this, you can give it any TLS certificate at all. This will be fixed soon.</p>
-<h3 id="do-i-need-the-same-certificate-for-the-client-and-federation-port-1"><a class="header" href="#do-i-need-the-same-certificate-for-the-client-and-federation-port-1">Do I need the same certificate for the client and federation port?</a></h3>
+<h3 id="do-i-need-the-same-certificate-for-the-client-and-federation-port"><a class="header" href="#do-i-need-the-same-certificate-for-the-client-and-federation-port">Do I need the same certificate for the client and federation port?</a></h3>
 <p>No. There is nothing stopping you from using different certificates,
 particularly if you are using a reverse proxy. However, Synapse will use the
 same certificate on any ports where TLS is configured.</p>
@@ -3141,6 +3147,24 @@ pid_file: DATADIR/homeserver.pid
 # 'listeners' below).
 #
 #public_baseurl: https://example.com/
+
+# Uncomment the following to tell other servers to send federation traffic on
+# port 443.
+#
+# By default, other servers will try to reach our server on port 8448, which can
+# be inconvenient in some environments.
+#
+# Provided 'https://&lt;server_name&gt;/' on port 443 is routed to Synapse, this
+# option configures Synapse to serve a file at
+# 'https://&lt;server_name&gt;/.well-known/matrix/server'. This will tell other
+# servers to send traffic to port 443 instead.
+#
+# See https://matrix-org.github.io/synapse/latest/delegate.html for more
+# information.
+#
+# Defaults to 'false'.
+#
+#serve_server_wellknown: true
 
 # Set the soft limit on the number of file descriptors synapse can use
 # Zero is used to indicate synapse should set the soft limit to the
