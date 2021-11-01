@@ -732,9 +732,9 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
                 )
 
             if rows:
-                # send more than stream_id to progress
+                # We don't just save the `stream_id` in progress as
                 # otherwise it can happen in large deployments that
-                # no change of status is visible in the log file
+                # no change of status is visible in the log file, as
                 # it may be that the stream_id does not change in several runs
                 self.db_pool.updates._background_update_progress_txn(
                     txn,
