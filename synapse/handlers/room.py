@@ -1344,7 +1344,9 @@ class RoomShutdownHandler:
             local_aliases:
                 An array of strings representing the local aliases that were
                 migrated from the old room to the new.
-            new_room_id: A string representing the room ID of the new room.
+            new_room_id:
+                A string representing the room ID of the new room, or None if
+                no such room was created.
         """
 
         if not new_room_name:

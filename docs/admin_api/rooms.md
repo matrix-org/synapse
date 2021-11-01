@@ -478,7 +478,8 @@ The following fields are returned in the JSON response body:
 * `failed_to_kick_users` - An array of users (`user_id`) that that were not kicked.
 * `local_aliases` - An array of strings representing the local aliases that were migrated from
                     the old room to the new.
-* `new_room_id` - A string representing the room ID of the new room.
+* `new_room_id` - A string representing the room ID of the new room, or `null` if
+                  no such room was created.
 
 
 ## Undoing room deletions
