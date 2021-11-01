@@ -125,11 +125,10 @@ class SSOConfig(Config):
             # phishing attacks from evil.site. To avoid this, include a slash after the
             # hostname: "https://my.client/".
             #
-            # If public_baseurl is set, then the login fallback page (used by clients
-            # that don't natively support the required login flows) is whitelisted in
-            # addition to any URLs in this list.
+            # The login fallback page (used by clients that don't natively support the
+            # required login flows) is whitelisted in addition to any URLs in this list.
             #
-            # By default, this list is empty.
+            # By default, this list contains only the login fallback page.
             #
             #client_whitelist:
             #  - https://riot.im/develop

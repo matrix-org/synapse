@@ -229,7 +229,7 @@ class RegistrationConfig(Config):
         # in on this server.
         #
         # (By default, no suggestion is made, so it is left up to the client.
-        # This setting is ignored unless public_baseurl is also set.)
+        # This setting is ignored unless public_baseurl is also explicitly set.)
         #
         #default_identity_server: https://matrix.org
 
@@ -253,8 +253,6 @@ class RegistrationConfig(Config):
         # Servers handling the these requests must answer the `/requestToken` endpoints defined
         # by the Matrix Identity Service API specification:
         # https://matrix.org/docs/spec/identity_service/latest
-        #
-        # If a delegate is specified, the config option public_baseurl must also be filled out.
         #
         account_threepid_delegates:
             #email: https://example.com     # Delegate email sending to example.com
