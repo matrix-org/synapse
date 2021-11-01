@@ -76,7 +76,7 @@ class ObservableDeferred(Generic[_T]):
     def __init__(self, deferred: "defer.Deferred[_T]", consumeErrors: bool = False):
         object.__setattr__(self, "_deferred", deferred)
         object.__setattr__(self, "_result", None)
-        object.__setattr__(self, "_observers", list())
+        object.__setattr__(self, "_observers", [])
 
         def callback(r):
             object.__setattr__(self, "_result", (True, r))
@@ -84,7 +84,7 @@ class ObservableDeferred(Generic[_T]):
             # once we have set _result, no more entries will be added to _observers,
             # so it's safe to replace it with the empty tuple.
             observers = self._observers
-            object.__setattr__(self, "_observers", tuple())
+            object.__setattr__(self, "_observers", ())
 
             for observer in observers:
                 try:
@@ -104,7 +104,7 @@ class ObservableDeferred(Generic[_T]):
             # once we have set _result, no more entries will be added to _observers,
             # so it's safe to replace it with the empty tuple.
             observers = self._observers
-            object.__setattr__(self, "_observers", tuple())
+            object.__setattr__(self, "_observers", ())
 
             for observer in observers:
                 # This is a little bit of magic to correctly propagate stack
