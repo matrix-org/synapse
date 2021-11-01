@@ -85,11 +85,11 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
-# Upgrading to v1.XX.0
+# Upgrading to v1.47.0
 
 ## Removal of old Room Admin API
 
-The following admin API were deprecated in [Synapse 1.34](https://github.com/matrix-org/synapse/blob/v1.34.0/CHANGES.md#deprecations-and-removals)
+The following admin APIs were deprecated in [Synapse 1.34](https://github.com/matrix-org/synapse/blob/v1.34.0/CHANGES.md#deprecations-and-removals)
 (released on 2021-05-17) and have now been removed:
 
 - `POST /_synapse/admin/v1/<room_id>/delete`
