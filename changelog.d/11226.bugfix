@@ -1,0 +1,1 @@
+Fix a bug in unit test `test_block_room_and_not_purge`.
