@@ -84,7 +84,11 @@ class HTTPConnectProxyEndpoint:
     def __repr__(self):
         return "<HTTPConnectProxyEndpoint %s>" % (self._proxy_endpoint,)
 
-    def connect(self, protocolFactory: ClientFactory):
+    # Mypy encounters a false positive here: it complains that ClientFactory
+    # is incompatible with IProtocolFactory. But ClientFactory inherits from
+    # Factory, which implements IProtocolFactory. So I think this is a bug
+    # in mypy-zope.
+    def connect(self, protocolFactory: ClientFactory):  # type: ignore[override]
         f = HTTPProxiedClientFactory(
             self._host, self._port, protocolFactory, self._proxy_creds
         )
@@ -119,13 +123,15 @@ class HTTPProxiedClientFactory(protocol.ClientFactory):
         self.dst_port = dst_port
         self.wrapped_factory = wrapped_factory
         self.proxy_creds = proxy_creds
-        self.on_connection = defer.Deferred()
+        self.on_connection: "defer.Deferred[None]" = defer.Deferred()
 
     def startedConnecting(self, connector):
         return self.wrapped_factory.startedConnecting(connector)
 
     def buildProtocol(self, addr):
         wrapped_protocol = self.wrapped_factory.buildProtocol(addr)
+        if wrapped_protocol is None:
+            raise TypeError("buildProtocol produced None instead of a Protocol")
 
         return HTTPConnectProtocol(
             self.dst_host,
@@ -235,7 +241,7 @@ class HTTPConnectSetupClient(http.HTTPClient):
         self.host = host
         self.port = port
         self.proxy_creds = proxy_creds
-        self.on_connected = defer.Deferred()
+        self.on_connected: "defer.Deferred[None]" = defer.Deferred()
 
     def connectionMade(self):
         logger.debug("Connected to proxy, sending CONNECT")

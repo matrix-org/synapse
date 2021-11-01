@@ -15,7 +15,7 @@ export DH_VIRTUALENV_INSTALL_ROOT=/opt/venvs
 # python won't look in the right directory. At least this way, the error will
 # be a *bit* more obvious.
 #
-SNAKE=`readlink -e /usr/bin/python3`
+SNAKE=$(readlink -e /usr/bin/python3)
 
 # try to set the CFLAGS so any compiled C extensions are compiled with the most
 # generic as possible x64 instructions, so that compiling it on a new Intel chip
@@ -24,7 +24,7 @@ SNAKE=`readlink -e /usr/bin/python3`
 # TODO: add similar things for non-amd64, or figure out a more generic way to
 # do this.
 
-case `dpkg-architecture -q DEB_HOST_ARCH` in
+case $(dpkg-architecture -q DEB_HOST_ARCH) in
     amd64)
         export CFLAGS=-march=x86-64
         ;;
@@ -56,8 +56,8 @@ case "$DEB_BUILD_OPTIONS" in
     *)
         # Copy tests to a temporary directory so that we can put them on the
         # PYTHONPATH without putting the uninstalled synapse on the pythonpath.
-        tmpdir=`mktemp -d`
-        trap "rm -r $tmpdir" EXIT
+        tmpdir=$(mktemp -d)
+        trap 'rm -r $tmpdir' EXIT
 
         cp -r tests "$tmpdir"
 
@@ -98,7 +98,7 @@ esac
         --output-file="${PACKAGE_BUILD_DIR}/etc/matrix-synapse/log.yaml"
 
 # add a dependency on the right version of python to substvars.
-PYPKG=`basename $SNAKE`
+PYPKG=$(basename "$SNAKE")
 echo "synapse:pydepends=$PYPKG" >> debian/matrix-synapse-py3.substvars
 
 
