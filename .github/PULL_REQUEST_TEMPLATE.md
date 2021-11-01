@@ -1,6 +1,6 @@
 ### Pull Request Checklist
 
-<!-- Please read CONTRIBUTING.md before submitting your pull request -->
+<!-- Please read https://matrix-org.github.io/synapse/latest/development/contributing_guide.html before submitting your pull request -->
 
 * [ ] Pull request is based on the develop branch
 * [ ] Pull request includes a [changelog file](https://matrix-org.github.io/synapse/latest/development/contributing_guide.html#changelog). The entry should:
