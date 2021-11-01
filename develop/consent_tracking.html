@@ -259,7 +259,7 @@ construct URIs where users can give their consent.</p>
 <p>In your consent templates, make use of the <code>public_version</code> variable to
 see if an unauthenticated user is viewing the page. This is typically
 wrapped around the form that would be used to actually agree to the document:</p>
-<pre><code>{% if not public_version %}
+<pre><code class="language-html">{% if not public_version %}
   &lt;!-- The variables used here are only provided when the 'u' param is given to the homeserver --&gt;
   &lt;form method=&quot;post&quot; action=&quot;consent&quot;&gt;
     &lt;input type=&quot;hidden&quot; name=&quot;v&quot; value=&quot;{{version}}&quot;/&gt;

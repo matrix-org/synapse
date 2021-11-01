@@ -694,12 +694,12 @@ Debian-derived distributions.</p>
 </ul>
 <h2 id="set-up-database"><a class="header" href="#set-up-database">Set up database</a></h2>
 <p>Assuming your PostgreSQL database user is called <code>postgres</code>, first authenticate as the database user with:</p>
-<pre><code>su - postgres
+<pre><code class="language-sh">su - postgres
 # Or, if your system uses sudo to get administrative rights
 sudo -u postgres bash
 </code></pre>
 <p>Then, create a postgres user and a database with:</p>
-<pre><code># this will prompt for a password for the new user
+<pre><code class="language-sh"># this will prompt for a password for the new user
 createuser --pwprompt synapse_user
 
 createdb --encoding=UTF8 --locale=C --template=template0 --owner=synapse_user synapse
@@ -787,17 +787,17 @@ space on disk after porting to Postgres.</p>
 <p>Firstly, shut down the currently running synapse server and copy its
 database file (typically <code>homeserver.db</code>) to another location. Once the
 copy is complete, restart synapse. For instance:</p>
-<pre><code>./synctl stop
+<pre><code class="language-sh">./synctl stop
 cp homeserver.db homeserver.db.snapshot
 ./synctl start
 </code></pre>
 <p>Copy the old config file into a new config file:</p>
-<pre><code>cp homeserver.yaml homeserver-postgres.yaml
+<pre><code class="language-sh">cp homeserver.yaml homeserver-postgres.yaml
 </code></pre>
 <p>Edit the database section as described in the section <em>Synapse config</em>
 above and with the SQLite snapshot located at <code>homeserver.db.snapshot</code>
 simply run:</p>
-<pre><code>synapse_port_db --sqlite-database homeserver.db.snapshot \
+<pre><code class="language-sh">synapse_port_db --sqlite-database homeserver.db.snapshot \
     --postgres-config homeserver-postgres.yaml
 </code></pre>
 <p>The flag <code>--curses</code> displays a coloured curses progress UI.</p>
@@ -807,12 +807,12 @@ newer snapshot.</p>
 <p>To complete the conversion shut down the synapse server and run the port
 script one last time, e.g. if the SQLite database is at <code>homeserver.db</code>
 run:</p>
-<pre><code>synapse_port_db --sqlite-database homeserver.db \
+<pre><code class="language-sh">synapse_port_db --sqlite-database homeserver.db \
     --postgres-config homeserver-postgres.yaml
 </code></pre>
 <p>Once that has completed, change the synapse config to point at the
 PostgreSQL database configuration file <code>homeserver-postgres.yaml</code>:</p>
-<pre><code>./synctl stop
+<pre><code class="language-sh">./synctl stop
 mv homeserver.yaml homeserver-old-sqlite.yaml
 mv homeserver-postgres.yaml homeserver.yaml
 ./synctl start
@@ -900,7 +900,7 @@ to proxied traffic.)</p>
 <h2 id="reverse-proxy-configuration-examples"><a class="header" href="#reverse-proxy-configuration-examples">Reverse-proxy configuration examples</a></h2>
 <p><strong>NOTE</strong>: You only need one of these.</p>
 <h3 id="nginx"><a class="header" href="#nginx">nginx</a></h3>
-<pre><code>server {
+<pre><code class="language-nginx">server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
 
@@ -979,7 +979,7 @@ matrix.example.com {
 }
 </code></pre>
 <h3 id="apache"><a class="header" href="#apache">Apache</a></h3>
-<pre><code>&lt;VirtualHost *:443&gt;
+<pre><code class="language-apache">&lt;VirtualHost *:443&gt;
     SSLEngine on
     ServerName matrix.example.com
 
@@ -1004,7 +1004,7 @@ matrix.example.com {
 </code></pre>
 <p><strong>NOTE</strong>: ensure the  <code>nocanon</code> options are included.</p>
 <p><strong>NOTE 2</strong>: It appears that Synapse is currently incompatible with the ModSecurity module for Apache (<code>mod_security2</code>). If you need it enabled for other services on your web server, you can disable it for Synapse's two VirtualHosts by including the following lines before each of the two <code>&lt;/VirtualHost&gt;</code> above:</p>
-<pre><code>&lt;IfModule security2_module&gt;
+<pre><code class="language-apache">&lt;IfModule security2_module&gt;
     SecRuleEngine off
 &lt;/IfModule&gt;
 </code></pre>
@@ -1189,7 +1189,7 @@ and to often not work.</p>
 </li>
 <li>
 <p>Configure it:</p>
-<pre><code>./configure
+<pre><code class="language-sh">./configure
 </code></pre>
 <p>You may need to install <code>libevent2</code>: if so, you should do so in
 the way recommended by your operating system. You can ignore
@@ -1198,7 +1198,7 @@ for this purpose.</p>
 </li>
 <li>
 <p>Build and install it:</p>
-<pre><code>make
+<pre><code class="language-sh">make
 make install
 </code></pre>
 </li>
@@ -1214,7 +1214,7 @@ realm=turn.myserver.org
 </code></pre>
 <p>See <code>turnserver.conf</code> for explanations of the options. One way to generate
 the <code>static-auth-secret</code> is with <code>pwgen</code>:</p>
-<pre><code>pwgen -s 64 1
+<pre><code class="language-sh">pwgen -s 64 1
 </code></pre>
 <p>A <code>realm</code> must be specified, but its value is somewhat arbitrary. (It is
 sent to clients as part of the authentication flow.) It is conventional to
@@ -1223,7 +1223,7 @@ set it to be your server name.</p>
 <li>
 <p>You will most likely want to configure coturn to write logs somewhere. The
 easiest way is normally to send them to the syslog:</p>
-<pre><code>syslog
+<pre><code class="language-sh">syslog
 </code></pre>
 <p>(in which case, the logs will be available via <code>journalctl -u coturn</code> on a
 systemd system). Alternatively, coturn can be configured to write to a
@@ -1336,7 +1336,7 @@ turn_allow_guests: True
 </code></pre>
 </li>
 <li>If you use systemd:
-<pre><code>systemctl restart matrix-synapse.service
+<pre><code class="language-sh">systemctl restart matrix-synapse.service
 </code></pre>
 </li>
 </ul>
@@ -2429,13 +2429,13 @@ recommend switching to Python 3, as it has been shown to give
 performance improvements.</p>
 <p>For users who have installed Synapse into a virtualenv, we recommend
 doing this by creating a new virtualenv. For example:</p>
-<pre><code>virtualenv -p python3 ~/synapse/env3
+<pre><code class="language-sh">virtualenv -p python3 ~/synapse/env3
 source ~/synapse/env3/bin/activate
 pip install matrix-synapse
 </code></pre>
 <p>You can then start synapse as normal, having activated the new
 virtualenv:</p>
-<pre><code>cd ~/synapse
+<pre><code class="language-sh">cd ~/synapse
 source env3/bin/activate
 synctl start
 </code></pre>
@@ -2449,7 +2449,7 @@ files are configured as UTF-8, by adding <code>encoding: utf8</code> to the
 <code>RotatingFileHandler</code> configuration (if you have one) in your
 <code>&lt;server&gt;.log.config</code> file. For example, if your <code>log.config</code>
 file contains:</p>
-<pre><code>handlers:
+<pre><code class="language-yaml">handlers:
   file:
     class: logging.handlers.RotatingFileHandler
     formatter: precise
@@ -2463,7 +2463,7 @@ file contains:</p>
     filters: [context]
 </code></pre>
 <p>Then you should update this to be:</p>
-<pre><code>handlers:
+<pre><code class="language-yaml">handlers:
   file:
     class: logging.handlers.RotatingFileHandler
     formatter: precise
@@ -2549,10 +2549,10 @@ too big of a security risk to ignore, and so the ability to register
 with the HS remotely has been removed.</p>
 <p>It has been replaced by specifying a list of application service
 registrations in <code>homeserver.yaml</code>:</p>
-<pre><code>app_service_config_files: [&quot;registration-01.yaml&quot;, &quot;registration-02.yaml&quot;]
+<pre><code class="language-yaml">app_service_config_files: [&quot;registration-01.yaml&quot;, &quot;registration-02.yaml&quot;]
 </code></pre>
 <p>Where <code>registration-01.yaml</code> looks like:</p>
-<pre><code>url: &lt;String&gt;  # e.g. &quot;https://my.application.service.com&quot;
+<pre><code class="language-yaml">url: &lt;String&gt;  # e.g. &quot;https://my.application.service.com&quot;
 as_token: &lt;String&gt;
 hs_token: &lt;String&gt;
 sender_localpart: &lt;String&gt;  # This is a new field which denotes the user_id localpart when using the AS token
@@ -7139,12 +7139,12 @@ in <code>homeserver.yaml</code>, to the list of authorized domains. If you have 
 <li>Agree to the terms of service and submit.</li>
 <li>Copy your site key and secret key and add them to your <code>homeserver.yaml</code>
 configuration file
-<pre><code>recaptcha_public_key: YOUR_SITE_KEY
+<pre><code class="language-yaml">recaptcha_public_key: YOUR_SITE_KEY
 recaptcha_private_key: YOUR_SECRET_KEY
 </code></pre>
 </li>
 <li>Enable the CAPTCHA for new registrations
-<pre><code>enable_registration_captcha: true
+<pre><code class="language-yaml">enable_registration_captcha: true
 </code></pre>
 </li>
 <li>Go to the settings page for the CAPTCHA you just created</li>
@@ -7305,7 +7305,7 @@ construct URIs where users can give their consent.</p>
 <p>In your consent templates, make use of the <code>public_version</code> variable to
 see if an unauthenticated user is viewing the page. This is typically
 wrapped around the form that would be used to actually agree to the document:</p>
-<pre><code>{% if not public_version %}
+<pre><code class="language-html">{% if not public_version %}
   &lt;!-- The variables used here are only provided when the 'u' param is given to the homeserver --&gt;
   &lt;form method=&quot;post&quot; action=&quot;consent&quot;&gt;
     &lt;input type=&quot;hidden&quot; name=&quot;v&quot; value=&quot;{{version}}&quot;/&gt;
@@ -7573,9 +7573,9 @@ admins to ensure that messages are never kept indefinitely in a server's
 database. </p>
 <p>A default policy can be defined as such, in the <code>retention</code> section of
 the configuration file:</p>
-<pre><code class="language-yaml">  default_policy:
-    min_lifetime: 1d
-    max_lifetime: 1y
+<pre><code class="language-yaml">default_policy:
+  min_lifetime: 1d
+  max_lifetime: 1y
 </code></pre>
 <p>Here, <code>min_lifetime</code> and <code>max_lifetime</code> have the same meaning and level
 of support as previously described. They can be expressed either as a
@@ -7592,14 +7592,14 @@ Synapse will use a default configuration, which is described in the
 depending on an event's room's policy. This can be done by setting the
 <code>purge_jobs</code> sub-section in the <code>retention</code> section of the configuration
 file. An example of such configuration could be:</p>
-<pre><code class="language-yaml">  purge_jobs:
-    - longest_max_lifetime: 3d
-      interval: 12h
-    - shortest_max_lifetime: 3d
-      longest_max_lifetime: 1w
-      interval: 1d
-    - shortest_max_lifetime: 1w
-      interval: 2d
+<pre><code class="language-yaml">purge_jobs:
+  - longest_max_lifetime: 3d
+    interval: 12h
+  - shortest_max_lifetime: 3d
+    longest_max_lifetime: 1w
+    interval: 1d
+  - shortest_max_lifetime: 1w
+    interval: 2d
 </code></pre>
 <p>In this example, we define three jobs:</p>
 <ul>
@@ -7630,8 +7630,8 @@ the server's database.</p>
 <p>Server admins can set limits on the values of <code>max_lifetime</code> to use when
 purging old events in a room. These limits can be defined as such in the
 <code>retention</code> section of the configuration file:</p>
-<pre><code class="language-yaml">  allowed_lifetime_min: 1d
-  allowed_lifetime_max: 1y
+<pre><code class="language-yaml">allowed_lifetime_min: 1d
+allowed_lifetime_max: 1y
 </code></pre>
 <p>The limits are considered when running purge jobs. If necessary, the
 effective value of <code>max_lifetime</code> will be brought between
@@ -8237,7 +8237,7 @@ registered by using the Module API's <code>register_password_auth_provider_callb
 <h2 id="callbacks-3"><a class="header" href="#callbacks-3">Callbacks</a></h2>
 <h3 id="auth_checkers"><a class="header" href="#auth_checkers"><code>auth_checkers</code></a></h3>
 <p><em>First introduced in Synapse v1.46.0</em></p>
-<pre><code> auth_checkers: Dict[Tuple[str,Tuple], Callable]
+<pre><code class="language-python"> auth_checkers: Dict[Tuple[str,Tuple], Callable]
 </code></pre>
 <p>A dict mapping from tuples of a login type identifier (such as <code>m.login.password</code>) and a
 tuple of field names (such as <code>(&quot;password&quot;, &quot;secret_thing&quot;)</code>) to authentication checking
@@ -8747,16 +8747,16 @@ media repository. Note that doing so will prevent the main process from being
 able to handle the above endpoints.</p>
 <p>In the <code>media_repository</code> worker configuration file, configure the http listener to
 expose the <code>media</code> resource. For example:</p>
-<pre><code class="language-yaml">    worker_listeners:
-     - type: http
-       port: 8085
-       resources:
-         - names:
-           - media
+<pre><code class="language-yaml">worker_listeners:
+ - type: http
+   port: 8085
+   resources:
+     - names:
+       - media
 </code></pre>
 <p>Note that if running multiple media repositories they must be on the same server
 and you must configure a single instance to run the background tasks, e.g.:</p>
-<pre><code class="language-yaml">    media_instance_running_background_jobs: &quot;media-repository-1&quot;
+<pre><code class="language-yaml">media_instance_running_background_jobs: &quot;media-repository-1&quot;
 </code></pre>
 <p>Note that if a reverse proxy is used , then <code>/_matrix/media/</code> must be routed for both inbound client and federation requests (if they are handled separately).</p>
 <h3 id="synapseappuser_dir"><a class="header" href="#synapseappuser_dir"><code>synapse.app.user_dir</code></a></h3>
@@ -8783,7 +8783,7 @@ endpoints matching the following regular expressions:</p>
 must therefore be configured with the location of the main instance, via
 the <code>worker_main_http_uri</code> setting in the <code>frontend_proxy</code> worker configuration
 file. For example:</p>
-<pre><code>worker_main_http_uri: http://127.0.0.1:8008
+<pre><code class="language-yaml">worker_main_http_uri: http://127.0.0.1:8008
 </code></pre>
 <h3 id="historical-apps"><a class="header" href="#historical-apps">Historical apps</a></h3>
 <p><em>Note:</em> Historically there used to be more apps, however they have been
@@ -8850,14 +8850,14 @@ synchrotron, you might write:</p>
 <p>Finally, to actually run your worker-based synapse, you must pass synctl the <code>-a</code>
 commandline option to tell it to operate on all the worker configurations found
 in the given directory, e.g.:</p>
-<pre><code>synctl -a $CONFIG/workers start
+<pre><code class="language-sh">synctl -a $CONFIG/workers start
 </code></pre>
 <p>Currently one should always restart all workers when restarting or upgrading
 synapse, unless you explicitly know it's safe not to.  For instance, restarting
 synapse without restarting all the synchrotrons may result in broken typing
 notifications.</p>
 <p>To manipulate a specific worker, you pass the -w option to synctl:</p>
-<pre><code>synctl -w $CONFIG/workers/worker1.yaml restart
+<pre><code class="language-sh">synctl -w $CONFIG/workers/worker1.yaml restart
 </code></pre>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="setting-up-synapse-with-workers-and-systemd"><a class="header" href="#setting-up-synapse-with-workers-and-systemd">Setting up Synapse with Workers and Systemd</a></h1>
 <p>This is a setup for managing synapse with systemd, including support for
@@ -9098,7 +9098,7 @@ have a canonical alias set.</li>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
 server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>It returns a JSON body like the following:</p>
-<pre><code class="language-jsonc">{
+<pre><code class="language-json">{
     &quot;event_id&quot;: &quot;$bNUFCwGzWca1meCGkjp-zwslF-GfVcXukvRLI1_FaVY&quot;,
     &quot;event_json&quot;: {
         &quot;auth_events&quot;: [
@@ -9130,7 +9130,7 @@ server admin: see <a href="admin_api/../usage/administration/admin_api">Admin AP
         },
         &quot;type&quot;: &quot;m.room.message&quot;,
         &quot;unsigned&quot;: {
-            &quot;age_ts&quot;: 1592291711430,
+            &quot;age_ts&quot;: 1592291711430
         }
     },
     &quot;id&quot;: &lt;report_id&gt;,
@@ -9425,7 +9425,7 @@ the only copies of this content in existence. (Events sent by remote users are
 deleted.)</p>
 <p>Room state data (such as joins, leaves, topic) is always preserved.</p>
 <p>To delete local message events as well, set <code>delete_local_events</code> in the body:</p>
-<pre><code>{
+<pre><code class="language-json">{
    &quot;delete_local_events&quot;: true
 }
 </code></pre>
@@ -9778,7 +9778,7 @@ invite users.</p>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
 server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>Response:</p>
-<pre><code>{
+<pre><code class="language-json">{
   &quot;room_id&quot;: &quot;!636q39766251:server.com&quot;
 }
 </code></pre>
@@ -9875,7 +9875,7 @@ get the &quot;previous page&quot; of results.</li>
 <pre><code>GET /_synapse/admin/v1/rooms
 </code></pre>
 <p>A response body like the following is returned:</p>
-<pre><code class="language-jsonc">{
+<pre><code class="language-json">{
   &quot;rooms&quot;: [
     {
       &quot;room_id&quot;: &quot;!OGEhHVWSdvArJzumhm:matrix.org&quot;,
@@ -9946,7 +9946,7 @@ get the &quot;previous page&quot; of results.</li>
 <pre><code>GET /_synapse/admin/v1/rooms?order_by=size
 </code></pre>
 <p>A response body like the following is returned:</p>
-<pre><code class="language-jsonc">{
+<pre><code class="language-json">{
   &quot;rooms&quot;: [
     {
       &quot;room_id&quot;: &quot;!OGEhHVWSdvArJzumhm:matrix.org&quot;,
@@ -9983,7 +9983,7 @@ get the &quot;previous page&quot; of results.</li>
     }
   ],
   &quot;offset&quot;: 0,
-  &quot;total_rooms&quot;: 150
+  &quot;total_rooms&quot;: 150,
   &quot;next_token&quot;: 100
 }
 </code></pre>
@@ -9994,7 +9994,7 @@ parameter to the value of <code>next_token</code>.</p>
 <pre><code>GET /_synapse/admin/v1/rooms?order_by=size&amp;from=100
 </code></pre>
 <p>A response body like the following is returned:</p>
-<pre><code class="language-jsonc">{
+<pre><code class="language-json">{
   &quot;rooms&quot;: [
     {
       &quot;room_id&quot;: &quot;!mscvqgqpHYjBGDxNym:matrix.org&quot;,
@@ -12159,7 +12159,7 @@ quickly and automatically check for formatting (and sometimes logical)
 errors in code.</p>
 <p>The necessary tools are detailed below.</p>
 <p>First install them with:</p>
-<pre><code>pip install -e &quot;.[lint,mypy]&quot;
+<pre><code class="language-sh">pip install -e &quot;.[lint,mypy]&quot;
 </code></pre>
 <ul>
 <li>
@@ -12169,7 +12169,7 @@ as an opinionated code formatter, ensuring all comitted code is
 properly formatted.</p>
 <p>Have <code>black</code> auto-format your code (it shouldn't change any
 functionality) with:</p>
-<pre><code>black . --exclude=&quot;\.tox|build|env&quot;
+<pre><code class="language-sh">black . --exclude=&quot;\.tox|build|env&quot;
 </code></pre>
 </li>
 <li>
@@ -12177,7 +12177,7 @@ functionality) with:</p>
 <p><code>flake8</code> is a code checking tool. We require code to pass <code>flake8</code>
 before being merged into the codebase.</p>
 <p>Check all application and test code with:</p>
-<pre><code>flake8 synapse tests
+<pre><code class="language-sh">flake8 synapse tests
 </code></pre>
 </li>
 <li>
@@ -12185,7 +12185,7 @@ before being merged into the codebase.</p>
 <p><code>isort</code> ensures imports are nicely formatted, and can suggest and
 auto-fix issues such as double-importing.</p>
 <p>Auto-fix imports with:</p>
-<pre><code>isort -rc synapse tests
+<pre><code class="language-sh">isort -rc synapse tests
 </code></pre>
 <p><code>-rc</code> means to recursively search the given directories.</p>
 </li>
@@ -12217,12 +12217,12 @@ in the sphinx documentation.</li>
 <p>Prefer to import classes and functions rather than packages or
 modules.</p>
 <p>Example:</p>
-<pre><code>from synapse.types import UserID
+<pre><code class="language-python">from synapse.types import UserID
 ...
 user_id = UserID(local, server)
 </code></pre>
 <p>is preferred over:</p>
-<pre><code>from synapse import types
+<pre><code class="language-python">from synapse import types
 ...
 user_id = types.UserID(local, server)
 </code></pre>
@@ -12303,7 +12303,7 @@ will be if no sub-options are enabled).</p>
 </li>
 </ul>
 <p>Example:</p>
-<pre><code>## Frobnication ##
+<pre><code class="language-yaml">## Frobnication ##
 
 # The frobnicator will ensure that all requests are fully frobnicated.
 # To enable it, uncomment the following.
@@ -12605,7 +12605,7 @@ has had all background updates run.</p>
 <p>To do so, use <code>scripts-dev/make_full_schema.sh</code>. This will produce new
 <code>full.sql.postgres</code> and <code>full.sql.sqlite</code> files.</p>
 <p>Ensure postgres is installed, then run:</p>
-<pre><code>./scripts-dev/make_full_schema.sh -p postgres_username -o output_dir/
+<pre><code class="language-sh">./scripts-dev/make_full_schema.sh -p postgres_username -o output_dir/
 </code></pre>
 <p>NB at the time of writing, this script predates the split into separate <code>state</code>/<code>main</code>
 databases so will require updates to handle that correctly.</p>
@@ -13220,7 +13220,7 @@ the XML from step 2 as the contents.</li>
   sp_config:
     allow_unknown_attributes: true  # Works around a bug with AVA Hashes: https://github.com/IdentityPython/pysaml2/issues/388
     metadata:
-      local: [&quot;samling.xml&quot;]   
+      local: [&quot;samling.xml&quot;]
 </code></pre>
 </li>
 <li>Ensure that your <code>homeserver.yaml</code> has a setting for <code>public_baseurl</code>:
@@ -13252,17 +13252,17 @@ easy to run CAS implementation built on top of Django.</p>
 <li>Create a new virtualenv: <code>python3 -m venv &lt;your virtualenv&gt;</code></li>
 <li>Activate your virtualenv: <code>source /path/to/your/virtualenv/bin/activate</code></li>
 <li>Install Django and django-mama-cas:
-<pre><code>python -m pip install &quot;django&lt;3&quot; &quot;django-mama-cas==2.4.0&quot;
+<pre><code class="language-sh">python -m pip install &quot;django&lt;3&quot; &quot;django-mama-cas==2.4.0&quot;
 </code></pre>
 </li>
 <li>Create a Django project in the current directory:
-<pre><code>django-admin startproject cas_test .
+<pre><code class="language-sh">django-admin startproject cas_test .
 </code></pre>
 </li>
 <li>Follow the <a href="https://django-mama-cas.readthedocs.io/en/latest/installation.html#configuring">install directions</a> for django-mama-cas</li>
 <li>Setup the SQLite database: <code>python manage.py migrate</code></li>
 <li>Create a user:
-<pre><code>python manage.py createsuperuser
+<pre><code class="language-sh">python manage.py createsuperuser
 </code></pre>
 <ol>
 <li>Use whatever you want as the username and password.</li>
@@ -13270,7 +13270,7 @@ easy to run CAS implementation built on top of Django.</p>
 </ol>
 </li>
 <li>Use the built-in Django test server to serve the CAS endpoints on port 8000:
-<pre><code>python manage.py runserver
+<pre><code class="language-sh">python manage.py runserver
 </code></pre>
 </li>
 </ol>

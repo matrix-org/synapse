@@ -275,7 +275,7 @@ get the &quot;previous page&quot; of results.</li>
 <pre><code>GET /_synapse/admin/v1/rooms
 </code></pre>
 <p>A response body like the following is returned:</p>
-<pre><code class="language-jsonc">{
+<pre><code class="language-json">{
   &quot;rooms&quot;: [
     {
       &quot;room_id&quot;: &quot;!OGEhHVWSdvArJzumhm:matrix.org&quot;,
@@ -346,7 +346,7 @@ get the &quot;previous page&quot; of results.</li>
 <pre><code>GET /_synapse/admin/v1/rooms?order_by=size
 </code></pre>
 <p>A response body like the following is returned:</p>
-<pre><code class="language-jsonc">{
+<pre><code class="language-json">{
   &quot;rooms&quot;: [
     {
       &quot;room_id&quot;: &quot;!OGEhHVWSdvArJzumhm:matrix.org&quot;,
@@ -383,7 +383,7 @@ get the &quot;previous page&quot; of results.</li>
     }
   ],
   &quot;offset&quot;: 0,
-  &quot;total_rooms&quot;: 150
+  &quot;total_rooms&quot;: 150,
   &quot;next_token&quot;: 100
 }
 </code></pre>
@@ -394,7 +394,7 @@ parameter to the value of <code>next_token</code>.</p>
 <pre><code>GET /_synapse/admin/v1/rooms?order_by=size&amp;from=100
 </code></pre>
 <p>A response body like the following is returned:</p>
-<pre><code class="language-jsonc">{
+<pre><code class="language-json">{
   &quot;rooms&quot;: [
     {
       &quot;room_id&quot;: &quot;!mscvqgqpHYjBGDxNym:matrix.org&quot;,

@@ -189,7 +189,7 @@ quickly and automatically check for formatting (and sometimes logical)
 errors in code.</p>
 <p>The necessary tools are detailed below.</p>
 <p>First install them with:</p>
-<pre><code>pip install -e &quot;.[lint,mypy]&quot;
+<pre><code class="language-sh">pip install -e &quot;.[lint,mypy]&quot;
 </code></pre>
 <ul>
 <li>
@@ -199,7 +199,7 @@ as an opinionated code formatter, ensuring all comitted code is
 properly formatted.</p>
 <p>Have <code>black</code> auto-format your code (it shouldn't change any
 functionality) with:</p>
-<pre><code>black . --exclude=&quot;\.tox|build|env&quot;
+<pre><code class="language-sh">black . --exclude=&quot;\.tox|build|env&quot;
 </code></pre>
 </li>
 <li>
@@ -207,7 +207,7 @@ functionality) with:</p>
 <p><code>flake8</code> is a code checking tool. We require code to pass <code>flake8</code>
 before being merged into the codebase.</p>
 <p>Check all application and test code with:</p>
-<pre><code>flake8 synapse tests
+<pre><code class="language-sh">flake8 synapse tests
 </code></pre>
 </li>
 <li>
@@ -215,7 +215,7 @@ before being merged into the codebase.</p>
 <p><code>isort</code> ensures imports are nicely formatted, and can suggest and
 auto-fix issues such as double-importing.</p>
 <p>Auto-fix imports with:</p>
-<pre><code>isort -rc synapse tests
+<pre><code class="language-sh">isort -rc synapse tests
 </code></pre>
 <p><code>-rc</code> means to recursively search the given directories.</p>
 </li>
@@ -247,12 +247,12 @@ in the sphinx documentation.</li>
 <p>Prefer to import classes and functions rather than packages or
 modules.</p>
 <p>Example:</p>
-<pre><code>from synapse.types import UserID
+<pre><code class="language-python">from synapse.types import UserID
 ...
 user_id = UserID(local, server)
 </code></pre>
 <p>is preferred over:</p>
-<pre><code>from synapse import types
+<pre><code class="language-python">from synapse import types
 ...
 user_id = types.UserID(local, server)
 </code></pre>
@@ -333,7 +333,7 @@ will be if no sub-options are enabled).</p>
 </li>
 </ul>
 <p>Example:</p>
-<pre><code>## Frobnication ##
+<pre><code class="language-yaml">## Frobnication ##
 
 # The frobnicator will ensure that all requests are fully frobnicated.
 # To enable it, uncomment the following.

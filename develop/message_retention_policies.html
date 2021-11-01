@@ -235,9 +235,9 @@ admins to ensure that messages are never kept indefinitely in a server's
 database. </p>
 <p>A default policy can be defined as such, in the <code>retention</code> section of
 the configuration file:</p>
-<pre><code class="language-yaml">  default_policy:
-    min_lifetime: 1d
-    max_lifetime: 1y
+<pre><code class="language-yaml">default_policy:
+  min_lifetime: 1d
+  max_lifetime: 1y
 </code></pre>
 <p>Here, <code>min_lifetime</code> and <code>max_lifetime</code> have the same meaning and level
 of support as previously described. They can be expressed either as a
@@ -254,14 +254,14 @@ Synapse will use a default configuration, which is described in the
 depending on an event's room's policy. This can be done by setting the
 <code>purge_jobs</code> sub-section in the <code>retention</code> section of the configuration
 file. An example of such configuration could be:</p>
-<pre><code class="language-yaml">  purge_jobs:
-    - longest_max_lifetime: 3d
-      interval: 12h
-    - shortest_max_lifetime: 3d
-      longest_max_lifetime: 1w
-      interval: 1d
-    - shortest_max_lifetime: 1w
-      interval: 2d
+<pre><code class="language-yaml">purge_jobs:
+  - longest_max_lifetime: 3d
+    interval: 12h
+  - shortest_max_lifetime: 3d
+    longest_max_lifetime: 1w
+    interval: 1d
+  - shortest_max_lifetime: 1w
+    interval: 2d
 </code></pre>
 <p>In this example, we define three jobs:</p>
 <ul>
@@ -292,8 +292,8 @@ the server's database.</p>
 <p>Server admins can set limits on the values of <code>max_lifetime</code> to use when
 purging old events in a room. These limits can be defined as such in the
 <code>retention</code> section of the configuration file:</p>
-<pre><code class="language-yaml">  allowed_lifetime_min: 1d
-  allowed_lifetime_max: 1y
+<pre><code class="language-yaml">allowed_lifetime_min: 1d
+allowed_lifetime_max: 1y
 </code></pre>
 <p>The limits are considered when running purge jobs. If necessary, the
 effective value of <code>max_lifetime</code> will be brought between

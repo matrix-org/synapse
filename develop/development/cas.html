@@ -190,17 +190,17 @@ easy to run CAS implementation built on top of Django.</p>
 <li>Create a new virtualenv: <code>python3 -m venv &lt;your virtualenv&gt;</code></li>
 <li>Activate your virtualenv: <code>source /path/to/your/virtualenv/bin/activate</code></li>
 <li>Install Django and django-mama-cas:
-<pre><code>python -m pip install &quot;django&lt;3&quot; &quot;django-mama-cas==2.4.0&quot;
+<pre><code class="language-sh">python -m pip install &quot;django&lt;3&quot; &quot;django-mama-cas==2.4.0&quot;
 </code></pre>
 </li>
 <li>Create a Django project in the current directory:
-<pre><code>django-admin startproject cas_test .
+<pre><code class="language-sh">django-admin startproject cas_test .
 </code></pre>
 </li>
 <li>Follow the <a href="https://django-mama-cas.readthedocs.io/en/latest/installation.html#configuring">install directions</a> for django-mama-cas</li>
 <li>Setup the SQLite database: <code>python manage.py migrate</code></li>
 <li>Create a user:
-<pre><code>python manage.py createsuperuser
+<pre><code class="language-sh">python manage.py createsuperuser
 </code></pre>
 <ol>
 <li>Use whatever you want as the username and password.</li>
@@ -208,7 +208,7 @@ easy to run CAS implementation built on top of Django.</p>
 </ol>
 </li>
 <li>Use the built-in Django test server to serve the CAS endpoints on port 8000:
-<pre><code>python manage.py runserver
+<pre><code class="language-sh">python manage.py runserver
 </code></pre>
 </li>
 </ol>

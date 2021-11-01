@@ -210,7 +210,7 @@ and to often not work.</p>
 </li>
 <li>
 <p>Configure it:</p>
-<pre><code>./configure
+<pre><code class="language-sh">./configure
 </code></pre>
 <p>You may need to install <code>libevent2</code>: if so, you should do so in
 the way recommended by your operating system. You can ignore
@@ -219,7 +219,7 @@ for this purpose.</p>
 </li>
 <li>
 <p>Build and install it:</p>
-<pre><code>make
+<pre><code class="language-sh">make
 make install
 </code></pre>
 </li>
@@ -235,7 +235,7 @@ realm=turn.myserver.org
 </code></pre>
 <p>See <code>turnserver.conf</code> for explanations of the options. One way to generate
 the <code>static-auth-secret</code> is with <code>pwgen</code>:</p>
-<pre><code>pwgen -s 64 1
+<pre><code class="language-sh">pwgen -s 64 1
 </code></pre>
 <p>A <code>realm</code> must be specified, but its value is somewhat arbitrary. (It is
 sent to clients as part of the authentication flow.) It is conventional to
@@ -244,7 +244,7 @@ set it to be your server name.</p>
 <li>
 <p>You will most likely want to configure coturn to write logs somewhere. The
 easiest way is normally to send them to the syslog:</p>
-<pre><code>syslog
+<pre><code class="language-sh">syslog
 </code></pre>
 <p>(in which case, the logs will be available via <code>journalctl -u coturn</code> on a
 systemd system). Alternatively, coturn can be configured to write to a
@@ -357,7 +357,7 @@ turn_allow_guests: True
 </code></pre>
 </li>
 <li>If you use systemd:
-<pre><code>systemctl restart matrix-synapse.service
+<pre><code class="language-sh">systemctl restart matrix-synapse.service
 </code></pre>
 </li>
 </ul>

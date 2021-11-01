@@ -196,14 +196,14 @@ synchrotron, you might write:</p>
 <p>Finally, to actually run your worker-based synapse, you must pass synctl the <code>-a</code>
 commandline option to tell it to operate on all the worker configurations found
 in the given directory, e.g.:</p>
-<pre><code>synctl -a $CONFIG/workers start
+<pre><code class="language-sh">synctl -a $CONFIG/workers start
 </code></pre>
 <p>Currently one should always restart all workers when restarting or upgrading
 synapse, unless you explicitly know it's safe not to.  For instance, restarting
 synapse without restarting all the synchrotrons may result in broken typing
 notifications.</p>
 <p>To manipulate a specific worker, you pass the -w option to synctl:</p>
-<pre><code>synctl -w $CONFIG/workers/worker1.yaml restart
+<pre><code class="language-sh">synctl -w $CONFIG/workers/worker1.yaml restart
 </code></pre>
 
                     </main>

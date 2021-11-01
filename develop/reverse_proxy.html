@@ -222,7 +222,7 @@ to proxied traffic.)</p>
 <h2 id="reverse-proxy-configuration-examples"><a class="header" href="#reverse-proxy-configuration-examples">Reverse-proxy configuration examples</a></h2>
 <p><strong>NOTE</strong>: You only need one of these.</p>
 <h3 id="nginx"><a class="header" href="#nginx">nginx</a></h3>
-<pre><code>server {
+<pre><code class="language-nginx">server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
 
@@ -301,7 +301,7 @@ matrix.example.com {
 }
 </code></pre>
 <h3 id="apache"><a class="header" href="#apache">Apache</a></h3>
-<pre><code>&lt;VirtualHost *:443&gt;
+<pre><code class="language-apache">&lt;VirtualHost *:443&gt;
     SSLEngine on
     ServerName matrix.example.com
 
@@ -326,7 +326,7 @@ matrix.example.com {
 </code></pre>
 <p><strong>NOTE</strong>: ensure the  <code>nocanon</code> options are included.</p>
 <p><strong>NOTE 2</strong>: It appears that Synapse is currently incompatible with the ModSecurity module for Apache (<code>mod_security2</code>). If you need it enabled for other services on your web server, you can disable it for Synapse's two VirtualHosts by including the following lines before each of the two <code>&lt;/VirtualHost&gt;</code> above:</p>
-<pre><code>&lt;IfModule security2_module&gt;
+<pre><code class="language-apache">&lt;IfModule security2_module&gt;
     SecRuleEngine off
 &lt;/IfModule&gt;
 </code></pre>

@@ -1118,13 +1118,13 @@ recommend switching to Python 3, as it has been shown to give
 performance improvements.</p>
 <p>For users who have installed Synapse into a virtualenv, we recommend
 doing this by creating a new virtualenv. For example:</p>
-<pre><code>virtualenv -p python3 ~/synapse/env3
+<pre><code class="language-sh">virtualenv -p python3 ~/synapse/env3
 source ~/synapse/env3/bin/activate
 pip install matrix-synapse
 </code></pre>
 <p>You can then start synapse as normal, having activated the new
 virtualenv:</p>
-<pre><code>cd ~/synapse
+<pre><code class="language-sh">cd ~/synapse
 source env3/bin/activate
 synctl start
 </code></pre>
@@ -1138,7 +1138,7 @@ files are configured as UTF-8, by adding <code>encoding: utf8</code> to the
 <code>RotatingFileHandler</code> configuration (if you have one) in your
 <code>&lt;server&gt;.log.config</code> file. For example, if your <code>log.config</code>
 file contains:</p>
-<pre><code>handlers:
+<pre><code class="language-yaml">handlers:
   file:
     class: logging.handlers.RotatingFileHandler
     formatter: precise
@@ -1152,7 +1152,7 @@ file contains:</p>
     filters: [context]
 </code></pre>
 <p>Then you should update this to be:</p>
-<pre><code>handlers:
+<pre><code class="language-yaml">handlers:
   file:
     class: logging.handlers.RotatingFileHandler
     formatter: precise
@@ -1238,10 +1238,10 @@ too big of a security risk to ignore, and so the ability to register
 with the HS remotely has been removed.</p>
 <p>It has been replaced by specifying a list of application service
 registrations in <code>homeserver.yaml</code>:</p>
-<pre><code>app_service_config_files: [&quot;registration-01.yaml&quot;, &quot;registration-02.yaml&quot;]
+<pre><code class="language-yaml">app_service_config_files: [&quot;registration-01.yaml&quot;, &quot;registration-02.yaml&quot;]
 </code></pre>
 <p>Where <code>registration-01.yaml</code> looks like:</p>
-<pre><code>url: &lt;String&gt;  # e.g. &quot;https://my.application.service.com&quot;
+<pre><code class="language-yaml">url: &lt;String&gt;  # e.g. &quot;https://my.application.service.com&quot;
 as_token: &lt;String&gt;
 hs_token: &lt;String&gt;
 sender_localpart: &lt;String&gt;  # This is a new field which denotes the user_id localpart when using the AS token
