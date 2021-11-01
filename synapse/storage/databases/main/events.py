@@ -1641,7 +1641,7 @@ class PersistEventsStore:
         """Store a room member in the database."""
 
         def str_or_none(val: Any) -> Optional[str]:
-            return val if isinstance(val, str) else None
+            return val if isinstance(val, str) and "\u0000" not in val else None
 
         self.db_pool.simple_insert_many_txn(
             txn,
