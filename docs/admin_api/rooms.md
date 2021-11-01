@@ -411,10 +411,10 @@ server admin: see [Admin API](../usage/administration/admin_api).
 
 ## Version 1 (old version)
 
-This version works synchronous. That means you get the response if the server has
-finised this action. This may take a long time. If you requests the same action
-a second time, if the server is not finished the first one, can the server hang up.
-This is fixed in Version 2 of this API. The parameters are the same in both APIs.
+This version works synchronously. That means you only get the response once the server has
+finished the action, which may take a long time. If you request the same action
+a second time, and the server has not finished the first one, the second request will block.
+This is fixed in version 2 of this API. The parameters are the same in both APIs.
 This API will become deprecated in the future.
 
 The API is:
@@ -451,13 +451,14 @@ A response body like the following is returned:
 }
 ```
 
-The parameters and response values have the same expression like in
+The parameters and response values have the same format as
 [version 2](#version-2-new-version) of the API.
 
 ## Version 2 (new version)
 
-This version works asynchronous. That means you get the response from server immediately.
-The server works on that task in background. You can request the status of this action.
+This version works asynchronously, meaning you get the response from server immediately
+while the server works on that task in background. You can then request the status of the action
+to check if it has completed.
 
 The API is:
 
@@ -516,8 +517,8 @@ The JSON body must not be empty. The body must be at least `{}`.
 ## Status of deleting rooms
 
 It is possible to query the status of the background task for deleting rooms.
-The status can be queried up to 24 hours after completion of the task
-or a restart of Synapse.
+The status can be queried up to 24 hours after completion of the task,
+or until Synapse is restarted (whichever happens first).
 
 The API is:
 
@@ -556,7 +557,7 @@ The following fields are returned in the JSON response body:
 
 * `status` - The status will be one of:
   - `remove members` - The process is removing users from the `room_id`.
-  - `active` - The process is purging the room from databse.
+  - `active` - The process is purging the room from database.
   - `complete` - The process has completed successfully.
   - `failed` - The process is aborted, an error has occurred.
 * `result` - An object containing information about the result of shutting down the room.

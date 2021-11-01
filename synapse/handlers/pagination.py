@@ -508,7 +508,9 @@ class PaginationHandler:
         force_purge: bool = False,
     ) -> None:
         """
-        Shuts down and purge a room. Moves all local users and room aliases
+        Shuts down and purges a room. 
+        
+        Moves all local users and room aliases
         automatically to a new room if `new_room_user_id` is set.
         Otherwise local users only leave the room without any information.
         After that, the room will be removed from the database.
