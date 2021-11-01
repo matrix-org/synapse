@@ -32,6 +32,7 @@ from prometheus_client.core import (
 )
 
 from twisted.internet import reactor
+from twisted.python.threadpool import ThreadPool
 
 import synapse
 from synapse.metrics._exposition import (
@@ -525,6 +526,42 @@ threepid_send_requests = Histogram(
     buckets=(1, 2, 3, 4, 5, 10),
     labelnames=("type", "reason"),
 )
+
+threadpool_total_threads = Gauge(
+    "synapse_threadpool_total_threads",
+    "Total number of threads currently in the threadpool",
+    ["name"],
+)
+
+threadpool_total_working_threads = Gauge(
+    "synapse_threadpool_working_threads",
+    "Number of threads currently working in the threadpool",
+    ["name"],
+)
+
+threadpool_total_min_threads = Gauge(
+    "synapse_threadpool_min_threads",
+    "Minimum number of threads configured in the threadpool",
+    ["name"],
+)
+
+threadpool_total_max_threads = Gauge(
+    "synapse_threadpool_max_threads",
+    "Maximum number of threads configured in the threadpool",
+    ["name"],
+)
+
+
+def register_threadpool(name: str, threadpool: ThreadPool) -> None:
+    """Add metrics for the threadpool."""
+
+    threadpool_total_min_threads.labels(name).set(threadpool.min)
+    threadpool_total_max_threads.labels(name).set(threadpool.max)
+
+    threadpool_total_threads.labels(name).set_function(lambda: len(threadpool.threads))
+    threadpool_total_working_threads.labels(name).set_function(
+        lambda: len(threadpool.working)
+    )
 
 
 class ReactorLastSeenMetric:

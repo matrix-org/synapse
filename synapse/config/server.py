@@ -262,6 +262,7 @@ class ServerConfig(Config):
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
+        self.serve_server_wellknown = config.get("serve_server_wellknown", False)
 
         self.public_baseurl = config.get("public_baseurl")
         if self.public_baseurl is not None:
@@ -773,6 +774,24 @@ class ServerConfig(Config):
         # 'listeners' below).
         #
         #public_baseurl: https://example.com/
+
+        # Uncomment the following to tell other servers to send federation traffic on
+        # port 443.
+        #
+        # By default, other servers will try to reach our server on port 8448, which can
+        # be inconvenient in some environments.
+        #
+        # Provided 'https://<server_name>/' on port 443 is routed to Synapse, this
+        # option configures Synapse to serve a file at
+        # 'https://<server_name>/.well-known/matrix/server'. This will tell other
+        # servers to send traffic to port 443 instead.
+        #
+        # See https://matrix-org.github.io/synapse/latest/delegate.html for more
+        # information.
+        #
+        # Defaults to 'false'.
+        #
+        #serve_server_wellknown: true
 
         # Set the soft limit on the number of file descriptors synapse can use
         # Zero is used to indicate synapse should set the soft limit to the

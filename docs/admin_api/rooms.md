@@ -90,7 +90,7 @@ GET /_synapse/admin/v1/rooms
 
 A response body like the following is returned:
 
-```jsonc
+```json
 {
   "rooms": [
     {
@@ -173,7 +173,7 @@ GET /_synapse/admin/v1/rooms?order_by=size
 
 A response body like the following is returned:
 
-```jsonc
+```json
 {
   "rooms": [
     {
@@ -211,7 +211,7 @@ A response body like the following is returned:
     }
   ],
   "offset": 0,
-  "total_rooms": 150
+  "total_rooms": 150,
   "next_token": 100
 }
 ```
@@ -227,7 +227,7 @@ GET /_synapse/admin/v1/rooms?order_by=size&from=100
 
 A response body like the following is returned:
 
-```jsonc
+```json
 {
   "rooms": [
     {
@@ -606,16 +606,6 @@ With all that being said, if you still want to try and recover the room:
 
 4. If `new_room_user_id` was given, a 'Content Violation' will have been
    created. Consider whether you want to delete that roomm.
-
-## Deprecated endpoint
-
-The previous deprecated API will be removed in a future release, it was:
-
-```
-POST /_synapse/admin/v1/rooms/<room_id>/delete
-```
-
-It behaves the same way than the current endpoint except the path and the method.
 
 # Make Room Admin API
 

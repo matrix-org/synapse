@@ -1,0 +1,1 @@
+Fix a long-standing bug which allowed hidden devices to receive to-device messages, resulting in unnecessary database bloat.
