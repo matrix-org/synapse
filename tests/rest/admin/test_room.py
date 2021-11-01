@@ -261,7 +261,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         # Assert one user in room
         self._is_member(room_id=self.room_id, user_id=self.other_user)
 
-        body = json.dumps({"block": False, "purge": False})
+        body = json.dumps({"block": True, "purge": False})
 
         channel = self.make_request(
             "DELETE",
@@ -278,7 +278,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         with self.assertRaises(AssertionError):
             self._is_purged(self.room_id)
-        self._is_blocked(self.room_id, expect=False)
+        self._is_blocked(self.room_id, expect=True)
         self._has_no_members(self.room_id)
 
     def test_shutdown_room_consent(self):
