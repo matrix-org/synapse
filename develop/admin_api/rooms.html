@@ -647,11 +647,6 @@ them handle rejoining themselves.</p>
 created. Consider whether you want to delete that roomm.</p>
 </li>
 </ol>
-<h2 id="deprecated-endpoint"><a class="header" href="#deprecated-endpoint">Deprecated endpoint</a></h2>
-<p>The previous deprecated API will be removed in a future release, it was:</p>
-<pre><code>POST /_synapse/admin/v1/rooms/&lt;room_id&gt;/delete
-</code></pre>
-<p>It behaves the same way than the current endpoint except the path and the method.</p>
 <h1 id="make-room-admin-api"><a class="header" href="#make-room-admin-api">Make Room Admin API</a></h1>
 <p>Grants another user the highest power available to a local user who is in the room.
 If the user is not in the room, and it is not publicly joinable, then invite the user.</p>

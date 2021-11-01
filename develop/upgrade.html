@@ -261,6 +261,14 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </li>
 </ul>
 <h1 id="upgrading-to-v1470"><a class="header" href="#upgrading-to-v1470">Upgrading to v1.47.0</a></h1>
+<h2 id="removal-of-old-room-admin-api"><a class="header" href="#removal-of-old-room-admin-api">Removal of old Room Admin API</a></h2>
+<p>The following admin APIs were deprecated in <a href="https://github.com/matrix-org/synapse/blob/v1.34.0/CHANGES.md#deprecations-and-removals">Synapse 1.34</a>
+(released on 2021-05-17) and have now been removed:</p>
+<ul>
+<li><code>POST /_synapse/admin/v1/&lt;room_id&gt;/delete</code></li>
+</ul>
+<p>Any scripts still using the above APIs should be converted to use the
+<a href="https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#delete-room-api">Delete Room API</a>.</p>
 <h2 id="deprecation-of-the-user_may_create_room_with_invites-module-callback"><a class="header" href="#deprecation-of-the-user_may_create_room_with_invites-module-callback">Deprecation of the <code>user_may_create_room_with_invites</code> module callback</a></h2>
 <p>The <code>user_may_create_room_with_invites</code> is deprecated and will be removed in a future
 version of Synapse. Modules implementing this callback can instead implement
@@ -287,7 +295,7 @@ has been updated to reflect that calls to the <code>/spaces</code>, <code>/hiera
 <code>/summary</code> endpoints can now be routed to workers for both client API and
 federation requests.</p>
 <h1 id="upgrading-to-v1420"><a class="header" href="#upgrading-to-v1420">Upgrading to v1.42.0</a></h1>
-<h2 id="removal-of-old-room-admin-api"><a class="header" href="#removal-of-old-room-admin-api">Removal of old Room Admin API</a></h2>
+<h2 id="removal-of-old-room-admin-api-1"><a class="header" href="#removal-of-old-room-admin-api-1">Removal of old Room Admin API</a></h2>
 <p>The following admin APIs were deprecated in <a href="https://github.com/matrix-org/synapse/blob/v1.25.0/CHANGES.md#removal-warning">Synapse 1.25</a>
 (released on 2021-01-13) and have now been removed:</p>
 <ul>
