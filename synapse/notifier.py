@@ -444,7 +444,7 @@ class Notifier:
 
             self.notify_replication()
 
-            # Notify appservices
+            # Notify appservices.
             try:
                 self.appservice_handler.notify_interested_services_ephemeral(
                     stream_key,

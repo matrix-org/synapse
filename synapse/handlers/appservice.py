@@ -212,12 +212,18 @@ class ApplicationServicesHandler:
         if stream_key not in ("typing_key", "receipt_key", "presence_key"):
             return
 
-        # Convert new_token from a RoomStreamToken to an int if necessary.
-        # We just use the minimum stream ordering and ignore the vector clock
-        # component. This is safe to do as long as we *always* ignore the vector
-        # clock components.
-        if isinstance(new_token, RoomStreamToken):
-            new_token = new_token.stream
+        # Assert that new_token is an integer (and not a RoomStreamToken).
+        # All of the supported streams that this function handles uses an
+        # integer to track progress (rather than a RoomStreamToken - a
+        # vector clock implementation - as they don't support multiple
+        # stream writers).
+        #
+        # As a result, we simply assert that new_token is an integer.
+        # If we do end up needing to pass a RoomStreamToken down here
+        # in the future, using RoomStreamToken.stream (the minimum stream
+        # position) to convert to an ascending integer value should work.
+        # Additional context: https://github.com/matrix-org/synapse/pull/11137
+        assert isinstance(new_token, int)
 
         services = [
             service
