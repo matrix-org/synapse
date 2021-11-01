@@ -85,6 +85,19 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.47.0
+
+## Deprecation of the `user_may_create_room_with_invites` module callback
+
+The `user_may_create_room_with_invites` is deprecated and will be removed in a future
+version of Synapse. Modules implementing this callback can instead implement
+[`user_may_invite`](https://matrix-org.github.io/synapse/latest/modules/spam_checker_callbacks.html#user_may_invite)
+and use the [`get_room_state`](https://github.com/matrix-org/synapse/blob/872f23b95fa980a61b0866c1475e84491991fa20/synapse/module_api/__init__.py#L869-L876)
+module API method to infer whether the invite is happening in the context of creating a
+room.
+
+We plan to remove this callback in January 2022.
+
 # Upgrading to v1.45.0
 
 ## Changes required to media storage provider modules when reading from the Synapse configuration object
