@@ -1,0 +1,1 @@
+Fix a bug introduced in 1.35.0 which made it impossible to join rooms that return a `send_join` response containing floats.
