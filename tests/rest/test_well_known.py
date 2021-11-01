@@ -66,7 +66,7 @@ class WellKnownTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(
             channel.json_body,
-            {"m.server": "tesths:443"},
+            {"m.server": "test:443"},
         )
 
     def test_server_well_known_disabled(self):
