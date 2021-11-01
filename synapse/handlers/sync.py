@@ -1064,9 +1064,10 @@ class SyncHandler:
             # See https://github.com/matrix-org/matrix-doc/issues/1144
             raise NotImplementedError()
         else:
-            joined_room_ids = await self.get_rooms_for_user_at(
-                user_id, now_token.room_key
-            )
+            with start_active_span("get_rooms_for_user_at"):
+                joined_room_ids = await self.get_rooms_for_user_at(
+                    user_id, now_token.room_key
+                )
         sync_result_builder = SyncResultBuilder(
             sync_config,
             full_state,
@@ -1077,15 +1078,18 @@ class SyncHandler:
 
         logger.debug("Fetching account data")
 
-        account_data_by_room = await self._generate_sync_entry_for_account_data(
-            sync_result_builder
-        )
+        with start_active_span("_generate_sync_entry_for_account_data"):
+            account_data_by_room = await self._generate_sync_entry_for_account_data(
+                sync_result_builder
+            )
 
         logger.debug("Fetching room data")
 
-        res = await self._generate_sync_entry_for_rooms(
-            sync_result_builder, account_data_by_room
-        )
+        with start_active_span("_generate_sync_entry_for_rooms"):
+            res = await self._generate_sync_entry_for_rooms(
+                sync_result_builder, account_data_by_room
+            )
+
         newly_joined_rooms, newly_joined_or_invited_or_knocked_users, _, _ = res
         _, _, newly_left_rooms, newly_left_users = res
 
@@ -1094,22 +1098,25 @@ class SyncHandler:
         )
         if self.hs_config.server.use_presence and not block_all_presence_data:
             logger.debug("Fetching presence data")
-            await self._generate_sync_entry_for_presence(
-                sync_result_builder,
-                newly_joined_rooms,
-                newly_joined_or_invited_or_knocked_users,
-            )
+            with start_active_span("_generate_sync_entry_for_presence"):
+                await self._generate_sync_entry_for_presence(
+                    sync_result_builder,
+                    newly_joined_rooms,
+                    newly_joined_or_invited_or_knocked_users,
+                )
 
         logger.debug("Fetching to-device data")
-        await self._generate_sync_entry_for_to_device(sync_result_builder)
+        with start_active_span("_generate_sync_entry_for_to_device"):
+            await self._generate_sync_entry_for_to_device(sync_result_builder)
 
-        device_lists = await self._generate_sync_entry_for_device_list(
-            sync_result_builder,
-            newly_joined_rooms=newly_joined_rooms,
-            newly_joined_or_invited_or_knocked_users=newly_joined_or_invited_or_knocked_users,
-            newly_left_rooms=newly_left_rooms,
-            newly_left_users=newly_left_users,
-        )
+        with start_active_span("_generate_sync_entry_for_device_list"):
+            device_lists = await self._generate_sync_entry_for_device_list(
+                sync_result_builder,
+                newly_joined_rooms=newly_joined_rooms,
+                newly_joined_or_invited_or_knocked_users=newly_joined_or_invited_or_knocked_users,
+                newly_left_rooms=newly_left_rooms,
+                newly_left_users=newly_left_users,
+            )
 
         logger.debug("Fetching OTK data")
         device_id = sync_config.device_id
@@ -1120,15 +1127,19 @@ class SyncHandler:
             #   * no change in OTK count since the provided since token
             #   * the server has zero OTKs left for this device
             #  Spec issue: https://github.com/matrix-org/matrix-doc/issues/3298
-            one_time_key_counts = await self.store.count_e2e_one_time_keys(
-                user_id, device_id
-            )
-            unused_fallback_key_types = (
-                await self.store.get_e2e_unused_fallback_key_types(user_id, device_id)
-            )
+            with start_active_span("count_e2e_one_time_keys"):
+                one_time_key_counts = await self.store.count_e2e_one_time_keys(
+                    user_id, device_id
+                )
+                unused_fallback_key_types = (
+                    await self.store.get_e2e_unused_fallback_key_types(
+                        user_id, device_id
+                    )
+                )
 
         logger.debug("Fetching group data")
-        await self._generate_sync_entry_for_groups(sync_result_builder)
+        with start_active_span("_generate_sync_entry_for_groups"):
+            await self._generate_sync_entry_for_groups(sync_result_builder)
 
         num_events = 0
 
@@ -1478,12 +1489,13 @@ class SyncHandler:
         if block_all_room_ephemeral:
             ephemeral_by_room: Dict[str, List[JsonDict]] = {}
         else:
-            now_token, ephemeral_by_room = await self.ephemeral_by_room(
-                sync_result_builder,
-                now_token=sync_result_builder.now_token,
-                since_token=sync_result_builder.since_token,
-            )
-            sync_result_builder.now_token = now_token
+            with start_active_span("ephemeral_by_room"):
+                now_token, ephemeral_by_room = await self.ephemeral_by_room(
+                    sync_result_builder,
+                    now_token=sync_result_builder.now_token,
+                    since_token=sync_result_builder.since_token,
+                )
+                sync_result_builder.now_token = now_token
 
         # We check up front if anything has changed, if it hasn't then there is
         # no point in going further.
@@ -1493,18 +1505,20 @@ class SyncHandler:
                 have_changed = await self._have_rooms_changed(sync_result_builder)
                 log_kv({"rooms_have_changed": have_changed})
                 if not have_changed:
-                    tags_by_room = await self.store.get_updated_tags(
-                        user_id, since_token.account_data_key
-                    )
-                    if not tags_by_room:
-                        logger.debug("no-oping sync")
-                        return set(), set(), set(), set()
+                    with start_active_span("get_updated_tags"):
+                        tags_by_room = await self.store.get_updated_tags(
+                            user_id, since_token.account_data_key
+                        )
+                        if not tags_by_room:
+                            logger.debug("no-oping sync")
+                            return set(), set(), set(), set()
 
-        ignored_account_data = (
-            await self.store.get_global_account_data_by_type_for_user(
-                AccountDataTypes.IGNORED_USER_LIST, user_id=user_id
+        with start_active_span("get_global_account_data_by_type_for_user"):
+            ignored_account_data = (
+                await self.store.get_global_account_data_by_type_for_user(
+                    AccountDataTypes.IGNORED_USER_LIST, user_id=user_id
+                )
             )
-        )
 
         # If there is ignored users account data and it matches the proper type,
         # then use it.
@@ -1515,12 +1529,15 @@ class SyncHandler:
                 ignored_users = frozenset(ignored_users_data.keys())
 
         if since_token:
-            room_changes = await self._get_rooms_changed(
-                sync_result_builder, ignored_users
-            )
-            tags_by_room = await self.store.get_updated_tags(
-                user_id, since_token.account_data_key
-            )
+            with start_active_span("_get_rooms_changed"):
+                room_changes = await self._get_rooms_changed(
+                    sync_result_builder, ignored_users
+                )
+
+            with start_active_span("get_updated_tags"):
+                tags_by_room = await self.store.get_updated_tags(
+                    user_id, since_token.account_data_key
+                )
         else:
             room_changes = await self._get_all_rooms(sync_result_builder, ignored_users)
 
@@ -1547,7 +1564,8 @@ class SyncHandler:
             )
             logger.debug("Generated room entry for %s", room_entry.room_id)
 
-        await concurrently_execute(handle_room_entries, room_entries, 10)
+        with start_active_span("handle_room_entries"):
+            await concurrently_execute(handle_room_entries, room_entries, 10)
 
         sync_result_builder.invited.extend(invited)
         sync_result_builder.knocked.extend(knocked)
