@@ -1,6 +1,8 @@
 Synapse 1.46.0 (2021-11-02)
 ===========================
 
+The cause of the [performance regression affecting Synapse 1.44](https://github.com/matrix-org/synapse/issues/11049) has been identified and fixed. ([\#11177](https://github.com/matrix-org/synapse/issues/11177))
+
 Bugfixes
 --------
 
@@ -9,8 +11,6 @@ Bugfixes
 
 Synapse 1.46.0rc1 (2021-10-27)
 ==============================
-
-The cause of the [performance regression affecting Synapse 1.44](https://github.com/matrix-org/synapse/issues/11049) has been identified and fixed. ([\#11177](https://github.com/matrix-org/synapse/issues/11177))
 
 Features
 --------
