@@ -410,8 +410,8 @@ class RoomWorkerStore(SQLBaseStore):
             order_by: the sort order of the returned list
             reverse_order: whether to reverse the room list
             search_term: a string to filter room names,
-                canonical alias and room ids by
-                room ids should only match case sensitive and the complete ID
+                canonical alias and room ids by.
+                Room ID must match exactly. Canonical alias must match a substring of the local part.
         Returns:
             A list of room dicts and an integer representing the total number of
             rooms that exist given this query
@@ -559,8 +559,7 @@ class RoomWorkerStore(SQLBaseStore):
             # Execute the count query
 
             # Add the search term into the WHERE clause if present
-            sql_values = search_pattern if search_pattern else ()
-            txn.execute(count_sql, sql_values)
+            txn.execute(count_sql, search_pattern)
 
             room_count = txn.fetchone()
             return rooms, room_count[0]
