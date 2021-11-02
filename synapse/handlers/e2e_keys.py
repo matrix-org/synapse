@@ -286,7 +286,7 @@ class E2eKeysHandler:
                         user_id=user_id
                     )
 
-                # Add teh device keys to the results.
+                # Add the device keys to the results.
                 user_devices = resync_results["devices"]
                 user_results = results.setdefault(user_id, {})
                 for device in user_devices:
