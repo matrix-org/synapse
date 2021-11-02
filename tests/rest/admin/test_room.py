@@ -680,36 +680,6 @@ class RoomTestCase(unittest.HomeserverTestCase):
         reversing the order, etc.
         """
 
-        def _set_canonical_alias(room_id: str, test_alias: str, admin_user_tok: str):
-            # Create a new alias to this room
-            url = "/_matrix/client/r0/directory/room/%s" % (
-                urllib.parse.quote(test_alias),
-            )
-            channel = self.make_request(
-                "PUT",
-                url.encode("ascii"),
-                {"room_id": room_id},
-                access_token=admin_user_tok,
-            )
-            self.assertEqual(
-                200, int(channel.result["code"]), msg=channel.result["body"]
-            )
-
-            # Set this new alias as the canonical alias for this room
-            self.helper.send_state(
-                room_id,
-                "m.room.aliases",
-                {"aliases": [test_alias]},
-                tok=admin_user_tok,
-                state_key="test",
-            )
-            self.helper.send_state(
-                room_id,
-                "m.room.canonical_alias",
-                {"alias": test_alias},
-                tok=admin_user_tok,
-            )
-
         def _order_test(
             order_type: str,
             expected_room_list: List[str],
@@ -781,9 +751,9 @@ class RoomTestCase(unittest.HomeserverTestCase):
         )
 
         # Set room canonical room aliases
-        _set_canonical_alias(room_id_1, "#A_alias:test", self.admin_user_tok)
-        _set_canonical_alias(room_id_2, "#B_alias:test", self.admin_user_tok)
-        _set_canonical_alias(room_id_3, "#C_alias:test", self.admin_user_tok)
+        self._set_canonical_alias(room_id_1, "#A_alias:test", self.admin_user_tok)
+        self._set_canonical_alias(room_id_2, "#B_alias:test", self.admin_user_tok)
+        self._set_canonical_alias(room_id_3, "#C_alias:test", self.admin_user_tok)
 
         # Set room member size in the reverse order. room 1 -> 1 member, 2 -> 2, 3 -> 3
         user_1 = self.register_user("bob1", "pass")
@@ -850,7 +820,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         room_id_2 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
 
         room_name_1 = "something"
-        room_name_2 = "else"
+        room_name_2 = "LoremIpsum"
 
         # Set the name for each room
         self.helper.send_state(
@@ -865,6 +835,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
             {"name": room_name_2},
             tok=self.admin_user_tok,
         )
+
+        self._set_canonical_alias(room_id_1, "#Room_Alias1:test", self.admin_user_tok)
 
         def _search_test(
             expected_room_id: Optional[str],
@@ -914,23 +886,35 @@ class RoomTestCase(unittest.HomeserverTestCase):
                 r = rooms[0]
                 self.assertEqual(expected_room_id, r["room_id"])
 
-        # Perform search tests
+        # Test searching by room name
         _search_test(room_id_1, "something")
         _search_test(room_id_1, "thing")
 
-        _search_test(room_id_2, "else")
-        _search_test(room_id_2, "se")
+        _search_test(room_id_2, "LoremIpsum")
+        _search_test(room_id_2, "lorem")
 
         # Test case insensitive
         _search_test(room_id_1, "SOMETHING")
         _search_test(room_id_1, "THING")
 
-        _search_test(room_id_2, "ELSE")
-        _search_test(room_id_2, "SE")
+        _search_test(room_id_2, "LOREMIPSUM")
+        _search_test(room_id_2, "LOREM")
 
         _search_test(None, "foo")
         _search_test(None, "bar")
         _search_test(None, "", expected_http_code=400)
+
+        # Test that the whole room id returns the room
+        _search_test(room_id_1, room_id_1)
+        # Test that the search by room_id is case sensitive
+        _search_test(None, room_id_1.lower())
+        # Test search part of local part of room id do not match
+        _search_test(None, room_id_1[1:10])
+
+        # Test that whole room alias return no result, because of domain
+        _search_test(None, "#Room_Alias1:test")
+        # Test search local part of alias
+        _search_test(room_id_1, "alias1")
 
     def test_search_term_non_ascii(self):
         """Test that searching for a room with non-ASCII characters works correctly"""
@@ -1113,6 +1097,32 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # testing that the state events match is painful and not done here. We assume that
         # the create_room already does the right thing, so no need to verify that we got
         # the state events it created.
+
+    def _set_canonical_alias(self, room_id: str, test_alias: str, admin_user_tok: str):
+        # Create a new alias to this room
+        url = "/_matrix/client/r0/directory/room/%s" % (urllib.parse.quote(test_alias),)
+        channel = self.make_request(
+            "PUT",
+            url.encode("ascii"),
+            {"room_id": room_id},
+            access_token=admin_user_tok,
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Set this new alias as the canonical alias for this room
+        self.helper.send_state(
+            room_id,
+            "m.room.aliases",
+            {"aliases": [test_alias]},
+            tok=admin_user_tok,
+            state_key="test",
+        )
+        self.helper.send_state(
+            room_id,
+            "m.room.canonical_alias",
+            {"alias": test_alias},
+            tok=admin_user_tok,
+        )
 
 
 class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
