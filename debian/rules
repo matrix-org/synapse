@@ -51,5 +51,11 @@ override_dh_shlibdeps:
 override_dh_virtualenv:
 	./debian/build_virtualenv
 
+override_dh_builddeb:
+        # force the compression to xzip, to stop dpkg-deb on impish defaulting to zstd
+        # (which requires reprepro 5.3.0-1.3, which is currently only in 'experimental' in Debian:
+        # https://metadata.ftp-master.debian.org/changelogs/main/r/reprepro/reprepro_5.3.0-1.3_changelog)
+	dh_builddeb -- -Zxz
+
 %:
 	dh $@ --with python-virtualenv

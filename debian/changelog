@@ -1,3 +1,9 @@
+matrix-synapse-py3 (1.46.0~rc1ubuntu1) UNRELEASED; urgency=medium
+
+  * Compress debs with xz, to fix incompatibility of impish debs with reprepro.
+
+ -- Richard van der Hoff <richard@matrix.org>  Wed, 27 Oct 2021 15:32:51 +0100
+
 matrix-synapse-py3 (1.46.0~rc1) stable; urgency=medium
 
   * New synapse release 1.46.0~rc1.
