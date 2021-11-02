@@ -297,7 +297,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         # Request the room be blocked.
         channel = self.make_request(
-            self.method,
+            "DELETE",
             f"/_synapse/admin/v1/rooms/{room_id}",
             {"block": True, "purge": purge},
             access_token=self.admin_user_tok,
