@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 @attr.s(slots=True, auto_attribs=True)
 class PurgeStatus:
-    """Object tracking the status of a purge request
+    """Object tracking the status of a purge and shut down room request
 
     This class contains information on the progress of a purge request, for
     return by get_purge_status.
@@ -58,7 +58,8 @@ class PurgeStatus:
         STATUS_REMOVE_MEMBERS: "remove members",
     }
 
-    # Tracks whether this request has completed. One of STATUS_{ACTIVE,COMPLETE,FAILED}.
+    # Tracks whether this request has completed.
+    # One of STATUS_{ACTIVE,COMPLETE,FAILED, STATUS_REMOVE_MEMBERS}.
     status: int = STATUS_ACTIVE
 
     # Saves the result of an action to give it back to REST API
@@ -96,10 +97,10 @@ class PaginationHandler:
         self.clock = hs.get_clock()
         self._server_name = hs.hostname
 
-        self.room_member_handler = hs.get_room_member_handler()
+        self._room_member_handler = hs.get_room_member_handler()
         self._room_creation_handler = hs.get_room_creation_handler()
         self._replication = hs.get_replication_data_handler()
-        self.event_creation_handler = hs.get_event_creation_handler()
+        self._event_creation_handler = hs.get_event_creation_handler()
 
         self.pagination_lock = ReadWriteLock()
         self._purges_in_progress_by_room: Set[str] = set()
@@ -508,8 +509,8 @@ class PaginationHandler:
         force_purge: bool = False,
     ) -> None:
         """
-        Shuts down and purges a room. 
-        
+        Shuts down and purges a room.
+
         Moves all local users and room aliases
         automatically to a new room if `new_room_user_id` is set.
         Otherwise local users only leave the room without any information.
@@ -629,7 +630,7 @@ class PaginationHandler:
                         target_requester = create_requester(
                             user_id, authenticated_entity=requester_user_id
                         )
-                        _, stream_id = await self.room_member_handler.update_membership(
+                        _, stream_id = await self._room_member_handler.update_membership(
                             requester=target_requester,
                             target=target_requester.user,
                             room_id=room_id,
@@ -648,13 +649,13 @@ class PaginationHandler:
                             stream_id,
                         )
 
-                        await self.room_member_handler.forget(
+                        await self._room_member_handler.forget(
                             target_requester.user, room_id
                         )
 
                         # Join users to new room
                         if new_room_user_id:
-                            await self.room_member_handler.update_membership(
+                            await self._room_member_handler.update_membership(
                                 requester=target_requester,
                                 target=target_requester.user,
                                 room_id=new_room_id,
@@ -676,7 +677,7 @@ class PaginationHandler:
 
                 # Send message in new room and move aliases
                 if new_room_user_id:
-                    await self.event_creation_handler.create_and_send_nonmember_event(
+                    await self._event_creation_handler.create_and_send_nonmember_event(
                         room_creator_requester,
                         {
                             "type": "m.room.message",
@@ -795,7 +796,8 @@ class PaginationHandler:
         logger.info("[shutdown_and_purge] starting shutdown room_id %s", room_id)
 
         self._purges_by_id[room_id] = PurgeStatus()
-        run_in_background(
+        run_as_background_process(
+            "_shutdown_and_purge_room",
             self._shutdown_and_purge_room,
             room_id,
             requester_user_id,

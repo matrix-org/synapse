@@ -64,17 +64,16 @@ class RoomRestV2Servlet(RestServlet):
     PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)$", "v2")
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
-        self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
-        self.pagination_handler = hs.get_pagination_handler()
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastore()
+        self._pagination_handler = hs.get_pagination_handler()
 
     async def on_DELETE(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
 
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        requester = await self._auth.get_user_by_req(request)
+        await assert_user_is_admin(self._auth, requester.user)
 
         content = parse_json_object_from_request(request)
 
@@ -105,10 +104,10 @@ class RoomRestV2Servlet(RestServlet):
         if not RoomID.is_valid(room_id):
             raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
 
-        if not await self.store.get_room(room_id):
+        if not await self._store.get_room(room_id):
             raise NotFoundError("Unknown room id %s" % (room_id,))
 
-        self.pagination_handler.start_shutdown_and_purge_room(
+        self._pagination_handler.start_shutdown_and_purge_room(
             room_id=room_id,
             new_room_user_id=content.get("new_room_user_id"),
             new_room_name=content.get("room_name"),
@@ -128,20 +127,19 @@ class DeleteRoomStatusRestServlet(RestServlet):
     PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/delete_status$", "v2")
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
-        self.auth = hs.get_auth()
-        self.pagination_handler = hs.get_pagination_handler()
+        self._auth = hs.get_auth()
+        self._pagination_handler = hs.get_pagination_handler()
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
 
-        await assert_requester_is_admin(self.auth, request)
+        await assert_requester_is_admin(self._auth, request)
 
         if not RoomID.is_valid(room_id):
             raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
 
-        purge_status = self.pagination_handler.get_purge_status(room_id)
+        purge_status = self._pagination_handler.get_purge_status(room_id)
         if purge_status is None:
             raise NotFoundError("No delete task for room_id '%s' found" % room_id)
 
