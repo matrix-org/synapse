@@ -1278,7 +1278,9 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
 class RoomShutdownHandler:
     """This handles synchronous room shutdowns and is part of the delete room v1 API.
     It will become deprecated in the future.
-    The handler for asynchronous shudowns is part of the PaginationHandler.
+
+    The handler for asynchronous shudowns is part of the `PaginationHandler`.
+    If this handler is removed, `shutdown_room` must to be migrated to `PaginationHandler`
     """
 
     DEFAULT_MESSAGE = (
