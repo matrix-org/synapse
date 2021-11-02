@@ -213,10 +213,10 @@ class ApplicationServicesHandler:
             return
 
         # Assert that new_token is an integer (and not a RoomStreamToken).
-        # All of the supported streams that this function handles uses an
+        # All of the supported streams that this function handles use an
         # integer to track progress (rather than a RoomStreamToken - a
-        # vector clock implementation - as they don't support multiple
-        # stream writers).
+        # vector clock implementation) as they don't support multiple
+        # stream writers.
         #
         # As a result, we simply assert that new_token is an integer.
         # If we do end up needing to pass a RoomStreamToken down here
