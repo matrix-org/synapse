@@ -1371,13 +1371,14 @@ class EventCreationHandler:
 
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.INVITE:
-                event.unsigned[
-                    "invite_room_state"
-                ] = await self.store.get_stripped_room_state_from_event_context(
-                    context,
-                    self.room_prejoin_state_types,
-                    membership_user_id=event.sender,
-                )
+                if not event.internal_metadata.outlier:
+                    event.unsigned[
+                        "invite_room_state"
+                    ] = await self.store.get_stripped_room_state_from_event_context(
+                        context,
+                        self.room_prejoin_state_types,
+                        membership_user_id=event.sender,
+                    )
 
                 invitee = UserID.from_string(event.state_key)
                 if not self.hs.is_mine(invitee):
@@ -1394,12 +1395,13 @@ class EventCreationHandler:
                     event.signatures.update(returned_invite.signatures)
 
             if event.content["membership"] == Membership.KNOCK:
-                event.unsigned[
-                    "knock_room_state"
-                ] = await self.store.get_stripped_room_state_from_event_context(
-                    context,
-                    self.room_prejoin_state_types,
-                )
+                if not event.internal_metadata.outlier:
+                    event.unsigned[
+                        "knock_room_state"
+                    ] = await self.store.get_stripped_room_state_from_event_context(
+                        context,
+                        self.room_prejoin_state_types,
+                    )
 
         if event.type == EventTypes.Redaction:
             original_event = await self.store.get_event(
