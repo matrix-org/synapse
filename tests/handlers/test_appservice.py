@@ -254,6 +254,11 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
 
     def test_notify_interested_services_ephemeral(self):
+        """
+        Test sending ephemeral events to the appservice handler are scheduled
+        to be pushed out to interested appservices, and that the stream ID is
+        updated accordingly.
+        """
         interested_service = self._mkservice(is_interested=True)
         services = [interested_service]
 
@@ -278,6 +283,10 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
 
     def test_notify_interested_services_ephemeral_out_of_order(self):
+        """
+        Test sending out of order ephemeral events to the appservice handler
+        are ignored.
+        """
         interested_service = self._mkservice(is_interested=True)
         services = [interested_service]
 
