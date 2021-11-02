@@ -1,0 +1,1 @@
+Fix a long-standing bug wherein a missing `Content-Type` header when downloading remote media would cause Synapse to throw an error.

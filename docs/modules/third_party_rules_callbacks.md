@@ -43,6 +43,14 @@ event with new data by returning the new event's data as a dictionary. In order 
 that, it is recommended the module calls `event.get_dict()` to get the current event as a
 dictionary, and modify the returned dictionary accordingly.
 
+If `check_event_allowed` raises an exception, the module is assumed to have failed.
+The event will not be accepted but is not treated as explicitly rejected, either.
+An HTTP request causing the module check will likely result in a 500 Internal
+Server Error.
+
+When the boolean returned by the module is `False`, the event is rejected.
+(Module developers should not use exceptions for rejection.)
+
 Note that replacing the event only works for events sent by local users, not for events
 received over federation.
 

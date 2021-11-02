@@ -21,9 +21,76 @@ from synapse.logging.context import (
     PreserveLoggingContext,
     current_context,
 )
-from synapse.util.async_helpers import timeout_deferred
+from synapse.util.async_helpers import ObservableDeferred, timeout_deferred
 
 from tests.unittest import TestCase
+
+
+class ObservableDeferredTest(TestCase):
+    def test_succeed(self):
+        origin_d = Deferred()
+        observable = ObservableDeferred(origin_d)
+
+        observer1 = observable.observe()
+        observer2 = observable.observe()
+
+        self.assertFalse(observer1.called)
+        self.assertFalse(observer2.called)
+
+        # check the first observer is called first
+        def check_called_first(res):
+            self.assertFalse(observer2.called)
+            return res
+
+        observer1.addBoth(check_called_first)
+
+        # store the results
+        results = [None, None]
+
+        def check_val(res, idx):
+            results[idx] = res
+            return res
+
+        observer1.addCallback(check_val, 0)
+        observer2.addCallback(check_val, 1)
+
+        origin_d.callback(123)
+        self.assertEqual(results[0], 123, "observer 1 callback result")
+        self.assertEqual(results[1], 123, "observer 2 callback result")
+
+    def test_failure(self):
+        origin_d = Deferred()
+        observable = ObservableDeferred(origin_d, consumeErrors=True)
+
+        observer1 = observable.observe()
+        observer2 = observable.observe()
+
+        self.assertFalse(observer1.called)
+        self.assertFalse(observer2.called)
+
+        # check the first observer is called first
+        def check_called_first(res):
+            self.assertFalse(observer2.called)
+            return res
+
+        observer1.addBoth(check_called_first)
+
+        # store the results
+        results = [None, None]
+
+        def check_val(res, idx):
+            results[idx] = res
+            return None
+
+        observer1.addErrback(check_val, 0)
+        observer2.addErrback(check_val, 1)
+
+        try:
+            raise Exception("gah!")
+        except Exception as e:
+            origin_d.errback(e)
+        self.assertEqual(str(results[0].value), "gah!", "observer 1 errback result")
+        self.assertEqual(str(results[1].value), "gah!", "observer 2 errback result")
 
 
 class TimeoutDeferredTest(TestCase):
