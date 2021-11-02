@@ -15,7 +15,10 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional, Tuple, Union, Dict, Sequence, TypeVar, Type
+
+import attr
+from attr.validators import instance_of, deep_iterable, deep_mapping, optional
 
 from synapse.api.errors import InvalidAPICallError, SynapseError
 from synapse.http.server import HttpServer
@@ -35,6 +38,53 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+
+Signatures = Dict[str, Dict[str, str]]
+
+
+C = TypeVar("C")
+
+
+def check_str_or_jsondict(instance: Any, attribute: str, input: Any) -> None:
+    if isinstance(input, str):
+        pass
+    elif isinstance(input, dict):
+        for key, val in input.items():
+            if not isinstance(key, str):
+                raise TypeError(f"{attribute} dictionary has non-string key {key}")
+    else:
+        raise TypeError(f"{attribute} should be a string, or a map from strings to any type.")
+
+
+@attr.s(frozen=True, slots=True)
+class DeviceKeys:
+    user_id: str = attr.ib(validator=instance_of(str))
+    device_id: str = attr.ib(validator=instance_of(str))
+    algorithms: Sequence[str] = attr.ib(validator=deep_iterable(instance_of(str)))
+    keys: Dict[str, str] = attr.ib(validator=deep_mapping(instance_of(str), instance_of(str)))
+    signatures: Signatures = attr.ib(validator=deep_mapping(
+        instance_of(str), deep_mapping(instance_of(str), instance_of(str))
+    ))
+
+
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class KeyUploadBody:
+    device_keys: Optional[DeviceKeys] = attr.ib(converter=attr.converters.optional(DeviceKeys))
+    one_time_keys: Optional[Dict[str, Union[str, JsonDict]]] = attr.ib(
+        validator=optional(deep_mapping(
+            instance_of(str), check_str_or_jsondict
+        ))
+    )
+    org_matrix_msc2732_fallback_keys: Optional[Dict[str, Union[str, JsonDict]]]
+
+    @classmethod
+    def load(cls: Type[C], src: JsonDict) -> C:
+        return cls(
+            device_keys=src.get("device_keys"),
+            one_time_keys=src.get("one_time_keys"),
+            org_matrix_msc2732_fallback_keys=src.get("org.matrix.msc2732.fallback.keys"),
+        )
 
 
 class KeyUploadServlet(RestServlet):
@@ -77,7 +127,7 @@ class KeyUploadServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         user_id = requester.user.to_string()
-        body = parse_json_object_from_request(request)
+        body = KeyUploadBody.load(parse_json_object_from_request(request))
 
         if device_id is not None:
             # Providing the device_id should only be done for setting keys

@@ -23,6 +23,7 @@ from twisted.enterprise.adbapi import Connection
 
 from synapse.api.constants import DeviceKeyAlgorithms
 from synapse.logging.opentracing import log_kv, set_tag, trace
+from synapse.rest.client.keys import DeviceKeys
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool, make_in_list_sql_clause
 from synapse.storage.engines import PostgresEngine
@@ -902,7 +903,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
 
 class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
     async def set_e2e_device_keys(
-        self, user_id: str, device_id: str, time_now: int, device_keys: JsonDict
+        self, user_id: str, device_id: str, time_now: int, device_keys: DeviceKeys
     ) -> bool:
         """Stores device keys for a device. Returns whether there was a change
         or the keys were already in the database.
@@ -924,7 +925,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
 
             # In py3 we need old_key_json to match new_key_json type. The DB
             # returns unicode while encode_canonical_json returns bytes.
-            new_key_json = encode_canonical_json(device_keys).decode("utf-8")
+            new_key_json = encode_canonical_json(attr.asdict(device_keys)).decode("utf-8")
 
             if old_key_json == new_key_json:
                 log_kv({"Message": "Device key already stored."})

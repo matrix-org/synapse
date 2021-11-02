@@ -29,6 +29,7 @@ from synapse.api.errors import CodeMessageException, Codes, NotFoundError, Synap
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import log_kv, set_tag, tag_args, trace
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
+from synapse.rest.client.keys import KeyUploadBody
 from synapse.types import (
     JsonDict,
     UserID,
@@ -491,14 +492,12 @@ class E2eKeysHandler:
 
     @tag_args
     async def upload_keys_for_user(
-        self, user_id: str, device_id: str, keys: JsonDict
+        self, user_id: str, device_id: str, keys: KeyUploadBody
     ) -> JsonDict:
 
         time_now = self.clock.time_msec()
 
-        # TODO: Validate the JSON to make sure it has the right keys.
-        device_keys = keys.get("device_keys", None)
-        if device_keys:
+        if keys.device_keys is not None:
             logger.info(
                 "Updating device_keys for device %r for user %s at %d",
                 device_id,
@@ -514,15 +513,14 @@ class E2eKeysHandler:
             )
             # TODO: Sign the JSON with the server key
             changed = await self.store.set_e2e_device_keys(
-                user_id, device_id, time_now, device_keys
+                user_id, device_id, time_now, keys.device_keys
             )
             if changed:
                 # Only notify about device updates *if* the keys actually changed
                 await self.device_handler.notify_device_update(user_id, [device_id])
         else:
             log_kv({"message": "Not updating device_keys for user", "user_id": user_id})
-        one_time_keys = keys.get("one_time_keys", None)
-        if one_time_keys:
+        if keys.one_time_keys is not None:
             log_kv(
                 {
                     "message": "Updating one_time_keys for device.",
@@ -531,13 +529,13 @@ class E2eKeysHandler:
                 }
             )
             await self._upload_one_time_keys_for_user(
-                user_id, device_id, time_now, one_time_keys
+                user_id, device_id, time_now, keys.one_time_keys
             )
         else:
             log_kv(
                 {"message": "Did not update one_time_keys", "reason": "no keys given"}
             )
-        fallback_keys = keys.get("org.matrix.msc2732.fallback_keys", None)
+        fallback_keys = keys.org_matrix_msc2732_fallback_keys
         if fallback_keys and isinstance(fallback_keys, dict):
             log_kv(
                 {
