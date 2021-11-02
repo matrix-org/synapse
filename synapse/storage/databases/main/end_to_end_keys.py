@@ -925,7 +925,9 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
 
             # In py3 we need old_key_json to match new_key_json type. The DB
             # returns unicode while encode_canonical_json returns bytes.
-            new_key_json = encode_canonical_json(attr.asdict(device_keys)).decode("utf-8")
+            new_key_json = encode_canonical_json(attr.asdict(device_keys)).decode(
+                "utf-8"
+            )
 
             if old_key_json == new_key_json:
                 log_kv({"Message": "Device key already stored."})
