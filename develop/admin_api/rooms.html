@@ -204,9 +204,14 @@ sorting the returned list. This API supports pagination.</p>
 <p><strong>Parameters</strong></p>
 <p>The following query parameters are available:</p>
 <ul>
-<li><code>from</code> - Offset in the returned list. Defaults to <code>0</code>.</li>
-<li><code>limit</code> - Maximum amount of rooms to return. Defaults to <code>100</code>.</li>
-<li><code>order_by</code> - The method in which to sort the returned list of rooms. Valid values are:
+<li>
+<p><code>from</code> - Offset in the returned list. Defaults to <code>0</code>.</p>
+</li>
+<li>
+<p><code>limit</code> - Maximum amount of rooms to return. Defaults to <code>100</code>.</p>
+</li>
+<li>
+<p><code>order_by</code> - The method in which to sort the returned list of rooms. Valid values are:</p>
 <ul>
 <li><code>alphabetical</code> - Same as <code>name</code>. This is deprecated.</li>
 <li><code>size</code> - Same as <code>joined_members</code>. This is deprecated.</li>
@@ -225,10 +230,20 @@ sorting the returned list. This API supports pagination.</p>
 <li><code>state_events</code> - Rooms are ordered by number of state events. Largest to smallest.</li>
 </ul>
 </li>
-<li><code>dir</code> - Direction of room order. Either <code>f</code> for forwards or <code>b</code> for backwards. Setting
-this value to <code>b</code> will reverse the above sort order. Defaults to <code>f</code>.</li>
-<li><code>search_term</code> - Filter rooms by their room name. Search term can be contained in any
-part of the room name. Defaults to no filtering.</li>
+<li>
+<p><code>dir</code> - Direction of room order. Either <code>f</code> for forwards or <code>b</code> for backwards. Setting
+this value to <code>b</code> will reverse the above sort order. Defaults to <code>f</code>.</p>
+</li>
+<li>
+<p><code>search_term</code> - Filter rooms by their room name, canonical alias and room id.
+Specifically, rooms are selected if the search term is contained in</p>
+<ul>
+<li>the room's name,</li>
+<li>the local part of the room's canonical alias, or</li>
+<li>the complete (local and server part) room's id (case sensitive).</li>
+</ul>
+<p>Defaults to no filtering.</p>
+</li>
 </ul>
 <p><strong>Response</strong></p>
 <p>The following fields are possible in the JSON response body:</p>
