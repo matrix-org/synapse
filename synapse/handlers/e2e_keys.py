@@ -278,19 +278,30 @@ class E2eKeysHandler:
             # done an initial sync on the device list so we do it now.
             try:
                 if self._is_master:
-                    user_devices = await self.device_handler.device_list_updater.user_device_resync(
+                    resync_results = await self.device_handler.device_list_updater.user_device_resync(
                         user_id
                     )
                 else:
-                    user_devices = await self._user_device_resync_client(
+                    resync_results = await self._user_device_resync_client(
                         user_id=user_id
                     )
 
-                user_devices = user_devices["devices"]
+                # Add teh device keys to the results.
+                user_devices = resync_results["devices"]
                 user_results = results.setdefault(user_id, {})
                 for device in user_devices:
                     user_results[device["device_id"]] = device["keys"]
                 user_ids_updated.append(user_id)
+
+                # Add any cross signing keys to the results.
+                master_key = resync_results.get("master_key")
+                self_signing_key = resync_results.get("self_signing_key")
+
+                if master_key:
+                    cross_signing_keys["master_keys"][user_id] = master_key
+
+                if self_signing_key:
+                    cross_signing_keys["self_signing_keys"][user_id] = self_signing_key
             except Exception as e:
                 failures[destination] = _exception_to_failure(e)
 
