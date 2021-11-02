@@ -1232,10 +1232,6 @@ class FederationHandlerRegistry:
 
         self.query_handlers[query_type] = handler
 
-    def register_instance_for_edu(self, edu_type: str, instance_name: str) -> None:
-        """Register that the EDU handler is on a different instance than master."""
-        self._edu_type_to_instance[edu_type] = [instance_name]
-
     def register_instances_for_edu(
         self, edu_type: str, instance_names: List[str]
     ) -> None:

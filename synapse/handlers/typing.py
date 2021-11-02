@@ -63,7 +63,7 @@ class FollowerTypingHandler:
             self.federation = hs.get_federation_sender()
 
         if hs.config.worker.writers.typing != hs.get_instance_name():
-            hs.get_federation_registry().register_instance_for_edu(
+            hs.get_federation_registry().register_instances_for_edu(
                 "m.typing",
                 hs.config.worker.writers.typing,
             )
