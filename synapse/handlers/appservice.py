@@ -268,10 +268,10 @@ class ApplicationServicesHandler:
                                 service, events
                             )
 
-                        # Persist the latest handled stream token for this appservice
-                        await self.store.set_type_stream_id_for_appservice(
-                            service, "read_receipt", new_token
-                        )
+                            # Persist the latest handled stream token for this appservice
+                            await self.store.set_type_stream_id_for_appservice(
+                                service, "read_receipt", new_token
+                            )
 
                     elif stream_key == "presence_key":
                         events = await self._handle_presence(service, users, new_token)
@@ -280,10 +280,10 @@ class ApplicationServicesHandler:
                                 service, events
                             )
 
-                        # Persist the latest handled stream token for this appservice
-                        await self.store.set_type_stream_id_for_appservice(
-                            service, "presence", new_token
-                        )
+                            # Persist the latest handled stream token for this appservice
+                            await self.store.set_type_stream_id_for_appservice(
+                                service, "presence", new_token
+                            )
 
     async def _handle_typing(
         self, service: ApplicationService, new_token: int
@@ -342,7 +342,8 @@ class ApplicationServicesHandler:
             service, "read_receipt"
         )
         if new_token is not None and new_token <= from_key:
-            raise Exception("Rejecting token lower than stored: %s" % (new_token,))
+            logger.debug("Rejecting token lower than stored: %s" % (new_token,))
+            return []
 
         receipts_source = self.event_sources.sources.receipt
         receipts, _ = await receipts_source.get_new_events_as(
@@ -378,7 +379,8 @@ class ApplicationServicesHandler:
             service, "presence"
         )
         if new_token is not None and new_token <= from_key:
-            raise Exception("Rejecting token lower than stored: %s" % (new_token,))
+            logger.debug("Rejecting token lower than stored: %s" % (new_token,))
+            return []
 
         for user in users:
             if isinstance(user, str):
