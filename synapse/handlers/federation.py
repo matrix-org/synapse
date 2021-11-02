@@ -1265,25 +1265,9 @@ class FederationHandler:
         # Synapse asks for 100 events per backfill request. Do not allow more.
         limit = min(limit, 100)
 
-        # events = await self.store.get_backfill_events(room_id, pdu_list, limit)
-        # logger.info(
-        #     "old implementation backfill events=%s",
-        #     [
-        #         "event_id=%s,depth=%d,body=%s,prevs=%s\n"
-        #         % (
-        #             event.event_id,
-        #             event.depth,
-        #             event.content.get("body", event.type),
-        #             event.prev_event_ids(),
-        #         )
-        #         for event in events
-        #     ],
-        # )
-
-        events = await self.get_backfill_events(origin, room_id, pdu_list, limit)
+        events = await self.store.get_backfill_events(room_id, pdu_list, limit)
         logger.info(
-            "new implementation backfill events(%d)=%s",
-            len(events),
+            "old implementation backfill events=%s",
             [
                 "event_id=%s,depth=%d,body=%s,prevs=%s\n"
                 % (
@@ -1295,6 +1279,22 @@ class FederationHandler:
                 for event in events
             ],
         )
+
+        # events = await self.get_backfill_events(origin, room_id, pdu_list, limit)
+        # logger.info(
+        #     "new implementation backfill events(%d)=%s",
+        #     len(events),
+        #     [
+        #         "event_id=%s,depth=%d,body=%s,prevs=%s\n"
+        #         % (
+        #             event.event_id,
+        #             event.depth,
+        #             event.content.get("body", event.type),
+        #             event.prev_event_ids(),
+        #         )
+        #         for event in events
+        #     ],
+        # )
 
         events = await filter_events_for_server(self.storage, origin, events)
 
