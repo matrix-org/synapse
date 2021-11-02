@@ -45,7 +45,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             update_name="local_group_updates_index",
             index_name="local_group_updates_stream_id_index",
             table="local_group_updates",
-            columns=("stream_id"),
+            columns=("stream_id",),
             unique=True,
         )
         super().__init__(database, db_conn, hs)

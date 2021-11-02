@@ -13,6 +13,6 @@
  * limitations under the License.
  */
 
--- Check old events for thread relations.
+-- Check index on `local_group_updates.stream_id`.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
   (6503, 'local_group_updates_index', '{}');
