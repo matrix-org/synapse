@@ -680,7 +680,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, status_channel.code, msg=status_channel.json_body)
         self.assertEqual("complete", status_channel.json_body["status"])
 
-    test_delete_same_room_twice.skip = "Disabled by default because it's flaky"
+    # test_delete_same_room_twice.skip = "Disabled by default because it's flaky"
 
     def test_purge_room_and_block(self):
         """Test to purge a room and block it.
