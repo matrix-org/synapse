@@ -135,9 +135,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
         # Create and persist all of the state events that float off on their own
         # before the batch. These will most likely be all of the invite/member
         # state events used to auth the upcoming historical messages.
-        if body["state_events_at_start"] is not None and len(
-            body["state_events_at_start"]
-        ):
+        if body["state_events_at_start"]:
             state_event_ids_at_start = (
                 await self.room_batch_handler.persist_state_events_at_start(
                     state_events_at_start=body["state_events_at_start"],
