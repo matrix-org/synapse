@@ -463,7 +463,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_typing_writer_handler(self) -> TypingWriterHandler:
-        if self.config.worker.writers.typing == self.get_instance_name():
+        if self.get_instance_name() in self.config.worker.writers.typing:
             return TypingWriterHandler(self)
         else:
             raise Exception("Workers cannot write typing")
@@ -474,7 +474,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_typing_handler(self) -> FollowerTypingHandler:
-        if self.config.worker.writers.typing == self.get_instance_name():
+        if self.get_instance_name() in self.config.worker.writers.typing:
             # Use get_typing_writer_handler to ensure that we use the same
             # cached version.
             return self.get_typing_writer_handler()
