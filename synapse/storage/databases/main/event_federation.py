@@ -997,8 +997,21 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
     def _get_connected_batch_event_backfill_results_txn(
         self, txn: LoggingTransaction, insertion_event_id: str, limit: int
-    ):
-        # Find any batch connections of a given insertion event
+    ) -> List[BackfillQueueNavigationItem]:
+        """
+        Find any batch connections of a given insertion event.
+        A batch event points at a insertion event via:
+        batch_event.content[MSC2716_BATCH_ID] -> insertion_event.content[MSC2716_NEXT_BATCH_ID]
+
+        Args:
+            txn: The database transaction to use
+            insertion_event_id: The event ID to navigate from. We will find
+                batch events that point back at this insertion event.
+            limit: Max number of event ID's to query for and return
+
+        Returns:
+            List of batch events that the backfill queue can process
+        """
         batch_connection_query = """
             SELECT e.depth, e.stream_ordering, c.event_id, e.type FROM insertion_events AS i
             /* Find the batch that connects to the given insertion event */
@@ -1029,7 +1042,18 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
     def _get_connected_prev_event_backfill_results_txn(
         self, txn: LoggingTransaction, event_id: str, limit: int
-    ):
+    ) -> List[BackfillQueueNavigationItem]:
+        """
+        Find any events connected by prev_event the specified event_id.
+
+        Args:
+            txn: The database transaction to use
+            event_id: The event ID to navigate from
+            limit: Max number of event ID's to query for and return
+
+        Returns:
+            List of prev events that the backfill queue can process
+        """
         # Look for the prev_event_id connected to the given event_id
         connected_prev_event_query = """
             SELECT depth, stream_ordering, prev_event_id, events.type FROM event_edges
