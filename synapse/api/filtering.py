@@ -331,7 +331,7 @@ class Filter:
     def filters_all_rooms(self) -> bool:
         return "*" in self.not_rooms
 
-    async def check(self, event: FilterEvent) -> bool:
+    async def _check(self, event: FilterEvent) -> bool:
         """Checks whether the filter matches the given event.
 
         Args:
@@ -454,7 +454,7 @@ class Filter:
         return room_ids
 
     async def filter(self, events: Iterable[FilterEvent]) -> List[FilterEvent]:
-        return [event for event in events if await self.check(event)]
+        return [event for event in events if await self._check(event)]
 
     def with_room_ids(self, room_ids: Iterable[str]) -> "Filter":
         """Returns a new filter with the given room IDs appended.
