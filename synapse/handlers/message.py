@@ -949,14 +949,24 @@ class EventCreationHandler:
         else:
             prev_event_ids = await self.store.get_prev_events_for_room(builder.room_id)
 
-        # we now ought to have some prev_events (unless it's a create event).
-        #
-        # do a quick sanity check here, rather than waiting until we've created the
+        # Do a quick sanity check here, rather than waiting until we've created the
         # event and then try to auth it (which fails with a somewhat confusing "No
         # create event in auth events")
-        assert (
-            builder.type == EventTypes.Create or len(prev_event_ids) > 0
-        ), "Attempting to create an event with no prev_events"
+        room_version_obj = await self.store.get_room_version(builder.room_id)
+        if room_version_obj.msc2716_empty_prev_events:
+            # We allow events with no `prev_events` but it better have some `auth_events`
+            assert (
+                builder.type == EventTypes.Create
+                or len(prev_event_ids) > 0
+                # Allow an event to have empty list of prev_event_ids
+                # only if it has auth_event_ids.
+                or (auth_event_ids and len(auth_event_ids) > 0)
+            ), "Attempting to create an event with no prev_events or auth_event_ids"
+        else:
+            # we now ought to have some prev_events (unless it's a create event).
+            assert (
+                builder.type == EventTypes.Create or len(prev_event_ids) > 0
+            ), "Attempting to create an event with no prev_events"
 
         event = await builder.build(
             prev_event_ids=prev_event_ids,
