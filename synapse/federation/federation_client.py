@@ -286,8 +286,8 @@ class FederationClient(FederationBase):
         timeout: Optional[int] = None,
     ) -> Optional[EventBase]:
         """Requests the PDU with given origin and ID from the remote home
-        server.
-        Does not have any caching or rate limiting!
+        server. Does not have any caching or rate limiting!
+
         Args:
             destination: Which homeserver to query
             event_id: event to fetch
@@ -297,8 +297,10 @@ class FederationClient(FederationBase):
                 of the current block of PDUs. Defaults to `False`
             timeout: How long to try (in ms) each destination for before
                 moving to the next destination. None indicates no timeout.
+
         Returns:
             The requested PDU, or None if we were unable to find it.
+
         Raises:
             SynapseError, NotRetryingDestination, FederationDeniedError
         """
