@@ -1,0 +1,1 @@
+`ObservableDeferred`: run registered observers in order.

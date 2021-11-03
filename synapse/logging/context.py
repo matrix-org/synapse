@@ -220,7 +220,7 @@ class _Sentinel:
         self.scope = None
         self.tag = None
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "sentinel"
 
     def copy_to(self, record):
@@ -241,7 +241,7 @@ class _Sentinel:
     def record_event_fetch(self, event_count):
         pass
 
-    def __bool__(self):
+    def __bool__(self) -> Literal[False]:
         return False
 
 

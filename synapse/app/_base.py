@@ -45,6 +45,7 @@ from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.logging.context import PreserveLoggingContext
+from synapse.metrics import register_threadpool
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
 from synapse.util.caches.lrucache import setup_expire_lru_cache_entries
@@ -346,9 +347,14 @@ async def start(hs: "HomeServer"):
     # numbers of DNS requests don't starve out other users of the threadpool.
     resolver_threadpool = ThreadPool(name="gai_resolver")
     resolver_threadpool.start()
+    reactor.addSystemEventTrigger("during", "shutdown", resolver_threadpool.stop)
     reactor.installNameResolver(
         GAIResolver(reactor, getThreadPool=lambda: resolver_threadpool)
     )
+
+    # Register the threadpools with our metrics.
+    register_threadpool("default", reactor.getThreadPool())
+    register_threadpool("gai_resolver", resolver_threadpool)
 
     # Set up the SIGHUP machinery.
     if hasattr(signal, "SIGHUP"):

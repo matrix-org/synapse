@@ -1,1 +1,0 @@
-Document Synapse's behaviour when dealing with multiple modules registering the same callbacks and/or handlers for the same HTTP endpoints.

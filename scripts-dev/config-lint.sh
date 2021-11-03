@@ -3,7 +3,7 @@
 # Exits with 0 if there are no problems, or another code otherwise.
 
 # cd to the root of the repository
-cd `dirname $0`/..
+cd "$(dirname "$0")/.." || exit
 
 # Restore backup of sample config upon script exit
 trap "mv docs/sample_config.yaml.bak docs/sample_config.yaml" EXIT

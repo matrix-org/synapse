@@ -1,3 +1,25 @@
+matrix-synapse-py3 (1.47.0+nmu1) UNRELEASED; urgency=medium
+
+  * Update scripts to pass Shellcheck lints.
+
+ -- root <root@cae79a6e79d7>  Fri, 22 Oct 2021 22:20:31 +0000
+
+matrix-synapse-py3 (1.46.0) stable; urgency=medium
+
+  [ Richard van der Hoff ]
+  * Compress debs with xz, to fix incompatibility of impish debs with reprepro.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.46.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 02 Nov 2021 13:22:53 +0000
+
+matrix-synapse-py3 (1.46.0~rc1) stable; urgency=medium
+
+  * New synapse release 1.46.0~rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 26 Oct 2021 14:04:04 +0100
+
 matrix-synapse-py3 (1.45.1) stable; urgency=medium
 
   * New synapse release 1.45.1.

@@ -197,6 +197,18 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         # self.assertFalse(d.called)
         self.get_success(d)
 
+    def test_verify_for_server_locally(self):
+        """Ensure that locally signed JSON can be verified without fetching keys
+        over federation
+        """
+        kr = keyring.Keyring(self.hs)
+        json1 = {}
+        signedjson.sign.sign_json(json1, self.hs.hostname, self.hs.signing_key)
+
+        # Test that verify_json_for_server succeeds on a object signed by ourselves
+        d = kr.verify_json_for_server(self.hs.hostname, json1, 0)
+        self.get_success(d)
+
     def test_verify_json_for_server_with_null_valid_until_ms(self):
         """Tests that we correctly handle key requests for keys we've stored
         with a null `ts_valid_until_ms`

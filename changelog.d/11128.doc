@@ -1,0 +1,1 @@
+Improve example HAProxy config in the docs to properly handle host headers with port information. This is required for federation over port 443 to work correctly.

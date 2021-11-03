@@ -149,7 +149,6 @@ class TransactionManager:
                 )
             except HttpResponseException as e:
                 code = e.code
-                response = e.response
 
                 set_tag(tags.ERROR, True)
 

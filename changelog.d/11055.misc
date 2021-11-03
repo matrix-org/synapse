@@ -1,1 +1,0 @@
-Improve type hints for `_wrap_in_base_path` decorator used by `MediaFilePaths`.
