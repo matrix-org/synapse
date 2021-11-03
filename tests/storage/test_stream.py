@@ -180,3 +180,23 @@ class PaginationTestCase(HomeserverTestCase):
         chunk = self._filter_messages(filter)
         self.assertEqual(len(chunk), 1, chunk)
         self.assertEqual(chunk[0].event_id, self.event_id_1)
+
+    def test_duplicate_relation(self):
+        """An event should only be returned once if there are multiple relations to it."""
+        self.helper.send_event(
+            room_id=self.room_id,
+            type="m.reaction",
+            content={
+                "m.relates_to": {
+                    "rel_type": RelationTypes.ANNOTATION,
+                    "event_id": self.event_id_1,
+                    "key": "A",
+                }
+            },
+            tok=self.second_tok,
+        )
+
+        filter = {"io.element.relation_senders": [self.second_user_id]}
+        chunk = self._filter_messages(filter)
+        self.assertEqual(len(chunk), 1, chunk)
+        self.assertEqual(chunk[0].event_id, self.event_id_1)
