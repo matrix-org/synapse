@@ -385,7 +385,7 @@ A response body like the following is returned:
 
 # Delete Room API
 
-The Delete Room admin API allows server admins to remove rooms from server
+The Delete Room admin API allows server admins to remove rooms from the server
 and block these rooms.
 
 Shuts down a room. Moves all local users and room aliases automatically to a
