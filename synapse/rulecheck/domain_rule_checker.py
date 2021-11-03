@@ -66,9 +66,6 @@ class DomainRuleChecker(object):
         self.can_only_join_rooms_with_invite = config.get(
             "can_only_join_rooms_with_invite", False
         )
-        self.can_only_create_one_to_one_rooms = config.get(
-            "can_only_create_one_to_one_rooms", False
-        )
         self.can_only_invite_during_room_creation = config.get(
             "can_only_invite_during_room_creation", False
         )
