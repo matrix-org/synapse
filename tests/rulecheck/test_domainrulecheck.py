@@ -272,43 +272,6 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
         channel = self._create_room(self.admin_access_token)
         assert channel.result["code"] == b"200", channel.result
 
-    def test_normal_user_cannot_create_empty_room(self):
-        channel = self._create_room(self.normal_access_token)
-        assert channel.result["code"] == b"403", channel.result
-
-    def test_normal_user_cannot_create_room_with_multiple_invites(self):
-        channel = self._create_room(
-            self.normal_access_token,
-            content={"invite": [self.other_user_id, self.admin_user_id]},
-        )
-        assert channel.result["code"] == b"403", channel.result
-
-        # Test that it correctly counts both normal and third party invites
-        channel = self._create_room(
-            self.normal_access_token,
-            content={
-                "invite": [self.other_user_id],
-                "invite_3pid": [{"medium": "email", "address": "foo@example.com"}],
-            },
-        )
-        assert channel.result["code"] == b"403", channel.result
-
-        # Test that it correctly rejects third party invites
-        channel = self._create_room(
-            self.normal_access_token,
-            content={
-                "invite": [],
-                "invite_3pid": [{"medium": "email", "address": "foo@example.com"}],
-            },
-        )
-        assert channel.result["code"] == b"403", channel.result
-
-    def test_normal_user_can_room_with_single_invites(self):
-        channel = self._create_room(
-            self.normal_access_token, content={"invite": [self.other_user_id]}
-        )
-        assert channel.result["code"] == b"200", channel.result
-
     def test_cannot_join_public_room(self):
         channel = self._create_room(self.admin_access_token)
         assert channel.result["code"] == b"200", channel.result

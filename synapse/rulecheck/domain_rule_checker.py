@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Optional
+from typing import Optional
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.config._base import ConfigError
@@ -84,7 +84,6 @@ class DomainRuleChecker(object):
         self._api.register_spam_checker_callbacks(
             user_may_invite=self.user_may_invite,
             user_may_send_3pid_invite=self.user_may_send_3pid_invite,
-            user_may_create_room=self.user_may_create_room,
             user_may_join_room=self.user_may_join_room,
         )
 
@@ -197,24 +196,6 @@ class DomainRuleChecker(object):
             return False
 
         return invitee_domain in self.domain_mapping[inviter_domain]
-
-    async def user_may_create_room(
-        self, userid, invite_list, third_party_invite_list, cloning
-    ):
-        """Implements synapse.events.SpamChecker.user_may_create_room"""
-
-        if cloning:
-            return True
-
-        if not self.can_invite_by_third_party_id and third_party_invite_list:
-            return False
-
-        number_of_invites = len(invite_list) + len(third_party_invite_list)
-
-        if self.can_only_create_one_to_one_rooms and number_of_invites != 1:
-            return False
-
-        return True
 
     async def user_may_join_room(self, userid, room_id, is_invited):
         """Implements the user_may_join_room spam checker callback."""
