@@ -302,7 +302,6 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         self.handler.notify_interested_services_ephemeral("receipt_key", 579)
         self.mock_scheduler.submit_ephemeral_events_for_as.assert_not_called()
-        self.mock_store.set_type_stream_id_for_appservice.assert_not_called()
 
     def _mkservice(self, is_interested, protocols=None):
         service = Mock()
