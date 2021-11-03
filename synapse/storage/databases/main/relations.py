@@ -334,17 +334,17 @@ class RelationsWorkerStore(SQLBaseStore):
 
         return count, latest_event
 
-    async def has_event_relations(
+    async def events_have_relations(
         self,
-        parent_id: str,
+        parent_ids: List[str],
         relation_senders: Optional[List[str]],
         relation_types: Optional[List[str]],
-    ) -> bool:
-        """Check if an event has a relationship from the given senders of the
+    ) -> List[str]:
+        """Check which events have a relationship from the given senders of the
         given types.
 
         Args:
-            parent_id: The event being annotated
+            parent_ids: The events being annotated
             relation_senders: The relation senders to check.
             relation_types: The relation types to check.
 
@@ -353,20 +353,22 @@ class RelationsWorkerStore(SQLBaseStore):
         """
         # If no restrictions are given then the event has the required relations.
         if not relation_senders and not relation_types:
-            return True
+            return parent_ids
 
         sql = """
-            SELECT 1 FROM event_relations
+            SELECT relates_to_id FROM event_relations
             INNER JOIN events USING (event_id)
             WHERE
-                relates_to_id = ?
-                AND %s
-            LIMIT 1;
+                %s;
         """
 
-        def _get_if_event_has_relations(txn) -> bool:
+        def _get_if_event_has_relations(txn) -> List[str]:
             clauses: List[str] = []
-            args = [parent_id]
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "relates_to_id", parent_ids
+            )
+            clauses.append(clause)
+
             if relation_senders:
                 clause, temp_args = make_in_list_sql_clause(
                     txn.database_engine, "sender", relation_senders
@@ -382,7 +384,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
             txn.execute(sql % " AND ".join(clauses), args)
 
-            return bool(txn.fetchone())
+            return [row[0] for row in txn]
 
         return await self.db_pool.runInteraction(
             "get_if_event_has_relations", _get_if_event_has_relations

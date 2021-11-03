@@ -331,7 +331,7 @@ class Filter:
     def filters_all_rooms(self) -> bool:
         return "*" in self.not_rooms
 
-    async def _check(self, event: FilterEvent) -> bool:
+    def _check(self, event: FilterEvent) -> bool:
         """Checks whether the filter matches the given event.
 
         Args:
@@ -389,14 +389,6 @@ class Filter:
                 if contains_url_filter != contains_url:
                     return False
 
-            # TODO This is wildly inefficient.
-            if isinstance(event, EventBase) and (
-                self.relation_senders or self.relation_types
-            ):
-                return await self._store.has_event_relations(
-                    event.event_id, self.relation_senders, self.relation_types
-                )
-
             return True
 
     def _check_fields(self, field_matchers: Dict[str, Callable[[str], bool]]) -> bool:
@@ -453,8 +445,30 @@ class Filter:
 
         return room_ids
 
+    async def _check_event_relations(
+        self, events: Iterable[FilterEvent]
+    ) -> List[FilterEvent]:
+        # The event IDs to check, mypy doesn't understand the ifinstance check.
+        event_ids = [event.event_id for event in events if isinstance(event, EventBase)]  # type: ignore[attr-defined]
+        event_ids_to_keep = set(
+            await self._store.events_have_relations(
+                event_ids, self.relation_senders, self.relation_types
+            )
+        )
+
+        return [
+            event
+            for event in events
+            if not isinstance(event, EventBase) or event.event_id in event_ids_to_keep
+        ]
+
     async def filter(self, events: Iterable[FilterEvent]) -> List[FilterEvent]:
-        return [event for event in events if await self._check(event)]
+        result = [event for event in events if self._check(event)]
+
+        if self.relation_senders or self.relation_types:
+            return await self._check_event_relations(result)
+
+        return result
 
     def with_room_ids(self, room_ids: Iterable[str]) -> "Filter":
         """Returns a new filter with the given room IDs appended.
