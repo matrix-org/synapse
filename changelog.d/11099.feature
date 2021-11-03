@@ -1,0 +1,1 @@
+Add search by room ID and room alias to List Room admin API.

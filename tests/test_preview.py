@@ -277,6 +277,21 @@ class CalcOgTestCase(unittest.TestCase):
         tree = decode_body(html, "http://example.com/test.html")
         self.assertIsNone(tree)
 
+    def test_xml(self):
+        """Test decoding XML and ensure it works properly."""
+        # Note that the strip() call is important to ensure the xml tag starts
+        # at the initial byte.
+        html = b"""
+        <?xml version="1.0" encoding="UTF-8"?>
+
+        <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+        <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+        <head><title>Foo</title></head><body>Some text.</body></html>
+        """.strip()
+        tree = decode_body(html, "http://example.com/test.html")
+        og = _calc_og(tree, "http://example.com/test.html")
+        self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
+
     def test_invalid_encoding(self):
         """An invalid character encoding should be ignored and treated as UTF-8, if possible."""
         html = b"""

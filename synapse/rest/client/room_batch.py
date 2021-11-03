@@ -131,20 +131,22 @@ class RoomBatchSendEventRestServlet(RestServlet):
             prev_event_ids_from_query
         )
 
+        state_event_ids_at_start = []
         # Create and persist all of the state events that float off on their own
         # before the batch. These will most likely be all of the invite/member
         # state events used to auth the upcoming historical messages.
-        state_event_ids_at_start = (
-            await self.room_batch_handler.persist_state_events_at_start(
-                state_events_at_start=body["state_events_at_start"],
-                room_id=room_id,
-                initial_auth_event_ids=auth_event_ids,
-                app_service_requester=requester,
+        if body["state_events_at_start"]:
+            state_event_ids_at_start = (
+                await self.room_batch_handler.persist_state_events_at_start(
+                    state_events_at_start=body["state_events_at_start"],
+                    room_id=room_id,
+                    initial_auth_event_ids=auth_event_ids,
+                    app_service_requester=requester,
+                )
             )
-        )
-        # Update our ongoing auth event ID list with all of the new state we
-        # just created
-        auth_event_ids.extend(state_event_ids_at_start)
+            # Update our ongoing auth event ID list with all of the new state we
+            # just created
+            auth_event_ids.extend(state_event_ids_at_start)
 
         inherited_depth = await self.room_batch_handler.inherit_depth_from_prev_ids(
             prev_event_ids_from_query
@@ -191,14 +193,17 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 depth=inherited_depth,
             )
 
-            batch_id_to_connect_to = base_insertion_event["content"][
+            batch_id_to_connect_to = base_insertion_event.content[
                 EventContentFields.MSC2716_NEXT_BATCH_ID
             ]
 
         # Also connect the historical event chain to the end of the floating
         # state chain, which causes the HS to ask for the state at the start of
-        # the batch later.
-        prev_event_ids = [state_event_ids_at_start[-1]]
+        # the batch later. If there is no state chain to connect to, just make
+        # the insertion event float itself.
+        prev_event_ids = []
+        if len(state_event_ids_at_start):
+            prev_event_ids = [state_event_ids_at_start[-1]]
 
         # Create and persist all of the historical events as well as insertion
         # and batch meta events to make the batch navigable in the DAG.
