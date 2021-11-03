@@ -752,9 +752,9 @@ class FederationEventHandler:
             backfilled: True if this is part of a historical batch of events (inhibits
                 notification to clients, and validation of device keys.)
         """
-
-        logger.info(
-            "backfill events=%s",
+        logger.debug(
+            "processing pulled backfilled=%s events=%s",
+            backfilled,
             [
                 "event_id=%s,depth=%d,body=%s,prevs=%s\n"
                 % (
@@ -1146,6 +1146,8 @@ class FederationEventHandler:
 
         await self._run_push_actions_and_persist_event(event, context, backfilled)
 
+        await self._handle_marker_event(origin, event)
+
         if backfilled:
             return
 
@@ -1222,8 +1224,6 @@ class FederationEventHandler:
                     self._resync_device,
                     event.sender,
                 )
-
-        await self._handle_marker_event(origin, event)
 
     async def _resync_device(self, sender: str) -> None:
         """We have detected that the device list for the given user may be out

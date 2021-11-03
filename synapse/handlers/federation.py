@@ -142,7 +142,7 @@ class FederationHandler:
         insertion_events_to_be_backfilled: Dict[str, int] = {}
         if self.hs.config.experimental.msc2716_enabled:
             insertion_events_to_be_backfilled = (
-                await self.store.get_insertion_event_backwards_extremities_in_room(
+                await self.store.get_insertion_event_backward_extremities_in_room(
                     room_id
                 )
             )
@@ -1055,8 +1055,8 @@ class FederationHandler:
         limit = min(limit, 100)
 
         events = await self.store.get_backfill_events(room_id, pdu_list, limit)
-        logger.info(
-            "old implementation backfill events=%s",
+        logger.debug(
+            "on_backfill_request: backfill events=%s",
             [
                 "event_id=%s,depth=%d,body=%s,prevs=%s\n"
                 % (
