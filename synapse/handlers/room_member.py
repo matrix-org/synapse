@@ -644,7 +644,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if block_invite:
                 raise SynapseError(403, "Invites have been disabled on this server")
 
-        if prev_event_ids:
+        if prev_event_ids is not None:
             return await self._local_membership_update(
                 requester=requester,
                 target=target,
