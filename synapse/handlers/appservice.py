@@ -342,7 +342,7 @@ class ApplicationServicesHandler:
             service, "read_receipt"
         )
         if new_token is not None and new_token <= from_key:
-            logger.debug("Rejecting token lower than stored: %s" % (new_token,))
+            logger.debug("Rejecting token lower than or equal to stored: %s" % (new_token,))
             return []
 
         receipts_source = self.event_sources.sources.receipt
@@ -379,7 +379,7 @@ class ApplicationServicesHandler:
             service, "presence"
         )
         if new_token is not None and new_token <= from_key:
-            logger.debug("Rejecting token lower than stored: %s" % (new_token,))
+            logger.debug("Rejecting token lower than or equal to stored: %s" % (new_token,))
             return []
 
         for user in users:
