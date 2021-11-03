@@ -13,8 +13,9 @@
 # limitations under the License.
 
 import logging
-from typing import Collection, Dict, List, Optional, Tuple
+from typing import Collection, Dict, Iterable, List, Optional, Tuple
 
+from synapse.appservice import ApplicationService
 from synapse.logging import issue9533_logger
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.replication.tcp.streams import ToDeviceStream
@@ -259,6 +260,36 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             "get_new_messages_for_device", get_new_messages_for_device_txn
         )
 
+    # TODO: OpenTracing support
+    async def delete_messages_for_appservice_users(
+        self, service: ApplicationService, users: Iterable[str], up_to_stream_id: int
+    ) -> int:
+        """
+        Delete to-device messages that have been delivered to an application service.
+
+        Only messages
+        that are intended for users that the given application service has registered an exclusive
+        namespace for will be deleted. If a message is intended for a user, but that user is not
+        part of an exclusive namespace registered by the given application service, then that
+        message will remain in-tact.
+
+        Args:
+            service: The application service to inspect user namespaces of.
+            users: The to-device message recipient users to scope to.
+            up_to_stream_id: The maximum message stream token to consider, inclusive.
+
+        Returns:
+            The number of messages deleted.
+            # TODO: Useful now that we skip stream tokens?
+        """
+        # TODO: Check cache
+
+        # Filter users based on exclusive namespace
+
+        # Only delete messages for those users up to the stream ID
+
+        # So potentially just a delete_messages_for_users method?
+
     @trace
     async def delete_messages_for_device(
         self, user_id: str, device_id: Optional[str], up_to_stream_id: int
@@ -267,7 +298,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         Args:
             user_id: The recipient user_id.
             device_id: The recipient device_id.
-            up_to_stream_id: Where to delete messages up to.
+            up_to_stream_id: Where to delete messages up to, inclusive.
 
         Returns:
             The number of messages deleted.
