@@ -646,22 +646,20 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         u2_token = self.login(u2, "pass")
         u3 = self.register_user("user3", "pass")
 
-        # We do not add users to the directory until they join a room.
+        # u1 can't see u2 until they share a private room, or u1 is in a public room.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 0)
 
+        # Get u1 and u2 into a private room.
         room = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
         self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
         self.helper.join(room, user=u2, tok=u2_token)
 
         # Check we have populated the database correctly.
-        shares_private = self.get_success(
-            self.user_dir_helper.get_users_who_share_private_rooms()
+        users, public_users, shares_private = self.get_success(
+            self.user_dir_helper.get_tables()
         )
-        public_users = self.get_success(
-            self.user_dir_helper.get_users_in_public_rooms()
-        )
-
+        self.assertEqual(users, {u1, u2, u3})
         self.assertEqual(shares_private, {(u1, u2, room), (u2, u1, room)})
         self.assertEqual(public_users, set())
 
@@ -680,14 +678,11 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # User 2 then leaves.
         self.helper.leave(room, user=u2, tok=u2_token)
 
-        # Check we have removed the values.
-        shares_private = self.get_success(
-            self.user_dir_helper.get_users_who_share_private_rooms()
+        # Check this is reflected in the DB.
+        users, public_users, shares_private = self.get_success(
+            self.user_dir_helper.get_tables()
         )
-        public_users = self.get_success(
-            self.user_dir_helper.get_users_in_public_rooms()
-        )
-
+        self.assertEqual(users, {u1, u2, u3})
         self.assertEqual(shares_private, set())
         self.assertEqual(public_users, set())
 
@@ -697,6 +692,50 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         s = self.get_success(self.handler.search_users(u1, "user3", 10))
         self.assertEqual(len(s["results"]), 0)
+
+    def test_joining_private_room_with_excluded_user(self) -> None:
+        """
+        When a user excluded from the user directory, E say, joins a private
+        room, E will not appear in the `users_who_share_private_rooms` table.
+
+        When a normal user, U say, joins a private room containing E, then
+        U will appear in the `users_who_share_private_rooms` table, but E will
+        not.
+        """
+        # Setup a support and two normal users.
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        bob = self.register_user("bob", "pass")
+        bob_token = self.login(bob, "pass")
+        support = "@support1:test"
+        self.get_success(
+            self.store.register_user(
+                user_id=support, password_hash=None, user_type=UserTypes.SUPPORT
+            )
+        )
+
+        # Alice makes a room. Inject the support user into the room.
+        room = self.helper.create_room_as(alice, is_public=False, tok=alice_token)
+        self.get_success(inject_member_event(self.hs, room, support, "join"))
+        # Check the DB state. The support user should not be in the directory.
+        users, in_public, in_private = self.get_success(
+            self.user_dir_helper.get_tables()
+        )
+        self.assertEqual(users, {alice, bob})
+        self.assertEqual(in_public, set())
+        self.assertEqual(in_private, set())
+
+        # Then invite Bob, who accepts.
+        self.helper.invite(room, alice, bob, tok=alice_token)
+        self.helper.join(room, bob, tok=bob_token)
+
+        # Check the DB state. The support user should not be in the directory.
+        users, in_public, in_private = self.get_success(
+            self.user_dir_helper.get_tables()
+        )
+        self.assertEqual(users, {alice, bob})
+        self.assertEqual(in_public, set())
+        self.assertEqual(in_private, {(alice, bob, room), (bob, alice, room)})
 
     def test_spam_checker(self) -> None:
         """

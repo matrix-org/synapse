@@ -100,6 +100,7 @@ from synapse.rest.client.register import (
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
+from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
 from synapse.storage.databases.main.censor_events import CensorEventsStore
 from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
@@ -131,10 +132,10 @@ class KeyUploadServlet(RestServlet):
 
     PATTERNS = client_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: HomeServer):
         """
         Args:
-            hs (synapse.server.HomeServer): server
+            hs: server
         """
         super().__init__()
         self.auth = hs.get_auth()
@@ -318,6 +319,8 @@ class GenericWorkerServer(HomeServer):
                     resources.update({CLIENT_API_PREFIX: resource})
 
                     resources.update(build_synapse_client_resource_tree(self))
+                    resources.update({"/.well-known": well_known_resource(self)})
+
                 elif name == "federation":
                     resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
                 elif name == "media":

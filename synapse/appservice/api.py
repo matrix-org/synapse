@@ -27,6 +27,7 @@ from synapse.util.caches.response_cache import ResponseCache
 
 if TYPE_CHECKING:
     from synapse.appservice import ApplicationService
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     pushing.
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.clock = hs.get_clock()
 

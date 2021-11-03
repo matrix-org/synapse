@@ -373,31 +373,29 @@ class UserDirectoryHandler(StateDeltasHandler):
         is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
         )
-        other_users_in_room = await self.store.get_users_in_room(room_id)
-
         if is_public:
             await self.store.add_users_in_public_rooms(room_id, (user_id,))
         else:
+            users_in_room = await self.store.get_users_in_room(room_id)
+            other_users_in_room = [
+                other
+                for other in users_in_room
+                if other != user_id
+                and (
+                    not self.is_mine_id(other)
+                    or await self.store.should_include_local_user_in_dir(other)
+                )
+            ]
             to_insert = set()
 
             # First, if they're our user then we need to update for every user
             if self.is_mine_id(user_id):
-                if await self.store.should_include_local_user_in_dir(user_id):
-                    for other_user_id in other_users_in_room:
-                        if user_id == other_user_id:
-                            continue
-
-                        to_insert.add((user_id, other_user_id))
+                for other_user_id in other_users_in_room:
+                    to_insert.add((user_id, other_user_id))
 
             # Next we need to update for every local user in the room
             for other_user_id in other_users_in_room:
-                if user_id == other_user_id:
-                    continue
-
-                include_other_user = self.is_mine_id(
-                    other_user_id
-                ) and await self.store.should_include_local_user_in_dir(other_user_id)
-                if include_other_user:
+                if self.is_mine_id(other_user_id):
                     to_insert.add((other_user_id, user_id))
 
             if to_insert:

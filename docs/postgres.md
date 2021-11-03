@@ -29,16 +29,20 @@ connect to a postgres database.
 
 Assuming your PostgreSQL database user is called `postgres`, first authenticate as the database user with:
 
-    su - postgres
-    # Or, if your system uses sudo to get administrative rights
-    sudo -u postgres bash
+```sh
+su - postgres
+# Or, if your system uses sudo to get administrative rights
+sudo -u postgres bash
+```
 
 Then, create a postgres user and a database with:
 
-    # this will prompt for a password for the new user
-    createuser --pwprompt synapse_user
+```sh
+# this will prompt for a password for the new user
+createuser --pwprompt synapse_user
 
-    createdb --encoding=UTF8 --locale=C --template=template0 --owner=synapse_user synapse
+createdb --encoding=UTF8 --locale=C --template=template0 --owner=synapse_user synapse
+```
 
 The above will create a user called `synapse_user`, and a database called
 `synapse`.
@@ -145,20 +149,26 @@ Firstly, shut down the currently running synapse server and copy its
 database file (typically `homeserver.db`) to another location. Once the
 copy is complete, restart synapse. For instance:
 
-    ./synctl stop
-    cp homeserver.db homeserver.db.snapshot
-    ./synctl start
+```sh
+./synctl stop
+cp homeserver.db homeserver.db.snapshot
+./synctl start
+```
 
 Copy the old config file into a new config file:
 
-    cp homeserver.yaml homeserver-postgres.yaml
+```sh
+cp homeserver.yaml homeserver-postgres.yaml
+```
 
 Edit the database section as described in the section *Synapse config*
 above and with the SQLite snapshot located at `homeserver.db.snapshot`
 simply run:
 
-    synapse_port_db --sqlite-database homeserver.db.snapshot \
-        --postgres-config homeserver-postgres.yaml
+```sh
+synapse_port_db --sqlite-database homeserver.db.snapshot \
+    --postgres-config homeserver-postgres.yaml
+```
 
 The flag `--curses` displays a coloured curses progress UI.
 
@@ -170,16 +180,20 @@ To complete the conversion shut down the synapse server and run the port
 script one last time, e.g. if the SQLite database is at `homeserver.db`
 run:
 
-    synapse_port_db --sqlite-database homeserver.db \
-        --postgres-config homeserver-postgres.yaml
+```sh
+synapse_port_db --sqlite-database homeserver.db \
+    --postgres-config homeserver-postgres.yaml
+```
 
 Once that has completed, change the synapse config to point at the
 PostgreSQL database configuration file `homeserver-postgres.yaml`:
 
-    ./synctl stop
-    mv homeserver.yaml homeserver-old-sqlite.yaml
-    mv homeserver-postgres.yaml homeserver.yaml
-    ./synctl start
+```sh
+./synctl stop
+mv homeserver.yaml homeserver-old-sqlite.yaml
+mv homeserver-postgres.yaml homeserver.yaml
+./synctl start
+```
 
 Synapse should now be running against PostgreSQL.
 

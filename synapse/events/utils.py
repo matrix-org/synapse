@@ -386,6 +386,7 @@ class EventClientSerializer:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self._msc1849_enabled = hs.config.experimental.msc1849_enabled
+        self._msc3440_enabled = hs.config.experimental.msc3440_enabled
 
     async def serialize_event(
         self,
@@ -461,6 +462,22 @@ class EventClientSerializer:
                     "origin_server_ts": edit.origin_server_ts,
                     "sender": edit.sender,
                 }
+
+            # If this event is the start of a thread, include a summary of the replies.
+            if self._msc3440_enabled:
+                (
+                    thread_count,
+                    latest_thread_event,
+                ) = await self.store.get_thread_summary(event_id)
+                if latest_thread_event:
+                    r = serialized_event["unsigned"].setdefault("m.relations", {})
+                    r[RelationTypes.THREAD] = {
+                        # Don't bundle aggregations as this could recurse forever.
+                        "latest_event": await self.serialize_event(
+                            latest_thread_event, time_now, bundle_aggregations=False
+                        ),
+                        "count": thread_count,
+                    }
 
         return serialized_event
 

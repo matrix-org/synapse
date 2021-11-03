@@ -1,4 +1,5 @@
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,43 +12,30 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os.path
-import shutil
-import tempfile
-from contextlib import redirect_stdout
-from io import StringIO
-
 import yaml
 
 from synapse.config import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 
-from tests import unittest
+from tests.config.utils import ConfigFileTestCase
 
 
-class ConfigLoadingTestCase(unittest.TestCase):
-    def setUp(self):
-        self.dir = tempfile.mkdtemp()
-        self.file = os.path.join(self.dir, "homeserver.yaml")
-
-    def tearDown(self):
-        shutil.rmtree(self.dir)
-
+class ConfigLoadingFileTestCase(ConfigFileTestCase):
     def test_load_fails_if_server_name_missing(self):
         self.generate_config_and_remove_lines_containing("server_name")
         with self.assertRaises(ConfigError):
-            HomeServerConfig.load_config("", ["-c", self.file])
+            HomeServerConfig.load_config("", ["-c", self.config_file])
         with self.assertRaises(ConfigError):
-            HomeServerConfig.load_or_generate_config("", ["-c", self.file])
+            HomeServerConfig.load_or_generate_config("", ["-c", self.config_file])
 
     def test_generates_and_loads_macaroon_secret_key(self):
         self.generate_config()
 
-        with open(self.file) as f:
+        with open(self.config_file) as f:
             raw = yaml.safe_load(f)
         self.assertIn("macaroon_secret_key", raw)
 
-        config = HomeServerConfig.load_config("", ["-c", self.file])
+        config = HomeServerConfig.load_config("", ["-c", self.config_file])
         self.assertTrue(
             hasattr(config.key, "macaroon_secret_key"),
             "Want config to have attr macaroon_secret_key",
@@ -58,7 +46,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
                 "was: %r" % (config.key.macaroon_secret_key,)
             )
 
-        config = HomeServerConfig.load_or_generate_config("", ["-c", self.file])
+        config = HomeServerConfig.load_or_generate_config("", ["-c", self.config_file])
         self.assertTrue(
             hasattr(config.key, "macaroon_secret_key"),
             "Want config to have attr macaroon_secret_key",
@@ -71,9 +59,9 @@ class ConfigLoadingTestCase(unittest.TestCase):
 
     def test_load_succeeds_if_macaroon_secret_key_missing(self):
         self.generate_config_and_remove_lines_containing("macaroon")
-        config1 = HomeServerConfig.load_config("", ["-c", self.file])
-        config2 = HomeServerConfig.load_config("", ["-c", self.file])
-        config3 = HomeServerConfig.load_or_generate_config("", ["-c", self.file])
+        config1 = HomeServerConfig.load_config("", ["-c", self.config_file])
+        config2 = HomeServerConfig.load_config("", ["-c", self.config_file])
+        config3 = HomeServerConfig.load_or_generate_config("", ["-c", self.config_file])
         self.assertEqual(
             config1.key.macaroon_secret_key, config2.key.macaroon_secret_key
         )
@@ -87,15 +75,15 @@ class ConfigLoadingTestCase(unittest.TestCase):
             ["enable_registration: true", "disable_registration: true"]
         )
         # Check that disable_registration clobbers enable_registration.
-        config = HomeServerConfig.load_config("", ["-c", self.file])
+        config = HomeServerConfig.load_config("", ["-c", self.config_file])
         self.assertFalse(config.registration.enable_registration)
 
-        config = HomeServerConfig.load_or_generate_config("", ["-c", self.file])
+        config = HomeServerConfig.load_or_generate_config("", ["-c", self.config_file])
         self.assertFalse(config.registration.enable_registration)
 
         # Check that either config value is clobbered by the command line.
         config = HomeServerConfig.load_or_generate_config(
-            "", ["-c", self.file, "--enable-registration"]
+            "", ["-c", self.config_file, "--enable-registration"]
         )
         self.assertTrue(config.registration.enable_registration)
 
@@ -104,33 +92,5 @@ class ConfigLoadingTestCase(unittest.TestCase):
         self.add_lines_to_config(["enable_metrics: true"])
 
         # The default Metrics Flags are off by default.
-        config = HomeServerConfig.load_config("", ["-c", self.file])
+        config = HomeServerConfig.load_config("", ["-c", self.config_file])
         self.assertFalse(config.metrics.metrics_flags.known_servers)
-
-    def generate_config(self):
-        with redirect_stdout(StringIO()):
-            HomeServerConfig.load_or_generate_config(
-                "",
-                [
-                    "--generate-config",
-                    "-c",
-                    self.file,
-                    "--report-stats=yes",
-                    "-H",
-                    "lemurs.win",
-                ],
-            )
-
-    def generate_config_and_remove_lines_containing(self, needle):
-        self.generate_config()
-
-        with open(self.file) as f:
-            contents = f.readlines()
-        contents = [line for line in contents if needle not in line]
-        with open(self.file, "w") as f:
-            f.write("".join(contents))
-
-    def add_lines_to_config(self, lines):
-        with open(self.file, "a") as f:
-            for line in lines:
-                f.write(line + "\n")

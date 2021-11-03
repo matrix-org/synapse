@@ -1,0 +1,1 @@
+Do not accept events if a third-party rule module API callback raises an exception.

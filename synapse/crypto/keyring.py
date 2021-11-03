@@ -22,6 +22,7 @@ import attr
 from signedjson.key import (
     decode_verify_key_bytes,
     encode_verify_key_base64,
+    get_verify_key,
     is_signing_algorithm_supported,
 )
 from signedjson.sign import (
@@ -30,6 +31,7 @@ from signedjson.sign import (
     signature_ids,
     verify_signed_json,
 )
+from signedjson.types import VerifyKey
 from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
@@ -87,7 +89,7 @@ class VerifyJsonRequest:
         server_name: str,
         json_object: JsonDict,
         minimum_valid_until_ms: int,
-    ):
+    ) -> "VerifyJsonRequest":
         """Create a VerifyJsonRequest to verify all signatures on a signed JSON
         object for the given server.
         """
@@ -104,7 +106,7 @@ class VerifyJsonRequest:
         server_name: str,
         event: EventBase,
         minimum_valid_until_ms: int,
-    ):
+    ) -> "VerifyJsonRequest":
         """Create a VerifyJsonRequest to verify all signatures on an event
         object for the given server.
         """
@@ -177,6 +179,8 @@ class Keyring:
             clock=hs.get_clock(),
             process_batch_callback=self._inner_fetch_key_requests,
         )
+        self.verify_key = get_verify_key(hs.signing_key)
+        self.hostname = hs.hostname
 
     async def verify_json_for_server(
         self,
@@ -196,6 +200,7 @@ class Keyring:
             validity_time: timestamp at which we require the signing key to
                 be valid. (0 implies we don't care)
         """
+
         request = VerifyJsonRequest.from_json_object(
             server_name,
             json_object,
@@ -262,6 +267,11 @@ class Keyring:
                 Codes.UNAUTHORIZED,
             )
 
+        # If we are the originating server don't fetch verify key for self over federation
+        if verify_request.server_name == self.hostname:
+            await self._process_json(self.verify_key, verify_request)
+            return
+
         # Add the keys we need to verify to the queue for retrieval. We queue
         # up requests for the same server so we don't end up with many in flight
         # requests for the same keys.
@@ -285,40 +295,46 @@ class Keyring:
             if key_result.valid_until_ts < verify_request.minimum_valid_until_ts:
                 continue
 
-            verify_key = key_result.verify_key
-            json_object = verify_request.get_json_object()
-            try:
-                verify_signed_json(
-                    json_object,
-                    verify_request.server_name,
-                    verify_key,
-                )
-                verified = True
-            except SignatureVerifyException as e:
-                logger.debug(
-                    "Error verifying signature for %s:%s:%s with key %s: %s",
-                    verify_request.server_name,
-                    verify_key.alg,
-                    verify_key.version,
-                    encode_verify_key_base64(verify_key),
-                    str(e),
-                )
-                raise SynapseError(
-                    401,
-                    "Invalid signature for server %s with key %s:%s: %s"
-                    % (
-                        verify_request.server_name,
-                        verify_key.alg,
-                        verify_key.version,
-                        str(e),
-                    ),
-                    Codes.UNAUTHORIZED,
-                )
+            await self._process_json(key_result.verify_key, verify_request)
+            verified = True
 
         if not verified:
             raise SynapseError(
                 401,
                 f"Failed to find any key to satisfy: {key_request}",
+                Codes.UNAUTHORIZED,
+            )
+
+    async def _process_json(
+        self, verify_key: VerifyKey, verify_request: VerifyJsonRequest
+    ) -> None:
+        """Processes the `VerifyJsonRequest`. Raises if the signature can't be
+        verified.
+        """
+        try:
+            verify_signed_json(
+                verify_request.get_json_object(),
+                verify_request.server_name,
+                verify_key,
+            )
+        except SignatureVerifyException as e:
+            logger.debug(
+                "Error verifying signature for %s:%s:%s with key %s: %s",
+                verify_request.server_name,
+                verify_key.alg,
+                verify_key.version,
+                encode_verify_key_base64(verify_key),
+                str(e),
+            )
+            raise SynapseError(
+                401,
+                "Invalid signature for server %s with key %s:%s: %s"
+                % (
+                    verify_request.server_name,
+                    verify_key.alg,
+                    verify_key.version,
+                    str(e),
+                ),
                 Codes.UNAUTHORIZED,
             )
 
@@ -449,7 +465,9 @@ class StoreKeyFetcher(KeyFetcher):
 
         self.store = hs.get_datastore()
 
-    async def _fetch_keys(self, keys_to_fetch: List[_FetchKeyRequest]):
+    async def _fetch_keys(
+        self, keys_to_fetch: List[_FetchKeyRequest]
+    ) -> Dict[str, Dict[str, FetchKeyResult]]:
         key_ids_to_fetch = (
             (queue_value.server_name, key_id)
             for queue_value in keys_to_fetch
