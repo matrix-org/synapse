@@ -15,17 +15,85 @@
 
 
 import json
+from typing import Optional
+
+import attr
 
 import synapse.rest.admin
+from synapse.api.constants import EventTypes
 from synapse.config._base import ConfigError
-from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.rest.client import login, room
 from synapse.rulecheck.domain_rule_checker import DomainRuleChecker
 
 from tests import unittest
 
 
-class DomainRuleCheckerTestCase(unittest.TestCase):
+@attr.s(auto_attribs=True)
+class MockEvent:
+    """Mock of an event, only implementing the fields the DomainRuleChecker module will
+    use.
+    """
+    sender: str
+    membership: Optional[str] = None
+
+
+@attr.s(auto_attribs=True)
+class MockPublicRoomListManager:
+    """Mock of a synapse.module_api.PublicRoomListManager, only implementing the method
+    the DomainRuleChecker module will use.
+    """
+    _published: bool
+
+    async def room_is_in_public_room_list(self, room_id: str) -> bool:
+        return self._published
+
+
+@attr.s(auto_attribs=True)
+class MockModuleApi:
+    """Mock of a synapse.module_api.ModuleApi, only implementing the methods the
+    DomainRuleChecker module will use.
+    """
+    _new_room: bool
+    _published: bool
+
+    def register_spam_checker_callbacks(self, *args, **kwargs):
+        """Don't fail when the module tries to register its callbacks."""
+        pass
+
+    @property
+    def public_room_list_manager(self):
+        """Returns a mock public room list manager. We could in theory return a Mock with
+        a return value of make_awaitable(self._published), but local testing seems to show
+        this doesn't work on all versions of Python.
+        """
+        return MockPublicRoomListManager(self._published)
+
+    async def get_room_state(self, *args, **kwargs):
+        """Mocks the ModuleApi's get_room_state method, by returning mock events. The
+        number of events depends on whether we're testing for a new room or not (if the
+        room is not new it will have an extra user joined to it).
+        """
+        state = {
+            (EventTypes.Create, ""): MockEvent("room_creator"),
+            (EventTypes.Member, "room_creator"): MockEvent("room_creator", "join"),
+            (EventTypes.Member, "invitee"): MockEvent("room_creator", "invite"),
+        }
+
+        if not self._new_room:
+            state[(EventTypes.Member, "joinee")] = MockEvent("joinee", "join")
+
+        return state
+
+
+# We use a HomeserverTestCase despite not using the homeserver itself because we need a
+# reactor to run asynchronous code.
+class DomainRuleCheckerTestCase(unittest.HomeserverTestCase):
+    def _test_user_may_invite(
+        self, config, inviter, invitee, new_room, published,
+    ) -> bool:
+        check = DomainRuleChecker(config, MockModuleApi(new_room, published))
+        return self.get_success(check.user_may_invite(inviter, invitee, "room"))
+
     def test_allowed(self):
         config = {
             "default": False,
@@ -35,35 +103,37 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
             },
             "domains_prevented_from_being_invited_to_published_rooms": ["target_two"],
         }
-        check = DomainRuleChecker(config)
+
         self.assertTrue(
-            check.user_may_invite(
-                "test:source_one", "test:target_one", None, "room", False
-            )
+            self._test_user_may_invite(
+                config, "test:source_one", "test:target_one", False, False,
+            ),
         )
+
         self.assertTrue(
-            check.user_may_invite(
-                "test:source_one", "test:target_two", None, "room", False
-            )
+            self._test_user_may_invite(
+                config, "test:source_one", "test:target_two", False, False,
+            ),
         )
+
         self.assertTrue(
-            check.user_may_invite(
-                "test:source_two", "test:target_two", None, "room", False
-            )
+            self._test_user_may_invite(
+                config, "test:source_two", "test:target_two", False, False,
+            ),
         )
 
         # User can invite internal user to a published room
         self.assertTrue(
-            check.user_may_invite(
-                "test:source_one", "test1:target_one", None, "room", False, True
-            )
+            self._test_user_may_invite(
+                config, "test:source_one", "test1:target_one", False, True,
+            ),
         )
 
         # User can invite external user to a non-published room
         self.assertTrue(
-            check.user_may_invite(
-                "test:source_one", "test:target_two", None, "room", False, False
-            )
+            self._test_user_may_invite(
+                config, "test:source_one", "test:target_two", False, False,
+            ),
         )
 
     def test_disallowed(self):
@@ -75,32 +145,32 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
                 "source_four": [],
             },
         }
-        check = DomainRuleChecker(config)
+
         self.assertFalse(
-            check.user_may_invite(
-                "test:source_one", "test:target_three", None, "room", False
+            self._test_user_may_invite(
+                config, "test:source_one", "test:target_three", False, False,
             )
         )
         self.assertFalse(
-            check.user_may_invite(
-                "test:source_two", "test:target_three", None, "room", False
+            self._test_user_may_invite(
+                config, "test:source_two", "test:target_three", False, False,
             )
         )
         self.assertFalse(
-            check.user_may_invite(
-                "test:source_two", "test:target_one", None, "room", False
+            self._test_user_may_invite(
+                config, "test:source_two", "test:target_one", False, False
             )
         )
         self.assertFalse(
-            check.user_may_invite(
-                "test:source_four", "test:target_one", None, "room", False
+            self._test_user_may_invite(
+                config, "test:source_four", "test:target_one", False, False
             )
         )
 
         # User cannot invite external user to a published room
         self.assertTrue(
-            check.user_may_invite(
-                "test:source_one", "test:target_two", None, "room", False, True
+            self._test_user_may_invite(
+                config, "test:source_one", "test:target_two", False, True
             )
         )
 
@@ -112,10 +182,10 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
                 "source_two": ["target_two"],
             },
         }
-        check = DomainRuleChecker(config)
+
         self.assertTrue(
-            check.user_may_invite(
-                "test:source_three", "test:target_one", None, "room", False
+            self._test_user_may_invite(
+                config, "test:source_three", "test:target_one", False, False,
             )
         )
 
@@ -127,10 +197,10 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
                 "source_two": ["target_two"],
             },
         }
-        check = DomainRuleChecker(config)
+
         self.assertFalse(
-            check.user_may_invite(
-                "test:source_three", "test:target_one", None, "room", False
+            self._test_user_may_invite(
+                config, "test:source_three", "test:target_one", False, False,
             )
         )
 
@@ -167,20 +237,26 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
         config = self.default_config()
         config["trusted_third_party_id_servers"] = ["localhost"]
 
-        config["spam_checker"] = {
-            "module": "synapse.rulecheck.domain_rule_checker.DomainRuleChecker",
-            "config": {
-                "default": True,
-                "domain_mapping": {},
-                "can_only_join_rooms_with_invite": True,
-                "can_only_create_one_to_one_rooms": True,
-                "can_only_invite_during_room_creation": True,
-                "can_invite_by_third_party_id": False,
-            },
-        }
+        config["modules"] = [
+            {
+                "module": "synapse.rulecheck.domain_rule_checker.DomainRuleChecker",
+                "config": {
+                    "default": True,
+                    "domain_mapping": {},
+                    "can_only_join_rooms_with_invite": True,
+                    "can_only_create_one_to_one_rooms": True,
+                    "can_only_invite_during_room_creation": True,
+                    "can_invite_by_third_party_id": False,
+                },
+            }
+        ]
 
         hs = self.setup_test_homeserver(config=config)
-        load_legacy_spam_checkers(hs)
+
+        module_api = hs.get_module_api()
+        for module, config in hs.config.modules.loaded_modules:
+            module(config=config, api=module_api)
+
         return hs
 
     def prepare(self, reactor, clock, hs):
