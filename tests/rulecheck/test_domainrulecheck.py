@@ -33,6 +33,7 @@ class MockEvent:
     """Mock of an event, only implementing the fields the DomainRuleChecker module will
     use.
     """
+
     sender: str
     membership: Optional[str] = None
 
@@ -42,6 +43,7 @@ class MockPublicRoomListManager:
     """Mock of a synapse.module_api.PublicRoomListManager, only implementing the method
     the DomainRuleChecker module will use.
     """
+
     _published: bool
 
     async def room_is_in_public_room_list(self, room_id: str) -> bool:
@@ -53,6 +55,7 @@ class MockModuleApi:
     """Mock of a synapse.module_api.ModuleApi, only implementing the methods the
     DomainRuleChecker module will use.
     """
+
     _new_room: bool
     _published: bool
 
@@ -89,7 +92,12 @@ class MockModuleApi:
 # reactor to run asynchronous code.
 class DomainRuleCheckerTestCase(unittest.HomeserverTestCase):
     def _test_user_may_invite(
-        self, config, inviter, invitee, new_room, published,
+        self,
+        config,
+        inviter,
+        invitee,
+        new_room,
+        published,
     ) -> bool:
         check = DomainRuleChecker(config, MockModuleApi(new_room, published))
         return self.get_success(check.user_may_invite(inviter, invitee, "room"))
@@ -106,33 +114,53 @@ class DomainRuleCheckerTestCase(unittest.HomeserverTestCase):
 
         self.assertTrue(
             self._test_user_may_invite(
-                config, "test:source_one", "test:target_one", False, False,
+                config,
+                "test:source_one",
+                "test:target_one",
+                False,
+                False,
             ),
         )
 
         self.assertTrue(
             self._test_user_may_invite(
-                config, "test:source_one", "test:target_two", False, False,
+                config,
+                "test:source_one",
+                "test:target_two",
+                False,
+                False,
             ),
         )
 
         self.assertTrue(
             self._test_user_may_invite(
-                config, "test:source_two", "test:target_two", False, False,
+                config,
+                "test:source_two",
+                "test:target_two",
+                False,
+                False,
             ),
         )
 
         # User can invite internal user to a published room
         self.assertTrue(
             self._test_user_may_invite(
-                config, "test:source_one", "test1:target_one", False, True,
+                config,
+                "test:source_one",
+                "test1:target_one",
+                False,
+                True,
             ),
         )
 
         # User can invite external user to a non-published room
         self.assertTrue(
             self._test_user_may_invite(
-                config, "test:source_one", "test:target_two", False, False,
+                config,
+                "test:source_one",
+                "test:target_two",
+                False,
+                False,
             ),
         )
 
@@ -148,12 +176,20 @@ class DomainRuleCheckerTestCase(unittest.HomeserverTestCase):
 
         self.assertFalse(
             self._test_user_may_invite(
-                config, "test:source_one", "test:target_three", False, False,
+                config,
+                "test:source_one",
+                "test:target_three",
+                False,
+                False,
             )
         )
         self.assertFalse(
             self._test_user_may_invite(
-                config, "test:source_two", "test:target_three", False, False,
+                config,
+                "test:source_two",
+                "test:target_three",
+                False,
+                False,
             )
         )
         self.assertFalse(
@@ -185,7 +221,11 @@ class DomainRuleCheckerTestCase(unittest.HomeserverTestCase):
 
         self.assertTrue(
             self._test_user_may_invite(
-                config, "test:source_three", "test:target_one", False, False,
+                config,
+                "test:source_three",
+                "test:target_one",
+                False,
+                False,
             )
         )
 
@@ -200,7 +240,11 @@ class DomainRuleCheckerTestCase(unittest.HomeserverTestCase):
 
         self.assertFalse(
             self._test_user_may_invite(
-                config, "test:source_three", "test:target_one", False, False,
+                config,
+                "test:source_three",
+                "test:target_one",
+                False,
+                False,
             )
         )
 

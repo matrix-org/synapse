@@ -144,7 +144,9 @@ class DomainRuleChecker(object):
     ) -> bool:
         """Implements the user_may_send_3pid_invite spam checker callback."""
         return await self._user_may_invite(
-            room_id=room_id, inviter_userid=inviter_userid, invitee_userid=None,
+            room_id=room_id,
+            inviter_userid=inviter_userid,
+            invitee_userid=None,
         )
 
     async def _user_may_invite(
@@ -186,7 +188,7 @@ class DomainRuleChecker(object):
             await self._api.public_room_list_manager.room_is_in_public_room_list(
                 room_id
             )
-    )
+        )
 
         if (
             published_room
