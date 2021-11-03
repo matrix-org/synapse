@@ -322,9 +322,6 @@ class ApplicationServicesHandler:
             should be sent to the given application service.
         """
         # Get the stream token that this application service has processed up until
-        # TODO: Is 'users' always going to be one user here? Sometimes it's the sender!
-
-        # TODO: DB migration to add a column for to_device to application_services_state table
         from_key = await self.store.get_type_stream_id_for_appservice(
             service, "to_device"
         )
