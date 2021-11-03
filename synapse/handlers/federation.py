@@ -17,7 +17,6 @@
 
 import logging
 from http import HTTPStatus
-from queue import Empty, PriorityQueue
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
 
 from signedjson.key import decode_verify_key_bytes
@@ -57,7 +56,6 @@ from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
 )
-from synapse.storage.databases.main.event_federation import BackfillQueueNavigationItem
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import JsonDict, StateMap, get_domain_from_id
 from synapse.util.async_helpers import Linearizer
