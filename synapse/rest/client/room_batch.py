@@ -131,6 +131,14 @@ class RoomBatchSendEventRestServlet(RestServlet):
             prev_event_ids_from_query
         )
 
+        if not auth_event_ids:
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "No auth events found for given prev_event query parameter. The prev_event=%s probably does not exist."
+                % prev_event_ids_from_query,
+                errcode=Codes.INVALID_PARAM,
+            )
+
         # Create and persist all of the state events that float off on their own
         # before the batch. These will most likely be all of the invite/member
         # state events used to auth the upcoming historical messages.
