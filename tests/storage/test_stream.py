@@ -38,6 +38,11 @@ class PaginationTestCase(HomeserverTestCase):
         login.register_servlets,
     ]
 
+    def default_config(self):
+        config = super().default_config()
+        config["experimental_features"] = {"msc3440_enabled": True}
+        return config
+
     def prepare(self, reactor, clock, homeserver):
         self.user_id = self.register_user("test", "test")
         self.tok = self.login("test", "test")

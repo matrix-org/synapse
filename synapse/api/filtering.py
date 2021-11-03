@@ -317,10 +317,19 @@ class Filter:
         self.labels = filter_json.get("org.matrix.labels", None)
         self.not_labels = filter_json.get("org.matrix.not_labels", [])
 
-        self.relation_senders = self.filter_json.get(
-            "io.element.relation_senders", None
-        )
-        self.relation_types = self.filter_json.get("io.element.relation_types", None)
+        # Ideally these would be rejected at the endpoint if they were provided
+        # and not supported, but that would involve modifying the JSON schema
+        # based on the homeserver configuration.
+        if hs.config.experimental.msc3440_enabled:
+            self.relation_senders = self.filter_json.get(
+                "io.element.relation_senders", None
+            )
+            self.relation_types = self.filter_json.get(
+                "io.element.relation_types", None
+            )
+        else:
+            self.relation_senders = None
+            self.relation_types = None
 
     def filters_all_types(self) -> bool:
         return "*" in self.not_types
