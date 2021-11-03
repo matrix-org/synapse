@@ -1474,7 +1474,9 @@ class FederationEventHandler:
         await self.persist_events_and_notify(
             room_id,
             tuple(events_to_persist),
-            # Events we fetch during backfill should be marked as backfilled as well
+            # Mark these events backfilled as they're historic events that will
+            # eventually be backfilled. For example, missing events we fetch
+            # during backfill should be marked as backfilled as well.
             backfilled=True,
         )
 
