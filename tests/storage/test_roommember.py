@@ -161,58 +161,20 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(users.keys(), {self.u_alice, self.u_bob})
 
-    def test_store_room_members_txn(self):
-        def _store_room_members_txn(txn, events, backfilled):
-            """Store a room member in the database."""
-
-            def non_null_str_or_none(val) -> str:
-                return val if isinstance(val, str) and "\u0000" not in val else None
-
-            self.store.db_pool.simple_insert_many_txn(
-                txn,
-                table="room_memberships",
-                values=[
-                    {
-                        "event_id": event.event_id,
-                        "user_id": "random_test_value",
-                        "sender": event.user_id,
-                        "room_id": event.room_id,
-                        "membership": event.membership,
-                        "display_name": non_null_str_or_none(
-                            event.content.get("displayname")
-                        ),
-                        "avatar_url": non_null_str_or_none(
-                            event.content.get("avatar_url")
-                        ),
-                    }
-                    for event in events
-                ],
-            )
-
+    def test__null_byte_in_display_name_properly_handled(self):
         room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
-        bob_event = self.get_success(
-            event_injection.inject_member_event(
-                self.hs, room, self.u_bob, Membership.JOIN
-            )
-        )
 
-        # Create an event with a null-containing string to pass to _store_room_members_txn
-        event, context = self.get_success(
-            event_injection.create_event(
-                self.hs,
-                room_id=room,
-                sender=self.u_alice,
-                prev_event_ids=[bob_event.event_id],
-                type="m.test.1",
-                content={"displayname": "bad\u0000null", "membership": Membership.JOIN},
-            )
-        )
+        # Create a profile with the offending null byte in the display name
+        new_profile = {"displayname": "ali\u0000ce"}
 
-        # pass event to _store_room_members_txn and verify that it doesn't blow up
-        self.get_success(
-            self.store.db_pool.runInteraction(
-                "store room members", _store_room_members_txn, [event], False
-            )
+        # Ensure that the change goes smoothly and does not fail due to the null byte
+        self.helper.change_membership(
+            room,
+            self.u_alice,
+            self.u_alice,
+            "join",
+            extra_data=new_profile,
+            tok=self.t_alice,
         )
 
 
