@@ -365,13 +365,13 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         fired_off_requests = []
 
         if state_filter_left_over != StateFilter.none():
-            # we need to fire off a request for remaining state
-            # REVIEW log contexts?
-            fired_off_requests.append(
-                make_deferred_yieldable(
-                    self._get_state_for_group_fire_request(group, state_filter)
-                )
+            # Fetch remaining state
+            remaining = await self._get_state_for_group_fire_request(
+                group, state_filter_left_over
             )
+            assembled_state: MutableStateMap[str] = dict(remaining)
+        else:
+            assembled_state = {}
 
         for request in reusable_requests:
             # Observe the requests that we want to re-use
@@ -384,7 +384,6 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         )
 
         # assemble our result.
-        assembled_state: MutableStateMap[str] = {}
         for result_piece in gathered:
             assembled_state.update(result_piece)
 
