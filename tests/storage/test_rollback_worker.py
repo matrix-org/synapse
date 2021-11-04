@@ -44,7 +44,9 @@ class WorkerSchemaTests(HomeserverTestCase):
             "tests",
         )
 
-        db_conn.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION + 1,))
+        cur = db_conn.cursor()
+        cur.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION + 1,))
+
         db_conn.commit()
 
         prepare_database(db_conn, db_pool.engine, self.hs.config)
@@ -58,7 +60,9 @@ class WorkerSchemaTests(HomeserverTestCase):
             "tests",
         )
 
-        db_conn.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION - 1,))
+        cur = db_conn.cursor()
+        cur.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION - 1,))
+
         db_conn.commit()
 
         with self.assertRaises(PrepareDatabaseException):
