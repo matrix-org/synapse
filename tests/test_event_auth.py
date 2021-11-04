@@ -24,6 +24,47 @@ from synapse.types import JsonDict, get_domain_from_id
 
 
 class EventAuthTestCase(unittest.TestCase):
+    def test_rejected_auth_events(self):
+        """
+        Events that refer to rejected events in their auth events are rejected
+        """
+        creator = "@creator:example.com"
+        auth_events = [
+            _create_event(creator),
+            _join_event(creator),
+        ]
+
+        # creator should be able to send state
+        event_auth.check_auth_rules_for_event(
+            RoomVersions.V9,
+            _random_state_event(creator),
+            auth_events,
+        )
+
+        # ... but a rejected join_rules event should cause it to be rejected
+        rejected_join_rules = _join_rules_event(creator, "public")
+        rejected_join_rules.rejected_reason = "stinky"
+        auth_events.append(rejected_join_rules)
+
+        self.assertRaises(
+            AuthError,
+            event_auth.check_auth_rules_for_event,
+            RoomVersions.V9,
+            _random_state_event(creator),
+            auth_events,
+        )
+
+        # ... even if there is *also* a good join rules
+        auth_events.append(_join_rules_event(creator, "public"))
+
+        self.assertRaises(
+            AuthError,
+            event_auth.check_auth_rules_for_event,
+            RoomVersions.V9,
+            _random_state_event(creator),
+            auth_events,
+        )
+
     def test_random_users_cannot_send_state_before_first_pl(self):
         """
         Check that, before the first PL lands, the creator is the only user
@@ -31,11 +72,11 @@ class EventAuthTestCase(unittest.TestCase):
         """
         creator = "@creator:example.com"
         joiner = "@joiner:example.com"
-        auth_events = {
-            ("m.room.create", ""): _create_event(creator),
-            ("m.room.member", creator): _join_event(creator),
-            ("m.room.member", joiner): _join_event(joiner),
-        }
+        auth_events = [
+            _create_event(creator),
+            _join_event(creator),
+            _join_event(joiner),
+        ]
 
         # creator should be able to send state
         event_auth.check_auth_rules_for_event(
@@ -62,15 +103,15 @@ class EventAuthTestCase(unittest.TestCase):
         pleb = "@joiner:example.com"
         king = "@joiner2:example.com"
 
-        auth_events = {
-            ("m.room.create", ""): _create_event(creator),
-            ("m.room.member", creator): _join_event(creator),
-            ("m.room.power_levels", ""): _power_levels_event(
+        auth_events = [
+            _create_event(creator),
+            _join_event(creator),
+            _power_levels_event(
                 creator, {"state_default": "30", "users": {pleb: "29", king: "30"}}
             ),
-            ("m.room.member", pleb): _join_event(pleb),
-            ("m.room.member", king): _join_event(king),
-        }
+            _join_event(pleb),
+            _join_event(king),
+        ]
 
         # pleb should not be able to send state
         self.assertRaises(
@@ -92,10 +133,10 @@ class EventAuthTestCase(unittest.TestCase):
         """Alias events have special behavior up through room version 6."""
         creator = "@creator:example.com"
         other = "@other:example.com"
-        auth_events = {
-            ("m.room.create", ""): _create_event(creator),
-            ("m.room.member", creator): _join_event(creator),
-        }
+        auth_events = [
+            _create_event(creator),
+            _join_event(creator),
+        ]
 
         # creator should be able to send aliases
         event_auth.check_auth_rules_for_event(
@@ -131,10 +172,10 @@ class EventAuthTestCase(unittest.TestCase):
         """After MSC2432, alias events have no special behavior."""
         creator = "@creator:example.com"
         other = "@other:example.com"
-        auth_events = {
-            ("m.room.create", ""): _create_event(creator),
-            ("m.room.member", creator): _join_event(creator),
-        }
+        auth_events = [
+            _create_event(creator),
+            _join_event(creator),
+        ]
 
         # creator should be able to send aliases
         event_auth.check_auth_rules_for_event(
@@ -170,14 +211,14 @@ class EventAuthTestCase(unittest.TestCase):
         creator = "@creator:example.com"
         pleb = "@joiner:example.com"
 
-        auth_events = {
-            ("m.room.create", ""): _create_event(creator),
-            ("m.room.member", creator): _join_event(creator),
-            ("m.room.power_levels", ""): _power_levels_event(
+        auth_events = [
+            _create_event(creator),
+            _join_event(creator),
+            _power_levels_event(
                 creator, {"state_default": "30", "users": {pleb: "30"}}
             ),
-            ("m.room.member", pleb): _join_event(pleb),
-        }
+            _join_event(pleb),
+        ]
 
         # pleb should be able to modify the notifications power level.
         event_auth.check_auth_rules_for_event(
@@ -211,7 +252,7 @@ class EventAuthTestCase(unittest.TestCase):
         event_auth.check_auth_rules_for_event(
             RoomVersions.V6,
             _join_event(pleb),
-            auth_events,
+            auth_events.values(),
         )
 
         # A user cannot be force-joined to a room.
@@ -219,7 +260,7 @@ class EventAuthTestCase(unittest.TestCase):
             event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _member_event(pleb, "join", sender=creator),
-                auth_events,
+                auth_events.values(),
             )
 
         # Banned should be rejected.
@@ -228,7 +269,7 @@ class EventAuthTestCase(unittest.TestCase):
             event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _join_event(pleb),
-                auth_events,
+                auth_events.values(),
             )
 
         # A user who left can re-join.
@@ -236,7 +277,7 @@ class EventAuthTestCase(unittest.TestCase):
         event_auth.check_auth_rules_for_event(
             RoomVersions.V6,
             _join_event(pleb),
-            auth_events,
+            auth_events.values(),
         )
 
         # A user can send a join if they're in the room.
@@ -244,7 +285,7 @@ class EventAuthTestCase(unittest.TestCase):
         event_auth.check_auth_rules_for_event(
             RoomVersions.V6,
             _join_event(pleb),
-            auth_events,
+            auth_events.values(),
         )
 
         # A user can accept an invite.
@@ -254,7 +295,7 @@ class EventAuthTestCase(unittest.TestCase):
         event_auth.check_auth_rules_for_event(
             RoomVersions.V6,
             _join_event(pleb),
-            auth_events,
+            auth_events.values(),
         )
 
     def test_join_rules_invite(self):
@@ -275,7 +316,7 @@ class EventAuthTestCase(unittest.TestCase):
             event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _join_event(pleb),
-                auth_events,
+                auth_events.values(),
             )
 
         # A user cannot be force-joined to a room.
@@ -283,7 +324,7 @@ class EventAuthTestCase(unittest.TestCase):
             event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _member_event(pleb, "join", sender=creator),
-                auth_events,
+                auth_events.values(),
             )
 
         # Banned should be rejected.
@@ -292,7 +333,7 @@ class EventAuthTestCase(unittest.TestCase):
             event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _join_event(pleb),
-                auth_events,
+                auth_events.values(),
             )
 
         # A user who left cannot re-join.
@@ -301,7 +342,7 @@ class EventAuthTestCase(unittest.TestCase):
             event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _join_event(pleb),
-                auth_events,
+                auth_events.values(),
             )
 
         # A user can send a join if they're in the room.
@@ -309,7 +350,7 @@ class EventAuthTestCase(unittest.TestCase):
         event_auth.check_auth_rules_for_event(
             RoomVersions.V6,
             _join_event(pleb),
-            auth_events,
+            auth_events.values(),
         )
 
         # A user can accept an invite.
@@ -319,7 +360,7 @@ class EventAuthTestCase(unittest.TestCase):
         event_auth.check_auth_rules_for_event(
             RoomVersions.V6,
             _join_event(pleb),
-            auth_events,
+            auth_events.values(),
         )
 
     def test_join_rules_msc3083_restricted(self):
@@ -347,7 +388,7 @@ class EventAuthTestCase(unittest.TestCase):
             event_auth.check_auth_rules_for_event(
                 RoomVersions.V6,
                 _join_event(pleb),
-                auth_events,
+                auth_events.values(),
             )
 
         # A properly formatted join event should work.
@@ -360,7 +401,7 @@ class EventAuthTestCase(unittest.TestCase):
         event_auth.check_auth_rules_for_event(
             RoomVersions.V8,
             authorised_join_event,
-            auth_events,
+            auth_events.values(),
         )
 
         # A join issued by a specific user works (i.e. the power level checks
@@ -380,7 +421,7 @@ class EventAuthTestCase(unittest.TestCase):
                     EventContentFields.AUTHORISING_USER: "@inviter:foo.test"
                 },
             ),
-            pl_auth_events,
+            pl_auth_events.values(),
         )
 
         # A join which is missing an authorised server is rejected.
@@ -388,7 +429,7 @@ class EventAuthTestCase(unittest.TestCase):
             event_auth.check_auth_rules_for_event(
                 RoomVersions.V8,
                 _join_event(pleb),
-                auth_events,
+                auth_events.values(),
             )
 
         # An join authorised by a user who is not in the room is rejected.
@@ -405,7 +446,7 @@ class EventAuthTestCase(unittest.TestCase):
                         EventContentFields.AUTHORISING_USER: "@other:example.com"
                     },
                 ),
-                auth_events,
+                auth_events.values(),
             )
 
         # A user cannot be force-joined to a room. (This uses an event which
@@ -421,7 +462,7 @@ class EventAuthTestCase(unittest.TestCase):
                         EventContentFields.AUTHORISING_USER: "@inviter:foo.test"
                     },
                 ),
-                auth_events,
+                auth_events.values(),
             )
 
         # Banned should be rejected.
@@ -430,7 +471,7 @@ class EventAuthTestCase(unittest.TestCase):
             event_auth.check_auth_rules_for_event(
                 RoomVersions.V8,
                 authorised_join_event,
-                auth_events,
+                auth_events.values(),
             )
 
         # A user who left can re-join.
@@ -438,7 +479,7 @@ class EventAuthTestCase(unittest.TestCase):
         event_auth.check_auth_rules_for_event(
             RoomVersions.V8,
             authorised_join_event,
-            auth_events,
+            auth_events.values(),
         )
 
         # A user can send a join if they're in the room. (This doesn't need to
@@ -447,7 +488,7 @@ class EventAuthTestCase(unittest.TestCase):
         event_auth.check_auth_rules_for_event(
             RoomVersions.V8,
             _join_event(pleb),
-            auth_events,
+            auth_events.values(),
         )
 
         # A user can accept an invite. (This doesn't need to be authorised since
@@ -458,7 +499,7 @@ class EventAuthTestCase(unittest.TestCase):
         event_auth.check_auth_rules_for_event(
             RoomVersions.V8,
             _join_event(pleb),
-            auth_events,
+            auth_events.values(),
         )
 
 
@@ -473,6 +514,7 @@ def _create_event(user_id: str) -> EventBase:
             "room_id": TEST_ROOM_ID,
             "event_id": _get_event_id(),
             "type": "m.room.create",
+            "state_key": "",
             "sender": user_id,
             "content": {"creator": user_id},
         }

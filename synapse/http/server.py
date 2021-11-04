@@ -22,6 +22,7 @@ import urllib
 from http import HTTPStatus
 from inspect import isawaitable
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -60,6 +61,9 @@ from synapse.logging.opentracing import trace_servlet
 from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
 from synapse.util.iterutils import chunk_seq
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -343,6 +347,11 @@ class DirectServeJsonResource(_AsyncResource):
         return_json_error(f, request)
 
 
+_PathEntry = collections.namedtuple(
+    "_PathEntry", ["pattern", "callback", "servlet_classname"]
+)
+
+
 class JsonResource(DirectServeJsonResource):
     """This implements the HttpServer interface and provides JSON support for
     Resources.
@@ -359,14 +368,10 @@ class JsonResource(DirectServeJsonResource):
 
     isLeaf = True
 
-    _PathEntry = collections.namedtuple(
-        "_PathEntry", ["pattern", "callback", "servlet_classname"]
-    )
-
-    def __init__(self, hs, canonical_json=True, extract_context=False):
+    def __init__(self, hs: "HomeServer", canonical_json=True, extract_context=False):
         super().__init__(canonical_json, extract_context)
         self.clock = hs.get_clock()
-        self.path_regexs = {}
+        self.path_regexs: Dict[bytes, List[_PathEntry]] = {}
         self.hs = hs
 
     def register_paths(self, method, path_patterns, callback, servlet_classname):
@@ -391,7 +396,7 @@ class JsonResource(DirectServeJsonResource):
         for path_pattern in path_patterns:
             logger.debug("Registering for %s %s", method, path_pattern.pattern)
             self.path_regexs.setdefault(method, []).append(
-                self._PathEntry(path_pattern, callback, servlet_classname)
+                _PathEntry(path_pattern, callback, servlet_classname)
             )
 
     def _get_handler_for_request(

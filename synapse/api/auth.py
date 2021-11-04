@@ -245,7 +245,7 @@ class Auth:
 
     async def validate_appservice_can_control_user_id(
         self, app_service: ApplicationService, user_id: str, also_allow_user: Optional[str] = None
-    ):
+    ) -> None:
         """Validates that the app service is allowed to control
         the given user.
 
@@ -619,5 +619,13 @@ class Auth:
                 % (user_id, room_id),
             )
 
-    async def check_auth_blocking(self, *args, **kwargs) -> None:
-        await self._auth_blocking.check_auth_blocking(*args, **kwargs)
+    async def check_auth_blocking(
+        self,
+        user_id: Optional[str] = None,
+        threepid: Optional[dict] = None,
+        user_type: Optional[str] = None,
+        requester: Optional[Requester] = None,
+    ) -> None:
+        await self._auth_blocking.check_auth_blocking(
+            user_id=user_id, threepid=threepid, user_type=user_type, requester=requester
+        )

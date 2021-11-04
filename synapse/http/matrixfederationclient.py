@@ -21,6 +21,7 @@ import typing
 import urllib.parse
 from io import BytesIO, StringIO
 from typing import (
+    TYPE_CHECKING,
     Callable,
     Dict,
     Generic,
@@ -72,6 +73,9 @@ from synapse.types import JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -319,7 +323,7 @@ class MatrixFederationHttpClient:
             requests.
     """
 
-    def __init__(self, hs, tls_client_options_factory):
+    def __init__(self, hs: "HomeServer", tls_client_options_factory):
         self.hs = hs
         self.signing_key = hs.signing_key
         self.server_name = hs.hostname
@@ -711,7 +715,7 @@ class MatrixFederationHttpClient:
         Returns:
             A list of headers to be added as "Authorization:" headers
         """
-        request = {
+        request: JsonDict = {
             "method": method.decode("ascii"),
             "uri": url_bytes.decode("ascii"),
             "origin": self.server_name,

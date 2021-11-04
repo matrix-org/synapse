@@ -15,10 +15,14 @@ import logging
 import math
 import resource
 import sys
+from typing import TYPE_CHECKING
 
 from prometheus_client import Gauge
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -41,7 +45,7 @@ registered_reserved_users_mau_gauge = Gauge(
 
 
 @wrap_as_background_process("phone_stats_home")
-async def phone_stats_home(hs, stats, stats_process=_stats_process):
+async def phone_stats_home(hs: "HomeServer", stats, stats_process=_stats_process):
     logger.info("Gathering stats for reporting")
     now = int(hs.get_clock().time())
     uptime = int(now - hs.start_time)
@@ -142,7 +146,7 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
         logger.warning("Error reporting stats: %s", e)
 
 
-def start_phone_stats_home(hs):
+def start_phone_stats_home(hs: "HomeServer"):
     """
     Start the background tasks which report phone home stats.
     """
