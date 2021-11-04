@@ -716,7 +716,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
                 pass
 
             @descriptors.cachedList("fn", "args1")
-            def list_fn(self, args1) -> Deferred[dict]:
+            def list_fn(self, args1) -> "Deferred[dict]":
                 return self.mock(args1)
 
         obj = Cls()
