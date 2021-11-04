@@ -41,6 +41,7 @@ from synapse.storage.state import StateFilter
 from synapse.storage.types import Cursor
 from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import MutableStateMap, StateKey, StateMap
+from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import ObservableDeferred, yieldable_gather_results
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.dictionary_cache import DictionaryCache
@@ -362,8 +363,6 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             state_filter_left_over,
         ) = self._get_state_for_group_gather_inflight_requests(group, state_filter)
 
-        fired_off_requests = []
-
         if state_filter_left_over != StateFilter.none():
             # Fetch remaining state
             remaining = await self._get_state_for_group_fire_request(
@@ -373,15 +372,11 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         else:
             assembled_state = {}
 
-        for request in reusable_requests:
-            # Observe the requests that we want to re-use
-            # REVIEW log contexts?
-            fired_off_requests.append(make_deferred_yieldable(request.observe()))
-
-        # REVIEW is this right wrt. log context rules?
         gathered = await make_deferred_yieldable(
-            defer.gatherResults(fired_off_requests, consumeErrors=True)
-        )
+            defer.gatherResults(
+                (r.observe() for r in reusable_requests), consumeErrors=True
+            )
+        ).addErrback(unwrapFirstError)
 
         # assemble our result.
         for result_piece in gathered:
