@@ -55,6 +55,9 @@ class ApplicationServicesHandler:
         self.clock = hs.get_clock()
         self.notify_appservices = hs.config.appservice.notify_appservices
         self.event_sources = hs.get_event_sources()
+        self.msc2409_to_device_messages_enabled = (
+            hs.config.experimental.msc2409_to_device_messages_enabled
+        )
 
         self.current_max = 0
         self.is_processing = False
