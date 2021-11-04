@@ -107,7 +107,7 @@ class RoomRestV2Servlet(RestServlet):
         if not await self._store.get_room(room_id):
             raise NotFoundError("Unknown room id %s" % (room_id,))
 
-        self._pagination_handler.start_shutdown_and_purge_room(
+        purge_id = self._pagination_handler.start_shutdown_and_purge_room(
             room_id=room_id,
             new_room_user_id=content.get("new_room_user_id"),
             new_room_name=content.get("room_name"),
@@ -118,7 +118,7 @@ class RoomRestV2Servlet(RestServlet):
             force_purge=force_purge,
         )
 
-        return 200, {}
+        return 200, {"purge_id": purge_id}
 
 
 class DeleteRoomStatusRestServlet(RestServlet):
@@ -139,11 +139,21 @@ class DeleteRoomStatusRestServlet(RestServlet):
         if not RoomID.is_valid(room_id):
             raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
 
-        purge_status = self._pagination_handler.get_purge_status(room_id)
-        if purge_status is None:
+        purge_ids = self._pagination_handler.get_purge_ids_by_room(room_id)
+        if purge_ids is None:
             raise NotFoundError("No delete task for room_id '%s' found" % room_id)
 
-        return 200, purge_status.asdict_with_result()
+        response = []
+        for purge_id in purge_ids:
+            purge = self._pagination_handler.get_purge_status(purge_id)
+            if purge:
+                response += [
+                    {
+                        "purge_id": purge_id,
+                        **purge.asdict_with_result(),
+                    }
+                ]
+        return 200, {"delete_status": response}
 
 
 class ListRoomRestServlet(RestServlet):

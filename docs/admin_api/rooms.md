@@ -461,6 +461,8 @@ The parameters and response values have the same format as
 
 ## Version 2 (new version)
 
+**Note**: This API is new, experimental and "subject to change".
+
 This version works asynchronously, meaning you get the response from server immediately
 while the server works on that task in background. You can then request the status of the action
 to check if it has completed.
@@ -483,10 +485,13 @@ with a body of:
 }
 ```
 
-An empty JSON dict is returned.
+The API starts the shut down and purge running, and returns immediately with a JSON body with
+a purge id:
 
 ```json
-{}
+{
+    "purge_id": "<opaque id>"
+}
 ```
 
 **Parameters**
@@ -521,9 +526,15 @@ The JSON body must not be empty. The body must be at least `{}`.
 
 ## Status of deleting rooms
 
+**Note**: This API is new, experimental and "subject to change".
+
 It is possible to query the status of the background task for deleting rooms.
 The status can be queried up to 24 hours after completion of the task,
 or until Synapse is restarted (whichever happens first).
+
+With this API you can get the status of all tasks the last 24h for this `room_id`.
+If you want only get the status of one specific task, you can also use
+the [Purge status query API](purge_history_api.md#Purge-status-query).
 
 The API is:
 
@@ -535,18 +546,32 @@ A response body like the following is returned:
 
 ```json
 {
-    "status": "active",
-    "result": {
-        "kicked_users": [
-            "@foobar:example.com"
-        ],
-        "failed_to_kick_users": [],
-        "local_aliases": [
-            "#badroom:example.com",
-            "#evilsaloon:example.com"
-        ],
-        "new_room_id": "!newroomid:example.com"
-    }
+    "delete_status": [
+        {
+            "purge_id": "purgeid1",
+            "status": "failed",
+            "result": {
+                "kicked_users": [],
+                "failed_to_kick_users": [],
+                "local_aliases": [],
+                "new_room_id": null
+            }
+        }, {
+            "purge_id": "purgeid2",
+            "status": "active",
+            "result": {
+                "kicked_users": [
+                    "@foobar:example.com"
+                ],
+                "failed_to_kick_users": [],
+                "local_aliases": [
+                    "#badroom:example.com",
+                    "#evilsaloon:example.com"
+                ],
+                "new_room_id": "!newroomid:example.com"
+            }
+        }
+    ]
 }
 ```
 
@@ -560,19 +585,21 @@ The following parameters should be set in the URL:
 
 The following fields are returned in the JSON response body:
 
-* `status` - The status will be one of:
-  - `remove members` - The process is removing users from the `room_id`.
-  - `active` - The process is purging the room from database.
-  - `complete` - The process has completed successfully.
-  - `failed` - The process is aborted, an error has occurred.
-* `result` - An object containing information about the result of shutting down the room.
-  *Note:* The result is shown after removing the room members. The delete process can
-  still be running. Please pay attention to the `status`.
-  - `kicked_users` - An array of users (`user_id`) that were kicked.
-  - `failed_to_kick_users` - An array of users (`user_id`) that that were not kicked.
-  - `local_aliases` - An array of strings representing the local aliases that were
-  migrated from the old room to the new.
-  - `new_room_id` - A string representing the room ID of the new room.
+- `delete_status` - An array of objects, each containing information about one task.
+  Task objects contain the following fields:
+  - `status` - The status will be one of:
+    - `remove members` - The process is removing users from the `room_id`.
+    - `active` - The process is purging the room from database.
+    - `complete` - The process has completed successfully.
+    - `failed` - The process is aborted, an error has occurred.
+  - `result` - An object containing information about the result of shutting down the room.
+    *Note:* The result is shown after removing the room members. The delete process can
+    still be running. Please pay attention to the `status`.
+    - `kicked_users` - An array of users (`user_id`) that were kicked.
+    - `failed_to_kick_users` - An array of users (`user_id`) that that were not kicked.
+    - `local_aliases` - An array of strings representing the local aliases that were
+    migrated from the old room to the new.
+    - `new_room_id` - A string representing the room ID of the new room.
 
 ## Undoing room deletions
 
