@@ -203,7 +203,9 @@ class ApplicationServicesHandler:
                 value for `stream_key` will cause this function to return early.
 
                 Ephemeral events will only be pushed to appservices that have opted into
-                them via the ephemeral AS registration file option.
+                receiving them by setting `push_ephemeral` to true in their registration
+                file. Note that while MSC2409 is experimental, this option is called
+                `de.sorunome.msc2409.push_ephemeral`.
 
                 Appservices will only receive ephemeral events that fall within their
                 registered user and room namespaces.
