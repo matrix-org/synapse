@@ -8275,7 +8275,7 @@ registered by using the Module API's <code>register_password_auth_provider_callb
 <h2 id="callbacks-3"><a class="header" href="#callbacks-3">Callbacks</a></h2>
 <h3 id="auth_checkers"><a class="header" href="#auth_checkers"><code>auth_checkers</code></a></h3>
 <p><em>First introduced in Synapse v1.46.0</em></p>
-<pre><code class="language-python"> auth_checkers: Dict[Tuple[str,Tuple], Callable]
+<pre><code class="language-python">auth_checkers: Dict[Tuple[str, Tuple[str, ...]], Callable]
 </code></pre>
 <p>A dict mapping from tuples of a login type identifier (such as <code>m.login.password</code>) and a
 tuple of field names (such as <code>(&quot;password&quot;, &quot;secret_thing&quot;)</code>) to authentication checking
