@@ -156,12 +156,21 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             txn.execute(
                 sql, (user_id, device_id, last_stream_id, current_stream_id, limit)
             )
+
             messages = []
+            stream_pos = current_stream_id
+
             for row in txn:
                 stream_pos = row[0]
                 messages.append(db_to_json(row[1]))
+
+            # If we don't end up hitting the limit, we still want to return the equivalent
+            # value of `current_stream_id` to the calling function. This is needed as we'll
+            # be processing up to `current_stream_id`, without necessarily fetching a message
+            # with a stream token of `current_stream_id`.
             if len(messages) < limit:
                 stream_pos = current_stream_id
+
             return messages, stream_pos
 
         return await self.db_pool.runInteraction(
