@@ -19,6 +19,7 @@ from collections import defaultdict
 from sys import intern
 from time import monotonic as monotonic_time
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Collection,
@@ -47,10 +48,14 @@ from synapse.logging.context import (
     current_context,
     make_deferred_yieldable,
 )
+from synapse.metrics import register_threadpool
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.types import Connection, Cursor
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 # python 3 does not have a maximum int value
 MAX_TXN_ID = 2 ** 63 - 1
@@ -100,12 +105,16 @@ def make_pool(
                 LoggingDatabaseConnection(conn, engine, "on_new_connection")
             )
 
-    return adbapi.ConnectionPool(
+    connection_pool = adbapi.ConnectionPool(
         db_config.config["name"],
         cp_reactor=reactor,
         cp_openfun=_on_new_connection,
         **db_args,
     )
+
+    register_threadpool(f"database-{db_config.name}", connection_pool.threadpool)
+
+    return connection_pool
 
 
 def make_conn(
@@ -392,7 +401,7 @@ class DatabasePool:
 
     def __init__(
         self,
-        hs,
+        hs: "HomeServer",
         database_config: DatabaseConnectionConfig,
         engine: BaseDatabaseEngine,
     ):

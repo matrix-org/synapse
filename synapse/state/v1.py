@@ -332,7 +332,7 @@ def _resolve_auth_events(
             event_auth.check_auth_rules_for_event(
                 RoomVersions.V1,
                 event,
-                auth_events,
+                auth_events.values(),
             )
             prev_event = event
         except AuthError:
@@ -350,7 +350,7 @@ def _resolve_normal_events(
             event_auth.check_auth_rules_for_event(
                 RoomVersions.V1,
                 event,
-                auth_events,
+                auth_events.values(),
             )
             return event
         except AuthError:

@@ -47,9 +47,7 @@ class DeferredCacheTestCase(TestCase):
             self.assertTrue(set_d.called)
             return r
 
-        # TODO: Actually ObservableDeferred *doesn't* run its tests in order on py3.8.
-        #   maybe we should fix that?
-        # get_d.addCallback(check1)
+        get_d.addCallback(check1)
 
         # now fire off all the deferreds
         origin_d.callback(99)

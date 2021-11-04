@@ -10,6 +10,8 @@ The available third party rules callbacks are:
 
 ### `check_event_allowed`
 
+_First introduced in Synapse v1.39.0_
+
 ```python
 async def check_event_allowed(
     event: "synapse.events.EventBase",
@@ -41,10 +43,25 @@ event with new data by returning the new event's data as a dictionary. In order 
 that, it is recommended the module calls `event.get_dict()` to get the current event as a
 dictionary, and modify the returned dictionary accordingly.
 
+If `check_event_allowed` raises an exception, the module is assumed to have failed.
+The event will not be accepted but is not treated as explicitly rejected, either.
+An HTTP request causing the module check will likely result in a 500 Internal
+Server Error.
+
+When the boolean returned by the module is `False`, the event is rejected.
+(Module developers should not use exceptions for rejection.)
+
 Note that replacing the event only works for events sent by local users, not for events
 received over federation.
 
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
 ### `on_create_room`
+
+_First introduced in Synapse v1.39.0_
 
 ```python
 async def on_create_room(
@@ -63,7 +80,15 @@ the request is a server admin.
 Modules can modify the `request_content` (by e.g. adding events to its `initial_state`),
 or deny the room's creation by raising a `module_api.errors.SynapseError`.
 
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns without raising an exception, Synapse falls through to the next one. The
+room creation will be forbidden as soon as one of the callbacks raises an exception. If
+this happens, Synapse will not call any of the subsequent implementations of this
+callback.
+
 ### `check_threepid_can_be_invited`
+
+_First introduced in Synapse v1.39.0_
 
 ```python
 async def check_threepid_can_be_invited(
@@ -76,7 +101,14 @@ async def check_threepid_can_be_invited(
 Called when processing an invite via a third-party identifier (i.e. email or phone number).
 The module must return a boolean indicating whether the invite can go through.
 
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
 ### `check_visibility_can_be_modified`
+
+_First introduced in Synapse v1.39.0_
 
 ```python
 async def check_visibility_can_be_modified(
@@ -89,6 +121,32 @@ async def check_visibility_can_be_modified(
 Called when changing the visibility of a room in the local public room directory. The
 visibility is a string that's either "public" or "private". The module must return a
 boolean indicating whether the change can go through.
+
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
+### `on_new_event`
+
+_First introduced in Synapse v1.47.0_
+
+```python
+async def on_new_event(
+    event: "synapse.events.EventBase",
+    state_events: "synapse.types.StateMap",
+) -> None:
+```
+
+Called after sending an event into a room. The module is passed the event, as well
+as the state of the room _after_ the event. This means that if the event is a state event,
+it will be included in this state.
+
+Note that this callback is called when the event has already been processed and stored
+into the room, which means this callback cannot be used to deny persisting the event. To
+deny an incoming event, see [`check_event_for_spam`](spam_checker_callbacks.md#check_event_for_spam) instead.
+
+If multiple modules implement this callback, Synapse runs them all in order.
 
 ## Example
 

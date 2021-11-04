@@ -161,7 +161,7 @@ class Ratelimiter:
 
         return allowed, time_allowed
 
-    def _prune_message_counts(self, time_now_s: float):
+    def _prune_message_counts(self, time_now_s: float) -> None:
         """Remove message count entries that have not exceeded their defined
         rate_hz limit
 
@@ -190,7 +190,7 @@ class Ratelimiter:
         update: bool = True,
         n_actions: int = 1,
         _time_now_s: Optional[float] = None,
-    ):
+    ) -> None:
         """Checks if an action can be performed. If not, raises a LimitExceededError
 
         Checks if the user has ratelimiting disabled in the database by looking

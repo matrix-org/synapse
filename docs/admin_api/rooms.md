@@ -38,9 +38,14 @@ The following query parameters are available:
   - `history_visibility` - Rooms are ordered alphabetically by visibility of history of the room.
   - `state_events` - Rooms are ordered by number of state events. Largest to smallest.
 * `dir` - Direction of room order. Either `f` for forwards or `b` for backwards. Setting
-          this value to `b` will reverse the above sort order. Defaults to `f`.
-* `search_term` - Filter rooms by their room name. Search term can be contained in any
-                  part of the room name. Defaults to no filtering.
+  this value to `b` will reverse the above sort order. Defaults to `f`.
+* `search_term` - Filter rooms by their room name, canonical alias and room id.
+  Specifically, rooms are selected if the search term is contained in
+  - the room's name,
+  - the local part of the room's canonical alias, or
+  - the complete (local and server part) room's id (case sensitive).
+
+  Defaults to no filtering.
 
 **Response**
 
@@ -87,7 +92,7 @@ GET /_synapse/admin/v1/rooms
 
 A response body like the following is returned:
 
-```jsonc
+```json
 {
   "rooms": [
     {
@@ -170,7 +175,7 @@ GET /_synapse/admin/v1/rooms?order_by=size
 
 A response body like the following is returned:
 
-```jsonc
+```json
 {
   "rooms": [
     {
@@ -208,7 +213,7 @@ A response body like the following is returned:
     }
   ],
   "offset": 0,
-  "total_rooms": 150
+  "total_rooms": 150,
   "next_token": 100
 }
 ```
@@ -224,7 +229,7 @@ GET /_synapse/admin/v1/rooms?order_by=size&from=100
 
 A response body like the following is returned:
 
-```jsonc
+```json
 {
   "rooms": [
     {
@@ -380,7 +385,7 @@ A response body like the following is returned:
 
 # Delete Room API
 
-The Delete Room admin API allows server admins to remove rooms from server
+The Delete Room admin API allows server admins to remove rooms from the server
 and block these rooms.
 
 Shuts down a room. Moves all local users and room aliases automatically to a
@@ -519,16 +524,6 @@ With all that being said, if you still want to try and recover the room:
 
 4. If `new_room_user_id` was given, a 'Content Violation' will have been
    created. Consider whether you want to delete that roomm.
-
-## Deprecated endpoint
-
-The previous deprecated API will be removed in a future release, it was:
-
-```
-POST /_synapse/admin/v1/rooms/<room_id>/delete
-```
-
-It behaves the same way than the current endpoint except the path and the method.
 
 # Make Room Admin API
 

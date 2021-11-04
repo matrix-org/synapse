@@ -21,6 +21,7 @@ such as [Github][github-idp].
 
 [google-idp]: https://developers.google.com/identity/protocols/oauth2/openid-connect
 [auth0]: https://auth0.com/
+[authentik]: https://goauthentik.io/
 [okta]: https://www.okta.com/
 [dex-idp]: https://github.com/dexidp/dex
 [keycloak-idp]: https://www.keycloak.org/docs/latest/server_admin/#sso-protocols
@@ -207,6 +208,39 @@ oidc_providers:
       config:
         localpart_template: "{{ user.preferred_username }}"
         display_name_template: "{{ user.name }}"
+```
+
+### Authentik
+
+[Authentik][authentik] is an open-source IdP solution.
+
+1. Create a provider in Authentik, with type OAuth2/OpenID.
+2. The parameters are:
+- Client Type: Confidential
+- JWT Algorithm: RS256
+- Scopes: OpenID, Email and Profile
+- RSA Key: Select any available key
+- Redirect URIs: `[synapse public baseurl]/_synapse/client/oidc/callback`
+3. Create an application for synapse in Authentik and link it to the provider.
+4. Note the slug of your application, Client ID and Client Secret.
+
+Synapse config:
+```yaml
+oidc_providers:
+  - idp_id: authentik
+    idp_name: authentik
+    discover: true
+    issuer: "https://your.authentik.example.org/application/o/your-app-slug/" # TO BE FILLED: domain and slug
+    client_id: "your client id" # TO BE FILLED
+    client_secret: "your client secret" # TO BE FILLED
+    scopes:
+      - "openid"
+      - "profile"
+      - "email"
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.preferred_username }}}"
+        display_name_template: "{{ user.preferred_username|capitalize }}" # TO BE FILLED: If your users have names in Authentik and you want those in Synapse, this should be replaced with user.name|capitalize.
 ```
 
 ### GitHub

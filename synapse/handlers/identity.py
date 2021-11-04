@@ -54,7 +54,9 @@ class IdentityHandler:
         self.http_client = SimpleHttpClient(hs)
         # An HTTP client for contacting identity servers specified by clients.
         self.blacklisting_http_client = SimpleHttpClient(
-            hs, ip_blacklist=hs.config.server.federation_ip_range_blacklist
+            hs,
+            ip_blacklist=hs.config.server.federation_ip_range_blacklist,
+            ip_whitelist=hs.config.server.federation_ip_range_whitelist,
         )
         self.federation_http_client = hs.get_federation_http_client()
         self.hs = hs
@@ -877,6 +879,8 @@ class IdentityHandler:
         }
 
         if room_type is not None:
+            invite_config["room_type"] = room_type
+            # TODO The unstable field is deprecated and should be removed in the future.
             invite_config["org.matrix.msc3288.room_type"] = room_type
 
         # If a custom web client location is available, include it in the request.

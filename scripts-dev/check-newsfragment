@@ -42,10 +42,10 @@ echo "--------------------------"
 echo
 
 matched=0
-for f in `git diff --name-only FETCH_HEAD... -- changelog.d`; do
+for f in $(git diff --name-only FETCH_HEAD... -- changelog.d); do
     # check that any modified newsfiles on this branch end with a full stop.
-    lastchar=`tr -d '\n' < $f | tail -c 1`
-    if [ $lastchar != '.' -a $lastchar != '!' ]; then
+    lastchar=$(tr -d '\n' < "$f" | tail -c 1)
+    if [ "$lastchar" != '.' ] && [ "$lastchar" != '!' ]; then
         echo -e "\e[31mERROR: newsfragment $f does not end with a '.' or '!'\e[39m" >&2
         echo -e "$CONTRIBUTING_GUIDE_TEXT" >&2
         exit 1

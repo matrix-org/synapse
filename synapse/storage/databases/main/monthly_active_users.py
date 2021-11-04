@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool, make_in_list_sql_clause
 from synapse.util.caches.descriptors import cached
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +30,7 @@ LAST_SEEN_GRANULARITY = 60 * 60 * 1000
 
 
 class MonthlyActiveUsersWorkerStore(SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
         self._clock = hs.get_clock()
         self.hs = hs
@@ -209,7 +212,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
 
 
 class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
 
         self._mau_stats_only = hs.config.server.mau_stats_only
@@ -354,27 +357,3 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
                         await self.upsert_monthly_active_user(user_id)
             elif now - last_seen_timestamp > LAST_SEEN_GRANULARITY:
                 await self.upsert_monthly_active_user(user_id)
-
-    async def remove_deactivated_user_from_mau_table(self, user_id: str) -> None:
-        """
-        Removes a deactivated user from the monthly active user
-        table and resets affected caches.
-
-        Args:
-            user_id(str): the user_id to remove
-        """
-
-        rows_deleted = await self.db_pool.simple_delete(
-            table="monthly_active_users",
-            keyvalues={"user_id": user_id},
-            desc="simple_delete",
-        )
-
-        if rows_deleted != 0:
-            await self.invalidate_cache_and_stream(
-                "user_last_seen_monthly_active", (user_id,)
-            )
-            await self.invalidate_cache_and_stream("get_monthly_active_count", ())
-            await self.invalidate_cache_and_stream(
-                "get_monthly_active_count_by_service", ()
-            )

@@ -39,6 +39,7 @@ from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.server import HomeServer
+from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.util.logcontext import LoggingContext
 from synapse.util.versionstring import get_version_string
 
@@ -58,6 +59,7 @@ class AdminCmdSlavedStore(
     SlavedEventStore,
     SlavedClientIpStore,
     BaseSlavedStore,
+    RoomWorkerStore,
 ):
     pass
 
@@ -66,11 +68,11 @@ class AdminCmdServer(HomeServer):
     DATASTORE_CLASS = AdminCmdSlavedStore
 
 
-async def export_data_command(hs, args):
+async def export_data_command(hs: HomeServer, args):
     """Export data for a user.
 
     Args:
-        hs (HomeServer)
+        hs
         args (argparse.Namespace)
     """
 
@@ -143,6 +145,20 @@ class FileExfiltrationWriter(ExfiltrationWriter):
             for event in state.values():
                 print(json.dumps(event), file=f)
 
+    def write_knock(self, room_id, event, state):
+        self.write_events(room_id, [event])
+
+        # We write the knock state somewhere else as they aren't full events
+        # and are only a subset of the state at the event.
+        room_directory = os.path.join(self.base_directory, "rooms", room_id)
+        os.makedirs(room_directory, exist_ok=True)
+
+        knock_state = os.path.join(room_directory, "knock_state")
+
+        with open(knock_state, "a") as f:
+            for event in state.values():
+                print(json.dumps(event), file=f)
+
     def finished(self):
         return self.base_directory
 
@@ -185,11 +201,7 @@ def start(config_options):
     # a full worker config.
     config.worker.worker_app = "synapse.app.admin_cmd"
 
-    if (
-        not config.worker.worker_daemonize
-        and not config.worker.worker_log_file
-        and not config.worker.worker_log_config
-    ):
+    if not config.worker.worker_daemonize and not config.worker.worker_log_config:
         # Since we're meant to be run as a "command" let's not redirect stdio
         # unless we've actually set log config.
         config.logging.no_redirect_stdio = True
@@ -198,9 +210,9 @@ def start(config_options):
     config.server.update_user_directory = False
     config.worker.run_background_tasks = False
     config.worker.start_pushers = False
-    config.pusher_shard_config.instances = []
+    config.worker.pusher_shard_config.instances = []
     config.worker.send_federation = False
-    config.federation_shard_config.instances = []
+    config.worker.federation_shard_config.instances = []
 
     synapse.events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
 
@@ -221,7 +233,7 @@ def start(config_options):
 
     async def run():
         with LoggingContext("command"):
-            _base.start(ss)
+            await _base.start(ss)
             await args.func(ss, args)
 
     _base.start_worker_reactor(

@@ -65,7 +65,8 @@ The following environment variables are supported in `generate` mode:
 * `SYNAPSE_DATA_DIR`: where the generated config will put persistent data
   such as the database and media store. Defaults to `/data`.
 * `UID`, `GID`: the user id and group id to use for creating the data
-  directories. Defaults to `991`, `991`.
+  directories. If unset, and no user is set via `docker run --user`, defaults
+  to `991`, `991`.
 
 ## Running synapse
 
@@ -97,7 +98,9 @@ The following environment variables are supported in `run` mode:
   `<SYNAPSE_CONFIG_DIR>/homeserver.yaml`.
 * `SYNAPSE_WORKER`: module to execute, used when running synapse with workers.
    Defaults to `synapse.app.homeserver`, which is suitable for non-worker mode.
-* `UID`, `GID`: the user and group id to run Synapse as. Defaults to `991`, `991`.
+* `UID`, `GID`: the user and group id to run Synapse as. If unset, and no user
+  is set via `docker run --user`, defaults to `991`, `991`. Note that this user
+  must have permission to read the config files, and write to the data directories.
 * `TZ`: the [timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) the container will run with. Defaults to `UTC`.
 
 For more complex setups (e.g. for workers) you can also pass your args directly to synapse using `run` mode. For example like this:
@@ -186,7 +189,7 @@ point to another Dockerfile.
 ## Disabling the healthcheck
 
 If you are using a non-standard port or tls inside docker you can disable the healthcheck
-whilst running the above `docker run` commands. 
+whilst running the above `docker run` commands.
 
 ```
    --no-healthcheck
@@ -212,7 +215,7 @@ If you wish to point the healthcheck at a different port with docker command, ad
 ## Setting the healthcheck in docker-compose file
 
 You can add the following to set a custom healthcheck in a docker compose file.
-You will need docker-compose version >2.1 for this to work. 
+You will need docker-compose version >2.1 for this to work.
 
 ```
 healthcheck:
@@ -226,4 +229,5 @@ healthcheck:
 ## Using jemalloc
 
 Jemalloc is embedded in the image and will be used instead of the default allocator.
-You can read about jemalloc by reading the Synapse [README](../README.rst).
+You can read about jemalloc by reading the Synapse
+[README](https://github.com/matrix-org/synapse/blob/HEAD/README.rst#help-synapse-is-slow-and-eats-all-my-ram-cpu).
