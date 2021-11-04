@@ -27,10 +27,9 @@ from typing import (
 import attr
 
 from twisted.internet import defer
-from twisted.internet.defer import ensureDeferred
 
 from synapse.api.constants import EventTypes
-from synapse.logging.context import make_deferred_yieldable
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
@@ -330,15 +329,17 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
             return group_to_state_dict[group]
 
-        # OSTD is this right wrt. log context rules?
-        request_deferred = ensureDeferred(_the_request())
+        # We don't immediately await the result, so must use run_in_background
+        # But we DO await the result before the current log context (request)
+        # finishes, so don't need to run it as a background process.
+        request_deferred = run_in_background(_the_request())
         observable_deferred = ObservableDeferred(request_deferred)
 
         # Insert the ObservableDeferred into the cache
         group_request_dict = self._state_group_inflight_requests.setdefault(group, {})
         group_request_dict[db_state_filter] = observable_deferred
 
-        return await request_deferred
+        return await make_deferred_yieldable(observable_deferred.observe())
 
     async def _get_state_for_group_using_inflight_cache(
         self, group: int, state_filter: StateFilter
