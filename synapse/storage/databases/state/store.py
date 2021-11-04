@@ -364,7 +364,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         fired_off_requests = []
 
-        if state_filter_left_over.types or state_filter_left_over.include_others:
+        if state_filter_left_over != StateFilter.none():
             # we need to fire off a request for remaining state
             # REVIEW log contexts?
             fired_off_requests.append(
