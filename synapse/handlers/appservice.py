@@ -203,7 +203,7 @@ class ApplicationServicesHandler:
                 value for `stream_key` will cause this function to return early.
 
                 Ephemeral events will only be pushed to appservices that have opted into
-                them.
+                them via the ephemeral AS registration file option.
 
                 Appservices will only receive ephemeral events that fall within their
                 registered user and room namespaces.
@@ -214,6 +214,7 @@ class ApplicationServicesHandler:
         if not self.notify_appservices:
             return
 
+        # Ignore any unsupported streams
         if stream_key not in ("typing_key", "receipt_key", "presence_key"):
             return
 
@@ -230,12 +231,19 @@ class ApplicationServicesHandler:
         # Additional context: https://github.com/matrix-org/synapse/pull/11137
         assert isinstance(new_token, int)
 
+        # Check whether there are any appservices which have registered to receive
+        # ephemeral events.
+        #
+        # Note that whether these events are actually relevant to these appservices
+        # is decided later on.
         services = [
             service
             for service in self.store.get_app_services()
             if service.supports_ephemeral
         ]
         if not services:
+            # Bail out early if none of the target appservices have explicitly registered
+            # to receive these ephemeral events.
             return
 
         # We only start a new background process if necessary rather than
@@ -252,7 +260,7 @@ class ApplicationServicesHandler:
         new_token: int,
         users: Collection[Union[str, UserID]],
     ) -> None:
-        logger.debug("Checking interested services for %s" % (stream_key))
+        logger.debug("Checking interested services for %s" % stream_key)
         with Measure(self.clock, "notify_interested_services_ephemeral"):
             for service in services:
                 if stream_key == "typing_key":
@@ -345,6 +353,9 @@ class ApplicationServicesHandler:
 
         Args:
             service: The application service to check for which events it should receive.
+            new_token: A receipts event stream token. Purely used to double-check that the
+                from_token we pull from the database isn't greater than or equal to this
+                token. Prevents accidentally duplicating work.
 
         Returns:
             A list of JSON dictionaries containing data derived from the read receipts that
@@ -382,6 +393,9 @@ class ApplicationServicesHandler:
         Args:
             service: The application service that ephemeral events are being sent to.
             users: The users that should receive the presence update.
+            new_token: A presence update stream token. Purely used to double-check that the
+                from_token we pull from the database isn't greater than or equal to this
+                token. Prevents accidentally duplicating work.
 
         Returns:
             A list of json dictionaries containing data derived from the presence events
