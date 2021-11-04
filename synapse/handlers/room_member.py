@@ -644,6 +644,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if block_invite:
                 raise SynapseError(403, "Invites have been disabled on this server")
 
+        # An empty prev_events list is allowed by room version "org.matrix.msc2716v4"
         if prev_event_ids is not None:
             return await self._local_membership_update(
                 requester=requester,
