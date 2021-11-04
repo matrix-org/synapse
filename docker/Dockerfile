@@ -46,7 +46,7 @@ COPY synapse/python_dependencies.py /synapse/synapse/python_dependencies.py
 #
 # This is aiming at installing the `install_requires` and `extras_require` from `setup.py`
 RUN pip install --prefix="/install" --no-warn-script-location \
-    /synapse[all] 'git+https://github.com/devture/matrix-synapse-shared-secret-auth#egg=shared_secret_authenticator'
+    /synapse[all] 'git+https://github.com/devture/matrix-synapse-shared-secret-auth@e178353ec87c56e0169dd04466d4769da5ed9c46#egg=shared_secret_authenticator'
 
 # Copy over the rest of the project
 COPY synapse /synapse/synapse/
