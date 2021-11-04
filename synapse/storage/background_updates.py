@@ -101,6 +101,7 @@ class BackgroundUpdater:
         self._all_done = False
 
     def start_doing_background_updates(self) -> None:
+        return
         run_as_background_process("background_updates", self.run_background_updates)
 
     async def run_background_updates(self, sleep: bool = True) -> None:
