@@ -144,14 +144,14 @@ class DeviceMessageHandler:
 
         # Add messages to the database.
         # Retrieve the stream id of the last-processed to-device message.
-        max_stream_id = await self.store.add_messages_from_remote_to_device_inbox(
+        last_stream_id = await self.store.add_messages_from_remote_to_device_inbox(
             origin, message_id, local_messages
         )
 
         # Notify listeners that there are new to-device messages to process,
         # handing them the latest stream id.
         self.notifier.on_new_event(
-            "to_device_key", max_stream_id, users=local_messages.keys()
+            "to_device_key", last_stream_id, users=local_messages.keys()
         )
 
     async def _check_for_unknown_devices(
@@ -278,14 +278,14 @@ class DeviceMessageHandler:
 
         # Add messages to the database.
         # Retrieve the stream id of the last-processed to-device message.
-        max_stream_id = await self.store.add_messages_to_device_inbox(
+        last_stream_id = await self.store.add_messages_to_device_inbox(
             local_messages, remote_edu_contents
         )
 
         # Notify listeners that there are new to-device messages to process,
         # handing them the latest stream id.
         self.notifier.on_new_event(
-            "to_device_key", max_stream_id, users=local_messages.keys()
+            "to_device_key", last_stream_id, users=local_messages.keys()
         )
 
         if self.federation_sender:
