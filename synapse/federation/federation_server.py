@@ -213,6 +213,11 @@ class FederationServer(FederationBase):
             self._started_handling_of_staged_events = True
             self._handle_old_staged_events()
 
+            # Start a periodic check for old staged events. This is to handle
+            # the case where locks time out, e.g. if another process gets killed
+            # without dropping its locks.
+            self._clock.looping_call(self._handle_old_staged_events, 60 * 1000)
+
         # keep this as early as possible to make the calculated origin ts as
         # accurate as possible.
         request_time = self._clock.time_msec()
