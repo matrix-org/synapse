@@ -707,8 +707,9 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         )
 
     def test_query_devices_remote_sync(self):
-        """Tests that querying keys for a remote user that we don't share a room
-        with returns the cross signing keys correctly.
+        """Tests that querying keys for a remote user that we share a room with,
+        but haven't yet fetched the keys for, returns the cross signing keys
+        correctly.
         """
 
         remote_user_id = "@test:other"
