@@ -22,9 +22,9 @@ from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.types import create_requester
 from synapse.util.stringutils import random_string
-from tests.test_utils.event_injection import create_event
 
 from tests import unittest
+from tests.test_utils.event_injection import create_event
 
 logger = logging.getLogger(__name__)
 
