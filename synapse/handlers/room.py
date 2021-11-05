@@ -1385,7 +1385,9 @@ class RoomShutdownHandler:
             else:
                 # But if you don't want to preventatively block another room,
                 # this function can't do anything useful.
-                raise NotFoundError("Cannot shut down room: unknown room id %s" % (room_id,))
+                raise NotFoundError(
+                    "Cannot shut down room: unknown room id %s" % (room_id,)
+                )
 
         if new_room_user_id is not None:
             if not self.hs.is_mine_id(new_room_user_id):
