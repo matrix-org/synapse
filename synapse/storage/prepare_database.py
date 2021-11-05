@@ -142,6 +142,9 @@ def prepare_database(
                     databases=databases,
                 )
             elif version_info.current_version < SCHEMA_VERSION:
+                # If the DB is on an older version than we expect the we refuse
+                # to start the worker (as the main process needs to run first to
+                # update the schema).
                 raise UpgradeDatabaseException(
                     OUTDATED_SCHEMA_ON_WORKER_ERROR
                     % (SCHEMA_VERSION, version_info.current_version)
