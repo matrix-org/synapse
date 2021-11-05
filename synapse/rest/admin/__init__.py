@@ -72,6 +72,7 @@ from synapse.rest.admin.users import (
 )
 from synapse.types import JsonDict, RoomStreamToken
 from synapse.util.versionstring import get_version_string
+from synapse.rest.admin.background_updates import BackgroundUpdateEnabledRestServlet
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -247,6 +248,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     # Some servlets only get registered for the main process.
     if hs.config.worker.worker_app is None:
         SendServerNoticeServlet(hs).register(http_server)
+        BackgroundUpdateEnabledRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(

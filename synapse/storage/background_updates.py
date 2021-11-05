@@ -103,18 +103,23 @@ class BackgroundUpdater:
         # Whether we're currently running updates
         self._running = False
 
+        # Whether background updates are enabled. This allows us to
+        # enable/disable background updates via the admin API.
+        self.enabled = True
+
     def start_doing_background_updates(self) -> None:
-        run_as_background_process("background_updates", self.run_background_updates)
+        if self.enabled:
+            run_as_background_process("background_updates", self.run_background_updates)
 
     async def run_background_updates(self, sleep: bool = True) -> None:
-        if self._running:
+        if self._running or not self.enabled:
             return
 
         self._running = True
 
         try:
             logger.info("Starting background schema updates")
-            while True:
+            while self.enabled:
                 if sleep:
                     await self._clock.sleep(self.BACKGROUND_UPDATE_INTERVAL_MS / 1000.0)
 
