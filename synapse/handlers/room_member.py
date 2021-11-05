@@ -268,6 +268,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         content: Optional[dict] = None,
         require_consent: bool = True,
         outlier: bool = False,
+        historical: bool = False,
     ) -> Tuple[str, int]:
         """
         Internal membership update function to get an existing event or create
@@ -337,6 +338,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             auth_event_ids=auth_event_ids,
             require_consent=require_consent,
             outlier=outlier,
+            historical=historical,
         )
 
         prev_state_ids = await context.get_prev_state_ids()
@@ -433,6 +435,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         new_room: bool = False,
         require_consent: bool = True,
         outlier: bool = False,
+        historical: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
@@ -487,6 +490,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 new_room=new_room,
                 require_consent=require_consent,
                 outlier=outlier,
+                historical=historical,
                 prev_event_ids=prev_event_ids,
                 auth_event_ids=auth_event_ids,
             )
@@ -507,6 +511,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         new_room: bool = False,
         require_consent: bool = True,
         outlier: bool = False,
+        historical: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
@@ -657,6 +662,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 content=content,
                 require_consent=require_consent,
                 outlier=outlier,
+                historical=historical,
             )
 
         latest_event_ids = await self.store.get_prev_events_for_room(room_id)
