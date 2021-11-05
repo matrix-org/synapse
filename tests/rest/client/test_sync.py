@@ -427,7 +427,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
                 200,
             ),
             ("agent2", "Element/1.2.2 (Linux; Android 6)", 200),
-            ("agent3", "SchildiChat/1.3.6 (Android 11)", 200),
+            ("agent3", "SchildiChat/1.3.6 (Android 11)", 400),
             ("agent4", "Element (Riot.im) (Android 9)", 200),
             ("agent5", "Element/1.2.1", 400),  # Does not contain Android
             ("agent6", "Element dbg/1.1.8-dev (Android)", 400),  # Different format
