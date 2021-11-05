@@ -15,12 +15,14 @@ import logging
 from typing import Tuple
 
 from synapse.api.constants import EventTypes
+from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.types import create_requester
 from synapse.util.stringutils import random_string
+from tests.test_utils.event_injection import create_event
 
 from tests import unittest
 
@@ -155,6 +157,79 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         # Check that we've deduplicated the events.
         self.assertEqual(len(events), 2)
         self.assertEqual(events[0].event_id, events[1].event_id)
+
+    def test_create_empty_prev_events_in_msc2716_room_version(self):
+        """Try to create an event without any prev_events (only auth_events).
+
+        This is currently only supported in the experimental MSC2716 room versions.
+        """
+        room_id = self.helper.create_room_as(
+            self.user_id,
+            tok=self.access_token,
+            room_version=RoomVersions.MSC2716v4.identifier,
+        )
+
+        # Create a member event we can use as an auth_event
+        memberEvent, memberEventContext = self.get_success(
+            create_event(
+                self.hs,
+                room_id=room_id,
+                type="m.room.member",
+                sender=self.requester.user.to_string(),
+                state_key=self.requester.user.to_string(),
+                content={"membership": "join"},
+            )
+        )
+        self.get_success(
+            self.persist_event_storage.persist_event(memberEvent, memberEventContext)
+        )
+
+        # Try to create the event with empty prev_events (only auth_events)
+        event, _ = self.get_success(
+            self.handler.create_event(
+                self.requester,
+                {
+                    "type": EventTypes.Message,
+                    "room_id": room_id,
+                    "sender": self.requester.user.to_string(),
+                    "content": {"msgtype": "m.text", "body": random_string(5)},
+                },
+                # Empty prev_events is the key thing we're testing here
+                prev_event_ids=[],
+                auth_event_ids=[memberEvent.event_id],
+            )
+        )
+        self.assertIsNotNone(event)
+
+    def test_reject_empty_prev_events_and_auth_events_in_msc2716_room_version(
+        self,
+    ):
+        """Try to create an event without any prev_events (only auth_events).
+
+        This is currently only supported in the experimental MSC2716 room versions.
+        """
+        room_id = self.helper.create_room_as(
+            self.user_id,
+            tok=self.access_token,
+            room_version=RoomVersions.MSC2716v4.identifier,
+        )
+
+        # Try to create the event with empty prev_events and empty auth_events
+        self.get_failure(
+            self.handler.create_event(
+                self.requester,
+                {
+                    "type": EventTypes.Message,
+                    "room_id": room_id,
+                    "sender": self.requester.user.to_string(),
+                    "content": {"msgtype": "m.text", "body": random_string(5)},
+                },
+                prev_event_ids=[],
+                # The event should be rejected when there are no auth_events
+                auth_event_ids=[],
+            ),
+            AssertionError,
+        )
 
 
 class ServerAclValidationTestCase(unittest.HomeserverTestCase):

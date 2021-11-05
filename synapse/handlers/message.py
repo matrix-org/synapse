@@ -918,6 +918,7 @@ class EventCreationHandler:
         full_state_ids_at_event = None
         if auth_event_ids is not None:
             # If auth events are provided, prev events must be also.
+            # prev_event_ids could be an empty array though.
             assert prev_event_ids is not None
 
             # Copy the full auth state before it stripped down
