@@ -26,6 +26,8 @@ from synapse.types import JsonDict
 
 from ._base import client_patterns
 
+pattern = re.compile(r"(?:Element|SchildiChat)/1\.[012]\.")
+
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -55,8 +57,6 @@ class ReceiptRestServlet(RestServlet):
             raise SynapseError(400, "Receipt type must be 'm.read'")
 
         user_agent = get_request_user_agent(request)
-        pattern = re.compile(r"(?:Element|SchildiChat)/1\.[012]\.")
-
         allow_empty_body = False
         if "Android" in user_agent:
             if pattern.match(user_agent) or "Riot" in user_agent:

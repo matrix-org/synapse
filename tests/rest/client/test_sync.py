@@ -427,10 +427,10 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
                 200,
             ),
             ("agent2", "Element/1.2.2 (Linux; Android 6)", 200),
-            ("agent3", "SchildiChat/1.3.6 (Android 11)", 400),
+            ("agent3", "SchildiChat/1.3.6 (Android 11)", 400),  # Will allow empty body again starting at version 1.3+
             ("agent4", "Element (Riot.im) (Android 9)", 200),
-            ("agent5", "Element/1.2.1", 400),  # Does not contain Android
-            ("agent6", "Element dbg/1.1.8-dev (Android)", 400),  # Different format
+            ("agent5", "Element/1.2.1", 400),  # Does not contain "Android"
+            ("agent6", "Element dbg/1.1.8-dev (Android)", 400),  # Different format, missing "/" after Element
         ]
     )
     def test_read_receipt_with_empty_body(
@@ -444,7 +444,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
             "POST",
             "/rooms/%s/receipt/m.read/%s" % (self.room_id, res["event_id"]),
             access_token=self.tok2,
-            custom_headers=[("User Agent", user_agent)],
+            custom_headers=[("User-Agent", user_agent)],
         )
         self.assertEqual(channel.code, expected_status_code)
 
