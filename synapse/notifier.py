@@ -444,15 +444,23 @@ class Notifier:
 
             self.notify_replication()
 
-            # Notify appservices.
-            try:
-                self.appservice_handler.notify_interested_services_ephemeral(
-                    stream_key,
-                    new_token,
-                    users,
-                )
-            except Exception:
-                logger.exception("Error notifying application services of event")
+            # Notify appservices of updates in ephemeral event streams.
+            # Only the following streams are currently supported.
+            if stream_key in (
+                "typing_key",
+                "receipt_key",
+                "presence_key",
+                "to_device_key",
+            ):
+                # Notify appservices.
+                try:
+                    self.appservice_handler.notify_interested_services_ephemeral(
+                        stream_key,
+                        new_token,
+                        users,
+                    )
+                except Exception:
+                    logger.exception("Error notifying application services of event")
 
     def on_new_replication_data(self) -> None:
         """Used to inform replication listeners that something has happened
