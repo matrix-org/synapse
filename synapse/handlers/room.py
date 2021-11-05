@@ -1342,8 +1342,10 @@ class RoomShutdownHandler:
                 Defaults to `Sharing illegal content on this server is not
                 permitted and rooms in violation will be blocked.`
             block:
-                If set to `true`, this room will be added to a blocking list,
-                preventing future attempts to join the room. Defaults to `false`.
+                If set to `True`, this room will be added to a blocking list,
+                preventing future attempts to join the room. Rooms can be blocked
+                even if they're not yet known to the homeserver. Defaults to
+                `False`.
 
         Returns: a dict containing the following keys:
             kicked_users: An array of users (`user_id`) that were kicked.
