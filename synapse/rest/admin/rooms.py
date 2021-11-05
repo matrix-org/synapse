@@ -250,7 +250,9 @@ class RoomRestServlet(RestServlet):
                     # But otherwise, we expect this purge to have succeeded.
                     raise
 
-        # Cast safety: I'm casting away the knowledge that this is a TypedDict.
+        # Cast safety: cast away the knowledge that this is a TypedDict.
+        # See https://github.com/python/mypy/issues/4976#issuecomment-579883622
+        # for some discussion on why this is necessary. Either way,
         # `ret` is an opaque dictionary blob as far as the rest of the app cares.
         return 200, cast(JsonDict, ret)
 
