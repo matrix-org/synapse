@@ -107,6 +107,19 @@ class BackgroundUpdater:
         # enable/disable background updates via the admin API.
         self.enabled = True
 
+    def get_current_update(self) -> Optional[BackgroundUpdatePerformance]:
+        """Returns the current background update, if any."""
+
+        update_name = self._current_background_update
+        if not update_name:
+            return None
+
+        perf = self._background_update_performance.get(update_name)
+        if not perf:
+            perf = BackgroundUpdatePerformance(update_name)
+
+        return self._background_update_performance.get(update_name)
+
     def start_doing_background_updates(self) -> None:
         if self.enabled:
             run_as_background_process("background_updates", self.run_background_updates)

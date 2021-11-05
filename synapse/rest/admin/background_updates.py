@@ -68,3 +68,40 @@ class BackgroundUpdateEnabledRestServlet(RestServlet):
                 db.updates.start_doing_background_updates()
 
         return 200, {"enabled": enabled}
+
+
+class BackgroundUpdateRestServlet(RestServlet):
+    """Fetch information about background updates"""
+
+    PATTERNS = admin_patterns("/background_updates/status")
+
+    def __init__(self, hs: "HomeServer"):
+        self.group_server = hs.get_groups_server_handler()
+        self.is_mine_id = hs.is_mine_id
+        self.auth = hs.get_auth()
+
+        self.data_stores = hs.get_datastores()
+
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        # We need to check that all configured databases have updates enabled.
+        # (They *should* all be in sync.)
+        enabled = all(db.updates.enabled for db in self.data_stores.databases)
+
+        current_updates = {}
+
+        for db in self.data_stores.databases:
+            update = db.updates.get_current_update()
+            if not update:
+                continue
+
+            current_updates[db.name()] = {
+                "name": update.name,
+                "total_item_count": update.total_item_count,
+                "total_duration_ms": update.total_duration_ms,
+                "average_items_per_ms": update.average_items_per_ms(),
+            }
+
+        return 200, {"enabled": enabled, "current_updates": current_updates}

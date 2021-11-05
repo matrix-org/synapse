@@ -25,6 +25,10 @@ from synapse.http.server import HttpServer, JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
+from synapse.rest.admin.background_updates import (
+    BackgroundUpdateEnabledRestServlet,
+    BackgroundUpdateRestServlet,
+)
 from synapse.rest.admin.devices import (
     DeleteDevicesRestServlet,
     DeviceRestServlet,
@@ -72,7 +76,6 @@ from synapse.rest.admin.users import (
 )
 from synapse.types import JsonDict, RoomStreamToken
 from synapse.util.versionstring import get_version_string
-from synapse.rest.admin.background_updates import BackgroundUpdateEnabledRestServlet
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -249,6 +252,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     if hs.config.worker.worker_app is None:
         SendServerNoticeServlet(hs).register(http_server)
         BackgroundUpdateEnabledRestServlet(hs).register(http_server)
+        BackgroundUpdateRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(
