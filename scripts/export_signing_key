@@ -85,7 +85,6 @@ if __name__ == "__main__":
         else format_plain
     )
 
-    keys = []
     for file in args.key_file:
         try:
             res = read_signing_keys(file)
