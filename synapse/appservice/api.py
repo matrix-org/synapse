@@ -231,13 +231,26 @@ class ApplicationServiceApi(SimpleHttpClient):
                 json_body=body,
                 args={"access_token": service.hs_token},
             )
+            logger.debug(
+                "push_bulk to %s succeeded! events=%s",
+                uri,
+                [event.get("event_id") for event in events],
+            )
             sent_transactions_counter.labels(service.id).inc()
             sent_events_counter.labels(service.id).inc(len(events))
             return True
         except CodeMessageException as e:
-            logger.warning("push_bulk to %s received %s", uri, e.code)
+            logger.warning(
+                "push_bulk to %s received code=%s msg=%s", uri, e.code, e.msg
+            )
         except Exception as ex:
-            logger.warning("push_bulk to %s threw exception %s", uri, ex)
+            logger.warning(
+                "push_bulk to %s threw exception(%s) %s args=%s",
+                uri,
+                type(ex).__name__,
+                ex,
+                ex.args,
+            )
         failed_transactions_counter.labels(service.id).inc()
         return False
 
