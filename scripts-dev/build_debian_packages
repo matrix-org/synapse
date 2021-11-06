@@ -17,7 +17,7 @@ import subprocess
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Set, TextIO
 
 DISTS = (
     "debian:buster",  # oldstable: EOL 2022-08
@@ -46,7 +46,7 @@ class Builder(object):
     ):
         self.redirect_stdout = redirect_stdout
         self._docker_build_args = tuple(docker_build_args or ())
-        self.active_containers = set()
+        self.active_containers: Set[str] = set()
         self._lock = threading.Lock()
         self._failed = False
 
@@ -75,6 +75,8 @@ class Builder(object):
         # doesn't solve the problem for natively-run dpkg-buildpakage).
         debsdir = os.path.join(projdir, "../debs")
         os.makedirs(debsdir, exist_ok=True)
+
+        stdout: Optional[TextIO]
 
         if self.redirect_stdout:
             logfile = os.path.join(debsdir, "%s.buildlog" % (tag,))
