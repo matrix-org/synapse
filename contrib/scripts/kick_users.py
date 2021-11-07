@@ -2,7 +2,7 @@
 
 import json
 import sys
-import urllib
+import urllib.parse
 from argparse import ArgumentParser
 
 import requests
@@ -56,7 +56,7 @@ def main(hs, room_id, access_token, user_id_prefix, why):
     if len(doit) > 0 and doit.lower() == "y":
         print("Kicking members...")
         # encode them all
-        kick_list = [urllib.quote(uid) for uid in kick_list]
+        kick_list = [urllib.parse.quote(uid) for uid in kick_list]
         for uid in kick_list:
             kick_url = _mkurl(
                 "$HS/_matrix/client/api/v1/rooms/$ROOM/state/m.room.member/$UID?access_token=$TOKEN",
