@@ -2,6 +2,7 @@ matrix-synapse-py3 (1.47.0+nmu1) UNRELEASED; urgency=medium
 
   * Update scripts to pass Shellcheck lints.
   * Remove unused Vagrant scripts from debian/ directory.
+  * Change package Architecture to any.
 
  -- root <root@cae79a6e79d7>  Fri, 22 Oct 2021 22:20:31 +0000
 
