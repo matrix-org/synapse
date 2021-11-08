@@ -77,7 +77,7 @@ The API returns the `enabled` param.
 
 ```json
 {
-    "enabled": 0
+    "enabled": false
 }
 ```
 

@@ -118,7 +118,7 @@ class BackgroundUpdater:
         if not perf:
             perf = BackgroundUpdatePerformance(update_name)
 
-        return self._background_update_performance.get(update_name)
+        return perf
 
     def start_doing_background_updates(self) -> None:
         if self.enabled:
