@@ -177,6 +177,16 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
             tok=self.t_alice,
         )
 
+        res = self.get_success(
+            self.store.db_pool.simple_select_onecol(
+                "room_memberships", {"user_id": "@alice:test"}, "display_name"
+            )
+        )
+        # verify that the display name was alice before change in membership
+        self.assertEqual(res[0], "alice")
+        # verify that it is now None
+        self.assertEqual(res[1], None)
+
 
 class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
