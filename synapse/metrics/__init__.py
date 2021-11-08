@@ -14,6 +14,7 @@
 
 import functools
 import gc
+import inspect
 import itertools
 import logging
 import os
@@ -32,6 +33,7 @@ from prometheus_client.core import (
 )
 
 from twisted.internet import reactor
+from twisted.internet.defer import Deferred
 from twisted.python.threadpool import ThreadPool
 
 import synapse
@@ -589,15 +591,21 @@ def callFromThreadTimer(func):
     def callFromThread(f: Callable[..., Any], *args: object, **kwargs: object) -> None:
         @functools.wraps(f)
         def g(*args, **kwargs):
+            callbacks = None
+            if inspect.ismethod(f):
+                if isinstance(f.__self__, Deferred):
+                    callbacks = list(f.__self__.callbacks)
+
             start = time.time()
             r = f(*args, **kwargs)
             end = time.time()
 
             if end - start > 0.5:
                 logger.warning(
-                    "callFromThread took %f seconds. name: %s",
+                    "callFromThread took %f seconds. name: %s, callbacks: %s",
                     end - start,
                     f,
+                    callbacks,
                 )
 
             return r
