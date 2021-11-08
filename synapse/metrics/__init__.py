@@ -602,7 +602,7 @@ def callFromThreadTimer(func):
 
             return r
 
-        func(g, args, kwargs)
+        func(g, *args, **kwargs)
 
     return callFromThread
 
