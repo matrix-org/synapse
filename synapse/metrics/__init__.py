@@ -584,7 +584,7 @@ MIN_TIME_BETWEEN_GCS = (1.0, 10.0, 30.0)
 _last_gc = [0.0, 0.0, 0.0]
 
 
-def callFromThreadTimer(reactor, func):
+def callFromThreadTimer(func):
     @functools.wraps(func)
     def callFromThread(
         self, f: Callable[..., Any], *args: object, **kwargs: object
@@ -694,6 +694,8 @@ try:
     # runUntilCurrent is called when we have pending calls. It is called once
     # per iteratation after fd polling.
     reactor.runUntilCurrent = runUntilCurrentTimer(reactor, reactor.runUntilCurrent)  # type: ignore
+
+    reactor.callFromThread = callFromThreadTimer(reactor.callFromThread)
 
     # We manually run the GC each reactor tick so that we can get some metrics
     # about time spent doing GC,
