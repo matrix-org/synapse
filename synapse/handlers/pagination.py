@@ -304,7 +304,7 @@ class PaginationHandler:
         """Carry out a history purge on a room.
 
         Args:
-            purge_id: The id for this purge
+            purge_id: The ID for this purge.
             room_id: The room to purge from
             token: topological token to delete events before
             delete_local_events: True to delete local events as well as remote ones
@@ -540,7 +540,7 @@ class PaginationHandler:
         aliases to the new room. Users on other servers will be unaffected.
 
         Args:
-            purge_id: The id for this purge
+            purge_id: The ID for this purge.
             room_id: The ID of the room to shut down.
             requester_user_id:
                 User who requested the action. Will be recorded as putting the room on the
@@ -720,7 +720,7 @@ class PaginationHandler:
         Remove the purge from the list 24 hours after it completes
 
         Args:
-            purge_id: The id for this purge
+            purge_id: The ID for this purge.
             room_id: The ID of the room to shut down.
         """
         del self._purges_by_id[purge_id]

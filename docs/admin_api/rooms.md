@@ -405,7 +405,7 @@ This API will remove all trace of the old room from your database after removing
 all local users. If `purge` is `true` (the default), all traces of the old room will
 be removed from your database after removing all local users. If you do not want
 this to happen, set `purge` to `false`.
-Depending on the amount of history being purged a call to the API may take
+Depending on the amount of history being purged, a call to the API may take
 several minutes or longer.
 
 The local server will only have the power to move local user and room aliases to
@@ -533,9 +533,9 @@ The status can be queried up to 24 hours after completion of the task,
 or until Synapse is restarted (whichever happens first).
 The result also includes the tasks that have been performed by retention policy.
 
+### Query by `room_id`
+
 With this API you can get the status of all tasks the last 24h for this `room_id`.
-If you want only get the status of one specific task, you can also use
-the [Purge status query API](purge_history_api.md#Purge-status-query).
 
 The API is:
 
@@ -583,12 +583,49 @@ The following parameters should be set in the URL:
 
 * `room_id` - The ID of the room.
 
-**Response**
+### Query by `purge_id`
+
+With this API you can get the status of one specific task by `purge_id`.
+
+The API is:
+
+```
+GET /_synapse/admin/v2/rooms/delete_status/<purge_id>
+```
+
+A response body like the following is returned:
+
+```json
+{
+    "status": "active",
+    "shutdown_room": {
+        "kicked_users": [
+            "@foobar:example.com"
+        ],
+        "failed_to_kick_users": [],
+        "local_aliases": [
+            "#badroom:example.com",
+            "#evilsaloon:example.com"
+        ],
+        "new_room_id": "!newroomid:example.com"
+    }
+}
+```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+* `purge_id` - The ID for this purge.
+
+### Response
 
 The following fields are returned in the JSON response body:
 
 - `results` - An array of objects, each containing information about one task.
+  This field is omitted from the result when you query by `purge_id`.
   Task objects contain the following fields:
+  - `purge_id` - The ID for this purge if you query by `room_id`.
   - `status` - The status will be one of:
     - `remove members` - The process is removing users from the `room_id`.
     - `active` - The process is purging the room from database.
@@ -602,8 +639,9 @@ The following fields are returned in the JSON response body:
     - `kicked_users` - An array of users (`user_id`) that were kicked.
     - `failed_to_kick_users` - An array of users (`user_id`) that that were not kicked.
     - `local_aliases` - An array of strings representing the local aliases that were
-    migrated from the old room to the new.
-    - `new_room_id` - A string representing the room ID of the new room.
+      migrated from the old room to the new.
+    - `new_room_id` - A string representing the room ID of the new room, or `null` if
+      no such room was created.
 
 ## Undoing room deletions
 
