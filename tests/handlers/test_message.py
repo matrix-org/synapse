@@ -161,7 +161,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
     def test_create_empty_prev_events_in_msc2716_room_version(self):
         """Try to create an event without any prev_events (only auth_events).
 
-        This is currently only supported in the experimental MSC2716 room versions.
+        This is currently only supported in the experimental MSC2716v4+ room versions.
         """
         room_id = self.helper.create_room_as(
             self.user_id,
@@ -204,9 +204,10 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
     def test_reject_empty_prev_events_and_auth_events_in_msc2716_room_version(
         self,
     ):
-        """Try to create an event without any prev_events (only auth_events).
+        """Try to create an event without any prev_events or auth_events.
+        Expect an exception to be raised.
 
-        This is currently only supported in the experimental MSC2716 room versions.
+        This is currently only supported in the experimental MSC2716v4 room versions.
         """
         room_id = self.helper.create_room_as(
             self.user_id,
