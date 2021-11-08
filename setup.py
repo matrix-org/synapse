@@ -17,9 +17,9 @@
 # limitations under the License.
 import glob
 import os
+from typing import Any, Dict
 
 from setuptools import Command, find_packages, setup
-from typing import Dict, Any
 
 here = os.path.abspath(os.path.dirname(__file__))
 
