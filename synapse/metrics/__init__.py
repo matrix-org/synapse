@@ -606,6 +606,9 @@ def runUntilCurrentTimer(reactor, func):
         ret = func(*args, **kwargs)
         end = time.time()
 
+        if end - start > 0.05:
+            logger.warning("runUntilCurrent took %f seconds", end - start)
+
         # record the amount of wallclock time spent running pending calls.
         # This is a proxy for the actual amount of time between reactor polls,
         # since about 25% of time is actually spent running things triggered by
