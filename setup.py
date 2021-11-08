@@ -110,7 +110,6 @@ CONDITIONAL_REQUIREMENTS["mypy"] = [
     "types-Pillow>=8.3.4",
     "types-pyOpenSSL>=20.0.7",
     "types-PyYAML>=5.4.10",
-    "types-requests>=2.25.11",
     "types-setuptools>=57.4.0",
 ]
 
