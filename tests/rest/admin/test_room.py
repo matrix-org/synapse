@@ -997,7 +997,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
     def _test_result(
         self,
         channel: FakeChannel,
-        purge_id,
+        purge_id: str,
         kicked_user: str,
         expect_new_room: bool = False,
     ) -> None:
@@ -1022,6 +1022,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             "failed_to_kick_users", channel.json_body["delete_status"][0]["result"]
         )
         self.assertIn("local_aliases", channel.json_body["delete_status"][0]["result"])
+        self.assertNotIn("error", channel.json_body["delete_status"][0])
 
         if expect_new_room:
             self.assertIsNotNone(

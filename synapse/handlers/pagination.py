@@ -59,8 +59,11 @@ class PurgeStatus:
     }
 
     # Tracks whether this request has completed.
-    # One of STATUS_{ACTIVE,COMPLETE,FAILED, STATUS_REMOVE_MEMBERS}.
+    # One of STATUS_{ACTIVE,COMPLETE,FAILED,REMOVE_MEMBERS}.
     status: int = STATUS_ACTIVE
+
+    # Save the error message if an error occurs
+    error: str = ""
 
     # Saves the result of an action to give it back to REST API
     result: Dict = {}
@@ -69,10 +72,13 @@ class PurgeStatus:
         return {"status": PurgeStatus.STATUS_TEXT[self.status]}
 
     def asdict_with_result(self) -> JsonDict:
-        return {
+        ret = {
             "status": PurgeStatus.STATUS_TEXT[self.status],
             "result": self.result,
         }
+        if self.error:
+            ret["error"] = self.error
+        return ret
 
 
 class PaginationHandler:
@@ -612,6 +618,7 @@ class PaginationHandler:
                 exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
             )
             self._purges_by_id[purge_id].status = PurgeStatus.STATUS_FAILED
+            self._purges_by_id[purge_id].error = f.getErrorMessage()
         finally:
             self._purges_in_progress_by_room.discard(room_id)
 

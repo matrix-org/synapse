@@ -550,6 +550,7 @@ A response body like the following is returned:
         {
             "purge_id": "purgeid1",
             "status": "failed",
+            "error": "error message",
             "result": {
                 "kicked_users": [],
                 "failed_to_kick_users": [],
@@ -592,6 +593,7 @@ The following fields are returned in the JSON response body:
     - `active` - The process is purging the room from database.
     - `complete` - The process has completed successfully.
     - `failed` - The process is aborted, an error has occurred.
+  - `error` - A string that shows an error message if `status` is `failed`. Otherwise this field is hidden.
   - `result` - An object containing information about the result of shutting down the room.
     *Note:* The result is shown after removing the room members. The delete process can
     still be running. Please pay attention to the `status`.
