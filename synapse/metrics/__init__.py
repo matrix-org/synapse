@@ -586,9 +586,7 @@ _last_gc = [0.0, 0.0, 0.0]
 
 def callFromThreadTimer(func):
     @functools.wraps(func)
-    def callFromThread(
-        self, f: Callable[..., Any], *args: object, **kwargs: object
-    ) -> None:
+    def callFromThread(f: Callable[..., Any], *args: object, **kwargs: object) -> None:
         @functools.wraps(f)
         def g(*args, **kwargs):
             start = time.time()
@@ -604,7 +602,7 @@ def callFromThreadTimer(func):
 
             return r
 
-        func(f, args, kwargs)
+        func(g, args, kwargs)
 
     return callFromThread
 
