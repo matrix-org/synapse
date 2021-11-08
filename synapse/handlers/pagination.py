@@ -40,10 +40,10 @@ logger = logging.getLogger(__name__)
 
 @attr.s(slots=True, auto_attribs=True)
 class PurgeStatus:
-    """Object tracking the status of a purge and shut down room request
+    """Object tracking the status of a purge events/delete room request
 
-    This class contains information on the progress of a purge request, for
-    return by get_purge_status.
+    This class contains information on the progress of a purge events/delete room request, for
+    return by get_purge_status or delete_status.
     """
 
     STATUS_ACTIVE = 0
@@ -339,7 +339,7 @@ class PaginationHandler:
         """
         return self._purges_by_id.get(purge_id)
 
-    def get_purge_ids_by_room(self, room_id: str) -> Optional[List[str]]:
+    def get_purge_ids_by_room(self, room_id: str) -> Optional[Collection[str]]:
         """Get all active purge ids by room
 
         Args:
@@ -541,7 +541,7 @@ class PaginationHandler:
             purge_id: The id for this purge
             room_id: The ID of the room to shut down.
             requester_user_id:
-                User who requested the action and put the room on the
+                User who requested the action. Will be recorded as putting the room on the
                 blocking list.
             new_room_user_id:
                 If set, a new room will be created with this user ID
@@ -697,7 +697,7 @@ class PaginationHandler:
         # we log the purge_id here so that it can be tied back to the
         # request id in the log lines.
         logger.info(
-            "[_shutdown_and_purge_room] starting shutdown room_id %s with purge_id %s",
+            "starting shutdown room_id %s with purge_id %s",
             room_id,
             purge_id,
         )
@@ -705,7 +705,7 @@ class PaginationHandler:
         self._purges_by_id[purge_id] = PurgeStatus()
         self._purges_by_room.setdefault(room_id, []).append(purge_id)
         run_as_background_process(
-            "_shutdown_and_purge_room",
+            "shutdown_and_purge_room",
             self._shutdown_and_purge_room,
             purge_id,
             room_id,
