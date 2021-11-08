@@ -1178,7 +1178,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
         if event_filter and (
             event_filter.relation_senders or event_filter.relation_types
         ):
-            # Filtering by relations could cause thes ame event to appear multiple
+            # Filtering by relations could cause the same event to appear multiple
             # times (since there's no limit on the number of relations to an event).
             needs_distinct = True
             join_clause += """
