@@ -1,0 +1,1 @@
+Minor speed up to start up times and getting updates for groups by adding missing index to `local_group_updates.stream_id`.
