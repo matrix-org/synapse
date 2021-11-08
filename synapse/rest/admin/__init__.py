@@ -194,7 +194,9 @@ class PurgeHistoryStatusRestServlet(RestServlet):
         if purge_status is None:
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
-        return 200, purge_status.asdict()
+        response = purge_status.asdict()
+        del response["result"]
+        return 200, response
 
 
 ########################################################################################

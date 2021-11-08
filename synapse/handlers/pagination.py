@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Collection, Dict, List, Optional, Set
 
 import attr
 
@@ -22,7 +22,6 @@ from twisted.python.failure import Failure
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
-from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
@@ -69,9 +68,6 @@ class PurgeStatus:
     result: Dict = {}
 
     def asdict(self) -> JsonDict:
-        return {"status": PurgeStatus.STATUS_TEXT[self.status]}
-
-    def asdict_with_result(self) -> JsonDict:
         ret = {
             "status": PurgeStatus.STATUS_TEXT[self.status],
             "result": self.result,
@@ -290,8 +286,14 @@ class PaginationHandler:
         logger.info("[purge] starting purge_id %s", purge_id)
 
         self._purges_by_id[purge_id] = PurgeStatus()
-        run_in_background(
-            self._purge_history, purge_id, room_id, token, delete_local_events
+        self._purges_by_room.setdefault(room_id, []).append(purge_id)
+        run_as_background_process(
+            "purge_history",
+            self._purge_history,
+            purge_id,
+            room_id,
+            token,
+            delete_local_events,
         )
         return purge_id
 
@@ -323,12 +325,11 @@ class PaginationHandler:
         finally:
             self._purges_in_progress_by_room.discard(room_id)
 
-            # remove the purge from the list 24 hours after it completes
-            def clear_purge() -> None:
-                del self._purges_by_id[purge_id]
-
             self.hs.get_reactor().callLater(
-                PaginationHandler.CLEAR_PURGE_TIME, clear_purge
+                PaginationHandler.CLEAR_PURGE_TIME,
+                self._clear_purge,
+                purge_id,
+                room_id,
             )
 
     def get_purge_status(self, purge_id: str) -> Optional[PurgeStatus]:
@@ -622,16 +623,11 @@ class PaginationHandler:
         finally:
             self._purges_in_progress_by_room.discard(room_id)
 
-            # remove the purge from the list 24 hours after it completes
-            def clear_purge() -> None:
-                del self._purges_by_id[purge_id]
-                self._purges_by_room[room_id].remove(purge_id)
-                if not self._purges_by_room[room_id]:
-                    del self._purges_by_room[room_id]
-
             self.hs.get_reactor().callLater(
                 PaginationHandler.CLEAR_PURGE_TIME,
-                clear_purge,
+                self._clear_purge,
+                purge_id,
+                room_id,
             )
 
     def start_shutdown_and_purge_room(
@@ -718,3 +714,16 @@ class PaginationHandler:
             force_purge,
         )
         return purge_id
+
+    def _clear_purge(self, purge_id: str, room_id: str) -> None:
+        """
+        Remove the purge from the list 24 hours after it completes
+
+        Args:
+            purge_id: The id for this purge
+            room_id: The ID of the room to shut down.
+        """
+        del self._purges_by_id[purge_id]
+        self._purges_by_room[room_id].remove(purge_id)
+        if not self._purges_by_room[room_id]:
+            del self._purges_by_room[room_id]

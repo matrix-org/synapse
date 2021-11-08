@@ -150,7 +150,7 @@ class DeleteRoomStatusRestServlet(RestServlet):
                 response += [
                     {
                         "purge_id": purge_id,
-                        **purge.asdict_with_result(),
+                        **purge.asdict(),
                     }
                 ]
         return 200, {"delete_status": response}
