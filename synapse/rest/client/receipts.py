@@ -56,6 +56,7 @@ class ReceiptRestServlet(RestServlet):
         if receipt_type != "m.read":
             raise SynapseError(400, "Receipt type must be 'm.read'")
 
+        # Do not allow older SchildiChat and Element Android clients (prior to Element/1.[012].x) to send an empty body.
         user_agent = get_request_user_agent(request)
         allow_empty_body = False
         if "Android" in user_agent:

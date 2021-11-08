@@ -421,16 +421,23 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
 
     @parameterized.expand(
         [
+            # Old Element version, expected to send an empty body
             (
                 "agent1",
                 "Element/1.2.2 (Linux; U; Android 9; MatrixAndroidSDK_X 0.0.1)",
                 200,
             ),
-            ("agent2", "Element/1.2.2 (Linux; Android 6)", 200),
-            ("agent3", "SchildiChat/1.3.6 (Android 11)", 400),  # Will allow empty body again starting at version 1.3+
-            ("agent4", "Element (Riot.im) (Android 9)", 200),
-            ("agent5", "Element/1.2.1", 400),  # Does not contain "Android"
-            ("agent6", "Element dbg/1.1.8-dev (Android)", 400),  # Different format, missing "/" after Element
+            # Old SchildiChat version, expected to send an empty body
+            ("agent2", "SchildiChat/1.2.1 (Android 10)", 200),
+            # Expected 400: Denies empty body starting at version 1.3+
+            ("agent3", "Element/1.3.6 (Android 10)", 400),
+            ("agent4", "SchildiChat/1.3.6 (Android 11)", 400),
+            # Contains "Riot": Receipts with empty bodies expected
+            ("agent5", "Element (Riot.im) (Android 9)", 200),
+            # Expected 400: Does not contain "Android"
+            ("agent6", "Element/1.2.1", 400),
+            # Expected 400: Different format, missing "/" after Element; existing build that should allow empty bodies, but minimal ongoing usage
+            ("agent7", "Element dbg/1.1.8-dev (Android)", 400),
         ]
     )
     def test_read_receipt_with_empty_body(
