@@ -1,0 +1,1 @@
+Require all new Python files in the repository to pass mypy.
