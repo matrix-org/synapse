@@ -526,18 +526,7 @@ class PaginationHandler:
         """
         Shuts down and purges a room.
 
-        Moves all local users and room aliases
-        automatically to a new room if `new_room_user_id` is set.
-        Otherwise local users only leave the room without any information.
-        After that, the room will be removed from the database.
-
-        The new room will be created with the user specified by the
-        `new_room_user_id` parameter as room administrator and will contain a
-        message explaining what happened. Users invited to the new room will
-        have power level `-10` by default, and thus be unable to speak.
-
-        The local server will only have the power to move local user and room
-        aliases to the new room. Users on other servers will be unaffected.
+        See `RoomShutdownHandler.shutdown_room` for details of creation of the new room
 
         Args:
             purge_id: The ID for this purge.

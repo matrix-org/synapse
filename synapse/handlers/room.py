@@ -1276,13 +1276,6 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
 
 
 class RoomShutdownHandler:
-    """This handles synchronous room shutdowns and is part of the delete room v1 API.
-    It will become deprecated in the future.
-
-    The handler for asynchronous shudowns is part of the `PaginationHandler`.
-    If this handler is removed, `shutdown_room` must to be migrated to `PaginationHandler`
-    """
-
     DEFAULT_MESSAGE = (
         "Sharing illegal content on this server is not permitted and rooms in"
         " violation will be blocked."
@@ -1307,6 +1300,10 @@ class RoomShutdownHandler:
         block: bool = False,
     ) -> dict:
         """
+        This handles synchronous room shutdowns and is part of the delete room v1 API.
+        The handler for asynchronous shudowns is part of the `PaginationHandler`.
+        If this handler is removed, `shutdown_room` must to be migrated to `PaginationHandler`
+
         Shuts down a room. Moves all local users and room aliases automatically
         to a new room if `new_room_user_id` is set. Otherwise local users only
         leave the room without any information.
