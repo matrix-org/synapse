@@ -20,7 +20,7 @@ import os
 import platform
 import threading
 import time
-from typing import Callable, Dict, Iterable, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Tuple, Union
 
 import attr
 from prometheus_client import Counter, Gauge, Histogram
@@ -584,6 +584,31 @@ MIN_TIME_BETWEEN_GCS = (1.0, 10.0, 30.0)
 _last_gc = [0.0, 0.0, 0.0]
 
 
+def callFromThreadTimer(reactor, func):
+    @functools.wraps(func)
+    def callFromThread(
+        self, f: Callable[..., Any], *args: object, **kwargs: object
+    ) -> None:
+        @functools.wraps(f)
+        def g(*args, **kwargs):
+            start = time.time()
+            r = f(*args, **kwargs)
+            end = time.time()
+
+            if end - start > 0.5:
+                logger.warning(
+                    "callFromThread took %f seconds. name: %s",
+                    end - start,
+                    f,
+                )
+
+            return r
+
+        func(f, args, kwargs)
+
+    return callFromThread
+
+
 def runUntilCurrentTimer(reactor, func):
     @functools.wraps(func)
     def f(*args, **kwargs):
@@ -607,7 +632,11 @@ def runUntilCurrentTimer(reactor, func):
         end = time.time()
 
         if end - start > 0.05:
-            logger.warning("runUntilCurrent took %f seconds", end - start)
+            logger.warning(
+                "runUntilCurrent took %f seconds. num_pending: %d",
+                end - start,
+                num_pending,
+            )
 
         # record the amount of wallclock time spent running pending calls.
         # This is a proxy for the actual amount of time between reactor polls,
