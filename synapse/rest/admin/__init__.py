@@ -195,7 +195,7 @@ class PurgeHistoryStatusRestServlet(RestServlet):
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
         response = purge_status.asdict()
-        del response["result"]
+        del response["shutdown_room"]
         return 200, response
 
 

@@ -70,7 +70,7 @@ class PurgeStatus:
     def asdict(self) -> JsonDict:
         ret = {
             "status": PurgeStatus.STATUS_TEXT[self.status],
-            "result": self.result,
+            "shutdown_room": self.result,
         }
         if self.error:
             ret["error"] = self.error
@@ -243,6 +243,7 @@ class PaginationHandler:
             purge_id = random_string(16)
 
             self._purges_by_id[purge_id] = PurgeStatus()
+            self._purges_by_room.setdefault(room_id, []).append(purge_id)
 
             logger.info(
                 "Starting purging events in room %s (purge_id %s)" % (room_id, purge_id)

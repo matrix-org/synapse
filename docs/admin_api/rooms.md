@@ -531,6 +531,7 @@ The JSON body must not be empty. The body must be at least `{}`.
 It is possible to query the status of the background task for deleting rooms.
 The status can be queried up to 24 hours after completion of the task,
 or until Synapse is restarted (whichever happens first).
+The result also includes the tasks that have been performed by retention policy.
 
 With this API you can get the status of all tasks the last 24h for this `room_id`.
 If you want only get the status of one specific task, you can also use
@@ -546,12 +547,12 @@ A response body like the following is returned:
 
 ```json
 {
-    "delete_status": [
+    "results": [
         {
             "purge_id": "purgeid1",
             "status": "failed",
             "error": "error message",
-            "result": {
+            "shutdown_room": {
                 "kicked_users": [],
                 "failed_to_kick_users": [],
                 "local_aliases": [],
@@ -560,7 +561,7 @@ A response body like the following is returned:
         }, {
             "purge_id": "purgeid2",
             "status": "active",
-            "result": {
+            "shutdown_room": {
                 "kicked_users": [
                     "@foobar:example.com"
                 ],
@@ -586,17 +587,18 @@ The following parameters should be set in the URL:
 
 The following fields are returned in the JSON response body:
 
-- `delete_status` - An array of objects, each containing information about one task.
+- `results` - An array of objects, each containing information about one task.
   Task objects contain the following fields:
   - `status` - The status will be one of:
     - `remove members` - The process is removing users from the `room_id`.
     - `active` - The process is purging the room from database.
     - `complete` - The process has completed successfully.
     - `failed` - The process is aborted, an error has occurred.
-  - `error` - A string that shows an error message if `status` is `failed`. Otherwise this field is hidden.
-  - `result` - An object containing information about the result of shutting down the room.
-    *Note:* The result is shown after removing the room members. The delete process can
-    still be running. Please pay attention to the `status`.
+  - `error` - A string that shows an error message if `status` is `failed`.
+    Otherwise this field is hidden.
+  - `shutdown_room` - An object containing information about the result of shutting down the room.
+    *Note:* The result is shown after removing the room members.
+    The delete process can still be running. Please pay attention to the `status`.
     - `kicked_users` - An array of users (`user_id`) that were kicked.
     - `failed_to_kick_users` - An array of users (`user_id`) that that were not kicked.
     - `local_aliases` - An array of strings representing the local aliases that were
