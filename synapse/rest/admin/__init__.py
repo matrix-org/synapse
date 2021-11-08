@@ -42,7 +42,8 @@ from synapse.rest.admin.registration_tokens import (
     RegistrationTokenRestServlet,
 )
 from synapse.rest.admin.rooms import (
-    DeleteRoomStatusRestServlet,
+    DeleteRoomStatusByPurgeIdRestServlet,
+    DeleteRoomStatusByRoomIdRestServlet,
     ForwardExtremitiesRestServlet,
     JoinRoomAliasServlet,
     ListRoomRestServlet,
@@ -225,7 +226,8 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     RoomRestServlet(hs).register(http_server)
     RoomRestV2Servlet(hs).register(http_server)
     RoomMembersRestServlet(hs).register(http_server)
-    DeleteRoomStatusRestServlet(hs).register(http_server)
+    DeleteRoomStatusByPurgeIdRestServlet(hs).register(http_server)
+    DeleteRoomStatusByRoomIdRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
     UserAdminServlet(hs).register(http_server)

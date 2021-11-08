@@ -65,12 +65,12 @@ class PurgeStatus:
     error: str = ""
 
     # Saves the result of an action to give it back to REST API
-    result: Dict = {}
+    shutdown_room: Dict = {}
 
     def asdict(self) -> JsonDict:
         ret = {
             "status": PurgeStatus.STATUS_TEXT[self.status],
-            "shutdown_room": self.result,
+            "shutdown_room": self.shutdown_room,
         }
         if self.error:
             ret["error"] = self.error
@@ -585,7 +585,7 @@ class PaginationHandler:
                 self._purges_by_id[purge_id].status = PurgeStatus.STATUS_REMOVE_MEMBERS
                 self._purges_by_id[
                     purge_id
-                ].result = await self._room_shutdown_handler.shutdown_room(
+                ].shutdown_room = await self._room_shutdown_handler.shutdown_room(
                     room_id=room_id,
                     requester_user_id=requester_user_id,
                     new_room_user_id=new_room_user_id,
@@ -597,7 +597,6 @@ class PaginationHandler:
 
                 if purge:
                     logger.info("starting purge room_id %s", room_id)
-                    self._purges_by_id[purge_id].status = PurgeStatus.STATUS_ACTIVE
 
                     # first check that we have no users in this room
                     if not force_purge:

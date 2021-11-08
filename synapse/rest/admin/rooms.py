@@ -121,7 +121,7 @@ class RoomRestV2Servlet(RestServlet):
         return 200, {"purge_id": purge_id}
 
 
-class DeleteRoomStatusRestServlet(RestServlet):
+class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
     """Get the status of the delete room background task."""
 
     PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/delete_status$", "v2")
@@ -154,6 +154,28 @@ class DeleteRoomStatusRestServlet(RestServlet):
                     }
                 ]
         return 200, {"results": response}
+
+
+class DeleteRoomStatusByPurgeIdRestServlet(RestServlet):
+    """Get the status of the delete room background task."""
+
+    PATTERNS = admin_patterns("/rooms/delete_status/(?P<purge_id>[^/]+)$", "v2")
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._pagination_handler = hs.get_pagination_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, purge_id: str
+    ) -> Tuple[int, JsonDict]:
+
+        await assert_requester_is_admin(self._auth, request)
+
+        purge_status = self._pagination_handler.get_purge_status(purge_id)
+        if purge_status is None:
+            raise NotFoundError("purge id '%s' not found" % purge_id)
+
+        return 200, purge_status.asdict()
 
 
 class ListRoomRestServlet(RestServlet):
