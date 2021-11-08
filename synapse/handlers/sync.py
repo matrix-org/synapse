@@ -34,7 +34,13 @@ from synapse.api.presence import UserPresenceState
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.logging.context import current_context
-from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, start_active_span
+from synapse.logging.opentracing import (
+    SynapseTags,
+    log_kv,
+    set_tag,
+    start_active_span,
+    trace,
+)
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.storage.roommember import MemberSummary
 from synapse.storage.state import StateFilter
@@ -483,6 +489,7 @@ class SyncHandler:
 
         return now_token, ephemeral_by_room
 
+    @trace
     async def _load_filtered_recents(
         self,
         room_id: str,
@@ -639,6 +646,7 @@ class SyncHandler:
             state_ids[(event.type, event.state_key)] = event.event_id
         return state_ids
 
+    @trace
     async def get_state_at(
         self,
         room_id: str,
@@ -671,6 +679,7 @@ class SyncHandler:
             state = {}
         return state
 
+    @trace
     async def compute_summary(
         self,
         room_id: str,
@@ -819,6 +828,7 @@ class SyncHandler:
             logger.debug("found LruCache for %r", cache_key)
         return cache
 
+    @trace
     async def compute_state_delta(
         self,
         room_id: str,
