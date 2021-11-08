@@ -1,1 +1,1 @@
-Rename MSC2716 related function to be more clear about the input and output (`get_insertion_event_id_by_batch_id`).
+Fix [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) historical messages backfilling in random order on remote homeservers.
