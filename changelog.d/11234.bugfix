@@ -1,1 +1,0 @@
-Fix long-standing bug where cross signing keys were not included in the response to `/r0/keys/query` the first time a remote user was queried.
