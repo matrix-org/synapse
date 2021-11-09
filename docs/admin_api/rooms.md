@@ -396,13 +396,17 @@ The new room will be created with the user specified by the `new_room_user_id` p
 as room administrator and will contain a message explaining what happened. Users invited
 to the new room will have power level `-10` by default, and thus be unable to speak.
 
-If `block` is `True` it prevents new joins to the old room.
+If `block` is `true`, users will be prevented from joining the old room.
+This option can also be used to pre-emptively block a room, even if it's unknown
+to this homeserver. In this case, the room will be blocked, and no further action
+will be taken. If `block` is `false`, attempting to delete an unknown room is
+invalid and will be rejected as a bad request.
 
 This API will remove all trace of the old room from your database after removing
 all local users. If `purge` is `true` (the default), all traces of the old room will
 be removed from your database after removing all local users. If you do not want
 this to happen, set `purge` to `false`.
-Depending on the amount of history being purged a call to the API may take
+Depending on the amount of history being purged, a call to the API may take
 several minutes or longer.
 
 The local server will only have the power to move local user and room aliases to
@@ -464,8 +468,9 @@ The following JSON body parameters are available:
               `new_room_user_id` in the new room. Ideally this will clearly convey why the
                original room was shut down. Defaults to `Sharing illegal content on this server
                is not permitted and rooms in violation will be blocked.`
-* `block` - Optional. If set to `true`, this room will be added to a blocking list, preventing
-            future attempts to join the room. Defaults to `false`.
+* `block` - Optional. If set to `true`, this room will be added to a blocking list,
+            preventing future attempts to join the room. Rooms can be blocked
+            even if they're not yet known to the homeserver. Defaults to `false`.
 * `purge` - Optional. If set to `true`, it will remove all traces of the room from your database.
             Defaults to `true`.
 * `force_purge` - Optional, and ignored unless `purge` is `true`. If set to `true`, it
@@ -483,7 +488,8 @@ The following fields are returned in the JSON response body:
 * `failed_to_kick_users` - An array of users (`user_id`) that that were not kicked.
 * `local_aliases` - An array of strings representing the local aliases that were migrated from
                     the old room to the new.
-* `new_room_id` - A string representing the room ID of the new room.
+* `new_room_id` - A string representing the room ID of the new room, or `null` if
+                  no such room was created.
 
 
 ## Undoing room deletions
