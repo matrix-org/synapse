@@ -164,10 +164,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 stream_pos = row[0]
                 messages.append(db_to_json(row[1]))
 
-            # If we don't end up hitting the limit, we still want to return the equivalent
-            # value of `current_stream_id` to the calling function. This is needed as we'll
-            # be processing up to `current_stream_id`, without necessarily fetching a message
-            # with a stream token of `current_stream_id`.
+            # If the limit was not reached we know that there's no more data for this
+            # user/device pair up to current_stream_id.
             if len(messages) < limit:
                 stream_pos = current_stream_id
 
@@ -280,10 +278,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 stream_pos = row[0]
                 messages.append(db_to_json(row[1]))
 
-            # If we don't end up hitting the limit, we still want to return the equivalent
-            # value of `current_stream_id` to the calling function. This is needed as we'll
-            # be processing up to `current_stream_id`, without necessarily fetching a message
-            # with a stream token of `current_stream_id`.
+            # If the limit was not reached we know that there's no more data for this
+            # user/device pair up to current_stream_id.
             if len(messages) < limit:
                 log_kv({"message": "Set stream position to current position"})
                 stream_pos = current_stream_id
