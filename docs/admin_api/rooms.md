@@ -566,7 +566,7 @@ A response body like the following is returned:
             }
         }, {
             "purge_id": "purgeid2",
-            "status": "active",
+            "status": "purging",
             "shutdown_room": {
                 "kicked_users": [
                     "@foobar:example.com"
@@ -603,7 +603,7 @@ A response body like the following is returned:
 
 ```json
 {
-    "status": "active",
+    "status": "purging",
     "shutdown_room": {
         "kicked_users": [
             "@foobar:example.com"
@@ -633,8 +633,8 @@ The following fields are returned in the JSON response body:
   Task objects contain the following fields:
   - `purge_id` - The ID for this purge if you query by `room_id`.
   - `status` - The status will be one of:
-    - `remove members` - The process is removing users from the `room_id`.
-    - `active` - The process is purging the room from database.
+    - `shutting_down` - The process is removing users from the room.
+    - `purging` - The process is purging the room and event data from database.
     - `complete` - The process has completed successfully.
     - `failed` - The process is aborted, an error has occurred.
   - `error` - A string that shows an error message if `status` is `failed`.

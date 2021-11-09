@@ -64,11 +64,11 @@ This API returns a JSON body like the following:
 
 ```json
 {
-    "status": "active"
+    "status": "purging"
 }
 ```
 
-The status will be one of `active`, `complete`, or `failed`.
+The status will be one of `purging`, `complete`, or `failed`.
 If `status` is `failed` there will be a string `error` with the error message.
 
 ## Reclaim disk space (Postgres)

@@ -46,21 +46,21 @@ class PurgeStatus:
     return by get_purge_status or delete_status.
     """
 
-    STATUS_ACTIVE = 0
+    STATUS_PURGING = 0
     STATUS_COMPLETE = 1
     STATUS_FAILED = 2
-    STATUS_REMOVE_MEMBERS = 3
+    STATUS_SHUTTING_DOWN = 3
 
     STATUS_TEXT = {
-        STATUS_ACTIVE: "active",
+        STATUS_PURGING: "purging",
         STATUS_COMPLETE: "complete",
         STATUS_FAILED: "failed",
-        STATUS_REMOVE_MEMBERS: "remove members",
+        STATUS_SHUTTING_DOWN: "shutting_down",
     }
 
     # Tracks whether this request has completed.
-    # One of STATUS_{ACTIVE,COMPLETE,FAILED,REMOVE_MEMBERS}.
-    status: int = STATUS_ACTIVE
+    # One of STATUS_{PURGING,COMPLETE,FAILED,SHUTTING_DOWN}.
+    status: int = STATUS_PURGING
 
     # Save the error message if an error occurs
     error: str = ""
@@ -570,7 +570,7 @@ class PaginationHandler:
         try:
             with await self.pagination_lock.write(room_id):
 
-                self._purges_by_id[purge_id].status = PurgeStatus.STATUS_REMOVE_MEMBERS
+                self._purges_by_id[purge_id].status = PurgeStatus.STATUS_SHUTTING_DOWN
                 self._purges_by_id[
                     purge_id
                 ].shutdown_room = await self._room_shutdown_handler.shutdown_room(
@@ -581,7 +581,7 @@ class PaginationHandler:
                     message=message,
                     block=block,
                 )
-                self._purges_by_id[purge_id].status = PurgeStatus.STATUS_ACTIVE
+                self._purges_by_id[purge_id].status = PurgeStatus.STATUS_PURGING
 
                 if purge:
                     logger.info("starting purge room_id %s", room_id)
