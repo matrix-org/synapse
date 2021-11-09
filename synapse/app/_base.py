@@ -27,6 +27,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Collection,
     Dict,
     Iterable,
     List,
@@ -256,7 +257,7 @@ def listen_metrics(bind_addresses: Iterable[str], port: int) -> None:
 
 
 def listen_manhole(
-    bind_addresses: Iterable[str],
+    bind_addresses: Collection[str],
     port: int,
     manhole_settings: ManholeConfig,
     manhole_globals: dict,
@@ -280,7 +281,7 @@ def listen_manhole(
 
 
 def listen_tcp(
-    bind_addresses: Iterable[str],
+    bind_addresses: Collection[str],
     port: int,
     factory: ServerFactory,
     # mypy can't figure out what the default reactor is.
@@ -306,7 +307,7 @@ def listen_tcp(
 
 
 def listen_ssl(
-    bind_addresses: Iterable[str],
+    bind_addresses: Collection[str],
     port: int,
     factory: ServerFactory,
     context_factory: IOpenSSLContextFactory,

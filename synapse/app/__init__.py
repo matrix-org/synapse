@@ -13,6 +13,7 @@
 # limitations under the License.
 import logging
 import sys
+from typing import Container
 
 from synapse import python_dependencies  # noqa: E402
 
@@ -27,7 +28,9 @@ except python_dependencies.DependencyException as e:
     sys.exit(1)
 
 
-def check_bind_error(e, address, bind_addresses):
+def check_bind_error(
+    e: Exception, address: str, bind_addresses: Container[str]
+) -> None:
     """
     This method checks an exception occurred while binding on 0.0.0.0.
     If :: is specified in the bind addresses a warning is shown.
@@ -38,9 +41,9 @@ def check_bind_error(e, address, bind_addresses):
     When binding on 0.0.0.0 after :: this can safely be ignored.
 
     Args:
-        e (Exception): Exception that was caught.
-        address (str): Address on which binding was attempted.
-        bind_addresses (list): Addresses on which the service listens.
+        e: Exception that was caught.
+        address: Address on which binding was attempted.
+        bind_addresses: Addresses on which the service listens.
     """
     if address == "0.0.0.0" and "::" in bind_addresses:
         logger.warning(
