@@ -1,0 +1,1 @@
+Changed the aspect() function to return at least size 1 in width and height.
