@@ -17,7 +17,7 @@ import sys
 from typing import Dict, Optional
 
 from twisted.internet import address
-from twisted.web.resource import IResource
+from twisted.web.resource import Resource
 from twisted.web.server import Request
 
 import synapse
@@ -270,7 +270,7 @@ class GenericWorkerServer(HomeServer):
             site_tag = port
 
         # We always include a health resource.
-        resources: Dict[str, IResource] = {"/health": HealthResource()}
+        resources: Dict[str, Resource] = {"/health": HealthResource()}
 
         for res in listener_config.http_options.resources:
             for name in res.names:

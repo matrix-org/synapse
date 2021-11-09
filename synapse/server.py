@@ -35,7 +35,7 @@ from typing import (
 
 import twisted.internet.tcp
 from twisted.web.iweb import IPolicyForHTTPS
-from twisted.web.resource import IResource
+from twisted.web.resource import Resource
 
 from synapse.api.auth import Auth
 from synapse.api.filtering import Filtering
@@ -257,10 +257,10 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         self.datastores: Optional[Databases] = None
 
-        self._module_web_resources: Dict[str, IResource] = {}
+        self._module_web_resources: Dict[str, Resource] = {}
         self._module_web_resources_consumed = False
 
-    def register_module_web_resource(self, path: str, resource: IResource):
+    def register_module_web_resource(self, path: str, resource: Resource):
         """Allows a module to register a web resource to be served at the given path.
 
         If multiple modules register a resource for the same path, the module that
