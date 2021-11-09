@@ -393,8 +393,9 @@ to the new room will have power level `-10` by default, and thus be unable to sp
 
 If `block` is `true`, users will be prevented from joining the old room.
 This option can also be used to pre-emptively block a room, even if it's unknown
-to this homeserver. (If `block` is `false`, attempting to delete an unknown room
-is invalid and will be rejected as a bad request.)
+to this homeserver. In this case, the room will be blocked, and no further action
+will be taken. If `block` is `false`, attempting to delete an unknown room is
+invalid and will be rejected as a bad request.
 
 This API will remove all trace of the old room from your database after removing
 all local users. If `purge` is `true` (the default), all traces of the old room will
