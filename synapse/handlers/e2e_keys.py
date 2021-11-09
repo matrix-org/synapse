@@ -245,9 +245,8 @@ class E2eKeysHandler:
                 updated with the newly fetched keys.
             cross_signing_keys: Map from user ID to their cross signing keys,
                 which gets updated with the newly fetched keys.
-            failures: Map of failures that have occurred while attempting to
-                fetch keys.
-
+            failures: Map of destinations to failures that have occurred while
+                attempting to fetch keys.
             destination: The remote server to query
             destination_query: The query dict of devices to query the remote
                 server for.
