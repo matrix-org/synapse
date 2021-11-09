@@ -272,7 +272,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             make_awaitable(([event], None))
         )
 
-        self.handler.notify_interested_services_ephemeral("receipt_key", 580)
+        self.handler.notify_interested_services_ephemeral(
+            "receipt_key", 580, ["@fakerecipient:example.com"]
+        )
         self.mock_scheduler.submit_ephemeral_events_for_as.assert_called_once_with(
             interested_service, [event]
         )
@@ -300,7 +302,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             make_awaitable(([event], None))
         )
 
-        self.handler.notify_interested_services_ephemeral("receipt_key", 579)
+        self.handler.notify_interested_services_ephemeral(
+            "receipt_key", 580, ["@fakerecipient:example.com"]
+        )
         self.mock_scheduler.submit_ephemeral_events_for_as.assert_not_called()
 
     def _mkservice(self, is_interested, protocols=None):
