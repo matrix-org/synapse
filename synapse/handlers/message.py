@@ -961,7 +961,7 @@ class EventCreationHandler:
                 or len(prev_event_ids) > 0
                 # Allow an event to have empty list of prev_event_ids
                 # only if it has auth_event_ids.
-                or (auth_event_ids and len(auth_event_ids) > 0)
+                or auth_event_ids
             ), "Attempting to create a non-m.room.create event with no prev_events or auth_event_ids"
         else:
             # we now ought to have some prev_events (unless it's a create event).
