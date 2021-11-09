@@ -1,0 +1,1 @@
+Fix long-standing bug where verification requests could fail in certain cases if whitelist was in place but did not include your own homeserver.

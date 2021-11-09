@@ -1,0 +1,1 @@
+Remove deprecated admin API to delete rooms (`POST /_synapse/admin/v1/rooms/<room_id>/delete`).

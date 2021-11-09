@@ -4,7 +4,7 @@
 
 set -e
 
-cd `dirname $0`/..
+cd "$(dirname "$0")/.."
 
 SAMPLE_CONFIG="docs/sample_config.yaml"
 SAMPLE_LOG_CONFIG="docs/sample_log_config.yaml"

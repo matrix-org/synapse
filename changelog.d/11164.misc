@@ -1,0 +1,1 @@
+Add type hints so that `synapse.http` passes `mypy` checks.
