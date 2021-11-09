@@ -721,7 +721,9 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, second_channel.code, msg=second_channel.json_body)
+        self.assertEqual(
+            HTTPStatus.BAD_REQUEST, second_channel.code, msg=second_channel.json_body
+        )
         self.assertEqual(Codes.UNKNOWN, second_channel.json_body["errcode"])
         self.assertEqual(
             f"History purge already in progress for {self.room_id}",
@@ -1021,9 +1023,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(
-            HTTPStatus.OK,
-            channel_room_id.code,
-            msg=channel_room_id.json_body
+            HTTPStatus.OK, channel_room_id.code, msg=channel_room_id.json_body
         )
         self.assertEqual(1, len(channel_room_id.json_body["results"]))
         self.assertEqual(purge_id, channel_room_id.json_body["results"][0]["purge_id"])

@@ -400,10 +400,10 @@ as room administrator and will contain a message explaining what happened. Users
 to the new room will have power level `-10` by default, and thus be unable to speak.
 
 If `block` is `true`, users will be prevented from joining the old room.
-This option can also be used to pre-emptively block a room, even if it's unknown
-to this homeserver. In this case, the room will be blocked, and no further action
-will be taken. If `block` is `false`, attempting to delete an unknown room is
-invalid and will be rejected as a bad request.
+This option can in [Version 1](#version-1-old-version) also be used to pre-emptively
+block a room, even if it's unknown to this homeserver. In this case, the room will be
+blocked, and no further action will be taken. If `block` is `false`, attempting to
+delete an unknown room is invalid and will be rejected as a bad request.
 
 This API will remove all trace of the old room from your database after removing
 all local users. If `purge` is `true` (the default), all traces of the old room will
@@ -519,7 +519,8 @@ The following JSON body parameters are available:
                is not permitted and rooms in violation will be blocked.`
 * `block` - Optional. If set to `true`, this room will be added to a blocking list,
             preventing future attempts to join the room. Rooms can be blocked
-            even if they're not yet known to the homeserver. Defaults to `false`.
+            even if they're not yet known to the homeserver (only with
+            [Version 1](#version-1-old-version) of the API). Defaults to `false`.
 * `purge` - Optional. If set to `true`, it will remove all traces of the room from your database.
             Defaults to `true`.
 * `force_purge` - Optional, and ignored unless `purge` is `true`. If set to `true`, it

@@ -153,7 +153,7 @@ class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
                         **purge.asdict(),
                     }
                 ]
-        return 200, {"results": response}
+        return 200, {"results": cast(JsonDict, response)}
 
 
 class DeleteRoomStatusByPurgeIdRestServlet(RestServlet):
@@ -175,7 +175,7 @@ class DeleteRoomStatusByPurgeIdRestServlet(RestServlet):
         if purge_status is None:
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
-        return 200, purge_status.asdict()
+        return 200, cast(JsonDict, purge_status.asdict())
 
 
 class ListRoomRestServlet(RestServlet):
