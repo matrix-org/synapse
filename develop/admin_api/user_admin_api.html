@@ -1110,7 +1110,7 @@ for more information.</p>
 <p>This endpoint will work even if registration is disabled on the server, unlike 
 <code>/_matrix/client/r0/register/available</code>.</p>
 <p>The API is:</p>
-<pre><code>POST /_synapse/admin/v1/username_availabile?username=$localpart
+<pre><code>GET /_synapse/admin/v1/username_available?username=$localpart
 </code></pre>
 <p>The request and response format is the same as the <a href="https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available">/_matrix/client/r0/register/available</a> API.</p>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
