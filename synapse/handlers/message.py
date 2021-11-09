@@ -1507,7 +1507,7 @@ class EventCreationHandler:
                 conflicting_insertion_event_id = None
                 if next_batch_id:
                     conflicting_insertion_event_id = (
-                        await self.store.get_insertion_event_by_batch_id(
+                        await self.store.get_insertion_event_id_by_batch_id(
                             event.room_id, next_batch_id
                         )
                     )

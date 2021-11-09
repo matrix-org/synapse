@@ -510,7 +510,7 @@ class SyncHandler:
             log_kv({"limited": limited})
 
             if potential_recents:
-                recents = sync_config.filter_collection.filter_room_timeline(
+                recents = await sync_config.filter_collection.filter_room_timeline(
                     potential_recents
                 )
                 log_kv({"recents_after_sync_filtering": len(recents)})
@@ -575,8 +575,8 @@ class SyncHandler:
 
                 log_kv({"loaded_recents": len(events)})
 
-                loaded_recents = sync_config.filter_collection.filter_room_timeline(
-                    events
+                loaded_recents = (
+                    await sync_config.filter_collection.filter_room_timeline(events)
                 )
 
                 log_kv({"loaded_recents_after_sync_filtering": len(loaded_recents)})
@@ -1015,7 +1015,7 @@ class SyncHandler:
 
         return {
             (e.type, e.state_key): e
-            for e in sync_config.filter_collection.filter_room_state(
+            for e in await sync_config.filter_collection.filter_room_state(
                 list(state.values())
             )
             if e.type != EventTypes.Aliases  # until MSC2261 or alternative solution
@@ -1383,7 +1383,7 @@ class SyncHandler:
                 sync_config.user
             )
 
-        account_data_for_user = sync_config.filter_collection.filter_account_data(
+        account_data_for_user = await sync_config.filter_collection.filter_account_data(
             [
                 {"type": account_data_type, "content": content}
                 for account_data_type, content in account_data.items()
@@ -1448,7 +1448,7 @@ class SyncHandler:
             # Deduplicate the presence entries so that there's at most one per user
             presence = list({p.user_id: p for p in presence}.values())
 
-        presence = sync_config.filter_collection.filter_presence(presence)
+        presence = await sync_config.filter_collection.filter_presence(presence)
 
         sync_result_builder.presence = presence
 
@@ -2021,12 +2021,14 @@ class SyncHandler:
                 )
 
             account_data_events = (
-                sync_config.filter_collection.filter_room_account_data(
+                await sync_config.filter_collection.filter_room_account_data(
                     account_data_events
                 )
             )
 
-            ephemeral = sync_config.filter_collection.filter_room_ephemeral(ephemeral)
+            ephemeral = await sync_config.filter_collection.filter_room_ephemeral(
+                ephemeral
+            )
 
             if not (
                 always_include

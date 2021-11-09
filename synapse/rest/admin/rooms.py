@@ -13,7 +13,7 @@
 # limitations under the License.
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple, cast
 from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
@@ -371,9 +371,22 @@ class RoomRestServlet(RestServlet):
 
         # Purge room
         if purge:
-            await pagination_handler.purge_room(room_id, force=force_purge)
+            try:
+                await pagination_handler.purge_room(room_id, force=force_purge)
+            except NotFoundError:
+                if block:
+                    # We can block unknown rooms with this endpoint, in which case
+                    # a failed purge is expected.
+                    pass
+                else:
+                    # But otherwise, we expect this purge to have succeeded.
+                    raise
 
-        return 200, ret
+        # Cast safety: cast away the knowledge that this is a TypedDict.
+        # See https://github.com/python/mypy/issues/4976#issuecomment-579883622
+        # for some discussion on why this is necessary. Either way,
+        # `ret` is an opaque dictionary blob as far as the rest of the app cares.
+        return 200, cast(JsonDict, ret)
 
 
 class RoomMembersRestServlet(RestServlet):
@@ -715,6 +728,7 @@ class RoomEventContextServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
+        self._hs = hs
         self.clock = hs.get_clock()
         self.room_context_handler = hs.get_room_context_handler()
         self._event_serializer = hs.get_event_client_serializer()
@@ -732,7 +746,9 @@ class RoomEventContextServlet(RestServlet):
         filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter: Optional[Filter] = Filter(json_decoder.decode(filter_json))
+            event_filter: Optional[Filter] = Filter(
+                self._hs, json_decoder.decode(filter_json)
+            )
         else:
             event_filter = None
 

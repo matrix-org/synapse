@@ -462,7 +462,7 @@ class PaginationHandler:
 
         if events:
             if event_filter:
-                events = event_filter.filter(events)
+                events = await event_filter.filter(events)
 
             events = await filter_events_for_client(
                 self.storage, user_id, events, is_peeking=(member_event_id is None)

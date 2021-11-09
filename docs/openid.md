@@ -22,6 +22,7 @@ such as [Github][github-idp].
 [google-idp]: https://developers.google.com/identity/protocols/oauth2/openid-connect
 [auth0]: https://auth0.com/
 [authentik]: https://goauthentik.io/
+[lemonldap]: https://lemonldap-ng.org/
 [okta]: https://www.okta.com/
 [dex-idp]: https://github.com/dexidp/dex
 [keycloak-idp]: https://www.keycloak.org/docs/latest/server_admin/#sso-protocols
@@ -241,6 +242,43 @@ oidc_providers:
       config:
         localpart_template: "{{ user.preferred_username }}}"
         display_name_template: "{{ user.preferred_username|capitalize }}" # TO BE FILLED: If your users have names in Authentik and you want those in Synapse, this should be replaced with user.name|capitalize.
+```
+
+### LemonLDAP
+
+[LemonLDAP::NG][lemonldap] is an open-source IdP solution.
+
+1. Create an OpenID Connect Relying Parties in LemonLDAP::NG
+2. The parameters are:
+- Client ID under the basic menu of the new Relying Parties (`Options > Basic >
+  Client ID`)
+- Client secret (`Options > Basic > Client secret`)
+- JWT Algorithm: RS256 within the security menu of the new Relying Parties
+  (`Options > Security > ID Token signature algorithm` and `Options > Security >
+  Access Token signature algorithm`)
+- Scopes: OpenID, Email and Profile
+- Allowed redirection addresses for login (`Options > Basic > Allowed
+  redirection addresses for login` ) :
+  `[synapse public baseurl]/_synapse/client/oidc/callback`
+
+Synapse config:
+```yaml
+oidc_providers:
+  - idp_id: lemonldap
+    idp_name: lemonldap
+    discover: true
+    issuer: "https://auth.example.org/" # TO BE FILLED: replace with your domain
+    client_id: "your client id" # TO BE FILLED
+    client_secret: "your client secret" # TO BE FILLED
+    scopes:
+      - "openid"
+      - "profile"
+      - "email"
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.preferred_username }}}"
+        # TO BE FILLED: If your users have names in LemonLDAP::NG and you want those in Synapse, this should be replaced with user.name|capitalize or any valid filter.
+        display_name_template: "{{ user.preferred_username|capitalize }}"
 ```
 
 ### GitHub
