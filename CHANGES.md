@@ -1,7 +1,16 @@
-Synapse 1.46.0rc1 (2021-10-27)
-==============================
+Synapse 1.46.0 (2021-11-02)
+===========================
 
 The cause of the [performance regression affecting Synapse 1.44](https://github.com/matrix-org/synapse/issues/11049) has been identified and fixed. ([\#11177](https://github.com/matrix-org/synapse/issues/11177))
+
+Bugfixes
+--------
+
+- Fix a bug introduced in v1.46.0rc1 where URL previews of some XML documents would fail. ([\#11196](https://github.com/matrix-org/synapse/issues/11196))
+
+
+Synapse 1.46.0rc1 (2021-10-27)
+==============================
 
 Features
 --------

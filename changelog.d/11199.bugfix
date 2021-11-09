@@ -1,0 +1,1 @@
+Delete `to_device` messages for hidden devices that will never be read, reducing database size.

@@ -1,8 +1,22 @@
 matrix-synapse-py3 (1.47.0+nmu1) UNRELEASED; urgency=medium
 
   * Update scripts to pass Shellcheck lints.
+  * Remove unused Vagrant scripts from debian/ directory.
+  * Allow building Debian packages for any architecture, not just amd64.
+  * Preinstall the "wheel" package when building virtualenvs.
+  * Do not error if /etc/default/matrix-synapse is missing.
 
- -- root <root@cae79a6e79d7>  Fri, 22 Oct 2021 22:20:31 +0000
+ -- Dan Callahan <danc@element.io>  Fri, 22 Oct 2021 22:20:31 +0000
+
+matrix-synapse-py3 (1.46.0) stable; urgency=medium
+
+  [ Richard van der Hoff ]
+  * Compress debs with xz, to fix incompatibility of impish debs with reprepro.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.46.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 02 Nov 2021 13:22:53 +0000
 
 matrix-synapse-py3 (1.46.0~rc1) stable; urgency=medium
 
