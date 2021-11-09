@@ -22,6 +22,7 @@ from twisted.python.failure import Failure
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
+from synapse.handlers.room import ShutdownRoomResponse
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
@@ -65,7 +66,12 @@ class PurgeStatus:
     error: str = ""
 
     # Saves the result of an action to give it back to REST API
-    shutdown_room: Dict = {}
+    shutdown_room: ShutdownRoomResponse = {
+        "kicked_users": [],
+        "failed_to_kick_users": [],
+        "local_aliases": [],
+        "new_room_id": None,
+    }
 
     def asdict(self) -> JsonDict:
         ret = {
@@ -557,14 +563,7 @@ class PaginationHandler:
                 If set to `true`, the room will be purged from database
                 also if it fails to remove some users from room.
 
-        Saves a dict containing the following keys in `PurgeStatus`:
-            kicked_users: An array of users (`user_id`) that were kicked.
-            failed_to_kick_users:
-                An array of users (`user_id`) that that were not kicked.
-            local_aliases:
-                An array of strings representing the local aliases that were
-                migrated from the old room to the new.
-            new_room_id: A string representing the room ID of the new room.
+        Saves a `RoomShutdownHandler.ShutdownRoomResponse` in `PurgeStatus`:
         """
 
         self._purges_in_progress_by_room.add(room_id)

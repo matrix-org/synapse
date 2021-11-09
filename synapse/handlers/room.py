@@ -1279,6 +1279,16 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
 
 
 class ShutdownRoomResponse(TypedDict):
+    """
+    kicked_users: An array of users (`user_id`) that were kicked.
+    failed_to_kick_users:
+        An array of users (`user_id`) that that were not kicked.
+    local_aliases:
+        An array of strings representing the local aliases that were
+        migrated from the old room to the new.
+    new_room_id: A string representing the room ID of the new room.
+    """
+
     kicked_users: List[str]
     failed_to_kick_users: List[str]
     local_aliases: List[str]
