@@ -231,17 +231,22 @@ class ApplicationServiceApi(SimpleHttpClient):
                 json_body=body,
                 args={"access_token": service.hs_token},
             )
-            logger.debug(
-                "push_bulk to %s succeeded! events=%s",
-                uri,
-                [event.get("event_id") for event in events],
-            )
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    "push_bulk to %s succeeded! events=%s",
+                    uri,
+                    [event.get("event_id") for event in events],
+                )
             sent_transactions_counter.labels(service.id).inc()
             sent_events_counter.labels(service.id).inc(len(events))
             return True
         except CodeMessageException as e:
             logger.warning(
-                "push_bulk to %s received code=%s msg=%s", uri, e.code, e.msg
+                "push_bulk to %s received code=%s msg=%s",
+                uri,
+                e.code,
+                e.msg,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
             )
         except Exception as ex:
             logger.warning(
@@ -250,6 +255,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                 type(ex).__name__,
                 ex,
                 ex.args,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
             )
         failed_transactions_counter.labels(service.id).inc()
         return False
