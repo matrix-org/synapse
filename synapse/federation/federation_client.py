@@ -304,14 +304,11 @@ class FederationClient(FederationBase):
         Raises:
             SynapseError, NotRetryingDestination, FederationDeniedError
         """
-
-        signed_pdu = None
-
         transaction_data = await self.transport_layer.get_event(
             destination, event_id, timeout=timeout
         )
 
-        logger.info(
+        logger.debug(
             "retrieved event id %s from %s: %r",
             event_id,
             destination,
@@ -328,8 +325,9 @@ class FederationClient(FederationBase):
 
             # Check signatures are correct.
             signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
+            return signed_pdu
 
-        return signed_pdu
+        return None
 
     async def get_pdu(
         self,
