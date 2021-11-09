@@ -512,7 +512,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_tok,
         )
 
-        self.assertEqual(403, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     @parameterized.expand(
@@ -534,7 +534,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(404, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     @parameterized.expand(
@@ -555,7 +555,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(
             "invalidroom is not a legal room ID",
             channel.json_body["error"],
@@ -573,7 +573,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertIn("purge_id", channel.json_body)
         purge_id = channel.json_body["purge_id"]
 
@@ -591,7 +591,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(
             "User must be our own: @not:exist.bla",
             channel.json_body["error"],
@@ -609,7 +609,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
 
     def test_purge_is_not_bool(self):
@@ -624,7 +624,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
 
     def test_delete_expired_status(self):
@@ -638,7 +638,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertIn("purge_id", channel.json_body)
         purge_id1 = channel.json_body["purge_id"]
 
@@ -653,7 +653,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertIn("purge_id", channel.json_body)
         purge_id2 = channel.json_body["purge_id"]
 
@@ -664,7 +664,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(2, len(channel.json_body["results"]))
         self.assertEqual("complete", channel.json_body["results"][0]["status"])
         self.assertEqual("complete", channel.json_body["results"][1]["status"])
@@ -681,7 +681,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(1, len(channel.json_body["results"]))
         self.assertEqual("complete", channel.json_body["results"][0]["status"])
         self.assertEqual(purge_id2, channel.json_body["results"][0]["purge_id"])
@@ -695,7 +695,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(404, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_delete_same_room_twice(self):
@@ -721,7 +721,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(400, second_channel.code, msg=second_channel.json_body)
+        self.assertEqual(HTTPStatus.BAD_REQUEST, second_channel.code, msg=second_channel.json_body)
         self.assertEqual(Codes.UNKNOWN, second_channel.json_body["errcode"])
         self.assertEqual(
             f"History purge already in progress for {self.room_id}",
@@ -730,7 +730,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
 
         # get result of first call
         first_channel.await_result()
-        self.assertEqual(200, first_channel.code, msg=first_channel.json_body)
+        self.assertEqual(HTTPStatus.OK, first_channel.code, msg=first_channel.json_body)
         self.assertIn("purge_id", first_channel.json_body)
 
         # check status after finish the task
@@ -761,7 +761,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertIn("purge_id", channel.json_body)
         purge_id = channel.json_body["purge_id"]
 
@@ -792,7 +792,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertIn("purge_id", channel.json_body)
         purge_id = channel.json_body["purge_id"]
 
@@ -824,7 +824,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertIn("purge_id", channel.json_body)
         purge_id = channel.json_body["purge_id"]
 
@@ -870,7 +870,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertIn("purge_id", channel.json_body)
         purge_id = channel.json_body["purge_id"]
 
@@ -881,7 +881,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             self.url_status_by_room_id,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(1, len(channel.json_body["results"]))
 
         # Test that member has moved to new room
@@ -908,7 +908,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             content={"history_visibility": "world_readable"},
             access_token=self.other_user_tok,
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # Test that room is not purged
         with self.assertRaises(AssertionError):
@@ -925,7 +925,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertIn("purge_id", channel.json_body)
         purge_id = channel.json_body["purge_id"]
 
@@ -936,7 +936,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             self.url_status_by_room_id,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(1, len(channel.json_body["results"]))
 
         # Test that member has moved to new room
@@ -1020,7 +1020,11 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             self.url_status_by_room_id,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(200, channel_room_id.code, msg=channel_room_id.json_body)
+        self.assertEqual(
+            HTTPStatus.OK,
+            channel_room_id.code,
+            msg=channel_room_id.json_body
+        )
         self.assertEqual(1, len(channel_room_id.json_body["results"]))
         self.assertEqual(purge_id, channel_room_id.json_body["results"][0]["purge_id"])
 
@@ -1030,7 +1034,11 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             self.url_status_by_purge_id + purge_id,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(200, channel_purge_id.code, msg=channel_purge_id.json_body)
+        self.assertEqual(
+            HTTPStatus.OK,
+            channel_purge_id.code,
+            msg=channel_purge_id.json_body,
+        )
 
         # test values that are the same in both responses
         for content in [
