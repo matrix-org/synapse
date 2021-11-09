@@ -149,6 +149,8 @@ class SynapseHomeServer(HomeServer):
         )
 
         if tls:
+            # refresh_certificate should have been called before this.
+            assert self.tls_server_context_factory is not None
             ports = listen_ssl(
                 bind_addresses,
                 port,

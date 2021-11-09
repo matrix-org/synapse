@@ -33,8 +33,8 @@ from typing import (
     cast,
 )
 
-import twisted.internet.tcp
 from twisted.internet.interfaces import IOpenSSLContextFactory
+from twisted.internet.tcp import Port
 from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import Resource
 
@@ -207,7 +207,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     Attributes:
         config (synapse.config.homeserver.HomeserverConfig):
-        _listening_services (list[twisted.internet.tcp.Port]): TCP ports that
+        _listening_services (list[Port]): TCP ports that
             we are listening on to provide HTTP services.
     """
 
@@ -250,7 +250,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         # the key we use to sign events and requests
         self.signing_key = config.key.signing_key[0]
         self.config = config
-        self._listening_services: List[twisted.internet.tcp.Port] = []
+        self._listening_services: List[Port] = []
         self.start_time: Optional[int] = None
 
         self._instance_id = random_string(5)
