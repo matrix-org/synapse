@@ -319,12 +319,7 @@ class HomeserverTestCase(TestCase):
 
     def wait_for_background_updates(self) -> None:
         """Block until all background database updates have completed."""
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.get_success(self.store.db_pool.updates.run_background_updates(False))
 
     def make_homeserver(self, reactor, clock):
         """
@@ -484,8 +479,7 @@ class HomeserverTestCase(TestCase):
 
         async def run_bg_updates():
             with LoggingContext("run_bg_updates"):
-                while not await stor.db_pool.updates.has_completed_background_updates():
-                    await stor.db_pool.updates.do_next_background_update(1)
+                self.get_success(stor.db_pool.updates.run_background_updates(False))
 
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
         stor = hs.get_datastore()

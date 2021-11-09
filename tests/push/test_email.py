@@ -408,13 +408,9 @@ class EmailPusherTests(HomeserverTestCase):
         self.hs.get_datastore().db_pool.updates._all_done = False
 
         # Now let's actually drive the updates to completion
-        while not self.get_success(
-            self.hs.get_datastore().db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.hs.get_datastore().db_pool.updates.do_next_background_update(100),
-                by=0.1,
-            )
+        self.get_success(
+            self.hs.get_datastore().db_pool.updates.run_background_updates(False)
+        )
 
         # Check that all pushers with unlinked addresses were deleted
         pushers = self.get_success(

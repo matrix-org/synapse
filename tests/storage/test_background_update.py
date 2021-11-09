@@ -20,10 +20,10 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
 
     def test_do_background_update(self):
         # the time we claim each update takes
-        duration_ms = 42
+        duration_ms = 0.2
 
         # the target runtime for each bg update
-        target_background_update_duration_ms = 50000
+        target_background_update_duration_ms = 100
 
         store = self.hs.get_datastore()
         self.get_success(
@@ -48,17 +48,13 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         self.update_handler.side_effect = update
         self.update_handler.reset_mock()
         res = self.get_success(
-            self.updates.do_next_background_update(
-                target_background_update_duration_ms
-            ),
-            by=0.1,
+            self.updates.do_next_background_update(False),
+            by=0.01,
         )
         self.assertFalse(res)
 
         # on the first call, we should get run with the default background update size
-        self.update_handler.assert_called_once_with(
-            {"my_key": 1}, self.updates.DEFAULT_BACKGROUND_BATCH_SIZE
-        )
+        self.update_handler.assert_called_once_with({"my_key": 1}, 100)
 
         # second step: complete the update
         # we should now get run with a much bigger number of items to update
@@ -74,16 +70,12 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
 
         self.update_handler.side_effect = update
         self.update_handler.reset_mock()
-        result = self.get_success(
-            self.updates.do_next_background_update(target_background_update_duration_ms)
-        )
+        result = self.get_success(self.updates.do_next_background_update(False))
         self.assertFalse(result)
         self.update_handler.assert_called_once()
 
         # third step: we don't expect to be called any more
         self.update_handler.reset_mock()
-        result = self.get_success(
-            self.updates.do_next_background_update(target_background_update_duration_ms)
-        )
+        result = self.get_success(self.updates.do_next_background_update(False))
         self.assertTrue(result)
         self.assertFalse(self.update_handler.called)
