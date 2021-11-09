@@ -545,12 +545,16 @@ leave the room without any information.</p>
 <p>The new room will be created with the user specified by the <code>new_room_user_id</code> parameter
 as room administrator and will contain a message explaining what happened. Users invited
 to the new room will have power level <code>-10</code> by default, and thus be unable to speak.</p>
-<p>If <code>block</code> is <code>True</code> it prevents new joins to the old room.</p>
+<p>If <code>block</code> is <code>true</code>, users will be prevented from joining the old room.
+This option can also be used to pre-emptively block a room, even if it's unknown
+to this homeserver. In this case, the room will be blocked, and no further action
+will be taken. If <code>block</code> is <code>false</code>, attempting to delete an unknown room is
+invalid and will be rejected as a bad request.</p>
 <p>This API will remove all trace of the old room from your database after removing
 all local users. If <code>purge</code> is <code>true</code> (the default), all traces of the old room will
 be removed from your database after removing all local users. If you do not want
 this to happen, set <code>purge</code> to <code>false</code>.
-Depending on the amount of history being purged a call to the API may take
+Depending on the amount of history being purged, a call to the API may take
 several minutes or longer.</p>
 <p>The local server will only have the power to move local user and room aliases to
 the new room. Users on other servers will be unaffected.</p>
@@ -598,8 +602,9 @@ invited to. Defaults to <code>Content Violation Notification</code></li>
 <li><code>message</code> - Optional. A string containing the first message that will be sent as
 <code>new_room_user_id</code> in the new room. Ideally this will clearly convey why the
 original room was shut down. Defaults to <code>Sharing illegal content on this server is not permitted and rooms in violation will be blocked.</code></li>
-<li><code>block</code> - Optional. If set to <code>true</code>, this room will be added to a blocking list, preventing
-future attempts to join the room. Defaults to <code>false</code>.</li>
+<li><code>block</code> - Optional. If set to <code>true</code>, this room will be added to a blocking list,
+preventing future attempts to join the room. Rooms can be blocked
+even if they're not yet known to the homeserver. Defaults to <code>false</code>.</li>
 <li><code>purge</code> - Optional. If set to <code>true</code>, it will remove all traces of the room from your database.
 Defaults to <code>true</code>.</li>
 <li><code>force_purge</code> - Optional, and ignored unless <code>purge</code> is <code>true</code>. If set to <code>true</code>, it
@@ -615,7 +620,8 @@ clients in a confused state.</li>
 <li><code>failed_to_kick_users</code> - An array of users (<code>user_id</code>) that that were not kicked.</li>
 <li><code>local_aliases</code> - An array of strings representing the local aliases that were migrated from
 the old room to the new.</li>
-<li><code>new_room_id</code> - A string representing the room ID of the new room.</li>
+<li><code>new_room_id</code> - A string representing the room ID of the new room, or <code>null</code> if
+no such room was created.</li>
 </ul>
 <h2 id="undoing-room-deletions"><a class="header" href="#undoing-room-deletions">Undoing room deletions</a></h2>
 <p><em>Note</em>: This guide may be outdated by the time you read it. By nature of room deletions being performed at the database level,
