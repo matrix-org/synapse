@@ -49,7 +49,9 @@ Changes in SCHEMA_VERSION = 65:
 """
 
 
-SCHEMA_COMPAT_VERSION = 61  # 61: Remove unused tables `user_stats_historical` and `room_stats_historical`
+SCHEMA_COMPAT_VERSION = (
+    61  # 61: Remove unused tables `user_stats_historical` and `room_stats_historical`
+)
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 
 This value is stored in the database, and checked on startup. If the value in the
