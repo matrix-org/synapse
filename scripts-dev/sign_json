@@ -25,7 +25,7 @@ from signedjson.sign import sign_json
 from synapse.util import json_encoder
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="""Adds a signature to a JSON object.
 

@@ -17,7 +17,7 @@
 # limitations under the License.
 import glob
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 from setuptools import Command, find_packages, setup
 
@@ -50,13 +50,13 @@ here = os.path.abspath(os.path.dirname(__file__))
 # [1]: http://tox.readthedocs.io/en/2.5.0/example/basic.html#integration-with-setup-py-test-command
 # [2]: https://pypi.python.org/pypi/setuptools_trial
 class TestCommand(Command):
-    def initialize_options(self):
+    def initialize_options(self) -> None:
         pass
 
-    def finalize_options(self):
+    def finalize_options(self) -> None:
         pass
 
-    def run(self):
+    def run(self) -> None:
         print(
             """Synapse's tests cannot be run via setup.py. To run them, try:
      PYTHONPATH="." trial tests
@@ -64,7 +64,7 @@ class TestCommand(Command):
         )
 
 
-def read_file(path_segments):
+def read_file(path_segments: Iterable[str]) -> str:
     """Read a file from the package. Takes a list of strings to join to
     make the path"""
     file_path = os.path.join(here, *path_segments)
@@ -72,7 +72,7 @@ def read_file(path_segments):
         return f.read()
 
 
-def exec_file(path_segments):
+def exec_file(path_segments: Iterable[str]) -> Dict[str, Any]:
     """Execute a single python file to get the variables defined in it"""
     result: Dict[str, Any] = {}
     code = read_file(path_segments)

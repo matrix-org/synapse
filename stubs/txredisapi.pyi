@@ -17,6 +17,7 @@
 from typing import Any, List, Optional, Type, Union
 
 from twisted.internet import protocol
+from twisted.internet.interfaces import IAddress
 
 class RedisProtocol(protocol.Protocol):
     def publish(self, channel: str, message: bytes): ...
@@ -70,7 +71,7 @@ class RedisFactory(protocol.ReconnectingClientFactory):
         replyTimeout: Optional[int] = None,
         convertNumbers: Optional[int] = True,
     ): ...
-    def buildProtocol(self, addr) -> RedisProtocol: ...
+    def buildProtocol(self, addr: IAddress) -> RedisProtocol: ...
 
 class SubscriberFactory(RedisFactory):
     def __init__(self) -> None: ...
