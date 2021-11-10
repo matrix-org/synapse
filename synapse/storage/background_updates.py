@@ -232,7 +232,9 @@ class BackgroundUpdater:
         # if a background update is currently running, its name.
         self._current_background_update: Optional[str] = None
 
-        self._controller = _TimeBasedBackgroundUpdateController(self._clock)
+        self._controller: BackgroundUpdateController = (
+            _TimeBasedBackgroundUpdateController(self._clock)
+        )
 
         self._background_update_performance: Dict[str, BackgroundUpdatePerformance] = {}
         self._background_update_handlers: Dict[str, _BackgroundUpdateHandler] = {}
@@ -244,6 +246,13 @@ class BackgroundUpdater:
         # Whether background updates are enabled. This allows us to
         # enable/disable background updates via the admin API.
         self.enabled = True
+
+    def register_update_controller(
+        self, controller: BackgroundUpdateController
+    ) -> None:
+        """Register a new background update controller to use."""
+
+        self._controller = controller
 
     def get_current_update(self) -> Optional[BackgroundUpdatePerformance]:
         """Returns the current background update, if any."""

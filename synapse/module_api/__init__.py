@@ -48,6 +48,7 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
+from synapse.storage.background_updates import BackgroundUpdateController
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
@@ -92,6 +93,7 @@ __all__ = [
     "JsonDict",
     "EventBase",
     "StateMap",
+    "BackgroundUpdateController",
 ]
 
 logger = logging.getLogger(__name__)
@@ -211,6 +213,21 @@ class ModuleApi:
             resource: The resource to attach to this path.
         """
         self._hs.register_module_web_resource(path, resource)
+
+    def register_background_update_controller(
+        self,
+        controller: BackgroundUpdateController,
+    ) -> None:
+        """Registers a background update controller.
+
+        Added in v1.48.0
+
+        Args:
+            controller: The controller to use.
+        """
+
+        for db in self._hs.get_datastores().databases:
+            db.updates.register_update_controller(controller)
 
     #########################################################################
     # The following methods can be called by the module at any point in time.
