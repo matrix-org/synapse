@@ -23,7 +23,7 @@
     - [Structured Logging](structured_logging.md)
     - [Templates](templates.md)
     - [User Authentication](usage/configuration/user_authentication/README.md)
-      - [Single-Sign On]()
+      - [Single-Sign On](usage/configuration/user_authentication/single_sign_on.md)
         - [OpenID Connect](openid.md)
         - [SAML]()
         - [CAS]()
