@@ -1,0 +1,1 @@
+Tell mypy to disallow_untyped_defs by default, except for files which are specifically excluded.
