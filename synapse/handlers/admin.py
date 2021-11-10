@@ -234,7 +234,7 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def write_invite(
-        self, room_id: str, event: EventBase, state: StateMap[dict]
+        self, room_id: str, event: EventBase, state: StateMap[EventBase]
     ) -> None:
         """Write an invite for the room, with associated invite state.
 
@@ -248,7 +248,7 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def write_knock(
-        self, room_id: str, event: EventBase, state: StateMap[dict]
+        self, room_id: str, event: EventBase, state: StateMap[EventBase]
     ) -> None:
         """Write a knock for the room, with associated knock state.
 
