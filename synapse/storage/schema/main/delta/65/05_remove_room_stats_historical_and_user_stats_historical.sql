@@ -13,6 +13,6 @@
  * limitations under the License.
  */
 
- --remove unused tables room_stats_historical and user_stats_historical--
+ --remove unused tables room_stats_historical and user_stats_historical
  DROP TABLE IF EXISTS room_stats_historical;
  DROP TABLE IF EXISTS user_stats_historical;
