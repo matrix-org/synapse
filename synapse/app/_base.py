@@ -33,12 +33,13 @@ from typing import (
     List,
     NoReturn,
     Tuple,
+    cast,
 )
 
 from cryptography.utils import CryptographyDeprecationWarning
 
 import twisted
-from twisted.internet import defer, error, reactor
+from twisted.internet import defer, error, reactor as _reactor
 from twisted.internet.interfaces import IOpenSSLContextFactory, IReactorSSL, IReactorTCP
 from twisted.internet.protocol import ServerFactory
 from twisted.internet.tcp import Port
@@ -61,6 +62,7 @@ from synapse.logging.context import PreserveLoggingContext
 from synapse.metrics import register_threadpool
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
+from synapse.types import ISynapseReactor
 from synapse.util.caches.lrucache import setup_expire_lru_cache_entries
 from synapse.util.daemonize import daemonize_process
 from synapse.util.gai_resolver import GAIResolver
@@ -69,6 +71,11 @@ from synapse.util.versionstring import get_version_string
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+
+# Twisted injects the global reactor to make it easier to import, this confuses
+# mypy which thinks it is a module. Tell it that it a more proper type.
+reactor = cast(ISynapseReactor, _reactor)
+
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +99,7 @@ def register_sighup(func: Callable[..., None], *args: Any, **kwargs: Any) -> Non
 def start_worker_reactor(
     appname: str,
     config: HomeServerConfig,
-    # mypy can't figure out what the default reactor is.
-    run_command: Callable[[], None] = reactor.run,  # type: ignore[attr-defined]
+    run_command: Callable[[], None] = reactor.run,
 ) -> None:
     """Run the reactor in the main process
 
@@ -128,8 +134,7 @@ def start_reactor(
     daemonize: bool,
     print_pidfile: bool,
     logger: logging.Logger,
-    # mypy can't figure out what the default reactor is.
-    run_command: Callable[[], None] = reactor.run,  # type: ignore[attr-defined]
+    run_command: Callable[[], None] = reactor.run,
 ) -> None:
     """Run the reactor in the main process
 
@@ -242,8 +247,7 @@ def register_start(cb: Callable[..., Awaitable], *args: Any, **kwargs: Any) -> N
             # on as normal.
             os._exit(1)
 
-    # mypy can't figure out what the default reactor is.
-    reactor.callWhenRunning(lambda: defer.ensureDeferred(wrapper()))  # type: ignore[attr-defined]
+    reactor.callWhenRunning(lambda: defer.ensureDeferred(wrapper()))
 
 
 def listen_metrics(bind_addresses: Iterable[str], port: int) -> None:
@@ -285,8 +289,7 @@ def listen_tcp(
     bind_addresses: Collection[str],
     port: int,
     factory: ServerFactory,
-    # mypy can't figure out what the default reactor is.
-    reactor: IReactorTCP = reactor,  # type: ignore[assignment]
+    reactor: IReactorTCP = reactor,
     backlog: int = 50,
 ) -> List[Port]:
     """
@@ -312,8 +315,7 @@ def listen_ssl(
     port: int,
     factory: ServerFactory,
     context_factory: IOpenSSLContextFactory,
-    # mypy can't figure out what the default reactor is.
-    reactor: IReactorSSL = reactor,  # type: ignore[assignment]
+    reactor: IReactorSSL = reactor,
     backlog: int = 50,
 ) -> List[Port]:
     """
