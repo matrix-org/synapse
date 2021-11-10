@@ -1,12 +1,16 @@
-matrix-synapse-py3 (1.47.0+nmu1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (1.47.0~rc2) stable; urgency=medium
 
+  [ Dan Callahan ]
   * Update scripts to pass Shellcheck lints.
   * Remove unused Vagrant scripts from debian/ directory.
   * Allow building Debian packages for any architecture, not just amd64.
   * Preinstall the "wheel" package when building virtualenvs.
   * Do not error if /etc/default/matrix-synapse is missing.
 
- -- Dan Callahan <danc@element.io>  Fri, 22 Oct 2021 22:20:31 +0000
+  [ Synapse Packaging team ]
+  * New synapse release 1.47.0~rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 10 Nov 2021 09:41:01 +0000
 
 matrix-synapse-py3 (1.46.0) stable; urgency=medium
 
