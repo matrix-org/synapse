@@ -16,8 +16,6 @@
 import logging
 from typing import IO, TYPE_CHECKING, Dict, List, Optional
 
-from twisted.web.server import Request
-
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import DirectServeJsonResource, respond_with_json
 from synapse.http.servlet import parse_bytes_from_args
@@ -43,10 +41,10 @@ class UploadResource(DirectServeJsonResource):
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
         self.auth = hs.get_auth()
-        self.max_upload_size = hs.config.max_upload_size
+        self.max_upload_size = hs.config.media.max_upload_size
         self.clock = hs.get_clock()
 
-    async def _async_render_OPTIONS(self, request: Request) -> None:
+    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
         respond_with_json(request, 200, {}, send_cors=True)
 
     async def _async_render_POST(self, request: SynapseRequest) -> None:
@@ -82,7 +80,7 @@ class UploadResource(DirectServeJsonResource):
             assert content_type_headers  # for mypy
             media_type = content_type_headers[0].decode("ascii")
         else:
-            raise SynapseError(msg="Upload request missing 'Content-Type'", code=400)
+            media_type = "application/octet-stream"
 
         # if headers.hasHeader(b"Content-Disposition"):
         #     disposition = headers.getRawHeaders(b"Content-Disposition")[0]

@@ -133,28 +133,29 @@ def prepare_database(
 
             # if it's a worker app, refuse to upgrade the database, to avoid multiple
             # workers doing it at once.
-            if (
-                config.worker_app is not None
-                and version_info.current_version != SCHEMA_VERSION
-            ):
+            if config.worker.worker_app is None:
+                _upgrade_existing_database(
+                    cur,
+                    version_info,
+                    database_engine,
+                    config,
+                    databases=databases,
+                )
+            elif version_info.current_version < SCHEMA_VERSION:
+                # If the DB is on an older version than we expect then we refuse
+                # to start the worker (as the main process needs to run first to
+                # update the schema).
                 raise UpgradeDatabaseException(
                     OUTDATED_SCHEMA_ON_WORKER_ERROR
                     % (SCHEMA_VERSION, version_info.current_version)
                 )
 
-            _upgrade_existing_database(
-                cur,
-                version_info,
-                database_engine,
-                config,
-                databases=databases,
-            )
         else:
             logger.info("%r: Initialising new database", databases)
 
             # if it's a worker app, refuse to upgrade the database, to avoid multiple
             # workers doing it at once.
-            if config and config.worker_app is not None:
+            if config and config.worker.worker_app is not None:
                 raise UpgradeDatabaseException(EMPTY_DATABASE_ON_WORKER_ERROR)
 
             _setup_new_database(cur, database_engine, databases=databases)
@@ -355,7 +356,7 @@ def _upgrade_existing_database(
     else:
         assert config
 
-    is_worker = config and config.worker_app is not None
+    is_worker = config and config.worker.worker_app is not None
 
     if (
         current_schema_state.compat_version is not None
@@ -366,7 +367,7 @@ def _upgrade_existing_database(
             + "new for the server to understand"
         )
 
-    # some of the deltas assume that config.server_name is set correctly, so now
+    # some of the deltas assume that server_name is set correctly, so now
     # is a good time to run the sanity check.
     if not is_empty and "main" in databases:
         from synapse.storage.databases.main import check_database_before_upgrade
@@ -487,6 +488,10 @@ def _upgrade_existing_database(
                 spec = importlib.util.spec_from_file_location(
                     module_name, absolute_path
                 )
+                if spec is None:
+                    raise RuntimeError(
+                        f"Could not build a module spec for {module_name} at {absolute_path}"
+                    )
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)  # type: ignore
 
@@ -545,7 +550,9 @@ def _apply_module_schemas(
         database_engine:
         config: application config
     """
-    for (mod, _config) in config.password_providers:
+    # This is the old way for password_auth_provider modules to make changes
+    # to the database. This should instead be done using the module API
+    for (mod, _config) in config.authproviders.password_providers:
         if not hasattr(mod, "get_db_schema_files"):
             continue
         modname = ".".join((mod.__module__, mod.__name__))

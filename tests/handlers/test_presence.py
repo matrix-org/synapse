@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+from typing import Optional
 from unittest.mock import Mock, call
 
 from signedjson.key import generate_signing_key
@@ -33,7 +33,7 @@ from synapse.handlers.presence import (
     handle_update,
 )
 from synapse.rest import admin
-from synapse.rest.client.v1 import room
+from synapse.rest.client import room
 from synapse.types import UserID, get_domain_from_id
 
 from tests import unittest
@@ -339,8 +339,11 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
 
 
 class PresenceTimeoutTestCase(unittest.TestCase):
+    """Tests different timers and that the timer does not change `status_msg` of user."""
+
     def test_idle_timer(self):
         user_id = "@foo:bar"
+        status_msg = "I'm here!"
         now = 5000000
 
         state = UserPresenceState.default(user_id)
@@ -348,12 +351,14 @@ class PresenceTimeoutTestCase(unittest.TestCase):
             state=PresenceState.ONLINE,
             last_active_ts=now - IDLE_TIMER - 1,
             last_user_sync_ts=now,
+            status_msg=status_msg,
         )
 
         new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
         self.assertEquals(new_state.state, PresenceState.UNAVAILABLE)
+        self.assertEquals(new_state.status_msg, status_msg)
 
     def test_busy_no_idle(self):
         """
@@ -361,6 +366,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         presence state into unavailable.
         """
         user_id = "@foo:bar"
+        status_msg = "I'm here!"
         now = 5000000
 
         state = UserPresenceState.default(user_id)
@@ -368,15 +374,18 @@ class PresenceTimeoutTestCase(unittest.TestCase):
             state=PresenceState.BUSY,
             last_active_ts=now - IDLE_TIMER - 1,
             last_user_sync_ts=now,
+            status_msg=status_msg,
         )
 
         new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
         self.assertEquals(new_state.state, PresenceState.BUSY)
+        self.assertEquals(new_state.status_msg, status_msg)
 
     def test_sync_timeout(self):
         user_id = "@foo:bar"
+        status_msg = "I'm here!"
         now = 5000000
 
         state = UserPresenceState.default(user_id)
@@ -384,15 +393,18 @@ class PresenceTimeoutTestCase(unittest.TestCase):
             state=PresenceState.ONLINE,
             last_active_ts=0,
             last_user_sync_ts=now - SYNC_ONLINE_TIMEOUT - 1,
+            status_msg=status_msg,
         )
 
         new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
         self.assertEquals(new_state.state, PresenceState.OFFLINE)
+        self.assertEquals(new_state.status_msg, status_msg)
 
     def test_sync_online(self):
         user_id = "@foo:bar"
+        status_msg = "I'm here!"
         now = 5000000
 
         state = UserPresenceState.default(user_id)
@@ -400,6 +412,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
             state=PresenceState.ONLINE,
             last_active_ts=now - SYNC_ONLINE_TIMEOUT - 1,
             last_user_sync_ts=now - SYNC_ONLINE_TIMEOUT - 1,
+            status_msg=status_msg,
         )
 
         new_state = handle_timeout(
@@ -408,9 +421,11 @@ class PresenceTimeoutTestCase(unittest.TestCase):
 
         self.assertIsNotNone(new_state)
         self.assertEquals(new_state.state, PresenceState.ONLINE)
+        self.assertEquals(new_state.status_msg, status_msg)
 
     def test_federation_ping(self):
         user_id = "@foo:bar"
+        status_msg = "I'm here!"
         now = 5000000
 
         state = UserPresenceState.default(user_id)
@@ -419,12 +434,13 @@ class PresenceTimeoutTestCase(unittest.TestCase):
             last_active_ts=now,
             last_user_sync_ts=now,
             last_federation_update_ts=now - FEDERATION_PING_INTERVAL - 1,
+            status_msg=status_msg,
         )
 
         new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
-        self.assertEquals(new_state, new_state)
+        self.assertEquals(state, new_state)
 
     def test_no_timeout(self):
         user_id = "@foo:bar"
@@ -444,6 +460,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
 
     def test_federation_timeout(self):
         user_id = "@foo:bar"
+        status_msg = "I'm here!"
         now = 5000000
 
         state = UserPresenceState.default(user_id)
@@ -452,6 +469,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
             last_active_ts=now,
             last_user_sync_ts=now,
             last_federation_update_ts=now - FEDERATION_TIMEOUT - 1,
+            status_msg=status_msg,
         )
 
         new_state = handle_timeout(
@@ -460,9 +478,11 @@ class PresenceTimeoutTestCase(unittest.TestCase):
 
         self.assertIsNotNone(new_state)
         self.assertEquals(new_state.state, PresenceState.OFFLINE)
+        self.assertEquals(new_state.status_msg, status_msg)
 
     def test_last_active(self):
         user_id = "@foo:bar"
+        status_msg = "I'm here!"
         now = 5000000
 
         state = UserPresenceState.default(user_id)
@@ -471,6 +491,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
             last_active_ts=now - LAST_ACTIVE_GRANULARITY - 1,
             last_user_sync_ts=now,
             last_federation_update_ts=now,
+            status_msg=status_msg,
         )
 
         new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
@@ -515,6 +536,144 @@ class PresenceHandlerTestCase(unittest.HomeserverTestCase):
             self.presence_handler.get_state(UserID.from_string(user_id))
         )
         self.assertEqual(state.state, PresenceState.OFFLINE)
+
+    def test_user_goes_offline_by_timeout_status_msg_remain(self):
+        """Test that if a user doesn't update the records for a while
+        users presence goes `OFFLINE` because of timeout and `status_msg` remains.
+        """
+        user_id = "@test:server"
+        status_msg = "I'm here!"
+
+        # Mark user as online
+        self._set_presencestate_with_status_msg(
+            user_id, PresenceState.ONLINE, status_msg
+        )
+
+        # Check that if we wait a while without telling the handler the user has
+        # stopped syncing that their presence state doesn't get timed out.
+        self.reactor.advance(SYNC_ONLINE_TIMEOUT / 2)
+
+        state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(user_id))
+        )
+        self.assertEqual(state.state, PresenceState.ONLINE)
+        self.assertEqual(state.status_msg, status_msg)
+
+        # Check that if the timeout fires, then the syncing user gets timed out
+        self.reactor.advance(SYNC_ONLINE_TIMEOUT)
+
+        state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(user_id))
+        )
+        # status_msg should remain even after going offline
+        self.assertEqual(state.state, PresenceState.OFFLINE)
+        self.assertEqual(state.status_msg, status_msg)
+
+    def test_user_goes_offline_manually_with_no_status_msg(self):
+        """Test that if a user change presence manually to `OFFLINE`
+        and no status is set, that `status_msg` is `None`.
+        """
+        user_id = "@test:server"
+        status_msg = "I'm here!"
+
+        # Mark user as online
+        self._set_presencestate_with_status_msg(
+            user_id, PresenceState.ONLINE, status_msg
+        )
+
+        # Mark user as offline
+        self.get_success(
+            self.presence_handler.set_state(
+                UserID.from_string(user_id), {"presence": PresenceState.OFFLINE}
+            )
+        )
+
+        state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(user_id))
+        )
+        self.assertEqual(state.state, PresenceState.OFFLINE)
+        self.assertEqual(state.status_msg, None)
+
+    def test_user_goes_offline_manually_with_status_msg(self):
+        """Test that if a user change presence manually to `OFFLINE`
+        and a status is set, that `status_msg` appears.
+        """
+        user_id = "@test:server"
+        status_msg = "I'm here!"
+
+        # Mark user as online
+        self._set_presencestate_with_status_msg(
+            user_id, PresenceState.ONLINE, status_msg
+        )
+
+        # Mark user as offline
+        self._set_presencestate_with_status_msg(
+            user_id, PresenceState.OFFLINE, "And now here."
+        )
+
+    def test_user_reset_online_with_no_status(self):
+        """Test that if a user set again the presence manually
+        and no status is set, that `status_msg` is `None`.
+        """
+        user_id = "@test:server"
+        status_msg = "I'm here!"
+
+        # Mark user as online
+        self._set_presencestate_with_status_msg(
+            user_id, PresenceState.ONLINE, status_msg
+        )
+
+        # Mark user as online again
+        self.get_success(
+            self.presence_handler.set_state(
+                UserID.from_string(user_id), {"presence": PresenceState.ONLINE}
+            )
+        )
+
+        state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(user_id))
+        )
+        # status_msg should remain even after going offline
+        self.assertEqual(state.state, PresenceState.ONLINE)
+        self.assertEqual(state.status_msg, None)
+
+    def test_set_presence_with_status_msg_none(self):
+        """Test that if a user set again the presence manually
+        and status is `None`, that `status_msg` is `None`.
+        """
+        user_id = "@test:server"
+        status_msg = "I'm here!"
+
+        # Mark user as online
+        self._set_presencestate_with_status_msg(
+            user_id, PresenceState.ONLINE, status_msg
+        )
+
+        # Mark user as online and `status_msg = None`
+        self._set_presencestate_with_status_msg(user_id, PresenceState.ONLINE, None)
+
+    def _set_presencestate_with_status_msg(
+        self, user_id: str, state: PresenceState, status_msg: Optional[str]
+    ):
+        """Set a PresenceState and status_msg and check the result.
+
+        Args:
+            user_id: User for that the status is to be set.
+            PresenceState: The new PresenceState.
+            status_msg: Status message that is to be set.
+        """
+        self.get_success(
+            self.presence_handler.set_state(
+                UserID.from_string(user_id),
+                {"presence": state, "status_msg": status_msg},
+            )
+        )
+
+        new_state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(user_id))
+        )
+        self.assertEqual(new_state.state, state)
+        self.assertEqual(new_state.status_msg, status_msg)
 
 
 class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
@@ -726,7 +885,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.federation_sender = hs.get_federation_sender()
         self.event_builder_factory = hs.get_event_builder_factory()
-        self.federation_handler = hs.get_federation_handler()
+        self.federation_event_handler = hs.get_federation_event_handler()
         self.presence_handler = hs.get_presence_handler()
 
         # self.event_builder_for_2 = EventBuilderFactory(hs)
@@ -867,7 +1026,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             builder.build(prev_event_ids=prev_event_ids, auth_event_ids=None)
         )
 
-        self.get_success(self.federation_handler.on_receive_pdu(hostname, event))
+        self.get_success(self.federation_event_handler.on_receive_pdu(hostname, event))
 
         # Check that it was successfully persisted.
         self.get_success(self.store.get_event(event.event_id))

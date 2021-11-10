@@ -14,7 +14,7 @@
 # limitations under the License.
 import inspect
 import logging
-from typing import TYPE_CHECKING, Dict, Generic, List, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, TypeVar, Union
 from urllib.parse import urlencode, urlparse
 
 import attr
@@ -249,11 +249,11 @@ class OidcHandler:
 class OidcError(Exception):
     """Used to catch errors when calling the token_endpoint"""
 
-    def __init__(self, error, error_description=None):
+    def __init__(self, error: str, error_description: Optional[str] = None):
         self.error = error
         self.error_description = error_description
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.error_description:
             return f"{self.error}: {self.error_description}"
         return self.error
@@ -277,7 +277,7 @@ class OidcProvider:
         self._token_generator = token_generator
 
         self._config = provider
-        self._callback_url: str = hs.config.oidc_callback_url
+        self._callback_url: str = hs.config.oidc.oidc_callback_url
 
         # Calculate the prefix for OIDC callback paths based on the public_baseurl.
         # We'll insert this into the Path= parameter of any session cookies we set.
@@ -324,7 +324,7 @@ class OidcProvider:
         self._allow_existing_users = provider.allow_existing_users
 
         self._http_client = hs.get_proxied_http_client()
-        self._server_name: str = hs.config.server_name
+        self._server_name: str = hs.config.server.server_name
 
         # identifier for the external_ids table
         self.idp_id = provider.idp_id
@@ -337,9 +337,6 @@ class OidcProvider:
 
         # optional brand identifier for this auth provider
         self.idp_brand = provider.idp_brand
-
-        # Optional brand identifier for the unstable API (see MSC2858).
-        self.unstable_idp_brand = provider.unstable_idp_brand
 
         self._sso_handler = hs.get_sso_handler()
 
@@ -1060,13 +1057,13 @@ class JwtClientSecret:
         self._cached_secret = b""
         self._cached_secret_replacement_time = 0
 
-    def __str__(self):
+    def __str__(self) -> str:
         # if client_auth_method is client_secret_basic, then ClientAuth.prepare calls
         # encode_client_secret_basic, which calls "{}".format(secret), which ends up
         # here.
         return self._get_secret().decode("ascii")
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         # if client_auth_method is client_secret_post, then ClientAuth.prepare calls
         # encode_client_secret_post, which ends up here.
         return self._get_secret()
@@ -1200,21 +1197,21 @@ class OidcSessionTokenGenerator:
         )
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class OidcSessionData:
     """The attributes which are stored in a OIDC session cookie"""
 
     # the Identity Provider being used
-    idp_id = attr.ib(type=str)
+    idp_id: str
 
     # The `nonce` parameter passed to the OIDC provider.
-    nonce = attr.ib(type=str)
+    nonce: str
 
     # The URL the client gave when it initiated the flow. ("" if this is a UI Auth)
-    client_redirect_url = attr.ib(type=str)
+    client_redirect_url: str
 
     # The session ID of the ongoing UI Auth ("" if this is a login)
-    ui_auth_session_id = attr.ib(type=str)
+    ui_auth_session_id: str
 
 
 class UserAttributeDict(TypedDict):
@@ -1293,20 +1290,20 @@ class OidcMappingProvider(Generic[C]):
 
 
 # Used to clear out "None" values in templates
-def jinja_finalize(thing):
+def jinja_finalize(thing: Any) -> Any:
     return thing if thing is not None else ""
 
 
 env = Environment(finalize=jinja_finalize)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class JinjaOidcMappingConfig:
-    subject_claim = attr.ib(type=str)
-    localpart_template = attr.ib(type=Optional[Template])
-    display_name_template = attr.ib(type=Optional[Template])
-    email_template = attr.ib(type=Optional[Template])
-    extra_attributes = attr.ib(type=Dict[str, Template])
+    subject_claim: str
+    localpart_template: Optional[Template]
+    display_name_template: Optional[Template]
+    email_template: Optional[Template]
+    extra_attributes: Dict[str, Template]
 
 
 class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):

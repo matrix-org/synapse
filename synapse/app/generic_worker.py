@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -65,45 +64,43 @@ from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.pushers import SlavedPusherStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
-from synapse.replication.slave.storage.room import RoomStore
 from synapse.rest.admin import register_servlets_for_media_repo
-from synapse.rest.client.v1 import events, login, presence, room
-from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
-from synapse.rest.client.v1.profile import (
-    ProfileAvatarURLRestServlet,
-    ProfileDisplaynameRestServlet,
-    ProfileRestServlet,
-)
-from synapse.rest.client.v1.push_rule import PushRuleRestServlet
-from synapse.rest.client.v1.voip import VoipRestServlet
-from synapse.rest.client.v2_alpha import (
+from synapse.rest.client import (
     account_data,
+    events,
     groups,
+    initial_sync,
+    login,
+    presence,
+    profile,
+    push_rule,
     read_marker,
     receipts,
+    room,
     room_keys,
+    sendtodevice,
     sync,
     tags,
     user_directory,
+    versions,
+    voip,
 )
-from synapse.rest.client.v2_alpha._base import client_patterns
-from synapse.rest.client.v2_alpha.account import ThreepidRestServlet
-from synapse.rest.client.v2_alpha.account_data import (
-    AccountDataServlet,
-    RoomAccountDataServlet,
-)
-from synapse.rest.client.v2_alpha.devices import DevicesRestServlet
-from synapse.rest.client.v2_alpha.keys import (
+from synapse.rest.client._base import client_patterns
+from synapse.rest.client.account import ThreepidRestServlet
+from synapse.rest.client.devices import DevicesRestServlet
+from synapse.rest.client.keys import (
     KeyChangesServlet,
     KeyQueryServlet,
     OneTimeKeyServlet,
 )
-from synapse.rest.client.v2_alpha.register import RegisterRestServlet
-from synapse.rest.client.v2_alpha.sendtodevice import SendToDeviceRestServlet
-from synapse.rest.client.versions import VersionsRestServlet
+from synapse.rest.client.register import (
+    RegisterRestServlet,
+    RegistrationTokenValidityRestServlet,
+)
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
+from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
 from synapse.storage.databases.main.censor_events import CensorEventsStore
 from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
@@ -115,7 +112,9 @@ from synapse.storage.databases.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
 from synapse.storage.databases.main.presence import PresenceStore
+from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.storage.databases.main.search import SearchStore
+from synapse.storage.databases.main.session import SessionStore
 from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
@@ -133,16 +132,16 @@ class KeyUploadServlet(RestServlet):
 
     PATTERNS = client_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: HomeServer):
         """
         Args:
-            hs (synapse.server.HomeServer): server
+            hs: server
         """
         super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.http_client = hs.get_simple_http_client()
-        self.main_uri = hs.config.worker_main_http_uri
+        self.main_uri = hs.config.worker.worker_main_http_uri
 
     async def on_POST(self, request: Request, device_id: Optional[str]):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
@@ -238,7 +237,7 @@ class GenericWorkerSlavedStore(
     ClientIpWorkerStore,
     SlavedEventStore,
     SlavedKeyStore,
-    RoomStore,
+    RoomWorkerStore,
     DirectoryStore,
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
@@ -251,6 +250,7 @@ class GenericWorkerSlavedStore(
     SearchStore,
     TransactionWorkerStore,
     LockStore,
+    SessionStore,
     BaseSlavedStore,
 ):
     pass
@@ -280,35 +280,35 @@ class GenericWorkerServer(HomeServer):
                     resource = JsonResource(self, canonical_json=False)
 
                     RegisterRestServlet(self).register(resource)
+                    RegistrationTokenValidityRestServlet(self).register(resource)
                     login.register_servlets(self, resource)
                     ThreepidRestServlet(self).register(resource)
                     DevicesRestServlet(self).register(resource)
-                    KeyQueryServlet(self).register(resource)
-                    OneTimeKeyServlet(self).register(resource)
-                    KeyChangesServlet(self).register(resource)
-                    VoipRestServlet(self).register(resource)
-                    PushRuleRestServlet(self).register(resource)
-                    VersionsRestServlet(self).register(resource)
 
-                    ProfileAvatarURLRestServlet(self).register(resource)
-                    ProfileDisplaynameRestServlet(self).register(resource)
-                    ProfileRestServlet(self).register(resource)
+                    # Read-only
                     KeyUploadServlet(self).register(resource)
-                    AccountDataServlet(self).register(resource)
-                    RoomAccountDataServlet(self).register(resource)
+                    KeyQueryServlet(self).register(resource)
+                    KeyChangesServlet(self).register(resource)
+                    OneTimeKeyServlet(self).register(resource)
+
+                    voip.register_servlets(self, resource)
+                    push_rule.register_servlets(self, resource)
+                    versions.register_servlets(self, resource)
+
+                    profile.register_servlets(self, resource)
 
                     sync.register_servlets(self, resource)
                     events.register_servlets(self, resource)
-                    room.register_servlets(self, resource, True)
+                    room.register_servlets(self, resource, is_worker=True)
                     room.register_deprecated_servlets(self, resource)
-                    InitialSyncRestServlet(self).register(resource)
+                    initial_sync.register_servlets(self, resource)
                     room_keys.register_servlets(self, resource)
                     tags.register_servlets(self, resource)
                     account_data.register_servlets(self, resource)
                     receipts.register_servlets(self, resource)
                     read_marker.register_servlets(self, resource)
 
-                    SendToDeviceRestServlet(self).register(resource)
+                    sendtodevice.register_servlets(self, resource)
 
                     user_directory.register_servlets(self, resource)
 
@@ -319,10 +319,12 @@ class GenericWorkerServer(HomeServer):
                     resources.update({CLIENT_API_PREFIX: resource})
 
                     resources.update(build_synapse_client_resource_tree(self))
+                    resources.update({"/.well-known": well_known_resource(self)})
+
                 elif name == "federation":
                     resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
                 elif name == "media":
-                    if self.config.can_load_media_repo:
+                    if self.config.media.can_load_media_repo:
                         media_repo = self.get_media_repository_resource()
 
                         # We need to serve the admin servlets for media on the
@@ -385,15 +387,18 @@ class GenericWorkerServer(HomeServer):
         logger.info("Synapse worker now listening on port %d", port)
 
     def start_listening(self):
-        for listener in self.config.worker_listeners:
+        for listener in self.config.worker.worker_listeners:
             if listener.type == "http":
                 self._listen_http(listener)
             elif listener.type == "manhole":
                 _base.listen_manhole(
-                    listener.bind_addresses, listener.port, manhole_globals={"hs": self}
+                    listener.bind_addresses,
+                    listener.port,
+                    manhole_settings=self.config.server.manhole_settings,
+                    manhole_globals={"hs": self},
                 )
             elif listener.type == "metrics":
-                if not self.config.enable_metrics:
+                if not self.config.metrics.enable_metrics:
                     logger.warning(
                         "Metrics listener configured, but "
                         "enable_metrics is not True!"
@@ -414,7 +419,7 @@ def start(config_options):
         sys.exit(1)
 
     # For backwards compatibility let any of the old app names.
-    assert config.worker_app in (
+    assert config.worker.worker_app in (
         "synapse.app.appservice",
         "synapse.app.client_reader",
         "synapse.app.event_creator",
@@ -428,7 +433,7 @@ def start(config_options):
         "synapse.app.user_dir",
     )
 
-    if config.worker_app == "synapse.app.appservice":
+    if config.worker.worker_app == "synapse.app.appservice":
         if config.appservice.notify_appservices:
             sys.stderr.write(
                 "\nThe appservices must be disabled in the main synapse process"
@@ -444,7 +449,7 @@ def start(config_options):
         # For other worker types we force this to off.
         config.appservice.notify_appservices = False
 
-    if config.worker_app == "synapse.app.user_dir":
+    if config.worker.worker_app == "synapse.app.user_dir":
         if config.server.update_user_directory:
             sys.stderr.write(
                 "\nThe update_user_directory must be disabled in the main synapse process"
@@ -460,14 +465,14 @@ def start(config_options):
         # For other worker types we force this to off.
         config.server.update_user_directory = False
 
-    synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
+    synapse.events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
     synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
 
     if config.server.gc_seconds:
         synapse.metrics.MIN_TIME_BETWEEN_GCS = config.server.gc_seconds
 
     hs = GenericWorkerServer(
-        config.server_name,
+        config.server.server_name,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
     )
@@ -486,7 +491,7 @@ def start(config_options):
     register_start(_base.start, hs)
 
     # redirect stdio to the logs, if configured.
-    if not hs.config.no_redirect_stdio:
+    if not hs.config.logging.no_redirect_stdio:
         redirect_stdio_to_logs()
 
     _base.start_worker_reactor("synapse-generic-worker", config)

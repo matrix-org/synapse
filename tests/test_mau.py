@@ -17,7 +17,7 @@
 from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.appservice import ApplicationService
-from synapse.rest.client.v2_alpha import register, sync
+from synapse.rest.client import register, sync
 
 from tests import unittest
 from tests.unittest import override_config
@@ -165,7 +165,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
 
     @override_config({"mau_trial_days": 1})
     def test_trial_users_cant_come_back(self):
-        self.hs.config.mau_trial_days = 1
+        self.hs.config.server.mau_trial_days = 1
 
         # We should be able to register more than the limit initially
         token1 = self.create_user("kermit1")

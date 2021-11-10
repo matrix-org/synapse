@@ -26,17 +26,18 @@ from synapse.storage.state import StateFilter
 from synapse.types import JsonDict, UserID
 from synapse.visibility import filter_events_for_client
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class SearchHandler(BaseHandler):
+class SearchHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
+        self.state_handler = hs.get_state_handler()
+        self.clock = hs.get_clock()
+        self.hs = hs
         self._event_serializer = hs.get_event_client_serializer()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
@@ -105,7 +106,7 @@ class SearchHandler(BaseHandler):
             dict to be returned to the client with results of search
         """
 
-        if not self.hs.config.enable_search:
+        if not self.hs.config.server.enable_search:
             raise SynapseError(400, "Search is disabled on this homeserver")
 
         batch_group = None
@@ -179,7 +180,7 @@ class SearchHandler(BaseHandler):
                 % (set(group_keys) - {"room_id", "sender"},),
             )
 
-        search_filter = Filter(filter_dict)
+        search_filter = Filter(self.hs, filter_dict)
 
         # TODO: Search through left rooms too
         rooms = await self.store.get_rooms_for_local_user_where_membership_is(
@@ -241,14 +242,14 @@ class SearchHandler(BaseHandler):
 
             rank_map.update({r["event"].event_id: r["rank"] for r in results})
 
-            filtered_events = search_filter.filter([r["event"] for r in results])
+            filtered_events = await search_filter.filter([r["event"] for r in results])
 
             events = await filter_events_for_client(
                 self.storage, user.to_string(), filtered_events
             )
 
             events.sort(key=lambda e: -rank_map[e.event_id])
-            allowed_events = events[: search_filter.limit()]
+            allowed_events = events[: search_filter.limit]
 
             for e in allowed_events:
                 rm = room_groups.setdefault(
@@ -270,13 +271,13 @@ class SearchHandler(BaseHandler):
             # We keep looping and we keep filtering until we reach the limit
             # or we run out of things.
             # But only go around 5 times since otherwise synapse will be sad.
-            while len(room_events) < search_filter.limit() and i < 5:
+            while len(room_events) < search_filter.limit and i < 5:
                 i += 1
                 search_result = await self.store.search_rooms(
                     room_ids,
                     search_term,
                     keys,
-                    search_filter.limit() * 2,
+                    search_filter.limit * 2,
                     pagination_token=pagination_token,
                 )
 
@@ -291,16 +292,18 @@ class SearchHandler(BaseHandler):
 
                 rank_map.update({r["event"].event_id: r["rank"] for r in results})
 
-                filtered_events = search_filter.filter([r["event"] for r in results])
+                filtered_events = await search_filter.filter(
+                    [r["event"] for r in results]
+                )
 
                 events = await filter_events_for_client(
                     self.storage, user.to_string(), filtered_events
                 )
 
                 room_events.extend(events)
-                room_events = room_events[: search_filter.limit()]
+                room_events = room_events[: search_filter.limit]
 
-                if len(results) < search_filter.limit() * 2:
+                if len(results) < search_filter.limit * 2:
                     pagination_token = None
                     break
                 else:
@@ -310,7 +313,7 @@ class SearchHandler(BaseHandler):
                 group = room_groups.setdefault(event.room_id, {"results": []})
                 group["results"].append(event.event_id)
 
-            if room_events and len(room_events) >= search_filter.limit():
+            if room_events and len(room_events) >= search_filter.limit:
                 last_event_id = room_events[-1].event_id
                 pagination_token = results_map[last_event_id]["pagination_token"]
 

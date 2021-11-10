@@ -1,0 +1,1 @@
+Remove and document unnecessary `RoomStreamToken` checks in application service ephemeral event code.

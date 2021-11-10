@@ -1,0 +1,1 @@
+Refactor `Filter` to check different fields depending on the data type.

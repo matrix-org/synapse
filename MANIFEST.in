@@ -8,6 +8,7 @@ include demo/demo.tls.dh
 include demo/*.py
 include demo/*.sh
 
+include synapse/py.typed
 recursive-include synapse/storage *.sql
 recursive-include synapse/storage *.sql.postgres
 recursive-include synapse/storage *.sql.sqlite
@@ -44,9 +45,9 @@ include book.toml
 include pyproject.toml
 recursive-include changelog.d *
 
-prune .buildkite
 prune .circleci
 prune .github
+prune .ci
 prune contrib
 prune debian
 prune demo/etc

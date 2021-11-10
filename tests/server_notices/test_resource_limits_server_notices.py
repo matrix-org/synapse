@@ -19,8 +19,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, LimitBlockingTypes, ServerNoticeMsgType
 from synapse.api.errors import ResourceLimitError
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import sync
+from synapse.rest.client import login, room, sync
 from synapse.server_notices.resource_limits_server_notices import (
     ResourceLimitsServerNotices,
 )
@@ -327,7 +326,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         for event in events:
             if (
                 event["type"] == EventTypes.Message
-                and event["sender"] == self.hs.config.server_notices_mxid
+                and event["sender"] == self.hs.config.servernotices.server_notices_mxid
             ):
                 notice_in_room = True
 
@@ -347,7 +346,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         invites = []
 
         # Register as many users as the MAU limit allows.
-        for i in range(self.hs.config.max_mau_value):
+        for i in range(self.hs.config.server.max_mau_value):
             localpart = "user%d" % i
             user_id = self.register_user(localpart, "password")
             tok = self.login(localpart, "password")

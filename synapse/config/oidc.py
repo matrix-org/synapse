@@ -58,9 +58,7 @@ class OIDCConfig(Config):
                     "Multiple OIDC providers have the idp_id %r." % idp_id
                 )
 
-        public_baseurl = self.public_baseurl
-        if public_baseurl is None:
-            raise ConfigError("oidc_config requires a public_baseurl to be set")
+        public_baseurl = self.root.server.public_baseurl
         self.oidc_callback_url = public_baseurl + "_synapse/client/oidc/callback"
 
     @property
@@ -277,12 +275,6 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
             "maxLength": 255,
             "pattern": "^[a-z][a-z0-9_.-]*$",
         },
-        "idp_unstable_brand": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255,
-            "pattern": "^[a-z][a-z0-9_.-]*$",
-        },
         "discover": {"type": "boolean"},
         "issuer": {"type": "string"},
         "client_id": {"type": "string"},
@@ -483,7 +475,6 @@ def _parse_oidc_config_dict(
         idp_name=oidc_config.get("idp_name", "OIDC"),
         idp_icon=idp_icon,
         idp_brand=oidc_config.get("idp_brand"),
-        unstable_idp_brand=oidc_config.get("unstable_idp_brand"),
         discover=oidc_config.get("discover", True),
         issuer=oidc_config["issuer"],
         client_id=oidc_config["client_id"],
@@ -530,9 +521,6 @@ class OidcProviderConfig:
 
     # Optional brand identifier for this IdP.
     idp_brand = attr.ib(type=Optional[str])
-
-    # Optional brand identifier for the unstable API (see MSC2858).
-    unstable_idp_brand = attr.ib(type=Optional[str])
 
     # whether the OIDC discovery mechanism is used to discover endpoints
     discover = attr.ib(type=bool)

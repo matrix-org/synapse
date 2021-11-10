@@ -321,8 +321,11 @@ class SimpleHttpClient:
 
         self.user_agent = hs.version_string
         self.clock = hs.get_clock()
-        if hs.config.user_agent_suffix:
-            self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix)
+        if hs.config.server.user_agent_suffix:
+            self.user_agent = "%s %s" % (
+                self.user_agent,
+                hs.config.server.user_agent_suffix,
+            )
 
         # We use this for our body producers to ensure that they use the correct
         # reactor.
@@ -847,7 +850,7 @@ class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
 
 def read_body_with_max_size(
     response: IResponse, stream: ByteWriteable, max_size: Optional[int]
-) -> defer.Deferred:
+) -> "defer.Deferred[int]":
     """
     Read a HTTP response body to a file-object. Optionally enforcing a maximum file size.
 
@@ -862,7 +865,7 @@ def read_body_with_max_size(
     Returns:
         A Deferred which resolves to the length of the read body.
     """
-    d = defer.Deferred()
+    d: "defer.Deferred[int]" = defer.Deferred()
 
     # If the Content-Length header gives a size larger than the maximum allowed
     # size, do not bother downloading the body.
@@ -909,7 +912,7 @@ class InsecureInterceptableContextFactory(ssl.ContextFactory):
 
     def __init__(self):
         self._context = SSL.Context(SSL.SSLv23_METHOD)
-        self._context.set_verify(VERIFY_NONE, lambda *_: None)
+        self._context.set_verify(VERIFY_NONE, lambda *_: False)
 
     def getContext(self, hostname=None, port=None):
         return self._context

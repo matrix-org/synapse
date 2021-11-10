@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.api.errors import Codes
+from synapse.events.utils import CANONICALJSON_MAX_INT, CANONICALJSON_MIN_INT
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import sync
+from synapse.rest.client import login, room, sync
 
 from tests.unittest import HomeserverTestCase
 
@@ -203,4 +204,80 @@ class PowerLevelsTestCase(HomeserverTestCase):
             },
             tok=self.admin_access_token,
             expect_code=200,  # expect success
+        )
+
+    def test_cannot_set_string_power_levels(self):
+        room_power_levels = self.helper.get_state(
+            self.room_id,
+            "m.room.power_levels",
+            tok=self.admin_access_token,
+        )
+
+        # Update existing power levels with user at PL "0"
+        room_power_levels["users"].update({self.user_user_id: "0"})
+
+        body = self.helper.send_state(
+            self.room_id,
+            "m.room.power_levels",
+            room_power_levels,
+            tok=self.admin_access_token,
+            expect_code=400,  # expect failure
+        )
+
+        self.assertEqual(
+            body["errcode"],
+            Codes.BAD_JSON,
+            body,
+        )
+
+    def test_cannot_set_unsafe_large_power_levels(self):
+        room_power_levels = self.helper.get_state(
+            self.room_id,
+            "m.room.power_levels",
+            tok=self.admin_access_token,
+        )
+
+        # Update existing power levels with user at PL above the max safe integer
+        room_power_levels["users"].update(
+            {self.user_user_id: CANONICALJSON_MAX_INT + 1}
+        )
+
+        body = self.helper.send_state(
+            self.room_id,
+            "m.room.power_levels",
+            room_power_levels,
+            tok=self.admin_access_token,
+            expect_code=400,  # expect failure
+        )
+
+        self.assertEqual(
+            body["errcode"],
+            Codes.BAD_JSON,
+            body,
+        )
+
+    def test_cannot_set_unsafe_small_power_levels(self):
+        room_power_levels = self.helper.get_state(
+            self.room_id,
+            "m.room.power_levels",
+            tok=self.admin_access_token,
+        )
+
+        # Update existing power levels with user at PL below the minimum safe integer
+        room_power_levels["users"].update(
+            {self.user_user_id: CANONICALJSON_MIN_INT - 1}
+        )
+
+        body = self.helper.send_state(
+            self.room_id,
+            "m.room.power_levels",
+            room_power_levels,
+            tok=self.admin_access_token,
+            expect_code=400,  # expect failure
+        )
+
+        self.assertEqual(
+            body["errcode"],
+            Codes.BAD_JSON,
+            body,
         )

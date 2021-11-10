@@ -1,0 +1,1 @@
+Add `twine` and `towncrier` as dev dependencies, as they're used by the release script.

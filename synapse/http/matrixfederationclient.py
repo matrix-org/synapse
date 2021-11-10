@@ -21,6 +21,7 @@ import typing
 import urllib.parse
 from io import BytesIO, StringIO
 from typing import (
+    TYPE_CHECKING,
     Callable,
     Dict,
     Generic,
@@ -59,7 +60,6 @@ from synapse.api.errors import (
 from synapse.http import QuieterFileBodyProducer
 from synapse.http.client import (
     BlacklistingAgentWrapper,
-    BlacklistingReactorWrapper,
     BodyExceededMaxSize,
     ByteWriteable,
     encode_query_args,
@@ -67,12 +67,15 @@ from synapse.http.client import (
 )
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.logging import opentracing
-from synapse.logging.context import make_deferred_yieldable
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import set_tag, start_active_span, tags
-from synapse.types import ISynapseReactor, JsonDict
+from synapse.types import JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -320,36 +323,31 @@ class MatrixFederationHttpClient:
             requests.
     """
 
-    def __init__(self, hs, tls_client_options_factory):
+    def __init__(self, hs: "HomeServer", tls_client_options_factory):
         self.hs = hs
         self.signing_key = hs.signing_key
         self.server_name = hs.hostname
 
-        # We need to use a DNS resolver which filters out blacklisted IP
-        # addresses, to prevent DNS rebinding.
-        self.reactor: ISynapseReactor = BlacklistingReactorWrapper(
-            hs.get_reactor(),
-            hs.config.federation_ip_range_whitelist,
-            hs.config.federation_ip_range_blacklist,
-        )
+        self.reactor = hs.get_reactor()
 
         user_agent = hs.version_string
-        if hs.config.user_agent_suffix:
-            user_agent = "%s %s" % (user_agent, hs.config.user_agent_suffix)
+        if hs.config.server.user_agent_suffix:
+            user_agent = "%s %s" % (user_agent, hs.config.server.user_agent_suffix)
         user_agent = user_agent.encode("ascii")
 
         federation_agent = MatrixFederationAgent(
             self.reactor,
             tls_client_options_factory,
             user_agent,
-            hs.config.federation_ip_range_blacklist,
+            hs.config.server.federation_ip_range_whitelist,
+            hs.config.server.federation_ip_range_blacklist,
         )
 
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
         # blacklist via IP literals in server names
         self.agent = BlacklistingAgentWrapper(
             federation_agent,
-            ip_blacklist=hs.config.federation_ip_range_blacklist,
+            ip_blacklist=hs.config.server.federation_ip_range_blacklist,
         )
 
         self.clock = hs.get_clock()
@@ -471,8 +469,9 @@ class MatrixFederationHttpClient:
             _sec_timeout = self.default_timeout
 
         if (
-            self.hs.config.federation_domain_whitelist is not None
-            and request.destination not in self.hs.config.federation_domain_whitelist
+            self.hs.config.federation.federation_domain_whitelist is not None
+            and request.destination
+            not in self.hs.config.federation.federation_domain_whitelist
         ):
             raise FederationDeniedError(request.destination)
 
@@ -559,20 +558,29 @@ class MatrixFederationHttpClient:
                         with Measure(self.clock, "outbound_request"):
                             # we don't want all the fancy cookie and redirect handling
                             # that treq.request gives: just use the raw Agent.
-                            request_deferred = self.agent.request(
+
+                            # To preserve the logging context, the timeout is treated
+                            # in a similar way to `defer.gatherResults`:
+                            # * Each logging context-preserving fork is wrapped in
+                            #   `run_in_background`. In this case there is only one,
+                            #   since the timeout fork is not logging-context aware.
+                            # * The `Deferred` that joins the forks back together is
+                            #   wrapped in `make_deferred_yieldable` to restore the
+                            #   logging context regardless of the path taken.
+                            request_deferred = run_in_background(
+                                self.agent.request,
                                 method_bytes,
                                 url_bytes,
                                 headers=Headers(headers_dict),
                                 bodyProducer=producer,
                             )
-
                             request_deferred = timeout_deferred(
                                 request_deferred,
                                 timeout=_sec_timeout,
                                 reactor=self.reactor,
                             )
 
-                            response = await request_deferred
+                            response = await make_deferred_yieldable(request_deferred)
                     except DNSLookupError as e:
                         raise RequestSendFailed(e, can_retry=retry_on_dns_fail) from e
                     except Exception as e:
@@ -707,7 +715,7 @@ class MatrixFederationHttpClient:
         Returns:
             A list of headers to be added as "Authorization:" headers
         """
-        request = {
+        request: JsonDict = {
             "method": method.decode("ascii"),
             "uri": url_bytes.decode("ascii"),
             "origin": self.server_name,
@@ -1183,7 +1191,7 @@ class MatrixFederationHttpClient:
             request.method,
             request.uri.decode("ascii"),
         )
-        return (length, headers)
+        return length, headers
 
 
 def _flatten_response_never_received(e):

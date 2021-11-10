@@ -22,9 +22,11 @@ from synapse.api.constants import (
     RestrictedJoinRuleTypes,
 )
 from synapse.api.errors import AuthError, Codes, SynapseError
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.api.room_versions import RoomVersion
+from synapse.event_auth import check_auth_rules_for_event
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
+from synapse.events.snapshot import EventContext
 from synapse.types import StateMap, get_domain_from_id
 from synapse.util.metrics import Measure
 
@@ -44,17 +46,16 @@ class EventAuthHandler:
         self._store = hs.get_datastore()
         self._server_name = hs.hostname
 
-    async def check_from_context(
-        self, room_version: str, event, context, do_sig_check=True
+    async def check_auth_rules_from_context(
+        self,
+        room_version_obj: RoomVersion,
+        event: EventBase,
+        context: EventContext,
     ) -> None:
+        """Check an event passes the auth rules at its own auth events"""
         auth_event_ids = event.auth_event_ids()
         auth_events_by_id = await self._store.get_events(auth_event_ids)
-        auth_events = {(e.type, e.state_key): e for e in auth_events_by_id.values()}
-
-        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-        event_auth.check(
-            room_version_obj, event, auth_events=auth_events, do_sig_check=do_sig_check
-        )
+        check_auth_rules_for_event(room_version_obj, event, auth_events_by_id.values())
 
     def compute_auth_events(
         self,
@@ -213,7 +214,7 @@ class EventAuthHandler:
 
             raise AuthError(
                 403,
-                "You do not belong to any of the required rooms to join this room.",
+                "You do not belong to any of the required rooms/spaces to join this room.",
             )
 
     async def has_restricted_join_rules(
@@ -240,7 +241,7 @@ class EventAuthHandler:
 
         # If the join rule is not restricted, this doesn't apply.
         join_rules_event = await self._store.get_event(join_rules_event_id)
-        return join_rules_event.content.get("join_rule") == JoinRules.MSC3083_RESTRICTED
+        return join_rules_event.content.get("join_rule") == JoinRules.RESTRICTED
 
     async def get_rooms_that_allow_join(
         self, state_ids: StateMap[str]

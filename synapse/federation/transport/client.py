@@ -15,7 +15,19 @@
 
 import logging
 import urllib
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple, Union
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import attr
 import ijson
@@ -100,7 +112,7 @@ class TransportLayerClient:
 
     @log_function
     async def backfill(
-        self, destination: str, room_id: str, event_tuples: Iterable[str], limit: int
+        self, destination: str, room_id: str, event_tuples: Collection[str], limit: int
     ) -> Optional[JsonDict]:
         """Requests `limit` previous PDUs in a given context before list of
         PDUs.
@@ -108,7 +120,9 @@ class TransportLayerClient:
         Args:
             destination
             room_id
-            event_tuples
+            event_tuples:
+                Must be a Collection that is falsy when empty.
+                (Iterable is not enough here!)
             limit
 
         Returns:
@@ -143,7 +157,7 @@ class TransportLayerClient:
         """Sends the given Transaction to its destination
 
         Args:
-            transaction (Transaction)
+            transaction
 
         Returns:
             Succeeds when we get a 2xx HTTP response. The result
@@ -786,7 +800,7 @@ class TransportLayerClient:
     @log_function
     def join_group(
         self, destination: str, group_id: str, user_id: str, content: JsonDict
-    ) -> JsonDict:
+    ) -> Awaitable[JsonDict]:
         """Attempts to join a group"""
         path = _create_v1_path("/groups/%s/users/%s/join", group_id, user_id)
 
@@ -1177,6 +1191,28 @@ class TransportLayerClient:
             destination=destination, path=path, data=params
         )
 
+    async def get_room_hierarchy(
+        self,
+        destination: str,
+        room_id: str,
+        suggested_only: bool,
+    ) -> JsonDict:
+        """
+        Args:
+            destination: The remote server
+            room_id: The room ID to ask about.
+            suggested_only: if True, only suggested rooms will be returned
+        """
+        path = _create_path(
+            FEDERATION_UNSTABLE_PREFIX, "/org.matrix.msc2946/hierarchy/%s", room_id
+        )
+
+        return await self.client.get_json(
+            destination=destination,
+            path=path,
+            args={"suggested_only": "true" if suggested_only else "false"},
+        )
+
 
 def _create_path(federation_prefix: str, path: str, *args: str) -> str:
     """
@@ -1274,14 +1310,17 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
         self._coro_state = ijson.items_coro(
             _event_list_parser(room_version, self._response.state),
             prefix + "state.item",
+            use_float=True,
         )
         self._coro_auth = ijson.items_coro(
             _event_list_parser(room_version, self._response.auth_events),
             prefix + "auth_chain.item",
+            use_float=True,
         )
         self._coro_event = ijson.kvitems_coro(
             _event_parser(self._response.event_dict),
             prefix + "org.matrix.msc3083.v2.event",
+            use_float=True,
         )
 
     def write(self, data: bytes) -> int:

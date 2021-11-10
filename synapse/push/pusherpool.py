@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -63,7 +62,7 @@ class PusherPool:
         self.clock = self.hs.get_clock()
 
         # We shard the handling of push notifications by user ID.
-        self._pusher_shard_config = hs.config.push.pusher_shard_config
+        self._pusher_shard_config = hs.config.worker.pusher_shard_config
         self._instance_name = hs.get_instance_name()
         self._should_start_pushers = (
             self._instance_name in self._pusher_shard_config.instances

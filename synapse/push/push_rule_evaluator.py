@@ -18,7 +18,7 @@ import re
 from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
 from synapse.events import EventBase
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID
 from synapse.util import glob_to_regex, re_word_boundary
 from synapse.util.caches.lrucache import LruCache
 
@@ -129,7 +129,7 @@ class PushRuleEvaluatorForEvent:
         self._value_cache = _flatten_dict(event)
 
     def matches(
-        self, condition: Dict[str, Any], user_id: str, display_name: str
+        self, condition: Dict[str, Any], user_id: str, display_name: Optional[str]
     ) -> bool:
         if condition["kind"] == "event_match":
             return self._event_match(condition, user_id)
@@ -172,7 +172,7 @@ class PushRuleEvaluatorForEvent:
 
             return _glob_matches(pattern, haystack)
 
-    def _contains_display_name(self, display_name: str) -> bool:
+    def _contains_display_name(self, display_name: Optional[str]) -> bool:
         if not display_name:
             return False
 
@@ -222,7 +222,7 @@ def _glob_matches(glob: str, value: str, word_boundary: bool = False) -> bool:
 
 
 def _flatten_dict(
-    d: Union[EventBase, dict],
+    d: Union[EventBase, JsonDict],
     prefix: Optional[List[str]] = None,
     result: Optional[Dict[str, str]] = None,
 ) -> Dict[str, str]:
@@ -233,7 +233,7 @@ def _flatten_dict(
     for key, value in d.items():
         if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
-        elif hasattr(value, "items"):
+        elif isinstance(value, dict):
             _flatten_dict(value, prefix=(prefix + [key]), result=result)
 
     return result

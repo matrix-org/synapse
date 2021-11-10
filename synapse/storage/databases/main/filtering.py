@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Union
+
 from canonicaljson import encode_canonical_json
 
 from synapse.api.errors import Codes, SynapseError
@@ -22,7 +24,9 @@ from synapse.util.caches.descriptors import cached
 
 class FilteringStore(SQLBaseStore):
     @cached(num_args=2)
-    async def get_user_filter(self, user_localpart, filter_id):
+    async def get_user_filter(
+        self, user_localpart: str, filter_id: Union[int, str]
+    ) -> JsonDict:
         # filter_id is BIGINT UNSIGNED, so if it isn't a number, fail
         # with a coherent error message rather than 500 M_UNKNOWN.
         try:
@@ -40,7 +44,7 @@ class FilteringStore(SQLBaseStore):
 
         return db_to_json(def_json)
 
-    async def add_user_filter(self, user_localpart: str, user_filter: JsonDict) -> str:
+    async def add_user_filter(self, user_localpart: str, user_filter: JsonDict) -> int:
         def_json = encode_canonical_json(user_filter)
 
         # Need an atomic transaction to SELECT the maximal ID so far then

@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool, make_in_list_sql_clause
 from synapse.util.caches.descriptors import cached
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +30,13 @@ LAST_SEEN_GRANULARITY = 60 * 60 * 1000
 
 
 class MonthlyActiveUsersWorkerStore(SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
         self._clock = hs.get_clock()
         self.hs = hs
 
-        self._limit_usage_by_mau = hs.config.limit_usage_by_mau
-        self._max_mau_value = hs.config.max_mau_value
+        self._limit_usage_by_mau = hs.config.server.limit_usage_by_mau
+        self._max_mau_value = hs.config.server.max_mau_value
 
     @cached(num_args=0)
     async def get_monthly_active_count(self) -> int:
@@ -63,7 +66,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         """Generates current count of monthly active users broken down by service.
         A service is typically an appservice but also includes native matrix users.
         Since the `monthly_active_users` table is populated from the `user_ips` table
-        `config.track_appservice_user_ips` must be set to `true` for this
+        `config.appservice.track_appservice_user_ips` must be set to `true` for this
         method to return anything other than native matrix users.
 
         Returns:
@@ -96,8 +99,8 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         """
         users = []
 
-        for tp in self.hs.config.mau_limits_reserved_threepids[
-            : self.hs.config.max_mau_value
+        for tp in self.hs.config.server.mau_limits_reserved_threepids[
+            : self.hs.config.server.max_mau_value
         ]:
             user_id = await self.hs.get_datastore().get_user_id_by_threepid(
                 tp["medium"], tp["address"]
@@ -209,10 +212,10 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
 
 
 class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
 
-        self._mau_stats_only = hs.config.mau_stats_only
+        self._mau_stats_only = hs.config.server.mau_stats_only
 
         # Do not add more reserved users than the total allowable number
         self.db_pool.new_transaction(
@@ -221,7 +224,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
             [],
             [],
             self._initialise_reserved_users,
-            hs.config.mau_limits_reserved_threepids[: self._max_mau_value],
+            hs.config.server.mau_limits_reserved_threepids[: self._max_mau_value],
         )
 
     def _initialise_reserved_users(self, txn, threepids):

@@ -73,7 +73,7 @@ class DirectTcpReplicationClientFactory(ReconnectingClientFactory):
     ):
         self.client_name = client_name
         self.command_handler = command_handler
-        self.server_name = hs.config.server_name
+        self.server_name = hs.config.server.server_name
         self.hs = hs
         self._clock = hs.get_clock()  # As self.clock is defined in super class
 
@@ -117,7 +117,7 @@ class ReplicationDataHandler:
         self._instance_name = hs.get_instance_name()
         self._typing_handler = hs.get_typing_handler()
 
-        self._notify_pushers = hs.config.start_pushers
+        self._notify_pushers = hs.config.worker.start_pushers
         self._pusher_pool = hs.get_pusherpool()
         self._presence_handler = hs.get_presence_handler()
 
@@ -207,11 +207,12 @@ class ReplicationDataHandler:
 
                 max_token = self.store.get_room_max_token()
                 event_pos = PersistedEventPosition(instance_name, token)
-                self.notifier.on_new_room_event_args(
+                await self.notifier.on_new_room_event_args(
                     event_pos=event_pos,
                     max_room_stream_token=max_token,
                     extra_users=extra_users,
                     room_id=row.data.room_id,
+                    event_id=row.data.event_id,
                     event_type=row.data.type,
                     state_key=row.data.state_key,
                     membership=row.data.membership,
@@ -285,7 +286,7 @@ class ReplicationDataHandler:
 
         # Create a new deferred that times out after N seconds, as we don't want
         # to wedge here forever.
-        deferred = Deferred()
+        deferred: "Deferred[None]" = Deferred()
         deferred = timeout_deferred(
             deferred, _WAIT_FOR_REPLICATION_TIMEOUT_SECONDS, self._reactor
         )
@@ -392,6 +393,11 @@ class FederationSenderHandler:
         for receipt in rows:
             # we only want to send on receipts for our own users
             if not self._is_mine_id(receipt.user_id):
+                continue
+            if (
+                receipt.data.get("hidden", False)
+                and self._hs.config.experimental.msc2285_enabled
+            ):
                 continue
             receipt_info = ReadReceipt(
                 receipt.room_id,

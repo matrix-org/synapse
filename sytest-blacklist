@@ -1,5 +1,5 @@
 # This file serves as a blacklist for SyTest tests that we expect will fail in
-# Synapse.
+# Synapse. This doesn't include flakey tests---better to deflake them instead.
 #
 # Each line of this file is scanned by sytest during a run and if the line
 # exactly matches the name of a test, it will be marked as "expected fail",
@@ -8,9 +8,6 @@
 #
 # Test names are encouraged to have a bug accompanied with them, serving as an
 # explanation for why the test has been excluded.
-
-# Blacklisted due to https://github.com/matrix-org/synapse/issues/1679
-Remote room members also see posted message events
 
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/2065
 Guest users can accept invites to private rooms over federation
@@ -24,12 +21,6 @@ Newly created users see their own presence in /initialSync (SYT-34)
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/1396
 Should reject keys claiming to belong to a different user
 
-# Blacklisted due to https://github.com/matrix-org/synapse/issues/1531
-Enabling an unknown default rule fails with 404
-
-# Blacklisted due to https://github.com/matrix-org/synapse/issues/1663
-New federated private chats get full presence information (SYN-115)
-
 # Blacklisted due to https://github.com/matrix-org/matrix-doc/pull/2314 removing
 # this requirement from the spec
 Inbound federation of state requires event_id as a mandatory paramater
@@ -41,3 +32,6 @@ We can't peek into rooms with invited history_visibility
 We can't peek into rooms with joined history_visibility
 Local users can peek by room alias
 Peeked rooms only turn up in the sync for the device who peeked them
+
+# Validation needs to be added to Synapse: #10554
+Rejects invalid device keys

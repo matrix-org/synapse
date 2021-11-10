@@ -1,4 +1,5 @@
 # Copyright 2020 Dirk Klimpel
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,17 +15,20 @@
 
 import json
 import os
-from binascii import unhexlify
 
 from parameterized import parameterized
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
-from synapse.rest.client.v1 import login, profile, room
+from synapse.rest.client import login, profile, room
 from synapse.rest.media.v1.filepath import MediaFilePaths
 
 from tests import unittest
 from tests.server import FakeSite, make_request
+from tests.test_utils import SMALL_PNG
+
+VALID_TIMESTAMP = 1609459200000  # 2021-01-01 in milliseconds
+INVALID_TIMESTAMP_IN_S = 1893456000  # 2030-01-01 in seconds
 
 
 class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
@@ -42,7 +46,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
-        self.filepaths = MediaFilePaths(hs.config.media_store_path)
+        self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
 
     def test_no_auth(self):
         """
@@ -110,15 +114,10 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
 
         download_resource = self.media_repo.children[b"download"]
         upload_resource = self.media_repo.children[b"upload"]
-        image_data = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
 
         # Upload some media into the room
         response = self.helper.upload_media(
-            upload_resource, image_data, tok=self.admin_user_tok, expect_code=200
+            upload_resource, SMALL_PNG, tok=self.admin_user_tok, expect_code=200
         )
         # Extract media ID from the response
         server_and_media_id = response["content_uri"][6:]  # Cut off 'mxc://'
@@ -129,7 +128,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         # Attempt to access media
         channel = make_request(
             self.reactor,
-            FakeSite(download_resource),
+            FakeSite(download_resource, self.reactor),
             "GET",
             server_and_media_id,
             shorthand=False,
@@ -168,7 +167,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         # Attempt to access media
         channel = make_request(
             self.reactor,
-            FakeSite(download_resource),
+            FakeSite(download_resource, self.reactor),
             "GET",
             server_and_media_id,
             shorthand=False,
@@ -204,8 +203,11 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
-        self.filepaths = MediaFilePaths(hs.config.media_store_path)
+        self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
         self.url = "/_synapse/admin/v1/media/%s/delete" % self.server_name
+
+        # Move clock up to somewhat realistic time
+        self.reactor.advance(1000000000)
 
     def test_no_auth(self):
         """
@@ -241,7 +243,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            url + "?before_ts=1234",
+            url + f"?before_ts={VALID_TIMESTAMP}",
             access_token=self.admin_user_tok,
         )
 
@@ -277,13 +279,27 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
-            "Query parameter before_ts must be a string representing a positive integer.",
+            "Query parameter before_ts must be a positive integer.",
             channel.json_body["error"],
         )
 
         channel = self.make_request(
             "POST",
-            self.url + "?before_ts=1234&size_gt=-1234",
+            self.url + f"?before_ts={INVALID_TIMESTAMP_IN_S}",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+        self.assertEqual(
+            "Query parameter before_ts you provided is from the year 1970. "
+            + "Double check that you are providing a timestamp in milliseconds.",
+            channel.json_body["error"],
+        )
+
+        channel = self.make_request(
+            "POST",
+            self.url + f"?before_ts={VALID_TIMESTAMP}&size_gt=-1234",
             access_token=self.admin_user_tok,
         )
 
@@ -296,7 +312,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            self.url + "?before_ts=1234&keep_profiles=not_bool",
+            self.url + f"?before_ts={VALID_TIMESTAMP}&keep_profiles=not_bool",
             access_token=self.admin_user_tok,
         )
 
@@ -504,16 +520,10 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         Create a media and return media_id and server_and_media_id
         """
         upload_resource = self.media_repo.children[b"upload"]
-        # file size is 67 Byte
-        image_data = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
 
         # Upload some media into the room
         response = self.helper.upload_media(
-            upload_resource, image_data, tok=self.admin_user_tok, expect_code=200
+            upload_resource, SMALL_PNG, tok=self.admin_user_tok, expect_code=200
         )
         # Extract media ID from the response
         server_and_media_id = response["content_uri"][6:]  # Cut off 'mxc://'
@@ -535,7 +545,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         channel = make_request(
             self.reactor,
-            FakeSite(download_resource),
+            FakeSite(download_resource, self.reactor),
             "GET",
             server_and_media_id,
             shorthand=False,
@@ -584,16 +594,10 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
 
         # Create media
         upload_resource = media_repo.children[b"upload"]
-        # file size is 67 Byte
-        image_data = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
 
         # Upload some media into the room
         response = self.helper.upload_media(
-            upload_resource, image_data, tok=self.admin_user_tok, expect_code=200
+            upload_resource, SMALL_PNG, tok=self.admin_user_tok, expect_code=200
         )
         # Extract media ID from the response
         server_and_media_id = response["content_uri"][6:]  # Cut off 'mxc://'
@@ -711,16 +715,10 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
 
         # Create media
         upload_resource = media_repo.children[b"upload"]
-        # file size is 67 Byte
-        image_data = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
 
         # Upload some media into the room
         response = self.helper.upload_media(
-            upload_resource, image_data, tok=self.admin_user_tok, expect_code=200
+            upload_resource, SMALL_PNG, tok=self.admin_user_tok, expect_code=200
         )
         # Extract media ID from the response
         server_and_media_id = response["content_uri"][6:]  # Cut off 'mxc://'
@@ -789,3 +787,81 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
 
         media_info = self.get_success(self.store.get_local_media(self.media_id))
         self.assertFalse(media_info["safe_from_quarantine"])
+
+
+class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_media_repo,
+        login.register_servlets,
+        profile.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.media_repo = hs.get_media_repository_resource()
+        self.server_name = hs.hostname
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
+        self.url = "/_synapse/admin/v1/purge_media_cache"
+
+    def test_no_auth(self):
+        """
+        Try to delete media without authentication.
+        """
+
+        channel = self.make_request("POST", self.url, b"{}")
+
+        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
+
+    def test_requester_is_not_admin(self):
+        """
+        If the user is not a server admin, an error is returned.
+        """
+        self.other_user = self.register_user("user", "pass")
+        self.other_user_token = self.login("user", "pass")
+
+        channel = self.make_request(
+            "POST",
+            self.url,
+            access_token=self.other_user_token,
+        )
+
+        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    def test_invalid_parameter(self):
+        """
+        If parameters are invalid, an error is returned.
+        """
+        channel = self.make_request(
+            "POST",
+            self.url + "?before_ts=-1234",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+        self.assertEqual(
+            "Query parameter before_ts must be a positive integer.",
+            channel.json_body["error"],
+        )
+
+        channel = self.make_request(
+            "POST",
+            self.url + f"?before_ts={INVALID_TIMESTAMP_IN_S}",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
+        self.assertEqual(
+            "Query parameter before_ts you provided is from the year 1970. "
+            + "Double check that you are providing a timestamp in milliseconds.",
+            channel.json_body["error"],
+        )

@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Tuple
 
 from typing_extensions import Counter as CounterType
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.metrics import event_processing_positions
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import JsonDict
@@ -46,7 +46,7 @@ class StatsHandler:
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
 
-        self.stats_enabled = hs.config.stats_enabled
+        self.stats_enabled = hs.config.stats.stats_enabled
 
         # The current position in the current_state_delta stream
         self.pos: Optional[int] = None
@@ -54,7 +54,7 @@ class StatsHandler:
         # Guard to ensure we only process deltas one at a time
         self._is_processing = False
 
-        if self.stats_enabled and hs.config.run_background_tasks:
+        if self.stats_enabled and hs.config.worker.run_background_tasks:
             self.notifier.add_replication_callback(self.notify_new_event)
 
             # We kick this off so that we don't have to wait for a change before
@@ -68,7 +68,7 @@ class StatsHandler:
 
         self._is_processing = True
 
-        async def process():
+        async def process() -> None:
             try:
                 await self._unsafe_process()
             finally:
@@ -254,7 +254,7 @@ class StatsHandler:
 
             elif typ == EventTypes.Create:
                 room_state["is_federatable"] = (
-                    event_content.get("m.federate", True) is True
+                    event_content.get(EventContentFields.FEDERATE, True) is True
                 )
             elif typ == EventTypes.JoinRules:
                 room_state["join_rules"] = event_content.get("join_rule")
@@ -273,7 +273,9 @@ class StatsHandler:
             elif typ == EventTypes.CanonicalAlias:
                 room_state["canonical_alias"] = event_content.get("alias")
             elif typ == EventTypes.GuestAccess:
-                room_state["guest_access"] = event_content.get("guest_access")
+                room_state["guest_access"] = event_content.get(
+                    EventContentFields.GUEST_ACCESS
+                )
 
         for room_id, state in room_to_state_updates.items():
             logger.debug("Updating room_stats_state for %s: %s", room_id, state)

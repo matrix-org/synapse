@@ -17,15 +17,16 @@ from unittest.mock import Mock
 import attr
 
 from synapse.api.constants import EduTypes
-from synapse.events.presence_router import PresenceRouter
+from synapse.events.presence_router import PresenceRouter, load_legacy_presence_router
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
 from synapse.module_api import ModuleApi
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, presence, room
+from synapse.rest.client import login, presence, room
 from synapse.types import JsonDict, StreamToken, create_requester
 
 from tests.handlers.test_sync import generate_sync_config
+from tests.test_utils import simple_async_mock
 from tests.unittest import FederatingHomeserverTestCase, TestCase, override_config
 
 
@@ -34,10 +35,57 @@ class PresenceRouterTestConfig:
     users_who_should_receive_all_presence = attr.ib(type=List[str], default=[])
 
 
-class PresenceRouterTestModule:
+class LegacyPresenceRouterTestModule:
     def __init__(self, config: PresenceRouterTestConfig, module_api: ModuleApi):
         self._config = config
         self._module_api = module_api
+
+    async def get_users_for_states(
+        self, state_updates: Iterable[UserPresenceState]
+    ) -> Dict[str, Set[UserPresenceState]]:
+        users_to_state = {
+            user_id: set(state_updates)
+            for user_id in self._config.users_who_should_receive_all_presence
+        }
+        return users_to_state
+
+    async def get_interested_users(
+        self, user_id: str
+    ) -> Union[Set[str], PresenceRouter.ALL_USERS]:
+        if user_id in self._config.users_who_should_receive_all_presence:
+            return PresenceRouter.ALL_USERS
+
+        return set()
+
+    @staticmethod
+    def parse_config(config_dict: dict) -> PresenceRouterTestConfig:
+        """Parse a configuration dictionary from the homeserver config, do
+        some validation and return a typed PresenceRouterConfig.
+
+        Args:
+            config_dict: The configuration dictionary.
+
+        Returns:
+            A validated config object.
+        """
+        # Initialise a typed config object
+        config = PresenceRouterTestConfig()
+
+        config.users_who_should_receive_all_presence = config_dict.get(
+            "users_who_should_receive_all_presence"
+        )
+
+        return config
+
+
+class PresenceRouterTestModule:
+    def __init__(self, config: PresenceRouterTestConfig, api: ModuleApi):
+        self._config = config
+        self._module_api = api
+        api.register_presence_router_callbacks(
+            get_users_for_states=self.get_users_for_states,
+            get_interested_users=self.get_interested_users,
+        )
 
     async def get_users_for_states(
         self, state_updates: Iterable[UserPresenceState]
@@ -86,9 +134,21 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor, clock):
-        return self.setup_test_homeserver(
-            federation_transport_client=Mock(spec=["send_transaction"]),
+        # Mock out the calls over federation.
+        fed_transport_client = Mock(spec=["send_transaction"])
+        fed_transport_client.send_transaction = simple_async_mock({})
+
+        hs = self.setup_test_homeserver(
+            federation_transport_client=fed_transport_client,
         )
+        # Load the modules into the homeserver
+        module_api = hs.get_module_api()
+        for module, config in hs.config.modules.loaded_modules:
+            module(config=config, api=module_api)
+
+        load_legacy_presence_router(hs)
+
+        return hs
 
     def prepare(self, reactor, clock, homeserver):
         self.sync_handler = self.hs.get_sync_handler()
@@ -98,7 +158,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         {
             "presence": {
                 "presence_router": {
-                    "module": __name__ + ".PresenceRouterTestModule",
+                    "module": __name__ + ".LegacyPresenceRouterTestModule",
                     "config": {
                         "users_who_should_receive_all_presence": [
                             "@presence_gobbler:test",
@@ -109,7 +169,28 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
             "send_federation": True,
         }
     )
+    def test_receiving_all_presence_legacy(self):
+        self.receiving_all_presence_test_body()
+
+    @override_config(
+        {
+            "modules": [
+                {
+                    "module": __name__ + ".PresenceRouterTestModule",
+                    "config": {
+                        "users_who_should_receive_all_presence": [
+                            "@presence_gobbler:test",
+                        ]
+                    },
+                },
+            ],
+            "send_federation": True,
+        }
+    )
     def test_receiving_all_presence(self):
+        self.receiving_all_presence_test_body()
+
+    def receiving_all_presence_test_body(self):
         """Test that a user that does not share a room with another other can receive
         presence for them, due to presence routing.
         """
@@ -203,7 +284,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         {
             "presence": {
                 "presence_router": {
-                    "module": __name__ + ".PresenceRouterTestModule",
+                    "module": __name__ + ".LegacyPresenceRouterTestModule",
                     "config": {
                         "users_who_should_receive_all_presence": [
                             "@presence_gobbler1:test",
@@ -216,7 +297,30 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
             "send_federation": True,
         }
     )
+    def test_send_local_online_presence_to_with_module_legacy(self):
+        self.send_local_online_presence_to_with_module_test_body()
+
+    @override_config(
+        {
+            "modules": [
+                {
+                    "module": __name__ + ".PresenceRouterTestModule",
+                    "config": {
+                        "users_who_should_receive_all_presence": [
+                            "@presence_gobbler1:test",
+                            "@presence_gobbler2:test",
+                            "@far_away_person:island",
+                        ]
+                    },
+                },
+            ],
+            "send_federation": True,
+        }
+    )
     def test_send_local_online_presence_to_with_module(self):
+        self.send_local_online_presence_to_with_module_test_body()
+
+    def send_local_online_presence_to_with_module_test_body(self):
         """Tests that send_local_presence_to_users sends local online presence to a set
         of specified local and remote users, with a custom PresenceRouter module enabled.
         """

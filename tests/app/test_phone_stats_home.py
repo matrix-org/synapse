@@ -1,6 +1,6 @@
 import synapse
 from synapse.app.phone_stats_home import start_phone_stats_home
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 
 from tests import unittest
 from tests.unittest import HomeserverTestCase
@@ -172,7 +172,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
 
         # We don't want our tests to actually report statistics, so check
         # that it's not enabled
-        assert not hs.config.report_stats
+        assert not hs.config.metrics.report_stats
 
         # This starts the needed data collection that we rely on to calculate
         # R30v2 metrics.

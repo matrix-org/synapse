@@ -16,8 +16,13 @@ from unittest.mock import Mock, patch
 
 import synapse.rest.admin
 from synapse.api.constants import EventTypes
-from synapse.rest.client.v1 import directory, login, profile, room
-from synapse.rest.client.v2_alpha import room_upgrade_rest_servlet
+from synapse.rest.client import (
+    directory,
+    login,
+    profile,
+    room,
+    room_upgrade_rest_servlet,
+)
 from synapse.types import UserID
 
 from tests import unittest
@@ -188,7 +193,7 @@ class RoomTestCase(_ShadowBannedBase):
         self.assertEquals(200, channel.code)
 
         # There should be no typing events.
-        event_source = self.hs.get_event_sources().sources["typing"]
+        event_source = self.hs.get_event_sources().sources.typing
         self.assertEquals(event_source.get_current_key(), 0)
 
         # The other user can join and send typing events.
@@ -205,7 +210,13 @@ class RoomTestCase(_ShadowBannedBase):
         # These appear in the room.
         self.assertEquals(event_source.get_current_key(), 1)
         events = self.get_success(
-            event_source.get_new_events(from_key=0, room_ids=[room_id])
+            event_source.get_new_events(
+                user=UserID.from_string(self.other_user_id),
+                from_key=0,
+                limit=None,
+                room_ids=[room_id],
+                is_guest=False,
+            )
         )
         self.assertEquals(
             events[0],

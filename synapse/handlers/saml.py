@@ -22,7 +22,6 @@ from saml2.client import Saml2Client
 
 from synapse.api.errors import SynapseError
 from synapse.config import ConfigError
-from synapse.handlers._base import BaseHandler
 from synapse.handlers.sso import MappingException, UserAttributes
 from synapse.http.servlet import parse_string
 from synapse.http.site import SynapseRequest
@@ -40,33 +39,34 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class Saml2SessionData:
     """Data we track about SAML2 sessions"""
 
     # time the session was created, in milliseconds
-    creation_time = attr.ib()
+    creation_time: int
     # The user interactive authentication session ID associated with this SAML
     # session (or None if this SAML session is for an initial login).
-    ui_auth_session_id = attr.ib(type=Optional[str], default=None)
+    ui_auth_session_id: Optional[str] = None
 
 
-class SamlHandler(BaseHandler):
+class SamlHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-        self._saml_client = Saml2Client(hs.config.saml2_sp_config)
-        self._saml_idp_entityid = hs.config.saml2_idp_entityid
+        self.store = hs.get_datastore()
+        self.clock = hs.get_clock()
+        self.server_name = hs.hostname
+        self._saml_client = Saml2Client(hs.config.saml2.saml2_sp_config)
+        self._saml_idp_entityid = hs.config.saml2.saml2_idp_entityid
 
-        self._saml2_session_lifetime = hs.config.saml2_session_lifetime
+        self._saml2_session_lifetime = hs.config.saml2.saml2_session_lifetime
         self._grandfathered_mxid_source_attribute = (
-            hs.config.saml2_grandfathered_mxid_source_attribute
+            hs.config.saml2.saml2_grandfathered_mxid_source_attribute
         )
         self._saml2_attribute_requirements = hs.config.saml2.attribute_requirements
-        self._error_template = hs.config.sso_error_template
 
         # plugin to do custom mapping from saml response to mxid
-        self._user_mapping_provider = hs.config.saml2_user_mapping_provider_class(
-            hs.config.saml2_user_mapping_provider_config,
+        self._user_mapping_provider = hs.config.saml2.saml2_user_mapping_provider_class(
+            hs.config.saml2.saml2_user_mapping_provider_config,
             ModuleApi(hs, hs.get_auth_handler()),
         )
 
@@ -80,7 +80,6 @@ class SamlHandler(BaseHandler):
         # the SsoIdentityProvider protocol type.
         self.idp_icon = None
         self.idp_brand = None
-        self.unstable_idp_brand = None
 
         # a map from saml session id to Saml2SessionData object
         self._outstanding_requests_dict: Dict[str, Saml2SessionData] = {}
@@ -360,7 +359,7 @@ class SamlHandler(BaseHandler):
 
         return remote_user_id
 
-    def expire_sessions(self):
+    def expire_sessions(self) -> None:
         expire_before = self.clock.time_msec() - self._saml2_session_lifetime
         to_expire = set()
         for reqid, data in self._outstanding_requests_dict.items():
@@ -392,10 +391,10 @@ MXID_MAPPER_MAP: Dict[str, Callable[[str], str]] = {
 }
 
 
-@attr.s
+@attr.s(auto_attribs=True)
 class SamlConfig:
-    mxid_source_attribute = attr.ib()
-    mxid_mapper = attr.ib()
+    mxid_source_attribute: str
+    mxid_mapper: Callable[[str], str]
 
 
 class DefaultSamlMappingProvider:
@@ -412,7 +411,7 @@ class DefaultSamlMappingProvider:
         self._mxid_mapper = parsed_config.mxid_mapper
 
         self._grandfathered_mxid_source_attribute = (
-            module_api._hs.config.saml2_grandfathered_mxid_source_attribute
+            module_api._hs.config.saml2.saml2_grandfathered_mxid_source_attribute
         )
 
     def get_remote_user_id(

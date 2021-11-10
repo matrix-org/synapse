@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import synapse.metrics
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, Membership
-from synapse.handlers.state_deltas import StateDeltasHandler
+from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo
 from synapse.types import JsonDict
@@ -30,14 +30,26 @@ logger = logging.getLogger(__name__)
 
 
 class UserDirectoryHandler(StateDeltasHandler):
-    """Handles querying of and keeping updated the user_directory.
+    """Handles queries and updates for the user_directory.
 
     N.B.: ASSUMES IT IS THE ONLY THING THAT MODIFIES THE USER DIRECTORY
 
-    The user directory is filled with users who this server can see are joined to a
-    world_readable or publicly joinable room. We keep a database table up to date
-    by streaming changes of the current state and recalculating whether users should
-    be in the directory or not when necessary.
+    When a local user searches the user_directory, we report two kinds of users:
+
+    - users this server can see are joined to a world_readable or publicly
+      joinable room, and
+    - users belonging to a private room shared by that local user.
+
+    The two cases are tracked separately in the `users_in_public_rooms` and
+    `users_who_share_private_rooms` tables. Both kinds of users have their
+    username and avatar tracked in a `user_directory` table.
+
+    This handler has three responsibilities:
+    1. Forwarding requests to `/user_directory/search` to the UserDirectoryStore.
+    2. Providing hooks for the application to call when local users are added,
+       removed, or have their profile changed.
+    3. Listening for room state changes that indicate remote users have
+       joined or left a room, or that their profile has changed.
     """
 
     def __init__(self, hs: "HomeServer"):
@@ -48,8 +60,8 @@ class UserDirectoryHandler(StateDeltasHandler):
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
-        self.update_user_directory = hs.config.update_user_directory
-        self.search_all_users = hs.config.user_directory_search_all_users
+        self.update_user_directory = hs.config.server.update_user_directory
+        self.search_all_users = hs.config.userdirectory.user_directory_search_all_users
         self.spam_checker = hs.get_spam_checker()
         # The current position in the current_state_delta stream
         self.pos: Optional[int] = None
@@ -102,7 +114,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         if self._is_processing:
             return
 
-        async def process():
+        async def process() -> None:
             try:
                 await self._unsafe_process()
             finally:
@@ -120,17 +132,12 @@ class UserDirectoryHandler(StateDeltasHandler):
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
 
-        # Support users are for diagnostics and should not appear in the user directory.
-        is_support = await self.store.is_support_user(user_id)
-        # When change profile information of deactivated user it should not appear in the user directory.
-        is_deactivated = await self.store.get_user_deactivated_status(user_id)
-
-        if not (is_support or is_deactivated):
+        if await self.store.should_include_local_user_in_dir(user_id):
             await self.store.update_profile_in_user_dir(
                 user_id, profile.display_name, profile.avatar_url
             )
 
-    async def handle_user_deactivated(self, user_id: str) -> None:
+    async def handle_local_user_deactivated(self, user_id: str) -> None:
         """Called when a user ID is deactivated"""
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
@@ -189,58 +196,12 @@ class UserDirectoryHandler(StateDeltasHandler):
                     room_id, prev_event_id, event_id, typ
                 )
             elif typ == EventTypes.Member:
-                change = await self._get_key_change(
+                await self._handle_room_membership_event(
+                    room_id,
                     prev_event_id,
                     event_id,
-                    key_name="membership",
-                    public_value=Membership.JOIN,
+                    state_key,
                 )
-
-                if change is False:
-                    # Need to check if the server left the room entirely, if so
-                    # we might need to remove all the users in that room
-                    is_in_room = await self.store.is_host_joined(
-                        room_id, self.server_name
-                    )
-                    if not is_in_room:
-                        logger.debug("Server left room: %r", room_id)
-                        # Fetch all the users that we marked as being in user
-                        # directory due to being in the room and then check if
-                        # need to remove those users or not
-                        user_ids = await self.store.get_users_in_dir_due_to_room(
-                            room_id
-                        )
-
-                        for user_id in user_ids:
-                            await self._handle_remove_user(room_id, user_id)
-                        return
-                    else:
-                        logger.debug("Server is still in room: %r", room_id)
-
-                is_support = await self.store.is_support_user(state_key)
-                if not is_support:
-                    if change is None:
-                        # Handle any profile changes
-                        await self._handle_profile_change(
-                            state_key, room_id, prev_event_id, event_id
-                        )
-                        continue
-
-                    if change:  # The user joined
-                        event = await self.store.get_event(event_id, allow_none=True)
-                        # It isn't expected for this event to not exist, but we
-                        # don't want the entire background process to break.
-                        if event is None:
-                            continue
-
-                        profile = ProfileInfo(
-                            avatar_url=event.content.get("avatar_url"),
-                            display_name=event.content.get("displayname"),
-                        )
-
-                        await self._handle_new_user(room_id, state_key, profile)
-                    else:  # The user left
-                        await self._handle_remove_user(room_id, state_key)
             else:
                 logger.debug("Ignoring irrelevant type: %r", typ)
 
@@ -263,14 +224,14 @@ class UserDirectoryHandler(StateDeltasHandler):
         logger.debug("Handling change for %s: %s", typ, room_id)
 
         if typ == EventTypes.RoomHistoryVisibility:
-            change = await self._get_key_change(
+            publicness = await self._get_key_change(
                 prev_event_id,
                 event_id,
                 key_name="history_visibility",
                 public_value=HistoryVisibility.WORLD_READABLE,
             )
         elif typ == EventTypes.JoinRules:
-            change = await self._get_key_change(
+            publicness = await self._get_key_change(
                 prev_event_id,
                 event_id,
                 key_name="join_rule",
@@ -278,9 +239,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             )
         else:
             raise Exception("Invalid event type")
-        # If change is None, no change. True => become world_readable/public,
-        # False => was world_readable/public
-        if change is None:
+        if publicness is MatchChange.no_change:
             logger.debug("No change")
             return
 
@@ -290,108 +249,185 @@ class UserDirectoryHandler(StateDeltasHandler):
             room_id
         )
 
-        logger.debug("Change: %r, is_public: %r", change, is_public)
+        logger.debug("Publicness change: %r, is_public: %r", publicness, is_public)
 
-        if change and not is_public:
+        if publicness is MatchChange.now_true and not is_public:
             # If we became world readable but room isn't currently public then
             # we ignore the change
             return
-        elif not change and is_public:
+        elif publicness is MatchChange.now_false and is_public:
             # If we stopped being world readable but are still public,
             # ignore the change
             return
 
-        other_users_in_room_with_profiles = (
-            await self.store.get_users_in_room_with_profiles(room_id)
-        )
+        users_in_room = await self.store.get_users_in_room(room_id)
 
         # Remove every user from the sharing tables for that room.
-        for user_id in other_users_in_room_with_profiles.keys():
+        for user_id in users_in_room:
             await self.store.remove_user_who_share_room(user_id, room_id)
 
-        # Then, re-add them to the tables.
-        # NOTE: this is not the most efficient method, as handle_new_user sets
+        # Then, re-add all remote users and some local users to the tables.
+        # NOTE: this is not the most efficient method, as _track_user_joined_room sets
         # up local_user -> other_user and other_user_whos_local -> local_user,
         # which when ran over an entire room, will result in the same values
         # being added multiple times. The batching upserts shouldn't make this
         # too bad, though.
-        for user_id, profile in other_users_in_room_with_profiles.items():
-            await self._handle_new_user(room_id, user_id, profile)
+        for user_id in users_in_room:
+            if not self.is_mine_id(
+                user_id
+            ) or await self.store.should_include_local_user_in_dir(user_id):
+                await self._track_user_joined_room(room_id, user_id)
 
-    async def _handle_new_user(
-        self, room_id: str, user_id: str, profile: ProfileInfo
+    async def _handle_room_membership_event(
+        self,
+        room_id: str,
+        prev_event_id: str,
+        event_id: str,
+        state_key: str,
     ) -> None:
-        """Called when we might need to add user to directory
+        """Process a single room membershp event.
 
-        Args:
-            room_id: The room ID that user joined or started being public
-            user_id
+        We have to do two things:
+
+        1. Update the room-sharing tables.
+           This applies to remote users and non-excluded local users.
+        2. Update the user_directory and user_directory_search tables.
+           This applies to remote users only, because we only become aware of
+           the (and any profile changes) by listening to these events.
+           The rest of the application knows exactly when local users are
+           created or their profile changed---it will directly call methods
+           on this class.
         """
+        joined = await self._get_key_change(
+            prev_event_id,
+            event_id,
+            key_name="membership",
+            public_value=Membership.JOIN,
+        )
+
+        # Both cases ignore excluded local users, so start by discarding them.
+        is_remote = not self.is_mine_id(state_key)
+        if not is_remote and not await self.store.should_include_local_user_in_dir(
+            state_key
+        ):
+            return
+
+        if joined is MatchChange.now_false:
+            # Need to check if the server left the room entirely, if so
+            # we might need to remove all the users in that room
+            is_in_room = await self.store.is_host_joined(room_id, self.server_name)
+            if not is_in_room:
+                logger.debug("Server left room: %r", room_id)
+                # Fetch all the users that we marked as being in user
+                # directory due to being in the room and then check if
+                # need to remove those users or not
+                user_ids = await self.store.get_users_in_dir_due_to_room(room_id)
+
+                for user_id in user_ids:
+                    await self._handle_remove_user(room_id, user_id)
+            else:
+                logger.debug("Server is still in room: %r", room_id)
+                await self._handle_remove_user(room_id, state_key)
+        elif joined is MatchChange.no_change:
+            # Handle any profile changes for remote users.
+            # (For local users the rest of the application calls
+            # `handle_local_profile_change`.)
+            if is_remote:
+                await self._handle_possible_remote_profile_change(
+                    state_key, room_id, prev_event_id, event_id
+                )
+        elif joined is MatchChange.now_true:  # The user joined
+            # This may be the first time we've seen a remote user. If
+            # so, ensure we have a directory entry for them. (For local users,
+            # the rest of the application calls `handle_local_profile_change`.)
+            if is_remote:
+                await self._upsert_directory_entry_for_remote_user(state_key, event_id)
+            await self._track_user_joined_room(room_id, state_key)
+
+    async def _upsert_directory_entry_for_remote_user(
+        self, user_id: str, event_id: str
+    ) -> None:
+        """A remote user has just joined a room. Ensure they have an entry in
+        the user directory. The caller is responsible for making sure they're
+        remote.
+        """
+        event = await self.store.get_event(event_id, allow_none=True)
+        # It isn't expected for this event to not exist, but we
+        # don't want the entire background process to break.
+        if event is None:
+            return
+
         logger.debug("Adding new user to dir, %r", user_id)
 
         await self.store.update_profile_in_user_dir(
-            user_id, profile.display_name, profile.avatar_url
+            user_id, event.content.get("displayname"), event.content.get("avatar_url")
         )
 
+    async def _track_user_joined_room(self, room_id: str, user_id: str) -> None:
+        """Someone's just joined a room. Update `users_in_public_rooms` or
+        `users_who_share_private_rooms` as appropriate.
+
+        The caller is responsible for ensuring that the given user should be
+        included in the user directory.
+        """
         is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
         )
-        # Now we update users who share rooms with users.
-        other_users_in_room = await self.store.get_users_in_room(room_id)
-
         if is_public:
             await self.store.add_users_in_public_rooms(room_id, (user_id,))
         else:
+            users_in_room = await self.store.get_users_in_room(room_id)
+            other_users_in_room = [
+                other
+                for other in users_in_room
+                if other != user_id
+                and (
+                    not self.is_mine_id(other)
+                    or await self.store.should_include_local_user_in_dir(other)
+                )
+            ]
             to_insert = set()
 
             # First, if they're our user then we need to update for every user
             if self.is_mine_id(user_id):
-
-                is_appservice = self.store.get_if_app_services_interested_in_user(
-                    user_id
-                )
-
-                # We don't care about appservice users.
-                if not is_appservice:
-                    for other_user_id in other_users_in_room:
-                        if user_id == other_user_id:
-                            continue
-
-                        to_insert.add((user_id, other_user_id))
+                for other_user_id in other_users_in_room:
+                    to_insert.add((user_id, other_user_id))
 
             # Next we need to update for every local user in the room
             for other_user_id in other_users_in_room:
-                if user_id == other_user_id:
-                    continue
-
-                is_appservice = self.store.get_if_app_services_interested_in_user(
-                    other_user_id
-                )
-                if self.is_mine_id(other_user_id) and not is_appservice:
+                if self.is_mine_id(other_user_id):
                     to_insert.add((other_user_id, user_id))
 
             if to_insert:
                 await self.store.add_users_who_share_private_room(room_id, to_insert)
 
     async def _handle_remove_user(self, room_id: str, user_id: str) -> None:
-        """Called when we might need to remove user from directory
+        """Called when when someone leaves a room. The user may be local or remote.
+
+        (If the person who left was the last local user in this room, the server
+        is no longer in the room. We call this function to forget that the remaining
+        remote users are in the room, even though they haven't left. So the name is
+        a little misleading!)
 
         Args:
             room_id: The room ID that user left or stopped being public that
             user_id
         """
-        logger.debug("Removing user %r", user_id)
+        logger.debug("Removing user %r from room %r", user_id, room_id)
 
         # Remove user from sharing tables
         await self.store.remove_user_who_share_room(user_id, room_id)
 
-        # Are they still in any rooms? If not, remove them entirely.
-        rooms_user_is_in = await self.store.get_user_dir_rooms_user_is_in(user_id)
+        # Additionally, if they're a remote user and we're no longer joined
+        # to any rooms they're in, remove them from the user directory.
+        if not self.is_mine_id(user_id):
+            rooms_user_is_in = await self.store.get_user_dir_rooms_user_is_in(user_id)
 
-        if len(rooms_user_is_in) == 0:
-            await self.store.remove_from_user_dir(user_id)
+            if len(rooms_user_is_in) == 0:
+                logger.debug("Removing user %r from directory", user_id)
+                await self.store.remove_from_user_dir(user_id)
 
-    async def _handle_profile_change(
+    async def _handle_possible_remote_profile_change(
         self,
         user_id: str,
         room_id: str,
@@ -399,7 +435,8 @@ class UserDirectoryHandler(StateDeltasHandler):
         event_id: Optional[str],
     ) -> None:
         """Check member event changes for any profile changes and update the
-        database if there are.
+        database if there are. This is intended for remote users only. The caller
+        is responsible for checking that the given user is remote.
         """
         if not prev_event_id or not event_id:
             return

@@ -118,21 +118,6 @@ class Config:
             "synapse", "res/templates"
         )
 
-    def __getattr__(self, item: str) -> Any:
-        """
-        Try and fetch a configuration option that does not exist on this class.
-
-        This is so that existing configs that rely on `self.value`, where value
-        is actually from a different config section, continue to work.
-        """
-        if item in ["generate_config_section", "read_config"]:
-            raise AttributeError(item)
-
-        if self.root is None:
-            raise AttributeError(item)
-        else:
-            return self.root._get_unclassed_config(self.section, item)
-
     @staticmethod
     def parse_size(value):
         if isinstance(value, int):
@@ -200,11 +185,7 @@ class Config:
     @classmethod
     def ensure_directory(cls, dir_path):
         dir_path = cls.abspath(dir_path)
-        try:
-            os.makedirs(dir_path)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
+        os.makedirs(dir_path, exist_ok=True)
         if not os.path.isdir(dir_path):
             raise ConfigError("%s is not a directory" % (dir_path,))
         return dir_path
@@ -237,13 +218,14 @@ class Config:
     def read_templates(
         self,
         filenames: List[str],
-        custom_template_directory: Optional[str] = None,
+        custom_template_directories: Optional[Iterable[str]] = None,
     ) -> List[jinja2.Template]:
         """Load a list of template files from disk using the given variables.
 
         This function will attempt to load the given templates from the default Synapse
-        template directory. If `custom_template_directory` is supplied, that directory
-        is tried first.
+        template directory. If `custom_template_directories` is supplied, any directory
+        in this list is tried (in the order they appear in the list) before trying
+        Synapse's default directory.
 
         Files read are treated as Jinja templates. The templates are not rendered yet
         and have autoescape enabled.
@@ -251,8 +233,8 @@ class Config:
         Args:
             filenames: A list of template filenames to read.
 
-            custom_template_directory: A directory to try to look for the templates
-                before using the default Synapse template directory instead.
+            custom_template_directories: A list of directory to try to look for the
+                templates before using the default Synapse template directory instead.
 
         Raises:
             ConfigError: if the file's path is incorrect or otherwise cannot be read.
@@ -260,20 +242,26 @@ class Config:
         Returns:
             A list of jinja2 templates.
         """
-        search_directories = [self.default_template_dir]
+        search_directories = []
 
-        # The loader will first look in the custom template directory (if specified) for the
-        # given filename. If it doesn't find it, it will use the default template dir instead
-        if custom_template_directory:
-            # Check that the given template directory exists
-            if not self.path_exists(custom_template_directory):
-                raise ConfigError(
-                    "Configured template directory does not exist: %s"
-                    % (custom_template_directory,)
-                )
+        # The loader will first look in the custom template directories (if specified)
+        # for the given filename. If it doesn't find it, it will use the default
+        # template dir instead.
+        if custom_template_directories is not None:
+            for custom_template_directory in custom_template_directories:
+                # Check that the given template directory exists
+                if not self.path_exists(custom_template_directory):
+                    raise ConfigError(
+                        "Configured template directory does not exist: %s"
+                        % (custom_template_directory,)
+                    )
 
-            # Search the custom template directory as well
-            search_directories.insert(0, custom_template_directory)
+                # Search the custom template directory as well
+                search_directories.append(custom_template_directory)
+
+        # Append the default directory at the end of the list so Jinja can fallback on it
+        # if a template is missing from any custom directory.
+        search_directories.append(self.default_template_dir)
 
         # TODO: switch to synapse.util.templates.build_jinja_env
         loader = jinja2.FileSystemLoader(search_directories)
@@ -286,7 +274,9 @@ class Config:
         env.filters.update(
             {
                 "format_ts": _format_ts_filter,
-                "mxc_to_http": _create_mxc_to_http_filter(self.public_baseurl),
+                "mxc_to_http": _create_mxc_to_http_filter(
+                    self.root.server.public_baseurl
+                ),
             }
         )
 
@@ -308,8 +298,6 @@ class RootConfig:
     config_classes = []
 
     def __init__(self):
-        self._configs = OrderedDict()
-
         for config_class in self.config_classes:
             if config_class.section is None:
                 raise ValueError("%r requires a section name" % (config_class,))
@@ -318,42 +306,7 @@ class RootConfig:
                 conf = config_class(self)
             except Exception as e:
                 raise Exception("Failed making %s: %r" % (config_class.section, e))
-            self._configs[config_class.section] = conf
-
-    def __getattr__(self, item: str) -> Any:
-        """
-        Redirect lookups on this object either to config objects, or values on
-        config objects, so that `config.tls.blah` works, as well as legacy uses
-        of things like `config.server_name`. It will first look up the config
-        section name, and then values on those config classes.
-        """
-        if item in self._configs.keys():
-            return self._configs[item]
-
-        return self._get_unclassed_config(None, item)
-
-    def _get_unclassed_config(self, asking_section: Optional[str], item: str):
-        """
-        Fetch a config value from one of the instantiated config classes that
-        has not been fetched directly.
-
-        Args:
-            asking_section: If this check is coming from a Config child, which
-                one? This section will not be asked if it has the value.
-            item: The configuration value key.
-
-        Raises:
-            AttributeError if no config classes have the config key. The body
-                will contain what sections were checked.
-        """
-        for key, val in self._configs.items():
-            if key == asking_section:
-                continue
-
-            if item in dir(val):
-                return getattr(val, item)
-
-        raise AttributeError(item, "not found in %s" % (list(self._configs.keys()),))
+            setattr(self, config_class.section, conf)
 
     def invoke_all(self, func_name: str, *args, **kwargs) -> MutableMapping[str, Any]:
         """
@@ -370,9 +323,11 @@ class RootConfig:
         """
         res = OrderedDict()
 
-        for name, config in self._configs.items():
+        for config_class in self.config_classes:
+            config = getattr(self, config_class.section)
+
             if hasattr(config, func_name):
-                res[name] = getattr(config, func_name)(*args, **kwargs)
+                res[config_class.section] = getattr(config, func_name)(*args, **kwargs)
 
         return res
 
@@ -686,8 +641,7 @@ class RootConfig:
                     open_private_ports=config_args.open_private_ports,
                 )
 
-                if not path_exists(config_dir_path):
-                    os.makedirs(config_dir_path)
+                os.makedirs(config_dir_path, exist_ok=True)
                 with open(config_path, "w") as config_file:
                     config_file.write(config_str)
                     config_file.write("\n\n# vim:ft=yaml")

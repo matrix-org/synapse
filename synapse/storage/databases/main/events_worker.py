@@ -14,7 +14,6 @@
 
 import logging
 import threading
-from collections import namedtuple
 from typing import (
     Collection,
     Container,
@@ -27,7 +26,9 @@ from typing import (
     overload,
 )
 
+import attr
 from constantly import NamedConstant, Names
+from prometheus_client import Gauge
 from typing_extensions import Literal
 
 from twisted.internet import defer
@@ -42,7 +43,11 @@ from synapse.api.room_versions import (
 from synapse.events import EventBase, make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.events.utils import prune_event
-from synapse.logging.context import PreserveLoggingContext, current_context
+from synapse.logging.context import (
+    PreserveLoggingContext,
+    current_context,
+    make_deferred_yieldable,
+)
 from synapse.metrics.background_process_metrics import (
     run_as_background_process,
     wrap_as_background_process,
@@ -51,11 +56,14 @@ from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import BackfillStream
 from synapse.replication.tcp.streams.events import EventsStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.engines import PostgresEngine
+from synapse.storage.types import Connection
 from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
 from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import JsonDict, get_domain_from_id
+from synapse.util import unwrapFirstError
+from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.iterutils import batch_iter
@@ -74,7 +82,57 @@ EVENT_QUEUE_ITERATIONS = 3  # No. times we block waiting for requests for events
 EVENT_QUEUE_TIMEOUT_S = 0.1  # Timeout when waiting for requests for events
 
 
-_EventCacheEntry = namedtuple("_EventCacheEntry", ("event", "redacted_event"))
+event_fetch_ongoing_gauge = Gauge(
+    "synapse_event_fetch_ongoing",
+    "The number of event fetchers that are running",
+)
+
+
+@attr.s(slots=True, auto_attribs=True)
+class _EventCacheEntry:
+    event: EventBase
+    redacted_event: Optional[EventBase]
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _EventRow:
+    """
+    An event, as pulled from the database.
+
+    Properties:
+        event_id: The event ID of the event.
+
+        stream_ordering: stream ordering for this event
+
+        json: json-encoded event structure
+
+        internal_metadata: json-encoded internal metadata dict
+
+        format_version: The format of the event. Hopefully one of EventFormatVersions.
+            'None' means the event predates EventFormatVersions (so the event is format V1).
+
+        room_version_id: The version of the room which contains the event. Hopefully
+            one of RoomVersions.
+
+           Due to historical reasons, there may be a few events in the database which
+           do not have an associated room; in this case None will be returned here.
+
+        rejected_reason: if the event was rejected, the reason why.
+
+        redactions: a list of event-ids which (claim to) redact this event.
+
+        outlier: True if this event is an outlier.
+    """
+
+    event_id: str
+    stream_ordering: int
+    json: str
+    internal_metadata: str
+    format_version: Optional[int]
+    room_version_id: Optional[int]
+    rejected_reason: Optional[str]
+    redactions: List[str]
+    outlier: bool
 
 
 class EventRedactBehaviour(Names):
@@ -149,7 +207,7 @@ class EventsWorkerStore(SQLBaseStore):
                     db_conn, "events", "stream_ordering", step=-1
                 )
 
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             # We periodically clean out old transaction ID mappings
             self._clock.looping_call(
                 self._cleanup_old_transaction_ids,
@@ -161,9 +219,17 @@ class EventsWorkerStore(SQLBaseStore):
             max_size=hs.config.caches.event_cache_size,
         )
 
+        # Map from event ID to a deferred that will result in a map from event
+        # ID to cache entry. Note that the returned dict may not have the
+        # requested event in it if the event isn't in the DB.
+        self._current_event_fetches: Dict[
+            str, ObservableDeferred[Dict[str, _EventCacheEntry]]
+        ] = {}
+
         self._event_fetch_lock = threading.Condition()
         self._event_fetch_list = []
         self._event_fetch_ongoing = 0
+        event_fetch_ongoing_gauge.set(self._event_fetch_ongoing)
 
         # We define this sequence here so that it can be referenced from both
         # the DataStore and PersistEventStore.
@@ -476,7 +542,9 @@ class EventsWorkerStore(SQLBaseStore):
 
         return events
 
-    async def _get_events_from_cache_or_db(self, event_ids, allow_rejected=False):
+    async def _get_events_from_cache_or_db(
+        self, event_ids: Iterable[str], allow_rejected: bool = False
+    ) -> Dict[str, _EventCacheEntry]:
         """Fetch a bunch of events from the cache or the database.
 
         If events are pulled from the database, they will be cached for future lookups.
@@ -485,53 +553,124 @@ class EventsWorkerStore(SQLBaseStore):
 
         Args:
 
-            event_ids (Iterable[str]): The event_ids of the events to fetch
+            event_ids: The event_ids of the events to fetch
 
-            allow_rejected (bool): Whether to include rejected events. If False,
+            allow_rejected: Whether to include rejected events. If False,
                 rejected events are omitted from the response.
 
         Returns:
-            Dict[str, _EventCacheEntry]:
-                map from event id to result
+            map from event id to result
         """
         event_entry_map = self._get_events_from_cache(
-            event_ids, allow_rejected=allow_rejected
+            event_ids,
         )
 
-        missing_events_ids = [e for e in event_ids if e not in event_entry_map]
+        missing_events_ids = {e for e in event_ids if e not in event_entry_map}
+
+        # We now look up if we're already fetching some of the events in the DB,
+        # if so we wait for those lookups to finish instead of pulling the same
+        # events out of the DB multiple times.
+        #
+        # Note: we might get the same `ObservableDeferred` back for multiple
+        # events we're already fetching, so we deduplicate the deferreds to
+        # avoid extraneous work (if we don't do this we can end up in a n^2 mode
+        # when we wait on the same Deferred N times, then try and merge the
+        # same dict into itself N times).
+        already_fetching_ids: Set[str] = set()
+        already_fetching_deferreds: Set[
+            ObservableDeferred[Dict[str, _EventCacheEntry]]
+        ] = set()
+
+        for event_id in missing_events_ids:
+            deferred = self._current_event_fetches.get(event_id)
+            if deferred is not None:
+                # We're already pulling the event out of the DB. Add the deferred
+                # to the collection of deferreds to wait on.
+                already_fetching_ids.add(event_id)
+                already_fetching_deferreds.add(deferred)
+
+        missing_events_ids.difference_update(already_fetching_ids)
 
         if missing_events_ids:
             log_ctx = current_context()
             log_ctx.record_event_fetch(len(missing_events_ids))
+
+            # Add entries to `self._current_event_fetches` for each event we're
+            # going to pull from the DB. We use a single deferred that resolves
+            # to all the events we pulled from the DB (this will result in this
+            # function returning more events than requested, but that can happen
+            # already due to `_get_events_from_db`).
+            fetching_deferred: ObservableDeferred[
+                Dict[str, _EventCacheEntry]
+            ] = ObservableDeferred(defer.Deferred())
+            for event_id in missing_events_ids:
+                self._current_event_fetches[event_id] = fetching_deferred
 
             # Note that _get_events_from_db is also responsible for turning db rows
             # into FrozenEvents (via _get_event_from_row), which involves seeing if
             # the events have been redacted, and if so pulling the redaction event out
             # of the database to check it.
             #
-            missing_events = await self._get_events_from_db(
-                missing_events_ids, allow_rejected=allow_rejected
-            )
+            try:
+                missing_events = await self._get_events_from_db(
+                    missing_events_ids,
+                )
 
-            event_entry_map.update(missing_events)
+                event_entry_map.update(missing_events)
+            except Exception as e:
+                with PreserveLoggingContext():
+                    fetching_deferred.errback(e)
+                raise e
+            finally:
+                # Ensure that we mark these events as no longer being fetched.
+                for event_id in missing_events_ids:
+                    self._current_event_fetches.pop(event_id, None)
+
+            with PreserveLoggingContext():
+                fetching_deferred.callback(missing_events)
+
+        if already_fetching_deferreds:
+            # Wait for the other event requests to finish and add their results
+            # to ours.
+            results = await make_deferred_yieldable(
+                defer.gatherResults(
+                    (d.observe() for d in already_fetching_deferreds),
+                    consumeErrors=True,
+                )
+            ).addErrback(unwrapFirstError)
+
+            for result in results:
+                # We filter out events that we haven't asked for as we might get
+                # a *lot* of superfluous events back, and there is no point
+                # going through and inserting them all (which can take time).
+                event_entry_map.update(
+                    (event_id, entry)
+                    for event_id, entry in result.items()
+                    if event_id in already_fetching_ids
+                )
+
+        if not allow_rejected:
+            event_entry_map = {
+                event_id: entry
+                for event_id, entry in event_entry_map.items()
+                if not entry.event.rejected_reason
+            }
 
         return event_entry_map
 
     def _invalidate_get_event_cache(self, event_id):
         self._get_event_cache.invalidate((event_id,))
 
-    def _get_events_from_cache(self, events, allow_rejected, update_metrics=True):
-        """Fetch events from the caches
+    def _get_events_from_cache(
+        self, events: Iterable[str], update_metrics: bool = True
+    ) -> Dict[str, _EventCacheEntry]:
+        """Fetch events from the caches.
+
+        May return rejected events.
 
         Args:
-            events (Iterable[str]): list of event_ids to fetch
-            allow_rejected (bool): Whether to return events that were rejected
-            update_metrics (bool): Whether to update the cache hit ratio metrics
-
-        Returns:
-            dict of event_id -> _EventCacheEntry for each event_id in cache. If
-            allow_rejected is `False` then there will still be an entry but it
-            will be `None`
+            events: list of event_ids to fetch
+            update_metrics: Whether to update the cache hit ratio metrics
         """
         event_map = {}
 
@@ -542,10 +681,7 @@ class EventsWorkerStore(SQLBaseStore):
             if not ret:
                 continue
 
-            if allow_rejected or not ret.event.rejected_reason:
-                event_map[event_id] = ret
-            else:
-                event_map[event_id] = None
+            event_map[event_id] = ret
 
         return event_map
 
@@ -600,40 +736,45 @@ class EventsWorkerStore(SQLBaseStore):
             for e in state_to_include.values()
         ]
 
-    def _do_fetch(self, conn):
+    def _do_fetch(self, conn: Connection) -> None:
         """Takes a database connection and waits for requests for events from
         the _event_fetch_list queue.
         """
-        i = 0
-        while True:
-            with self._event_fetch_lock:
-                event_list = self._event_fetch_list
-                self._event_fetch_list = []
+        try:
+            i = 0
+            while True:
+                with self._event_fetch_lock:
+                    event_list = self._event_fetch_list
+                    self._event_fetch_list = []
 
-                if not event_list:
-                    single_threaded = self.database_engine.single_threaded
-                    if (
-                        not self.USE_DEDICATED_DB_THREADS_FOR_EVENT_FETCHING
-                        or single_threaded
-                        or i > EVENT_QUEUE_ITERATIONS
-                    ):
-                        self._event_fetch_ongoing -= 1
-                        return
-                    else:
-                        self._event_fetch_lock.wait(EVENT_QUEUE_TIMEOUT_S)
-                        i += 1
-                        continue
-                i = 0
+                    if not event_list:
+                        single_threaded = self.database_engine.single_threaded
+                        if (
+                            not self.USE_DEDICATED_DB_THREADS_FOR_EVENT_FETCHING
+                            or single_threaded
+                            or i > EVENT_QUEUE_ITERATIONS
+                        ):
+                            break
+                        else:
+                            self._event_fetch_lock.wait(EVENT_QUEUE_TIMEOUT_S)
+                            i += 1
+                            continue
+                    i = 0
 
-            self._fetch_event_list(conn, event_list)
+                self._fetch_event_list(conn, event_list)
+        finally:
+            self._event_fetch_ongoing -= 1
+            event_fetch_ongoing_gauge.set(self._event_fetch_ongoing)
 
-    def _fetch_event_list(self, conn, event_list):
+    def _fetch_event_list(
+        self, conn: Connection, event_list: List[Tuple[List[str], defer.Deferred]]
+    ) -> None:
         """Handle a load of requests from the _event_fetch_list queue
 
         Args:
-            conn (twisted.enterprise.adbapi.Connection): database connection
+            conn: database connection
 
-            event_list (list[Tuple[list[str], Deferred]]):
+            event_list:
                 The fetch requests. Each entry consists of a list of event
                 ids to be fetched, and a deferred to be completed once the
                 events have been fetched.
@@ -672,23 +813,23 @@ class EventsWorkerStore(SQLBaseStore):
                 with PreserveLoggingContext():
                     self.hs.get_reactor().callFromThread(fire, event_list, e)
 
-    async def _get_events_from_db(self, event_ids, allow_rejected=False):
+    async def _get_events_from_db(
+        self, event_ids: Iterable[str]
+    ) -> Dict[str, _EventCacheEntry]:
         """Fetch a bunch of events from the database.
+
+        May return rejected events.
 
         Returned events will be added to the cache for future lookups.
 
         Unknown events are omitted from the response.
 
         Args:
-            event_ids (Iterable[str]): The event_ids of the events to fetch
-
-            allow_rejected (bool): Whether to include rejected events. If False,
-                rejected events are omitted from the response.
+            event_ids: The event_ids of the events to fetch
 
         Returns:
-            Dict[str, _EventCacheEntry]:
-                map from event id to result. May return extra events which
-                weren't asked for.
+            map from event id to result. May return extra events which
+            weren't asked for.
         """
         fetched_events = {}
         events_to_fetch = event_ids
@@ -702,7 +843,7 @@ class EventsWorkerStore(SQLBaseStore):
                 row = row_map.get(event_id)
                 fetched_events[event_id] = row
                 if row:
-                    redaction_ids.update(row["redactions"])
+                    redaction_ids.update(row.redactions)
 
             events_to_fetch = redaction_ids.difference(fetched_events.keys())
             if events_to_fetch:
@@ -713,35 +854,32 @@ class EventsWorkerStore(SQLBaseStore):
         for event_id, row in fetched_events.items():
             if not row:
                 continue
-            assert row["event_id"] == event_id
+            assert row.event_id == event_id
 
-            rejected_reason = row["rejected_reason"]
-
-            if not allow_rejected and rejected_reason:
-                continue
+            rejected_reason = row.rejected_reason
 
             # If the event or metadata cannot be parsed, log the error and act
             # as if the event is unknown.
             try:
-                d = db_to_json(row["json"])
+                d = db_to_json(row.json)
             except ValueError:
                 logger.error("Unable to parse json from event: %s", event_id)
                 continue
             try:
-                internal_metadata = db_to_json(row["internal_metadata"])
+                internal_metadata = db_to_json(row.internal_metadata)
             except ValueError:
                 logger.error(
                     "Unable to parse internal_metadata from event: %s", event_id
                 )
                 continue
 
-            format_version = row["format_version"]
+            format_version = row.format_version
             if format_version is None:
                 # This means that we stored the event before we had the concept
                 # of a event format version, so it must be a V1 event.
                 format_version = EventFormatVersions.V1
 
-            room_version_id = row["room_version_id"]
+            room_version_id = row.room_version_id
 
             if not room_version_id:
                 # this should only happen for out-of-band membership events which
@@ -806,8 +944,8 @@ class EventsWorkerStore(SQLBaseStore):
                 internal_metadata_dict=internal_metadata,
                 rejected_reason=rejected_reason,
             )
-            original_ev.internal_metadata.stream_ordering = row["stream_ordering"]
-            original_ev.internal_metadata.outlier = row["outlier"]
+            original_ev.internal_metadata.stream_ordering = row.stream_ordering
+            original_ev.internal_metadata.outlier = row.outlier
 
             event_map[event_id] = original_ev
 
@@ -815,7 +953,7 @@ class EventsWorkerStore(SQLBaseStore):
         # the cache entries.
         result_map = {}
         for event_id, original_ev in event_map.items():
-            redactions = fetched_events[event_id]["redactions"]
+            redactions = fetched_events[event_id].redactions
             redacted_event = self._maybe_redact_event_row(
                 original_ev, redactions, event_map
             )
@@ -829,17 +967,17 @@ class EventsWorkerStore(SQLBaseStore):
 
         return result_map
 
-    async def _enqueue_events(self, events):
+    async def _enqueue_events(self, events: Iterable[str]) -> Dict[str, _EventRow]:
         """Fetches events from the database using the _event_fetch_list. This
         allows batch and bulk fetching of events - it allows us to fetch events
         without having to create a new transaction for each request for events.
 
         Args:
-            events (Iterable[str]): events to be fetched.
+            events: events to be fetched.
 
         Returns:
-            Dict[str, Dict]: map from event id to row data from the database.
-                May contain events that weren't requested.
+            A map from event id to row data from the database. May contain events
+            that weren't requested.
         """
 
         events_d = defer.Deferred()
@@ -850,6 +988,7 @@ class EventsWorkerStore(SQLBaseStore):
 
             if self._event_fetch_ongoing < EVENT_QUEUE_THREADS:
                 self._event_fetch_ongoing += 1
+                event_fetch_ongoing_gauge.set(self._event_fetch_ongoing)
                 should_start = True
             else:
                 should_start = False
@@ -866,43 +1005,19 @@ class EventsWorkerStore(SQLBaseStore):
 
         return row_map
 
-    def _fetch_event_rows(self, txn, event_ids):
+    def _fetch_event_rows(
+        self, txn: LoggingTransaction, event_ids: Iterable[str]
+    ) -> Dict[str, _EventRow]:
         """Fetch event rows from the database
 
         Events which are not found are omitted from the result.
 
-        The returned per-event dicts contain the following keys:
-
-         * event_id (str)
-
-         * stream_ordering (int): stream ordering for this event
-
-         * json (str): json-encoded event structure
-
-         * internal_metadata (str): json-encoded internal metadata dict
-
-         * format_version (int|None): The format of the event. Hopefully one
-           of EventFormatVersions. 'None' means the event predates
-           EventFormatVersions (so the event is format V1).
-
-         * room_version_id (str|None): The version of the room which contains the event.
-           Hopefully one of RoomVersions.
-
-           Due to historical reasons, there may be a few events in the database which
-           do not have an associated room; in this case None will be returned here.
-
-         * rejected_reason (str|None): if the event was rejected, the reason
-           why.
-
-         * redactions (List[str]): a list of event-ids which (claim to) redact
-           this event.
-
         Args:
-            txn (twisted.enterprise.adbapi.Connection):
-            event_ids (Iterable[str]): event IDs to fetch
+            txn: The database transaction.
+            event_ids: event IDs to fetch
 
         Returns:
-            Dict[str, Dict]: a map from event id to event info.
+            A map from event id to event info.
         """
         event_dict = {}
         for evs in batch_iter(event_ids, 200):
@@ -930,17 +1045,17 @@ class EventsWorkerStore(SQLBaseStore):
 
             for row in txn:
                 event_id = row[0]
-                event_dict[event_id] = {
-                    "event_id": event_id,
-                    "stream_ordering": row[1],
-                    "internal_metadata": row[2],
-                    "json": row[3],
-                    "format_version": row[4],
-                    "room_version_id": row[5],
-                    "rejected_reason": row[6],
-                    "redactions": [],
-                    "outlier": row[7],
-                }
+                event_dict[event_id] = _EventRow(
+                    event_id=event_id,
+                    stream_ordering=row[1],
+                    internal_metadata=row[2],
+                    json=row[3],
+                    format_version=row[4],
+                    room_version_id=row[5],
+                    rejected_reason=row[6],
+                    redactions=[],
+                    outlier=row[7],
+                )
 
             # check for redactions
             redactions_sql = "SELECT event_id, redacts FROM redactions WHERE "
@@ -952,7 +1067,7 @@ class EventsWorkerStore(SQLBaseStore):
             for (redacter, redacted) in txn:
                 d = event_dict.get(redacted)
                 if d:
-                    d["redactions"].append(redacter)
+                    d.redactions.append(redacter)
 
         return event_dict
 
@@ -1412,7 +1527,7 @@ class EventsWorkerStore(SQLBaseStore):
         if not res:
             raise SynapseError(404, "Could not find event %s" % (event_id,))
 
-        return (int(res["topological_ordering"]), int(res["stream_ordering"]))
+        return int(res["topological_ordering"]), int(res["stream_ordering"])
 
     async def get_next_event_to_expire(self) -> Optional[Tuple[str, int]]:
         """Retrieve the entry with the lowest expiry timestamp in the event_expiry

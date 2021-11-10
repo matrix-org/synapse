@@ -18,10 +18,8 @@ import attr
 from nacl.signing import SigningKey
 
 from synapse.api.constants import MAX_DEPTH
-from synapse.api.errors import UnsupportedRoomVersionError
 from synapse.api.room_versions import (
     KNOWN_EVENT_FORMAT_VERSIONS,
-    KNOWN_ROOM_VERSIONS,
     EventFormatVersions,
     RoomVersion,
 )
@@ -92,13 +90,13 @@ class EventBuilder:
     )
 
     @property
-    def state_key(self):
+    def state_key(self) -> str:
         if self._state_key is not None:
             return self._state_key
 
         raise AttributeError("state_key")
 
-    def is_state(self):
+    def is_state(self) -> bool:
         return self._state_key is not None
 
     async def build(
@@ -196,24 +194,6 @@ class EventBuilderFactory:
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
-
-    def new(self, room_version: str, key_values: dict) -> EventBuilder:
-        """Generate an event builder appropriate for the given room version
-
-        Deprecated: use for_room_version with a RoomVersion object instead
-
-        Args:
-            room_version: Version of the room that we're creating an event builder for
-            key_values: Fields used as the basis of the new event
-
-        Returns:
-            EventBuilder
-        """
-        v = KNOWN_ROOM_VERSIONS.get(room_version)
-        if not v:
-            # this can happen if support is withdrawn for a room version
-            raise UnsupportedRoomVersionError()
-        return self.for_room_version(v, key_values)
 
     def for_room_version(
         self, room_version: RoomVersion, key_values: dict

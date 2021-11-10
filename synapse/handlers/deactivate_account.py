@@ -19,19 +19,17 @@ from synapse.api.errors import SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import Requester, UserID, create_requester
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class DeactivateAccountHandler(BaseHandler):
+class DeactivateAccountHandler:
     """Handler which deals with deactivating user accounts."""
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
         self.hs = hs
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
@@ -46,7 +44,7 @@ class DeactivateAccountHandler(BaseHandler):
 
         # Start the user parter loop so it can resume parting users from rooms where
         # it left off (if it has work left to do).
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             hs.get_reactor().callWhenRunning(self._start_user_parting)
 
         self._account_validity_enabled = (
@@ -131,7 +129,7 @@ class DeactivateAccountHandler(BaseHandler):
         await self.store.add_user_pending_deactivation(user_id)
 
         # delete from user directory
-        await self.user_directory_handler.handle_user_deactivated(user_id)
+        await self.user_directory_handler.handle_local_user_deactivated(user_id)
 
         # Mark the user as erased, if they asked for that
         if erase_data:
@@ -255,16 +253,16 @@ class DeactivateAccountHandler(BaseHandler):
         Args:
             user_id: ID of user to be re-activated
         """
-        # Add the user to the directory, if necessary.
         user = UserID.from_string(user_id)
-        if self.hs.config.user_directory_search_all_users:
-            profile = await self.store.get_profileinfo(user.localpart)
-            await self.user_directory_handler.handle_local_profile_change(
-                user_id, profile
-            )
 
         # Ensure the user is not marked as erased.
         await self.store.mark_user_not_erased(user_id)
 
         # Mark the user as active.
         await self.store.set_user_deactivated_status(user_id, False)
+
+        # Add the user to the directory, if necessary. Note that
+        # this must be done after the user is re-activated, because
+        # deactivated users are excluded from the user directory.
+        profile = await self.store.get_profileinfo(user.localpart)
+        await self.user_directory_handler.handle_local_profile_change(user_id, profile)

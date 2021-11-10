@@ -14,7 +14,7 @@
 import calendar
 import logging
 import time
-from typing import Dict
+from typing import TYPE_CHECKING, Dict
 
 from synapse.metrics import GaugeBucketCollector
 from synapse.metrics.background_process_metrics import wrap_as_background_process
@@ -23,6 +23,9 @@ from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.event_push_actions import (
     EventPushActionsWorkerStore,
 )
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -52,11 +55,11 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
     stats and prometheus metrics.
     """
 
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
 
         # Read the extrems every 60 minutes
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             self._clock.looping_call(self._read_forward_extremities, 60 * 60 * 1000)
 
         # Used in _generate_user_daily_visits to keep track of progress

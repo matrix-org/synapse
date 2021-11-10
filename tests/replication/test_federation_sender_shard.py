@@ -17,7 +17,7 @@ from unittest.mock import Mock
 from synapse.api.constants import EventTypes, Membership
 from synapse.events.builder import EventBuilderFactory
 from synapse.rest.admin import register_servlets_for_client_rest_resource
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.types import UserID, create_requester
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
@@ -205,7 +205,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
     def create_room_with_remote_server(self, user, token, remote_server="other_server"):
         room = self.helper.create_room_as(user, tok=token)
         store = self.hs.get_datastore()
-        federation = self.hs.get_federation_handler()
+        federation = self.hs.get_federation_event_handler()
 
         prev_event_ids = self.get_success(store.get_latest_event_ids_in_room(room))
         room_version = self.get_success(store.get_room_version(room))

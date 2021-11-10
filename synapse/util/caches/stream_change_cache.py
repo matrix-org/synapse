@@ -40,10 +40,10 @@ class StreamChangeCache:
         self,
         name: str,
         current_stream_pos: int,
-        max_size=10000,
+        max_size: int = 10000,
         prefilled_cache: Optional[Mapping[EntityType, int]] = None,
-    ):
-        self._original_max_size = max_size
+    ) -> None:
+        self._original_max_size: int = max_size
         self._max_size = math.floor(max_size)
         self._entity_to_key: Dict[EntityType, int] = {}
 
@@ -195,7 +195,7 @@ class StreamChangeCache:
             for entity in r:
                 del self._entity_to_key[entity]
 
-    def _evict(self):
+    def _evict(self) -> None:
         while len(self._cache) > self._max_size:
             k, r = self._cache.popitem(0)
             self._earliest_known_stream_pos = max(k, self._earliest_known_stream_pos)

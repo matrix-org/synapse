@@ -34,14 +34,12 @@ from typing import (
 )
 
 import twisted.internet.tcp
-from twisted.internet import defer
-from twisted.mail.smtp import sendmail
 from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import IResource
 
 from synapse.api.auth import Auth
 from synapse.api.filtering import Filtering
-from synapse.api.ratelimiting import Ratelimiter
+from synapse.api.ratelimiting import Ratelimiter, RequestRatelimiter
 from synapse.appservice.api import ApplicationServiceApi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
 from synapse.config.homeserver import HomeServerConfig
@@ -67,7 +65,7 @@ from synapse.handlers.account_data import AccountDataHandler
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.admin import AdminHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
-from synapse.handlers.auth import AuthHandler, MacaroonGenerator
+from synapse.handlers.auth import AuthHandler, MacaroonGenerator, PasswordAuthProvider
 from synapse.handlers.cas import CasHandler
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
@@ -78,6 +76,7 @@ from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
 from synapse.handlers.event_auth import EventAuthHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.federation import FederationHandler
+from synapse.handlers.federation_event import FederationEventHandler
 from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
 from synapse.handlers.identity import IdentityHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
@@ -98,13 +97,14 @@ from synapse.handlers.room import (
     RoomCreationHandler,
     RoomShutdownHandler,
 )
+from synapse.handlers.room_batch import RoomBatchHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
+from synapse.handlers.room_summary import RoomSummaryHandler
 from synapse.handlers.search import SearchHandler
 from synapse.handlers.send_email import SendEmailHandler
 from synapse.handlers.set_password import SetPasswordHandler
-from synapse.handlers.space_summary import SpaceSummaryHandler
 from synapse.handlers.sso import SsoHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
@@ -314,7 +314,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         # Register background tasks required by this server. This must be done
         # somewhat manually due to the background tasks not being registered
         # unless handlers are instantiated.
-        if self.config.run_background_tasks:
+        if self.config.worker.run_background_tasks:
             self.setup_background_tasks()
 
     def start_listening(self) -> None:
@@ -371,8 +371,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         return Ratelimiter(
             store=self.get_datastore(),
             clock=self.get_clock(),
-            rate_hz=self.config.rc_registration.per_second,
-            burst_count=self.config.rc_registration.burst_count,
+            rate_hz=self.config.ratelimiting.rc_registration.per_second,
+            burst_count=self.config.ratelimiting.rc_registration.burst_count,
         )
 
     @cache_in_self
@@ -393,7 +393,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_http_client_context_factory(self) -> IPolicyForHTTPS:
-        if self.config.use_insecure_ssl_client_just_for_testing_do_not_use:
+        if self.config.tls.use_insecure_ssl_client_just_for_testing_do_not_use:
             return InsecureInterceptableContextFactory()
         return RegularPolicyForHTTPS()
 
@@ -419,8 +419,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         return SimpleHttpClient(
             self,
-            ip_whitelist=self.config.ip_range_whitelist,
-            ip_blacklist=self.config.ip_range_blacklist,
+            ip_whitelist=self.config.server.ip_range_whitelist,
+            ip_blacklist=self.config.server.ip_range_blacklist,
             use_proxy=True,
         )
 
@@ -439,12 +439,12 @@ class HomeServer(metaclass=abc.ABCMeta):
         return RoomCreationHandler(self)
 
     @cache_in_self
-    def get_room_shutdown_handler(self) -> RoomShutdownHandler:
-        return RoomShutdownHandler(self)
+    def get_room_batch_handler(self) -> RoomBatchHandler:
+        return RoomBatchHandler(self)
 
     @cache_in_self
-    def get_sendmail(self) -> Callable[..., defer.Deferred]:
-        return sendmail
+    def get_room_shutdown_handler(self) -> RoomShutdownHandler:
+        return RoomShutdownHandler(self)
 
     @cache_in_self
     def get_state_handler(self) -> StateHandler:
@@ -463,7 +463,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_typing_writer_handler(self) -> TypingWriterHandler:
-        if self.config.worker.writers.typing == self.get_instance_name():
+        if self.get_instance_name() in self.config.worker.writers.typing:
             return TypingWriterHandler(self)
         else:
             raise Exception("Workers cannot write typing")
@@ -474,7 +474,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_typing_handler(self) -> FollowerTypingHandler:
-        if self.config.worker.writers.typing == self.get_instance_name():
+        if self.get_instance_name() in self.config.worker.writers.typing:
             # Use get_typing_writer_handler to ensure that we use the same
             # cached version.
             return self.get_typing_writer_handler()
@@ -503,7 +503,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_device_handler(self):
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return DeviceWorkerHandler(self)
         else:
             return DeviceHandler(self)
@@ -551,6 +551,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_federation_handler(self) -> FederationHandler:
         return FederationHandler(self)
+
+    @cache_in_self
+    def get_federation_event_handler(self) -> FederationEventHandler:
+        return FederationEventHandler(self)
 
     @cache_in_self
     def get_identity_handler(self) -> IdentityHandler:
@@ -622,7 +626,7 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_federation_sender(self) -> AbstractFederationSender:
         if self.should_send_federation():
             return FederationSender(self)
-        elif not self.config.worker_app:
+        elif not self.config.worker.worker_app:
             return FederationRemoteSendQueue(self)
         else:
             raise Exception("Workers cannot send federation traffic")
@@ -651,14 +655,14 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_groups_local_handler(
         self,
     ) -> Union[GroupsLocalWorkerHandler, GroupsLocalHandler]:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return GroupsLocalWorkerHandler(self)
         else:
             return GroupsLocalHandler(self)
 
     @cache_in_self
     def get_groups_server_handler(self):
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return GroupsServerWorkerHandler(self)
         else:
             return GroupsServerHandler(self)
@@ -684,8 +688,12 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ThirdPartyEventRules(self)
 
     @cache_in_self
+    def get_password_auth_provider(self) -> PasswordAuthProvider:
+        return PasswordAuthProvider()
+
+    @cache_in_self
     def get_room_member_handler(self) -> RoomMemberHandler:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return RoomMemberWorkerHandler(self)
         return RoomMemberMasterHandler(self)
 
@@ -695,13 +703,13 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_server_notices_manager(self) -> ServerNoticesManager:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             raise Exception("Workers cannot send server notices")
         return ServerNoticesManager(self)
 
     @cache_in_self
     def get_server_notices_sender(self) -> WorkerServerNoticesSender:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return WorkerServerNoticesSender(self)
         return ServerNoticesSender(self)
 
@@ -767,7 +775,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_federation_ratelimiter(self) -> FederationRateLimiter:
-        return FederationRateLimiter(self.get_clock(), config=self.config.rc_federation)
+        return FederationRateLimiter(
+            self.get_clock(), config=self.config.ratelimiting.rc_federation
+        )
 
     @cache_in_self
     def get_module_api(self) -> ModuleApi:
@@ -778,8 +788,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         return AccountDataHandler(self)
 
     @cache_in_self
-    def get_space_summary_handler(self) -> SpaceSummaryHandler:
-        return SpaceSummaryHandler(self)
+    def get_room_summary_handler(self) -> RoomSummaryHandler:
+        return RoomSummaryHandler(self)
 
     @cache_in_self
     def get_event_auth_handler(self) -> EventAuthHandler:
@@ -790,9 +800,14 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ExternalCache(self)
 
     @cache_in_self
-    def get_outbound_redis_connection(self) -> Optional["RedisProtocol"]:
-        if not self.config.redis.redis_enabled:
-            return None
+    def get_outbound_redis_connection(self) -> "RedisProtocol":
+        """
+        The Redis connection used for replication.
+
+        Raises:
+            AssertionError: if Redis is not enabled in the homeserver config.
+        """
+        assert self.config.redis.redis_enabled
 
         # We only want to import redis module if we're using it, as we have
         # `txredisapi` as an optional dependency.
@@ -800,18 +815,27 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         logger.info(
             "Connecting to redis (host=%r port=%r) for external cache",
-            self.config.redis_host,
-            self.config.redis_port,
+            self.config.redis.redis_host,
+            self.config.redis.redis_port,
         )
 
         return lazyConnection(
             hs=self,
-            host=self.config.redis_host,
-            port=self.config.redis_port,
+            host=self.config.redis.redis_host,
+            port=self.config.redis.redis_port,
             password=self.config.redis.redis_password,
             reconnect=True,
         )
 
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"
-        return self.config.send_federation
+        return self.config.worker.send_federation
+
+    @cache_in_self
+    def get_request_ratelimiter(self) -> RequestRatelimiter:
+        return RequestRatelimiter(
+            self.get_datastore(),
+            self.get_clock(),
+            self.config.ratelimiting.rc_message,
+            self.config.ratelimiting.rc_admin_redaction,
+        )

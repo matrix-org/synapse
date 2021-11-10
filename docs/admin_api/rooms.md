@@ -38,9 +38,14 @@ The following query parameters are available:
   - `history_visibility` - Rooms are ordered alphabetically by visibility of history of the room.
   - `state_events` - Rooms are ordered by number of state events. Largest to smallest.
 * `dir` - Direction of room order. Either `f` for forwards or `b` for backwards. Setting
-          this value to `b` will reverse the above sort order. Defaults to `f`.
-* `search_term` - Filter rooms by their room name. Search term can be contained in any
-                  part of the room name. Defaults to no filtering.
+  this value to `b` will reverse the above sort order. Defaults to `f`.
+* `search_term` - Filter rooms by their room name, canonical alias and room id.
+  Specifically, rooms are selected if the search term is contained in
+  - the room's name,
+  - the local part of the room's canonical alias, or
+  - the complete (local and server part) room's id (case sensitive).
+
+  Defaults to no filtering.
 
 **Response**
 
@@ -87,7 +92,7 @@ GET /_synapse/admin/v1/rooms
 
 A response body like the following is returned:
 
-```jsonc
+```json
 {
   "rooms": [
     {
@@ -170,7 +175,7 @@ GET /_synapse/admin/v1/rooms?order_by=size
 
 A response body like the following is returned:
 
-```jsonc
+```json
 {
   "rooms": [
     {
@@ -208,7 +213,7 @@ A response body like the following is returned:
     }
   ],
   "offset": 0,
-  "total_rooms": 150
+  "total_rooms": 150,
   "next_token": 100
 }
 ```
@@ -224,7 +229,7 @@ GET /_synapse/admin/v1/rooms?order_by=size&from=100
 
 A response body like the following is returned:
 
-```jsonc
+```json
 {
   "rooms": [
     {
@@ -380,7 +385,7 @@ A response body like the following is returned:
 
 # Delete Room API
 
-The Delete Room admin API allows server admins to remove rooms from server
+The Delete Room admin API allows server admins to remove rooms from the server
 and block these rooms.
 
 Shuts down a room. Moves all local users and room aliases automatically to a
@@ -391,13 +396,17 @@ The new room will be created with the user specified by the `new_room_user_id` p
 as room administrator and will contain a message explaining what happened. Users invited
 to the new room will have power level `-10` by default, and thus be unable to speak.
 
-If `block` is `True` it prevents new joins to the old room.
+If `block` is `true`, users will be prevented from joining the old room.
+This option can also be used to pre-emptively block a room, even if it's unknown
+to this homeserver. In this case, the room will be blocked, and no further action
+will be taken. If `block` is `false`, attempting to delete an unknown room is
+invalid and will be rejected as a bad request.
 
 This API will remove all trace of the old room from your database after removing
 all local users. If `purge` is `true` (the default), all traces of the old room will
 be removed from your database after removing all local users. If you do not want
 this to happen, set `purge` to `false`.
-Depending on the amount of history being purged a call to the API may take
+Depending on the amount of history being purged, a call to the API may take
 several minutes or longer.
 
 The local server will only have the power to move local user and room aliases to
@@ -459,8 +468,9 @@ The following JSON body parameters are available:
               `new_room_user_id` in the new room. Ideally this will clearly convey why the
                original room was shut down. Defaults to `Sharing illegal content on this server
                is not permitted and rooms in violation will be blocked.`
-* `block` - Optional. If set to `true`, this room will be added to a blocking list, preventing
-            future attempts to join the room. Defaults to `false`.
+* `block` - Optional. If set to `true`, this room will be added to a blocking list,
+            preventing future attempts to join the room. Rooms can be blocked
+            even if they're not yet known to the homeserver. Defaults to `false`.
 * `purge` - Optional. If set to `true`, it will remove all traces of the room from your database.
             Defaults to `true`.
 * `force_purge` - Optional, and ignored unless `purge` is `true`. If set to `true`, it
@@ -478,45 +488,48 @@ The following fields are returned in the JSON response body:
 * `failed_to_kick_users` - An array of users (`user_id`) that that were not kicked.
 * `local_aliases` - An array of strings representing the local aliases that were migrated from
                     the old room to the new.
-* `new_room_id` - A string representing the room ID of the new room.
+* `new_room_id` - A string representing the room ID of the new room, or `null` if
+                  no such room was created.
 
 
-## Undoing room shutdowns
+## Undoing room deletions
 
-*Note*: This guide may be outdated by the time you read it. By nature of room shutdowns being performed at the database level,
+*Note*: This guide may be outdated by the time you read it. By nature of room deletions being performed at the database level,
 the structure can and does change without notice.
 
-First, it's important to understand that a room shutdown is very destructive. Undoing a shutdown is not as simple as pretending it
+First, it's important to understand that a room deletion is very destructive. Undoing a deletion is not as simple as pretending it
 never happened - work has to be done to move forward instead of resetting the past. In fact, in some cases it might not be possible
 to recover at all:
 
 * If the room was invite-only, your users will need to be re-invited.
 * If the room no longer has any members at all, it'll be impossible to rejoin.
-* The first user to rejoin will have to do so via an alias on a different server.
+* The first user to rejoin will have to do so via an alias on a different
+  server (or receive an invite from a user on a different server).
 
 With all that being said, if you still want to try and recover the room:
 
-1. For safety reasons, shut down Synapse.
-2. In the database, run `DELETE FROM blocked_rooms WHERE room_id = '!example:example.org';`
-   * For caution: it's recommended to run this in a transaction: `BEGIN; DELETE ...;`, verify you got 1 result, then `COMMIT;`.
-   * The room ID is the same one supplied to the shutdown room API, not the Content Violation room.
-3. Restart Synapse.
+1. If the room was `block`ed, you must unblock it on your server. This can be
+   accomplished as follows:
 
-You will have to manually handle, if you so choose, the following:
+   1. For safety reasons, shut down Synapse.
+   2. In the database, run `DELETE FROM blocked_rooms WHERE room_id = '!example:example.org';`
+      * For caution: it's recommended to run this in a transaction: `BEGIN; DELETE ...;`, verify you got 1 result, then `COMMIT;`.
+      * The room ID is the same one supplied to the delete room API, not the Content Violation room.
+   3. Restart Synapse.
 
-* Aliases that would have been redirected to the Content Violation room.
-* Users that would have been booted from the room (and will have been force-joined to the Content Violation room).
-* Removal of the Content Violation room if desired.
+   This step is unnecessary if `block` was not set.
 
-## Deprecated endpoint
+2. Any room aliases on your server that pointed to the deleted room may have
+   been deleted, or redirected to the Content Violation room. These will need
+   to be restored manually.
 
-The previous deprecated API will be removed in a future release, it was:
+3. Users on your server that were in the deleted room will have been kicked
+   from the room. Consider whether you want to update their membership
+   (possibly via the [Edit Room Membership API](room_membership.md)) or let
+   them handle rejoining themselves.
 
-```
-POST /_synapse/admin/v1/rooms/<room_id>/delete
-```
-
-It behaves the same way than the current endpoint except the path and the method.
+4. If `new_room_user_id` was given, a 'Content Violation' will have been
+   created. Consider whether you want to delete that roomm.
 
 # Make Room Admin API
 
@@ -536,7 +549,7 @@ POST /_synapse/admin/v1/rooms/<room_id_or_alias>/make_room_admin
 # Forward Extremities Admin API
 
 Enables querying and deleting forward extremities from rooms. When a lot of forward
-extremities accumulate in a room, performance can become degraded. For details, see 
+extremities accumulate in a room, performance can become degraded. For details, see
 [#1760](https://github.com/matrix-org/synapse/issues/1760).
 
 ## Check for forward extremities
@@ -565,7 +578,7 @@ A response as follows will be returned:
 
 ## Deleting forward extremities
 
-**WARNING**: Please ensure you know what you're doing and have read 
+**WARNING**: Please ensure you know what you're doing and have read
 the related issue [#1760](https://github.com/matrix-org/synapse/issues/1760).
 Under no situations should this API be executed as an automated maintenance task!
 

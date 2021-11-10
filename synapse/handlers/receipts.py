@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
+from synapse.api.constants import ReadReceiptEventFields
 from synapse.appservice import ApplicationService
-from synapse.handlers._base import BaseHandler
-from synapse.types import JsonDict, ReadReceipt, get_domain_from_id
+from synapse.streams import EventSource
+from synapse.types import JsonDict, ReadReceipt, UserID, get_domain_from_id
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -24,11 +25,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ReceiptsHandler(BaseHandler):
+class ReceiptsHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
-        self.server_name = hs.config.server_name
+        self.notifier = hs.get_notifier()
+        self.server_name = hs.config.server.server_name
         self.store = hs.get_datastore()
         self.event_auth_handler = hs.get_event_auth_handler()
 
@@ -69,7 +69,8 @@ class ReceiptsHandler(BaseHandler):
             )
             if not is_in_room:
                 logger.info(
-                    "Ignoring receipt from %s as we're not in the room",
+                    "Ignoring receipt for room %r from server %s as we're not in the room",
+                    room_id,
                     origin,
                 )
                 continue
@@ -137,7 +138,7 @@ class ReceiptsHandler(BaseHandler):
         return True
 
     async def received_client_receipt(
-        self, room_id: str, receipt_type: str, user_id: str, event_id: str
+        self, room_id: str, receipt_type: str, user_id: str, event_id: str, hidden: bool
     ) -> None:
         """Called when a client tells us a local user has read up to the given
         event_id in the room.
@@ -147,23 +148,80 @@ class ReceiptsHandler(BaseHandler):
             receipt_type=receipt_type,
             user_id=user_id,
             event_ids=[event_id],
-            data={"ts": int(self.clock.time_msec())},
+            data={"ts": int(self.clock.time_msec()), "hidden": hidden},
         )
 
         is_new = await self._handle_new_receipts([receipt])
         if not is_new:
             return
 
-        if self.federation_sender:
+        if self.federation_sender and not (
+            self.hs.config.experimental.msc2285_enabled and hidden
+        ):
             await self.federation_sender.send_read_receipt(receipt)
 
 
-class ReceiptEventSource:
+class ReceiptEventSource(EventSource[int, JsonDict]):
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
+        self.config = hs.config
+
+    @staticmethod
+    def filter_out_hidden(events: List[JsonDict], user_id: str) -> List[JsonDict]:
+        visible_events = []
+
+        # filter out hidden receipts the user shouldn't see
+        for event in events:
+            content = event.get("content", {})
+            new_event = event.copy()
+            new_event["content"] = {}
+
+            for event_id in content.keys():
+                event_content = content.get(event_id, {})
+                m_read = event_content.get("m.read", {})
+
+                # If m_read is missing copy over the original event_content as there is nothing to process here
+                if not m_read:
+                    new_event["content"][event_id] = event_content.copy()
+                    continue
+
+                new_users = {}
+                for rr_user_id, user_rr in m_read.items():
+                    try:
+                        hidden = user_rr.get("hidden")
+                    except AttributeError:
+                        # Due to https://github.com/matrix-org/synapse/issues/10376
+                        # there are cases where user_rr is a string, in those cases
+                        # we just ignore the read receipt
+                        continue
+
+                    if hidden is not True or rr_user_id == user_id:
+                        new_users[rr_user_id] = user_rr.copy()
+                        # If hidden has a value replace hidden with the correct prefixed key
+                        if hidden is not None:
+                            new_users[rr_user_id].pop("hidden")
+                            new_users[rr_user_id][
+                                ReadReceiptEventFields.MSC2285_HIDDEN
+                            ] = hidden
+
+                # Set new users unless empty
+                if len(new_users.keys()) > 0:
+                    new_event["content"][event_id] = {"m.read": new_users}
+
+            # Append new_event to visible_events unless empty
+            if len(new_event["content"].keys()) > 0:
+                visible_events.append(new_event)
+
+        return visible_events
 
     async def get_new_events(
-        self, from_key: int, room_ids: List[str], **kwargs
+        self,
+        user: UserID,
+        from_key: int,
+        limit: Optional[int],
+        room_ids: Iterable[str],
+        is_guest: bool,
+        explicit_room_id: Optional[str] = None,
     ) -> Tuple[List[JsonDict], int]:
         from_key = int(from_key)
         to_key = self.get_current_key()
@@ -175,17 +233,26 @@ class ReceiptEventSource:
             room_ids, from_key=from_key, to_key=to_key
         )
 
-        return (events, to_key)
+        if self.config.experimental.msc2285_enabled:
+            events = ReceiptEventSource.filter_out_hidden(events, user.to_string())
+
+        return events, to_key
 
     async def get_new_events_as(
         self, from_key: int, service: ApplicationService
     ) -> Tuple[List[JsonDict], int]:
-        """Returns a set of new receipt events that an appservice
+        """Returns a set of new read receipt events that an appservice
         may be interested in.
 
         Args:
             from_key: the stream position at which events should be fetched from
             service: The appservice which may be interested
+
+        Returns:
+            A two-tuple containing the following:
+                * A list of json dictionaries derived from read receipts that the
+                  appservice may be interested in.
+                * The current read receipt stream token.
         """
         from_key = int(from_key)
         to_key = self.get_current_key()
@@ -207,7 +274,7 @@ class ReceiptEventSource:
 
             events.append(event)
 
-        return (events, to_key)
+        return events, to_key
 
     def get_current_key(self, direction: str = "f") -> int:
         return self.store.get_max_receipt_stream_id()

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from synapse.api.errors import NotFoundError, SynapseError
-from synapse.rest.client.v1 import room
+from synapse.rest.client import room
 
 from tests.unittest import HomeserverTestCase
 

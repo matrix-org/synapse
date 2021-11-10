@@ -70,8 +70,8 @@ class Auth:
 
         self._auth_blocking = AuthBlocking(self.hs)
 
-        self._track_appservice_user_ips = hs.config.track_appservice_user_ips
-        self._macaroon_secret_key = hs.config.macaroon_secret_key
+        self._track_appservice_user_ips = hs.config.appservice.track_appservice_user_ips
+        self._macaroon_secret_key = hs.config.key.macaroon_secret_key
         self._force_tracing_for_users = hs.config.tracing.force_tracing_for_users
 
     async def check_user_in_room(
@@ -245,7 +245,7 @@ class Auth:
 
     async def validate_appservice_can_control_user_id(
         self, app_service: ApplicationService, user_id: str
-    ):
+    ) -> None:
         """Validates that the app service is allowed to control
         the given user.
 
@@ -618,5 +618,13 @@ class Auth:
                 % (user_id, room_id),
             )
 
-    async def check_auth_blocking(self, *args, **kwargs) -> None:
-        await self._auth_blocking.check_auth_blocking(*args, **kwargs)
+    async def check_auth_blocking(
+        self,
+        user_id: Optional[str] = None,
+        threepid: Optional[dict] = None,
+        user_type: Optional[str] = None,
+        requester: Optional[Requester] = None,
+    ) -> None:
+        await self._auth_blocking.check_auth_blocking(
+            user_id=user_id, threepid=threepid, user_type=user_type, requester=requester
+        )

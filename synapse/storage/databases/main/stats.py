@@ -16,18 +16,21 @@
 import logging
 from enum import Enum
 from itertools import chain
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from typing_extensions import Counter
 
 from twisted.internet.defer import DeferredLock
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import StoreError
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.types import JsonDict
 from synapse.util.caches.descriptors import cached
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -93,12 +96,12 @@ class UserSortOrder(Enum):
 
 
 class StatsStore(StateDeltasStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
 
         self.server_name = hs.hostname
         self.clock = self.hs.get_clock()
-        self.stats_enabled = hs.config.stats_enabled
+        self.stats_enabled = hs.config.stats.stats_enabled
 
         self.stats_delta_processing_lock = DeferredLock()
 
@@ -590,7 +593,7 @@ class StatsStore(StateDeltasStore):
                 room_state["canonical_alias"] = event.content.get("alias")
             elif event.type == EventTypes.Create:
                 room_state["is_federatable"] = (
-                    event.content.get("m.federate", True) is True
+                    event.content.get(EventContentFields.FEDERATE, True) is True
                 )
 
         await self.update_room_state(room_id, room_state)
@@ -672,7 +675,7 @@ class StatsStore(StateDeltasStore):
 
         def get_users_media_usage_paginate_txn(txn):
             filters = []
-            args = [self.hs.config.server_name]
+            args = [self.hs.config.server.server_name]
 
             if search_term:
                 filters.append("(lmr.user_id LIKE ? OR displayname LIKE ?)")

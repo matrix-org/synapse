@@ -5,15 +5,11 @@
 set -ex
 
 # Get the codename from distro env
-DIST=`cut -d ':' -f2 <<< $distro`
+DIST=$(cut -d ':' -f2 <<< "${distro:?}")
 
 # we get a read-only copy of the source: make a writeable copy
 cp -aT /synapse/source /synapse/build
 cd /synapse/build
-
-# add an entry to the changelog for this distribution
-dch -M -l "+$DIST" "build for $DIST"
-dch -M -r "" --force-distribution --distribution "$DIST"
 
 # if this is a prerelease, set the Section accordingly.
 #
@@ -21,13 +17,16 @@ dch -M -r "" --force-distribution --distribution "$DIST"
 # Section to determine which "component" it should go into (see
 # https://manpages.debian.org/stretch/reprepro/reprepro.1.en.html#GUESSING)
 
-DEB_VERSION=`dpkg-parsechangelog -SVersion`
+DEB_VERSION=$(dpkg-parsechangelog -SVersion)
 case $DEB_VERSION in
-    *rc*|*a*|*b*|*c*)
+    *~rc*|*~a*|*~b*|*~c*)
         sed -ie '/^Section:/c\Section: prerelease' debian/control
         ;;
 esac
 
+# add an entry to the changelog for this distribution
+dch -M -l "+$DIST" "build for $DIST"
+dch -M -r "" --force-distribution --distribution "$DIST"
 
 dpkg-buildpackage -us -uc
 

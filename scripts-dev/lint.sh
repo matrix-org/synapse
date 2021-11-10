@@ -90,11 +90,11 @@ else
           "scripts/hash_password"
           "scripts/register_new_matrix_user"
           "scripts/synapse_port_db"
+          "scripts/update_synapse_database"
           "scripts-dev"
           "scripts-dev/build_debian_packages"
           "scripts-dev/sign_json"
-          "scripts-dev/update_database"
-          "contrib" "synctl" "setup.py" "synmark" "stubs" ".buildkite"
+          "contrib" "synctl" "setup.py" "synmark" "stubs" ".ci"
       )
   fi
 fi

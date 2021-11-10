@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Generator, List, Tuple
 
 from twisted.web.resource import Resource
 from twisted.web.server import Request
@@ -27,6 +27,7 @@ from synapse.http.server import (
 )
 from synapse.http.servlet import parse_boolean, parse_string
 from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict
 from synapse.util.templates import build_jinja_env
 
 if TYPE_CHECKING:
@@ -57,7 +58,7 @@ class AvailabilityCheckResource(DirectServeJsonResource):
         super().__init__()
         self._sso_handler = hs.get_sso_handler()
 
-    async def _async_render_GET(self, request: Request):
+    async def _async_render_GET(self, request: Request) -> Tuple[int, JsonDict]:
         localpart = parse_string(request, "username", required=True)
 
         session_id = get_username_mapping_session_cookie_from_request(request)
@@ -73,12 +74,14 @@ class AccountDetailsResource(DirectServeHtmlResource):
         super().__init__()
         self._sso_handler = hs.get_sso_handler()
 
-        def template_search_dirs():
+        def template_search_dirs() -> Generator[str, None, None]:
+            if hs.config.server.custom_template_directory:
+                yield hs.config.server.custom_template_directory
             if hs.config.sso.sso_template_dir:
                 yield hs.config.sso.sso_template_dir
             yield hs.config.sso.default_template_dir
 
-        self._jinja_env = build_jinja_env(template_search_dirs(), hs.config)
+        self._jinja_env = build_jinja_env(list(template_search_dirs()), hs.config)
 
     async def _async_render_GET(self, request: Request) -> None:
         try:
@@ -102,7 +105,7 @@ class AccountDetailsResource(DirectServeHtmlResource):
         html = template.render(template_params)
         respond_with_html(request, 200, html)
 
-    async def _async_render_POST(self, request: SynapseRequest):
+    async def _async_render_POST(self, request: SynapseRequest) -> None:
         # This will always be set by the time Twisted calls us.
         assert request.args is not None
 

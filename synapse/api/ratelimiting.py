@@ -17,6 +17,7 @@ from collections import OrderedDict
 from typing import Hashable, Optional, Tuple
 
 from synapse.api.errors import LimitExceededError
+from synapse.config.ratelimiting import RateLimitConfig
 from synapse.storage.databases.main import DataStore
 from synapse.types import Requester
 from synapse.util import Clock
@@ -46,7 +47,7 @@ class Ratelimiter:
         #   * How many times an action has occurred since a point in time
         #   * The point in time
         #   * The rate_hz of this particular entry. This can vary per request
-        self.actions: OrderedDict[Hashable, Tuple[float, int, float]] = OrderedDict()
+        self.actions: OrderedDict[Hashable, Tuple[float, float, float]] = OrderedDict()
 
     async def can_do_action(
         self,
@@ -56,7 +57,7 @@ class Ratelimiter:
         burst_count: Optional[int] = None,
         update: bool = True,
         n_actions: int = 1,
-        _time_now_s: Optional[int] = None,
+        _time_now_s: Optional[float] = None,
     ) -> Tuple[bool, float]:
         """Can the entity (e.g. user or IP address) perform the action?
 
@@ -160,7 +161,7 @@ class Ratelimiter:
 
         return allowed, time_allowed
 
-    def _prune_message_counts(self, time_now_s: int):
+    def _prune_message_counts(self, time_now_s: float) -> None:
         """Remove message count entries that have not exceeded their defined
         rate_hz limit
 
@@ -188,8 +189,8 @@ class Ratelimiter:
         burst_count: Optional[int] = None,
         update: bool = True,
         n_actions: int = 1,
-        _time_now_s: Optional[int] = None,
-    ):
+        _time_now_s: Optional[float] = None,
+    ) -> None:
         """Checks if an action can be performed. If not, raises a LimitExceededError
 
         Checks if the user has ratelimiting disabled in the database by looking
@@ -232,4 +233,89 @@ class Ratelimiter:
         if not allowed:
             raise LimitExceededError(
                 retry_after_ms=int(1000 * (time_allowed - time_now_s))
+            )
+
+
+class RequestRatelimiter:
+    def __init__(
+        self,
+        store: DataStore,
+        clock: Clock,
+        rc_message: RateLimitConfig,
+        rc_admin_redaction: Optional[RateLimitConfig],
+    ):
+        self.store = store
+        self.clock = clock
+
+        # The rate_hz and burst_count are overridden on a per-user basis
+        self.request_ratelimiter = Ratelimiter(
+            store=self.store, clock=self.clock, rate_hz=0, burst_count=0
+        )
+        self._rc_message = rc_message
+
+        # Check whether ratelimiting room admin message redaction is enabled
+        # by the presence of rate limits in the config
+        if rc_admin_redaction:
+            self.admin_redaction_ratelimiter: Optional[Ratelimiter] = Ratelimiter(
+                store=self.store,
+                clock=self.clock,
+                rate_hz=rc_admin_redaction.per_second,
+                burst_count=rc_admin_redaction.burst_count,
+            )
+        else:
+            self.admin_redaction_ratelimiter = None
+
+    async def ratelimit(
+        self,
+        requester: Requester,
+        update: bool = True,
+        is_admin_redaction: bool = False,
+    ) -> None:
+        """Ratelimits requests.
+
+        Args:
+            requester
+            update: Whether to record that a request is being processed.
+                Set to False when doing multiple checks for one request (e.g.
+                to check up front if we would reject the request), and set to
+                True for the last call for a given request.
+            is_admin_redaction: Whether this is a room admin/moderator
+                redacting an event. If so then we may apply different
+                ratelimits depending on config.
+
+        Raises:
+            LimitExceededError if the request should be ratelimited
+        """
+        user_id = requester.user.to_string()
+
+        # The AS user itself is never rate limited.
+        app_service = self.store.get_app_service_by_user_id(user_id)
+        if app_service is not None:
+            return  # do not ratelimit app service senders
+
+        messages_per_second = self._rc_message.per_second
+        burst_count = self._rc_message.burst_count
+
+        # Check if there is a per user override in the DB.
+        override = await self.store.get_ratelimit_for_user(user_id)
+        if override:
+            # If overridden with a null Hz then ratelimiting has been entirely
+            # disabled for the user
+            if not override.messages_per_second:
+                return
+
+            messages_per_second = override.messages_per_second
+            burst_count = override.burst_count
+
+        if is_admin_redaction and self.admin_redaction_ratelimiter:
+            # If we have separate config for admin redactions, use a separate
+            # ratelimiter as to not have user_ids clash
+            await self.admin_redaction_ratelimiter.ratelimit(requester, update=update)
+        else:
+            # Override rate and burst count per-user
+            await self.request_ratelimiter.ratelimit(
+                requester,
+                rate_hz=messages_per_second,
+                burst_count=burst_count,
+                update=update,
             )

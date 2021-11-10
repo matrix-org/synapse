@@ -19,6 +19,8 @@ import logging
 import os
 import signal
 import sys
+from types import FrameType, TracebackType
+from typing import NoReturn, Type
 
 
 def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -> None:
@@ -97,7 +99,9 @@ def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -
     # (we don't normally expect reactor.run to raise any exceptions, but this will
     # also catch any other uncaught exceptions before we get that far.)
 
-    def excepthook(type_, value, traceback):
+    def excepthook(
+        type_: Type[BaseException], value: BaseException, traceback: TracebackType
+    ) -> None:
         logger.critical("Unhanded exception", exc_info=(type_, value, traceback))
 
     sys.excepthook = excepthook
@@ -119,14 +123,14 @@ def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -
         sys.exit(1)
 
     # write a log line on SIGTERM.
-    def sigterm(signum, frame):
+    def sigterm(signum: signal.Signals, frame: FrameType) -> NoReturn:
         logger.warning("Caught signal %s. Stopping daemon." % signum)
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, sigterm)
 
     # Cleanup pid file at exit.
-    def exit():
+    def exit() -> None:
         logger.warning("Stopping daemon.")
         os.remove(pid_file)
         sys.exit(0)
