@@ -1,7 +1,7 @@
 Synapse 1.47.0rc2 (2021-11-10)
 ==============================
 
-This release candidate fixes an issue causing the Synapse 1.47.0rc1 Debian packages being marked as a full release, rather than a release candidate.
+This fixes an issue with publishing the Debian packages for 1.47.0rc1.
 It is otherwise identical to 1.47.0rc1.
 
 
