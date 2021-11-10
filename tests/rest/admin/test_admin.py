@@ -522,4 +522,3 @@ class PurgeHistoryTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("complete", channel.json_body["status"])
-        self.assertNotIn("shutdown_room", channel.json_body)

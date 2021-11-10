@@ -107,7 +107,7 @@ class RoomRestV2Servlet(RestServlet):
         if not await self._store.get_room(room_id):
             raise NotFoundError("Unknown room id %s" % (room_id,))
 
-        purge_id = self._pagination_handler.start_shutdown_and_purge_room(
+        delete_id = self._pagination_handler.start_shutdown_and_purge_room(
             room_id=room_id,
             new_room_user_id=content.get("new_room_user_id"),
             new_room_name=content.get("room_name"),
@@ -118,7 +118,7 @@ class RoomRestV2Servlet(RestServlet):
             force_purge=force_purge,
         )
 
-        return 200, {"purge_id": purge_id}
+        return 200, {"delete_id": delete_id}
 
 
 class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
@@ -139,43 +139,43 @@ class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
         if not RoomID.is_valid(room_id):
             raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
 
-        purge_ids = self._pagination_handler.get_purge_ids_by_room(room_id)
-        if purge_ids is None:
+        delete_ids = self._pagination_handler.get_delete_ids_by_room(room_id)
+        if delete_ids is None:
             raise NotFoundError("No delete task for room_id '%s' found" % room_id)
 
         response = []
-        for purge_id in purge_ids:
-            purge = self._pagination_handler.get_purge_status(purge_id)
-            if purge:
+        for delete_id in delete_ids:
+            delete = self._pagination_handler.get_delete_status(delete_id)
+            if delete:
                 response += [
                     {
-                        "purge_id": purge_id,
-                        **purge.asdict(),
+                        "delete_id": delete_id,
+                        **delete.asdict(),
                     }
                 ]
         return 200, {"results": cast(JsonDict, response)}
 
 
-class DeleteRoomStatusByPurgeIdRestServlet(RestServlet):
+class DeleteRoomStatusByDeleteIdRestServlet(RestServlet):
     """Get the status of the delete room background task."""
 
-    PATTERNS = admin_patterns("/rooms/delete_status/(?P<purge_id>[^/]+)$", "v2")
+    PATTERNS = admin_patterns("/rooms/delete_status/(?P<delete_id>[^/]+)$", "v2")
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()
         self._pagination_handler = hs.get_pagination_handler()
 
     async def on_GET(
-        self, request: SynapseRequest, purge_id: str
+        self, request: SynapseRequest, delete_id: str
     ) -> Tuple[int, JsonDict]:
 
         await assert_requester_is_admin(self._auth, request)
 
-        purge_status = self._pagination_handler.get_purge_status(purge_id)
-        if purge_status is None:
-            raise NotFoundError("purge id '%s' not found" % purge_id)
+        delete_status = self._pagination_handler.get_delete_status(delete_id)
+        if delete_status is None:
+            raise NotFoundError("delete id '%s' not found" % delete_id)
 
-        return 200, cast(JsonDict, purge_status.asdict())
+        return 200, cast(JsonDict, delete_status.asdict())
 
 
 class ListRoomRestServlet(RestServlet):

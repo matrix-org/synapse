@@ -494,7 +494,7 @@ a purge id:
 
 ```json
 {
-    "purge_id": "<opaque id>"
+    "delete_id": "<opaque id>"
 }
 ```
 
@@ -537,7 +537,6 @@ The JSON body must not be empty. The body must be at least `{}`.
 It is possible to query the status of the background task for deleting rooms.
 The status can be queried up to 24 hours after completion of the task,
 or until Synapse is restarted (whichever happens first).
-The result also includes the tasks that have been performed by retention policy.
 
 ### Query by `room_id`
 
@@ -555,7 +554,7 @@ A response body like the following is returned:
 {
     "results": [
         {
-            "purge_id": "purgeid1",
+            "delete_id": "delete_id1",
             "status": "failed",
             "error": "error message",
             "shutdown_room": {
@@ -565,7 +564,7 @@ A response body like the following is returned:
                 "new_room_id": null
             }
         }, {
-            "purge_id": "purgeid2",
+            "delete_id": "delete_id2",
             "status": "purging",
             "shutdown_room": {
                 "kicked_users": [
@@ -589,14 +588,14 @@ The following parameters should be set in the URL:
 
 * `room_id` - The ID of the room.
 
-### Query by `purge_id`
+### Query by `delete_id`
 
-With this API you can get the status of one specific task by `purge_id`.
+With this API you can get the status of one specific task by `delete_id`.
 
 The API is:
 
 ```
-GET /_synapse/admin/v2/rooms/delete_status/<purge_id>
+GET /_synapse/admin/v2/rooms/delete_status/<delete_id>
 ```
 
 A response body like the following is returned:
@@ -622,16 +621,16 @@ A response body like the following is returned:
 
 The following parameters should be set in the URL:
 
-* `purge_id` - The ID for this purge.
+* `delete_id` - The ID for this delete.
 
 ### Response
 
 The following fields are returned in the JSON response body:
 
 - `results` - An array of objects, each containing information about one task.
-  This field is omitted from the result when you query by `purge_id`.
+  This field is omitted from the result when you query by `delete_id`.
   Task objects contain the following fields:
-  - `purge_id` - The ID for this purge if you query by `room_id`.
+  - `delete_id` - The ID for this purge if you query by `room_id`.
   - `status` - The status will be one of:
     - `shutting_down` - The process is removing users from the room.
     - `purging` - The process is purging the room and event data from database.

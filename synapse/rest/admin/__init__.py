@@ -46,7 +46,7 @@ from synapse.rest.admin.registration_tokens import (
     RegistrationTokenRestServlet,
 )
 from synapse.rest.admin.rooms import (
-    DeleteRoomStatusByPurgeIdRestServlet,
+    DeleteRoomStatusByDeleteIdRestServlet,
     DeleteRoomStatusByRoomIdRestServlet,
     ForwardExtremitiesRestServlet,
     JoinRoomAliasServlet,
@@ -199,9 +199,7 @@ class PurgeHistoryStatusRestServlet(RestServlet):
         if purge_status is None:
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
-        response = purge_status.asdict()
-        del response["shutdown_room"]
-        return 200, response
+        return 200, purge_status.asdict()
 
 
 ########################################################################################
@@ -230,7 +228,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     RoomRestServlet(hs).register(http_server)
     RoomRestV2Servlet(hs).register(http_server)
     RoomMembersRestServlet(hs).register(http_server)
-    DeleteRoomStatusByPurgeIdRestServlet(hs).register(http_server)
+    DeleteRoomStatusByDeleteIdRestServlet(hs).register(http_server)
     DeleteRoomStatusByRoomIdRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
