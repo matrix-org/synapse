@@ -31,6 +31,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    NoReturn,
     Tuple,
 )
 
@@ -171,7 +172,7 @@ def start_reactor(
         run()
 
 
-def quit_with_error(error_string: str) -> None:
+def quit_with_error(error_string: str) -> NoReturn:
     message_lines = error_string.split("\n")
     line_length = min(max(len(line) for line in message_lines), 80) + 2
     sys.stderr.write("*" * line_length + "\n")
@@ -181,7 +182,7 @@ def quit_with_error(error_string: str) -> None:
     sys.exit(1)
 
 
-def handle_startup_exception(e: Exception) -> None:
+def handle_startup_exception(e: Exception) -> NoReturn:
     # Exceptions that occur between setting up the logging and forking or starting
     # the reactor are written to the logs, followed by a summary to stderr.
     logger.exception("Exception during startup")
