@@ -1,1 +1,1 @@
-Correct a type annotation in `room_batches.py`.
+Add type hints to storage classes.
