@@ -39,13 +39,11 @@ class RoomBatchStore(SQLBaseStore):
 
     async def store_state_group_id_for_event_id(
         self, event_id: str, state_group_id: int
-    ) -> Optional[str]:
-        {
-            await self.db_pool.simple_upsert(
-                table="event_to_state_groups",
-                keyvalues={"event_id": event_id},
-                values={"state_group": state_group_id, "event_id": event_id},
-                # Unique constraint on event_id so we don't have to lock
-                lock=False,
-            )
-        }
+    ) -> None:
+        await self.db_pool.simple_upsert(
+            table="event_to_state_groups",
+            keyvalues={"event_id": event_id},
+            values={"state_group": state_group_id, "event_id": event_id},
+            # Unique constraint on event_id so we don't have to lock
+            lock=False,
+        )
