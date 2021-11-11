@@ -44,13 +44,12 @@ CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[Union[bool, str]],
 ]
-# FIXME: Callback signature differs from mainline
-USER_MAY_INVITE_CALLBACK = Callable[
-    [str, Optional[str], Optional[dict], str, bool, bool], Awaitable[bool]
-]
-# FIXME: Callback signature differs from mainline
-USER_MAY_CREATE_ROOM_CALLBACK = Callable[
-    [str, List[str], List[dict], bool], Awaitable[bool]
+USER_MAY_JOIN_ROOM_CALLBACK = Callable[[str, str, bool], Awaitable[bool]]
+USER_MAY_INVITE_CALLBACK = Callable[[str, str, str], Awaitable[bool]]
+USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[[str, str, str, str], Awaitable[bool]]
+USER_MAY_CREATE_ROOM_CALLBACK = Callable[[str], Awaitable[bool]]
+USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK = Callable[
+    [str, List[str], List[Dict[str, str]]], Awaitable[bool]
 ]
 USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[[str, RoomAlias], Awaitable[bool]]
 USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[[str, str], Awaitable[bool]]
@@ -76,17 +75,15 @@ CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK = Callable[
     [ReadableFileWrapper, FileInfo],
     Awaitable[bool],
 ]
-# FIXME: This callback only exists on the DINUM fork and not in mainline.
-USER_MAY_JOIN_ROOM_CALLBACK = Callable[[str, str, bool], Awaitable[bool]]
 
 
-def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
+def load_legacy_spam_checkers(hs: "synapse.server.HomeServer") -> None:
     """Wrapper that loads spam checkers configured using the old configuration, and
     registers the spam checker hooks they implement.
     """
     spam_checkers: List[Any] = []
     api = hs.get_module_api()
-    for module, config in hs.config.spam_checkers:
+    for module, config in hs.config.spamchecker.spam_checkers:
         # Older spam checkers don't accept the `api` argument, so we
         # try and detect support.
         spam_args = inspect.getfullargspec(module)
@@ -106,7 +103,6 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
         "check_username_for_spam",
         "check_registration_for_spam",
         "check_media_file_for_spam",
-        "user_may_join_room",
     }
 
     for spam_checker in spam_checkers:
@@ -133,9 +129,9 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
                         request_info: Collection[Tuple[str, str]],
                         auth_provider_id: Optional[str],
                     ) -> Union[Awaitable[RegistrationBehaviour], RegistrationBehaviour]:
-                        # We've already made sure f is not None above, but mypy doesn't
-                        # do well across function boundaries so we need to tell it f is
-                        # definitely not None.
+                        # Assertion required because mypy can't prove we won't
+                        # change `f` back to `None`. See
+                        # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
                         assert f is not None
 
                         return f(
@@ -150,9 +146,10 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
                         "Bad signature for callback check_registration_for_spam",
                     )
 
-            def run(*args, **kwargs):
-                # mypy doesn't do well across function boundaries so we need to tell it
-                # wrapped_func is definitely not None.
+            def run(*args: Any, **kwargs: Any) -> Awaitable:
+                # Assertion required because mypy can't prove we won't change `f`
+                # back to `None`. See
+                # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
                 assert wrapped_func is not None
 
                 return maybe_awaitable(wrapped_func(*args, **kwargs))
@@ -169,10 +166,17 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
 
 
 class SpamChecker:
-    def __init__(self):
+    def __init__(self) -> None:
         self._check_event_for_spam_callbacks: List[CHECK_EVENT_FOR_SPAM_CALLBACK] = []
+        self._user_may_join_room_callbacks: List[USER_MAY_JOIN_ROOM_CALLBACK] = []
         self._user_may_invite_callbacks: List[USER_MAY_INVITE_CALLBACK] = []
+        self._user_may_send_3pid_invite_callbacks: List[
+            USER_MAY_SEND_3PID_INVITE_CALLBACK
+        ] = []
         self._user_may_create_room_callbacks: List[USER_MAY_CREATE_ROOM_CALLBACK] = []
+        self._user_may_create_room_with_invites_callbacks: List[
+            USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK
+        ] = []
         self._user_may_create_room_alias_callbacks: List[
             USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
         ] = []
@@ -186,13 +190,17 @@ class SpamChecker:
         self._check_media_file_for_spam_callbacks: List[
             CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK
         ] = []
-        self._user_may_join_room_callbacks: List[USER_MAY_JOIN_ROOM_CALLBACK] = []
 
     def register_callbacks(
         self,
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
+        user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
+        user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
         user_may_create_room: Optional[USER_MAY_CREATE_ROOM_CALLBACK] = None,
+        user_may_create_room_with_invites: Optional[
+            USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK
+        ] = None,
         user_may_create_room_alias: Optional[
             USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
         ] = None,
@@ -202,17 +210,29 @@ class SpamChecker:
             CHECK_REGISTRATION_FOR_SPAM_CALLBACK
         ] = None,
         check_media_file_for_spam: Optional[CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK] = None,
-        user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
-    ):
+    ) -> None:
         """Register callbacks from module for each hook."""
         if check_event_for_spam is not None:
             self._check_event_for_spam_callbacks.append(check_event_for_spam)
 
+        if user_may_join_room is not None:
+            self._user_may_join_room_callbacks.append(user_may_join_room)
+
         if user_may_invite is not None:
             self._user_may_invite_callbacks.append(user_may_invite)
 
+        if user_may_send_3pid_invite is not None:
+            self._user_may_send_3pid_invite_callbacks.append(
+                user_may_send_3pid_invite,
+            )
+
         if user_may_create_room is not None:
             self._user_may_create_room_callbacks.append(user_may_create_room)
+
+        if user_may_create_room_with_invites is not None:
+            self._user_may_create_room_with_invites_callbacks.append(
+                user_may_create_room_with_invites,
+            )
 
         if user_may_create_room_alias is not None:
             self._user_may_create_room_alias_callbacks.append(
@@ -232,9 +252,6 @@ class SpamChecker:
 
         if check_media_file_for_spam is not None:
             self._check_media_file_for_spam_callbacks.append(check_media_file_for_spam)
-
-        if user_may_join_room is not None:
-            self._user_may_join_room_callbacks.append(user_may_join_room)
 
     async def check_event_for_spam(
         self, event: "synapse.events.EventBase"
@@ -259,81 +276,113 @@ class SpamChecker:
 
         return False
 
+    async def user_may_join_room(
+        self, user_id: str, room_id: str, is_invited: bool
+    ) -> bool:
+        """Checks if a given users is allowed to join a room.
+        Not called when a user creates a room.
+
+        Args:
+            userid: The ID of the user wanting to join the room
+            room_id: The ID of the room the user wants to join
+            is_invited: Whether the user is invited into the room
+
+        Returns:
+            Whether the user may join the room
+        """
+        for callback in self._user_may_join_room_callbacks:
+            if await callback(user_id, room_id, is_invited) is False:
+                return False
+
+        return True
+
     async def user_may_invite(
-        self,
-        inviter_userid: str,
-        invitee_userid: Optional[str],
-        third_party_invite: Optional[Dict],
-        room_id: str,
-        new_room: bool,
-        published_room: bool,
+        self, inviter_userid: str, invitee_userid: str, room_id: str
     ) -> bool:
         """Checks if a given user may send an invite
 
         If this method returns false, the invite will be rejected.
 
         Args:
-            inviter_userid:
-            invitee_userid: The user ID of the invitee. Is None
-                if this is a third party invite and the 3PID is not bound to a
-                user ID.
-            third_party_invite: If a third party invite then is a
-                dict containing the medium and address of the invitee.
-            room_id:
-            new_room: Whether the user is being invited to the room as
-                part of a room creation, if so the invitee would have been
-                included in the call to `user_may_create_room`.
-            published_room: Whether the room the user is being invited
-                to has been published in the local homeserver's public room
-                directory.
+            inviter_userid: The user ID of the sender of the invitation
+            invitee_userid: The user ID targeted in the invitation
+            room_id: The room ID
 
         Returns:
             True if the user may send an invite, otherwise False
         """
         for callback in self._user_may_invite_callbacks:
-            if (
-                await callback(
-                    inviter_userid,
-                    invitee_userid,
-                    third_party_invite,
-                    room_id,
-                    new_room,
-                    published_room,
-                )
-                is False
-            ):
+            if await callback(inviter_userid, invitee_userid, room_id) is False:
                 return False
 
         return True
 
-    async def user_may_create_room(
-        self,
-        userid: str,
-        invite_list: List[str],
-        third_party_invite_list: List[Dict],
-        cloning: bool,
+    async def user_may_send_3pid_invite(
+        self, inviter_userid: str, medium: str, address: str, room_id: str
     ) -> bool:
+        """Checks if a given user may invite a given threepid into the room
+
+        If this method returns false, the threepid invite will be rejected.
+
+        Note that if the threepid is already associated with a Matrix user ID, Synapse
+        will call user_may_invite with said user ID instead.
+
+        Args:
+            inviter_userid: The user ID of the sender of the invitation
+            medium: The 3PID's medium (e.g. "email")
+            address: The 3PID's address (e.g. "alice@example.com")
+            room_id: The room ID
+
+        Returns:
+            True if the user may send the invite, otherwise False
+        """
+        for callback in self._user_may_send_3pid_invite_callbacks:
+            if await callback(inviter_userid, medium, address, room_id) is False:
+                return False
+
+        return True
+
+    async def user_may_create_room(self, userid: str) -> bool:
         """Checks if a given user may create a room
 
         If this method returns false, the creation request will be rejected.
 
         Args:
             userid: The ID of the user attempting to create a room
-            invite_list: List of user IDs that would be invited to
-                the new room.
-            third_party_invite_list: List of third party invites
-                for the new room.
-            cloning: Whether the user is cloning an existing room, e.g.
-                upgrading a room.
 
         Returns:
             True if the user may create a room, otherwise False
         """
         for callback in self._user_may_create_room_callbacks:
-            if (
-                await callback(userid, invite_list, third_party_invite_list, cloning)
-                is False
-            ):
+            if await callback(userid) is False:
+                return False
+
+        return True
+
+    async def user_may_create_room_with_invites(
+        self,
+        userid: str,
+        invites: List[str],
+        threepid_invites: List[Dict[str, str]],
+    ) -> bool:
+        """Checks if a given user may create a room with invites
+
+        If this method returns false, the creation request will be rejected.
+
+        Args:
+            userid: The ID of the user attempting to create a room
+            invites: The IDs of the Matrix users to be invited if the room creation is
+                allowed.
+            threepid_invites: The threepids to be invited if the room creation is allowed,
+                as a dict including a "medium" key indicating the threepid's medium (e.g.
+                "email") and an "address" key indicating the threepid's address (e.g.
+                "alice@example.com")
+
+        Returns:
+            True if the user may create the room, otherwise False
+        """
+        for callback in self._user_may_create_room_with_invites_callbacks:
+            if await callback(userid, invites, threepid_invites) is False:
                 return False
 
         return True
@@ -372,25 +421,6 @@ class SpamChecker:
         """
         for callback in self._user_may_publish_room_callbacks:
             if await callback(userid, room_id) is False:
-                return False
-
-        return True
-
-    async def user_may_join_room(self, userid: str, room_id: str, is_invited: bool):
-        """Checks if a given users is allowed to join a room.
-
-        Not called when a user creates a room.
-
-        Args:
-            userid:
-            room_id:
-            is_invited: Whether the user is invited into the room
-
-        Returns:
-            bool: Whether the user may join the room
-        """
-        for callback in self._user_may_join_room_callbacks:
-            if await callback(userid, room_id, is_invited) is False:
                 return False
 
         return True

@@ -449,6 +449,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             third_party_signed: Information from a 3PID invite.
             ratelimit: Whether to rate limit the request.
             content: The content of the created event.
+            new_room: Whether the membership update is happening in the context of a room
+                creation.
             require_consent: Whether consent is required.
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
@@ -523,6 +525,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             third_party_signed:
             ratelimit:
             content:
+            new_room: Whether the membership update is happening in the context of a room
+                creation.
             require_consent:
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
@@ -610,15 +614,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     )
                     block_invite = True
 
-                is_published = await self.store.is_room_published(room_id)
-
                 if not await self.spam_checker.user_may_invite(
-                    requester.user.to_string(),
-                    target_id,
-                    third_party_invite=None,
-                    room_id=room_id,
-                    new_room=new_room,
-                    published_room=is_published,
+                    requester.user.to_string(), target_id, room_id
                 ):
                     logger.info("Blocking invite due to spam checker")
                     block_invite = True
@@ -711,24 +708,29 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     # so don't really fit into the general auth process.
                     raise AuthError(403, "Guest access not allowed")
 
+            # Figure out whether the user is a server admin to determine whether they
+            # should be able to bypass the spam checker.
             if (
                 self._server_notices_mxid is not None
                 and requester.user.to_string() == self._server_notices_mxid
             ):
                 # allow the server notices mxid to join rooms
-                is_requester_admin = True
+                bypass_spam_checker = True
 
             else:
-                is_requester_admin = await self.auth.is_server_admin(requester.user)
+                bypass_spam_checker = await self.auth.is_server_admin(requester.user)
 
             inviter = await self._get_inviter(target.to_string(), room_id)
-            if not is_requester_admin:
+            if (
+                not bypass_spam_checker
                 # We assume that if the spam checker allowed the user to create
                 # a room then they're allowed to join it.
-                if not new_room and not await self.spam_checker.user_may_join_room(
+                and not new_room
+                and not await self.spam_checker.user_may_join_room(
                     target.to_string(), room_id, is_invited=inviter is not None
-                ):
-                    raise SynapseError(403, "Not allowed to join this room")
+                )
+            ):
+                raise SynapseError(403, "Not allowed to join this room")
 
             # Check if a remote join should be performed.
             remote_join, remote_room_hosts = await self._should_perform_remote_join(
@@ -1161,7 +1163,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         id_server: str,
         requester: Requester,
         txn_id: Optional[str],
-        new_room: bool = False,
         id_access_token: Optional[str] = None,
     ) -> int:
         """Invite a 3PID to a room.
@@ -1228,26 +1229,25 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             id_server, medium, address, id_access_token
         )
 
-        is_published = await self.store.is_room_published(room_id)
-
-        if not await self.spam_checker.user_may_invite(
-            requester.user.to_string(),
-            invitee,
-            third_party_invite={"medium": medium, "address": address},
-            room_id=room_id,
-            new_room=new_room,
-            published_room=is_published,
-        ):
-            logger.info("Blocking invite due to spam checker")
-            raise SynapseError(403, "Invites have been disabled on this server")
-
         if invitee:
             # Note that update_membership with an action of "invite" can raise
             # a ShadowBanError, but this was done above already.
+            # We don't check the invite against the spamchecker(s) here (through
+            # user_may_invite) because we'll do it further down the line anyway (in
+            # update_membership_locked).
             _, stream_id = await self.update_membership(
                 requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
             )
         else:
+            # Check if the spamchecker(s) allow this invite to go through.
+            if not await self.spam_checker.user_may_send_3pid_invite(
+                inviter_userid=requester.user.to_string(),
+                medium=medium,
+                address=address,
+                room_id=room_id,
+            ):
+                raise SynapseError(403, "Cannot send threepid invite")
+
             stream_id = await self._make_and_store_3pid_invite(
                 requester,
                 id_server,

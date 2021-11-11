@@ -14,8 +14,11 @@
 # limitations under the License.
 
 import logging
+from typing import Optional
 
+from synapse.api.constants import EventTypes, Membership
 from synapse.config._base import ConfigError
+from synapse.module_api import ModuleApi
 
 logger = logging.getLogger(__name__)
 
@@ -56,15 +59,12 @@ class DomainRuleChecker(object):
     Don't forget to consider if you can invite users from your own domain.
     """
 
-    def __init__(self, config):
+    def __init__(self, config, api: ModuleApi):
         self.domain_mapping = config["domain_mapping"] or {}
         self.default = config["default"]
 
         self.can_only_join_rooms_with_invite = config.get(
             "can_only_join_rooms_with_invite", False
-        )
-        self.can_only_create_one_to_one_rooms = config.get(
-            "can_only_create_one_to_one_rooms", False
         )
         self.can_only_invite_during_room_creation = config.get(
             "can_only_invite_during_room_creation", False
@@ -76,36 +76,116 @@ class DomainRuleChecker(object):
             "domains_prevented_from_being_invited_to_published_rooms", []
         )
 
-    def check_event_for_spam(self, event):
-        """Implements synapse.events.SpamChecker.check_event_for_spam"""
-        return False
+        self._api = api
 
-    def user_may_invite(
+        self._api.register_spam_checker_callbacks(
+            user_may_invite=self.user_may_invite,
+            user_may_send_3pid_invite=self.user_may_send_3pid_invite,
+            user_may_join_room=self.user_may_join_room,
+        )
+
+    async def _is_new_room(self, room_id: str) -> bool:
+        """Checks if the room provided looks new according to its state.
+
+        The module will consider a room to look new if the only m.room.member events in
+        its state are either for the room's creator (i.e. its join event) or invites sent
+        by the room's creator.
+
+        Args:
+            room_id: The ID of the room to check.
+
+        Returns:
+            Whether the room looks new.
+        """
+        state_event_filter = [
+            (EventTypes.Create, None),
+            (EventTypes.Member, None),
+        ]
+
+        events = await self._api.get_room_state(room_id, state_event_filter)
+
+        room_creator = events[(EventTypes.Create, "")].sender
+
+        for key, event in events.items():
+            if key[0] == EventTypes.Create:
+                continue
+
+            if key[1] != room_creator:
+                if (
+                    event.sender != room_creator
+                    and event.membership != Membership.INVITE
+                ):
+                    return False
+
+        return True
+
+    async def user_may_invite(
         self,
-        inviter_userid,
-        invitee_userid,
-        third_party_invite,
-        room_id,
-        new_room,
-        published_room=False,
-    ):
-        """Implements synapse.events.SpamChecker.user_may_invite"""
+        inviter_userid: str,
+        invitee_userid: str,
+        room_id: str,
+    ) -> bool:
+        """Implements the user_may_invite spam checker callback."""
+        return await self._user_may_invite(
+            room_id=room_id,
+            inviter_userid=inviter_userid,
+            invitee_userid=invitee_userid,
+        )
+
+    async def user_may_send_3pid_invite(
+        self,
+        inviter_userid: str,
+        medium: str,
+        address: str,
+        room_id: str,
+    ) -> bool:
+        """Implements the user_may_send_3pid_invite spam checker callback."""
+        return await self._user_may_invite(
+            room_id=room_id,
+            inviter_userid=inviter_userid,
+            invitee_userid=None,
+        )
+
+    async def _user_may_invite(
+        self,
+        room_id: str,
+        inviter_userid: str,
+        invitee_userid: Optional[str],
+    ) -> bool:
+        """Processes any incoming invite, both normal Matrix invites and 3PID ones, and
+        check if they should be allowed.
+
+        Args:
+            room_id: The ID of the room the invite is happening in.
+            inviter_userid: The MXID of the user sending the invite.
+            invitee_userid: The MXID of the user being invited, or None if this is a 3PID
+                invite (in which case no MXID exists for this user yet).
+
+        Returns:
+            Whether the invite can be allowed to go through.
+        """
+        new_room = await self._is_new_room(room_id)
+
         if self.can_only_invite_during_room_creation and not new_room:
             return False
 
-        if not self.can_invite_by_third_party_id and third_party_invite:
-            return False
-
-        # This is a third party invite (without a bound mxid), so unless we have
-        # banned all third party invites (above) we allow it.
-        if not invitee_userid:
-            return True
+        # If invitee_userid is None, then this means this is a 3PID invite (without a
+        # bound MXID), so we allow it unless the configuration mandates blocking all 3PID
+        # invites.
+        if invitee_userid is None:
+            return self.can_invite_by_third_party_id
 
         inviter_domain = self._get_domain_from_id(inviter_userid)
         invitee_domain = self._get_domain_from_id(invitee_userid)
 
         if inviter_domain not in self.domain_mapping:
             return self.default
+
+        published_room = (
+            await self._api.public_room_list_manager.room_is_in_public_room_list(
+                room_id
+            )
+        )
 
         if (
             published_room
@@ -116,34 +196,8 @@ class DomainRuleChecker(object):
 
         return invitee_domain in self.domain_mapping[inviter_domain]
 
-    def user_may_create_room(
-        self, userid, invite_list, third_party_invite_list, cloning
-    ):
-        """Implements synapse.events.SpamChecker.user_may_create_room"""
-
-        if cloning:
-            return True
-
-        if not self.can_invite_by_third_party_id and third_party_invite_list:
-            return False
-
-        number_of_invites = len(invite_list) + len(third_party_invite_list)
-
-        if self.can_only_create_one_to_one_rooms and number_of_invites != 1:
-            return False
-
-        return True
-
-    def user_may_create_room_alias(self, userid, room_alias):
-        """Implements synapse.events.SpamChecker.user_may_create_room_alias"""
-        return True
-
-    def user_may_publish_room(self, userid, room_id):
-        """Implements synapse.events.SpamChecker.user_may_publish_room"""
-        return True
-
-    def user_may_join_room(self, userid, room_id, is_invited):
-        """Implements synapse.events.SpamChecker.user_may_join_room"""
+    async def user_may_join_room(self, userid, room_id, is_invited):
+        """Implements the user_may_join_room spam checker callback."""
         if self.can_only_join_rooms_with_invite and not is_invited:
             return False
 
@@ -151,7 +205,9 @@ class DomainRuleChecker(object):
 
     @staticmethod
     def parse_config(config):
-        """Implements synapse.events.SpamChecker.parse_config"""
+        """Checks whether required fields exist in the provided configuration for the
+        module.
+        """
         if "default" in config:
             return config
         else:

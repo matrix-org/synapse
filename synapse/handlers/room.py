@@ -374,19 +374,7 @@ class RoomCreationHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        if (
-            self._server_notices_mxid is not None
-            and requester.user.to_string() == self._server_notices_mxid
-        ):
-            # allow the server notices mxid to create rooms
-            is_requester_admin = True
-
-        else:
-            is_requester_admin = await self.auth.is_server_admin(requester.user)
-
-        if not is_requester_admin and not await self.spam_checker.user_may_create_room(
-            user_id, invite_list=[], third_party_invite_list=[], cloning=True
-        ):
+        if not await self.spam_checker.user_may_create_room(user_id):
             raise SynapseError(403, "You are not permitted to create rooms")
 
         creation_content: JsonDict = {
@@ -636,14 +624,16 @@ class RoomCreationHandler(BaseHandler):
             requester, config, is_requester_admin=is_requester_admin
         )
 
-        invite_list = config.get("invite", [])
         invite_3pid_list = config.get("invite_3pid", [])
+        invite_list = config.get("invite", [])
 
-        if not is_requester_admin and not await self.spam_checker.user_may_create_room(
-            user_id,
-            invite_list=invite_list,
-            third_party_invite_list=invite_3pid_list,
-            cloning=False,
+        if not is_requester_admin and not (
+            await self.spam_checker.user_may_create_room(user_id)
+            and await self.spam_checker.user_may_create_room_with_invites(
+                user_id,
+                invite_list,
+                invite_3pid_list,
+            )
         ):
             raise SynapseError(403, "You are not permitted to create rooms")
 
@@ -677,8 +667,6 @@ class RoomCreationHandler(BaseHandler):
             if mapping:
                 raise SynapseError(400, "Room alias already taken", Codes.ROOM_IN_USE)
 
-        invite_3pid_list = config.get("invite_3pid", [])
-        invite_list = config.get("invite", [])
         for i in invite_list:
             try:
                 uid = UserID.from_string(i)
@@ -861,7 +849,6 @@ class RoomCreationHandler(BaseHandler):
                 id_server,
                 requester,
                 txn_id=None,
-                new_room=True,
                 id_access_token=id_access_token,
             )
 

@@ -45,7 +45,14 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
-from synapse.types import JsonDict, Requester, UserID, UserInfo, create_requester
+from synapse.types import (
+    JsonDict,
+    Requester,
+    StateMap,
+    UserID,
+    UserInfo,
+    create_requester,
+)
 from synapse.util import Clock
 from synapse.util.caches.descriptors import cached
 
@@ -70,6 +77,8 @@ __all__ = [
     "DirectServeHtmlResource",
     "DirectServeJsonResource",
     "ModuleApi",
+    "EventBase",
+    "StateMap",
 ]
 
 logger = logging.getLogger(__name__)
@@ -689,6 +698,52 @@ class ModuleApi:
             filenames,
             (td for td in (self.custom_template_dir, custom_template_directory) if td),
         )
+
+    async def get_room_state(
+        self,
+        room_id: str,
+        event_filter: Optional[Iterable[Tuple[str, Optional[str]]]] = None,
+    ) -> StateMap[EventBase]:
+        """Returns the current state of the given room.
+
+        The events are returned as a mapping, in which the key for each event is a tuple
+        which first element is the event's type and the second one is its state key.
+
+        Added in Synapse v1.47.0
+
+        Args:
+            room_id: The ID of the room to get state from.
+            event_filter: A filter to apply when retrieving events. None if no filter
+                should be applied. If provided, must be an iterable of tuples. A tuple's
+                first element is the event type and the second is the state key, or is
+                None if the state key should not be filtered on.
+                An example of a filter is:
+                    [
+                        ("m.room.member", "@alice:example.com"),  # Member event for @alice:example.com
+                        ("org.matrix.some_event", ""),  # State event of type "org.matrix.some_event"
+                                                        # with an empty string as its state key
+                        ("org.matrix.some_other_event", None),  # State events of type "org.matrix.some_other_event"
+                                                                # regardless of their state key
+                    ]
+        """
+        if event_filter:
+            # If a filter was provided, turn it into a StateFilter and retrieve a filtered
+            # view of the state.
+            state_filter = StateFilter.from_types(event_filter)
+            state_ids = await self._store.get_filtered_current_state_ids(
+                room_id,
+                state_filter,
+            )
+        else:
+            # If no filter was provided, get the whole state. We could also reuse the call
+            # to get_filtered_current_state_ids above, with `state_filter = StateFilter.all()`,
+            # but get_filtered_current_state_ids isn't cached and `get_current_state_ids`
+            # is, so using the latter when we can is better for perf.
+            state_ids = await self._store.get_current_state_ids(room_id)
+
+        state_events = await self._store.get_events(state_ids.values())
+
+        return {key: state_events[event_id] for key, event_id in state_ids.items()}
 
 
 class PublicRoomListManager:
