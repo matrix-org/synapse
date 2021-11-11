@@ -298,7 +298,9 @@ class RelationAggregationPaginationServlet(RestServlet):
             raise SynapseError(404, "Unknown parent event.")
 
         if relation_type not in (RelationTypes.ANNOTATION, None):
-            raise SynapseError(400, "Relation type must be 'annotation'")
+            raise SynapseError(
+                400, f"Relation type must be '{RelationTypes.ANNOTATION}'"
+            )
 
         limit = parse_integer(request, "limit", default=5)
         from_token_str = parse_string(request, "from")

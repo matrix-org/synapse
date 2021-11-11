@@ -1,0 +1,1 @@
+Fix a long-standing bug where all requests that read events from the database could get stuck as a result of losing the database connection.

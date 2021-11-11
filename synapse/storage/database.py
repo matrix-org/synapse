@@ -446,6 +446,10 @@ class DatabasePool:
                 self._check_safe_to_upsert,
             )
 
+    def name(self) -> str:
+        "Return the name of this database"
+        return self._database_config.name
+
     def is_running(self) -> bool:
         """Is the database pool currently running"""
         return self._db_pool.running

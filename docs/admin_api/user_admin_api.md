@@ -1107,7 +1107,7 @@ This endpoint will work even if registration is disabled on the server, unlike
 The API is:
 
 ```
-POST /_synapse/admin/v1/username_availabile?username=$localpart
+GET /_synapse/admin/v1/username_available?username=$localpart
 ```
 
 The request and response format is the same as the [/_matrix/client/r0/register/available](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available) API.

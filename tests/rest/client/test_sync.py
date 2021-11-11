@@ -14,6 +14,8 @@
 # limitations under the License.
 import json
 
+from parameterized import parameterized
+
 import synapse.rest.admin
 from synapse.api.constants import (
     EventContentFields,
@@ -417,7 +419,30 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Test that the first user can't see the other user's hidden read receipt
         self.assertEqual(self._get_read_receipt(), None)
 
-    def test_read_receipt_with_empty_body(self):
+    @parameterized.expand(
+        [
+            # Old Element version, expected to send an empty body
+            (
+                "agent1",
+                "Element/1.2.2 (Linux; U; Android 9; MatrixAndroidSDK_X 0.0.1)",
+                200,
+            ),
+            # Old SchildiChat version, expected to send an empty body
+            ("agent2", "SchildiChat/1.2.1 (Android 10)", 200),
+            # Expected 400: Denies empty body starting at version 1.3+
+            ("agent3", "Element/1.3.6 (Android 10)", 400),
+            ("agent4", "SchildiChat/1.3.6 (Android 11)", 400),
+            # Contains "Riot": Receipts with empty bodies expected
+            ("agent5", "Element (Riot.im) (Android 9)", 200),
+            # Expected 400: Does not contain "Android"
+            ("agent6", "Element/1.2.1", 400),
+            # Expected 400: Different format, missing "/" after Element; existing build that should allow empty bodies, but minimal ongoing usage
+            ("agent7", "Element dbg/1.1.8-dev (Android)", 400),
+        ]
+    )
+    def test_read_receipt_with_empty_body(
+        self, name, user_agent: str, expected_status_code: int
+    ):
         # Send a message as the first user
         res = self.helper.send(self.room_id, body="hello", tok=self.tok)
 
@@ -426,8 +451,9 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
             "POST",
             "/rooms/%s/receipt/m.read/%s" % (self.room_id, res["event_id"]),
             access_token=self.tok2,
+            custom_headers=[("User-Agent", user_agent)],
         )
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, expected_status_code)
 
     def _get_read_receipt(self):
         """Syncs and returns the read receipt."""

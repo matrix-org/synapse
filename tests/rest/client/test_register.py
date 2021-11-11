@@ -891,7 +891,6 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
             "smtp_pass": None,
             "notif_from": "test@example.com",
         }
-        config["public_baseurl"] = "aaa"
 
         self.hs = self.setup_test_homeserver(config=config)
 

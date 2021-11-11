@@ -1,0 +1,1 @@
+Allow `stream_writers.typing` config to be a list of one worker.
