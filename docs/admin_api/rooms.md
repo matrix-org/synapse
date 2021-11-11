@@ -540,7 +540,8 @@ or until Synapse is restarted (whichever happens first).
 
 ### Query by `room_id`
 
-With this API you can get the status of all tasks the last 24h for this `room_id`.
+With this API you can get the status of all active deletion tasks, and all those completed in the last 24h,
+for the given `room_id`.
 
 The API is:
 

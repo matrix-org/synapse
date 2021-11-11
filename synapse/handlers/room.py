@@ -1280,13 +1280,14 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
 
 class ShutdownRoomResponse(TypedDict):
     """
-    kicked_users: An array of users (`user_id`) that were kicked.
-    failed_to_kick_users:
-        An array of users (`user_id`) that that were not kicked.
-    local_aliases:
-        An array of strings representing the local aliases that were
-        migrated from the old room to the new.
-    new_room_id: A string representing the room ID of the new room.
+    Attributes:
+        kicked_users: An array of users (`user_id`) that were kicked.
+        failed_to_kick_users:
+            An array of users (`user_id`) that that were not kicked.
+        local_aliases:
+            An array of strings representing the local aliases that were
+            migrated from the old room to the new.
+        new_room_id: A string representing the room ID of the new room.
     """
 
     kicked_users: List[str]
@@ -1320,10 +1321,6 @@ class RoomShutdownHandler:
         block: bool = False,
     ) -> ShutdownRoomResponse:
         """
-        This handles synchronous room shutdowns and is part of the delete room v1 API.
-        The handler for asynchronous shudowns is part of the `PaginationHandler`.
-        If this handler is removed, `shutdown_room` must to be migrated to `PaginationHandler`
-
         Shuts down a room. Moves all local users and room aliases automatically
         to a new room if `new_room_user_id` is set. Otherwise local users only
         leave the room without any information.

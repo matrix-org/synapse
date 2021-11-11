@@ -121,8 +121,8 @@ class PaginationHandler:
     paginating during a purge.
     """
 
-    # remove the purge from the list 24 hours after it completes
-    CLEAR_PURGE_TIME = 3600 * 24
+    # when to remove a completed deletion/purge from the results map
+    CLEAR_PURGE_AFTER_MS = 1000 * 3600 * 24   # 24 hours
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
@@ -135,6 +135,7 @@ class PaginationHandler:
         self._room_shutdown_handler = hs.get_room_shutdown_handler()
 
         self.pagination_lock = ReadWriteLock()
+        # IDs of rooms in which there currently an active purge *or delete* operation.
         self._purges_in_progress_by_room: Set[str] = set()
         # map from purge id to PurgeStatus
         self._purges_by_id: Dict[str, PurgeStatus] = {}
@@ -369,7 +370,7 @@ class PaginationHandler:
                 del self._purges_by_id[purge_id]
 
             self.hs.get_reactor().callLater(
-                PaginationHandler.CLEAR_PURGE_TIME, clear_purge
+                PaginationHandler.CLEAR_PURGE_AFTER_MS/1000, clear_purge
             )
 
     def get_purge_status(self, purge_id: str) -> Optional[PurgeStatus]:
@@ -610,7 +611,6 @@ class PaginationHandler:
         self._purges_in_progress_by_room.add(room_id)
         try:
             with await self.pagination_lock.write(room_id):
-
                 self._delete_by_id[delete_id].status = DeleteStatus.STATUS_SHUTTING_DOWN
                 self._delete_by_id[
                     delete_id
@@ -660,7 +660,7 @@ class PaginationHandler:
                     del self._delete_by_room[room_id]
 
             self.hs.get_reactor().callLater(
-                PaginationHandler.CLEAR_PURGE_TIME, clear_delete
+                PaginationHandler.CLEAR_PURGE_AFTER_MS/1000, clear_delete
             )
 
     def start_shutdown_and_purge_room(
