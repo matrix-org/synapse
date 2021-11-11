@@ -1029,7 +1029,15 @@ class EventCreationHandler:
         relates_to = relation["event_id"]
         parent_event = await self.store.get_event(relates_to)
         if not parent_event:
-            # TODO Attempt to fetch the event over federation.
+            # There must be some reason that the client knows the event exists,
+            # see if there are existing relations. If so, assume everything is fine.
+            pagination = await self.store.get_relations_for_event(
+                relates_to, limit=1
+            )
+            if pagination.chunk:
+                return
+
+            # Otherwise, the client can't know about the parent event!
             raise SynapseError(400, "Can't send relation to unknown event")
 
         # And in the same room.
