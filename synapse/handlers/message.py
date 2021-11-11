@@ -1031,10 +1031,7 @@ class EventCreationHandler:
         if not parent_event:
             # There must be some reason that the client knows the event exists,
             # see if there are existing relations. If so, assume everything is fine.
-            pagination = await self.store.get_relations_for_event(
-                relates_to, limit=1
-            )
-            if pagination.chunk:
+            if await self.store.event_has_relations(relates_to):
                 return
 
             # Otherwise, the client can't know about the parent event!
@@ -1059,9 +1056,10 @@ class EventCreationHandler:
         # If this relation is a thread, then ensure thread head is not part of
         # a thread already.
         elif relation_type == RelationTypes.THREAD:
-            already_thread = await self.store.get_event_thread(relates_to)
-            if already_thread:
-                raise SynapseError(400, "Can't fork threads")
+            if await self.store.event_has_relations(relates_to):
+                raise SynapseError(
+                    400, "Cannot start threads from an event with a relation"
+                )
 
     @measure_func("handle_new_client_event")
     async def handle_new_client_event(

@@ -132,6 +132,25 @@ class RelationsWorkerStore(SQLBaseStore):
             "get_recent_references_for_event", _get_recent_references_for_event_txn
         )
 
+    async def event_has_relations(self, parent_id: str) -> bool:
+        """Check if a given event has any known relations in the database.
+
+        Args:
+            parent_id: The event to check.
+
+        Returns:
+            True if the event has any relations.
+        """
+
+        result = await self.db_pool.simple_select_one_onecol(
+            table="event_relations",
+            keyvalues={"relates_to_id": parent_id},
+            retcol="event_id",
+            allow_none=True,
+            desc="event_has_relations",
+        )
+        return result is not None
+
     @cached(tree=True)
     async def get_aggregation_groups_for_event(
         self,
@@ -435,37 +454,6 @@ class RelationsWorkerStore(SQLBaseStore):
         return await self.db_pool.runInteraction(
             "get_if_user_has_annotated_event", _get_if_user_has_annotated_event
         )
-
-    async def get_event_thread(self, event_id: str) -> Optional[str]:
-        """Return an event's thread.
-
-        Args:
-            event_id: The event being used as the start of a new thread.
-
-        Returns:
-            The thread ID of the event.
-        """
-
-        sql = """
-            SELECT relates_to_id FROM event_relations
-            WHERE
-                event_id = ?
-                AND relation_type = ?
-            LIMIT 1;
-        """
-
-        def _get_thread_id(txn) -> Optional[str]:
-            txn.execute(
-                sql,
-                (
-                    event_id,
-                    RelationTypes.THREAD,
-                ),
-            )
-
-            return txn.fetchone()
-
-        return await self.db_pool.runInteraction("get_thread_id", _get_thread_id)
 
 
 class RelationsStore(RelationsWorkerStore):
