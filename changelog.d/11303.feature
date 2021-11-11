@@ -1,1 +1,1 @@
-Fix a long-standing bug where messages in the `device_inbox` table for deleted devices would persist indefinitely. Contributed by @dklimpel and @JohannesKleine.
+Fix an issue which prevented the 'remove deleted devices from device_inbox column' background process from running when updating from a recent Synapse version. 
