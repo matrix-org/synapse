@@ -643,7 +643,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         delete_id1 = channel.json_body["delete_id"]
 
         # go ahead
-        self.reactor.advance(PaginationHandler.CLEAR_PURGE_TIME / 2)
+        self.reactor.advance(PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000 / 2)
 
         # second task
         channel = self.make_request(
@@ -673,7 +673,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
 
         # get status after more than clearing time for first task
         # second task is not cleared
-        self.reactor.advance(PaginationHandler.CLEAR_PURGE_TIME / 2)
+        self.reactor.advance(PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000 / 2)
 
         channel = self.make_request(
             "GET",
@@ -687,7 +687,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         self.assertEqual(delete_id2, channel.json_body["results"][0]["delete_id"])
 
         # get status after more than clearing time for all tasks
-        self.reactor.advance(PaginationHandler.CLEAR_PURGE_TIME / 2)
+        self.reactor.advance(PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000 / 2)
 
         channel = self.make_request(
             "GET",

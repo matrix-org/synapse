@@ -122,7 +122,7 @@ class PaginationHandler:
     """
 
     # when to remove a completed deletion/purge from the results map
-    CLEAR_PURGE_AFTER_MS = 1000 * 3600 * 24   # 24 hours
+    CLEAR_PURGE_AFTER_MS = 1000 * 3600 * 24  # 24 hours
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
@@ -370,7 +370,7 @@ class PaginationHandler:
                 del self._purges_by_id[purge_id]
 
             self.hs.get_reactor().callLater(
-                PaginationHandler.CLEAR_PURGE_AFTER_MS/1000, clear_purge
+                PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000, clear_purge
             )
 
     def get_purge_status(self, purge_id: str) -> Optional[PurgeStatus]:
@@ -660,7 +660,7 @@ class PaginationHandler:
                     del self._delete_by_room[room_id]
 
             self.hs.get_reactor().callLater(
-                PaginationHandler.CLEAR_PURGE_AFTER_MS/1000, clear_delete
+                PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000, clear_delete
             )
 
     def start_shutdown_and_purge_room(
