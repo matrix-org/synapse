@@ -63,12 +63,12 @@ class SignatureWorkerStore(SQLBaseStore):
             A list of tuples of event ID and a mapping of algorithm to base-64 encoded hash.
         """
         hashes = await self.get_event_reference_hashes(event_ids)
-        hashes = {
+        encoded_hashes = {
             e_id: {k: encode_base64(v) for k, v in h.items() if k == "sha256"}
             for e_id, h in hashes.items()
         }
 
-        return list(hashes.items())
+        return list(encoded_hashes.items())
 
     def _get_event_reference_hashes_txn(
         self, txn: Cursor, event_id: str
