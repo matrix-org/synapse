@@ -44,6 +44,7 @@ from twisted.python.threadpool import ThreadPool
 from twisted.test.proto_helpers import MemoryReactor
 from twisted.trial import unittest
 from twisted.web.resource import Resource
+from twisted.web.server import Request
 
 from synapse import events
 from synapse.api.constants import EventTypes, Membership
@@ -93,9 +94,6 @@ def around(target):
         setattr(target, name, new)
 
     return _around
-
-
-T = TypeVar("T")
 
 
 class TestCase(unittest.TestCase):
@@ -417,7 +415,7 @@ class HomeserverTestCase(TestCase):
         path: Union[bytes, str],
         content: Union[bytes, str, JsonDict] = b"",
         access_token: Optional[str] = None,
-        request: Type[T] = SynapseRequest,
+        request: Type[Request] = SynapseRequest,
         shorthand: bool = True,
         federation_auth_origin: Optional[bytes] = None,
         content_is_form: bool = False,
