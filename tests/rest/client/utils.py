@@ -19,7 +19,18 @@ import json
 import re
 import time
 import urllib.parse
-from typing import Any, AnyStr, Dict, Iterable, Mapping, MutableMapping, Optional, Tuple
+from typing import (
+    Any,
+    AnyStr,
+    Dict,
+    Iterable,
+    Literal,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Tuple,
+    overload,
+)
 from unittest.mock import patch
 
 import attr
@@ -45,6 +56,32 @@ class RestHelper:
     site = attr.ib(type=Site)
     auth_user_id = attr.ib()
 
+    @overload
+    def create_room_as(
+        self,
+        room_creator: Optional[str] = ...,
+        is_public: Optional[bool] = ...,
+        room_version: Optional[str] = ...,
+        tok: Optional[str] = ...,
+        expect_code: Literal[200] = ...,
+        extra_content: Optional[Dict] = ...,
+        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = ...,
+    ) -> str:
+        ...
+
+    @overload
+    def create_room_as(
+        self,
+        room_creator: Optional[str] = ...,
+        is_public: Optional[bool] = ...,
+        room_version: Optional[str] = ...,
+        tok: Optional[str] = ...,
+        expect_code: int = ...,
+        extra_content: Optional[Dict] = ...,
+        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = ...,
+    ) -> Optional[str]:
+        ...
+
     def create_room_as(
         self,
         room_creator: Optional[str] = None,
@@ -54,7 +91,7 @@ class RestHelper:
         expect_code: int = 200,
         extra_content: Optional[Dict] = None,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
-    ) -> str:
+    ) -> Optional[str]:
         """
         Create a room.
 
@@ -97,6 +134,8 @@ class RestHelper:
 
         if expect_code == 200:
             return channel.json_body["room_id"]
+        else:
+            return None
 
     def invite(self, room=None, src=None, targ=None, expect_code=200, tok=None):
         self.change_membership(
