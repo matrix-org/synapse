@@ -19,17 +19,7 @@ import json
 import re
 import time
 import urllib.parse
-from typing import (
-    Any,
-    AnyStr,
-    Dict,
-    Iterable,
-    Mapping,
-    MutableMapping,
-    Optional,
-    Tuple,
-    Union,
-)
+from typing import Any, AnyStr, Dict, Iterable, Mapping, MutableMapping, Optional, Tuple
 from unittest.mock import patch
 
 import attr
@@ -260,9 +250,7 @@ class RestHelper:
         txn_id=None,
         tok=None,
         expect_code=200,
-        custom_headers: Optional[
-            Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
-        ] = None,
+        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
     ):
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
