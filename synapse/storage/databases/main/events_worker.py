@@ -34,7 +34,7 @@ from typing_extensions import Literal
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import NotFoundError, SynapseError
+from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
     EventFormatVersions,
@@ -1627,9 +1627,11 @@ class EventsWorkerStore(SQLBaseStore):
             _cleanup_old_transaction_ids_txn,
         )
 
-    async def get_event_for_timestamp(self, room_id, timestamp):
+    async def get_event_for_timestamp(
+        self, room_id: str, timestamp: int, direction: str
+    ) -> str:
         sql_template = """
-            SELECT event_id, origin_server_ts FROM events
+            SELECT event_id FROM events
             WHERE
                 origin_server_ts %s ?
                 AND room_id = ?
@@ -1637,47 +1639,40 @@ class EventsWorkerStore(SQLBaseStore):
             LIMIT 1;
         """
 
-        def get_event_for_timestamp_txn(txn):
-            # Find closest event before a given timestamp. We use descending
-            # (which gives values largest to smallest) because we want the
-            # largest possible timestamp *before* the given timestamp.
-            txn.execute(sql_template % ("<=", "DESC"), (timestamp, room_id))
-            row = txn.fetchone()
-            if row:
-                event_id_before, ts_before = row
-            else:
-                event_id_before, ts_before = None, None
+        def get_event_for_timestamp_txn(txn) -> str:
 
-            # Find closest event after a given timestamp. We use ascending
-            # (which gives values smallest to largest) because we want the
-            # closest possible timestamp *after* the given timestamp.
-            txn.execute(sql_template % (">=", "ASC"), (timestamp, room_id))
-            row = txn.fetchone()
-            if row:
-                event_id_after, ts_after = row
+            if direction == "b":
+                # Find closest event *before* a given timestamp. We use descending
+                # (which gives values largest to smallest) because we want the
+                # largest possible timestamp *before* the given timestamp.
+                comparison_operator = "<="
+                order = "DESC"
             else:
-                event_id_after, ts_after = None, None
+                # Find closest event *after* a given timestamp. We use ascending
+                # (which gives values smallest to largest) because we want the
+                # closest possible timestamp *after* the given timestamp.
+                comparison_operator = ">="
+                order = "ASC"
 
-            logger.info(
-                "get_event_for_timestamp: timestamp=%s event_id_before=%s ts_before=%s event_id_after=%s ts_after=%s",
-                timestamp,
-                event_id_before,
-                ts_before,
-                event_id_after,
-                ts_after,
+            txn.execute(
+                sql_template % (comparison_operator, order), (timestamp, room_id)
+            )
+            row = txn.fetchone()
+            logger.info("row %s", row)
+            if row:
+                (event_id,) = row
+                return event_id
+
+            raise SynapseError(
+                404,
+                "Unable to find event from %s in direction %s" % (timestamp, direction),
+                errcode=Codes.NOT_FOUND,
             )
 
-            if event_id_before and event_id_after:
-                # Return the closest
-                if (timestamp - ts_before) < (ts_after - timestamp):
-                    return event_id_before
-                else:
-                    return event_id_after
-
-            if event_id_before:
-                return event_id_before
-
-            return event_id_after
+        if direction not in ("f", "b"):
+            raise SynapseError(
+                400, "Unknown direction: %s" % (direction,), errcode=Codes.INVALID_PARAM
+            )
 
         return await self.db_pool.runInteraction(
             "get_event_for_timestamp_txn",

@@ -1085,10 +1085,10 @@ class TimestampLookupRestServlet(RestServlet):
         await self._auth.check_user_in_room(room_id, requester.user.to_string())
 
         timestamp = parse_integer(request, "ts")
+        direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])
 
         event_id = await self._store.get_event_for_timestamp(
-            room_id,
-            timestamp,
+            room_id, timestamp, direction
         )
 
         return 200, {
