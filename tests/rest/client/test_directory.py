@@ -14,10 +14,13 @@
 from http import HTTPStatus
 
 import json
+from twisted.internet.testing import MemoryReactor
 
 from synapse.rest import admin
 from synapse.rest.client import directory, login, room
+from synapse.server import HomeServer
 from synapse.types import RoomAlias
+from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 from tests import unittest
@@ -33,7 +36,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
         config["require_membership_for_aliases"] = True
 
@@ -41,7 +44,9 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
         return self.hs
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         self.room_owner = self.register_user("room_owner", "test")
         self.room_owner_tok = self.login("room_owner", "test")
 
@@ -52,39 +57,39 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         self.user = self.register_user("user", "test")
         self.user_tok = self.login("user", "test")
 
-    def test_state_event_not_in_room(self):
+    def test_state_event_not_in_room(self) -> None:
         self.ensure_user_left_room()
         self.set_alias_via_state_event(HTTPStatus.FORBIDDEN)
 
-    def test_directory_endpoint_not_in_room(self):
+    def test_directory_endpoint_not_in_room(self) -> None:
         self.ensure_user_left_room()
         self.set_alias_via_directory(HTTPStatus.FORBIDDEN)
 
-    def test_state_event_in_room_too_long(self):
+    def test_state_event_in_room_too_long(self) -> None:
         self.ensure_user_joined_room()
         self.set_alias_via_state_event(HTTPStatus.BAD_REQUEST, alias_length=256)
 
-    def test_directory_in_room_too_long(self):
+    def test_directory_in_room_too_long(self) -> None:
         self.ensure_user_joined_room()
         self.set_alias_via_directory(HTTPStatus.BAD_REQUEST, alias_length=256)
 
     @override_config({"default_room_version": 5})
-    def test_state_event_user_in_v5_room(self):
+    def test_state_event_user_in_v5_room(self) -> None:
         """Test that a regular user can add alias events before room v6"""
         self.ensure_user_joined_room()
         self.set_alias_via_state_event(HTTPStatus.OK)
 
     @override_config({"default_room_version": 6})
-    def test_state_event_v6_room(self):
+    def test_state_event_v6_room(self) -> None:
         """Test that a regular user can *not* add alias events from room v6"""
         self.ensure_user_joined_room()
         self.set_alias_via_state_event(HTTPStatus.FORBIDDEN)
 
-    def test_directory_in_room(self):
+    def test_directory_in_room(self) -> None:
         self.ensure_user_joined_room()
         self.set_alias_via_directory(HTTPStatus.OK)
 
-    def test_room_creation_too_long(self):
+    def test_room_creation_too_long(self) -> None:
         url = "/_matrix/client/r0/createRoom"
 
         # We use deliberately a localpart under the length threshold so
@@ -96,7 +101,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
 
-    def test_room_creation(self):
+    def test_room_creation(self) -> None:
         url = "/_matrix/client/r0/createRoom"
 
         # Check with an alias of allowed length. There should already be
@@ -109,7 +114,9 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
 
-    def set_alias_via_state_event(self, expected_code, alias_length=5):
+    def set_alias_via_state_event(
+        self, expected_code: HTTPStatus, alias_length: int = 5
+    ) -> None:
         url = "/_matrix/client/r0/rooms/%s/state/m.room.aliases/%s" % (
             self.room_id,
             self.hs.hostname,
@@ -123,7 +130,9 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, expected_code, channel.result)
 
-    def set_alias_via_directory(self, expected_code: HTTPStatus, alias_length=5) -> None:
+    def set_alias_via_directory(
+        self, expected_code: HTTPStatus, alias_length: int = 5
+    ) -> None:
         url = "/_matrix/client/r0/directory/room/%s" % self.random_alias(alias_length)
         data = {"room_id": self.room_id}
         request_data = json.dumps(data)
@@ -133,16 +142,16 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, expected_code, channel.result)
 
-    def random_alias(self, length):
+    def random_alias(self, length: int) -> str:
         return RoomAlias(random_string(length), self.hs.hostname).to_string()
 
-    def ensure_user_left_room(self):
+    def ensure_user_left_room(self) -> None:
         self.ensure_membership("leave")
 
-    def ensure_user_joined_room(self):
+    def ensure_user_joined_room(self) -> None:
         self.ensure_membership("join")
 
-    def ensure_membership(self, membership):
+    def ensure_membership(self, membership: str) -> None:
         try:
             if membership == "leave":
                 self.helper.leave(room=self.room_id, user=self.user, tok=self.user_tok)
