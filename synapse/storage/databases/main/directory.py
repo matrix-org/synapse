@@ -126,7 +126,7 @@ class DirectoryWorkerStore(SQLBaseStore):
 
 
 class DirectoryStore(DirectoryWorkerStore):
-    async def delete_room_alias(self, room_alias: RoomAlias) -> str:
+    async def delete_room_alias(self, room_alias: RoomAlias) -> Optional[str]:
         room_id = await self.db_pool.runInteraction(
             "delete_room_alias", self._delete_room_alias_txn, room_alias
         )

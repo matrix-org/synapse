@@ -204,6 +204,10 @@ class DirectoryHandler:
             )
 
         room_id = await self._delete_association(room_alias)
+        # The call to `_user_can_delete_alias` above ensures the alias exists.
+        # `_delete_association` returns `None` only if the alias doesn't exist.
+        # We leave the assert here for mypy's benefit.
+        assert room_id is not None
 
         try:
             await self._update_canonical_alias(requester, user_id, room_id, room_alias)
@@ -225,7 +229,7 @@ class DirectoryHandler:
             )
         await self._delete_association(room_alias)
 
-    async def _delete_association(self, room_alias: RoomAlias) -> str:
+    async def _delete_association(self, room_alias: RoomAlias) -> Optional[str]:
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
 
