@@ -24,7 +24,6 @@ from typing import (
     AnyStr,
     Dict,
     Iterable,
-    Literal,
     Mapping,
     MutableMapping,
     Optional,
@@ -34,6 +33,7 @@ from typing import (
 from unittest.mock import patch
 
 import attr
+from typing_extensions import Literal
 
 from twisted.web.resource import Resource
 from twisted.web.server import Site
