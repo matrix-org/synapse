@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from http import HTTPStatus
 
 import json
 
@@ -53,35 +54,35 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
     def test_state_event_not_in_room(self):
         self.ensure_user_left_room()
-        self.set_alias_via_state_event(403)
+        self.set_alias_via_state_event(HTTPStatus.FORBIDDEN)
 
     def test_directory_endpoint_not_in_room(self):
         self.ensure_user_left_room()
-        self.set_alias_via_directory(403)
+        self.set_alias_via_directory(HTTPStatus.FORBIDDEN)
 
     def test_state_event_in_room_too_long(self):
         self.ensure_user_joined_room()
-        self.set_alias_via_state_event(400, alias_length=256)
+        self.set_alias_via_state_event(HTTPStatus.BAD_REQUEST, alias_length=256)
 
     def test_directory_in_room_too_long(self):
         self.ensure_user_joined_room()
-        self.set_alias_via_directory(400, alias_length=256)
+        self.set_alias_via_directory(HTTPStatus.BAD_REQUEST, alias_length=256)
 
     @override_config({"default_room_version": 5})
     def test_state_event_user_in_v5_room(self):
         """Test that a regular user can add alias events before room v6"""
         self.ensure_user_joined_room()
-        self.set_alias_via_state_event(200)
+        self.set_alias_via_state_event(HTTPStatus.OK)
 
     @override_config({"default_room_version": 6})
     def test_state_event_v6_room(self):
         """Test that a regular user can *not* add alias events from room v6"""
         self.ensure_user_joined_room()
-        self.set_alias_via_state_event(403)
+        self.set_alias_via_state_event(HTTPStatus.FORBIDDEN)
 
     def test_directory_in_room(self):
         self.ensure_user_joined_room()
-        self.set_alias_via_directory(200)
+        self.set_alias_via_directory(HTTPStatus.OK)
 
     def test_room_creation_too_long(self):
         url = "/_matrix/client/r0/createRoom"
@@ -93,7 +94,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST", url, request_data, access_token=self.user_tok
         )
-        self.assertEqual(channel.code, 400, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
 
     def test_room_creation(self):
         url = "/_matrix/client/r0/createRoom"
@@ -106,7 +107,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST", url, request_data, access_token=self.user_tok
         )
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
 
     def set_alias_via_state_event(self, expected_code, alias_length=5):
         url = "/_matrix/client/r0/rooms/%s/state/m.room.aliases/%s" % (
@@ -122,7 +123,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, expected_code, channel.result)
 
-    def set_alias_via_directory(self, expected_code, alias_length=5):
+    def set_alias_via_directory(self, expected_code: HTTPStatus, alias_length=5) -> None:
         url = "/_matrix/client/r0/directory/room/%s" % self.random_alias(alias_length)
         data = {"room_id": self.room_id}
         request_data = json.dumps(data)
