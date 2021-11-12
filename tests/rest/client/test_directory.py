@@ -14,7 +14,7 @@
 import json
 from http import HTTPStatus
 
-from twisted.internet.testing import MemoryReactor
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.rest import admin
 from synapse.rest.client import directory, login, room
