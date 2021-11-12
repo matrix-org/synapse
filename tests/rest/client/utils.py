@@ -658,7 +658,13 @@ class RestHelper:
 
         # hit the redirect url again with the right Host header, which should now issue
         # a cookie and redirect to the SSO provider.
-        location = channel.headers.getRawHeaders("Location")[0]
+        def get_location() -> str:
+            location_values = channel.headers.getRawHeaders("Location")
+            # Keep mypy happy by asserting that location_values is nonempty
+            assert location_values
+            return location_values[0]
+
+        location = get_location()
         parts = urllib.parse.urlsplit(location)
         channel = make_request(
             self.hs.get_reactor(),
@@ -672,7 +678,7 @@ class RestHelper:
 
         assert channel.code == 302
         channel.extract_cookies(cookies)
-        return channel.headers.getRawHeaders("Location")[0]
+        return get_location()
 
     def initiate_sso_ui_auth(
         self, ui_auth_session_id: str, cookies: MutableMapping[str, str]
