@@ -11,9 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 from http import HTTPStatus
 
-import json
 from twisted.internet.testing import MemoryReactor
 
 from synapse.rest import admin
@@ -47,6 +47,8 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
     def prepare(
         self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
     ) -> None:
+        """Create two local users and access tokens for them.
+        One of them creates a room."""
         self.room_owner = self.register_user("room_owner", "test")
         self.room_owner_tok = self.login("room_owner", "test")
 
@@ -114,6 +116,41 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
 
+    def test_deleting_alias_via_directory(self) -> None:
+        # Add an alias for the room. We must be joined to do so.
+        self.ensure_user_joined_room()
+        alias = self.set_alias_via_directory(HTTPStatus.OK)
+
+        # Then try to remove the alias
+        channel = self.make_request(
+            "DELETE",
+            f"/_matrix/client/r0/directory/room/{alias}",
+            access_token=self.user_tok,
+        )
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
+
+    def test_deleting_nonexistant_alias(self) -> None:
+        # Check that no alias exists
+        alias = "#potato:test"
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/r0/directory/room/{alias}",
+            access_token=self.user_tok,
+        )
+        self.assertEqual(channel.code, HTTPStatus.NOT_FOUND, channel.result)
+        self.assertIn("error", channel.json_body, channel.json_body)
+        self.assertEqual(channel.json_body["errcode"], "M_NOT_FOUND", channel.json_body)
+
+        # Then try to remove the alias
+        channel = self.make_request(
+            "DELETE",
+            f"/_matrix/client/r0/directory/room/{alias}",
+            access_token=self.user_tok,
+        )
+        self.assertEqual(channel.code, HTTPStatus.NOT_FOUND, channel.result)
+        self.assertIn("error", channel.json_body, channel.json_body)
+        self.assertEqual(channel.json_body["errcode"], "M_NOT_FOUND", channel.json_body)
+
     def set_alias_via_state_event(
         self, expected_code: HTTPStatus, alias_length: int = 5
     ) -> None:
@@ -132,8 +169,9 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
     def set_alias_via_directory(
         self, expected_code: HTTPStatus, alias_length: int = 5
-    ) -> None:
-        url = "/_matrix/client/r0/directory/room/%s" % self.random_alias(alias_length)
+    ) -> str:
+        alias = self.random_alias(alias_length)
+        url = "/_matrix/client/r0/directory/room/%s" % alias
         data = {"room_id": self.room_id}
         request_data = json.dumps(data)
 
@@ -141,6 +179,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
             "PUT", url, request_data, access_token=self.user_tok
         )
         self.assertEqual(channel.code, expected_code, channel.result)
+        return alias
 
     def random_alias(self, length: int) -> str:
         return RoomAlias(random_string(length), self.hs.hostname).to_string()
