@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
- --remove unused tables room_stats_historical and user_stats_historical
+ -- Remove unused tables room_stats_historical and user_stats_historical
+ -- which have not been read or written since schema version 61.
  DROP TABLE IF EXISTS room_stats_historical;
  DROP TABLE IF EXISTS user_stats_historical;
