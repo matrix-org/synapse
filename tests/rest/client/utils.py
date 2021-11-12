@@ -536,7 +536,7 @@ class RestHelper:
             went.
         """
 
-        cookies = {}
+        cookies: Dict[str, str] = {}
 
         # if we're doing a ui auth, hit the ui auth redirect endpoint
         if ui_auth_session_id:
