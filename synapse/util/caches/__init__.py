@@ -17,7 +17,7 @@ import logging
 import typing
 from enum import Enum, auto
 from sys import intern
-from typing import Any, Callable, Dict, List, Optional, Sized, TypeVar
+from typing import Any, Callable, Dict, List, Optional, Sized
 
 import attr
 from prometheus_client.core import Gauge

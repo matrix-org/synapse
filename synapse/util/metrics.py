@@ -64,6 +64,7 @@ in_flight = InFlightGauge(
     sub_metrics=["real_time_max", "real_time_sum"],
 )
 
+
 # This is dynamically created in InFlightGauge.__init__.
 class _InFlightMetric(Protocol):
     real_time_max: float
