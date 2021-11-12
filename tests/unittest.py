@@ -20,7 +20,19 @@ import inspect
 import logging
 import secrets
 import time
-from typing import Any, Callable, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 from unittest.mock import Mock, patch
 
 from canonicaljson import json
@@ -45,6 +57,7 @@ from synapse.logging.context import (
     current_context,
     set_current_context,
 )
+from synapse.rest import RegisterServletsFunc
 from synapse.server import HomeServer
 from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
@@ -204,15 +217,15 @@ class HomeserverTestCase(TestCase):
       config dict.
 
     Attributes:
-        servlets (list[function]): List of servlet registration function.
+        servlets: List of servlet registration function.
         user_id (str): The user ID to assume if auth is hijacked.
         hijack_auth (bool): Whether to hijack auth to return the user specified
         in user_id.
     """
 
-    servlets = []
     hijack_auth = True
     needs_threadpool = False
+    servlets: ClassVar[List[RegisterServletsFunc]] = []
 
     def __init__(self, methodName, *args, **kwargs):
         super().__init__(methodName, *args, **kwargs)

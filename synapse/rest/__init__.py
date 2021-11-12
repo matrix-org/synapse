@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from synapse.http.server import HttpServer, JsonResource
 from synapse.rest import admin
@@ -61,6 +61,8 @@ from synapse.rest.client import (
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+
+RegisterServletsFunc = Callable[["HomeServer", HttpServer], None]
 
 
 class ClientRestResource(JsonResource):
