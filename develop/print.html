@@ -320,6 +320,11 @@ sudo apt install matrix-synapse-py3
 </code></pre>
 <p>The fingerprint of the repository signing key (as shown by <code>gpg /usr/share/keyrings/matrix-org-archive-keyring.gpg</code>) is
 <code>AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058</code>.</p>
+<p>When installing with Debian packages, you might prefer to place files in
+<code>/etc/matrix-synapse/conf.d/</code> to override your configuration without editing
+the main configuration file at <code>/etc/matrix-synapse/homeserver.yaml</code>.
+By doing that, you won't be asked if you want to replace your configuration
+file when you upgrade the Debian package to a later version.</p>
 <h5 id="downstream-debian-packages"><a class="header" href="#downstream-debian-packages">Downstream Debian packages</a></h5>
 <p>We do not recommend using the packages from the default Debian <code>buster</code>
 repository at this time, as they are old and suffer from known security
