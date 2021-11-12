@@ -60,6 +60,7 @@
       - [Registration Tokens](usage/administration/admin_api/registration_tokens.md)
       - [Manipulate Room Membership](admin_api/room_membership.md)
       - [Rooms](admin_api/rooms.md)
+      - [Spaces](usage/administration/admin_api/spaces.md)
       - [Server Notices](admin_api/server_notices.md)
       - [Statistics](admin_api/statistics.md)
       - [Users](admin_api/user_admin_api.md)
