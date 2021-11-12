@@ -17,6 +17,7 @@ from typing import Iterable, List, Optional
 
 from synapse.api.errors import SynapseError
 from synapse.storage._base import SQLBaseStore
+from synapse.storage.database import LoggingTransaction
 from synapse.types import RoomAlias
 from synapse.util.caches.descriptors import cached
 
@@ -133,7 +134,9 @@ class DirectoryStore(DirectoryWorkerStore):
 
         return room_id
 
-    def _delete_room_alias_txn(self, txn, room_alias: RoomAlias) -> str:
+    def _delete_room_alias_txn(
+        self, txn: LoggingTransaction, room_alias: RoomAlias
+    ) -> Optional[str]:
         txn.execute(
             "SELECT room_id FROM room_aliases WHERE room_alias = ?",
             (room_alias.to_string(),),

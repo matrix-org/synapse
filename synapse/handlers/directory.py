@@ -204,10 +204,10 @@ class DirectoryHandler:
             )
 
         room_id = await self._delete_association(room_alias)
-        # The call to `_user_can_delete_alias` above ensures the alias exists.
-        # `_delete_association` returns `None` only if the alias doesn't exist.
-        # We leave the assert here for mypy's benefit.
-        assert room_id is not None
+        if room_id is None:
+            # It's possible someone else deleted the association after the
+            # checks above, but before we did the deletion.
+            raise NotFoundError("Unknown room alias")
 
         try:
             await self._update_canonical_alias(requester, user_id, room_id, room_alias)
