@@ -132,9 +132,7 @@ class ApplicationServiceStore(ApplicationServiceWorkerStore):
 class ApplicationServiceTransactionWorkerStore(
     ApplicationServiceWorkerStore, EventsWorkerStore
 ):
-    async def get_appservices_by_state(
-        self, state: ApplicationServiceState
-    ) -> List[ApplicationService]:
+    async def get_appservices_by_state(self, state: str) -> List[ApplicationService]:
         """Get a list of application services based on their state.
 
         Args:
@@ -177,7 +175,7 @@ class ApplicationServiceTransactionWorkerStore(
         return None
 
     async def set_appservice_state(
-        self, service: ApplicationService, state: ApplicationServiceState
+        self, service: ApplicationService, state: str
     ) -> None:
         """Set the application service state.
 
