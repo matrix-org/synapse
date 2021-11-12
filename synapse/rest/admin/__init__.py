@@ -45,6 +45,7 @@ from synapse.rest.admin.registration_tokens import (
     NewRegistrationTokenRestServlet,
     RegistrationTokenRestServlet,
 )
+from synapse.rest.admin.room_hierarchy import RemoveHierarchyMemberRestServlet
 from synapse.rest.admin.rooms import (
     DeleteRoomStatusByDeleteIdRestServlet,
     DeleteRoomStatusByRoomIdRestServlet,
@@ -253,6 +254,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ListRegistrationTokensRestServlet(hs).register(http_server)
     NewRegistrationTokenRestServlet(hs).register(http_server)
     RegistrationTokenRestServlet(hs).register(http_server)
+    RemoveHierarchyMemberRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
     if hs.config.worker.worker_app is None:
