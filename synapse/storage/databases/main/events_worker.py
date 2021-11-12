@@ -1633,24 +1633,39 @@ class EventsWorkerStore(SQLBaseStore):
             WHERE
                 origin_server_ts %s ?
                 AND room_id = ?
-            ORDER BY origin_server_ts
+            ORDER BY origin_server_ts %s
             LIMIT 1;
         """
 
         def get_event_for_timestamp_txn(txn):
-            txn.execute(sql_template % ("<=",), (timestamp, room_id))
+            # Find closest event before a given timestamp. We use descending
+            # (which gives values largest to smallest) because we want the
+            # largest possible timestamp *before* the given timestamp.
+            txn.execute(sql_template % ("<=", "DESC"), (timestamp, room_id))
             row = txn.fetchone()
             if row:
                 event_id_before, ts_before = row
             else:
                 event_id_before, ts_before = None, None
 
-            txn.execute(sql_template % (">=",), (timestamp, room_id))
+            # Find closest event after a given timestamp. We use ascending
+            # (which gives values smallest to largest) because we want the
+            # closest possible timestamp *after* the given timestamp.
+            txn.execute(sql_template % (">=", "ASC"), (timestamp, room_id))
             row = txn.fetchone()
             if row:
                 event_id_after, ts_after = row
             else:
                 event_id_after, ts_after = None, None
+
+            logger.info(
+                "get_event_for_timestamp: timestamp=%s event_id_before=%s ts_before=%s event_id_after=%s ts_after=%s",
+                timestamp,
+                event_id_before,
+                ts_before,
+                event_id_after,
+                ts_after,
+            )
 
             if event_id_before and event_id_after:
                 # Return the closest
