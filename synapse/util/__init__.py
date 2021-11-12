@@ -16,7 +16,7 @@ import json
 import logging
 import re
 import typing
-from typing import Any, Callable, Dict, Generator, Pattern
+from typing import Any, Callable, Dict, Generator, Optional, Pattern
 
 import attr
 from frozendict import frozendict
@@ -110,7 +110,9 @@ class Clock:
         """Returns the current system time in milliseconds since epoch."""
         return int(self.time() * 1000)
 
-    def looping_call(self, f: Callable, msec: float, *args, **kwargs) -> LoopingCall:
+    def looping_call(
+        self, f: Callable, msec: float, *args: Any, **kwargs: Any
+    ) -> LoopingCall:
         """Call a function repeatedly.
 
         Waits `msec` initially before calling `f` for the first time.
@@ -130,20 +132,22 @@ class Clock:
         d.addErrback(log_failure, "Looping call died", consumeErrors=False)
         return call
 
-    def call_later(self, delay, callback, *args, **kwargs) -> IDelayedCall:
+    def call_later(
+        self, delay: float, callback: Callable, *args: Any, **kwargs: Any
+    ) -> IDelayedCall:
         """Call something later
 
         Note that the function will be called with no logcontext, so if it is anything
         other than trivial, you probably want to wrap it in run_as_background_process.
 
         Args:
-            delay(float): How long to wait in seconds.
-            callback(function): Function to call
+            delay: How long to wait in seconds.
+            callback: Function to call
             *args: Postional arguments to pass to function.
             **kwargs: Key arguments to pass to function.
         """
 
-        def wrapped_callback(*args, **kwargs):
+        def wrapped_callback(*args: Any, **kwargs: Any) -> None:
             with context.PreserveLoggingContext():
                 callback(*args, **kwargs)
 
@@ -158,25 +162,29 @@ class Clock:
                 raise
 
 
-def log_failure(failure, msg, consumeErrors=True):
+def log_failure(
+    failure: Failure, msg: str, consumeErrors: bool = True
+) -> Optional[Failure]:
     """Creates a function suitable for passing to `Deferred.addErrback` that
     logs any failures that occur.
 
     Args:
-        msg (str): Message to log
-        consumeErrors (bool): If true consumes the failure, otherwise passes
-            on down the callback chain
+        failure: The Failure to log
+        msg: Message to log
+        consumeErrors: If true consumes the failure, otherwise passes on down
+            the callback chain
 
     Returns:
-        func(Failure)
+        The Failure if consumeErrors is false. None, otherwise.
     """
 
     logger.error(
-        msg, exc_info=(failure.type, failure.value, failure.getTracebackObject())
+        msg, exc_info=(failure.type, failure.value, failure.getTracebackObject())  # type: ignore[arg-type]
     )
 
     if not consumeErrors:
         return failure
+    return None
 
 
 def glob_to_regex(glob: str, word_boundary: bool = False) -> Pattern:
