@@ -94,9 +94,32 @@ class RelationsTestCase(unittest.HomeserverTestCase):
     def test_deny_invalid_event(self):
         """Test that we deny relations on non-existant events"""
         channel = self._send_relation(
-            RelationTypes.ANNOTATION, EventTypes.Member, parent_id="foo"
+            RelationTypes.ANNOTATION,
+            EventTypes.Message,
+            parent_id="foo",
+            content={"body": "foo", "msgtype": "m.text"},
         )
         self.assertEquals(400, channel.code, channel.json_body)
+
+        # Unless that event is referenced from another event!
+        self.get_success(
+            self.hs.get_datastore().db_pool.simple_insert(
+                table="event_relations",
+                values={
+                    "event_id": "bar",
+                    "relates_to_id": "foo",
+                    "relation_type": RelationTypes.THREAD,
+                },
+                desc="test_deny_invalid_event",
+            )
+        )
+        channel = self._send_relation(
+            RelationTypes.THREAD,
+            EventTypes.Message,
+            parent_id="foo",
+            content={"body": "foo", "msgtype": "m.text"},
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
 
     def test_deny_invalid_room(self):
         """Test that we deny relations on non-existant events"""
@@ -107,7 +130,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         # Attempt to send an annotation to that event.
         channel = self._send_relation(
-            RelationTypes.ANNOTATION, EventTypes.Member, parent_id=parent_id
+            RelationTypes.ANNOTATION, "m.reaction", parent_id=parent_id, key="A"
         )
         self.assertEquals(400, channel.code, channel.json_body)
 

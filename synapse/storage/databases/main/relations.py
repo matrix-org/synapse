@@ -132,14 +132,33 @@ class RelationsWorkerStore(SQLBaseStore):
             "get_recent_references_for_event", _get_recent_references_for_event_txn
         )
 
-    async def event_has_relations(self, parent_id: str) -> bool:
-        """Check if a given event has any known relations in the database.
+    async def event_has_relations(self, event_id: str) -> bool:
+        """Check if a given event has relations.
+
+        Args:
+            event_id: The event to check.
+
+        Returns:
+            True if the event has any relations.
+        """
+
+        result = await self.db_pool.simple_select_one_onecol(
+            table="event_relations",
+            keyvalues={"event_id": event_id},
+            retcol="event_id",
+            allow_none=True,
+            desc="event_has_relations",
+        )
+        return result is not None
+
+    async def event_related_to(self, parent_id: str) -> bool:
+        """Check if a given event has other event relating to it.
 
         Args:
             parent_id: The event to check.
 
         Returns:
-            True if the event has any relations.
+            True if the event is the target of any relations.
         """
 
         result = await self.db_pool.simple_select_one_onecol(

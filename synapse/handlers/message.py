@@ -1027,19 +1027,18 @@ class EventCreationHandler:
 
         # Ensure the parent is real.
         relates_to = relation["event_id"]
-        parent_event = await self.store.get_event(relates_to)
-        if not parent_event:
+        parent_event = await self.store.get_event(relates_to, allow_none=True)
+        if parent_event:
+            # And in the same room.
+            if parent_event.room_id != event.room_id:
+                raise SynapseError(400, "Relations must be in the same room")
+
+        else:
             # There must be some reason that the client knows the event exists,
             # see if there are existing relations. If so, assume everything is fine.
-            if await self.store.event_has_relations(relates_to):
-                return
-
-            # Otherwise, the client can't know about the parent event!
-            raise SynapseError(400, "Can't send relation to unknown event")
-
-        # And in the same room.
-        if parent_event.room_id != event.room_id:
-            raise SynapseError(400, "Relations must be in the same room")
+            if not await self.store.event_related_to(relates_to):
+                # Otherwise, the client can't know about the parent event!
+                raise SynapseError(400, "Can't send relation to unknown event")
 
         # If this event is an annotation then we check that that the sender
         # can't annotate the same way twice (e.g. stops users from liking an
@@ -1053,8 +1052,7 @@ class EventCreationHandler:
             if already_exists:
                 raise SynapseError(400, "Can't send same reaction twice")
 
-        # If this relation is a thread, then ensure thread head is not part of
-        # a thread already.
+        # Don't attempt to start a thread if the parent event is a relation.
         elif relation_type == RelationTypes.THREAD:
             if await self.store.event_has_relations(relates_to):
                 raise SynapseError(
