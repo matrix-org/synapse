@@ -418,7 +418,7 @@ class HomeserverTestCase(TestCase):
         access_token: Optional[str] = None,
         request: Type[T] = SynapseRequest,
         shorthand: bool = True,
-        federation_auth_origin: str = None,
+        federation_auth_origin: Optional[bytes] = None,
         content_is_form: bool = False,
         await_result: bool = True,
         custom_headers: Optional[
@@ -438,7 +438,7 @@ class HomeserverTestCase(TestCase):
             a dict.
             shorthand: Whether to try and be helpful and prefix the given URL
             with the usual REST API path, if it doesn't contain it.
-            federation_auth_origin (bytes|None): if set to not-None, we will add a fake
+            federation_auth_origin: if set to not-None, we will add a fake
                 Authorization header pretenting to be the given server name.
             content_is_form: Whether the content is URL encoded form data. Adds the
                 'Content-Type': 'application/x-www-form-urlencoded' header.
