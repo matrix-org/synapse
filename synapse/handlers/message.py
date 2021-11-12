@@ -1026,7 +1026,10 @@ class EventCreationHandler:
             return
 
         # Ensure the parent is real.
-        relates_to = relation["event_id"]
+        relates_to = relation.get("event_id")
+        if not relates_to:
+            return
+
         parent_event = await self.store.get_event(relates_to, allow_none=True)
         if parent_event:
             # And in the same room.
