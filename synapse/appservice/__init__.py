@@ -58,7 +58,7 @@ class ApplicationService:
         url: Optional[str] = None,
         namespaces: Optional[JsonDict] = None,
         hs_token: Optional[str] = None,
-        protocols: Iterable[str] = None,
+        protocols: Optional[Iterable[str]] = None,
         rate_limited: bool = True,
         ip_range_whitelist: Optional[IPSet] = None,
         supports_ephemeral: bool = False,
@@ -133,14 +133,14 @@ class ApplicationService:
                     raise ValueError("Expected string for 'regex' in ns '%s'" % ns)
         return namespaces
 
-    def _matches_regex(self, test_string: str, namespace_key: str) -> Optional[Match]:
+    def _matches_regex(self, namespace_key: str, test_string: str) -> Optional[Match]:
         for regex_obj in self.namespaces[namespace_key]:
             if regex_obj["regex"].match(test_string):
                 return regex_obj
         return None
 
-    def _is_exclusive(self, ns_key: str, test_string: str) -> bool:
-        regex_obj = self._matches_regex(test_string, ns_key)
+    def _is_exclusive(self, namespace_key: str, test_string: str) -> bool:
+        regex_obj = self._matches_regex(namespace_key, test_string)
         if regex_obj:
             return regex_obj["exclusive"]
         return False
@@ -261,15 +261,15 @@ class ApplicationService:
 
     def is_interested_in_user(self, user_id: str) -> bool:
         return (
-            bool(self._matches_regex(user_id, ApplicationService.NS_USERS))
+            bool(self._matches_regex(ApplicationService.NS_USERS), user_id)
             or user_id == self.sender
         )
 
     def is_interested_in_alias(self, alias: str) -> bool:
-        return bool(self._matches_regex(alias, ApplicationService.NS_ALIASES))
+        return bool(self._matches_regex(ApplicationService.NS_ALIASES), alias)
 
     def is_interested_in_room(self, room_id: str) -> bool:
-        return bool(self._matches_regex(room_id, ApplicationService.NS_ROOMS))
+        return bool(self._matches_regex(ApplicationService.NS_ROOMS), room_id)
 
     def is_exclusive_user(self, user_id: str) -> bool:
         return (
