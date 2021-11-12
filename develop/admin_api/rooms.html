@@ -190,6 +190,9 @@
 <li><a href="#room-state-api">Room State API</a></li>
 <li><a href="#delete-room-api">Delete Room API</a>
 <ul>
+<li><a href="#version-1-old-version">Version 1 (old version)</a></li>
+<li><a href="#version-2-new-version">Version 2 (new version)</a></li>
+<li><a href="#status-of-deleting-rooms">Status of deleting rooms</a></li>
 <li><a href="#undoing-room-shutdowns">Undoing room shutdowns</a></li>
 </ul>
 </li>
@@ -546,10 +549,10 @@ leave the room without any information.</p>
 as room administrator and will contain a message explaining what happened. Users invited
 to the new room will have power level <code>-10</code> by default, and thus be unable to speak.</p>
 <p>If <code>block</code> is <code>true</code>, users will be prevented from joining the old room.
-This option can also be used to pre-emptively block a room, even if it's unknown
-to this homeserver. In this case, the room will be blocked, and no further action
-will be taken. If <code>block</code> is <code>false</code>, attempting to delete an unknown room is
-invalid and will be rejected as a bad request.</p>
+This option can in <a href="#version-1-old-version">Version 1</a> also be used to pre-emptively
+block a room, even if it's unknown to this homeserver. In this case, the room will be
+blocked, and no further action will be taken. If <code>block</code> is <code>false</code>, attempting to
+delete an unknown room is invalid and will be rejected as a bad request.</p>
 <p>This API will remove all trace of the old room from your database after removing
 all local users. If <code>purge</code> is <code>true</code> (the default), all traces of the old room will
 be removed from your database after removing all local users. If you do not want
@@ -558,6 +561,14 @@ Depending on the amount of history being purged, a call to the API may take
 several minutes or longer.</p>
 <p>The local server will only have the power to move local user and room aliases to
 the new room. Users on other servers will be unaffected.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
+server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
+<h2 id="version-1-old-version"><a class="header" href="#version-1-old-version">Version 1 (old version)</a></h2>
+<p>This version works synchronously. That means you only get the response once the server has
+finished the action, which may take a long time. If you request the same action
+a second time, and the server has not finished the first one, the second request will block.
+This is fixed in version 2 of this API. The parameters are the same in both APIs.
+This API will become deprecated in the future.</p>
 <p>The API is:</p>
 <pre><code>DELETE /_synapse/admin/v1/rooms/&lt;room_id&gt;
 </code></pre>
@@ -570,8 +581,6 @@ the new room. Users on other servers will be unaffected.</p>
     &quot;purge&quot;: true
 }
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
     &quot;kicked_users&quot;: [
@@ -583,6 +592,31 @@ server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
         &quot;#evilsaloon:example.com&quot;
     ],
     &quot;new_room_id&quot;: &quot;!newroomid:example.com&quot;
+}
+</code></pre>
+<p>The parameters and response values have the same format as
+<a href="#version-2-new-version">version 2</a> of the API.</p>
+<h2 id="version-2-new-version"><a class="header" href="#version-2-new-version">Version 2 (new version)</a></h2>
+<p><strong>Note</strong>: This API is new, experimental and &quot;subject to change&quot;.</p>
+<p>This version works asynchronously, meaning you get the response from server immediately
+while the server works on that task in background. You can then request the status of the action
+to check if it has completed.</p>
+<p>The API is:</p>
+<pre><code>DELETE /_synapse/admin/v2/rooms/&lt;room_id&gt;
+</code></pre>
+<p>with a body of:</p>
+<pre><code class="language-json">{
+    &quot;new_room_user_id&quot;: &quot;@someuser:example.com&quot;,
+    &quot;room_name&quot;: &quot;Content Violation Notification&quot;,
+    &quot;message&quot;: &quot;Bad Room has been shutdown due to content violations on this server. Please review our Terms of Service.&quot;,
+    &quot;block&quot;: true,
+    &quot;purge&quot;: true
+}
+</code></pre>
+<p>The API starts the shut down and purge running, and returns immediately with a JSON body with
+a purge id:</p>
+<pre><code class="language-json">{
+    &quot;delete_id&quot;: &quot;&lt;opaque id&gt;&quot;
 }
 </code></pre>
 <p><strong>Parameters</strong></p>
@@ -604,7 +638,8 @@ invited to. Defaults to <code>Content Violation Notification</code></li>
 original room was shut down. Defaults to <code>Sharing illegal content on this server is not permitted and rooms in violation will be blocked.</code></li>
 <li><code>block</code> - Optional. If set to <code>true</code>, this room will be added to a blocking list,
 preventing future attempts to join the room. Rooms can be blocked
-even if they're not yet known to the homeserver. Defaults to <code>false</code>.</li>
+even if they're not yet known to the homeserver (only with
+<a href="#version-1-old-version">Version 1</a> of the API). Defaults to <code>false</code>.</li>
 <li><code>purge</code> - Optional. If set to <code>true</code>, it will remove all traces of the room from your database.
 Defaults to <code>true</code>.</li>
 <li><code>force_purge</code> - Optional, and ignored unless <code>purge</code> is <code>true</code>. If set to <code>true</code>, it
@@ -613,15 +648,111 @@ use this unless a regular <code>purge</code> operation fails, as it could leave 
 clients in a confused state.</li>
 </ul>
 <p>The JSON body must not be empty. The body must be at least <code>{}</code>.</p>
-<p><strong>Response</strong></p>
+<h2 id="status-of-deleting-rooms"><a class="header" href="#status-of-deleting-rooms">Status of deleting rooms</a></h2>
+<p><strong>Note</strong>: This API is new, experimental and &quot;subject to change&quot;.</p>
+<p>It is possible to query the status of the background task for deleting rooms.
+The status can be queried up to 24 hours after completion of the task,
+or until Synapse is restarted (whichever happens first).</p>
+<h3 id="query-by-room_id"><a class="header" href="#query-by-room_id">Query by <code>room_id</code></a></h3>
+<p>With this API you can get the status of all active deletion tasks, and all those completed in the last 24h,
+for the given <code>room_id</code>.</p>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v2/rooms/&lt;room_id&gt;/delete_status
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+    &quot;results&quot;: [
+        {
+            &quot;delete_id&quot;: &quot;delete_id1&quot;,
+            &quot;status&quot;: &quot;failed&quot;,
+            &quot;error&quot;: &quot;error message&quot;,
+            &quot;shutdown_room&quot;: {
+                &quot;kicked_users&quot;: [],
+                &quot;failed_to_kick_users&quot;: [],
+                &quot;local_aliases&quot;: [],
+                &quot;new_room_id&quot;: null
+            }
+        }, {
+            &quot;delete_id&quot;: &quot;delete_id2&quot;,
+            &quot;status&quot;: &quot;purging&quot;,
+            &quot;shutdown_room&quot;: {
+                &quot;kicked_users&quot;: [
+                    &quot;@foobar:example.com&quot;
+                ],
+                &quot;failed_to_kick_users&quot;: [],
+                &quot;local_aliases&quot;: [
+                    &quot;#badroom:example.com&quot;,
+                    &quot;#evilsaloon:example.com&quot;
+                ],
+                &quot;new_room_id&quot;: &quot;!newroomid:example.com&quot;
+            }
+        }
+    ]
+}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>room_id</code> - The ID of the room.</li>
+</ul>
+<h3 id="query-by-delete_id"><a class="header" href="#query-by-delete_id">Query by <code>delete_id</code></a></h3>
+<p>With this API you can get the status of one specific task by <code>delete_id</code>.</p>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v2/rooms/delete_status/&lt;delete_id&gt;
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+    &quot;status&quot;: &quot;purging&quot;,
+    &quot;shutdown_room&quot;: {
+        &quot;kicked_users&quot;: [
+            &quot;@foobar:example.com&quot;
+        ],
+        &quot;failed_to_kick_users&quot;: [],
+        &quot;local_aliases&quot;: [
+            &quot;#badroom:example.com&quot;,
+            &quot;#evilsaloon:example.com&quot;
+        ],
+        &quot;new_room_id&quot;: &quot;!newroomid:example.com&quot;
+    }
+}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>delete_id</code> - The ID for this delete.</li>
+</ul>
+<h3 id="response"><a class="header" href="#response">Response</a></h3>
 <p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>results</code> - An array of objects, each containing information about one task.
+This field is omitted from the result when you query by <code>delete_id</code>.
+Task objects contain the following fields:
+<ul>
+<li><code>delete_id</code> - The ID for this purge if you query by <code>room_id</code>.</li>
+<li><code>status</code> - The status will be one of:
+<ul>
+<li><code>shutting_down</code> - The process is removing users from the room.</li>
+<li><code>purging</code> - The process is purging the room and event data from database.</li>
+<li><code>complete</code> - The process has completed successfully.</li>
+<li><code>failed</code> - The process is aborted, an error has occurred.</li>
+</ul>
+</li>
+<li><code>error</code> - A string that shows an error message if <code>status</code> is <code>failed</code>.
+Otherwise this field is hidden.</li>
+<li><code>shutdown_room</code> - An object containing information about the result of shutting down the room.
+<em>Note:</em> The result is shown after removing the room members.
+The delete process can still be running. Please pay attention to the <code>status</code>.
 <ul>
 <li><code>kicked_users</code> - An array of users (<code>user_id</code>) that were kicked.</li>
 <li><code>failed_to_kick_users</code> - An array of users (<code>user_id</code>) that that were not kicked.</li>
-<li><code>local_aliases</code> - An array of strings representing the local aliases that were migrated from
-the old room to the new.</li>
+<li><code>local_aliases</code> - An array of strings representing the local aliases that were
+migrated from the old room to the new.</li>
 <li><code>new_room_id</code> - A string representing the room ID of the new room, or <code>null</code> if
 no such room was created.</li>
+</ul>
+</li>
+</ul>
+</li>
 </ul>
 <h2 id="undoing-room-deletions"><a class="header" href="#undoing-room-deletions">Undoing room deletions</a></h2>
 <p><em>Note</em>: This guide may be outdated by the time you read it. By nature of room deletions being performed at the database level,

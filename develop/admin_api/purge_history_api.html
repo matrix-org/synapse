@@ -228,6 +228,7 @@ server admin.</p>
 }
 </code></pre>
 <p>The status will be one of <code>active</code>, <code>complete</code>, or <code>failed</code>.</p>
+<p>If <code>status</code> is <code>failed</code> there will be a string <code>error</code> with the error message.</p>
 <h2 id="reclaim-disk-space-postgres"><a class="header" href="#reclaim-disk-space-postgres">Reclaim disk space (Postgres)</a></h2>
 <p>To reclaim the disk space and return it to the operating system, you need to run
 <code>VACUUM FULL;</code> on the database.</p>
