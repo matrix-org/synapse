@@ -13,8 +13,9 @@
 # limitations under the License.
 import logging
 import re
-from typing import TYPE_CHECKING, Iterable, List, Match, Optional, Pattern
+from typing import TYPE_CHECKING, Iterable, List, Optional, Pattern
 
+import attr
 from netaddr import IPSet
 
 from synapse.api.constants import EventTypes
@@ -32,6 +33,20 @@ logger = logging.getLogger(__name__)
 class ApplicationServiceState:
     DOWN = "down"
     UP = "up"
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class Namespace:
+    exclusive: bool
+    group_id: Optional[str]
+    regex: Pattern
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class Namespaces:
+    users: List[Namespace]
+    aliases: List[Namespace]
+    rooms: List[Namespace]
 
 
 class ApplicationService:
@@ -86,27 +101,30 @@ class ApplicationService:
 
         self.rate_limited = rate_limited
 
-    def _check_namespaces(self, namespaces):
+    def _check_namespaces(self, namespaces: Optional[JsonDict]) -> Namespaces:
         # Sanity check that it is of the form:
         # {
         #   users: [ {regex: "[A-z]+.*", exclusive: true}, ...],
         #   aliases: [ {regex: "[A-z]+.*", exclusive: true}, ...],
         #   rooms: [ {regex: "[A-z]+.*", exclusive: true}, ...],
         # }
+        result = Namespaces([], [], [])
         if not namespaces:
-            namespaces = {}
+            return result
 
         for ns in ApplicationService.NS_LIST:
             if ns not in namespaces:
-                namespaces[ns] = []
                 continue
 
-            if type(namespaces[ns]) != list:
+            namespace: List[Namespace] = getattr(result, ns)
+
+            if not isinstance(namespaces[ns], list):
                 raise ValueError("Bad namespace value for '%s'" % ns)
             for regex_obj in namespaces[ns]:
                 if not isinstance(regex_obj, dict):
                     raise ValueError("Expected dict regex for ns '%s'" % ns)
-                if not isinstance(regex_obj.get("exclusive"), bool):
+                exclusive = regex_obj.get("exclusive")
+                if not isinstance(exclusive, bool):
                     raise ValueError("Expected bool for 'exclusive' in ns '%s'" % ns)
                 group_id = regex_obj.get("group_id")
                 if group_id:
@@ -127,22 +145,26 @@ class ApplicationService:
                         )
 
                 regex = regex_obj.get("regex")
-                if isinstance(regex, str):
-                    regex_obj["regex"] = re.compile(regex)  # Pre-compile regex
-                else:
+                if not isinstance(regex, str):
                     raise ValueError("Expected string for 'regex' in ns '%s'" % ns)
-        return namespaces
 
-    def _matches_regex(self, namespace_key: str, test_string: str) -> Optional[Match]:
-        for regex_obj in self.namespaces[namespace_key]:
-            if regex_obj["regex"].match(test_string):
-                return regex_obj
+                # Pre-compile regex.
+                namespace.append(Namespace(exclusive, group_id, re.compile(regex)))
+
+        return result
+
+    def _matches_regex(
+        self, namespaces: List[Namespace], test_string: str
+    ) -> Optional[Namespace]:
+        for namespace in namespaces:
+            if namespace.regex.match(test_string):
+                return namespace
         return None
 
-    def _is_exclusive(self, namespace_key: str, test_string: str) -> bool:
-        regex_obj = self._matches_regex(namespace_key, test_string)
-        if regex_obj:
-            return regex_obj["exclusive"]
+    def _is_exclusive(self, namespaces: List[Namespace], test_string: str) -> bool:
+        namespace = self._matches_regex(namespaces, test_string)
+        if namespace:
+            return namespace.exclusive
         return False
 
     async def _matches_user(
@@ -261,39 +283,38 @@ class ApplicationService:
 
     def is_interested_in_user(self, user_id: str) -> bool:
         return (
-            bool(self._matches_regex(ApplicationService.NS_USERS), user_id)
+            bool(self._matches_regex(self.namespaces.users, user_id))
             or user_id == self.sender
         )
 
     def is_interested_in_alias(self, alias: str) -> bool:
-        return bool(self._matches_regex(ApplicationService.NS_ALIASES), alias)
+        return bool(self._matches_regex(self.namespaces.aliases, alias))
 
     def is_interested_in_room(self, room_id: str) -> bool:
-        return bool(self._matches_regex(ApplicationService.NS_ROOMS), room_id)
+        return bool(self._matches_regex(self.namespaces.rooms, room_id))
 
     def is_exclusive_user(self, user_id: str) -> bool:
         return (
-            self._is_exclusive(ApplicationService.NS_USERS, user_id)
-            or user_id == self.sender
+            self._is_exclusive(self.namespaces.users, user_id) or user_id == self.sender
         )
 
     def is_interested_in_protocol(self, protocol: str) -> bool:
         return protocol in self.protocols
 
     def is_exclusive_alias(self, alias: str) -> bool:
-        return self._is_exclusive(ApplicationService.NS_ALIASES, alias)
+        return self._is_exclusive(self.namespaces.aliases, alias)
 
     def is_exclusive_room(self, room_id: str) -> bool:
-        return self._is_exclusive(ApplicationService.NS_ROOMS, room_id)
+        return self._is_exclusive(self.namespaces.rooms, room_id)
 
     def get_exclusive_user_regexes(self) -> List[Pattern]:
         """Get the list of regexes used to determine if a user is exclusively
         registered by the AS
         """
         return [
-            regex_obj["regex"]
-            for regex_obj in self.namespaces[ApplicationService.NS_USERS]
-            if regex_obj["exclusive"]
+            namespace.regex
+            for namespace in self.namespaces.users
+            if namespace.exclusive
         ]
 
     def get_groups_for_user(self, user_id: str) -> Iterable[str]:
@@ -306,9 +327,9 @@ class ApplicationService:
             An iterable that yields group_id strings.
         """
         return (
-            regex_obj["group_id"]
-            for regex_obj in self.namespaces[ApplicationService.NS_USERS]
-            if "group_id" in regex_obj and regex_obj["regex"].match(user_id)
+            namespace.group_id
+            for namespace in self.namespaces.users
+            if namespace.group_id and namespace.regex.match(user_id)
         )
 
     def is_rate_limited(self) -> bool:
