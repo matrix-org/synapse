@@ -205,7 +205,7 @@ class RestHelper:
         extra_data: Optional[dict] = None,
         tok: Optional[str] = None,
         expect_code: int = 200,
-        expect_errcode: str = None,
+        expect_errcode: Optional[str] = None,
     ) -> None:
         """
         Send a membership state event into a room.
