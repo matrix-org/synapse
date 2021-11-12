@@ -595,7 +595,7 @@ class HomeserverTestCase(TestCase):
             nonce_str += b"\x00notadmin"
 
         want_mac.update(nonce.encode("ascii") + b"\x00" + nonce_str)
-        want_mac = want_mac.hexdigest()
+        want_mac_digest = want_mac.hexdigest()
 
         body = json.dumps(
             {
@@ -604,7 +604,7 @@ class HomeserverTestCase(TestCase):
                 "displayname": displayname,
                 "password": password,
                 "admin": admin,
-                "mac": want_mac,
+                "mac": want_mac_digest,
                 "inhibit_login": True,
             }
         )
