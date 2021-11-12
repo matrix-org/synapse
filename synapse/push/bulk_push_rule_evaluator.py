@@ -24,6 +24,7 @@ from synapse.event_auth import get_user_power_level
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
+from synapse.types import StateMap
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import CacheMetric, register_cache
 from synapse.util.caches.descriptors import lru_cache
@@ -170,7 +171,9 @@ class BulkPushRuleEvaluator:
         if pl_event_id:
             # fastpath: if there's a power level event, that's all we need, and
             # not having a power level event is an extreme edge case
-            auth_events = {POWER_KEY: await self.store.get_event(pl_event_id)}
+            auth_events: StateMap[EventBase] = {
+                POWER_KEY: await self.store.get_event(pl_event_id)
+            }
         else:
             auth_events_ids = self._event_auth_handler.compute_auth_events(
                 event, prev_state_ids, for_verification=False

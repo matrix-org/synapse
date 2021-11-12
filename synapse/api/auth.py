@@ -34,7 +34,7 @@ from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
 from synapse.logging import opentracing as opentracing
 from synapse.storage.databases.main.registration import TokenLookupResult
-from synapse.types import Requester, StateMap, UserID, create_requester
+from synapse.types import MutableStateMap, Requester, StateMap, UserID, create_requester
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 
@@ -511,7 +511,7 @@ class Auth:
             room_id, EventTypes.PowerLevels, ""
         )
 
-        auth_events = {}
+        auth_events: MutableStateMap[EventBase] = {}
         if power_level_event:
             auth_events[(EventTypes.PowerLevels, "")] = power_level_event
 
