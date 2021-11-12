@@ -218,12 +218,12 @@ class HomeserverTestCase(TestCase):
     Attributes:
         servlets: List of servlet registration function.
         user_id (str): The user ID to assume if auth is hijacked.
-        hijack_auth (bool): Whether to hijack auth to return the user specified
+        hijack_auth: Whether to hijack auth to return the user specified
         in user_id.
     """
 
-    hijack_auth = True
-    needs_threadpool = False
+    hijack_auth: ClassVar[bool] = True
+    needs_threadpool: ClassVar[bool] = False
     servlets: ClassVar[List[RegisterServletsFunc]] = []
 
     def __init__(self, methodName: str):
