@@ -3,22 +3,47 @@
 # We copy it here as we need to instantiate `GAIResolver` manually, but it is a
 # private class.
 
-
 from socket import (
     AF_INET,
     AF_INET6,
     AF_UNSPEC,
     SOCK_DGRAM,
     SOCK_STREAM,
+    AddressFamily,
+    SocketKind,
     gaierror,
     getaddrinfo,
+)
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    List,
+    NoReturn,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
 )
 
 from zope.interface import implementer
 
 from twisted.internet.address import IPv4Address, IPv6Address
-from twisted.internet.interfaces import IHostnameResolver, IHostResolution
+from twisted.internet.interfaces import (
+    IAddress,
+    IHostnameResolver,
+    IHostResolution,
+    IReactorThreads,
+    IResolutionReceiver,
+)
 from twisted.internet.threads import deferToThreadPool
+
+if TYPE_CHECKING:
+    from twisted.python.runtime import platform
+
+    if platform.supportsThreads():
+        from twisted.python.threadpool import ThreadPool
+    else:
+        ThreadPool = object  # type: ignore[misc, assignment]
 
 
 @implementer(IHostResolution)
@@ -27,13 +52,13 @@ class HostResolution:
     The in-progress resolution of a given hostname.
     """
 
-    def __init__(self, name):
+    def __init__(self, name: str):
         """
         Create a L{HostResolution} with the given name.
         """
         self.name = name
 
-    def cancel(self):
+    def cancel(self) -> NoReturn:
         # IHostResolution.cancel
         raise NotImplementedError()
 
@@ -62,6 +87,17 @@ _socktypeToType = {
 }
 
 
+_GETADDRINFO_RESULT = List[
+    Tuple[
+        AddressFamily,
+        SocketKind,
+        int,
+        str,
+        Union[Tuple[str, int], Tuple[str, int, int, int]],
+    ]
+]
+
+
 @implementer(IHostnameResolver)
 class GAIResolver:
     """
@@ -69,7 +105,12 @@ class GAIResolver:
     L{getaddrinfo} in a thread.
     """
 
-    def __init__(self, reactor, getThreadPool=None, getaddrinfo=getaddrinfo):
+    def __init__(
+        self,
+        reactor: IReactorThreads,
+        getThreadPool: Optional[Callable[[], "ThreadPool"]] = None,
+        getaddrinfo: Callable[[str, int, int, int], _GETADDRINFO_RESULT] = getaddrinfo,
+    ):
         """
         Create a L{GAIResolver}.
         @param reactor: the reactor to schedule result-delivery on
@@ -91,12 +132,12 @@ class GAIResolver:
 
     def resolveHostName(
         self,
-        resolutionReceiver,
-        hostName,
-        portNumber=0,
-        addressTypes=None,
-        transportSemantics="TCP",
-    ):
+        resolutionReceiver: IResolutionReceiver,
+        hostName: str,
+        portNumber: int = 0,
+        addressTypes: Optional[Sequence[IAddress]] = None,
+        transportSemantics: str = "TCP",
+    ) -> IResolutionReceiver:
         """
         See L{IHostnameResolver.resolveHostName}
         @param resolutionReceiver: see interface
@@ -108,11 +149,11 @@ class GAIResolver:
         """
         pool = self._getThreadPool()
         addressFamily = _typesToAF[
-            _any if addressTypes is None else frozenset(addressTypes)
+            _any if addressTypes is None else frozenset(addressTypes)  # type: ignore[arg-type]
         ]
         socketType = _transportToSocket[transportSemantics]
 
-        def get():
+        def get() -> _GETADDRINFO_RESULT:
             try:
                 return self._getaddrinfo(
                     hostName, portNumber, addressFamily, socketType
@@ -125,7 +166,7 @@ class GAIResolver:
         resolutionReceiver.resolutionBegan(resolution)
 
         @d.addCallback
-        def deliverResults(result):
+        def deliverResults(result: _GETADDRINFO_RESULT) -> None:
             for family, socktype, _proto, _cannoname, sockaddr in result:
                 addrType = _afToType[family]
                 resolutionReceiver.addressResolved(
@@ -133,4 +174,6 @@ class GAIResolver:
                 )
             resolutionReceiver.resolutionComplete()
 
-        return resolution
+        # IHostnameResolver declares that resolverHostName returns IResolutionReceiver,
+        # but the implementations return IHostResolution.
+        return resolution  # type: ignore[return-value]
