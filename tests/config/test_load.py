@@ -94,3 +94,16 @@ class ConfigLoadingFileTestCase(ConfigFileTestCase):
         # The default Metrics Flags are off by default.
         config = HomeServerConfig.load_config("", ["-c", self.config_file])
         self.assertFalse(config.metrics.metrics_flags.known_servers)
+
+    def test_depreciated_identity_server_flag_throws_error(self):
+        self.generate_config()
+        # Needed to ensure that actual key/value pair added below don't end up on a line with a comment
+        self.add_lines_to_config([" "])
+        # Check that presence of "trust_identity_server_for_password" throws config error whether
+        # true or false
+        self.add_lines_to_config(["trust_identity_server_for_password_resets: true"])
+        with self.assertRaises(ConfigError):
+            HomeServerConfig.load_config("", ["-c", self.config_file])
+        self.add_lines_to_config(["trust_identity_server_for_password_resets: false"])
+        with self.assertRaises(ConfigError):
+            HomeServerConfig.load_config("", ["-c", self.config_file])
