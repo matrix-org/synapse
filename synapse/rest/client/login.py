@@ -143,8 +143,8 @@ class LoginRestServlet(RestServlet):
 
         flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())
 
-        flows.append({"type": LoginRestServlet.APPSERVICE_TYPE_UNSTABLE})
         flows.append({"type": LoginRestServlet.APPSERVICE_TYPE})
+        flows.append({"type": LoginRestServlet.APPSERVICE_TYPE_UNSTABLE})
 
         return 200, {"flows": flows}
 
