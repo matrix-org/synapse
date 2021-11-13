@@ -61,7 +61,8 @@ class LoginRestServlet(RestServlet):
     TOKEN_TYPE = "m.login.token"
     JWT_TYPE = "org.matrix.login.jwt"
     JWT_TYPE_DEPRECATED = "m.login.jwt"
-    APPSERVICE_TYPE = "uk.half-shot.msc2778.login.application_service"
+    APPSERVICE_TYPE = "m.login.application_service"
+    APPSERVICE_TYPE_UNSTABLE = "uk.half-shot.msc2778.login.application_service"
     REFRESH_TOKEN_PARAM = "org.matrix.msc2918.refresh_token"
 
     def __init__(self, hs: "HomeServer"):
@@ -142,6 +143,7 @@ class LoginRestServlet(RestServlet):
 
         flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())
 
+        flows.append({"type": LoginRestServlet.APPSERVICE_TYPE_UNSTABLE})
         flows.append({"type": LoginRestServlet.APPSERVICE_TYPE})
 
         return 200, {"flows": flows}
@@ -159,7 +161,10 @@ class LoginRestServlet(RestServlet):
             should_issue_refresh_token = False
 
         try:
-            if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
+            if login_submission["type"] in (
+                LoginRestServlet.APPSERVICE_TYPE,
+                LoginRestServlet.APPSERVICE_TYPE_UNSTABLE,
+            ):
                 appservice = self.auth.get_appservice_by_req(request)
 
                 if appservice.is_rate_limited():
