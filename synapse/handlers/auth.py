@@ -1950,7 +1950,7 @@ def load_single_legacy_password_auth_provider(
         # need to use a tuple here for ("password",) not a list since lists aren't hashable
         auth_checkers[(LoginType.PASSWORD, ("password",))] = check_password
 
-    api.register_password_auth_provider_callbacks(hooks, auth_checkers=auth_checkers)
+    api.register_password_auth_provider_callbacks(auth_checkers=auth_checkers, **hooks)
 
 
 CHECK_3PID_AUTH_CALLBACK = Callable[
