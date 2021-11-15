@@ -47,13 +47,10 @@ logger = logging.getLogger(__name__)
 
 
 class SlavedEventStore(
-    EventFederationWorkerStore,
     RoomMemberWorkerStore,
     EventPushActionsWorkerStore,
     StreamWorkerStore,
     StateGroupWorkerStore,
-    EventsWorkerStore,
-    SignatureWorkerStore,
     UserErasureWorkerStore,
     RelationsWorkerStore,
     BaseSlavedStore,

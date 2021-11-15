@@ -18,15 +18,11 @@ from typing import Any, Dict, List
 from synapse.api.errors import SynapseError
 from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main import CacheInvalidationWorkerStore
-from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
 
 logger = logging.getLogger(__name__)
 
 
-class EventForwardExtremitiesStore(
-    EventFederationWorkerStore,
-    CacheInvalidationWorkerStore,
-):
+class EventForwardExtremitiesStore(CacheInvalidationWorkerStore):
     async def delete_forward_extremities_for_room(self, room_id: str) -> int:
         """Delete any extra forward extremities for a room.
 
