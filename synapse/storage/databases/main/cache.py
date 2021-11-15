@@ -30,6 +30,7 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
+from synapse.storage.databases.main.relations import RelationsWorkerStore
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
 from synapse.util.caches.descriptors import _CachedFunction
@@ -49,7 +50,7 @@ CURRENT_STATE_CACHE_NAME = "cs_cache_fake"
 _CacheData = Tuple[str, Optional[List[str]], Optional[int]]
 
 
-class CacheInvalidationWorkerStore(EventFederationWorkerStore):
+class CacheInvalidationWorkerStore(EventFederationWorkerStore, RelationsWorkerStore):
     # This class must be mixed in with a child class which provides the following
     # attribute. TODO: can we get static analysis to enforce this?
     _cache_id_gen: Optional[MultiWriterIdGenerator]

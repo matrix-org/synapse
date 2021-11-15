@@ -52,7 +52,6 @@ class SlavedEventStore(
     StreamWorkerStore,
     StateGroupWorkerStore,
     UserErasureWorkerStore,
-    RelationsWorkerStore,
     BaseSlavedStore,
 ):
     def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
