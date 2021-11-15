@@ -63,7 +63,7 @@ class InFlightBlockMetrics(Protocol):
 
 
 # Tracks the number of blocks currently active
-in_flight = InFlightGauge[InFlightBlockMetrics](
+in_flight: InFlightGauge[InFlightBlockMetrics] = InFlightGauge(
     "synapse_util_metrics_block_in_flight",
     "",
     labels=["block_name"],
