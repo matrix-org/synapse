@@ -31,6 +31,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
 from synapse.storage.engines import PostgresEngine
+from synapse.storage.util.id_generators import MultiWriterIdGenerator
 from synapse.util.caches.descriptors import _CachedFunction
 from synapse.util.iterutils import batch_iter
 
@@ -49,6 +50,10 @@ _CacheData = Tuple[str, Optional[List[str]], Optional[int]]
 
 
 class CacheInvalidationWorkerStore(EventFederationWorkerStore):
+    # This class must be mixed in with a child class which provides the following
+    # attribute. TODO: can we get static analysis to enforce this?
+    _cache_id_gen: Optional[MultiWriterIdGenerator]
+
     def __init__(
         self,
         database: DatabasePool,
@@ -313,6 +318,7 @@ class CacheInvalidationWorkerStore(EventFederationWorkerStore):
             # the transaction. However, we want to only get an ID when we want
             # to use it, here, so we need to call __enter__ manually, and have
             # __exit__ called after the transaction finishes.
+            assert self._cache_id_gen is not None
             stream_id = self._cache_id_gen.get_next_txn(txn)
             txn.call_after(self.hs.get_notifier().on_new_replication_data)
 
