@@ -82,10 +82,15 @@ class Authenticator:
 
         for auth in auth_headers:
             if auth.startswith(b"X-Matrix"):
-                (origin, key, sig) = _parse_auth_header(auth)
+                (origin, key, sig, destination) = _parse_auth_header(auth)
                 json_request["origin"] = origin
                 json_request["signatures"].setdefault(origin, {})[key] = sig
 
+                # if the origin_server sent a destination along it needs to match our own server_name
+                if destination is not None and destination != self.server_name:
+                    raise AuthenticationError(
+                        400, "Destination mismatch in auth header", Codes.UNAUTHORIZED
+                    )
         if (
             self.federation_domain_whitelist is not None
             and origin not in self.federation_domain_whitelist
@@ -140,7 +145,7 @@ def _parse_auth_header(header_bytes):
         header_bytes (bytes): header value
 
     Returns:
-        Tuple[str, str, str]: origin, key id, signature.
+        Tuple[str, str, str, Optional[str]]: origin, key id, signature, destination.
 
     Raises:
         AuthenticationError if the header could not be parsed
@@ -163,7 +168,14 @@ def _parse_auth_header(header_bytes):
 
         key = strip_quotes(param_dict["key"])
         sig = strip_quotes(param_dict["sig"])
-        return origin, key, sig
+
+        # get the destination server_name from the auth header if it exists
+        if param_dict.get("destination") is not None:
+            destination = strip_quotes(param_dict.get("destination"))
+        else:
+            destination = None
+
+        return origin, key, sig, destination
     except Exception as e:
         logger.warning(
             "Error parsing auth header '%s': %s",
