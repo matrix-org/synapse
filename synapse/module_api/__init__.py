@@ -114,7 +114,7 @@ class ModuleApi:
     can register new users etc if necessary.
     """
 
-    def __init__(self, hs: "HomeServer", auth_handler):
+    def __init__(self, hs: "HomeServer", auth_handler) -> None:
         self._hs = hs
 
         # TODO: Fix this type hint once the types for the data stores have been ironed
@@ -216,7 +216,7 @@ class ModuleApi:
     # The following methods can be called by the module at any point in time.
 
     @property
-    def http_client(self):
+    def http_client(self) -> SimpleHttpClient:
         """Allows making outbound HTTP requests to remote resources.
 
         An instance of synapse.http.client.SimpleHttpClient
@@ -226,7 +226,7 @@ class ModuleApi:
         return self._http_client
 
     @property
-    def public_room_list_manager(self):
+    def public_room_list_manager(self) -> "PublicRoomListManager":
         """Allows adding to, removing from and checking the status of rooms in the
         public room list.
 
@@ -309,7 +309,7 @@ class ModuleApi:
         """
         return await self._store.is_server_admin(UserID.from_string(user_id))
 
-    def get_qualified_user_id(self, username):
+    def get_qualified_user_id(self, username: str) -> str:
         """Qualify a user id, if necessary
 
         Takes a user id provided by the user and adds the @ and :domain to
@@ -357,7 +357,7 @@ class ModuleApi:
         """
         return await self._store.user_get_threepids(user_id)
 
-    def check_user_exists(self, user_id):
+    def check_user_exists(self, user_id: str):
         """Check if user exists.
 
         Added in Synapse v0.25.0.
