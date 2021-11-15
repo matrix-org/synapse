@@ -138,7 +138,7 @@ class EmailConfig(Config):
             else ThreepidBehaviour.LOCAL
         )
 
-        if "trust_identity_server_for_password_resets" in config:
+        if config.get("trust_identity_server_for_password_resets"):
             raise ConfigError(
                 'The config option "trust_identity_server_for_password_resets" '
                 'has been replaced by "account_threepid_delegate". '
