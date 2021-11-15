@@ -224,7 +224,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     # This is overridden in derived application classes
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
     # instantiated during setup() for future return by get_datastore()
-    DATASTORE_CLASS = abc.abstractproperty()
+    @property
+    @abc.abstractmethod
+    def DATASTORE_CLASS(self):
+        pass
 
     tls_server_context_factory: Optional[IOpenSSLContextFactory]
 
