@@ -16,7 +16,16 @@ import json
 import logging
 from collections import deque
 from io import SEEK_END, BytesIO
-from typing import Callable, Dict, Iterable, MutableMapping, Optional, Tuple, Union
+from typing import (
+    AnyStr,
+    Callable,
+    Dict,
+    Iterable,
+    MutableMapping,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import attr
 from typing_extensions import Deque
@@ -222,9 +231,7 @@ def make_request(
     federation_auth_origin: Optional[bytes] = None,
     content_is_form: bool = False,
     await_result: bool = True,
-    custom_headers: Optional[
-        Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
-    ] = None,
+    custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
     client_ip: str = "127.0.0.1",
 ) -> FakeChannel:
     """

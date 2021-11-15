@@ -123,9 +123,9 @@ class DataStore(
     RelationsStore,
     CensorEventsStore,
     UIAuthStore,
+    EventForwardExtremitiesStore,
     CacheInvalidationWorkerStore,
     ServerMetricsStore,
-    EventForwardExtremitiesStore,
     LockStore,
     SessionStore,
 ):
