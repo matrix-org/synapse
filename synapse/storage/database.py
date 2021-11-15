@@ -300,7 +300,9 @@ class LoggingTransaction:
         from psycopg2.extras import execute_values  # type: ignore
 
         return self._do_execute(
-            lambda *x: execute_values(self.txn, *x, fetch=fetch), sql, *args
+            lambda sql, *argslist: execute_values(self.txn, sql, argslist, fetch=fetch),
+            sql,
+            *args,
         )
 
     def execute(self, sql: str, *args: Any) -> None:
