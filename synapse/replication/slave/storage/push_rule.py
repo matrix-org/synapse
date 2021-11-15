@@ -20,7 +20,7 @@ from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
 from .events import SlavedEventStore
 
 
-class SlavedPushRuleStore(SlavedEventStore, PushRulesWorkerStore):
+class SlavedPushRuleStore(PushRulesWorkerStore, SlavedEventStore):
     def get_max_push_rules_stream_id(self):
         return self._push_rules_stream_id_gen.get_current_token()
 

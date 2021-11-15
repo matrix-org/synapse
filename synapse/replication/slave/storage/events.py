@@ -47,7 +47,6 @@ logger = logging.getLogger(__name__)
 
 
 class SlavedEventStore(
-    RoomMemberWorkerStore,
     StateGroupWorkerStore,
     UserErasureWorkerStore,
     BaseSlavedStore,

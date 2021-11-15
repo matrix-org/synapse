@@ -61,7 +61,6 @@ class AdminCmdSlavedStore(
     SlavedPushRuleStore,
     SlavedEventStore,
     SlavedClientIpStore,
-    BaseSlavedStore,
     RoomWorkerStore,
 ):
     pass

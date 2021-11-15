@@ -71,7 +71,6 @@ class PushRulesWorkerStore(
     PusherWorkerStore,
     RoomMemberWorkerStore,
     EventsWorkerStore,
-    SQLBaseStore,
     metaclass=abc.ABCMeta,
 ):
     """This is an abstract base class where subclasses must implement
