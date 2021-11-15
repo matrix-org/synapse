@@ -351,7 +351,7 @@ def _upgrade_existing_database(
     is_worker = config and config.worker.worker_app is not None
 
     # If the schema version needs to be updated, and we are on a worker, we immediately
-    # know to bail out as workers cannot update the database schema. Only one worker
+    # know to bail out as workers cannot update the database schema. Only one process
     # must update the database at the time, therefore we delegate this task to the master.
     if is_worker and current_schema_state.current_version < SCHEMA_VERSION:
         # If the DB is on an older version than we expect then we refuse
