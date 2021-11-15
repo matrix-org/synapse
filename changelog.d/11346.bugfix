@@ -1,0 +1,1 @@
+Fix a bug introduced in v1.47.0rc1 which caused worker processes to not halt startup in the presence of outstanding database migrations.
