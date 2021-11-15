@@ -58,6 +58,9 @@ class ApplicationServicesHandler:
         self._msc2409_to_device_messages_enabled = (
             hs.config.experimental.msc2409_to_device_messages_enabled
         )
+        self._msc3202_transaction_extensions_enabled = (
+            hs.config.experimental.msc3202_transaction_extensions
+        )
 
         self.current_max = 0
         self.is_processing = False
@@ -204,9 +207,9 @@ class ApplicationServicesHandler:
         Args:
             stream_key: The stream the event came from.
 
-                `stream_key` can be "typing_key", "receipt_key", "presence_key" or
-                "to_device_key". Any other value for `stream_key` will cause this function
-                to return early.
+                `stream_key` can be "typing_key", "receipt_key", "presence_key",
+                "to_device_key" or "device_list_key". Any other value for `stream_key`
+                will cause this function to return early.
 
                 Ephemeral events will only be pushed to appservices that have opted into
                 receiving them by setting `push_ephemeral` to true in their registration
@@ -230,6 +233,7 @@ class ApplicationServicesHandler:
             "receipt_key",
             "presence_key",
             "to_device_key",
+            "device_list_key",
         ):
             return
 
@@ -253,15 +257,37 @@ class ApplicationServicesHandler:
         ):
             return
 
+        # Ignore device lists if the feature flag is not enabled
+        if (
+            stream_key == "device_list_key"
+            and not self._msc3202_transaction_extensions_enabled
+        ):
+            return
+
         # Check whether there are any appservices which have registered to receive
         # ephemeral events.
         #
         # Note that whether these events are actually relevant to these appservices
         # is decided later on.
+        services = self.store.get_app_services()
         services = [
             service
-            for service in self.store.get_app_services()
-            if service.supports_ephemeral
+            for service in services
+            # Different stream keys require different support booleans
+            if (
+                stream_key
+                in (
+                    "typing_key",
+                    "receipt_key",
+                    "presence_key",
+                    "to_device_key",
+                )
+                and service.supports_ephemeral
+            )
+            or (
+                stream_key == "device_list_key"
+                and service.msc3202_transaction_extensions
+            )
         ]
         if not services:
             # Bail out early if none of the target appservices have explicitly registered
