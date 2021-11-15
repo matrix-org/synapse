@@ -52,7 +52,7 @@ class Databases(Generic[DataStoreT]):
         # Note we pass in the main store class here as workers use a different main
         # store.
 
-        self.databases = []
+        self.databases: List[DatabasePool] = []
         main: Optional[DataStoreT] = None
         state: Optional[StateGroupDataStore] = None
         persist_events: Optional[PersistEventsStore] = None
