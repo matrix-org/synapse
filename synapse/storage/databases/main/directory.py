@@ -13,18 +13,18 @@
 # limitations under the License.
 
 from collections import namedtuple
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Tuple
 
 from synapse.api.errors import SynapseError
-from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import LoggingTransaction
+from synapse.storage.databases.main import CacheInvalidationWorkerStore
 from synapse.types import RoomAlias
 from synapse.util.caches.descriptors import cached
 
 RoomAliasMapping = namedtuple("RoomAliasMapping", ("room_id", "room_alias", "servers"))
 
 
-class DirectoryWorkerStore(SQLBaseStore):
+class DirectoryWorkerStore(CacheInvalidationWorkerStore):
     async def get_association_from_room_alias(
         self, room_alias: RoomAlias
     ) -> Optional[RoomAliasMapping]:
@@ -92,7 +92,7 @@ class DirectoryWorkerStore(SQLBaseStore):
             creator: Optional user_id of creator.
         """
 
-        def alias_txn(txn):
+        def alias_txn(txn: LoggingTransaction) -> None:
             self.db_pool.simple_insert_txn(
                 txn,
                 "room_aliases",
@@ -176,9 +176,9 @@ class DirectoryStore(DirectoryWorkerStore):
                 If None, the creator will be left unchanged.
         """
 
-        def _update_aliases_for_room_txn(txn):
+        def _update_aliases_for_room_txn(txn: LoggingTransaction) -> None:
             update_creator_sql = ""
-            sql_params = (new_room_id, old_room_id)
+            sql_params: Tuple[str, ...] = (new_room_id, old_room_id)
             if creator:
                 update_creator_sql = ", creator = ?"
                 sql_params = (new_room_id, creator, old_room_id)
