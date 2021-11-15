@@ -57,3 +57,7 @@ class ExperimentalConfig(Config):
         self.msc2409_to_device_messages_enabled: bool = experimental.get(
             "msc2409_to_device_messages_enabled", False
         )
+
+        # MSC3202 (device list updates and OTK counts / fallback keys to appservices).
+        # Only device lists are supported currently.
+        self.msc3202_enabled: bool = experimental.get("msc3202_enabled", False)
