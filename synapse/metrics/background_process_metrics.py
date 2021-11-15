@@ -29,7 +29,6 @@ from typing import (
     TypeVar,
     Union,
     cast,
-    overload,
 )
 
 from prometheus_client import Metric
@@ -47,7 +46,6 @@ from synapse.logging.opentracing import (
     noop_context_manager,
     start_active_span,
 )
-from synapse.util.async_helpers import maybe_awaitable
 
 if TYPE_CHECKING:
     import resource
@@ -192,39 +190,9 @@ class _BackgroundProcess:
 R = TypeVar("R")
 
 
-@overload
-def run_as_background_process(  # type: ignore[misc]
-    desc: str,
-    func: Callable[..., Awaitable[R]],
-    *args: Any,
-    bg_start_span: bool = True,
-    **kwargs: Any,
-) -> "defer.Deferred[Optional[R]]":
-    ...
-    # The `type: ignore[misc]` above suppresses
-    # "error: Overloaded function signatures 1 and 2 overlap with incompatible return types  [misc]"
-    #
-    # Overloads are used instead of a `Union` here because mypy fails to infer the type of `R`
-    # and complains about almost every call to this function when `func` is a `Union`.
-
-
-@overload
 def run_as_background_process(
     desc: str,
-    func: Callable[..., R],
-    *args: Any,
-    bg_start_span: bool = True,
-    **kwargs: Any,
-) -> "defer.Deferred[Optional[R]]":
-    ...
-
-
-def run_as_background_process(
-    desc: str,
-    func: Union[
-        Callable[..., Awaitable[R]],
-        Callable[..., R],
-    ],
+    func: Callable[..., Awaitable[Optional[R]]],
     *args: Any,
     bg_start_span: bool = True,
     **kwargs: Any,
@@ -271,7 +239,7 @@ def run_as_background_process(
                 else:
                     ctx = noop_context_manager()
                 with ctx:
-                    return await maybe_awaitable(func(*args, **kwargs))
+                    return await func(*args, **kwargs)
             except Exception:
                 logger.exception(
                     "Background process '%s' threw an exception",
@@ -287,22 +255,16 @@ def run_as_background_process(
         return defer.ensureDeferred(run())
 
 
-F = TypeVar("F", bound=Callable[..., Any])
+F = TypeVar("F", bound=Callable[..., Awaitable[Optional[Any]]])
 
 
 def wrap_as_background_process(desc: str) -> Callable[[F], F]:
     """Decorator that wraps a function that gets called as a background
     process.
 
-    Equivalent to calling the function with `run_as_background_process`.
-
-    Note that the annotated return type of this function is incorrect.
-    The return type of the function, once wrapped, is actually a
-    `Deferred[Optional[T]]`.
+    Equivalent to calling the function with `run_as_background_process`
     """
 
-    # NB: Return type is incorrect and should be F with a Deferred[Optional[R]] return
-    #     We can't express the return types correctly until Python 3.10.
     def wrap_as_background_process_inner(func: F) -> F:
         @wraps(func)
         def wrap_as_background_process_inner_2(
