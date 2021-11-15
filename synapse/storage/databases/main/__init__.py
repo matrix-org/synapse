@@ -119,7 +119,6 @@ class DataStore(
     GroupServerStore,
     UserErasureStore,
     MonthlyActiveUsersStore,
-    StatsStore,
     RelationsStore,
     CensorEventsStore,
     UIAuthStore,

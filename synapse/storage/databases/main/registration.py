@@ -1877,7 +1877,7 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         return res if res else False
 
 
-class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
+class RegistrationStore(RegistrationBackgroundUpdateStore, StatsStore):
     def __init__(
         self,
         database: DatabasePool,
