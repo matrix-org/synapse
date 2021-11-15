@@ -16,12 +16,15 @@
 import functools
 import os
 import re
-from typing import Any, Callable, List
+from typing import Any, Callable, List, TypeVar, cast
 
 NEW_FORMAT_ID_RE = re.compile(r"^\d\d\d\d-\d\d-\d\d")
 
 
-def _wrap_in_base_path(func: Callable[..., str]) -> Callable[..., str]:
+F = TypeVar("F", bound=Callable[..., str])
+
+
+def _wrap_in_base_path(func: F) -> F:
     """Takes a function that returns a relative path and turns it into an
     absolute path based on the location of the primary media store
     """
@@ -31,7 +34,7 @@ def _wrap_in_base_path(func: Callable[..., str]) -> Callable[..., str]:
         path = func(self, *args, **kwargs)
         return os.path.join(self.base_path, path)
 
-    return _wrapped
+    return cast(F, _wrapped)
 
 
 class MediaFilePaths:
@@ -44,23 +47,6 @@ class MediaFilePaths:
 
     def __init__(self, primary_base_path: str):
         self.base_path = primary_base_path
-
-    def default_thumbnail_rel(
-        self,
-        default_top_level: str,
-        default_sub_type: str,
-        width: int,
-        height: int,
-        content_type: str,
-        method: str,
-    ) -> str:
-        top_level_type, sub_type = content_type.split("/")
-        file_name = "%i-%i-%s-%s-%s" % (width, height, top_level_type, sub_type, method)
-        return os.path.join(
-            "default_thumbnails", default_top_level, default_sub_type, file_name
-        )
-
-    default_thumbnail = _wrap_in_base_path(default_thumbnail_rel)
 
     def local_media_filepath_rel(self, media_id: str) -> str:
         return os.path.join("local_content", media_id[0:2], media_id[2:4], media_id[4:])

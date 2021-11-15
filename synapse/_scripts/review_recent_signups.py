@@ -20,7 +20,12 @@ from typing import List
 
 import attr
 
-from synapse.config._base import RootConfig, find_config_files, read_config_files
+from synapse.config._base import (
+    Config,
+    RootConfig,
+    find_config_files,
+    read_config_files,
+)
 from synapse.config.database import DatabaseConfig
 from synapse.storage.database import DatabasePool, LoggingTransaction, make_conn
 from synapse.storage.engines import create_engine
@@ -87,7 +92,7 @@ def get_recent_users(txn: LoggingTransaction, since_ms: int) -> List[UserInfo]:
     return user_infos
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-c",
@@ -126,7 +131,7 @@ def main():
         config_dict,
     )
 
-    since_ms = time.time() * 1000 - config.parse_duration(config_args.since)
+    since_ms = time.time() * 1000 - Config.parse_duration(config_args.since)
     exclude_users_with_email = config_args.exclude_emails
     include_context = not config_args.only_users
 
@@ -137,7 +142,8 @@ def main():
     engine = create_engine(database_config.config)
 
     with make_conn(database_config, engine, "review_recent_signups") as db_conn:
-        user_infos = get_recent_users(db_conn.cursor(), since_ms)
+        # This generates a type of Cursor, not LoggingTransaction.
+        user_infos = get_recent_users(db_conn.cursor(), since_ms)  # type: ignore[arg-type]
 
     for user_info in user_infos:
         if exclude_users_with_email and user_info.emails:

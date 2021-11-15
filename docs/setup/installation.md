@@ -76,6 +76,12 @@ The fingerprint of the repository signing key (as shown by `gpg
 /usr/share/keyrings/matrix-org-archive-keyring.gpg`) is
 `AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058`.
 
+When installing with Debian packages, you might prefer to place files in
+`/etc/matrix-synapse/conf.d/` to override your configuration without editing
+the main configuration file at `/etc/matrix-synapse/homeserver.yaml`.
+By doing that, you won't be asked if you want to replace your configuration
+file when you upgrade the Debian package to a later version.
+
 ##### Downstream Debian packages
 
 We do not recommend using the packages from the default Debian `buster`
@@ -356,12 +362,14 @@ make install
 
 ##### Windows
 
-If you wish to run or develop Synapse on Windows, the Windows Subsystem For
-Linux provides a Linux environment on Windows 10 which is capable of using the
-Debian, Fedora, or source installation methods. More information about WSL can
-be found at <https://docs.microsoft.com/en-us/windows/wsl/install-win10> for
-Windows 10 and <https://docs.microsoft.com/en-us/windows/wsl/install-on-server>
-for Windows Server.
+Running Synapse natively on Windows is not officially supported.
+
+If you wish to run or develop Synapse on Windows, the Windows Subsystem for
+Linux provides a Linux environment which is capable of using the Debian, Fedora,
+or source installation methods. More information about WSL can be found at
+<https://docs.microsoft.com/en-us/windows/wsl/install> for Windows 10/11 and
+<https://docs.microsoft.com/en-us/windows/wsl/install-on-server> for
+Windows Server.
 
 ## Setting up Synapse
 

@@ -19,7 +19,17 @@ import json
 import re
 import time
 import urllib.parse
-from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, Tuple, Union
+from typing import (
+    Any,
+    AnyStr,
+    Dict,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Tuple,
+    Union,
+)
 from unittest.mock import patch
 
 import attr
@@ -53,9 +63,7 @@ class RestHelper:
         tok: Optional[str] = None,
         expect_code: int = 200,
         extra_content: Optional[Dict] = None,
-        custom_headers: Optional[
-            Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
-        ] = None,
+        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
     ) -> str:
         """
         Create a room.
@@ -119,6 +127,35 @@ class RestHelper:
             membership=Membership.JOIN,
             expect_code=expect_code,
         )
+
+    def knock(self, room=None, user=None, reason=None, expect_code=200, tok=None):
+        temp_id = self.auth_user_id
+        self.auth_user_id = user
+        path = "/knock/%s" % room
+        if tok:
+            path = path + "?access_token=%s" % tok
+
+        data = {}
+        if reason:
+            data["reason"] = reason
+
+        channel = make_request(
+            self.hs.get_reactor(),
+            self.site,
+            "POST",
+            path,
+            json.dumps(data).encode("utf8"),
+        )
+
+        assert (
+            int(channel.result["code"]) == expect_code
+        ), "Expected: %d, got: %d, resp: %r" % (
+            expect_code,
+            int(channel.result["code"]),
+            channel.result["body"],
+        )
+
+        self.auth_user_id = temp_id
 
     def leave(self, room=None, user=None, expect_code=200, tok=None):
         self.change_membership(
@@ -198,9 +235,7 @@ class RestHelper:
         txn_id=None,
         tok=None,
         expect_code=200,
-        custom_headers: Optional[
-            Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
-        ] = None,
+        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
     ):
         if body is None:
             body = "body_text_here"
@@ -389,7 +424,7 @@ class RestHelper:
             path,
             content=image_data,
             access_token=tok,
-            custom_headers=[(b"Content-Length", str(image_length))],
+            custom_headers=[("Content-Length", str(image_length))],
         )
 
         assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (

@@ -1,0 +1,1 @@
+Add a new version of delete room admin API `DELETE /_synapse/admin/v2/rooms/<room_id>` to run it in background. Contributed by @dklimpel.

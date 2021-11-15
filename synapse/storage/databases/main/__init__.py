@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.config.homeserver import HomeServerConfig
 from synapse.storage.database import DatabasePool
@@ -75,6 +75,9 @@ from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
 from .user_erasure_store import UserErasureStore
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
@@ -120,13 +123,13 @@ class DataStore(
     RelationsStore,
     CensorEventsStore,
     UIAuthStore,
+    EventForwardExtremitiesStore,
     CacheInvalidationWorkerStore,
     ServerMetricsStore,
-    EventForwardExtremitiesStore,
     LockStore,
     SessionStore,
 ):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         self.hs = hs
         self._clock = hs.get_clock()
         self.database_engine = database.engine
@@ -151,6 +154,7 @@ class DataStore(
             db_conn, "local_group_updates", "stream_id"
         )
 
+        self._cache_id_gen: Optional[MultiWriterIdGenerator]
         if isinstance(self.database_engine, PostgresEngine):
             # We set the `writers` to an empty list here as we don't care about
             # missing updates over restarts, as we'll not have anything in our

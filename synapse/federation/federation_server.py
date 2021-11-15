@@ -213,6 +213,11 @@ class FederationServer(FederationBase):
             self._started_handling_of_staged_events = True
             self._handle_old_staged_events()
 
+            # Start a periodic check for old staged events. This is to handle
+            # the case where locks time out, e.g. if another process gets killed
+            # without dropping its locks.
+            self._clock.looping_call(self._handle_old_staged_events, 60 * 1000)
+
         # keep this as early as possible to make the calculated origin ts as
         # accurate as possible.
         request_time = self._clock.time_msec()
@@ -295,14 +300,16 @@ class FederationServer(FederationBase):
         Returns:
             HTTP response code and body
         """
-        response = await self.transaction_actions.have_responded(origin, transaction)
+        existing_response = await self.transaction_actions.have_responded(
+            origin, transaction
+        )
 
-        if response:
+        if existing_response:
             logger.debug(
                 "[%s] We've already responded to this request",
                 transaction.transaction_id,
             )
-            return response
+            return existing_response
 
         logger.debug("[%s] Transaction is new", transaction.transaction_id)
 
@@ -467,7 +474,7 @@ class FederationServer(FederationBase):
 
     async def on_room_state_request(
         self, origin: str, room_id: str, event_id: Optional[str]
-    ) -> Tuple[int, Dict[str, Any]]:
+    ) -> Tuple[int, JsonDict]:
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
 
@@ -481,7 +488,7 @@ class FederationServer(FederationBase):
         # - but that's non-trivial to get right, and anyway somewhat defeats
         # the point of the linearizer.
         with (await self._server_linearizer.queue((origin, room_id))):
-            resp = dict(
+            resp: JsonDict = dict(
                 await self._state_resp_cache.wrap(
                     (room_id, event_id),
                     self._on_context_state_request_compute,
@@ -632,7 +639,7 @@ class FederationServer(FederationBase):
 
     async def on_make_knock_request(
         self, origin: str, room_id: str, user_id: str, supported_versions: List[str]
-    ) -> Dict[str, Union[EventBase, str]]:
+    ) -> JsonDict:
         """We've received a /make_knock/ request, so we create a partial knock
         event for the room and hand that back, along with the room version, to the knocking
         homeserver. We do *not* persist or process this event until the other server has
@@ -1061,11 +1068,12 @@ class FederationServer(FederationBase):
 
                 origin, event = next
 
-            lock = await self.store.try_acquire_lock(
+            new_lock = await self.store.try_acquire_lock(
                 _INBOUND_EVENT_HANDLING_LOCK_NAME, room_id
             )
-            if not lock:
+            if not new_lock:
                 return
+            lock = new_lock
 
     def __str__(self) -> str:
         return "<ReplicationLayer(%s)>" % self.server_name
@@ -1228,10 +1236,6 @@ class FederationHandlerRegistry:
         logger.info("Registering federation query handler for %r", query_type)
 
         self.query_handlers[query_type] = handler
-
-    def register_instance_for_edu(self, edu_type: str, instance_name: str) -> None:
-        """Register that the EDU handler is on a different instance than master."""
-        self._edu_type_to_instance[edu_type] = [instance_name]
 
     def register_instances_for_edu(
         self, edu_type: str, instance_names: List[str]

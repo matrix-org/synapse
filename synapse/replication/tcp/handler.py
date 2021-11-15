@@ -138,7 +138,7 @@ class ReplicationCommandHandler:
             if isinstance(stream, TypingStream):
                 # Only add TypingStream as a source on the instance in charge of
                 # typing.
-                if hs.config.worker.writers.typing == hs.get_instance_name():
+                if hs.get_instance_name() in hs.config.worker.writers.typing:
                     self._streams_to_replicate.append(stream)
 
                 continue
@@ -294,7 +294,7 @@ class ReplicationCommandHandler:
             # This shouldn't be possible
             raise Exception("Unrecognised command %s in stream queue", cmd.NAME)
 
-    def start_replication(self, hs):
+    def start_replication(self, hs: "HomeServer"):
         """Helper method to start a replication connection to the remote server
         using TCP.
         """
@@ -321,6 +321,8 @@ class ReplicationCommandHandler:
                 hs.config.redis.redis_host,  # type: ignore[arg-type]
                 hs.config.redis.redis_port,
                 self._factory,
+                timeout=30,
+                bindAddress=None,
             )
         else:
             client_name = hs.get_instance_name()
@@ -331,6 +333,8 @@ class ReplicationCommandHandler:
                 host,  # type: ignore[arg-type]
                 port,
                 self._factory,
+                timeout=30,
+                bindAddress=None,
             )
 
     def get_streams(self) -> Dict[str, Stream]:

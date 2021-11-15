@@ -12,25 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import threading
-from typing import Dict
+from typing import TYPE_CHECKING, Dict, Optional, Tuple
 from unittest.mock import Mock
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, Membership
+from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
-from synapse.module_api import ModuleApi
 from synapse.rest import admin
 from synapse.rest.client import login, room
-from synapse.types import Requester, StateMap
+from synapse.types import JsonDict, Requester, StateMap
 from synapse.util.frozenutils import unfreeze
 
 from tests import unittest
+from tests.test_utils import make_awaitable
+
+if TYPE_CHECKING:
+    from synapse.module_api import ModuleApi
 
 thread_local = threading.local()
 
 
 class LegacyThirdPartyRulesTestModule:
-    def __init__(self, config: Dict, module_api: ModuleApi):
+    def __init__(self, config: Dict, module_api: "ModuleApi"):
         # keep a record of the "current" rules module, so that the test can patch
         # it if desired.
         thread_local.rules_module = self
@@ -50,7 +54,7 @@ class LegacyThirdPartyRulesTestModule:
 
 
 class LegacyDenyNewRooms(LegacyThirdPartyRulesTestModule):
-    def __init__(self, config: Dict, module_api: ModuleApi):
+    def __init__(self, config: Dict, module_api: "ModuleApi"):
         super().__init__(config, module_api)
 
     def on_create_room(
@@ -60,7 +64,7 @@ class LegacyDenyNewRooms(LegacyThirdPartyRulesTestModule):
 
 
 class LegacyChangeEvents(LegacyThirdPartyRulesTestModule):
-    def __init__(self, config: Dict, module_api: ModuleApi):
+    def __init__(self, config: Dict, module_api: "ModuleApi"):
         super().__init__(config, module_api)
 
     async def check_event_allowed(self, event: EventBase, state: StateMap[EventBase]):
@@ -71,7 +75,7 @@ class LegacyChangeEvents(LegacyThirdPartyRulesTestModule):
         return d
 
 
-class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
+class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
     servlets = [
         admin.register_servlets,
         login.register_servlets,
@@ -83,11 +87,29 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
 
         load_legacy_third_party_event_rules(hs)
 
+        # We're not going to be properly signing events as our remote homeserver is fake,
+        # therefore disable event signature checks.
+        # Note that these checks are not relevant to this test case.
+
+        # Have this homeserver auto-approve all event signature checking.
+        async def approve_all_signature_checking(_, pdu):
+            return pdu
+
+        hs.get_federation_server()._check_sigs_and_hash = approve_all_signature_checking
+
+        # Have this homeserver skip event auth checks. This is necessary due to
+        # event auth checks ensuring that events were signed by the sender's homeserver.
+        async def _check_event_auth(origin, event, context, *args, **kwargs):
+            return context
+
+        hs.get_federation_event_handler()._check_event_auth = _check_event_auth
+
         return hs
 
     def prepare(self, reactor, clock, homeserver):
-        # Create a user and room to play with during the tests
+        # Create some users and a room to play with during the tests
         self.user_id = self.register_user("kermit", "monkey")
+        self.invitee = self.register_user("invitee", "hackme")
         self.tok = self.login("kermit", "monkey")
 
         # Some tests might prevent room creation on purpose.
@@ -136,6 +158,47 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         )
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
+    def test_third_party_rules_workaround_synapse_errors_pass_through(self):
+        """
+        Tests that the workaround introduced by https://github.com/matrix-org/synapse/pull/11042
+        is functional: that SynapseErrors are passed through from check_event_allowed
+        and bubble up to the web resource.
+
+        NEW MODULES SHOULD NOT MAKE USE OF THIS WORKAROUND!
+        This is a temporary workaround!
+        """
+
+        class NastyHackException(SynapseError):
+            def error_dict(self):
+                """
+                This overrides SynapseError's `error_dict` to nastily inject
+                JSON into the error response.
+                """
+                result = super().error_dict()
+                result["nasty"] = "very"
+                return result
+
+        # add a callback that will raise our hacky exception
+        async def check(ev, state) -> Tuple[bool, Optional[JsonDict]]:
+            raise NastyHackException(429, "message")
+
+        self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [check]
+
+        # Make a request
+        channel = self.make_request(
+            "PUT",
+            "/_matrix/client/r0/rooms/%s/send/foo.bar.forbidden/2" % self.room_id,
+            {},
+            access_token=self.tok,
+        )
+        # Check the error code
+        self.assertEquals(channel.result["code"], b"429", channel.result)
+        # Check the JSON body has had the `nasty` key injected
+        self.assertEqual(
+            channel.json_body,
+            {"errcode": "M_UNKNOWN", "error": "message", "nasty": "very"},
+        )
+
     def test_cannot_modify_event(self):
         """cannot accidentally modify an event before it is persisted"""
 
@@ -153,19 +216,9 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             {"x": "x"},
             access_token=self.tok,
         )
-        # check_event_allowed has some error handling, so it shouldn't 500 just because a
-        # module did something bad.
-        self.assertEqual(channel.code, 200, channel.result)
-        event_id = channel.json_body["event_id"]
-
-        channel = self.make_request(
-            "GET",
-            "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, event_id),
-            access_token=self.tok,
-        )
-        self.assertEqual(channel.code, 200, channel.result)
-        ev = channel.json_body
-        self.assertEqual(ev["content"]["x"], "x")
+        # Because check_event_allowed raises an exception, it leads to a
+        # 500 Internal Server Error
+        self.assertEqual(channel.code, 500, channel.result)
 
     def test_modify_event(self):
         """The module can return a modified version of the event"""
@@ -379,6 +432,74 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
 
             self.assertEqual(channel.code, 200)
             self.assertEqual(channel.json_body["i"], i)
+
+    def test_on_new_event(self):
+        """Test that the on_new_event callback is called on new events"""
+        on_new_event = Mock(make_awaitable(None))
+        self.hs.get_third_party_event_rules()._on_new_event_callbacks.append(
+            on_new_event
+        )
+
+        # Send a message event to the room and check that the callback is called.
+        self.helper.send(room_id=self.room_id, tok=self.tok)
+        self.assertEqual(on_new_event.call_count, 1)
+
+        # Check that the callback is also called on membership updates.
+        self.helper.invite(
+            room=self.room_id,
+            src=self.user_id,
+            targ=self.invitee,
+            tok=self.tok,
+        )
+
+        self.assertEqual(on_new_event.call_count, 2)
+
+        args, _ = on_new_event.call_args
+
+        self.assertEqual(args[0].membership, Membership.INVITE)
+        self.assertEqual(args[0].state_key, self.invitee)
+
+        # Check that the invitee's membership is correct in the state that's passed down
+        # to the callback.
+        self.assertEqual(
+            args[1][(EventTypes.Member, self.invitee)].membership,
+            Membership.INVITE,
+        )
+
+        # Send an event over federation and check that the callback is also called.
+        self._send_event_over_federation()
+        self.assertEqual(on_new_event.call_count, 3)
+
+    def _send_event_over_federation(self) -> None:
+        """Send a dummy event over federation and check that the request succeeds."""
+        body = {
+            "origin": self.hs.config.server.server_name,
+            "origin_server_ts": self.clock.time_msec(),
+            "pdus": [
+                {
+                    "sender": self.user_id,
+                    "type": EventTypes.Message,
+                    "state_key": "",
+                    "content": {"body": "hello world", "msgtype": "m.text"},
+                    "room_id": self.room_id,
+                    "depth": 0,
+                    "origin_server_ts": self.clock.time_msec(),
+                    "prev_events": [],
+                    "auth_events": [],
+                    "signatures": {},
+                    "unsigned": {},
+                }
+            ],
+        }
+
+        channel = self.make_request(
+            method="PUT",
+            path="/_matrix/federation/v1/send/1",
+            content=body,
+            federation_auth_origin=self.hs.config.server.server_name.encode("utf8"),
+        )
+
+        self.assertEqual(channel.code, 200, channel.result)
 
     def _update_power_levels(self, event_default: int = 0):
         """Updates the room's power levels.

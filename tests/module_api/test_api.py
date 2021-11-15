@@ -15,12 +15,12 @@ from unittest.mock import Mock
 
 from twisted.internet import defer
 
-from synapse.api.constants import EduTypes
+from synapse.api.constants import EduTypes, EventTypes
 from synapse.events import EventBase
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
 from synapse.rest import admin
-from synapse.rest.client import login, presence, room
+from synapse.rest.client import login, presence, profile, room
 from synapse.types import create_requester
 
 from tests.events.test_presence_router import send_presence_update, sync_presence
@@ -37,6 +37,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         login.register_servlets,
         room.register_servlets,
         presence.register_servlets,
+        profile.register_servlets,
     ]
 
     def prepare(self, reactor, clock, homeserver):
@@ -115,7 +116,6 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         # Insert a second ip, agent at a later date. We should be able to retrieve it.
         last_seen_2 = last_seen_1 + 10000
-        print("%s => %s" % (last_seen_1, last_seen_2))
         self.get_success(
             self.store.insert_client_ip(
                 user_id, "access_token", "ip_2", "user_agent_2", "device_2", last_seen_2
@@ -384,6 +384,152 @@ class ModuleApiTestCase(HomeserverTestCase):
                         found_update = True
 
         self.assertTrue(found_update)
+
+    def test_update_membership(self):
+        """Tests that the module API can update the membership of a user in a room."""
+        peter = self.register_user("peter", "hackme")
+        lesley = self.register_user("lesley", "hackme")
+        tok = self.login("peter", "hackme")
+        lesley_tok = self.login("lesley", "hackme")
+
+        # Make peter create a public room.
+        room_id = self.helper.create_room_as(
+            room_creator=peter, is_public=True, tok=tok
+        )
+
+        # Set a profile for lesley.
+        channel = self.make_request(
+            method="PUT",
+            path="/_matrix/client/r0/profile/%s/displayname" % lesley,
+            content={"displayname": "Lesley May"},
+            access_token=lesley_tok,
+        )
+
+        self.assertEqual(channel.code, 200, channel.result)
+
+        channel = self.make_request(
+            method="PUT",
+            path="/_matrix/client/r0/profile/%s/avatar_url" % lesley,
+            content={"avatar_url": "some_url"},
+            access_token=lesley_tok,
+        )
+
+        self.assertEqual(channel.code, 200, channel.result)
+
+        # Make Peter invite Lesley to the room.
+        self.get_success(
+            defer.ensureDeferred(
+                self.module_api.update_room_membership(peter, lesley, room_id, "invite")
+            )
+        )
+
+        res = self.helper.get_state(
+            room_id=room_id,
+            event_type="m.room.member",
+            state_key=lesley,
+            tok=tok,
+        )
+
+        # Check the membership is correct.
+        self.assertEqual(res["membership"], "invite")
+
+        # Also check that the profile was correctly filled out, and that it's not
+        # Peter's.
+        self.assertEqual(res["displayname"], "Lesley May")
+        self.assertEqual(res["avatar_url"], "some_url")
+
+        # Make lesley join it.
+        self.get_success(
+            defer.ensureDeferred(
+                self.module_api.update_room_membership(lesley, lesley, room_id, "join")
+            )
+        )
+
+        # Check that the membership of lesley in the room is "join".
+        res = self.helper.get_state(
+            room_id=room_id,
+            event_type="m.room.member",
+            state_key=lesley,
+            tok=tok,
+        )
+
+        self.assertEqual(res["membership"], "join")
+
+        # Also check that the profile was correctly filled out.
+        self.assertEqual(res["displayname"], "Lesley May")
+        self.assertEqual(res["avatar_url"], "some_url")
+
+        # Make peter kick lesley from the room.
+        self.get_success(
+            defer.ensureDeferred(
+                self.module_api.update_room_membership(peter, lesley, room_id, "leave")
+            )
+        )
+
+        # Check that the membership of lesley in the room is "leave".
+        res = self.helper.get_state(
+            room_id=room_id,
+            event_type="m.room.member",
+            state_key=lesley,
+            tok=tok,
+        )
+
+        self.assertEqual(res["membership"], "leave")
+
+        # Try to send a membership update from a non-local user and check that it fails.
+        d = defer.ensureDeferred(
+            self.module_api.update_room_membership(
+                "@nicolas:otherserver.com",
+                lesley,
+                room_id,
+                "invite",
+            )
+        )
+
+        self.get_failure(d, RuntimeError)
+
+        # Check that inviting a user that doesn't have a profile falls back to using a
+        # default (localpart + no avatar) profile.
+        simone = "@simone:" + self.hs.config.server.server_name
+        self.get_success(
+            defer.ensureDeferred(
+                self.module_api.update_room_membership(peter, simone, room_id, "invite")
+            )
+        )
+
+        res = self.helper.get_state(
+            room_id=room_id,
+            event_type="m.room.member",
+            state_key=simone,
+            tok=tok,
+        )
+
+        self.assertEqual(res["membership"], "invite")
+        self.assertEqual(res["displayname"], "simone")
+        self.assertIsNone(res["avatar_url"])
+
+    def test_get_room_state(self):
+        """Tests that a module can retrieve the state of a room through the module API."""
+        user_id = self.register_user("peter", "hackme")
+        tok = self.login("peter", "hackme")
+
+        # Create a room and send some custom state in it.
+        room_id = self.helper.create_room_as(tok=tok)
+        self.helper.send_state(room_id, "org.matrix.test", {}, tok=tok)
+
+        # Check that the module API can successfully fetch state for the room.
+        state = self.get_success(
+            defer.ensureDeferred(self.module_api.get_room_state(room_id))
+        )
+
+        # Check that a few standard events are in the returned state.
+        self.assertIn((EventTypes.Create, ""), state)
+        self.assertIn((EventTypes.Member, user_id), state)
+
+        # Check that our custom state event is in the returned state.
+        self.assertEqual(state[("org.matrix.test", "")].sender, user_id)
+        self.assertEqual(state[("org.matrix.test", "")].state_key, "")
+        self.assertEqual(state[("org.matrix.test", "")].content, {})
 
 
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):

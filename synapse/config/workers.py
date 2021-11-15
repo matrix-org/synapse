@@ -63,7 +63,8 @@ class WriterLocations:
 
     Attributes:
         events: The instances that write to the event and backfill streams.
-        typing: The instance that writes to the typing stream.
+        typing: The instances that write to the typing stream. Currently
+            can only be a single instance.
         to_device: The instances that write to the to_device stream. Currently
             can only be a single instance.
         account_data: The instances that write to the account data streams. Currently
@@ -75,9 +76,15 @@ class WriterLocations:
     """
 
     events = attr.ib(
-        default=["master"], type=List[str], converter=_instance_to_list_converter
+        default=["master"],
+        type=List[str],
+        converter=_instance_to_list_converter,
     )
-    typing = attr.ib(default="master", type=str)
+    typing = attr.ib(
+        default=["master"],
+        type=List[str],
+        converter=_instance_to_list_converter,
+    )
     to_device = attr.ib(
         default=["master"],
         type=List[str],
@@ -216,6 +223,11 @@ class WorkerConfig(Config):
                         "Instance %r is configured to write %s but does not appear in `instance_map` config."
                         % (instance, stream)
                     )
+
+        if len(self.writers.typing) != 1:
+            raise ConfigError(
+                "Must only specify one instance to handle `typing` messages."
+            )
 
         if len(self.writers.to_device) != 1:
             raise ConfigError(

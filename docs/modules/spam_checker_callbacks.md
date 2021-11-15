@@ -10,6 +10,8 @@ The available spam checker callbacks are:
 
 ### `check_event_for_spam`
 
+_First introduced in Synapse v1.37.0_
+
 ```python
 async def check_event_for_spam(event: "synapse.events.EventBase") -> Union[bool, str]
 ```
@@ -19,7 +21,14 @@ either a `bool` to indicate whether the event must be rejected because of spam, 
 to indicate the event must be rejected because of spam and to give a rejection reason to
 forward to clients.
 
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `False`, Synapse falls through to the next one. The value of the first
+callback that does not return `False` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
 ### `user_may_join_room`
+
+_First introduced in Synapse v1.37.0_
 
 ```python
 async def user_may_join_room(user: str, room: str, is_invited: bool) -> bool
@@ -34,7 +43,14 @@ currently has a pending invite in the room.
 This callback isn't called if the join is performed by a server administrator, or in the
 context of a room creation.
 
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
 ### `user_may_invite`
+
+_First introduced in Synapse v1.37.0_
 
 ```python
 async def user_may_invite(inviter: str, invitee: str, room_id: str) -> bool
@@ -44,7 +60,14 @@ Called when processing an invitation. The module must return a `bool` indicating
 the inviter can invite the invitee to the given room. Both inviter and invitee are
 represented by their Matrix user ID (e.g. `@alice:example.com`).
 
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
 ### `user_may_send_3pid_invite`
+
+_First introduced in Synapse v1.45.0_
 
 ```python
 async def user_may_send_3pid_invite(
@@ -79,7 +102,14 @@ await user_may_send_3pid_invite(
 **Note**: If the third-party identifier is already associated with a matrix user ID,
 [`user_may_invite`](#user_may_invite) will be used instead.
 
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
 ### `user_may_create_room`
+
+_First introduced in Synapse v1.37.0_
 
 ```python
 async def user_may_create_room(user: str) -> bool
@@ -88,36 +118,14 @@ async def user_may_create_room(user: str) -> bool
 Called when processing a room creation request. The module must return a `bool` indicating
 whether the given user (represented by their Matrix user ID) is allowed to create a room.
 
-### `user_may_create_room_with_invites`
-
-```python
-async def user_may_create_room_with_invites(
-    user: str,
-    invites: List[str],
-    threepid_invites: List[Dict[str, str]],
-) -> bool
-```
-
-Called when processing a room creation request (right after `user_may_create_room`).
-The module is given the Matrix user ID of the user trying to create a room, as well as a
-list of Matrix users to invite and a list of third-party identifiers (3PID, e.g. email
-addresses) to invite.
-
-An invited Matrix user to invite is represented by their Matrix user IDs, and an invited
-3PIDs is represented by a dict that includes the 3PID medium (e.g. "email") through its
-`medium` key and its address (e.g. "alice@example.com") through its `address` key.
-
-See [the Matrix specification](https://matrix.org/docs/spec/appendices#pid-types) for more
-information regarding third-party identifiers.
-
-If no invite and/or 3PID invite were specified in the room creation request, the
-corresponding list(s) will be empty.
-
-**Note**: This callback is not called when a room is cloned (e.g. during a room upgrade)
-since no invites are sent when cloning a room. To cover this case, modules also need to
-implement `user_may_create_room`.
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
 
 ### `user_may_create_room_alias`
+
+_First introduced in Synapse v1.37.0_
 
 ```python
 async def user_may_create_room_alias(user: str, room_alias: "synapse.types.RoomAlias") -> bool
@@ -127,7 +135,14 @@ Called when trying to associate an alias with an existing room. The module must 
 `bool` indicating whether the given user (represented by their Matrix user ID) is allowed
 to set the given alias.
 
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
 ### `user_may_publish_room`
+
+_First introduced in Synapse v1.37.0_
 
 ```python
 async def user_may_publish_room(user: str, room_id: str) -> bool
@@ -137,7 +152,14 @@ Called when trying to publish a room to the homeserver's public rooms directory.
 module must return a `bool` indicating whether the given user (represented by their
 Matrix user ID) is allowed to publish the given room.
 
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
 ### `check_username_for_spam`
+
+_First introduced in Synapse v1.37.0_
 
 ```python
 async def check_username_for_spam(user_profile: Dict[str, str]) -> bool
@@ -154,7 +176,14 @@ is represented as a dictionary with the following keys:
 The module is given a copy of the original dictionary, so modifying it from within the
 module cannot modify a user's profile when included in user directory search results.
 
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `False`, Synapse falls through to the next one. The value of the first
+callback that does not return `False` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
 ### `check_registration_for_spam`
+
+_First introduced in Synapse v1.37.0_
 
 ```python
 async def check_registration_for_spam(
@@ -179,7 +208,15 @@ The arguments passed to this callback are:
   used during the registration process.
 * `auth_provider_id`: The identifier of the SSO authentication provider, if any.
 
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `RegistrationBehaviour.ALLOW`, Synapse falls through to the next one.
+The value of the first callback that does not return `RegistrationBehaviour.ALLOW` will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.
+
 ### `check_media_file_for_spam`
+
+_First introduced in Synapse v1.37.0_
 
 ```python
 async def check_media_file_for_spam(
@@ -190,6 +227,11 @@ async def check_media_file_for_spam(
 
 Called when storing a local or remote file. The module must return a boolean indicating
 whether the given file can be stored in the homeserver's media store.
+
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `False`, Synapse falls through to the next one. The value of the first
+callback that does not return `False` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
 
 ## Example
 

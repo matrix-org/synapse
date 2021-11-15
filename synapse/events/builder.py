@@ -90,13 +90,13 @@ class EventBuilder:
     )
 
     @property
-    def state_key(self):
+    def state_key(self) -> str:
         if self._state_key is not None:
             return self._state_key
 
         raise AttributeError("state_key")
 
-    def is_state(self):
+    def is_state(self) -> bool:
         return self._state_key is not None
 
     async def build(
@@ -128,14 +128,12 @@ class EventBuilder:
             )
 
         format_version = self.room_version.event_format
+        # The types of auth/prev events changes between event versions.
+        prev_events: Union[List[str], List[Tuple[str, Dict[str, str]]]]
+        auth_events: Union[List[str], List[Tuple[str, Dict[str, str]]]]
         if format_version == EventFormatVersions.V1:
-            # The types of auth/prev events changes between event versions.
-            auth_events: Union[
-                List[str], List[Tuple[str, Dict[str, str]]]
-            ] = await self._store.add_event_hashes(auth_event_ids)
-            prev_events: Union[
-                List[str], List[Tuple[str, Dict[str, str]]]
-            ] = await self._store.add_event_hashes(prev_event_ids)
+            auth_events = await self._store.add_event_hashes(auth_event_ids)
+            prev_events = await self._store.add_event_hashes(prev_event_ids)
         else:
             auth_events = auth_event_ids
             prev_events = prev_event_ids

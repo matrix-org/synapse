@@ -145,7 +145,7 @@ class DirectoryHandler:
             if not self.config.roomdirectory.is_alias_creation_allowed(
                 user_id, room_id, room_alias_str
             ):
-                # Lets just return a generic message, as there may be all sorts of
+                # Let's just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages
                 # per alias creation rule?
                 raise SynapseError(403, "Not allowed to create alias")
@@ -204,6 +204,10 @@ class DirectoryHandler:
             )
 
         room_id = await self._delete_association(room_alias)
+        if room_id is None:
+            # It's possible someone else deleted the association after the
+            # checks above, but before we did the deletion.
+            raise NotFoundError("Unknown room alias")
 
         try:
             await self._update_canonical_alias(requester, user_id, room_id, room_alias)
@@ -225,7 +229,7 @@ class DirectoryHandler:
             )
         await self._delete_association(room_alias)
 
-    async def _delete_association(self, room_alias: RoomAlias) -> str:
+    async def _delete_association(self, room_alias: RoomAlias) -> Optional[str]:
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
 
@@ -245,7 +249,7 @@ class DirectoryHandler:
                 servers = result.servers
         else:
             try:
-                fed_result = await self.federation.make_query(
+                fed_result: Optional[JsonDict] = await self.federation.make_query(
                     destination=room_alias.domain,
                     query_type="directory",
                     args={"room_alias": room_alias.to_string()},
@@ -461,7 +465,7 @@ class DirectoryHandler:
             if not self.config.roomdirectory.is_publishing_room_allowed(
                 user_id, room_id, room_aliases
             ):
-                # Lets just return a generic message, as there may be all sorts of
+                # Let's just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages
                 # per alias creation rule?
                 raise SynapseError(403, "Not allowed to publish room")

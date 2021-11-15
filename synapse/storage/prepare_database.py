@@ -133,22 +133,23 @@ def prepare_database(
 
             # if it's a worker app, refuse to upgrade the database, to avoid multiple
             # workers doing it at once.
-            if (
-                config.worker.worker_app is not None
-                and version_info.current_version != SCHEMA_VERSION
-            ):
+            if config.worker.worker_app is None:
+                _upgrade_existing_database(
+                    cur,
+                    version_info,
+                    database_engine,
+                    config,
+                    databases=databases,
+                )
+            elif version_info.current_version < SCHEMA_VERSION:
+                # If the DB is on an older version than we expect then we refuse
+                # to start the worker (as the main process needs to run first to
+                # update the schema).
                 raise UpgradeDatabaseException(
                     OUTDATED_SCHEMA_ON_WORKER_ERROR
                     % (SCHEMA_VERSION, version_info.current_version)
                 )
 
-            _upgrade_existing_database(
-                cur,
-                version_info,
-                database_engine,
-                config,
-                databases=databases,
-            )
         else:
             logger.info("%r: Initialising new database", databases)
 
@@ -549,6 +550,8 @@ def _apply_module_schemas(
         database_engine:
         config: application config
     """
+    # This is the old way for password_auth_provider modules to make changes
+    # to the database. This should instead be done using the module API
     for (mod, _config) in config.authproviders.password_providers:
         if not hasattr(mod, "get_db_schema_files"):
             continue

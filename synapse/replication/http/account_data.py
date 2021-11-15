@@ -13,9 +13,13 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING
 
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +41,7 @@ class ReplicationUserAccountDataRestServlet(ReplicationEndpoint):
     PATH_ARGS = ("user_id", "account_data_type")
     CACHE = False
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self.handler = hs.get_account_data_handler()
@@ -78,7 +82,7 @@ class ReplicationRoomAccountDataRestServlet(ReplicationEndpoint):
     PATH_ARGS = ("user_id", "room_id", "account_data_type")
     CACHE = False
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self.handler = hs.get_account_data_handler()
@@ -119,7 +123,7 @@ class ReplicationAddTagRestServlet(ReplicationEndpoint):
     PATH_ARGS = ("user_id", "room_id", "tag")
     CACHE = False
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self.handler = hs.get_account_data_handler()
@@ -162,7 +166,7 @@ class ReplicationRemoveTagRestServlet(ReplicationEndpoint):
     )
     CACHE = False
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self.handler = hs.get_account_data_handler()
@@ -183,7 +187,7 @@ class ReplicationRemoveTagRestServlet(ReplicationEndpoint):
         return 200, {"max_stream_id": max_stream_id}
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server):
     ReplicationUserAccountDataRestServlet(hs).register(http_server)
     ReplicationRoomAccountDataRestServlet(hs).register(http_server)
     ReplicationAddTagRestServlet(hs).register(http_server)

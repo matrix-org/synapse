@@ -14,11 +14,10 @@
 # limitations under the License.
 import logging
 import sys
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Tuple
 
 from twisted.internet import address
-from twisted.web.resource import IResource
-from twisted.web.server import Request
+from twisted.web.resource import Resource
 
 import synapse
 import synapse.events
@@ -44,7 +43,7 @@ from synapse.config.server import ListenerConfig
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.server import JsonResource, OptionsResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.http.site import SynapseSite
+from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
@@ -100,6 +99,7 @@ from synapse.rest.client.register import (
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
+from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
 from synapse.storage.databases.main.censor_events import CensorEventsStore
 from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
@@ -118,6 +118,7 @@ from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
+from synapse.types import JsonDict
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.versionstring import get_version_string
 
@@ -131,10 +132,10 @@ class KeyUploadServlet(RestServlet):
 
     PATTERNS = client_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: HomeServer):
         """
         Args:
-            hs (synapse.server.HomeServer): server
+            hs: server
         """
         super().__init__()
         self.auth = hs.get_auth()
@@ -142,7 +143,9 @@ class KeyUploadServlet(RestServlet):
         self.http_client = hs.get_simple_http_client()
         self.main_uri = hs.config.worker.worker_main_http_uri
 
-    async def on_POST(self, request: Request, device_id: Optional[str]):
+    async def on_POST(
+        self, request: SynapseRequest, device_id: Optional[str]
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
@@ -186,9 +189,8 @@ class KeyUploadServlet(RestServlet):
                 # If the header exists, add to the comma-separated list of the first
                 # instance of the header. Otherwise, generate a new header.
                 if x_forwarded_for:
-                    x_forwarded_for = [
-                        x_forwarded_for[0] + b", " + previous_host
-                    ] + x_forwarded_for[1:]
+                    x_forwarded_for = [x_forwarded_for[0] + b", " + previous_host]
+                    x_forwarded_for.extend(x_forwarded_for[1:])
                 else:
                     x_forwarded_for = [previous_host]
             headers[b"X-Forwarded-For"] = x_forwarded_for
@@ -252,13 +254,16 @@ class GenericWorkerSlavedStore(
     SessionStore,
     BaseSlavedStore,
 ):
-    pass
+    # Properties that multiple storage classes define. Tell mypy what the
+    # expected type is.
+    server_name: str
+    config: HomeServerConfig
 
 
 class GenericWorkerServer(HomeServer):
-    DATASTORE_CLASS = GenericWorkerSlavedStore
+    DATASTORE_CLASS = GenericWorkerSlavedStore  # type: ignore
 
-    def _listen_http(self, listener_config: ListenerConfig):
+    def _listen_http(self, listener_config: ListenerConfig) -> None:
         port = listener_config.port
         bind_addresses = listener_config.bind_addresses
 
@@ -266,10 +271,10 @@ class GenericWorkerServer(HomeServer):
 
         site_tag = listener_config.http_options.tag
         if site_tag is None:
-            site_tag = port
+            site_tag = str(port)
 
         # We always include a health resource.
-        resources: Dict[str, IResource] = {"/health": HealthResource()}
+        resources: Dict[str, Resource] = {"/health": HealthResource()}
 
         for res in listener_config.http_options.resources:
             for name in res.names:
@@ -318,6 +323,8 @@ class GenericWorkerServer(HomeServer):
                     resources.update({CLIENT_API_PREFIX: resource})
 
                     resources.update(build_synapse_client_resource_tree(self))
+                    resources.update({"/.well-known": well_known_resource(self)})
+
                 elif name == "federation":
                     resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
                 elif name == "media":
@@ -383,7 +390,7 @@ class GenericWorkerServer(HomeServer):
 
         logger.info("Synapse worker now listening on port %d", port)
 
-    def start_listening(self):
+    def start_listening(self) -> None:
         for listener in self.config.worker.worker_listeners:
             if listener.type == "http":
                 self._listen_http(listener)
@@ -408,7 +415,7 @@ class GenericWorkerServer(HomeServer):
         self.get_tcp_replication().start_replication(self)
 
 
-def start(config_options):
+def start(config_options: List[str]) -> None:
     try:
         config = HomeServerConfig.load_config("Synapse worker", config_options)
     except ConfigError as e:
