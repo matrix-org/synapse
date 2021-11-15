@@ -355,7 +355,7 @@ class Linearizer:
         new_defer = make_deferred_yieldable(defer.Deferred())
         entry.deferreds[new_defer] = 1
 
-        def cb(_r: None) -> defer.Deferred:
+        def cb(_r: None) -> "defer.Deferred[None]":
             logger.debug("Acquired linearizer lock %r for key %r", self.name, key)
             entry.count += 1
 
@@ -542,7 +542,7 @@ def timeout_deferred(
 
     deferred.addBoth(cancel_timeout)
 
-    def success_cb(val: Any) -> None:
+    def success_cb(val: _T) -> None:
         if not new_d.called:
             new_d.callback(val)
 
