@@ -34,6 +34,7 @@ from synapse.storage.databases.main.event_push_actions import (
     EventPushActionsWorkerStore,
 )
 from synapse.storage.databases.main.relations import RelationsWorkerStore
+from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
 from synapse.util.caches.descriptors import _CachedFunction
@@ -57,6 +58,7 @@ class CacheInvalidationWorkerStore(
     EventFederationWorkerStore,
     RelationsWorkerStore,
     EventPushActionsWorkerStore,
+    StreamWorkerStore,
 ):
     # This class must be mixed in with a child class which provides the following
     # attribute. TODO: can we get static analysis to enforce this?

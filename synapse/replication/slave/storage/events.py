@@ -48,10 +48,10 @@ logger = logging.getLogger(__name__)
 
 class SlavedEventStore(
     RoomMemberWorkerStore,
-    StreamWorkerStore,
     StateGroupWorkerStore,
     UserErasureWorkerStore,
     BaseSlavedStore,
+    StreamWorkerStore,
 ):
     def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
