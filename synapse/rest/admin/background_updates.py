@@ -146,7 +146,7 @@ class BackgroundUpdateStartJobRestServlet(RestServlet):
                 {
                     "update_name": "populate_user_directory_createtables",
                     "progress_json": "{}",
-                    "depends_on": None,
+                    "depends_on": "",
                 },
                 {
                     "update_name": "populate_user_directory_process_rooms",
