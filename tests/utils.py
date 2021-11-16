@@ -189,10 +189,10 @@ class TestHomeServer(HomeServer):
 
 
 def setup_test_homeserver(
-    cleanup_func,
-    name="test",
-    config=None,
-    reactor=None,
+    cleanup_func: Callable[[Callable], Any],
+    name: str = "test",
+    config: Optional[HomeServerConfig] = None,
+    reactor: Optional[ModuleType] = None,
     homeserver_to_use: Type[HomeServer] = TestHomeServer,
     **kwargs,
 ):
@@ -224,7 +224,7 @@ def setup_test_homeserver(
     if USE_POSTGRES_FOR_TESTS:
         test_db = "synapse_test_%s" % uuid.uuid4().hex
 
-        database_config = {
+        database_config_dict = {
             "name": "psycopg2",
             "args": {
                 "database": test_db,
@@ -236,18 +236,18 @@ def setup_test_homeserver(
             },
         }
     else:
-        database_config = {
+        database_config_dict = {
             "name": "sqlite3",
             "args": {"database": ":memory:", "cp_min": 1, "cp_max": 1},
         }
 
     if "db_txn_limit" in kwargs:
-        database_config["txn_limit"] = kwargs["db_txn_limit"]
+        database_config_dict["txn_limit"] = kwargs["db_txn_limit"]
 
-    database = DatabaseConnectionConfig("master", database_config)
-    config.database.databases = [database]
+    database_config = DatabaseConnectionConfig("master", database_config_dict)
+    config.database.databases = [database_config]
 
-    db_engine = create_engine(database.config)
+    db_engine = create_engine(database_config.config)
 
     # Create the database before we actually try and connect to it, based off
     # the template database we generate in setupdb()
