@@ -1,0 +1,1 @@
+Add ModuleAPI endpoint to count total messages sent by a user. Contributed by @rhetenor, @Neeeflix
