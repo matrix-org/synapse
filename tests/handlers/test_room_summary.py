@@ -338,7 +338,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self._assert_hierarchy(result2, expected)
         self.assertIs(result1, result2)
 
-        # A subsequent `get_room_hierarchy` call should reuse the result.
+        # A subsequent `get_room_hierarchy` call should not reuse the result.
         result3 = self.get_success(
             self.handler.get_room_hierarchy(self.user, self.space)
         )
