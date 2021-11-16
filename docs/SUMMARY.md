@@ -66,7 +66,12 @@
       - [Server Version](admin_api/version_api.md)
     - [Manhole](manhole.md)
     - [Monitoring](metrics-howto.md)
+    - [Understanding Synapse Through Grafana Graphs](usage/administration/Understanding-Synapse-Performance-Issues-Through-Grafana-Graphs.md)
+    - [Useful SQL for Admins](usage/administration/SQL-for-analyzing-Synapse-PostgreSQL-database-stats.md)
+    - [Database Maintenance Tools](usage/administration/Synapse-database-maintenance-tools.md)
+    - [State Groups](usage/administration/State-Groups.md) 
     - [Request log format](usage/administration/request_log.md)
+    - [Admin FAQ](usage/administration/Admin_FAQ.md)
     - [Scripts]()
 
 # Development
@@ -94,3 +99,4 @@
 
 # Other
   - [Dependency Deprecation Policy](deprecation_policy.md)
+  - [Running Synapse on a Single-Board Computer](other/Running-synapse-on-Single-board-computers.md)
