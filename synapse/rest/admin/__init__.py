@@ -28,6 +28,7 @@ from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
 from synapse.rest.admin.background_updates import (
     BackgroundUpdateEnabledRestServlet,
     BackgroundUpdateRestServlet,
+    BackgroundUpdateStartJobRestServlet,
 )
 from synapse.rest.admin.devices import (
     DeleteDevicesRestServlet,
@@ -259,6 +260,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
         SendServerNoticeServlet(hs).register(http_server)
         BackgroundUpdateEnabledRestServlet(hs).register(http_server)
         BackgroundUpdateRestServlet(hs).register(http_server)
+        BackgroundUpdateStartJobRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(
