@@ -210,7 +210,9 @@ def setup_test_homeserver(
     HomeserverTestCase.
     """
     if reactor is None:
-        from twisted.internet import reactor
+        from twisted.internet import reactor as _reactor
+
+        reactor = _reactor
 
     if config is None:
         config_dict = default_config(name)
