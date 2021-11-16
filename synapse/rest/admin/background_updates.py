@@ -16,7 +16,11 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import SynapseError
-from synapse.http.servlet import RestServlet, assert_params_in_dict, parse_json_object_from_request
+from synapse.http.servlet import (
+    RestServlet,
+    assert_params_in_dict,
+    parse_json_object_from_request,
+)
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_user_is_admin
 from synapse.types import JsonDict
