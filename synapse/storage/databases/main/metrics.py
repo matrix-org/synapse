@@ -521,3 +521,50 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
         await self.db_pool.runInteraction(
             "generate_user_daily_visits", _generate_user_daily_visits
         )
+
+
+class UserMetricsStore(SQLBaseStore):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
+        super().__init__(database, db_conn, hs)
+
+    async def count_user_total_messages(self, user_id):
+        """
+        Counts the total number of messages sent by a user.
+        """
+
+        def _count_messages(txn):
+
+            sql = """
+                SELECT COALESCE(COUNT(*), 0) FROM events
+                WHERE type = 'm.room.message'
+                    AND sender LIKE ?
+            """
+
+            txn.execute(sql, user_id)
+            (count,) = txn.fetchone()
+            return count
+
+        return await self.db_pool.runInteraction(
+            "count_user_total_messages", _count_messages
+        )
+
+    async def count_user_total_encrypted_messages(self, user_id):
+        """
+        Counts the total number of encrypted messages sent by a user.
+        """
+
+        def _count_messages(txn):
+
+            sql = """
+                SELECT COALESCE(COUNT(*), 0) FROM events
+                WHERE type = 'm.room.encrypted'
+                    AND sender LIKE ?
+            """
+
+            txn.execute(sql, user_id)
+            (count,) = txn.fetchone()
+            return count
+
+        return await self.db_pool.runInteraction(
+            "count_user_total_encrypted_messages", _count_messages
+        )

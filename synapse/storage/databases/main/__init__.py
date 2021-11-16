@@ -48,7 +48,7 @@ from .group_server import GroupServerStore
 from .keys import KeyStore
 from .lock import LockStore
 from .media_repository import MediaRepositoryStore
-from .metrics import ServerMetricsStore
+from .metrics import ServerMetricsStore, UserMetricsStore
 from .monthly_active_users import MonthlyActiveUsersStore
 from .openid import OpenIdStore
 from .presence import PresenceStore
@@ -125,6 +125,7 @@ class DataStore(
     UIAuthStore,
     CacheInvalidationWorkerStore,
     ServerMetricsStore,
+    UserMetricsStore,
     EventForwardExtremitiesStore,
     LockStore,
     SessionStore,
