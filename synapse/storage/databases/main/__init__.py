@@ -67,7 +67,6 @@ from .search import SearchStore
 from .session import SessionStore
 from .signatures import SignatureStore
 from .state import StateStore
-from .stats import StatsStore
 from .stream import StreamStore
 from .tags import TagsStore
 from .transactions import TransactionWorkerStore

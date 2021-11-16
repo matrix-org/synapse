@@ -15,7 +15,7 @@
 
 import itertools
 import logging
-from typing import TYPE_CHECKING, Any, Collection, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Collection, Iterable, List, Optional, Tuple
 
 from synapse.api.constants import EventTypes
 from synapse.replication.tcp.streams import BackfillStream, CachesStream

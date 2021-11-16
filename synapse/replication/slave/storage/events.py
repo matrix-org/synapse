@@ -16,14 +16,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from synapse.storage.database import DatabasePool
-from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
-from synapse.storage.databases.main.event_push_actions import (
-    EventPushActionsWorkerStore,
-)
-from synapse.storage.databases.main.events_worker import EventsWorkerStore
-from synapse.storage.databases.main.relations import RelationsWorkerStore
-from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
-from synapse.storage.databases.main.signatures import SignatureWorkerStore
 from synapse.storage.databases.main.state import StateGroupWorkerStore
 from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.databases.main.user_erasure_store import UserErasureWorkerStore
