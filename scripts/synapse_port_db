@@ -35,6 +35,7 @@ from synapse.logging.context import (
     make_deferred_yieldable,
     run_in_background,
 )
+from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.storage.database import DatabasePool, make_conn
 from synapse.storage.databases.main.client_ips import ClientIpBackgroundUpdateStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxBackgroundUpdateStore
@@ -57,7 +58,6 @@ from synapse.storage.databases.main.room import RoomBackgroundUpdateStore
 from synapse.storage.databases.main.roommember import RoomMemberBackgroundUpdateStore
 from synapse.storage.databases.main.search import SearchBackgroundUpdateStore
 from synapse.storage.databases.main.state import MainStateBackgroundUpdateStore
-from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.databases.main.user_directory import (
     UserDirectoryBackgroundUpdateStore,
 )
@@ -179,10 +179,10 @@ class Store(
     MainStateBackgroundUpdateStore,
     UserDirectoryBackgroundUpdateStore,
     EndToEndKeyBackgroundStore,
-    StatsStore,
     PusherWorkerStore,
     PresenceBackgroundUpdateStore,
     GroupServerWorkerStore,
+    SlavedEventStore,
 ):
     def execute(self, f, *args, **kwargs):
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
@@ -228,6 +228,10 @@ class MockHomeserver:
 
     def get_instance_name(self):
         return "master"
+
+    def should_send_federation(self) -> bool:
+        "Should this server be sending federation traffic directly?"
+        return False
 
 
 class Porter(object):
