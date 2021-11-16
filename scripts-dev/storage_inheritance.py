@@ -32,7 +32,6 @@ def scrape_storage_classes() -> str:
             "synapse",
             "tests",
         ],
-        cwd="/home/dmr/workspace/synapse/",
     ).decode()
 
 
