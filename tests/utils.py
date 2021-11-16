@@ -104,9 +104,15 @@ def setupdb():
         atexit.register(_cleanup)
 
 
-def default_config(name, parse=False):
+def default_config(name: str) -> Dict[str, Any]:
     """
     Create a reasonable test config.
+
+    Args:
+        name: The value of the 'server_name' option in the returned config.
+
+    Returns:
+        A sensible, default homeserver config.
     """
     config_dict = {
         "server_name": name,
@@ -175,11 +181,6 @@ def default_config(name, parse=False):
         "listeners": [{"port": 0, "type": "http"}],
     }
 
-    if parse:
-        config = HomeServerConfig()
-        config.parse_config_dict(config_dict, "", "")
-        return config
-
     return config_dict
 
 
@@ -212,9 +213,10 @@ def setup_test_homeserver(
         from twisted.internet import reactor
 
     if config is None:
-        config = default_config(name, parse=True)
+        config_dict = default_config(name)
 
-    config.ldap_enabled = False
+        config = HomeServerConfig()
+        config.parse_config_dict(config_dict)
 
     if "clock" not in kwargs:
         kwargs["clock"] = MockClock()

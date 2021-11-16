@@ -18,6 +18,7 @@ from unittest.mock import Mock
 
 from twisted.internet import defer
 
+from synapse.config.homeserver import HomeServerConfig
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import create_engine
@@ -47,7 +48,10 @@ class SQLBaseStoreTestCase(unittest.TestCase):
 
         self.db_pool.runWithConnection = runWithConnection
 
-        config = default_config(name="test", parse=True)
+        config_dict = default_config(name="test")
+        config = HomeServerConfig()
+        config.parse_config_dict(config_dict)
+
         hs = TestHomeServer("test", config=config)
 
         sqlite_config = {"name": "sqlite3"}
