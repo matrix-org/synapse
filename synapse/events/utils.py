@@ -433,6 +433,13 @@ class EventClientSerializer:
             serialized_event: The serialized event which may be modified.
 
         """
+        # Do not bundle aggregations for an event which represents an edit or annotation.
+        relates_to = event.content.get("m.relates_to")
+        if isinstance(relates_to, (dict, frozendict)):
+            relation_type = relates_to.get("rel_type")
+            if relation_type in (RelationTypes.ANNOTATION, RelationTypes.REPLACE):
+                return
+
         event_id = event.event_id
 
         annotations = await self.store.get_aggregation_groups_for_event(event_id)
@@ -465,7 +472,6 @@ class EventClientSerializer:
             serialized_event["content"] = edit_content.get("m.new_content", {})
 
             # Check for existing relations
-            relates_to = event.content.get("m.relates_to")
             if relates_to:
                 # Keep the relations, ensuring we use a dict copy of the original
                 serialized_event["content"]["m.relates_to"] = relates_to.copy()
