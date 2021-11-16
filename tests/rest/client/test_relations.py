@@ -461,6 +461,52 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             },
         )
 
+    def test_aggregation_get_event_for_thread(self):
+        """Test that threads get bundled relations included when directly requested."""
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        self.assertEquals(200, channel.code, channel.json_body)
+        thread_id = channel.json_body["event_id"]
+
+        # Annotate the annotation.
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "a", parent_id=thread_id
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/event/{thread_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEquals(
+            channel.json_body["unsigned"].get("m.relations"),
+            {
+                RelationTypes.ANNOTATION: {
+                    "chunk": [{"count": 1, "key": "a", "type": "m.reaction"}]
+                },
+            },
+        )
+
+        # It should also be included when the entire thread is requested.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(len(channel.json_body["chunk"]), 1)
+
+        thread_message = channel.json_body["chunk"][0]
+        self.assertEquals(
+            thread_message["unsigned"].get("m.relations"),
+            {
+                RelationTypes.ANNOTATION: {
+                    "chunk": [{"count": 1, "key": "a", "type": "m.reaction"}]
+                },
+            },
+        )
+
     def test_edit(self):
         """Test that a simple edit works."""
 
