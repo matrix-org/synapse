@@ -425,12 +425,12 @@ class EventClientSerializer:
             )
 
             if annotations.chunk:
-                r = serialized_event["unsigned"].setdefault("m.relations", {})
-                r[RelationTypes.ANNOTATION] = annotations.to_dict()
+                relations = serialized_event["unsigned"].setdefault("m.relations", {})
+                relations[RelationTypes.ANNOTATION] = annotations.to_dict()
 
             if references.chunk:
-                r = serialized_event["unsigned"].setdefault("m.relations", {})
-                r[RelationTypes.REFERENCE] = references.to_dict()
+                relations = serialized_event["unsigned"].setdefault("m.relations", {})
+                relations[RelationTypes.REFERENCE] = references.to_dict()
 
             edit = None
             if event.type == EventTypes.Message:
@@ -449,15 +449,15 @@ class EventClientSerializer:
                 serialized_event["content"] = edit_content.get("m.new_content", {})
 
                 # Check for existing relations
-                relations = event.content.get("m.relates_to")
-                if relations:
+                relates_to = event.content.get("m.relates_to")
+                if relates_to:
                     # Keep the relations, ensuring we use a dict copy of the original
-                    serialized_event["content"]["m.relates_to"] = relations.copy()
+                    serialized_event["content"]["m.relates_to"] = relates_to.copy()
                 else:
                     serialized_event["content"].pop("m.relates_to", None)
 
-                r = serialized_event["unsigned"].setdefault("m.relations", {})
-                r[RelationTypes.REPLACE] = {
+                relations = serialized_event["unsigned"].setdefault("m.relations", {})
+                relations[RelationTypes.REPLACE] = {
                     "event_id": edit.event_id,
                     "origin_server_ts": edit.origin_server_ts,
                     "sender": edit.sender,
@@ -470,8 +470,10 @@ class EventClientSerializer:
                     latest_thread_event,
                 ) = await self.store.get_thread_summary(event_id)
                 if latest_thread_event:
-                    r = serialized_event["unsigned"].setdefault("m.relations", {})
-                    r[RelationTypes.THREAD] = {
+                    relations = serialized_event["unsigned"].setdefault(
+                        "m.relations", {}
+                    )
+                    relations[RelationTypes.THREAD] = {
                         # Don't bundle aggregations as this could recurse forever.
                         "latest_event": await self.serialize_event(
                             latest_thread_event, time_now, bundle_aggregations=False
