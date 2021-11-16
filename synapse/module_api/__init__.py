@@ -425,6 +425,15 @@ class ModuleApi:
             )
         )
 
+    def get_user_total_message_count(self, user_id):
+        """Counts the total number of messages, sent by a user.
+        Args:
+            user_id (str): full canonical @user:id
+        Returns:
+            defer.Deferred[int] : The number of messages.
+        """
+        return defer.ensureDeferred(self._store.count_total_messages(user_id))
+
     def register_device(self, user_id, device_id=None, initial_display_name=None):
         """Register a device for a user and generate an access token.
 

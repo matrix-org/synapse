@@ -86,6 +86,21 @@ class ModuleApiTestCase(HomeserverTestCase):
         displayname = self.get_success(self.store.get_profile_displayname("bob"))
         self.assertEqual(displayname, "Bobberino")
 
+    def test_get_user_total_message_count(self):
+        user_id = self.register_user("winter", "monkey")
+        tok = self.login("winter", "monkey")
+        room_id_1 = self.helper.create_room_as(user_id, tok=tok)
+        room_id_2 = self.helper.create_room_as(user_id, tok=tok)
+
+        content = {"body": "I am a puppet", "msgtype": "m.text"}
+        self.helper.send_event(room_id_1, "m.room.message", content=content, tok=tok)
+        self.helper.send_event(room_id_1, "m.room.encrypted", content=content, tok=tok)
+        self.helper.send_event(room_id_2, "m.room.message", content=content, tok=tok)
+
+        message_count = self.get_success(self.module_api.get_user_total_message_count(user_id))
+
+        self.assertEqual(3, message_count)
+
     def test_get_userinfo_by_id(self):
         user_id = self.register_user("alice", "1234")
         found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
