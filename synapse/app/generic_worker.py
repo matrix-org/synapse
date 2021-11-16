@@ -106,7 +106,7 @@ from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
 from synapse.storage.databases.main.e2e_room_keys import EndToEndRoomKeyStore
 from synapse.storage.databases.main.lock import LockStore
 from synapse.storage.databases.main.media_repository import MediaRepositoryStore
-from synapse.storage.databases.main.metrics import ServerMetricsStore
+from synapse.storage.databases.main.metrics import ServerMetricsStore, UserMetricsStore
 from synapse.storage.databases.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
@@ -248,6 +248,7 @@ class GenericWorkerSlavedStore(
     MonthlyActiveUsersWorkerStore,
     MediaRepositoryStore,
     ServerMetricsStore,
+    UserMetricsStore,
     SearchStore,
     TransactionWorkerStore,
     LockStore,
