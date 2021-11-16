@@ -97,7 +97,9 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.helper.send_event(room_id_1, "m.room.encrypted", content=content, tok=tok)
         self.helper.send_event(room_id_2, "m.room.message", content=content, tok=tok)
 
-        message_count = self.get_success(self.module_api.get_user_total_message_count(user_id))
+        message_count = self.get_success(
+            self.module_api.get_user_total_message_count(user_id)
+        )
 
         self.assertEqual(3, message_count)
 
