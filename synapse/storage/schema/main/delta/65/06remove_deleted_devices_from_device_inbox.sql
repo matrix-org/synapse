@@ -18,5 +18,11 @@
 -- when a device was deleted using Synapse earlier than 1.47.0.
 -- This runs as background task, but may take a bit to finish.
 
+-- The name of this update ending is '_v2' is due to it accidentally
+-- being included in schema version 64 during v1.47.0rc1,rc2. If a
+-- homeserver had updated from Synapse <=v1.45.0 (schema version <=64),
+-- then they would have run the original version of this background update
+-- already. So we rename it here, to ensure it is run regardless of upgrade path.
+
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (6505, 'remove_deleted_devices_from_device_inbox', '{}');
+  (6506, 'remove_deleted_devices_from_device_inbox_v2', '{}');

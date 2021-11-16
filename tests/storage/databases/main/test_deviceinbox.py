@@ -66,7 +66,7 @@ class DeviceInboxBackgroundUpdateStoreTestCase(HomeserverTestCase):
             self.store.db_pool.simple_insert(
                 "background_updates",
                 {
-                    "update_name": "remove_deleted_devices_from_device_inbox",
+                    "update_name": "remove_deleted_devices_from_device_inbox_v2",
                     "progress_json": "{}",
                 },
             )

@@ -560,8 +560,11 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
 class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
     DEVICE_INBOX_STREAM_ID = "device_inbox_stream_drop"
-    REMOVE_DELETED_DEVICES = "remove_deleted_devices_from_device_inbox"
     REMOVE_HIDDEN_DEVICES = "remove_hidden_devices_from_device_inbox"
+    REMOVE_DELETED_DEVICES = "remove_deleted_devices_from_device_inbox"
+    # See '05remove_deleted_devices_from_device_inbox.sql' for an explanation on
+    # why this is needed.
+    REMOVE_DELETED_DEVICES_V2 = "remove_deleted_devices_from_device_inbox_v2"
 
     def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
@@ -583,6 +586,11 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
         )
 
         self.db_pool.updates.register_background_update_handler(
+            self.REMOVE_DELETED_DEVICES_V2,
+            self._remove_deleted_devices_from_device_inbox_v2,
+        )
+
+        self.db_pool.updates.register_background_update_handler(
             self.REMOVE_HIDDEN_DEVICES,
             self._remove_hidden_devices_from_device_inbox,
         )
@@ -599,12 +607,15 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
 
         return 1
 
-    async def _remove_deleted_devices_from_device_inbox(
+    async def _remove_deleted_devices_from_device_inbox_v2(
         self, progress: JsonDict, batch_size: int
     ) -> int:
         """A background update that deletes all device_inboxes for deleted devices.
 
-        This should only need to be run once (when users upgrade to v1.47.0)
+        This should only need to be run once (when users upgrade to v1.47.0).
+
+        See '05remove_deleted_devices_from_device_inbox.sql' for an explanation on
+        why this is needed.
 
         Args:
             progress: JsonDict used to store progress of this background update
@@ -659,7 +670,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
                 # it may be that the stream_id does not change in several runs
                 self.db_pool.updates._background_update_progress_txn(
                     txn,
-                    self.REMOVE_DELETED_DEVICES,
+                    self.REMOVE_DELETED_DEVICES_V2,
                     {
                         "device_id": rows[-1][0],
                         "user_id": rows[-1][1],
@@ -677,10 +688,20 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
         # The task is finished when no more lines are deleted.
         if not number_deleted:
             await self.db_pool.updates._end_background_update(
-                self.REMOVE_DELETED_DEVICES
+                self.REMOVE_DELETED_DEVICES_V2
             )
 
         return number_deleted
+
+    async def _remove_deleted_devices_from_device_inbox(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """
+        This background update has been converted to a no-op. See
+        _remove_deleted_devices_from_device_inbox_v2 instead.
+        """
+        await self.db_pool.updates._end_background_update(self.REMOVE_DELETED_DEVICES)
+        return 0
 
     async def _remove_hidden_devices_from_device_inbox(
         self, progress: JsonDict, batch_size: int
