@@ -19,6 +19,7 @@ from twisted.internet import defer
 from synapse.api.auth import Auth
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
+from synapse.config.homeserver import HomeServerConfig
 from synapse.events import make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.state import StateHandler, StateResolutionHandler
@@ -172,7 +173,11 @@ class StateTestCase(unittest.TestCase):
                 "hostname",
             ]
         )
-        hs.config = default_config("tesths", True)
+
+        config_dict = default_config("tesths")
+        hs.config = HomeServerConfig()
+        hs.config.parse_config_dict(config_dict)
+
         hs.get_datastore.return_value = self.store
         hs.get_state_handler.return_value = None
         hs.get_clock.return_value = MockClock()
