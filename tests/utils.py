@@ -1,5 +1,4 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018-2019 New Vector Ltd
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,14 +18,11 @@ import os
 import time
 import uuid
 import warnings
-from typing import Type
-from unittest.mock import Mock, patch
-from urllib import parse as urlparse
-
-from twisted.internet import defer
+from types import ModuleType
+from typing import Any, Callable, Dict, Optional, Type
+from unittest.mock import Mock
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import CodeMessageException, cs_error
 from synapse.api.room_versions import RoomVersions
 from synapse.config.database import DatabaseConnectionConfig
 from synapse.config.homeserver import HomeServerConfig
@@ -364,111 +360,6 @@ def mock_getRawHeaders(headers=None):
         return headers.get(name, default)
 
     return getRawHeaders
-
-
-# This is a mock /resource/ not an entire server
-class MockHttpResource:
-    def __init__(self, prefix=""):
-        self.callbacks = []  # 3-tuple of method/pattern/function
-        self.prefix = prefix
-
-    def trigger_get(self, path):
-        return self.trigger(b"GET", path, None)
-
-    @patch("twisted.web.http.Request")
-    @defer.inlineCallbacks
-    def trigger(
-        self, http_method, path, content, mock_request, federation_auth_origin=None
-    ):
-        """Fire an HTTP event.
-
-        Args:
-            http_method : The HTTP method
-            path : The HTTP path
-            content : The HTTP body
-            mock_request : Mocked request to pass to the event so it can get
-                           content.
-            federation_auth_origin (bytes|None): domain to authenticate as, for federation
-        Returns:
-            A tuple of (code, response)
-        Raises:
-            KeyError If no event is found which will handle the path.
-        """
-        path = self.prefix + path
-
-        # annoyingly we return a twisted http request which has chained calls
-        # to get at the http content, hence mock it here.
-        mock_content = Mock()
-        config = {"read.return_value": content}
-        mock_content.configure_mock(**config)
-        mock_request.content = mock_content
-
-        mock_request.method = http_method.encode("ascii")
-        mock_request.uri = path.encode("ascii")
-
-        mock_request.getClientIP.return_value = "-"
-
-        headers = {}
-        if federation_auth_origin is not None:
-            headers[b"Authorization"] = [
-                b"X-Matrix origin=%s,key=,sig=" % (federation_auth_origin,)
-            ]
-        mock_request.requestHeaders.getRawHeaders = mock_getRawHeaders(headers)
-
-        # return the right path if the event requires it
-        mock_request.path = path
-
-        # add in query params to the right place
-        try:
-            mock_request.args = urlparse.parse_qs(path.split("?")[1])
-            mock_request.path = path.split("?")[0]
-            path = mock_request.path
-        except Exception:
-            pass
-
-        if isinstance(path, bytes):
-            path = path.decode("utf8")
-
-        for (method, pattern, func) in self.callbacks:
-            if http_method != method:
-                continue
-
-            matcher = pattern.match(path)
-            if matcher:
-                try:
-                    args = [urlparse.unquote(u) for u in matcher.groups()]
-
-                    (code, response) = yield defer.ensureDeferred(
-                        func(mock_request, *args)
-                    )
-                    return code, response
-                except CodeMessageException as e:
-                    return e.code, cs_error(e.msg, code=e.errcode)
-
-        raise KeyError("No event can handle %s" % path)
-
-    def register_paths(self, method, path_patterns, callback, servlet_name):
-        for path_pattern in path_patterns:
-            self.callbacks.append((method, path_pattern, callback))
-
-
-class MockKey:
-    alg = "mock_alg"
-    version = "mock_version"
-    signature = b"\x9a\x87$"
-
-    @property
-    def verify_key(self):
-        return self
-
-    def sign(self, message):
-        return self
-
-    def verify(self, message, sig):
-        assert sig == b"\x9a\x87$"
-
-    def encode(self):
-        return b"<fake_encoded_key>"
 
 
 class MockClock:
