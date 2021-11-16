@@ -38,6 +38,9 @@ from twisted.internet.interfaces import (
 from twisted.internet.threads import deferToThreadPool
 
 if TYPE_CHECKING:
+    # The types below are copied from
+    # https://github.com/twisted/twisted/blob/release-21.2.0-10091/src/twisted/internet/interfaces.py
+    # so that the type hints can match the interfaces.
     from twisted.python.runtime import platform
 
     if platform.supportsThreads():
