@@ -1039,7 +1039,7 @@ class EventCreationHandler:
         else:
             # There must be some reason that the client knows the event exists,
             # see if there are existing relations. If so, assume everything is fine.
-            if not await self.store.event_related_to(relates_to):
+            if not await self.store.event_has_relation(relates_to):
                 # Otherwise, the client can't know about the parent event!
                 raise SynapseError(400, "Can't send relation to unknown event")
 
@@ -1057,7 +1057,7 @@ class EventCreationHandler:
 
         # Don't attempt to start a thread if the parent event is a relation.
         elif relation_type == RelationTypes.THREAD:
-            if await self.store.event_has_relations(relates_to):
+            if await self.store.event_includes_relation(relates_to):
                 raise SynapseError(
                     400, "Cannot start threads from an event with a relation"
                 )
