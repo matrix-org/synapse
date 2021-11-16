@@ -79,7 +79,10 @@ EXPECTED_CLIENT_REDIRECT_URL_PARAMS = [("<ab c>", ""), ('q" =+"', '"fö&=o"')]
 
 # (possibly experimental) login flows we expect to appear in the list after the normal
 # ones
-ADDITIONAL_LOGIN_FLOWS = [{"type": "uk.half-shot.msc2778.login.application_service"}]
+ADDITIONAL_LOGIN_FLOWS = [
+    {"type": "m.login.application_service"},
+    {"type": "uk.half-shot.msc2778.login.application_service"},
+]
 
 
 class LoginRestServletTestCase(unittest.HomeserverTestCase):

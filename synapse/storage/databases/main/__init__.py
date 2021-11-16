@@ -123,10 +123,10 @@ class DataStore(
     RelationsStore,
     CensorEventsStore,
     UIAuthStore,
+    EventForwardExtremitiesStore,
     CacheInvalidationWorkerStore,
     ServerMetricsStore,
     UserMetricsStore,
-    EventForwardExtremitiesStore,
     LockStore,
     SessionStore,
 ):
@@ -155,6 +155,7 @@ class DataStore(
             db_conn, "local_group_updates", "stream_id"
         )
 
+        self._cache_id_gen: Optional[MultiWriterIdGenerator]
         if isinstance(self.database_engine, PostgresEngine):
             # We set the `writers` to an empty list here as we don't care about
             # missing updates over restarts, as we'll not have anything in our

@@ -92,9 +92,9 @@ def _resource_id(resource: Resource, path_seg: bytes) -> str:
     the mapping should looks like _resource_id(A,C) = B.
 
     Args:
-        resource (Resource): The *parent* Resourceb
-        path_seg (str): The name of the child Resource to be attached.
+        resource: The *parent* Resourceb
+        path_seg: The name of the child Resource to be attached.
     Returns:
-        str: A unique string which can be a key to the child Resource.
+        A unique string which can be a key to the child Resource.
     """
     return "%s-%r" % (resource, path_seg)

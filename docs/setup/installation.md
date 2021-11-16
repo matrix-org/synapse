@@ -76,6 +76,12 @@ The fingerprint of the repository signing key (as shown by `gpg
 /usr/share/keyrings/matrix-org-archive-keyring.gpg`) is
 `AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058`.
 
+When installing with Debian packages, you might prefer to place files in
+`/etc/matrix-synapse/conf.d/` to override your configuration without editing
+the main configuration file at `/etc/matrix-synapse/homeserver.yaml`.
+By doing that, you won't be asked if you want to replace your configuration
+file when you upgrade the Debian package to a later version.
+
 ##### Downstream Debian packages
 
 We do not recommend using the packages from the default Debian `buster`
