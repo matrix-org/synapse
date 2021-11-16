@@ -22,6 +22,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import create_engine
+from synapse.storage.types import Connection
 
 from tests import unittest
 from tests.utils import TestHomeServer, default_config
@@ -63,7 +64,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         db = DatabasePool(Mock(), Mock(config=sqlite_config), fake_engine)
         db._db_pool = self.db_pool
 
-        self.datastore = SQLBaseStore(db, None, hs)
+        self.datastore = SQLBaseStore(db, Mock(spec=Connection), hs)
 
     @defer.inlineCallbacks
     def test_insert_1col(self):
