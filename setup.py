@@ -135,6 +135,8 @@ CONDITIONAL_REQUIREMENTS["dev"] = (
         # The following are executed as commands by the release script.
         "twine",
         "towncrier",
+        # For storage_inheritance script
+        "networkx==2.6.3",
     ]
 )
 
