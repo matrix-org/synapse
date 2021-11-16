@@ -1947,9 +1947,9 @@ def load_single_legacy_password_auth_provider(
         auth_checkers[(LoginType.PASSWORD, ("password",))] = check_password
 
     api.register_password_auth_provider_callbacks(
-        auth_checkers=auth_checkers,
         check_3pid_auth=check_3pid_auth_hook,
         on_logged_out=on_logged_out_hook,
+        auth_checkers=auth_checkers,
     )
 
 
