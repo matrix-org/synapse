@@ -58,11 +58,6 @@ class _BackgroundUpdateHandler:
 class BackgroundUpdateController(abc.ABC):
     """A base class for controlling background update timings."""
 
-    ####
-    # NOTE: This is used by modules so changes must be backwards compatible or
-    # be announced appropriately
-    ####
-
     @abc.abstractmethod
     def run_update(
         self, update_name: str, database_name: str, oneshot: bool
@@ -106,6 +101,35 @@ class BackgroundUpdateController(abc.ABC):
         Used to ensure that progress is always made. Must be greater than 0.
         """
         ...
+
+
+@attr.s(auto_attribs=True)
+class _CallbackBackgroundUpdateController(BackgroundUpdateController):
+    """A background update controller that defers to the given callbacks.
+
+    Used to wrap callbacks from the module API.
+    """
+
+    _update_handler: Callable[[str, str, bool], AsyncContextManager[int]]
+    _default_batch_size: Optional[Callable[[str, str], Awaitable[int]]] = None
+    _min_batch_size: Optional[Callable[[str, str], Awaitable[int]]] = None
+
+    def run_update(
+        self, update_name: str, database_name: str, oneshot: bool
+    ) -> AsyncContextManager[int]:
+        return self._update_handler(update_name, database_name, oneshot)
+
+    async def default_batch_size(self, update_name: str, database_name: str) -> int:
+        if self._default_batch_size is None:
+            return 100
+
+        return await self._default_batch_size(update_name, database_name)
+
+    async def min_batch_size(self, update_name: str, database_name: str) -> int:
+        if self._min_batch_size is None:
+            return 100
+
+        return await self._min_batch_size(update_name, database_name)
 
 
 class _TimeBasedBackgroundUpdateController(BackgroundUpdateController):
