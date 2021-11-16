@@ -19,6 +19,7 @@ from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
     Any,
+    ClassVar,
     Dict,
     Mapping,
     MutableMapping,
@@ -219,7 +220,7 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
         'domain' : The domain part of the name
     """
 
-    SIGIL: str = abc.abstractproperty()  # type: ignore
+    SIGIL: ClassVar[str] = abc.abstractproperty()  # type: ignore
 
     localpart = attr.ib(type=str)
     domain = attr.ib(type=str)

@@ -262,7 +262,7 @@ class SigningKeyUploadServlet(RestServlet):
     }
     """
 
-    PATTERNS = client_patterns("/keys/device_signing/upload$", releases=())
+    PATTERNS = client_patterns("/keys/device_signing/upload$", releases=("v3",))
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
