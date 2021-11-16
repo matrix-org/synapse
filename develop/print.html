@@ -11622,7 +11622,7 @@ Max length, 512 bytes.</p>
 </ul>
 <p>See also the
 <a href="https://matrix.org/docs/spec/client_server/latest#get-matrix-client-r0-pushers">Client-Server API Spec on pushers</a>.</p>
-<h2 id="shadow-banning-users"><a class="header" href="#shadow-banning-users">Shadow-banning users</a></h2>
+<h2 id="controlling-whether-a-user-is-shadow-banned"><a class="header" href="#controlling-whether-a-user-is-shadow-banned">Controlling whether a user is shadow-banned</a></h2>
 <p>Shadow-banning is a useful tool for moderating malicious or egregiously abusive users.
 A shadow-banned users receives successful responses to their client-server API requests,
 but the events are not propagated into rooms. This can be an effective tool as it
@@ -11632,12 +11632,15 @@ pivoting to another account.</p>
 or broken behaviour for the client. A shadow-banned user will not receive any
 notification and it is generally more appropriate to ban or kick abusive users.
 A shadow-banned user will be unable to contact anyone on the server.</p>
-<p>The API is:</p>
+<p>To shadow-ban a user the API is:</p>
 <pre><code>POST /_synapse/admin/v1/users/&lt;user_id&gt;/shadow_ban
+</code></pre>
+<p>To un-shadow-ban a user the API is:</p>
+<pre><code>DELETE /_synapse/admin/v1/users/&lt;user_id&gt;/shadow_ban
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
 server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
-<p>An empty JSON dict is returned.</p>
+<p>An empty JSON dict is returned in both cases.</p>
 <p><strong>Parameters</strong></p>
 <p>The following parameters should be set in the URL:</p>
 <ul>
