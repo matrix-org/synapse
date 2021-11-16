@@ -22,6 +22,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Type,
     Union,
 )
 
@@ -133,14 +134,16 @@ class GAIResolver:
         )
         self._getaddrinfo = getaddrinfo
 
-    def resolveHostName(
+    # The types on IHostnameResolver is incorrect in Twisted, see
+    # https://twistedmatrix.com/trac/ticket/10276
+    def resolveHostName(  # type: ignore[override]
         self,
         resolutionReceiver: IResolutionReceiver,
         hostName: str,
         portNumber: int = 0,
-        addressTypes: Optional[Sequence[IAddress]] = None,
+        addressTypes: Optional[Sequence[Type[IAddress]]] = None,
         transportSemantics: str = "TCP",
-    ) -> IResolutionReceiver:
+    ) -> IHostResolution:
         """
         See L{IHostnameResolver.resolveHostName}
         @param resolutionReceiver: see interface
@@ -152,7 +155,7 @@ class GAIResolver:
         """
         pool = self._getThreadPool()
         addressFamily = _typesToAF[
-            _any if addressTypes is None else frozenset(addressTypes)  # type: ignore[arg-type]
+            _any if addressTypes is None else frozenset(addressTypes)
         ]
         socketType = _transportToSocket[transportSemantics]
 
@@ -177,6 +180,4 @@ class GAIResolver:
                 )
             resolutionReceiver.resolutionComplete()
 
-        # IHostnameResolver declares that resolverHostName returns IResolutionReceiver,
-        # but the implementations return IHostResolution.
-        return resolution  # type: ignore[return-value]
+        return resolution
