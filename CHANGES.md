@@ -1,3 +1,13 @@
+Synapse 1.47.0rc3 (2021-11-16)
+==============================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in 1.47.0rc1 which caused worker processes to not halt startup in the presence of outstanding database migrations. ([\#11346](https://github.com/matrix-org/synapse/issues/11346))
+- Fix a bug introduced in 1.47.0rc1 which prevented the 'remove deleted devices from `device_inbox` column' background process from running when updating from a recent Synapse version. ([\#11303](https://github.com/matrix-org/synapse/issues/11303), [\#11353](https://github.com/matrix-org/synapse/issues/11353))
+
+
 Synapse 1.47.0rc2 (2021-11-10)
 ==============================
 
