@@ -341,12 +341,12 @@ def setup_test_homeserver(
     async def hash(p):
         return hashlib.md5(p.encode("utf8")).hexdigest()
 
-    hs.get_auth_handler().hash = hash
+    hs.get_auth_handler().hash = hash  # type: ignore
 
     async def validate_hash(p, h):
         return hashlib.md5(p.encode("utf8")).hexdigest() == h
 
-    hs.get_auth_handler().validate_hash = validate_hash
+    hs.get_auth_handler().validate_hash = validate_hash  # type: ignore
 
     return hs
 
