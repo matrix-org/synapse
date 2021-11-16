@@ -72,6 +72,7 @@ class LoginRestServlet(RestServlet):
         # JWT configuration variables.
         self.jwt_enabled = hs.config.jwt.jwt_enabled
         self.jwt_secret = hs.config.jwt.jwt_secret
+        self.jwt_subject_claim = hs.config.jwt.jwt_subject_claim
         self.jwt_algorithm = hs.config.jwt.jwt_algorithm
         self.jwt_issuer = hs.config.jwt.jwt_issuer
         self.jwt_audiences = hs.config.jwt.jwt_audiences
@@ -413,7 +414,8 @@ class LoginRestServlet(RestServlet):
                 errcode=Codes.FORBIDDEN,
             )
 
-        user = payload.get("sub", None)
+        subject_claim = self.jwt_subject_claim or "sub"
+        user = payload.get(subject_claim, None)
         if user is None:
             raise LoginError(403, "Invalid JWT", errcode=Codes.FORBIDDEN)
 

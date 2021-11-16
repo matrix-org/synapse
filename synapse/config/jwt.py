@@ -33,6 +33,7 @@ class JWTConfig(Config):
 
             # The issuer and audiences are optional, if provided, it is asserted
             # that the claims exist on the JWT.
+            self.jwt_subject_claim = jwt_config.get("subject_claim", "sub")
             self.jwt_issuer = jwt_config.get("issuer")
             self.jwt_audiences = jwt_config.get("audiences")
 
@@ -48,6 +49,7 @@ class JWTConfig(Config):
             self.jwt_algorithm = None
             self.jwt_issuer = None
             self.jwt_audiences = None
+            self.jwt_subject_claim = None
 
     def generate_config_section(self, **kwargs):
         return """\
@@ -78,6 +80,12 @@ class JWTConfig(Config):
             # Required if 'enabled' is true.
             #
             #secret: "provided-by-your-issuer"
+
+            # Name of the claim containing a unique identifier for the user.
+            #
+            # Optional, defaults to `sub`.
+            #
+            #subject_claim: "sub"
 
             # The algorithm used to sign the JSON web token.
             #
