@@ -476,7 +476,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             shadow_banned: true iff the user is to be shadow-banned, false otherwise.
         """
 
-        def set_shadow_banned_txn(txn):
+        def set_shadow_banned_txn(txn: LoggingTransaction) -> None:
             user_id = user.to_string()
             self.db_pool.simple_update_one_txn(
                 txn,

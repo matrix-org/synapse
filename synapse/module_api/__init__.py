@@ -33,7 +33,7 @@ import attr
 import jinja2
 
 from twisted.internet import defer
-from twisted.web.resource import IResource
+from twisted.web.resource import Resource
 
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
@@ -95,7 +95,6 @@ __all__ = [
     "JsonDict",
     "EventBase",
     "StateMap",
-    "BackgroundUpdateController",
 ]
 
 logger = logging.getLogger(__name__)
@@ -200,7 +199,7 @@ class ModuleApi:
         """
         return self._password_auth_provider.register_password_auth_provider_callbacks
 
-    def register_web_resource(self, path: str, resource: IResource):
+    def register_web_resource(self, path: str, resource: Resource):
         """Registers a web resource to be served at the given path.
 
         This function should be called during initialisation of the module.

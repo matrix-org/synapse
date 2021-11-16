@@ -1641,8 +1641,8 @@ class PersistEventsStore:
     def _store_room_members_txn(self, txn, events, backfilled):
         """Store a room member in the database."""
 
-        def str_or_none(val: Any) -> Optional[str]:
-            return val if isinstance(val, str) else None
+        def non_null_str_or_none(val: Any) -> Optional[str]:
+            return val if isinstance(val, str) and "\u0000" not in val else None
 
         self.db_pool.simple_insert_many_txn(
             txn,
@@ -1654,8 +1654,10 @@ class PersistEventsStore:
                     "sender": event.user_id,
                     "room_id": event.room_id,
                     "membership": event.membership,
-                    "display_name": str_or_none(event.content.get("displayname")),
-                    "avatar_url": str_or_none(event.content.get("avatar_url")),
+                    "display_name": non_null_str_or_none(
+                        event.content.get("displayname")
+                    ),
+                    "avatar_url": non_null_str_or_none(event.content.get("avatar_url")),
                 }
                 for event in events
             ],
