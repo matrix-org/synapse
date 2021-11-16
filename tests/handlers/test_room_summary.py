@@ -26,7 +26,7 @@ from synapse.api.constants import (
 from synapse.api.errors import AuthError, NotFoundError, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
-from synapse.handlers.room_summary import _child_events_comparison_key, _RoomEntry
+from synapse.handlers.room_summary import _RoomEntry, child_events_comparison_key
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
@@ -46,7 +46,7 @@ def _create_event(room_id: str, order: Optional[Any] = None, origin_server_ts: i
 
 
 def _order(*events):
-    return sorted(events, key=_child_events_comparison_key)
+    return sorted(events, key=child_events_comparison_key)
 
 
 class TestSpaceSummarySort(unittest.TestCase):

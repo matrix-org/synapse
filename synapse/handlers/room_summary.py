@@ -1032,7 +1032,7 @@ class RoomSummaryHandler:
 
         # filter out any events without a "via" (which implies it has been redacted),
         # and order to ensure we return stable results.
-        return sorted(filter(_has_valid_via, events), key=_child_events_comparison_key)
+        return sorted(filter(has_valid_via, events), key=child_events_comparison_key)
 
     async def get_room_summary(
         self,
@@ -1126,7 +1126,7 @@ class _RoomEntry:
         return result
 
 
-def _has_valid_via(e: EventBase) -> bool:
+def has_valid_via(e: EventBase) -> bool:
     via = e.content.get("via")
     if not via or not isinstance(via, Sequence):
         return False
@@ -1149,7 +1149,7 @@ def _is_suggested_child_event(edge_event: EventBase) -> bool:
 _INVALID_ORDER_CHARS_RE = re.compile(r"[^\x20-\x7E]")
 
 
-def _child_events_comparison_key(
+def child_events_comparison_key(
     child: EventBase,
 ) -> Tuple[bool, Optional[str], int, str]:
     """
