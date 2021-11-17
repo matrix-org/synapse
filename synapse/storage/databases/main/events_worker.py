@@ -1629,39 +1629,25 @@ class EventsWorkerStore(SQLBaseStore):
 
     async def check_if_event_is_extremity(self, room_id: str, event_id: str):
         def check_if_event_is_extremity_txn(txn) -> bool:
+            # If the event in question, is listed as a backward extremity, it's
+            # an extremity.
             backward_extremity_query = """
                 SELECT event_id FROM event_backward_extremities
                 WHERE room_id = ? AND event_id = ?
                 LIMIT 1
             """
 
-            forward_extremity_query = """
-                SELECT event_id FROM event_forward_extremities
-                WHERE room_id = ? AND event_id = ?
+            # Check to see whether the event in question is already referenced
+            # by another event. If we don't see any edges, we're next to a
+            # forward gap.
+            #
+            # We can't just check `event_forward_extremities` here because those
+            # can only be .... (pending discussion on https://github.com/matrix-org/synapse/pull/9445#discussion_r750946180)
+            forward_edge_query = """
+                SELECT event_id FROM event_edges
+                WHERE room_id = ? AND prev_event_id = ?
                 LIMIT 1
             """
-
-            all_backward_extremity_query = """
-                SELECT event_id FROM event_backward_extremities
-                WHERE room_id = ?
-                LIMIT 100
-            """
-
-            all_forward_extremity_query = """
-                SELECT event_id FROM event_forward_extremities
-                WHERE room_id = ?
-                LIMIT 100
-            """
-
-            txn.execute(all_backward_extremity_query, (room_id,))
-            all_backward_extremties = txn.fetchall()
-            txn.execute(all_forward_extremity_query, (room_id,))
-            all_forward_extremties = txn.fetchall()
-            logger.info(
-                "all_forward_extremties=%s all_backward_extremties=%s",
-                all_forward_extremties,
-                all_backward_extremties,
-            )
 
             txn.execute(backward_extremity_query, (room_id, event_id))
             backward_extremties = txn.fetchall()
@@ -1669,10 +1655,10 @@ class EventsWorkerStore(SQLBaseStore):
             if len(backward_extremties):
                 return True
 
-            txn.execute(forward_extremity_query, (room_id, event_id))
-            forward_extremties = txn.fetchall()
+            txn.execute(forward_edge_query, (room_id, event_id))
+            forward_edges = txn.fetchall()
 
-            if len(forward_extremties):
+            if not len(forward_edges):
                 return True
 
             return False
