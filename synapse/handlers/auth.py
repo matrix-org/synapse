@@ -855,7 +855,7 @@ class AuthHandler:
         )
         return refresh_token, refresh_token_id
 
-    async def get_access_token_for_user_id(
+    async def create_access_token_for_user_id(
         self,
         user_id: str,
         device_id: Optional[str],
