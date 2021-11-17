@@ -741,23 +741,40 @@ class EventsWorkerStore(SQLBaseStore):
         try:
             await self.db_pool.runWithConnection(self._do_fetch_txn)
         except BaseException as e:
+            failed_event_list = []
             with self._event_fetch_lock:
-                self._event_fetch_ongoing -= 1
-                event_fetch_ongoing_gauge.set(self._event_fetch_ongoing)
-
-                if self._event_fetch_ongoing == 0 and self._event_fetch_list:
+                if self._event_fetch_ongoing == 1 and self._event_fetch_list:
                     # We are the last remaining fetcher and we have just failed.
-                    # Fail any outstanding event fetches, since no one else will process
-                    # them.
+                    # Fail any outstanding fetches, since they won't get processed
+                    # otherwise.
                     failed_event_list = self._event_fetch_list
                     self._event_fetch_list = []
-                else:
-                    failed_event_list = []
+
+                self._event_fetch_ongoing -= 1
+                event_fetch_ongoing_gauge.set(self._event_fetch_ongoing)
 
             for _, deferred in failed_event_list:
                 if not deferred.called:
                     with PreserveLoggingContext():
                         deferred.errback(e)
+        else:
+            should_restart = False
+            with self._event_fetch_lock:
+                if self._event_fetch_ongoing == 1 and self._event_fetch_list:
+                    # An event fetch has been queued, but we're the last remaining
+                    # fetcher and have already decided to terminate.
+                    # Start a new fetcher.
+                    should_restart = True
+
+                    # `_event_fetch_ongoing` ought to be decremented for ourself and
+                    # incremented for the new fetcher. These cancel out, so we leave it
+                    # alone.
+                else:
+                    self._event_fetch_ongoing -= 1
+                    event_fetch_ongoing_gauge.set(self._event_fetch_ongoing)
+
+            if should_restart:
+                run_as_background_process("fetch_events", self._do_fetch)
 
     def _do_fetch_txn(self, conn: Connection) -> None:
         """Takes a database connection and waits for requests for events from
@@ -776,8 +793,6 @@ class EventsWorkerStore(SQLBaseStore):
                         or single_threaded
                         or i > EVENT_QUEUE_ITERATIONS
                     ):
-                        self._event_fetch_ongoing -= 1
-                        event_fetch_ongoing_gauge.set(self._event_fetch_ongoing)
                         return
                     else:
                         self._event_fetch_lock.wait(EVENT_QUEUE_TIMEOUT_S)
