@@ -84,6 +84,16 @@ def parse_integer_from_args(
     args: Mapping[bytes, Sequence[bytes]],
     name: str,
     default: Optional[int] = None,
+    required: bool = False,
+) -> Optional[int]:
+    ...
+
+
+@overload
+def parse_integer_from_args(
+    args: Mapping[bytes, Sequence[bytes]],
+    name: str,
+    default: Optional[int] = None,
 ) -> Optional[int]:
     ...
 
