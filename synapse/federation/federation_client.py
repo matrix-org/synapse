@@ -1358,61 +1358,6 @@ class FederationClient(FederationBase):
         # server doesn't give it to us.
         return None
 
-    async def get_space_summary(
-        self,
-        destinations: Iterable[str],
-        room_id: str,
-        suggested_only: bool,
-        max_rooms_per_space: Optional[int],
-        exclude_rooms: List[str],
-    ) -> "FederationSpaceSummaryResult":
-        """
-        Call other servers to get a summary of the given space
-
-
-        Args:
-            destinations: The remote servers. We will try them in turn, omitting any
-                that have been blacklisted.
-
-            room_id: ID of the space to be queried
-
-            suggested_only:  If true, ask the remote server to only return children
-                with the "suggested" flag set
-
-            max_rooms_per_space: A limit on the number of children to return for each
-                space
-
-            exclude_rooms: A list of room IDs to tell the remote server to skip
-
-        Returns:
-            a parsed FederationSpaceSummaryResult
-
-        Raises:
-            SynapseError if we were unable to get a valid summary from any of the
-               remote servers
-        """
-
-        async def send_request(destination: str) -> FederationSpaceSummaryResult:
-            res = await self.transport_layer.get_space_summary(
-                destination=destination,
-                room_id=room_id,
-                suggested_only=suggested_only,
-                max_rooms_per_space=max_rooms_per_space,
-                exclude_rooms=exclude_rooms,
-            )
-
-            try:
-                return FederationSpaceSummaryResult.from_json_dict(res)
-            except ValueError as e:
-                raise InvalidResponseError(str(e))
-
-        return await self._try_destination_list(
-            "fetch space summary",
-            destinations,
-            send_request,
-            failover_on_unknown_endpoint=True,
-        )
-
     async def get_room_hierarchy(
         self,
         destinations: Iterable[str],

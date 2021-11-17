@@ -225,7 +225,6 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/context/.*$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/members$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state$
-    ^/_matrix/client/unstable/org.matrix.msc2946/rooms/.*/spaces$
     ^/_matrix/client/(v1|unstable/org.matrix.msc2946)/rooms/.*/hierarchy$
     ^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
     ^/_matrix/client/(r0|v3|unstable)/account/3pid$
