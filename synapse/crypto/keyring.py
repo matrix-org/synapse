@@ -270,7 +270,7 @@ class Keyring:
                 Codes.UNAUTHORIZED,
             )
 
-        found_keys: Dict[str:FetchKeyResult] = {}
+        found_keys: Dict[str, FetchKeyResult] = {}
 
         # If we are the originating server, short-circuit the key-fetch for any keys
         # we already have
