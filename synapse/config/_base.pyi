@@ -4,8 +4,8 @@ from typing import (
     Dict,
     Iterable,
     List,
-    Optional,
     MutableMapping,
+    Optional,
     Tuple,
     Type,
     TypeVar,
@@ -33,6 +33,7 @@ from synapse.config import (
     logger,
     metrics,
     modules,
+    oembed,
     oidc,
     password_auth_providers,
     push,
@@ -41,6 +42,7 @@ from synapse.config import (
     registration,
     repository,
     retention,
+    room,
     room_directory,
     saml2,
     server,
@@ -77,6 +79,7 @@ class RootConfig:
     logging: logger.LoggingConfig
     ratelimiting: ratelimiting.RatelimitConfig
     media: repository.ContentRepositoryConfig
+    oembed: oembed.OembedConfig
     captcha: captcha.CaptchaConfig
     voip: voip.VoipConfig
     registration: registration.RegistrationConfig
@@ -96,6 +99,7 @@ class RootConfig:
     authproviders: password_auth_providers.PasswordAuthProviderConfig
     push: push.PushConfig
     spamchecker: spam_checker.SpamCheckerConfig
+    room: room.RoomConfig
     groups: groups.GroupsConfig
     userdirectory: user_directory.UserDirectoryConfig
     consent: consent.ConsentConfig
@@ -103,7 +107,7 @@ class RootConfig:
     servernotices: server_notices.ServerNoticesConfig
     roomdirectory: room_directory.RoomDirectoryConfig
     thirdpartyrules: third_party_event_rules.ThirdPartyRulesConfig
-    tracer: tracer.TracerConfig
+    tracing: tracer.TracerConfig
     redis: redis.RedisConfig
     modules: modules.ModulesConfig
     caches: cache.CacheConfig
