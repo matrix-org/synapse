@@ -1429,10 +1429,8 @@ class FederationClient(FederationBase):
             if any(not isinstance(e, dict) for e in children_state):
                 raise InvalidResponseError("Invalid event in 'children_state' list")
             try:
-                [
-                    FederationSpaceSummaryEventResult.from_json_dict(e)
-                    for e in children_state
-                ]
+                for child_state in children_state:
+                    _validate_hierarchy_event(child_state)
             except ValueError as e:
                 raise InvalidResponseError(str(e))
 
@@ -1601,89 +1599,34 @@ class TimestampToEventResponse:
         return cls(event_id, origin_server_ts, d)
 
 
-@attr.s(frozen=True, slots=True, auto_attribs=True)
-class FederationSpaceSummaryEventResult:
-    """Represents a single event in the result of a successful get_space_summary call.
+def _validate_hierarchy_event(d: JsonDict) -> None:
+    """Validate an event within the result of a /hierarchy request
 
-    It's essentially just a serialised event object, but we do a bit of parsing and
-    validation in `from_json_dict` and store some of the validated properties in
-    object attributes.
+    Args:
+        d: json object to be parsed
+
+    Raises:
+        ValueError if d is not a valid event
     """
 
-    event_type: str
-    room_id: str
-    state_key: str
-    via: Sequence[str]
+    event_type = d.get("type")
+    if not isinstance(event_type, str):
+        raise ValueError("Invalid event: 'event_type' must be a str")
 
-    # the raw data, including the above keys
-    data: JsonDict
+    room_id = d.get("room_id")
+    if not isinstance(room_id, str):
+        raise ValueError("Invalid event: 'room_id' must be a str")
 
-    @classmethod
-    def from_json_dict(cls, d: JsonDict) -> "FederationSpaceSummaryEventResult":
-        """Parse an event within the result of a /spaces/ request
+    state_key = d.get("state_key")
+    if not isinstance(state_key, str):
+        raise ValueError("Invalid event: 'state_key' must be a str")
 
-        Args:
-            d: json object to be parsed
+    content = d.get("content")
+    if not isinstance(content, dict):
+        raise ValueError("Invalid event: 'content' must be a dict")
 
-        Raises:
-            ValueError if d is not a valid event
-        """
-
-        event_type = d.get("type")
-        if not isinstance(event_type, str):
-            raise ValueError("Invalid event: 'event_type' must be a str")
-
-        room_id = d.get("room_id")
-        if not isinstance(room_id, str):
-            raise ValueError("Invalid event: 'room_id' must be a str")
-
-        state_key = d.get("state_key")
-        if not isinstance(state_key, str):
-            raise ValueError("Invalid event: 'state_key' must be a str")
-
-        content = d.get("content")
-        if not isinstance(content, dict):
-            raise ValueError("Invalid event: 'content' must be a dict")
-
-        via = content.get("via")
-        if not isinstance(via, Sequence):
-            raise ValueError("Invalid event: 'via' must be a list")
-        if any(not isinstance(v, str) for v in via):
-            raise ValueError("Invalid event: 'via' must be a list of strings")
-
-        return cls(event_type, room_id, state_key, via, d)
-
-
-@attr.s(frozen=True, slots=True, auto_attribs=True)
-class FederationSpaceSummaryResult:
-    """Represents the data returned by a successful get_space_summary call."""
-
-    rooms: List[JsonDict]
-    events: Sequence[FederationSpaceSummaryEventResult]
-
-    @classmethod
-    def from_json_dict(cls, d: JsonDict) -> "FederationSpaceSummaryResult":
-        """Parse the result of a /spaces/ request
-
-        Args:
-            d: json object to be parsed
-
-        Raises:
-            ValueError if d is not a valid /spaces/ response
-        """
-        rooms = d.get("rooms")
-        if not isinstance(rooms, List):
-            raise ValueError("'rooms' must be a list")
-        if any(not isinstance(r, dict) for r in rooms):
-            raise ValueError("Invalid room in 'rooms' list")
-
-        events = d.get("events")
-        if not isinstance(events, Sequence):
-            raise ValueError("'events' must be a list")
-        if any(not isinstance(e, dict) for e in events):
-            raise ValueError("Invalid event in 'events' list")
-        parsed_events = [
-            FederationSpaceSummaryEventResult.from_json_dict(e) for e in events
-        ]
-
-        return cls(rooms, parsed_events)
+    via = content.get("via")
+    if not isinstance(via, Sequence):
+        raise ValueError("Invalid event: 'via' must be a list")
+    if any(not isinstance(v, str) for v in via):
+        raise ValueError("Invalid event: 'via' must be a list of strings")
