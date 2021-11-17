@@ -1138,11 +1138,15 @@ class RoomSpaceSummaryRestServlet(RestServlet):
 
 
 class RoomHierarchyRestServlet(RestServlet):
-    PATTERNS = (
+    PATTERNS = [
         re.compile(
             "^/_matrix/client/unstable/org.matrix.msc2946"
             "/rooms/(?P<room_id>[^/]*)/hierarchy$"
         ),
+    ] + list(
+        client_patterns(
+            "/rooms/(?P<room_id>[^/]*)/hierarchy$", releases=("v1",), unstable=False
+        )
     )
 
     def __init__(self, hs: "HomeServer"):
