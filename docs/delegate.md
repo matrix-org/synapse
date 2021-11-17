@@ -1,4 +1,8 @@
-# Delegation
+# Delegation of incoming federation traffic
+
+In the following documentation, we use the term `server_name` to refer to that setting
+in your homeserver configuration file. It appears at the ends of user ids, and tells
+other homeservers where they can find your server.
 
 By default, other homeservers will expect to be able to reach yours via
 your `server_name`, on port 8448. For example, if you set your `server_name`
@@ -12,13 +16,21 @@ to a different server and/or port (e.g. `synapse.example.com:443`).
 
 ## .well-known delegation
 
-To use this method, you need to be able to alter the
-`server_name` 's https server to serve the `/.well-known/matrix/server`
-URL. Having an active server (with a valid TLS certificate) serving your
-`server_name` domain is out of the scope of this documentation.
+To use this method, you need to be able to configure the server at
+`https://<server_name>` to serve a file at
+`https://<server_name>/.well-known/matrix/server`.  There are two ways to do this, shown below.
 
-The URL `https://<server_name>/.well-known/matrix/server` should
-return a JSON structure containing the key `m.server` like so:
+Note that the `.well-known` file is hosted on the default port for `https` (port 443).
+
+### External server
+
+For maximum flexibility, you need to configure an external server such as nginx, Apache
+or HAProxy to serve the `https://<server_name>/.well-known/matrix/server` file. Setting
+up such a server is out of the scope of this documentation, but note that it is often
+possible to configure your [reverse proxy](reverse_proxy.md) for this.
+
+The URL `https://<server_name>/.well-known/matrix/server` should be configured
+return a JSON structure containing the key `m.server` like this:
 
 ```json
 {
@@ -26,8 +38,9 @@ return a JSON structure containing the key `m.server` like so:
 }
 ```
 
-In our example, this would mean that URL `https://example.com/.well-known/matrix/server`
-should return:
+In our example (where we want federation traffic to be routed to
+`https://synapse.example.com`, on port 443), this would mean that
+`https://example.com/.well-known/matrix/server` should return:
 
 ```json
 {
@@ -38,16 +51,29 @@ should return:
 Note, specifying a port is optional. If no port is specified, then it defaults
 to 8448.
 
-With .well-known delegation, federating servers will check for a valid TLS
-certificate for the delegated hostname (in our example: `synapse.example.com`).
+### Serving a `.well-known/matrix/server` file with Synapse
+
+If you are able to set up your domain so that `https://<server_name>` is routed to
+Synapse (i.e., the only change needed is to direct federation traffic to port 443
+instead of port 8448), then it is possible to configure Synapse to serve a suitable
+`.well-known/matrix/server` file. To do so, add the following to your `homeserver.yaml`
+file:
+
+```yaml
+serve_server_wellknown: true
+```
+
+**Note**: this *only* works if `https://<server_name>` is routed to Synapse, so is
+generally not suitable if Synapse is hosted at a subdomain such as
+`https://synapse.example.com`.
 
 ## SRV DNS record delegation
 
-It is also possible to do delegation using a SRV DNS record. However, that is
-considered an advanced topic since it's a bit complex to set up, and `.well-known`
-delegation is already enough in most cases.
+It is also possible to do delegation using a SRV DNS record. However, that is generally
+not recommended, as it can be difficult to configure the TLS certificates correctly in
+this case, and it offers little advantage over `.well-known` delegation.
 
-However, if you really need it, you can find some documentation on how such a
+However, if you really need it, you can find some documentation on what such a
 record should look like and how Synapse will use it in [the Matrix
 specification](https://matrix.org/docs/spec/server_server/latest#resolving-server-names).
 
@@ -68,27 +94,9 @@ wouldn't need any delegation set up.
 domain `server_name` points to, you will need to let other servers know how to
 find it using delegation.
 
-### Do you still recommend against using a reverse proxy on the federation port?
+### Should I use a reverse proxy for federation traffic?
 
-We no longer actively recommend against using a reverse proxy. Many admins will
-find it easier to direct federation traffic to a reverse proxy and manage their
-own TLS certificates, and this is a supported configuration.
-
-See [the reverse proxy documentation](reverse_proxy.md) for information on setting up a
+Generally, using a reverse proxy for both the federation and client traffic is a good
+idea, since it saves handling TLS traffic in Synapse. See
+[the reverse proxy documentation](reverse_proxy.md) for information on setting up a
 reverse proxy.
-
-### Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?
-
-This is no longer necessary. If you are using a reverse proxy for all of your
-TLS traffic, then you can set `no_tls: True` in the Synapse config.
-
-In that case, the only reason Synapse needs the certificate is to populate a legacy
-`tls_fingerprints` field in the federation API. This is ignored by Synapse 0.99.0
-and later, and the only time pre-0.99 Synapses will check it is when attempting to
-fetch the server keys - and generally this is delegated via `matrix.org`, which
-is running a modern version of Synapse.
-
-### Do I need the same certificate for the client and federation port?
-
-No. There is nothing stopping you from using different certificates,
-particularly if you are using a reverse proxy.

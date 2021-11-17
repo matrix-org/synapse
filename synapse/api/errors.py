@@ -596,3 +596,10 @@ class ShadowBanError(Exception):
 
     This should be caught and a proper "fake" success response sent to the user.
     """
+
+
+class ModuleFailedException(Exception):
+    """
+    Raised when a module API callback fails, for example because it raised an
+    exception.
+    """

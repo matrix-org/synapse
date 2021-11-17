@@ -20,7 +20,9 @@ Finally, to actually run your worker-based synapse, you must pass synctl the `-a
 commandline option to tell it to operate on all the worker configurations found
 in the given directory, e.g.:
 
-    synctl -a $CONFIG/workers start
+```sh
+synctl -a $CONFIG/workers start
+```
 
 Currently one should always restart all workers when restarting or upgrading
 synapse, unless you explicitly know it's safe not to.  For instance, restarting
@@ -29,4 +31,6 @@ notifications.
 
 To manipulate a specific worker, you pass the -w option to synctl:
 
-    synctl -w $CONFIG/workers/worker1.yaml restart
+```sh
+synctl -w $CONFIG/workers/worker1.yaml restart
+```

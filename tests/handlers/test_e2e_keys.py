@@ -17,6 +17,8 @@ from unittest import mock
 
 from signedjson import key as key, sign as sign
 
+from twisted.internet import defer
+
 from synapse.api.constants import RoomEncryptionAlgorithms
 from synapse.api.errors import Codes, SynapseError
 
@@ -629,4 +631,153 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
                 "ed25519:" + usersigning_pubkey
             ],
             other_master_key["signatures"][local_user]["ed25519:" + usersigning_pubkey],
+        )
+
+    def test_query_devices_remote_no_sync(self):
+        """Tests that querying keys for a remote user that we don't share a room
+        with returns the cross signing keys correctly.
+        """
+
+        remote_user_id = "@test:other"
+        local_user_id = "@test:test"
+
+        remote_master_key = "85T7JXPFBAySB/jwby4S3lBPTqY3+Zg53nYuGmu1ggY"
+        remote_self_signing_key = "QeIiFEjluPBtI7WQdG365QKZcFs9kqmHir6RBD0//nQ"
+
+        self.hs.get_federation_client().query_client_keys = mock.Mock(
+            return_value=defer.succeed(
+                {
+                    "device_keys": {remote_user_id: {}},
+                    "master_keys": {
+                        remote_user_id: {
+                            "user_id": remote_user_id,
+                            "usage": ["master"],
+                            "keys": {"ed25519:" + remote_master_key: remote_master_key},
+                        },
+                    },
+                    "self_signing_keys": {
+                        remote_user_id: {
+                            "user_id": remote_user_id,
+                            "usage": ["self_signing"],
+                            "keys": {
+                                "ed25519:"
+                                + remote_self_signing_key: remote_self_signing_key
+                            },
+                        }
+                    },
+                }
+            )
+        )
+
+        e2e_handler = self.hs.get_e2e_keys_handler()
+
+        query_result = self.get_success(
+            e2e_handler.query_devices(
+                {
+                    "device_keys": {remote_user_id: []},
+                },
+                timeout=10,
+                from_user_id=local_user_id,
+                from_device_id="some_device_id",
+            )
+        )
+
+        self.assertEqual(query_result["failures"], {})
+        self.assertEqual(
+            query_result["master_keys"],
+            {
+                remote_user_id: {
+                    "user_id": remote_user_id,
+                    "usage": ["master"],
+                    "keys": {"ed25519:" + remote_master_key: remote_master_key},
+                },
+            },
+        )
+        self.assertEqual(
+            query_result["self_signing_keys"],
+            {
+                remote_user_id: {
+                    "user_id": remote_user_id,
+                    "usage": ["self_signing"],
+                    "keys": {
+                        "ed25519:" + remote_self_signing_key: remote_self_signing_key
+                    },
+                }
+            },
+        )
+
+    def test_query_devices_remote_sync(self):
+        """Tests that querying keys for a remote user that we share a room with,
+        but haven't yet fetched the keys for, returns the cross signing keys
+        correctly.
+        """
+
+        remote_user_id = "@test:other"
+        local_user_id = "@test:test"
+
+        self.store.get_rooms_for_user = mock.Mock(
+            return_value=defer.succeed({"some_room_id"})
+        )
+
+        remote_master_key = "85T7JXPFBAySB/jwby4S3lBPTqY3+Zg53nYuGmu1ggY"
+        remote_self_signing_key = "QeIiFEjluPBtI7WQdG365QKZcFs9kqmHir6RBD0//nQ"
+
+        self.hs.get_federation_client().query_user_devices = mock.Mock(
+            return_value=defer.succeed(
+                {
+                    "user_id": remote_user_id,
+                    "stream_id": 1,
+                    "devices": [],
+                    "master_key": {
+                        "user_id": remote_user_id,
+                        "usage": ["master"],
+                        "keys": {"ed25519:" + remote_master_key: remote_master_key},
+                    },
+                    "self_signing_key": {
+                        "user_id": remote_user_id,
+                        "usage": ["self_signing"],
+                        "keys": {
+                            "ed25519:"
+                            + remote_self_signing_key: remote_self_signing_key
+                        },
+                    },
+                }
+            )
+        )
+
+        e2e_handler = self.hs.get_e2e_keys_handler()
+
+        query_result = self.get_success(
+            e2e_handler.query_devices(
+                {
+                    "device_keys": {remote_user_id: []},
+                },
+                timeout=10,
+                from_user_id=local_user_id,
+                from_device_id="some_device_id",
+            )
+        )
+
+        self.assertEqual(query_result["failures"], {})
+        self.assertEqual(
+            query_result["master_keys"],
+            {
+                remote_user_id: {
+                    "user_id": remote_user_id,
+                    "usage": ["master"],
+                    "keys": {"ed25519:" + remote_master_key: remote_master_key},
+                }
+            },
+        )
+        self.assertEqual(
+            query_result["self_signing_keys"],
+            {
+                remote_user_id: {
+                    "user_id": remote_user_id,
+                    "usage": ["self_signing"],
+                    "keys": {
+                        "ed25519:" + remote_self_signing_key: remote_self_signing_key
+                    },
+                }
+            },
         )

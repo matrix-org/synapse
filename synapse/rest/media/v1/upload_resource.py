@@ -80,7 +80,7 @@ class UploadResource(DirectServeJsonResource):
             assert content_type_headers  # for mypy
             media_type = content_type_headers[0].decode("ascii")
         else:
-            raise SynapseError(msg="Upload request missing 'Content-Type'", code=400)
+            media_type = "application/octet-stream"
 
         # if headers.hasHeader(b"Content-Disposition"):
         #     disposition = headers.getRawHeaders(b"Content-Disposition")[0]

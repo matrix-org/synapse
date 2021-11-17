@@ -123,42 +123,6 @@ callback returns `True`, Synapse falls through to the next one. The value of the
 callback that does not return `True` will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.
 
-### `user_may_create_room_with_invites`
-
-_First introduced in Synapse v1.44.0_
-
-```python
-async def user_may_create_room_with_invites(
-    user: str,
-    invites: List[str],
-    threepid_invites: List[Dict[str, str]],
-) -> bool
-```
-
-Called when processing a room creation request (right after `user_may_create_room`).
-The module is given the Matrix user ID of the user trying to create a room, as well as a
-list of Matrix users to invite and a list of third-party identifiers (3PID, e.g. email
-addresses) to invite.
-
-An invited Matrix user to invite is represented by their Matrix user IDs, and an invited
-3PIDs is represented by a dict that includes the 3PID medium (e.g. "email") through its
-`medium` key and its address (e.g. "alice@example.com") through its `address` key.
-
-See [the Matrix specification](https://matrix.org/docs/spec/appendices#pid-types) for more
-information regarding third-party identifiers.
-
-If no invite and/or 3PID invite were specified in the room creation request, the
-corresponding list(s) will be empty.
-
-**Note**: This callback is not called when a room is cloned (e.g. during a room upgrade)
-since no invites are sent when cloning a room. To cover this case, modules also need to
-implement `user_may_create_room`.
-
-If multiple modules implement this callback, they will be considered in order. If a
-callback returns `True`, Synapse falls through to the next one. The value of the first
-callback that does not return `True` will be used. If this happens, Synapse will not call
-any of the subsequent implementations of this callback.
-
 ### `user_may_create_room_alias`
 
 _First introduced in Synapse v1.37.0_

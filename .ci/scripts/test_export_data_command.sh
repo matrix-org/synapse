@@ -3,7 +3,7 @@
 # Test for the export-data admin command against sqlite and postgres
 
 set -xe
-cd `dirname $0`/../..
+cd "$(dirname "$0")/../.."
 
 echo "--- Install dependencies"
 
