@@ -1266,7 +1266,8 @@ def register_servlets(
     RoomAliasListServlet(hs).register(http_server)
     SearchRestServlet(hs).register(http_server)
     RoomCreateRestServlet(hs).register(http_server)
-    TimestampLookupRestServlet(hs).register(http_server)
+    if hs.config.experimental.msc3030_enabled:
+        TimestampLookupRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
     if not is_worker:
