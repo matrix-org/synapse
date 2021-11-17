@@ -204,9 +204,9 @@ class FederationTimestampLookupServlet(BaseFederationServerServlet):
         query: Dict[bytes, List[bytes]],
         room_id: str,
     ) -> Tuple[int, JsonDict]:
-        timestamp = parse_integer_from_args(query, "ts", None)
+        timestamp = parse_integer_from_args(query, "ts", required=True)
         direction = parse_string_from_args(
-            query, "dir", default="f", allowed_values=["f", "b"]
+            query, "dir", default="f", allowed_values=["f", "b"], required=True
         )
 
         return await self.handler.on_timestamp_to_event_request(

@@ -1110,7 +1110,7 @@ class TimestampLookupRestServlet(RestServlet):
         requester = await self._auth.get_user_by_req(request)
         await self._auth.check_user_in_room(room_id, requester.user.to_string())
 
-        timestamp = parse_integer(request, "ts")
+        timestamp = parse_integer(request, "ts", required=True)
         direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])
 
         event_id = await self.timestamp_lookup_handler.get_event_for_timestamp(

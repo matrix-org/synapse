@@ -56,6 +56,7 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
 from synapse.events.utils import copy_power_levels_contents
+from synapse.handlers.federation import get_domains_from_state
 from synapse.rest.admin._base import assert_user_is_admin
 from synapse.storage.state import StateFilter
 from synapse.streams import EventSource
@@ -76,7 +77,6 @@ from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.visibility import filter_events_for_client
-from synapse.handlers.federation import get_domains_from_state
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -1263,9 +1263,11 @@ class TimestampLookupHandler:
 
         # If we found an extremity, we should probably ask another homeserver
         # first about more history in between
-        is_extremity = await self.store.check_if_event_is_extremity(
-            room_id, local_event_id
-        )
+        is_extremity = False
+        if local_event_id:
+            is_extremity = await self.store.check_if_event_is_extremity(
+                room_id, local_event_id
+            )
         if not local_event_id or is_extremity:
             logger.debug(
                 "get_event_for_timestamp: locally, we found event_id=%s closest to timestamp=%s which is an extremity so we're asking other homeservers first",
@@ -1291,6 +1293,9 @@ class TimestampLookupHandler:
                         domain,
                         remote_response,
                     )
+                    if not remote_response:
+                        continue
+
                     remote_event_id = remote_response.get("event_id", None)
                     if remote_event_id:
                         # TODO: Do we want to persist this as an extremity?
