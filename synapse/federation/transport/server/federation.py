@@ -624,81 +624,6 @@ class FederationVersionServlet(BaseFederationServlet):
         )
 
 
-class FederationSpaceSummaryServlet(BaseFederationServlet):
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc2946"
-    PATH = "/spaces/(?P<room_id>[^/]*)"
-
-    def __init__(
-        self,
-        hs: "HomeServer",
-        authenticator: Authenticator,
-        ratelimiter: FederationRateLimiter,
-        server_name: str,
-    ):
-        super().__init__(hs, authenticator, ratelimiter, server_name)
-        self.handler = hs.get_room_summary_handler()
-
-    async def on_GET(
-        self,
-        origin: str,
-        content: Literal[None],
-        query: Mapping[bytes, Sequence[bytes]],
-        room_id: str,
-    ) -> Tuple[int, JsonDict]:
-        suggested_only = parse_boolean_from_args(query, "suggested_only", default=False)
-
-        max_rooms_per_space = parse_integer_from_args(query, "max_rooms_per_space")
-        if max_rooms_per_space is not None and max_rooms_per_space < 0:
-            raise SynapseError(
-                400,
-                "Value for 'max_rooms_per_space' must be a non-negative integer",
-                Codes.BAD_JSON,
-            )
-
-        exclude_rooms = parse_strings_from_args(query, "exclude_rooms", default=[])
-
-        return 200, await self.handler.federation_space_summary(
-            origin, room_id, suggested_only, max_rooms_per_space, exclude_rooms
-        )
-
-    # TODO When switching to the stable endpoint, remove the POST handler.
-    async def on_POST(
-        self,
-        origin: str,
-        content: JsonDict,
-        query: Mapping[bytes, Sequence[bytes]],
-        room_id: str,
-    ) -> Tuple[int, JsonDict]:
-        suggested_only = content.get("suggested_only", False)
-        if not isinstance(suggested_only, bool):
-            raise SynapseError(
-                400, "'suggested_only' must be a boolean", Codes.BAD_JSON
-            )
-
-        exclude_rooms = content.get("exclude_rooms", [])
-        if not isinstance(exclude_rooms, list) or any(
-            not isinstance(x, str) for x in exclude_rooms
-        ):
-            raise SynapseError(400, "bad value for 'exclude_rooms'", Codes.BAD_JSON)
-
-        max_rooms_per_space = content.get("max_rooms_per_space")
-        if max_rooms_per_space is not None:
-            if not isinstance(max_rooms_per_space, int):
-                raise SynapseError(
-                    400, "bad value for 'max_rooms_per_space'", Codes.BAD_JSON
-                )
-            if max_rooms_per_space < 0:
-                raise SynapseError(
-                    400,
-                    "Value for 'max_rooms_per_space' must be a non-negative integer",
-                    Codes.BAD_JSON,
-                )
-
-        return 200, await self.handler.federation_space_summary(
-            origin, room_id, suggested_only, max_rooms_per_space, exclude_rooms
-        )
-
-
 class FederationRoomHierarchyServlet(BaseFederationServlet):
     PATH = "/hierarchy/(?P<room_id>[^/]*)"
 
@@ -826,7 +751,6 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     On3pidBindServlet,
     FederationVersionServlet,
     RoomComplexityServlet,
-    FederationSpaceSummaryServlet,
     FederationRoomHierarchyServlet,
     FederationRoomHierarchyUnstableServlet,
     FederationV1SendKnockServlet,

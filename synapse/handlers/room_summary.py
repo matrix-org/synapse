@@ -15,7 +15,6 @@
 import itertools
 import logging
 import re
-from collections import deque
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import attr
@@ -340,74 +339,6 @@ class RoomSummaryHandler:
             )
 
         return result
-
-    async def federation_space_summary(
-        self,
-        origin: str,
-        room_id: str,
-        suggested_only: bool,
-        max_rooms_per_space: Optional[int],
-        exclude_rooms: Iterable[str],
-    ) -> JsonDict:
-        """
-        Implementation of the space summary Federation API
-
-        Args:
-            origin: The server requesting the spaces summary.
-
-            room_id: room id to start the summary at
-
-            suggested_only: whether we should only return children with the "suggested"
-                flag set.
-
-            max_rooms_per_space: an optional limit on the number of child rooms we will
-                return. Unlike the C-S API, this applies to the root room (room_id).
-                It is clipped to MAX_ROOMS_PER_SPACE.
-
-            exclude_rooms: a list of rooms to skip over (presumably because the
-                calling server has already seen them).
-
-        Returns:
-            summary dict to return
-        """
-        # the queue of rooms to process
-        room_queue = deque((room_id,))
-
-        # the set of rooms that we should not walk further. Initialise it with the
-        # excluded-rooms list; we will add other rooms as we process them so that
-        # we do not loop.
-        processed_rooms: Set[str] = set(exclude_rooms)
-
-        rooms_result: List[JsonDict] = []
-        events_result: List[JsonDict] = []
-
-        # Set a limit on the number of rooms to return.
-        if max_rooms_per_space is None or max_rooms_per_space > MAX_ROOMS_PER_SPACE:
-            max_rooms_per_space = MAX_ROOMS_PER_SPACE
-
-        while room_queue and len(rooms_result) < MAX_ROOMS:
-            room_id = room_queue.popleft()
-            if room_id in processed_rooms:
-                # already done this room
-                continue
-
-            room_entry = await self._summarize_local_room(
-                None, origin, room_id, suggested_only, max_rooms_per_space
-            )
-
-            processed_rooms.add(room_id)
-
-            if room_entry:
-                rooms_result.append(room_entry.room)
-                events_result.extend(room_entry.children_state_events)
-
-                # add any children to the queue
-                room_queue.extend(
-                    edge_event["state_key"]
-                    for edge_event in room_entry.children_state_events
-                )
-
-        return {"rooms": rooms_result, "events": events_result}
 
     async def get_federation_hierarchy(
         self,
