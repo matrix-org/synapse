@@ -757,6 +757,8 @@ class EventsWorkerStore(SQLBaseStore):
                 if not deferred.called:
                     with PreserveLoggingContext():
                         deferred.errback(e)
+
+            raise
         else:
             should_restart = False
             with self._event_fetch_lock:
