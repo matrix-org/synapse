@@ -203,6 +203,21 @@ class FederationServer(FederationBase):
     async def on_timestamp_to_event_request(
         self, origin: str, room_id: str, timestamp: int, direction: str
     ) -> Tuple[int, Dict[str, Any]]:
+        """When we receive a federated `/timestamp_to_event` request,
+        handle all of the logic for validating and fetching the event.
+
+        Args:
+            origin: The server we received the event from
+            room_id: Room to fetch the event from
+            timestamp: The point in time we should navigate from in the given
+                direction to find the closest event.
+            direction: ["f"|"b"] to indicate whether we should navigate forward
+                or backward from the given timestamp to find the closest event.
+
+        Returns:
+            Tuple indicating the response status code and dictionary response
+            body including `event_id`.
+        """
         with (await self._server_linearizer.queue((origin, room_id))):
             origin_host, _ = parse_server_name(origin)
             await self.check_server_matches_acl(origin_host, room_id)

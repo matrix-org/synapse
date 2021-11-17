@@ -1231,46 +1231,62 @@ class TimestampLookupHandler:
         room_id: str,
         timestamp: int,
         direction: str,
-    ) -> Optional[JsonDict]:
-        event_id = await self.store.get_event_for_timestamp(
+    ) -> Optional[str]:
+        """Find the closest event to the given timestamp in the given direction.
+        If we can't find an event locally or the event we have locally is next to a gap,
+        it will ask other federated homeservers for an event.
+
+        Args:
+            requester: The user making the request according to the access token
+            room_id: Room to fetch the event from
+            timestamp: The point in time we should navigate from in the given
+                direction to find the closest event.
+            direction: ["f"|"b"] to indicate whether we should navigate forward
+                or backward from the given timestamp to find the closest event.
+
+        Returns:
+            `event_id` closest to the given timestamp in the given direction
+
+        Raises:
+            SynapseError if unable to find any event locally in the given direction
+        """
+
+        local_event_id = await self.store.get_event_for_timestamp(
             room_id, timestamp, direction
         )
 
-        if not event_id:
-            raise SynapseError(
-                404,
-                "Unable to find event from %s in direction %s" % (timestamp, direction),
-                errcode=Codes.NOT_FOUND,
-            )
+        logger.debug(
+            "get_event_for_timestamp: locally, we found event_id=%s closest to timestamp=%s",
+            local_event_id,
+            timestamp,
+        )
 
         # If we found an extremity, we should probably ask another homeserver
         # first about more history in between
-        is_extremity = await self.store.check_if_event_is_extremity(room_id, event_id)
-        logger.info(
-            "get_event_for_timestamp: locally, we found event=%s closest to timestamp=%s and is is_extremity=%s",
-            event_id,
-            timestamp,
-            is_extremity,
+        is_extremity = await self.store.check_if_event_is_extremity(
+            room_id, local_event_id
         )
-        if is_extremity:
-            logger.info(
-                "get_event_for_timestamp: locally, we found event=%s closest to timestamp=%s is an extremity so we're asking other homeservers first",
-                event_id,
+        if not local_event_id or is_extremity:
+            logger.debug(
+                "get_event_for_timestamp: locally, we found event_id=%s closest to timestamp=%s which is an extremity so we're asking other homeservers first",
+                local_event_id,
                 timestamp,
             )
 
+            # Find other homeservers from the given state in the room
             curr_state = await self.state_handler.get_current_state(room_id)
             curr_domains = get_domains_from_state(curr_state)
             likely_domains = [
                 domain for domain, depth in curr_domains if domain != self.server_name
             ]
 
+            # Loop through each homeserver candidate until we get a succesful response
             for domain in likely_domains:
                 try:
                     remote_response = await self.transport_layer.timestamp_to_event(
                         domain, room_id, timestamp, direction
                     )
-                    logger.info(
+                    logger.debug(
                         "get_event_for_timestamp: response from domain(%s)=%s",
                         domain,
                         remote_response,
@@ -1278,18 +1294,31 @@ class TimestampLookupHandler:
                     remote_event_id = remote_response.get("event_id", None)
                     if remote_event_id:
                         # TODO: Do we want to persist this as an extremity?
+                        # TODO: I think ideally, we would try to backfill from
+                        # this event and run this whole
+                        # `get_event_for_timestamp` function again to make sure
+                        # they didn't give us an event from their gappy history.
                         return remote_event_id
 
                     continue
-                except Exception as e:
+                except Exception as ex:
                     logger.exception(
-                        "Failed to fetch /timestamp_to_event from %s because %s",
+                        "Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
                         domain,
-                        e,
+                        type(ex).__name__,
+                        ex,
+                        ex.args,
                     )
                     continue
 
-        return event_id
+        if not local_event_id:
+            raise SynapseError(
+                404,
+                "Unable to find event from %s in direction %s" % (timestamp, direction),
+                errcode=Codes.NOT_FOUND,
+            )
+
+        return local_event_id
 
 
 class RoomEventSource(EventSource[RoomStreamToken, EventBase]):

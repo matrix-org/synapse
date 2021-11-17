@@ -1627,7 +1627,19 @@ class EventsWorkerStore(SQLBaseStore):
             _cleanup_old_transaction_ids_txn,
         )
 
-    async def check_if_event_is_extremity(self, room_id: str, event_id: str):
+    async def check_if_event_is_extremity(self, room_id: str, event_id: str) -> bool:
+        """Check if the given `event_id` is a forward or backward extremity.
+        More specifically, we're looking whether it's next to a gap of missing
+        events.
+
+        Args:
+            room_id: room where the event lives
+            event_id: event to check
+
+        Returns:
+            Boolean indicating whether it's an extremity
+        """
+
         def check_if_event_is_extremity_txn(txn) -> bool:
             # If the event in question, is listed as a backward extremity, it's
             # an extremity.

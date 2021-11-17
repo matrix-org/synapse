@@ -175,7 +175,27 @@ class FederationBackfillServlet(BaseFederationServerServlet):
 
 
 class FederationTimestampLookupServlet(BaseFederationServerServlet):
+    """
+    API endpoint to fetch the `event_id` of the closest event to the given
+    timestamp (`ts` query parameter) in the given direction (`dir` query
+    parameter).
+
+    Useful for other homeservers when they're unable to find an event locally.
+
+    `ts` is a timestamp in milliseconds where we will find the closest event in
+    the given direction.
+
+    `dir` can be `f` or `b` to indicate forwards and backwards in time from the
+    given timestamp.
+
+    GET /_matrix/federation/unstable/org.matrix.msc3030/timestamp_to_event/<roomID>?ts=<timestamp>&dir=<direction>
+    {
+        "event_id": ...
+    }
+    """
+
     PATH = "/timestamp_to_event/(?P<room_id>[^/]*)/?"
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc3030"
 
     async def on_GET(
         self,

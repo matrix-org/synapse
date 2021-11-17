@@ -153,9 +153,26 @@ class TransportLayerClient:
         self, destination: str, room_id: str, timestamp: int, direction: str
     ) -> Optional[JsonDict]:
         """
-        TODO
+        Calls a remote federating server at `destination` asking for their
+        closest event to the given timestamp in the given direction.
+
+        Args:
+            destination: Domain name of the remote homeserver
+            room_id: Room to fetch the event from
+            timestamp: The point in time we should navigate from in the given
+                direction to find the closest event.
+            direction: ["f"|"b"] to indicate whether we should navigate forward
+                or backward from the given timestamp to find the closest event.
+
+        Returns:
+            Results in a dict received from the remote homeserver.
+            Expected response will include the `event_id` key for the closest event.
         """
-        path = _create_v1_path("/timestamp_to_event/%s", room_id)
+        path = _create_path(
+            FEDERATION_UNSTABLE_PREFIX,
+            "/org.matrix.msc3030/timestamp_to_event/%s",
+            room_id,
+        )
 
         args = {"ts": [str(timestamp)], "dir": [direction]}
 
