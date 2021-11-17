@@ -602,7 +602,7 @@ class EventsWorkerStore(SQLBaseStore):
             # already due to `_get_events_from_db`).
             fetching_deferred: ObservableDeferred[
                 Dict[str, _EventCacheEntry]
-            ] = ObservableDeferred(defer.Deferred())
+            ] = ObservableDeferred(defer.Deferred(), consumeErrors=True)
             for event_id in missing_events_ids:
                 self._current_event_fetches[event_id] = fetching_deferred
 
@@ -736,35 +736,56 @@ class EventsWorkerStore(SQLBaseStore):
             for e in state_to_include.values()
         ]
 
-    def _do_fetch(self, conn: Connection) -> None:
+    async def _do_fetch(self) -> None:
+        """Services requests for events from the `_event_fetch_list` queue."""
+        try:
+            await self.db_pool.runWithConnection(self._do_fetch_txn)
+        except BaseException as e:
+            with self._event_fetch_lock:
+                self._event_fetch_ongoing -= 1
+                event_fetch_ongoing_gauge.set(self._event_fetch_ongoing)
+
+                if self._event_fetch_ongoing == 0 and self._event_fetch_list:
+                    # We are the last remaining fetcher and we have just failed.
+                    # Fail any outstanding event fetches, since no one else will process
+                    # them.
+                    failed_event_list = self._event_fetch_list
+                    self._event_fetch_list = []
+                else:
+                    failed_event_list = []
+
+            for _, deferred in failed_event_list:
+                if not deferred.called:
+                    with PreserveLoggingContext():
+                        deferred.errback(e)
+
+    def _do_fetch_txn(self, conn: Connection) -> None:
         """Takes a database connection and waits for requests for events from
         the _event_fetch_list queue.
         """
-        try:
-            i = 0
-            while True:
-                with self._event_fetch_lock:
-                    event_list = self._event_fetch_list
-                    self._event_fetch_list = []
+        i = 0
+        while True:
+            with self._event_fetch_lock:
+                event_list = self._event_fetch_list
+                self._event_fetch_list = []
 
-                    if not event_list:
-                        single_threaded = self.database_engine.single_threaded
-                        if (
-                            not self.USE_DEDICATED_DB_THREADS_FOR_EVENT_FETCHING
-                            or single_threaded
-                            or i > EVENT_QUEUE_ITERATIONS
-                        ):
-                            break
-                        else:
-                            self._event_fetch_lock.wait(EVENT_QUEUE_TIMEOUT_S)
-                            i += 1
-                            continue
-                    i = 0
+                if not event_list:
+                    single_threaded = self.database_engine.single_threaded
+                    if (
+                        not self.USE_DEDICATED_DB_THREADS_FOR_EVENT_FETCHING
+                        or single_threaded
+                        or i > EVENT_QUEUE_ITERATIONS
+                    ):
+                        self._event_fetch_ongoing -= 1
+                        event_fetch_ongoing_gauge.set(self._event_fetch_ongoing)
+                        return
+                    else:
+                        self._event_fetch_lock.wait(EVENT_QUEUE_TIMEOUT_S)
+                        i += 1
+                        continue
+                i = 0
 
-                self._fetch_event_list(conn, event_list)
-        finally:
-            self._event_fetch_ongoing -= 1
-            event_fetch_ongoing_gauge.set(self._event_fetch_ongoing)
+            self._fetch_event_list(conn, event_list)
 
     def _fetch_event_list(
         self, conn: Connection, event_list: List[Tuple[List[str], defer.Deferred]]
@@ -994,9 +1015,7 @@ class EventsWorkerStore(SQLBaseStore):
                 should_start = False
 
         if should_start:
-            run_as_background_process(
-                "fetch_events", self.db_pool.runWithConnection, self._do_fetch
-            )
+            run_as_background_process("fetch_events", self._do_fetch)
 
         logger.debug("Loading %d events: %s", len(events), events)
         with PreserveLoggingContext():
