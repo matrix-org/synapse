@@ -1,8 +1,0 @@
-/* Remove the prev, next chapter buttons as they interfere with the
- * table of contents.
- * Note that the table of contents only appears on desktop, thus we
- * only remove the desktop (wide) chapter buttons.
- */
-.nav-wide-wrapper {
-    display: none
-}
