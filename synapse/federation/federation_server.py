@@ -200,6 +200,22 @@ class FederationServer(FederationBase):
 
         return 200, res
 
+    async def on_timestamp_to_event_request(
+        self, origin: str, room_id: str, timestamp: int, direction: str
+    ) -> Tuple[int, Dict[str, Any]]:
+        with (await self._server_linearizer.queue((origin, room_id))):
+            origin_host, _ = parse_server_name(origin)
+            await self.check_server_matches_acl(origin_host, room_id)
+
+            # We only try to fetch data from the local database
+            event_id = await self.store.get_event_for_timestamp(
+                room_id, timestamp, direction
+            )
+
+        return 200, {
+            "event_id": event_id,
+        }
+
     async def on_incoming_transaction(
         self,
         origin: str,

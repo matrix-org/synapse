@@ -1627,9 +1627,64 @@ class EventsWorkerStore(SQLBaseStore):
             _cleanup_old_transaction_ids_txn,
         )
 
+    async def check_if_event_is_extremity(self, room_id: str, event_id: str):
+        def check_if_event_is_extremity_txn(txn) -> bool:
+            backward_extremity_query = """
+                SELECT event_id FROM event_backward_extremities
+                WHERE room_id = ? AND event_id = ?
+                LIMIT 1
+            """
+
+            forward_extremity_query = """
+                SELECT event_id FROM event_forward_extremities
+                WHERE room_id = ? AND event_id = ?
+                LIMIT 1
+            """
+
+            all_backward_extremity_query = """
+                SELECT event_id FROM event_backward_extremities
+                WHERE room_id = ?
+                LIMIT 100
+            """
+
+            all_forward_extremity_query = """
+                SELECT event_id FROM event_forward_extremities
+                WHERE room_id = ?
+                LIMIT 100
+            """
+
+            txn.execute(all_backward_extremity_query, (room_id,))
+            all_backward_extremties = txn.fetchall()
+            txn.execute(all_forward_extremity_query, (room_id,))
+            all_forward_extremties = txn.fetchall()
+            logger.info(
+                "all_forward_extremties=%s all_backward_extremties=%s",
+                all_forward_extremties,
+                all_backward_extremties,
+            )
+
+            txn.execute(backward_extremity_query, (room_id, event_id))
+            backward_extremties = txn.fetchall()
+
+            if len(backward_extremties):
+                return True
+
+            txn.execute(forward_extremity_query, (room_id, event_id))
+            forward_extremties = txn.fetchall()
+
+            if len(forward_extremties):
+                return True
+
+            return False
+
+        return await self.db_pool.runInteraction(
+            "check_if_event_is_extremity_txn",
+            check_if_event_is_extremity_txn,
+        )
+
     async def get_event_for_timestamp(
         self, room_id: str, timestamp: int, direction: str
-    ) -> str:
+    ) -> Optional[str]:
         sql_template = """
             SELECT event_id FROM events
             WHERE
@@ -1640,7 +1695,6 @@ class EventsWorkerStore(SQLBaseStore):
         """
 
         def get_event_for_timestamp_txn(txn) -> str:
-
             if direction == "b":
                 # Find closest event *before* a given timestamp. We use descending
                 # (which gives values largest to smallest) because we want the
@@ -1658,16 +1712,11 @@ class EventsWorkerStore(SQLBaseStore):
                 sql_template % (comparison_operator, order), (timestamp, room_id)
             )
             row = txn.fetchone()
-            logger.info("row %s", row)
             if row:
                 (event_id,) = row
                 return event_id
 
-            raise SynapseError(
-                404,
-                "Unable to find event from %s in direction %s" % (timestamp, direction),
-                errcode=Codes.NOT_FOUND,
-            )
+            return None
 
         if direction not in ("f", "b"):
             raise SynapseError(

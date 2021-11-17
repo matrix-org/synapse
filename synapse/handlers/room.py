@@ -76,6 +76,7 @@ from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.visibility import filter_events_for_client
+from synapse.handlers.federation import get_domains_from_state
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -1215,6 +1216,80 @@ class RoomContextHandler:
         ).to_string(self.store)
 
         return results
+
+
+class TimestampLookupHandler:
+    def __init__(self, hs: "HomeServer"):
+        self.server_name = hs.hostname
+        self.store = hs.get_datastore()
+        self.state_handler = hs.get_state_handler()
+        self.transport_layer = hs.get_federation_transport_client()
+
+    async def get_event_for_timestamp(
+        self,
+        requester: Requester,
+        room_id: str,
+        timestamp: int,
+        direction: str,
+    ) -> Optional[JsonDict]:
+        event_id = await self.store.get_event_for_timestamp(
+            room_id, timestamp, direction
+        )
+
+        if not event_id:
+            raise SynapseError(
+                404,
+                "Unable to find event from %s in direction %s" % (timestamp, direction),
+                errcode=Codes.NOT_FOUND,
+            )
+
+        # If we found an extremity, we should probably ask another homeserver
+        # first about more history in between
+        is_extremity = await self.store.check_if_event_is_extremity(room_id, event_id)
+        logger.info(
+            "get_event_for_timestamp: locally, we found event=%s closest to timestamp=%s and is is_extremity=%s",
+            event_id,
+            timestamp,
+            is_extremity,
+        )
+        if is_extremity:
+            logger.info(
+                "get_event_for_timestamp: locally, we found event=%s closest to timestamp=%s is an extremity so we're asking other homeservers first",
+                event_id,
+                timestamp,
+            )
+
+            curr_state = await self.state_handler.get_current_state(room_id)
+            curr_domains = get_domains_from_state(curr_state)
+            likely_domains = [
+                domain for domain, depth in curr_domains if domain != self.server_name
+            ]
+
+            for domain in likely_domains:
+                try:
+                    remote_response = await self.transport_layer.timestamp_to_event(
+                        domain, room_id, timestamp, direction
+                    )
+                    logger.info(
+                        "get_event_for_timestamp: response from domain(%s)=%s",
+                        domain,
+                        remote_response,
+                    )
+                    remote_event_id = remote_response.get("event_id", None)
+                    if remote_event_id:
+                        # TODO: Do we want to persist this as an extremity?
+                        return remote_event_id
+
+                    continue
+                except Exception as e:
+                    logger.exception(
+                        "Failed to fetch /timestamp_to_event from %s because %s",
+                        domain,
+                        e,
+                    )
+                    continue
+
+        return event_id
 
 
 class RoomEventSource(EventSource[RoomStreamToken, EventBase]):

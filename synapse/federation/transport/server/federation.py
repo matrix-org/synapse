@@ -174,6 +174,26 @@ class FederationBackfillServlet(BaseFederationServerServlet):
         return await self.handler.on_backfill_request(origin, room_id, versions, limit)
 
 
+class FederationTimestampLookupServlet(BaseFederationServerServlet):
+    PATH = "/timestamp_to_event/(?P<room_id>[^/]*)/?"
+
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
+        timestamp = parse_integer_from_args(query, "ts", None)
+        direction = parse_string_from_args(
+            query, "dir", default="f", allowed_values=["f", "b"]
+        )
+
+        return await self.handler.on_timestamp_to_event_request(
+            origin, room_id, timestamp, direction
+        )
+
+
 class FederationQueryServlet(BaseFederationServerServlet):
     PATH = "/query/(?P<query_type>[^/]*)"
 
@@ -680,6 +700,7 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationStateV1Servlet,
     FederationStateIdsServlet,
     FederationBackfillServlet,
+    FederationTimestampLookupServlet,
     FederationQueryServlet,
     FederationMakeJoinServlet,
     FederationMakeLeaveServlet,

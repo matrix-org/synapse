@@ -149,6 +149,21 @@ class TransportLayerClient:
         )
 
     @log_function
+    async def timestamp_to_event(
+        self, destination: str, room_id: str, timestamp: int, direction: str
+    ) -> Optional[JsonDict]:
+        """
+        TODO
+        """
+        path = _create_v1_path("/timestamp_to_event/%s", room_id)
+
+        args = {"ts": [str(timestamp)], "dir": [direction]}
+
+        return await self.client.get_json(
+            destination, path=path, args=args, try_trailing_slash_on_400=True
+        )
+
+    @log_function
     async def send_transaction(
         self,
         transaction: Transaction,

@@ -1077,6 +1077,7 @@ class TimestampLookupRestServlet(RestServlet):
         super().__init__()
         self._auth = hs.get_auth()
         self._store = hs.get_datastore()
+        self.timestamp_lookup_handler = hs.get_timestamp_lookup_handler()
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
@@ -1087,8 +1088,8 @@ class TimestampLookupRestServlet(RestServlet):
         timestamp = parse_integer(request, "ts")
         direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])
 
-        event_id = await self._store.get_event_for_timestamp(
-            room_id, timestamp, direction
+        event_id = await self.timestamp_lookup_handler.get_event_for_timestamp(
+            requester, room_id, timestamp, direction
         )
 
         return 200, {
