@@ -611,7 +611,6 @@ class FederationSpaceSummaryServlet(BaseFederationServlet):
 
 
 class FederationRoomHierarchyServlet(BaseFederationServlet):
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc2946"
     PATH = "/hierarchy/(?P<room_id>[^/]*)"
 
     def __init__(
@@ -635,6 +634,10 @@ class FederationRoomHierarchyServlet(BaseFederationServlet):
         return 200, await self.handler.get_federation_hierarchy(
             origin, room_id, suggested_only
         )
+
+
+class FederationRoomHierarchyUnstableServlet(FederationRoomHierarchyServlet):
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc2946"
 
 
 class RoomComplexityServlet(BaseFederationServlet):
@@ -701,6 +704,7 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     RoomComplexityServlet,
     FederationSpaceSummaryServlet,
     FederationRoomHierarchyServlet,
+    FederationRoomHierarchyUnstableServlet,
     FederationV1SendKnockServlet,
     FederationMakeKnockServlet,
 )

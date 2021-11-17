@@ -210,7 +210,7 @@ expressions:
     ^/_matrix/federation/v1/get_groups_publicised$
     ^/_matrix/key/v2/query
     ^/_matrix/federation/unstable/org.matrix.msc2946/spaces/
-    ^/_matrix/federation/unstable/org.matrix.msc2946/hierarchy/
+    ^/_matrix/federation/(v1|unstable/org.matrix.msc2946)/hierarchy/
 
     # Inbound federation transaction request
     ^/_matrix/federation/v1/send/

@@ -1395,11 +1395,28 @@ class FederationClient(FederationBase):
         async def send_request(
             destination: str,
         ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]:
-            res = await self.transport_layer.get_room_hierarchy(
-                destination=destination,
-                room_id=room_id,
-                suggested_only=suggested_only,
-            )
+            try:
+                res = await self.transport_layer.get_room_hierarchy(
+                    destination=destination,
+                    room_id=room_id,
+                    suggested_only=suggested_only,
+                )
+            except HttpResponseException as e:
+                # If an error is received that is due to an unrecognised endpoint,
+                # fallback to the unstable endpoint. Otherwise consider it a
+                # legitmate error and raise.
+                if not self._is_unknown_endpoint(e):
+                    raise
+
+                logger.debug(
+                    "Couldn't fetch room hierarchy with the v1 API, falling back to the unstable API"
+                )
+
+                res = await self.transport_layer.get_room_hierarchy_unstable(
+                    destination=destination,
+                    room_id=room_id,
+                    suggested_only=suggested_only,
+                )
 
             room = res.get("room")
             if not isinstance(room, dict):
@@ -1448,6 +1465,10 @@ class FederationClient(FederationBase):
             # If an unexpected error occurred, re-raise it.
             if e.code != 502:
                 raise
+
+            logger.debug(
+                "Couldn't fetch room hierarchy, falling back to the spaces API"
+            )
 
             # Fallback to the old federation API and translate the results if
             # no servers implement the new API.
