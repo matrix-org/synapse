@@ -147,11 +147,13 @@ class EmailConfig(Config):
             and config.get("trust_identity_server_for_password_resets", False) is True
         ):
             # Use the first entry in self.trusted_third_party_id_servers instead
-            if self.trusted_third_party_id_servers:
+            if self.root.registration.trusted_third_party_id_servers:
                 # XXX: It's a little confusing that account_threepid_delegate_email is modified
                 # both in RegistrationConfig and here. We should factor this bit out
 
-                first_trusted_identity_server = self.trusted_third_party_id_servers[0]
+                first_trusted_identity_server = (
+                    self.root.registration.trusted_third_party_id_servers[0]
+                )
 
                 # trusted_third_party_id_servers does not contain a scheme whereas
                 # account_threepid_delegate_email is expected to. Presume https
