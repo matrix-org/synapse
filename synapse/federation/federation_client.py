@@ -1509,62 +1509,12 @@ class FederationClient(FederationBase):
 
             return room, children_state, children, inaccessible_children
 
-        try:
-            result = await self._try_destination_list(
-                "fetch room hierarchy",
-                destinations,
-                send_request,
-                failover_on_unknown_endpoint=True,
-            )
-        except SynapseError as e:
-            # If an unexpected error occurred, re-raise it.
-            if e.code != 502:
-                raise
-
-            logger.debug(
-                "Couldn't fetch room hierarchy, falling back to the spaces API"
-            )
-
-            # Fallback to the old federation API and translate the results if
-            # no servers implement the new API.
-            #
-            # The algorithm below is a bit inefficient as it only attempts to
-            # parse information for the requested room, but the legacy API may
-            # return additional layers.
-            legacy_result = await self.get_space_summary(
-                destinations,
-                room_id,
-                suggested_only,
-                max_rooms_per_space=None,
-                exclude_rooms=[],
-            )
-
-            # Find the requested room in the response (and remove it).
-            for _i, room in enumerate(legacy_result.rooms):
-                if room.get("room_id") == room_id:
-                    break
-            else:
-                # The requested room was not returned, nothing we can do.
-                raise
-            requested_room = legacy_result.rooms.pop(_i)
-
-            # Find any children events of the requested room.
-            children_events = []
-            children_room_ids = set()
-            for event in legacy_result.events:
-                if event.room_id == room_id:
-                    children_events.append(event.data)
-                    children_room_ids.add(event.state_key)
-
-            # Find the children rooms.
-            children = []
-            for room in legacy_result.rooms:
-                if room.get("room_id") in children_room_ids:
-                    children.append(room)
-
-            # It isn't clear from the response whether some of the rooms are
-            # not accessible.
-            result = (requested_room, children_events, children, ())
+        result = await self._try_destination_list(
+            "fetch room hierarchy",
+            destinations,
+            send_request,
+            failover_on_unknown_endpoint=True,
+        )
 
         # Cache the result to avoid fetching data over federation every time.
         self._get_room_hierarchy_cache[(room_id, suggested_only)] = result
