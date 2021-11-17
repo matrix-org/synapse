@@ -173,12 +173,14 @@ class ReplicationDataHandler:
             if entities:
                 self.notifier.on_new_event("to_device_key", token, users=entities)
         elif stream_name == DeviceListsStream.NAME:
-            all_room_ids: Set[str] = set()
+            users_to_notify: Set[str] = set()
             for row in rows:
                 if row.entity.startswith("@"):
-                    room_ids = await self.store.get_rooms_for_user(row.entity)
-                    all_room_ids.update(room_ids)
-            self.notifier.on_new_event("device_list_key", token, rooms=all_room_ids)
+                    user_ids = await self.store.get_users_who_share_room_with_user(
+                        row.entity
+                    )
+                    users_to_notify.update(user_ids)
+            self.notifier.on_new_event("device_list_key", token, users=users_to_notify)
         elif stream_name == GroupServerStream.NAME:
             self.notifier.on_new_event(
                 "groups_key", token, users=[row.user_id for row in rows]
