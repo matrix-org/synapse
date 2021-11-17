@@ -1,3 +1,13 @@
+Synapse 1.47.0rc3 (2021-11-16)
+==============================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in 1.47.0rc1 which caused worker processes to not halt startup in the presence of outstanding database migrations. ([\#11346](https://github.com/matrix-org/synapse/issues/11346))
+- Fix a bug introduced in 1.47.0rc1 which prevented the 'remove deleted devices from `device_inbox` column' background process from running when updating from a recent Synapse version. ([\#11303](https://github.com/matrix-org/synapse/issues/11303), [\#11353](https://github.com/matrix-org/synapse/issues/11353))
+
+
 Synapse 1.47.0rc2 (2021-11-10)
 ==============================
 
@@ -8678,14 +8688,14 @@ General:
 
 Federation:
 
--   Add key distribution mechanisms for fetching public keys of unavailable remote home servers. See [Retrieving Server Keys](https://github.com/matrix-org/matrix-doc/blob/6f2698/specification/30_server_server_api.rst#retrieving-server-keys) in the spec.
+-   Add key distribution mechanisms for fetching public keys of unavailable remote homeservers. See [Retrieving Server Keys](https://github.com/matrix-org/matrix-doc/blob/6f2698/specification/30_server_server_api.rst#retrieving-server-keys) in the spec.
 
 Configuration:
 
 -   Add support for multiple config files.
 -   Add support for dictionaries in config files.
 -   Remove support for specifying config options on the command line, except for:
-    -   `--daemonize` - Daemonize the home server.
+    -   `--daemonize` - Daemonize the homeserver.
     -   `--manhole` - Turn on the twisted telnet manhole service on the given port.
     -   `--database-path` - The path to a sqlite database to use.
     -   `--verbose` - The verbosity level.
@@ -8890,7 +8900,7 @@ This version adds support for using a TURN server. See docs/turn-howto.rst on ho
 Homeserver:
 
 -   Add support for redaction of messages.
--   Fix bug where inviting a user on a remote home server could take up to 20-30s.
+-   Fix bug where inviting a user on a remote homeserver could take up to 20-30s.
 -   Implement a get current room state API.
 -   Add support specifying and retrieving turn server configuration.
 
@@ -8980,7 +8990,7 @@ Changes in synapse 0.2.3 (2014-09-12)
 
 Homeserver:
 
--   Fix bug where we stopped sending events to remote home servers if a user from that home server left, even if there were some still in the room.
+-   Fix bug where we stopped sending events to remote homeservers if a user from that homeserver left, even if there were some still in the room.
 -   Fix bugs in the state conflict resolution where it was incorrectly rejecting events.
 
 Webclient:
