@@ -102,14 +102,6 @@ with the following body:
 }
 ```
 
-The API returns the `job_name` param.
-
-```json
-{
-    "job_name": "populate_stats_process_rooms"
-}
-```
-
 The following JSON body parameters are available:
 
 - `job_name` - A string which job to run. Valid values are:

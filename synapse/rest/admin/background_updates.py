@@ -168,4 +168,4 @@ class BackgroundUpdateStartJobRestServlet(RestServlet):
 
         self._store.db_pool.updates.start_doing_background_updates()
 
-        return HTTPStatus.OK, {"job_name": job_name}
+        return HTTPStatus.OK, {}

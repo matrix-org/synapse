@@ -314,7 +314,6 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
-        self.assertEqual(job_name, channel.json_body["job_name"])
 
         # test that each background update is waiting now
         for update in updates:
