@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import abc
 import logging
 from typing import (
     TYPE_CHECKING,
@@ -39,6 +38,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+UPDATE_HANDLER_CALLBACK = Callable[[str, str, bool], AsyncContextManager[int]]
+DEFAULT_BATCH_SIZE_CALLBACK = Callable[[str, str], Awaitable[int]]
+MIN_BATCH_SIZE_CALLBACK = Callable[[str, str], Awaitable[int]]
+
+
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class _BackgroundUpdateHandler:
     """A handler for a given background update.
@@ -55,141 +59,21 @@ class _BackgroundUpdateHandler:
     oneshot: bool = False
 
 
-class BackgroundUpdateController(abc.ABC):
-    """A base class for controlling background update timings."""
-
-    @abc.abstractmethod
-    def run_update(
-        self, update_name: str, database_name: str, oneshot: bool
-    ) -> AsyncContextManager[int]:
-        """Called before we do the next iteration of a background update. The
-        returned async context manager is immediately entered and then exited
-        after this iteration of the background update has finished.
-
-        Implementations will likely want to sleep for a period of time to stop
-        the background update from continuously being run.
-
-        Args:
-            update_name: The name of the update that is to be run
-            database_name: The name of the database the background update is
-                being run on. Really only useful if Synapse is configured with
-                multiple databases.
-            oneshot: Whether the update will complete all in one go, e.g.
-                index creation. In such cases the returned target duration is
-                ignored.
-
-        Returns:
-            The target duration in milliseconds that the background update
-            should run for.
-
-            Note: this is a *target*, and an iteration may take substantially
-            longer or shorter.
-        """
-        ...
-
-    @abc.abstractmethod
-    async def default_batch_size(self, update_name: str, database_name: str) -> int:
-        """The batch size to use for the first iteration of a new background
-        update.
-        """
-        ...
-
-    @abc.abstractmethod
-    async def min_batch_size(self, update_name: str, database_name: str) -> int:
-        """A lower bound on the batch size of a new background update.
-
-        Used to ensure that progress is always made. Must be greater than 0.
-        """
-        ...
-
-
-@attr.s(auto_attribs=True)
-class _CallbackBackgroundUpdateController(BackgroundUpdateController):
-    """A background update controller that defers to the given callbacks.
-
-    Used to wrap callbacks from the module API.
-    """
-
-    _update_handler: Callable[[str, str, bool], AsyncContextManager[int]]
-    _default_batch_size: Optional[Callable[[str, str], Awaitable[int]]] = None
-    _min_batch_size: Optional[Callable[[str, str], Awaitable[int]]] = None
-
-    def run_update(
-        self, update_name: str, database_name: str, oneshot: bool
-    ) -> AsyncContextManager[int]:
-        return self._update_handler(update_name, database_name, oneshot)
-
-    async def default_batch_size(self, update_name: str, database_name: str) -> int:
-        if self._default_batch_size is None:
-            return 100
-
-        return await self._default_batch_size(update_name, database_name)
-
-    async def min_batch_size(self, update_name: str, database_name: str) -> int:
-        if self._min_batch_size is None:
-            return 100
-
-        return await self._min_batch_size(update_name, database_name)
-
-
-class _TimeBasedBackgroundUpdateController(BackgroundUpdateController):
-    """The default controller which aims to spend X ms doing the background
-    update every Y ms.
-    """
-
-    MINIMUM_BACKGROUND_BATCH_SIZE = 100
-    DEFAULT_BACKGROUND_BATCH_SIZE = 100
-
+class _BackgroundUpdateContextManager:
     BACKGROUND_UPDATE_INTERVAL_MS = 1000
     BACKGROUND_UPDATE_DURATION_MS = 100
 
-    def __init__(self, clock: Clock):
+    def __init__(self, sleep: bool, clock: Clock):
+        self._sleep = sleep
         self._clock = clock
 
-    def run_update(
-        self,
-        update_name: str,
-        database_name: str,
-        oneshot: bool,
-    ) -> AsyncContextManager[int]:
-        return self
-
-    async def default_batch_size(self, update_name: str, database_name: str) -> int:
-        return self.DEFAULT_BACKGROUND_BATCH_SIZE
-
-    async def min_batch_size(self, update_name: str, database_name: str) -> int:
-        return self.MINIMUM_BACKGROUND_BATCH_SIZE
-
     async def __aenter__(self) -> int:
-        await self._clock.sleep(self.BACKGROUND_UPDATE_INTERVAL_MS / 1000)
+        if self._sleep:
+            await self._clock.sleep(self.BACKGROUND_UPDATE_INTERVAL_MS / 1000)
+
         return self.BACKGROUND_UPDATE_DURATION_MS
 
-    async def __aexit__(self, *exc):
-        pass
-
-
-class _ImmediateBackgroundUpdateController(BackgroundUpdateController):
-    """A background update controller that doesn't ever wait, effectively
-    running the background updates as quickly as possible"""
-
-    def run_update(
-        self,
-        update_name: str,
-        database_name: str,
-        oneshot: bool,
-    ) -> AsyncContextManager[int]:
-        return self
-
-    async def default_batch_size(self, update_name: str, database_name: str) -> int:
-        return 100
-
-    async def min_batch_size(self, update_name: str, database_name: str) -> int:
-        return 100
-
-    async def __aenter__(self) -> int:
-        return 100
-
-    async def __aexit__(self, *exc):
+    async def __aexit__(self, *exc) -> None:
         pass
 
 
@@ -256,9 +140,9 @@ class BackgroundUpdater:
         # if a background update is currently running, its name.
         self._current_background_update: Optional[str] = None
 
-        self._controller: BackgroundUpdateController = (
-            _TimeBasedBackgroundUpdateController(self._clock)
-        )
+        self._update_handler_callback: Optional[UPDATE_HANDLER_CALLBACK] = None
+        self._default_batch_size_callback: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None
+        self._min_batch_size_callback: Optional[MIN_BATCH_SIZE_CALLBACK] = None
 
         self._background_update_performance: Dict[str, BackgroundUpdatePerformance] = {}
         self._background_update_handlers: Dict[str, _BackgroundUpdateHandler] = {}
@@ -271,12 +155,53 @@ class BackgroundUpdater:
         # enable/disable background updates via the admin API.
         self.enabled = True
 
-    def register_update_controller(
-        self, controller: BackgroundUpdateController
+    def register_update_controller_callbacks(
+        self,
+        update_handler: UPDATE_HANDLER_CALLBACK,
+        default_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
+        min_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
     ) -> None:
-        """Register a new background update controller to use."""
+        if self._update_handler_callback is not None:
+            logger.warning(
+                "More than one module tried to register callbacks for controlling"
+                " background updates. Only the callbacks registered by the first module"
+                " (in order of appearance in Synapse's configuration file) that tried to"
+                " do so will be called."
+            )
 
-        self._controller = controller
+            return
+
+        self._update_handler_callback = update_handler
+
+        if default_batch_size is not None:
+            self._default_batch_size_callback = default_batch_size
+
+        if min_batch_size is not None:
+            self._min_batch_size_callback = min_batch_size
+
+    def _get_context_manager_for_update(
+        self,
+        sleep: bool,
+        update_name: str,
+        database_name: str,
+        oneshot: bool,
+    ) -> AsyncContextManager[int]:
+        if self._update_handler_callback is not None:
+            return self._update_handler_callback(update_name, database_name, oneshot)
+
+        return _BackgroundUpdateContextManager(sleep, self._clock)
+
+    async def _default_batch_size(self, update_name: str, database_name: str) -> int:
+        if self._default_batch_size_callback is not None:
+            return await self._default_batch_size_callback(update_name, database_name)
+
+        return 100
+
+    async def _min_batch_size(self, update_name: str, database_name: str) -> int:
+        if self._min_batch_size_callback is not None:
+            return await self._min_batch_size_callback(update_name, database_name)
+
+        return 100
 
     def get_current_update(self) -> Optional[BackgroundUpdatePerformance]:
         """Returns the current background update, if any."""
@@ -423,14 +348,8 @@ class BackgroundUpdater:
         assert self._current_background_update is not None
         update_info = self._background_update_handlers[self._current_background_update]
 
-        if sleep:
-            controller = self._controller
-        else:
-            # If `sleep` is False then we want to run the updates as quickly as
-            # possible.
-            controller = _ImmediateBackgroundUpdateController()
-
-        async with controller.run_update(
+        async with self._get_context_manager_for_update(
+            sleep=sleep,
             update_name=self._current_background_update,
             database_name=self._database_name,
             oneshot=update_info.oneshot,
@@ -459,12 +378,10 @@ class BackgroundUpdater:
             # Clamp the batch size so that we always make progress
             batch_size = max(
                 batch_size,
-                await self._controller.min_batch_size(update_name, self._database_name),
+                await self._min_batch_size(update_name, self._database_name),
             )
         else:
-            batch_size = await self._controller.default_batch_size(
-                update_name, self._database_name
-            )
+            batch_size = await self._default_batch_size(update_name, self._database_name)
 
         progress_json = await self.db_pool.simple_select_one_onecol(
             "background_updates",

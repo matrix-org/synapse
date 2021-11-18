@@ -1,13 +1,13 @@
+from typing import AsyncContextManager
+
 from mock import AsyncMock, Mock
 
 from twisted.internet.defer import Deferred, ensureDeferred
 
-from synapse.storage.background_updates import (
-    BackgroundUpdateController,
-    BackgroundUpdater,
-)
+from synapse.storage.background_updates import BackgroundUpdater
 
 from tests import unittest
+from tests.test_utils import make_awaitable
 
 
 class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
@@ -100,11 +100,28 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
             "test_update", self.update_handler
         )
 
-        self._controller_ctx_mgr = AsyncMock(name="_controller_ctx_mgr")
-        self._controller = AsyncMock(BackgroundUpdateController)
-        self._controller.run_update.return_value = self._controller_ctx_mgr
+        # Mock out the AsyncContextManager
+        self._update_ctx_manager = Mock(spec=["__aenter__", "__aexit__"])
+        self._update_ctx_manager.__aenter__ = Mock(
+            return_value=make_awaitable(None),
+        )
+        self._update_ctx_manager.__aexit__ = Mock(return_value=make_awaitable(None))
 
-        self.updates.register_update_controller(self._controller)
+        # Mock out the `update_handler` callback
+        self._update_handler_callback = Mock(return_value=self._update_ctx_manager)
+
+        # Define a default batch size value that's not the same as the internal default
+        # value (100).
+        self._default_batch_size = 500
+
+        # Register the callbacks with more mocks
+        self.hs.get_module_api().register_background_update_controller_callbacks(
+            update_handler=self._update_handler_callback,
+            min_batch_size=Mock(return_value=make_awaitable(self._default_batch_size)),
+            default_batch_size=Mock(
+                return_value=make_awaitable(self._default_batch_size),
+            ),
+        )
 
     def test_controller(self):
         store = self.hs.get_datastore()
@@ -115,13 +132,9 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        default_batch_size = 100
-
-        # Set up the return values of the controller.
+        # Set the return value for the context manager.
         enter_defer = Deferred()
-        self._controller_ctx_mgr.__aenter__ = Mock(return_value=enter_defer)
-        self._controller.default_batch_size.return_value = default_batch_size
-        self._controller.min_batch_size.return_value = default_batch_size
+        self._update_ctx_manager.__aenter__ = Mock(return_value=enter_defer)
 
         # Start the background update.
         do_update_d = ensureDeferred(self.updates.do_next_background_update(True))
@@ -130,10 +143,8 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
 
         # `run_update` should have been called, but the update handler won't be
         # called until the `enter_defer` (returned by `__aenter__`) is resolved.
-        self._controller.run_update.assert_called_once_with(
-            update_name="test_update",
-            database_name="master",
-            oneshot=False,
+        self._update_handler_callback.assert_called_once_with(
+            "test_update", "master", False,
         )
         self.assertFalse(do_update_d.called)
         self.assertFalse(self.update_deferred.called)
@@ -142,13 +153,13 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
         # blocks.
         enter_defer.callback(100)
         self.pump()
-        self.update_handler.assert_called_once_with({}, default_batch_size)
+        self.update_handler.assert_called_once_with({}, self._default_batch_size)
         self.assertFalse(self.update_deferred.called)
-        self._controller_ctx_mgr.__aexit__.assert_not_awaited()
+        self._update_ctx_manager.__aexit__.assert_not_called()
 
         # Resolving the update handler deferred should cause the
         # `do_next_background_update` to finish and return
         self.update_deferred.callback(100)
         self.pump()
-        self._controller_ctx_mgr.__aexit__.assert_awaited()
+        self._update_ctx_manager.__aexit__.assert_called()
         self.get_success(do_update_d)

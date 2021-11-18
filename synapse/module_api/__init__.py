@@ -50,7 +50,11 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
-from synapse.storage.background_updates import _CallbackBackgroundUpdateController
+from synapse.storage.background_updates import (
+    DEFAULT_BATCH_SIZE_CALLBACK,
+    MIN_BATCH_SIZE_CALLBACK,
+    UPDATE_HANDLER_CALLBACK,
+)
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
@@ -215,39 +219,23 @@ class ModuleApi:
         """
         self._hs.register_module_web_resource(path, resource)
 
-    def register_background_update_controller(
+    def register_background_update_controller_callbacks(
         self,
-        update_handler: Callable[[str, str, bool], AsyncContextManager[int]],
-        default_batch_size: Optional[Callable[[str, str], Awaitable[int]]] = None,
-        min_batch_size: Optional[Callable[[str, str], Awaitable[int]]] = None,
+        update_handler: UPDATE_HANDLER_CALLBACK,
+        default_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
+        min_batch_size: Optional[MIN_BATCH_SIZE_CALLBACK] = None,
     ) -> None:
-        """Registers a background update controller.
+        """Registers background update controller callbacks.
 
         Added in v1.48.0
-
-        Args:
-            update_handler: Called when about to do an iteration of a background
-                update. Takes the `update_name`, `database_name` and `oneshot`
-                as arguments, where `oneshot` is a flag to indicate whether the
-                background update will happen in one go and may take a long time
-                (e.g creating indices). The return value is a async context
-                manager that returns the desired duration of the iteration in ms,
-                and will be exited when the iteration is complete.
-
-            default_batch_size: Called to get the default batch size, i.e. the
-                batch size to use for the first iteration of a given background
-                update. Defaults to always returning 100.
-
-            min_batch_size: The minimum batch size for each background update,
-                default to always returning 100.
         """
 
-        controller = _CallbackBackgroundUpdateController(
-            update_handler, default_batch_size, min_batch_size
-        )
-
         for db in self._hs.get_datastores().databases:
-            db.updates.register_update_controller(controller)
+            db.updates.register_update_controller_callbacks(
+                update_handler=update_handler,
+                default_batch_size=default_batch_size,
+                min_batch_size=min_batch_size,
+            )
 
     #########################################################################
     # The following methods can be called by the module at any point in time.

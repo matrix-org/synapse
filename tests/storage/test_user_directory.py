@@ -23,6 +23,7 @@ from synapse.rest import admin
 from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.storage.background_updates import _BackgroundUpdateHandler
 from synapse.storage.roommember import ProfileInfo
 from synapse.util import Clock
 
@@ -391,7 +392,9 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
 
         with mock.patch.dict(
             self.store.db_pool.updates._background_update_handlers,
-            populate_user_directory_process_users=mocked_process_users,
+            populate_user_directory_process_users=_BackgroundUpdateHandler(
+                mocked_process_users,
+            ),
         ):
             self._purge_and_rebuild_user_dir()
 
