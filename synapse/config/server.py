@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import itertools
 import logging
 import os.path
@@ -1223,7 +1224,7 @@ class ServerConfig(Config):
             % locals()
         )
 
-    def read_arguments(self, args):
+    def read_arguments(self, args: argparse.Namespace) -> None:
         if args.manhole is not None:
             self.manhole = args.manhole
         if args.daemonize is not None:
@@ -1232,7 +1233,7 @@ class ServerConfig(Config):
             self.print_pidfile = args.print_pidfile
 
     @staticmethod
-    def add_arguments(parser):
+    def add_arguments(parser: argparse.ArgumentParser) -> None:
         server_group = parser.add_argument_group("server")
         server_group.add_argument(
             "-D",

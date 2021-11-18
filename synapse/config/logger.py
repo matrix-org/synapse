@@ -1,4 +1,5 @@
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -161,14 +162,14 @@ class LoggingConfig(Config):
             % locals()
         )
 
-    def read_arguments(self, args):
+    def read_arguments(self, args: argparse.Namespace) -> None:
         if args.no_redirect_stdio is not None:
             self.no_redirect_stdio = args.no_redirect_stdio
         if args.log_file is not None:
             raise ConfigError(LOG_FILE_ERROR)
 
     @staticmethod
-    def add_arguments(parser):
+    def add_arguments(parser: argparse.ArgumentParser) -> None:
         logging_group = parser.add_argument_group("logging")
         logging_group.add_argument(
             "-n",
