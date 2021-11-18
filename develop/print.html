@@ -9931,6 +9931,7 @@ server admin: see <a href="admin_api/../usage/administration/admin_api">Admin AP
 <li><a href="admin_api/rooms.html#room-details-api">Room Details API</a></li>
 <li><a href="admin_api/rooms.html#room-members-api">Room Members API</a></li>
 <li><a href="admin_api/rooms.html#room-state-api">Room State API</a></li>
+<li><a href="admin_api/rooms.html#block-room-api">Block Room API</a></li>
 <li><a href="admin_api/rooms.html#delete-room-api">Delete Room API</a>
 <ul>
 <li><a href="admin_api/rooms.html#version-1-old-version">Version 1 (old version)</a></li>
@@ -10282,6 +10283,61 @@ end of the list.</p>
   ]
 }
 </code></pre>
+<h1 id="block-room-api"><a class="header" href="#block-room-api">Block Room API</a></h1>
+<p>The Block Room admin API allows server admins to block and unblock rooms,
+and query to see if a given room is blocked.
+This API can be used to pre-emptively block a room, even if it's unknown to this
+homeserver. Users will be prevented from joining a blocked room.</p>
+<h2 id="block-or-unblock-a-room"><a class="header" href="#block-or-unblock-a-room">Block or unblock a room</a></h2>
+<p>The API is:</p>
+<pre><code>PUT /_synapse/admin/v1/rooms/&lt;room_id&gt;/block
+</code></pre>
+<p>with a body of:</p>
+<pre><code class="language-json">{
+    &quot;block&quot;: true
+}
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+    &quot;block&quot;: true
+}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>room_id</code> - The ID of the room.</li>
+</ul>
+<p>The following JSON body parameters are available:</p>
+<ul>
+<li><code>block</code> - If <code>true</code> the room will be blocked and if <code>false</code> the room will be unblocked.</li>
+</ul>
+<p><strong>Response</strong></p>
+<p>The following fields are possible in the JSON response body:</p>
+<ul>
+<li><code>block</code> - A boolean. <code>true</code> if the room is blocked, otherwise <code>false</code></li>
+</ul>
+<h2 id="get-block-status"><a class="header" href="#get-block-status">Get block status</a></h2>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v1/rooms/&lt;room_id&gt;/block
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+    &quot;block&quot;: true,
+    &quot;user_id&quot;: &quot;&lt;user_id&gt;&quot;
+}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>room_id</code> - The ID of the room.</li>
+</ul>
+<p><strong>Response</strong></p>
+<p>The following fields are possible in the JSON response body:</p>
+<ul>
+<li><code>block</code> - A boolean. <code>true</code> if the room is blocked, otherwise <code>false</code></li>
+<li><code>user_id</code> - An optional string. If the room is blocked (<code>block</code> is <code>true</code>) shows
+the user who has add the room to blocking list. Otherwise it is not displayed.</li>
+</ul>
 <h1 id="delete-room-api"><a class="header" href="#delete-room-api">Delete Room API</a></h1>
 <p>The Delete Room admin API allows server admins to remove rooms from the server
 and block these rooms.</p>
