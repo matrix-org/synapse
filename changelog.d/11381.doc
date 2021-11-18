@@ -1,1 +1,1 @@
-Quote wildcard `federation_certificate_verification_whitelist` in config
+Fix missing quotes for wildcard domains in `federation_certificate_verification_whitelist`.
