@@ -88,13 +88,15 @@ class RemoveSpaceMemberRestServlet(ResolveRoomIdMixin, RestServlet):
             descendants,
             inaccessible_room_ids,
         ) = await self._space_hierarchy_handler.get_space_descendants(space_id)
-        space_room_ids = {room_id for room_id, _ in descendants}
 
         # Determine which rooms to leave by checking join rules
-        rooms_to_check = space_room_ids.intersection(user_room_ids)
-        rooms_to_leave = set()
+        rooms_to_leave: List[str] = []
         state_filter = StateFilter.from_types([(EventTypes.JoinRules, "")])
-        for room_id in rooms_to_check:
+        for room_id, _via in descendants:
+            if room_id not in user_room_ids:
+                # The user is not in this room. There is nothing to do here.
+                continue
+
             current_state_ids = await self._store.get_filtered_current_state_ids(
                 room_id, state_filter
             )
@@ -108,12 +110,10 @@ class RemoveSpaceMemberRestServlet(ResolveRoomIdMixin, RestServlet):
                 # If it turns out that the room is actually public, then we've not
                 # actually prevented the user from joining it.
                 join_rules = None
-            if join_rules != JoinRules.PUBLIC:
-                rooms_to_leave.add(room_id)
 
-        # Always leave the space, even if it is public
-        if space_id in user_room_ids:
-            rooms_to_leave.add(space_id)
+            # Leave the room if it is not public, or it is the root space.
+            if join_rules != JoinRules.PUBLIC or room_id == space_id:
+                rooms_to_leave.append(room_id)
 
         # Now start leaving rooms
         failures: Dict[str, List[str]] = {
