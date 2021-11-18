@@ -44,6 +44,15 @@ class WellKnownBuilder:
                 "base_url": self._config.registration.default_identity_server
             }
 
+        if self._config.auth.oauth_delegation_enabled:
+            result["org.matrix.msc2965.authentication"] = {
+                "issuer": self._config.auth.oauth_delegation_issuer
+            }
+            if self._config.auth.oauth_delegation_account != "":
+                result["org.matrix.msc2965.authentication"][
+                    "account"
+                ] = self._config.auth.oauth_delegation_account
+
         if self._config.server.extra_well_known_client_content:
             for (
                 key,
