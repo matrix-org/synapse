@@ -816,12 +816,16 @@ class JWTTestCase(unittest.HomeserverTestCase):
     jwt_secret = "secret"
     jwt_algorithm = "HS256"
 
-    def make_homeserver(self, reactor, clock):
-        self.hs = self.setup_test_homeserver()
-        self.hs.config.jwt.jwt_enabled = True
-        self.hs.config.jwt.jwt_secret = self.jwt_secret
-        self.hs.config.jwt.jwt_algorithm = self.jwt_algorithm
-        return self.hs
+    def default_config(self):
+        config = super().default_config()
+        if config.get("jwt_config", None) is None:
+            config["jwt_config"] = {
+                "enabled": True,
+                "secret": self.jwt_secret,
+                "algorithm": self.jwt_algorithm,
+            }
+
+        return config
 
     def jwt_encode(self, payload: Dict[str, Any], secret: str = jwt_secret) -> str:
         # PyJWT 2.0.0 changed the return type of jwt.encode from bytes to str.
@@ -882,7 +886,7 @@ class JWTTestCase(unittest.HomeserverTestCase):
     @override_config(
         {
             "jwt_config": {
-                "jwt_enabled": True,
+                "enabled": True,
                 "secret": jwt_secret,
                 "algorithm": jwt_algorithm,
                 "issuer": "test-issuer",
@@ -922,7 +926,7 @@ class JWTTestCase(unittest.HomeserverTestCase):
     @override_config(
         {
             "jwt_config": {
-                "jwt_enabled": True,
+                "enabled": True,
                 "secret": jwt_secret,
                 "algorithm": jwt_algorithm,
                 "audiences": ["test-audience"],
@@ -971,7 +975,7 @@ class JWTTestCase(unittest.HomeserverTestCase):
     @override_config(
         {
             "jwt_config": {
-                "jwt_enabled": True,
+                "enabled": True,
                 "secret": jwt_secret,
                 "algorithm": jwt_algorithm,
                 "subject_claim": "username",
@@ -1046,12 +1050,14 @@ class JWTPubKeyTestCase(unittest.HomeserverTestCase):
         ]
     )
 
-    def make_homeserver(self, reactor, clock):
-        self.hs = self.setup_test_homeserver()
-        self.hs.config.jwt.jwt_enabled = True
-        self.hs.config.jwt.jwt_secret = self.jwt_pubkey
-        self.hs.config.jwt.jwt_algorithm = "RS256"
-        return self.hs
+    def default_config(self):
+        config = super().default_config()
+        config["jwt_config"] = {
+            "enabled": True,
+            "secret": self.jwt_pubkey,
+            "algorithm": "RS256",
+        }
+        return config
 
     def jwt_encode(self, payload: Dict[str, Any], secret: str = jwt_privatekey) -> str:
         # PyJWT 2.0.0 changed the return type of jwt.encode from bytes to str.
