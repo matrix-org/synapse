@@ -16,6 +16,8 @@ from typing import Dict, Optional, Tuple, Union
 
 from typing_extensions import Literal
 
+from twisted.test.proto_helpers import MemoryReactor
+
 import synapse.rest.admin
 from synapse.api.constants import (
     EventContentFields,
@@ -27,7 +29,9 @@ from synapse.api.constants import (
 )
 from synapse.api.room_versions import RoomVersions
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
 from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -41,7 +45,7 @@ class RemoveSpaceMemberTestCase(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
         self.store = hs.get_datastore()
 
         # Create users

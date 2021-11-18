@@ -14,11 +14,14 @@
 
 from typing import Dict, Optional
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.constants import EventContentFields, EventTypes, RoomTypes
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
 from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -32,7 +35,7 @@ class SpaceDescendantsTestCase(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
         self.hs = hs
         self.handler = self.hs.get_space_hierarchy_handler()
 
