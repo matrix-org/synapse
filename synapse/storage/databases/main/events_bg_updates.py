@@ -1,4 +1,4 @@
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 import attr
 
-from synapse.api.constants import EventContentFields, RelationTypes
+from synapse.api.constants import EventContentFields
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import make_event_from_dict
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
@@ -172,6 +172,11 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         )
 
         self.db_pool.updates.register_noop_background_update("event_thread_relation")
+
+        self.db_pool.updates.register_background_update_handler(
+            "event_arbitrary_relations",
+            self._event_arbitrary_relations,
+        )
 
         ################################################################################
 
@@ -1097,11 +1102,16 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
         return result
 
-    async def _event_thread_relation(self, progress: JsonDict, batch_size: int) -> int:
-        """Background update handler which will store thread relations for existing events."""
+    async def _event_arbitrary_relations(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Background update handler which will store previously unknown relations for existing events."""
         last_event_id = progress.get("last_event_id", "")
 
-        def _event_thread_relation_txn(txn: LoggingTransaction) -> int:
+        def _event_arbitrary_relations_txn(txn: LoggingTransaction) -> int:
+            # Iterate over events which do not appear in the event_relations
+            # table -- they might have a relation that was not previously stored
+            # due to an unknown relation type.
             txn.execute(
                 """
                 SELECT event_id, json FROM event_json
@@ -1113,7 +1123,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             )
 
             results = list(txn)
-            missing_thread_relations = []
+            missing_relations = []
             for (event_id, event_json_raw) in results:
                 try:
                     event_json = db_to_json(event_json_raw)
@@ -1125,11 +1135,15 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                     )
                     continue
 
-                # If there's no relation (or it is not a thread), skip!
+                # If there's no relation, skip!
                 relates_to = event_json["content"].get("m.relates_to")
                 if not relates_to or not isinstance(relates_to, dict):
                     continue
-                if relates_to.get("rel_type") != RelationTypes.THREAD:
+
+                # The only expected relation type would be from threads, but
+                # there could be other unknown ones.
+                rel_type = relates_to.get("rel_type")
+                if not isinstance(rel_type, str):
                     continue
 
                 # Get the parent ID.
@@ -1137,7 +1151,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 if not isinstance(parent_id, str):
                     continue
 
-                missing_thread_relations.append((event_id, parent_id))
+                missing_relations.append((event_id, parent_id, rel_type))
 
             # Insert the missing data.
             self.db_pool.simple_insert_many_txn(
@@ -1147,26 +1161,28 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                     {
                         "event_id": event_id,
                         "relates_to_Id": parent_id,
-                        "relation_type": RelationTypes.THREAD,
+                        "relation_type": rel_type,
                     }
-                    for event_id, parent_id in missing_thread_relations
+                    for event_id, parent_id, rel_type in missing_relations
                 ],
             )
 
             if results:
                 latest_event_id = results[-1][0]
                 self.db_pool.updates._background_update_progress_txn(
-                    txn, "event_thread_relation", {"last_event_id": latest_event_id}
+                    txn, "event_arbitrary_relations", {"last_event_id": latest_event_id}
                 )
 
             return len(results)
 
         num_rows = await self.db_pool.runInteraction(
-            desc="event_thread_relation", func=_event_thread_relation_txn
+            desc="event_arbitrary_relations", func=_event_arbitrary_relations_txn
         )
 
         if not num_rows:
-            await self.db_pool.updates._end_background_update("event_thread_relation")
+            await self.db_pool.updates._end_background_update(
+                "event_arbitrary_relations"
+            )
 
         return num_rows
 
