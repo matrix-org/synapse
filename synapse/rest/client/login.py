@@ -414,8 +414,7 @@ class LoginRestServlet(RestServlet):
                 errcode=Codes.FORBIDDEN,
             )
 
-        subject_claim = self.jwt_subject_claim
-        user = payload.get(subject_claim, None)
+        user = payload.get(self.jwt_subject_claim, None)
         if user is None:
             raise LoginError(403, "Invalid JWT", errcode=Codes.FORBIDDEN)
 
