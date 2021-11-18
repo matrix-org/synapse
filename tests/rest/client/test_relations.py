@@ -1,4 +1,5 @@
 # Copyright 2019 New Vector Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -763,6 +764,52 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertIn("chunk", channel.json_body)
+        self.assertEquals(channel.json_body["chunk"], [])
+
+    def test_unknown_relations(self):
+        """Unknown relations should be accepted."""
+        channel = self._send_relation("m.relation.test", "m.room.test")
+        self.assertEquals(200, channel.code, channel.json_body)
+        event_id = channel.json_body["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            "/_matrix/client/unstable/rooms/%s/relations/%s?limit=1"
+            % (self.room, self.parent_id),
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        # We expect to get back a single pagination result, which is the full
+        # relation event we sent above.
+        self.assertEquals(len(channel.json_body["chunk"]), 1, channel.json_body)
+        self.assert_dict(
+            {"event_id": event_id, "sender": self.user_id, "type": "m.room.test"},
+            channel.json_body["chunk"][0],
+        )
+
+        # We also expect to get the original event (the id of which is self.parent_id)
+        self.assertEquals(
+            channel.json_body["original_event"]["event_id"], self.parent_id
+        )
+
+        # When bundling the unknown relation is not included.
+        channel = self.make_request(
+            "GET",
+            "/rooms/%s/event/%s" % (self.room, self.parent_id),
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertNotIn("m.relations", channel.json_body["unsigned"])
+
+        # But unknown relations can be directly queried.
+        channel = self.make_request(
+            "GET",
+            "/_matrix/client/unstable/rooms/%s/aggregations/%s?limit=1"
+            % (self.room, self.parent_id),
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
         self.assertEquals(channel.json_body["chunk"], [])
 
     def _send_relation(
