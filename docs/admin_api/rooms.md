@@ -3,6 +3,7 @@
 - [Room Details API](#room-details-api)
 - [Room Members API](#room-members-api)
 - [Room State API](#room-state-api)
+- [Block Room API](#block-room-api)
 - [Delete Room API](#delete-room-api)
   * [Version 1 (old version)](#version-1-old-version)
   * [Version 2 (new version)](#version-2-new-version)
@@ -385,6 +386,83 @@ A response body like the following is returned:
   ]
 }
 ```
+
+# Block Room API
+The Block Room admin API allows server admins to block and unblock rooms,
+and query to see if a given room is blocked.
+This API can be used to pre-emptively block a room, even if it's unknown to this
+homeserver. Users will be prevented from joining a blocked room.
+
+## Block or unblock a room
+
+The API is:
+
+```
+PUT /_synapse/admin/v1/rooms/<room_id>/block
+```
+
+with a body of:
+
+```json
+{
+    "block": true
+}
+```
+
+A response body like the following is returned:
+
+```json
+{
+    "block": true
+}
+```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `room_id` - The ID of the room.
+
+The following JSON body parameters are available:
+
+- `block` - If `true` the room will be blocked and if `false` the room will be unblocked.
+
+**Response**
+
+The following fields are possible in the JSON response body:
+
+- `block` - A boolean. `true` if the room is blocked, otherwise `false`
+
+## Get block status
+
+The API is:
+
+```
+GET /_synapse/admin/v1/rooms/<room_id>/block
+```
+
+A response body like the following is returned:
+
+```json
+{
+    "block": true,
+    "user_id": "<user_id>"
+}
+```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `room_id` - The ID of the room.
+
+**Response**
+
+The following fields are possible in the JSON response body:
+
+- `block` - A boolean. `true` if the room is blocked, otherwise `false`
+- `user_id` - An optional string. If the room is blocked (`block` is `true`) shows
+  the user who has add the room to blocking list. Otherwise it is not displayed.
 
 # Delete Room API
 
