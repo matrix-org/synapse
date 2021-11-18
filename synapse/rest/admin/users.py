@@ -898,7 +898,7 @@ class UserTokenRestServlet(RestServlet):
         if auth_user.to_string() == user_id:
             raise SynapseError(400, "Cannot use admin API to login as self")
 
-        token = await self.auth_handler.get_access_token_for_user_id(
+        token = await self.auth_handler.create_access_token_for_user_id(
             user_id=auth_user.to_string(),
             device_id=None,
             valid_until_ms=valid_until_ms,
