@@ -19,7 +19,7 @@ import os
 import sys
 import threading
 from string import Template
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import yaml
 from zope.interface import implementer
@@ -41,6 +41,7 @@ from synapse.util.versionstring import get_version_string
 from ._base import Config, ConfigError
 
 if TYPE_CHECKING:
+    from synapse.config.homeserver import HomeServerConfig
     from synapse.server import HomeServer
 
 DEFAULT_LOG_CONFIG = Template(
@@ -142,13 +143,13 @@ removed in Synapse 1.3.0. You should instead set up a separate log configuration
 class LoggingConfig(Config):
     section = "logging"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config, **kwargs) -> None:
         if config.get("log_file"):
             raise ConfigError(LOG_FILE_ERROR)
         self.log_config = self.abspath(config.get("log_config"))
         self.no_redirect_stdio = config.get("no_redirect_stdio", False)
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, config_dir_path, server_name, **kwargs) -> str:
         log_config = os.path.join(config_dir_path, server_name + ".log.config")
         return (
             """\
@@ -198,7 +199,9 @@ class LoggingConfig(Config):
                 log_config_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=log_file))
 
 
-def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> None:
+def _setup_stdlib_logging(
+    config: "HomeServerConfig", log_config_path: Optional[str], logBeginner: LogBeginner
+) -> None:
     """
     Set up Python standard library logging.
     """
@@ -231,7 +234,7 @@ def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> 
     log_metadata_filter = MetadataFilter({"server_name": config.server.server_name})
     old_factory = logging.getLogRecordFactory()
 
-    def factory(*args, **kwargs):
+    def factory(*args: Any, **kwargs: Any) -> logging.LogRecord:
         record = old_factory(*args, **kwargs)
         log_context_filter.filter(record)
         log_metadata_filter.filter(record)
@@ -298,7 +301,7 @@ def _load_logging_config(log_config_path: str) -> None:
     logging.config.dictConfig(log_config)
 
 
-def _reload_logging_config(log_config_path):
+def _reload_logging_config(log_config_path: Optional[str]) -> None:
     """
     Reload the log configuration from the file and apply it.
     """
@@ -312,8 +315,8 @@ def _reload_logging_config(log_config_path):
 
 def setup_logging(
     hs: "HomeServer",
-    config,
-    use_worker_options=False,
+    config: "HomeServerConfig",
+    use_worker_options: bool = False,
     logBeginner: LogBeginner = globalLogBeginner,
 ) -> None:
     """
