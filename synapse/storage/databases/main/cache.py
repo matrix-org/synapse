@@ -121,7 +121,7 @@ class CacheInvalidationWorkerStore(
             txn.execute(sql, (last_id, instance_name, limit))
             updates: List[Tuple[int, _CacheData]] = []
             row: Tuple[int, str, Optional[List[str]], Optional[int]]
-            # Type saftey: iterating over `txn` yields `Tuple`, i.e.
+            # Type safety: iterating over `txn` yields `Tuple`, i.e.
             # `Tuple[Any, ...]` of arbitrary length. Mypy detects assigning a
             # variadic tuple to a fixed length tuple and flags it up as an error.
             for row in txn:  # type: ignore[assignment]
