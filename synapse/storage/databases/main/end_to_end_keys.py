@@ -411,7 +411,9 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
         await self.db_pool.runInteraction(
             "set_e2e_fallback_keys_txn",
             self._set_e2e_fallback_keys_txn,
-            user_id, device_id, fallback_keys
+            user_id,
+            device_id,
+            fallback_keys,
         )
 
         await self.invalidate_cache_and_stream(
@@ -456,7 +458,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
                         "key_id": key_id,
                         "key_json": json_encoder.encode(fallback_key),
                         "used": False,
-                    }
+                    },
                 )
 
     @cached(max_entries=10000)

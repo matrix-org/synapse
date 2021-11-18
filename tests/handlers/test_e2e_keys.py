@@ -243,7 +243,6 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(res, ["alg1"])
 
-
         # if the user uploads a one-time key, the next claim should fetch the
         # one-time key, and then go back to the fallback
         self.get_success(
