@@ -35,7 +35,7 @@ from synapse.storage.databases.main.event_push_actions import (
 )
 from synapse.storage.databases.main.relations import RelationsWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
-from synapse.storage.databases.main.stats import StatsStore
+from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
@@ -61,7 +61,7 @@ class CacheInvalidationWorkerStore(
     RelationsWorkerStore,
     EventPushActionsWorkerStore,
     StreamWorkerStore,
-    StatsStore,
+    StateDeltasStore,
     RoomMemberWorkerStore,
 ):
     # This class must be mixed in with a child class which provides the following
@@ -347,7 +347,7 @@ class CacheInvalidationWorkerStore(
                     "instance_name": self._instance_name,
                     "cache_func": cache_name,
                     "keys": keys,
-                    "invalidation_ts": self.clock.time_msec(),
+                    "invalidation_ts": self._clock.time_msec(),
                 },
             )
 

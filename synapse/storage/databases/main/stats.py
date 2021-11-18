@@ -100,7 +100,6 @@ class StatsStore(StateDeltasStore):
         super().__init__(database, db_conn, hs)
 
         self.server_name = hs.hostname
-        self.clock = self.hs.get_clock()
         self.stats_enabled = hs.config.stats.stats_enabled
 
         self.stats_delta_processing_lock = DeferredLock()
@@ -601,7 +600,7 @@ class StatsStore(StateDeltasStore):
         local_users_in_room = [u for u in users_in_room if self.hs.is_mine_id(u)]
 
         await self.update_stats_delta(
-            ts=self.clock.time_msec(),
+            ts=self._clock.time_msec(),
             stats_type="room",
             stats_id=room_id,
             fields={},
@@ -638,7 +637,7 @@ class StatsStore(StateDeltasStore):
         )
 
         await self.update_stats_delta(
-            ts=self.clock.time_msec(),
+            ts=self._clock.time_msec(),
             stats_type="user",
             stats_id=user_id,
             fields={},
