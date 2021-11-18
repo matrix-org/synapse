@@ -46,6 +46,7 @@ from synapse.rest.admin.registration_tokens import (
     RegistrationTokenRestServlet,
 )
 from synapse.rest.admin.rooms import (
+    BlockRoomRestServlet,
     DeleteRoomStatusByDeleteIdRestServlet,
     DeleteRoomStatusByRoomIdRestServlet,
     ForwardExtremitiesRestServlet,
@@ -223,6 +224,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     Register all the admin servlets.
     """
     register_servlets_for_client_rest_resource(hs, http_server)
+    BlockRoomRestServlet(hs).register(http_server)
     ListRoomRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
     RoomRestServlet(hs).register(http_server)

@@ -84,26 +84,26 @@ class TokenLookupResult:
         return self.user_id
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(auto_attribs=True, frozen=True, slots=True)
 class RefreshTokenLookupResult:
     """Result of looking up a refresh token."""
 
-    user_id = attr.ib(type=str)
+    user_id: str
     """The user this token belongs to."""
 
-    device_id = attr.ib(type=str)
+    device_id: str
     """The device associated with this refresh token."""
 
-    token_id = attr.ib(type=int)
+    token_id: int
     """The ID of this refresh token."""
 
-    next_token_id = attr.ib(type=Optional[int])
+    next_token_id: Optional[int]
     """The ID of the refresh token which replaced this one."""
 
-    has_next_refresh_token_been_refreshed = attr.ib(type=bool)
+    has_next_refresh_token_been_refreshed: bool
     """True if the next refresh token was used for another refresh."""
 
-    has_next_access_token_been_used = attr.ib(type=bool)
+    has_next_access_token_been_used: bool
     """True if the next access token was already used at least once."""
 
 
