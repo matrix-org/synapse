@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class RoomHierarchyHandler:
+class SpaceHierarchyHandler:
     """Provides methods for walking over space hierarchies.
 
     Also see `RoomSummaryHandler`, which has similar functionality.
@@ -49,7 +49,7 @@ class RoomHierarchyHandler:
 
         self._server_name = hs.hostname
 
-    async def get_room_descendants(
+    async def get_space_descendants(
         self, space_id: str, via: Optional[Iterable[str]] = None
     ) -> Tuple[Sequence[Tuple[str, Iterable[str]]], Sequence[str]]:
         """Gets the children of a space, recursively.
@@ -75,6 +75,7 @@ class RoomHierarchyHandler:
         todo: List[Tuple[str, Iterable[str], Mapping[str, Optional[JsonDict]]]] = [
             (space_id, via, {})
         ]
+        # [(room ID, via)]
         descendants: List[Tuple[str, Iterable[str]]] = []
 
         seen = {space_id}
@@ -89,7 +90,9 @@ class RoomHierarchyHandler:
                     is_in_room,
                     children,
                     federation_room_chunks,
-                ) = await self._get_room_children(space_id, via, federation_room_chunks)
+                ) = await self._get_space_children(
+                    space_id, via, federation_room_chunks
+                )
             except SynapseError:
                 # Could not list children over federation
                 inaccessible_room_ids.append(space_id)
@@ -103,7 +106,7 @@ class RoomHierarchyHandler:
 
                 # Queue up the child for processing.
                 # The child may not actually be a space, but that's checked by
-                # `_get_room_children`.
+                # `_get_space_children`.
                 todo.append((child_room_id, child_via, federation_room_chunks))
 
             # Children were retrieved over federation, which is not guaranteed to be
@@ -113,7 +116,7 @@ class RoomHierarchyHandler:
 
         return descendants, inaccessible_room_ids
 
-    async def _get_room_children(
+    async def _get_space_children(
         self,
         space_id: str,
         via: Optional[Iterable[str]] = None,
@@ -127,7 +130,7 @@ class RoomHierarchyHandler:
             space_id: The room ID of the space.
             via: A list of servers which may know about the space.
             federation_room_chunks: A cache of room chunks previously returned by
-               `_get_room_children` that may be used to skip federation requests for
+               `_get_space_children` that may be used to skip federation requests for
                inaccessible or non-space rooms.
 
         Returns:
@@ -156,7 +159,7 @@ class RoomHierarchyHandler:
 
         is_in_room = await self._store.is_host_joined(space_id, self._server_name)
         if is_in_room:
-            children = await self._get_room_children_local(space_id)
+            children = await self._get_space_children_local(space_id)
             return True, children, {}
         else:
             # Check the room chunks previously returned over federation to see if we
@@ -175,10 +178,10 @@ class RoomHierarchyHandler:
                     # `space_id` is not a space according to federation.
                     return False, [], {}
 
-            children, room_chunks = await self._get_room_children_remote(space_id, via)
+            children, room_chunks = await self._get_space_children_remote(space_id, via)
             return False, children, room_chunks
 
-    async def _get_room_children_local(
+    async def _get_space_children_local(
         self, space_id: str
     ) -> Sequence[Tuple[str, Iterable[str]]]:
         """Gets the direct children of a space that the local homeserver is in.
@@ -225,7 +228,7 @@ class RoomHierarchyHandler:
         child_events.sort(key=child_events_comparison_key)
         return [(event.state_key, event.content["via"]) for event in child_events]
 
-    async def _get_room_children_remote(
+    async def _get_space_children_remote(
         self, space_id: str, via: Iterable[str]
     ) -> Tuple[Sequence[Tuple[str, Iterable[str]]], Mapping[str, Optional[JsonDict]]]:
         """Gets the direct children of a space over federation.

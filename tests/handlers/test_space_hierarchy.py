@@ -23,7 +23,7 @@ from synapse.types import JsonDict
 from tests import unittest
 
 
-class RoomDescendantsTestCase(unittest.HomeserverTestCase):
+class SpaceDescendantsTestCase(unittest.HomeserverTestCase):
     """Tests iteration over the descendants of a space."""
 
     servlets = [
@@ -34,7 +34,7 @@ class RoomDescendantsTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs: HomeServer):
         self.hs = hs
-        self.handler = self.hs.get_room_hierarchy_handler()
+        self.handler = self.hs.get_space_hierarchy_handler()
 
         # Create a user.
         self.user = self.register_user("user", "pass")
@@ -87,7 +87,7 @@ class RoomDescendantsTestCase(unittest.HomeserverTestCase):
         space_id = self._create_space()
 
         descendants, inaccessible_room_ids = self.get_success(
-            self.handler.get_room_descendants(space_id)
+            self.handler.get_space_descendants(space_id)
         )
 
         self.assertEqual(descendants, [(space_id, [])])
@@ -98,7 +98,7 @@ class RoomDescendantsTestCase(unittest.HomeserverTestCase):
         space_id = f"!invalid:{self.hs.hostname}"
 
         descendants, inaccessible_room_ids = self.get_success(
-            self.handler.get_room_descendants(space_id)
+            self.handler.get_space_descendants(space_id)
         )
 
         self.assertEqual(descendants, [(space_id, [])])
@@ -111,7 +111,7 @@ class RoomDescendantsTestCase(unittest.HomeserverTestCase):
         self._add_child(space_id, room_id)
 
         descendants, inaccessible_room_ids = self.get_success(
-            self.handler.get_room_descendants(space_id)
+            self.handler.get_space_descendants(space_id)
         )
 
         self.assertEqual(descendants, [(space_id, []), (room_id, [self.hs.hostname])])
@@ -128,7 +128,7 @@ class RoomDescendantsTestCase(unittest.HomeserverTestCase):
         self._add_child(subspace_id, space_id)
 
         descendants, inaccessible_room_ids = self.get_success(
-            self.handler.get_room_descendants(space_id)
+            self.handler.get_space_descendants(space_id)
         )
 
         self.assertEqual(
@@ -158,7 +158,7 @@ class RoomDescendantsTestCase(unittest.HomeserverTestCase):
         self._add_child(subspace_id, room_id, order="3")
 
         descendants, inaccessible_room_ids = self.get_success(
-            self.handler.get_room_descendants(space_id)
+            self.handler.get_space_descendants(space_id)
         )
 
         self.assertEqual(

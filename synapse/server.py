@@ -99,7 +99,6 @@ from synapse.handlers.room import (
     RoomShutdownHandler,
 )
 from synapse.handlers.room_batch import RoomBatchHandler
-from synapse.handlers.room_hierarchy import RoomHierarchyHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
@@ -107,6 +106,7 @@ from synapse.handlers.room_summary import RoomSummaryHandler
 from synapse.handlers.search import SearchHandler
 from synapse.handlers.send_email import SendEmailHandler
 from synapse.handlers.set_password import SetPasswordHandler
+from synapse.handlers.space_hierarchy import SpaceHierarchyHandler
 from synapse.handlers.sso import SsoHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
@@ -792,8 +792,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         return AccountDataHandler(self)
 
     @cache_in_self
-    def get_room_hierarchy_handler(self) -> RoomHierarchyHandler:
-        return RoomHierarchyHandler(self)
+    def get_space_hierarchy_handler(self) -> SpaceHierarchyHandler:
+        return SpaceHierarchyHandler(self)
 
     @cache_in_self
     def get_room_summary_handler(self) -> RoomSummaryHandler:

@@ -32,7 +32,7 @@ from synapse.types import JsonDict
 from tests import unittest
 
 
-class RemoveHierarchyMemberTestCase(unittest.HomeserverTestCase):
+class RemoveSpaceMemberTestCase(unittest.HomeserverTestCase):
     """Tests removal of a user from a space."""
 
     servlets = [

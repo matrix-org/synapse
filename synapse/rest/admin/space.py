@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class RemoveHierarchyMemberRestServlet(ResolveRoomIdMixin, RestServlet):
+class RemoveSpaceMemberRestServlet(ResolveRoomIdMixin, RestServlet):
     """
     Puppets a local user to remove them from all rooms in a space.
     """
@@ -43,7 +43,7 @@ class RemoveHierarchyMemberRestServlet(ResolveRoomIdMixin, RestServlet):
         self._auth = hs.get_auth()
         self._store = hs.get_datastore()
         self._room_member_handler = hs.get_room_member_handler()
-        self._room_hierarchy_handler = hs.get_room_hierarchy_handler()
+        self._space_hierarchy_handler = hs.get_space_hierarchy_handler()
 
     async def on_DELETE(
         self, request: SynapseRequest, space_id: str, user_id: str
@@ -87,7 +87,7 @@ class RemoveHierarchyMemberRestServlet(ResolveRoomIdMixin, RestServlet):
         (
             descendants,
             inaccessible_room_ids,
-        ) = await self._room_hierarchy_handler.get_room_descendants(space_id)
+        ) = await self._space_hierarchy_handler.get_space_descendants(space_id)
         space_room_ids = {space_id}
         space_room_ids.update(room_id for room_id, _ in descendants)
 
