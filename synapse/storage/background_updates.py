@@ -189,8 +189,8 @@ class BackgroundUpdater:
     ) -> AsyncContextManager[int]:
         """Get a context manager to run a background update with.
 
-        If a module has registered a `update_handler` callback, and we can sleep between
-        updates, use the context manager it returns.
+        If a module has registered a `update_handler` callback, use the context manager
+        it returns.
 
         Otherwise, returns a context manager that will return a default value, optionally
         sleeping if needed.
@@ -208,9 +208,7 @@ class BackgroundUpdater:
             Note: this is a *target*, and an iteration may take substantially longer or
             shorter.
         """
-        if self._update_handler_callback is not None and sleep:
-            # TODO: not sure skipping the module callback if sleep is False is the right
-            #   thing to do
+        if self._update_handler_callback is not None:
             return self._update_handler_callback(update_name, database_name, oneshot)
 
         return _BackgroundUpdateContextManager(sleep, self._clock)
