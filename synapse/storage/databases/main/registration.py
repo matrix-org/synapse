@@ -1728,10 +1728,6 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         )
 
         self.db_pool.updates.register_background_update_handler(
-            "user_threepids_grandfather", self._bg_user_threepids_grandfather
-        )
-
-        self.db_pool.updates.register_background_update_handler(
             "users_set_deactivated_flag", self._background_update_set_deactivated_flag
         )
 
@@ -1804,35 +1800,6 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             )
 
         return nb_processed
-
-    async def _bg_user_threepids_grandfather(self, progress, batch_size):
-        """We now track which identity servers a user binds their 3PID to, so
-        we need to handle the case of existing bindings where we didn't track
-        this.
-
-        We do this by grandfathering in existing user threepids assuming that
-        they used one of the server configured trusted identity servers.
-        """
-        id_servers = set(self.config.registration.trusted_third_party_id_servers)
-
-        def _bg_user_threepids_grandfather_txn(txn):
-            sql = """
-                INSERT INTO user_threepid_id_server
-                    (user_id, medium, address, id_server)
-                SELECT user_id, medium, address, ?
-                FROM user_threepids
-            """
-
-            txn.execute_batch(sql, [(id_server,) for id_server in id_servers])
-
-        if id_servers:
-            await self.db_pool.runInteraction(
-                "_bg_user_threepids_grandfather", _bg_user_threepids_grandfather_txn
-            )
-
-        await self.db_pool.updates._end_background_update("user_threepids_grandfather")
-
-        return 1
 
     async def set_user_deactivated_status(
         self, user_id: str, deactivated: bool
