@@ -824,6 +824,7 @@ class JWTTestCase(unittest.HomeserverTestCase):
     def default_config(self):
         config = super().default_config()
 
+        # If jwt_config has been defined (eg via @override_config), don't replace it.
         if config.get("jwt_config") is None:
             config["jwt_config"] = self.base_config
 
