@@ -331,3 +331,26 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
                 self.store.db_pool.updates.has_completed_background_updates()
             )
         )
+
+    def test_start_backround_job_twice(self):
+        """Test that add a background update twice return an error."""
+
+        # add job to database
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                table="background_updates",
+                values={
+                    "update_name": "populate_stats_process_rooms",
+                    "progress_json": "{}",
+                },
+            )
+        )
+
+        channel = self.make_request(
+            "POST",
+            "/_synapse/admin/v1/background_updates/start_job",
+            content={"job_name": "populate_stats_process_rooms"},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
