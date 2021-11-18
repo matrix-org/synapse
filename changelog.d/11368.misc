@@ -1,0 +1,1 @@
+Fix running `scripts-dev/complement.sh`, which was broken in v1.47.0rc1.

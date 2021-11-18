@@ -1169,14 +1169,14 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # regardless of whether password login or SSO is allowed
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.get_success(
-            self.auth_handler.get_access_token_for_user_id(
+            self.auth_handler.create_access_token_for_user_id(
                 self.admin_user, device_id=None, valid_until_ms=None
             )
         )
 
         self.other_user = self.register_user("user", "pass", displayname="User")
         self.other_user_token = self.get_success(
-            self.auth_handler.get_access_token_for_user_id(
+            self.auth_handler.create_access_token_for_user_id(
                 self.other_user, device_id=None, valid_until_ms=None
             )
         )

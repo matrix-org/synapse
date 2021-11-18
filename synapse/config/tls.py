@@ -263,8 +263,8 @@ class TlsConfig(Config):
         #
         #federation_certificate_verification_whitelist:
         #  - lon.example.com
-        #  - *.domain.com
-        #  - *.onion
+        #  - "*.domain.com"
+        #  - "*.onion"
 
         # List of custom certificate authorities for federation traffic.
         #
