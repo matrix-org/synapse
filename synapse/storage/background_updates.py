@@ -161,6 +161,7 @@ class BackgroundUpdater:
         default_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
         min_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
     ) -> None:
+        """Register callbacks from a module for each hook."""
         if self._update_handler_callback is not None:
             logger.warning(
                 "More than one module tried to register callbacks for controlling"
@@ -186,18 +187,48 @@ class BackgroundUpdater:
         database_name: str,
         oneshot: bool,
     ) -> AsyncContextManager[int]:
-        if self._update_handler_callback is not None:
+        """Get a context manager to run a background update with.
+
+        If a module has registered a `update_handler` callback, and we can sleep between
+        updates, use the context manager it returns.
+
+        Otherwise, returns a context manager that will return a default value, optionally
+        sleeping if needed.
+
+        Args:
+            sleep: Whether we can sleep between updates.
+            update_name: The name of the update.
+            database_name: The name of the database the update is being run on.
+            oneshot: Whether the update will complete all in one go, e.g. index creation.
+                In such cases the returned target duration is ignored.
+
+        Returns:
+            The target duration in milliseconds that the background update should run for.
+
+            Note: this is a *target*, and an iteration may take substantially longer or
+            shorter.
+        """
+        if self._update_handler_callback is not None and sleep:
+            # TODO: not sure skipping the module callback if sleep is False is the right
+            #   thing to do
             return self._update_handler_callback(update_name, database_name, oneshot)
 
         return _BackgroundUpdateContextManager(sleep, self._clock)
 
     async def _default_batch_size(self, update_name: str, database_name: str) -> int:
+        """The batch size to use for the first iteration of a new background
+        update.
+        """
         if self._default_batch_size_callback is not None:
             return await self._default_batch_size_callback(update_name, database_name)
 
         return 100
 
     async def _min_batch_size(self, update_name: str, database_name: str) -> int:
+        """A lower bound on the batch size of a new background update.
+
+        Used to ensure that progress is always made. Must be greater than 0.
+        """
         if self._min_batch_size_callback is not None:
             return await self._min_batch_size_callback(update_name, database_name)
 
@@ -381,7 +412,9 @@ class BackgroundUpdater:
                 await self._min_batch_size(update_name, self._database_name),
             )
         else:
-            batch_size = await self._default_batch_size(update_name, self._database_name)
+            batch_size = await self._default_batch_size(
+                update_name, self._database_name
+            )
 
         progress_json = await self.db_pool.simple_select_one_onecol(
             "background_updates",

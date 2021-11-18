@@ -1,6 +1,4 @@
-from typing import AsyncContextManager
-
-from mock import AsyncMock, Mock
+from mock import Mock
 
 from twisted.internet.defer import Deferred, ensureDeferred
 
@@ -144,7 +142,9 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
         # `run_update` should have been called, but the update handler won't be
         # called until the `enter_defer` (returned by `__aenter__`) is resolved.
         self._update_handler_callback.assert_called_once_with(
-            "test_update", "master", False,
+            "test_update",
+            "master",
+            False,
         )
         self.assertFalse(do_update_d.called)
         self.assertFalse(self.update_deferred.called)
