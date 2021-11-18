@@ -815,15 +815,17 @@ class JWTTestCase(unittest.HomeserverTestCase):
 
     jwt_secret = "secret"
     jwt_algorithm = "HS256"
+    base_config = {
+        "enabled": True,
+        "secret": jwt_secret,
+        "algorithm": jwt_algorithm,
+    }
 
     def default_config(self):
         config = super().default_config()
-        if config.get("jwt_config", None) is None:
-            config["jwt_config"] = {
-                "enabled": True,
-                "secret": self.jwt_secret,
-                "algorithm": self.jwt_algorithm,
-            }
+
+        if config.get("jwt_config") is None:
+            config["jwt_config"] = self.base_config
 
         return config
 
@@ -883,16 +885,7 @@ class JWTTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(channel.json_body["error"], "Invalid JWT")
 
-    @override_config(
-        {
-            "jwt_config": {
-                "enabled": True,
-                "secret": jwt_secret,
-                "algorithm": jwt_algorithm,
-                "issuer": "test-issuer",
-            }
-        }
-    )
+    @override_config({"jwt_config": {**base_config, "issuer": "test-issuer"}})
     def test_login_iss(self):
         """Test validating the issuer claim."""
         # A valid issuer.
@@ -923,16 +916,7 @@ class JWTTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.result["code"], b"200", channel.result)
         self.assertEqual(channel.json_body["user_id"], "@kermit:test")
 
-    @override_config(
-        {
-            "jwt_config": {
-                "enabled": True,
-                "secret": jwt_secret,
-                "algorithm": jwt_algorithm,
-                "audiences": ["test-audience"],
-            }
-        }
-    )
+    @override_config({"jwt_config": {**base_config, "audiences": ["test-audience"]}})
     def test_login_aud(self):
         """Test validating the audience claim."""
         # A valid audience.
@@ -972,16 +956,7 @@ class JWTTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.result["code"], b"200", channel.result)
         self.assertEqual(channel.json_body["user_id"], "@kermit:test")
 
-    @override_config(
-        {
-            "jwt_config": {
-                "enabled": True,
-                "secret": jwt_secret,
-                "algorithm": jwt_algorithm,
-                "subject_claim": "username",
-            }
-        }
-    )
+    @override_config({"jwt_config": {**base_config, "subject_claim": "username"}})
     def test_login_custom_sub(self):
         """Test reading user ID from a custom subject claim."""
         channel = self.jwt_login({"username": "frog"})
