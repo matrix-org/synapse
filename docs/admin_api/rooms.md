@@ -388,7 +388,8 @@ A response body like the following is returned:
 ```
 
 # Block Room API
-The Block Room admin API allows server admins to block and unblock rooms, and query to see if a given room is blocked.
+The Block Room admin API allows server admins to block and unblock rooms,
+and query to see if a given room is blocked.
 This API can be used to pre-emptively block a room, even if it's unknown to this
 homeserver. Users will be prevented from joining a blocked room.
 
@@ -460,8 +461,8 @@ The following parameters should be set in the URL:
 The following fields are possible in the JSON response body:
 
 - `block` - A boolean. `true` if the room is blocked, otherwise `false`
-- `user_id` - Optional. If the room is blocked (`block` is `true`) shows the user who has
-  add the room to blocking list. Otherwise it is not displayed.
+- `user_id` - A optional string. If the room is blocked (`block` is `true`) shows
+  the user who has add the room to blocking list. Otherwise it is not displayed.
 
 # Delete Room API
 

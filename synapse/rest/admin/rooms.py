@@ -808,7 +808,9 @@ class BlockRoomRestServlet(RestServlet):
             )
 
         blocked_by = await self._store.room_is_blocked_by(room_id)
-        if blocked_by:
+        # Test `not None` if `user_id` is an empty string
+        # if someone add manually an entry in database
+        if blocked_by is not None:
             response = {"block": True, "user_id": blocked_by}
         else:
             response = {"block": False}

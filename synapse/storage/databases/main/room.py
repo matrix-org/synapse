@@ -398,7 +398,11 @@ class RoomWorkerStore(SQLBaseStore):
         )
 
     async def room_is_blocked_by(self, room_id: str) -> Optional[str]:
-        """Function to retrieve user who has blocked the room"""
+        """
+        Function to retrieve user who has blocked the room.
+        user_id is non-nullable
+        It returns None if the room is not blocked.
+        """
         return await self.db_pool.simple_select_one_onecol(
             table="blocked_rooms",
             keyvalues={"room_id": room_id},
