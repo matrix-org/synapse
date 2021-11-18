@@ -85,7 +85,7 @@ There is also a `GET` version which returns the `enabled` state.
 
 ## Run
 
-This API runs specific background updates. The job starts immediately after calling the API.
+This API schedules a specific background update to run. The job starts immediately after calling the API.
 
 
 The API is:

@@ -130,7 +130,7 @@ class BackgroundUpdateStartJobRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["job_name"])
 
-        job_name = body.get("job_name")
+        job_name = body["job_name"]
 
         if job_name == "populate_stats_process_rooms":
             await self._store.db_pool.simple_insert(
