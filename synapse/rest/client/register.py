@@ -876,7 +876,7 @@ def _calculate_registration_flows(
                 "validation is not configured"
             )
 
-    flows: List[List[str]] = []
+    flows = []
 
     # only support 3PIDless registration if no 3PIDs are required
     if not require_email and not require_msisdn:

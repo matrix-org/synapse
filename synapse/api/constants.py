@@ -19,8 +19,6 @@
 
 from typing_extensions import Final
 
-from synapse.util.enum import StrEnum
-
 # the max size of a (canonical-json-encoded) event
 MAX_PDU_SIZE = 65536
 
@@ -39,49 +37,51 @@ MAX_GROUP_CATEGORYID_LENGTH = 255
 MAX_GROUP_ROLEID_LENGTH = 255
 
 
-class Membership(StrEnum):
+class Membership:
+
     """Represents the membership states of a user in a room."""
 
-    INVITE = "invite"
-    JOIN = "join"
-    KNOCK = "knock"
-    LEAVE = "leave"
-    BAN = "ban"
+    INVITE: Final = "invite"
+    JOIN: Final = "join"
+    KNOCK: Final = "knock"
+    LEAVE: Final = "leave"
+    BAN: Final = "ban"
+    LIST: Final = (INVITE, JOIN, KNOCK, LEAVE, BAN)
 
 
-class PresenceState(StrEnum):
+class PresenceState:
     """Represents the presence state of a user."""
 
-    OFFLINE = "offline"
-    UNAVAILABLE = "unavailable"
-    ONLINE = "online"
-    BUSY = "org.matrix.msc3026.busy"
+    OFFLINE: Final = "offline"
+    UNAVAILABLE: Final = "unavailable"
+    ONLINE: Final = "online"
+    BUSY: Final = "org.matrix.msc3026.busy"
 
 
-class JoinRules(StrEnum):
-    PUBLIC = "public"
-    KNOCK = "knock"
-    INVITE = "invite"
-    PRIVATE = "private"
+class JoinRules:
+    PUBLIC: Final = "public"
+    KNOCK: Final = "knock"
+    INVITE: Final = "invite"
+    PRIVATE: Final = "private"
     # As defined for MSC3083.
-    RESTRICTED = "restricted"
+    RESTRICTED: Final = "restricted"
 
 
-class RestrictedJoinRuleTypes(StrEnum):
+class RestrictedJoinRuleTypes:
     """Understood types for the allow rules in restricted join rules."""
 
-    ROOM_MEMBERSHIP = "m.room_membership"
+    ROOM_MEMBERSHIP: Final = "m.room_membership"
 
 
-class LoginType(StrEnum):
-    PASSWORD = "m.login.password"
-    EMAIL_IDENTITY = "m.login.email.identity"
-    MSISDN = "m.login.msisdn"
-    RECAPTCHA = "m.login.recaptcha"
-    TERMS = "m.login.terms"
-    SSO = "m.login.sso"
-    DUMMY = "m.login.dummy"
-    REGISTRATION_TOKEN = "org.matrix.msc3231.login.registration_token"
+class LoginType:
+    PASSWORD: Final = "m.login.password"
+    EMAIL_IDENTITY: Final = "m.login.email.identity"
+    MSISDN: Final = "m.login.msisdn"
+    RECAPTCHA: Final = "m.login.recaptcha"
+    TERMS: Final = "m.login.terms"
+    SSO: Final = "m.login.sso"
+    DUMMY: Final = "m.login.dummy"
+    REGISTRATION_TOKEN: Final = "org.matrix.msc3231.login.registration_token"
 
 
 # This is used in the `type` parameter for /register when called by
@@ -89,168 +89,169 @@ class LoginType(StrEnum):
 APP_SERVICE_REGISTRATION_TYPE: Final = "m.login.application_service"
 
 
-class EventTypes(StrEnum):
-    Member = "m.room.member"
-    Create = "m.room.create"
-    Tombstone = "m.room.tombstone"
-    JoinRules = "m.room.join_rules"
-    PowerLevels = "m.room.power_levels"
-    Aliases = "m.room.aliases"
-    Redaction = "m.room.redaction"
-    ThirdPartyInvite = "m.room.third_party_invite"
-    RelatedGroups = "m.room.related_groups"
+class EventTypes:
+    Member: Final = "m.room.member"
+    Create: Final = "m.room.create"
+    Tombstone: Final = "m.room.tombstone"
+    JoinRules: Final = "m.room.join_rules"
+    PowerLevels: Final = "m.room.power_levels"
+    Aliases: Final = "m.room.aliases"
+    Redaction: Final = "m.room.redaction"
+    ThirdPartyInvite: Final = "m.room.third_party_invite"
+    RelatedGroups: Final = "m.room.related_groups"
 
-    RoomHistoryVisibility = "m.room.history_visibility"
-    CanonicalAlias = "m.room.canonical_alias"
-    Encrypted = "m.room.encrypted"
-    RoomAvatar = "m.room.avatar"
-    RoomEncryption = "m.room.encryption"
-    GuestAccess = "m.room.guest_access"
+    RoomHistoryVisibility: Final = "m.room.history_visibility"
+    CanonicalAlias: Final = "m.room.canonical_alias"
+    Encrypted: Final = "m.room.encrypted"
+    RoomAvatar: Final = "m.room.avatar"
+    RoomEncryption: Final = "m.room.encryption"
+    GuestAccess: Final = "m.room.guest_access"
 
     # These are used for validation
-    Message = "m.room.message"
-    Topic = "m.room.topic"
-    Name = "m.room.name"
+    Message: Final = "m.room.message"
+    Topic: Final = "m.room.topic"
+    Name: Final = "m.room.name"
 
-    ServerACL = "m.room.server_acl"
-    Pinned = "m.room.pinned_events"
+    ServerACL: Final = "m.room.server_acl"
+    Pinned: Final = "m.room.pinned_events"
 
-    Retention = "m.room.retention"
+    Retention: Final = "m.room.retention"
 
-    Dummy = "org.matrix.dummy_event"
+    Dummy: Final = "org.matrix.dummy_event"
 
-    SpaceChild = "m.space.child"
-    SpaceParent = "m.space.parent"
+    SpaceChild: Final = "m.space.child"
+    SpaceParent: Final = "m.space.parent"
 
-    MSC2716_INSERTION = "org.matrix.msc2716.insertion"
-    MSC2716_BATCH = "org.matrix.msc2716.batch"
-    MSC2716_MARKER = "org.matrix.msc2716.marker"
-
-
-class ToDeviceEventTypes(StrEnum):
-    RoomKeyRequest = "m.room_key_request"
+    MSC2716_INSERTION: Final = "org.matrix.msc2716.insertion"
+    MSC2716_BATCH: Final = "org.matrix.msc2716.batch"
+    MSC2716_MARKER: Final = "org.matrix.msc2716.marker"
 
 
-class DeviceKeyAlgorithms(StrEnum):
+class ToDeviceEventTypes:
+    RoomKeyRequest: Final = "m.room_key_request"
+
+
+class DeviceKeyAlgorithms:
     """Spec'd algorithms for the generation of per-device keys"""
 
-    ED25519 = "ed25519"
-    CURVE25519 = "curve25519"
-    SIGNED_CURVE25519 = "signed_curve25519"
+    ED25519: Final = "ed25519"
+    CURVE25519: Final = "curve25519"
+    SIGNED_CURVE25519: Final = "signed_curve25519"
 
 
-class EduTypes(StrEnum):
-    Presence = "m.presence"
+class EduTypes:
+    Presence: Final = "m.presence"
 
 
-class RejectedReason(StrEnum):
-    AUTH_ERROR = "auth_error"
+class RejectedReason:
+    AUTH_ERROR: Final = "auth_error"
 
 
-class RoomCreationPreset(StrEnum):
-    PRIVATE_CHAT = "private_chat"
-    PUBLIC_CHAT = "public_chat"
-    TRUSTED_PRIVATE_CHAT = "trusted_private_chat"
+class RoomCreationPreset:
+    PRIVATE_CHAT: Final = "private_chat"
+    PUBLIC_CHAT: Final = "public_chat"
+    TRUSTED_PRIVATE_CHAT: Final = "trusted_private_chat"
 
 
-class ThirdPartyEntityKind(StrEnum):
-    USER = "user"
-    LOCATION = "location"
+class ThirdPartyEntityKind:
+    USER: Final = "user"
+    LOCATION: Final = "location"
 
 
 ServerNoticeMsgType: Final = "m.server_notice"
 ServerNoticeLimitReached: Final = "m.server_notice.usage_limit_reached"
 
 
-class UserTypes(StrEnum):
+class UserTypes:
     """Allows for user type specific behaviour. With the benefit of hindsight
     'admin' and 'guest' users should also be UserTypes. Normal users are type None
     """
 
-    SUPPORT = "support"
-    BOT = "bot"
+    SUPPORT: Final = "support"
+    BOT: Final = "bot"
+    ALL_USER_TYPES: Final = (SUPPORT, BOT)
 
 
-class RelationTypes(StrEnum):
+class RelationTypes:
     """The types of relations known to this server."""
 
-    ANNOTATION = "m.annotation"
-    REPLACE = "m.replace"
-    REFERENCE = "m.reference"
-    THREAD = "io.element.thread"
+    ANNOTATION: Final = "m.annotation"
+    REPLACE: Final = "m.replace"
+    REFERENCE: Final = "m.reference"
+    THREAD: Final = "io.element.thread"
 
 
-class LimitBlockingTypes(StrEnum):
+class LimitBlockingTypes:
     """Reasons that a server may be blocked"""
 
-    MONTHLY_ACTIVE_USER = "monthly_active_user"
-    HS_DISABLED = "hs_disabled"
+    MONTHLY_ACTIVE_USER: Final = "monthly_active_user"
+    HS_DISABLED: Final = "hs_disabled"
 
 
-class EventContentFields(StrEnum):
+class EventContentFields:
     """Fields found in events' content, regardless of type."""
 
     # Labels for the event, cf https://github.com/matrix-org/matrix-doc/pull/2326
-    LABELS = "org.matrix.labels"
+    LABELS: Final = "org.matrix.labels"
 
     # Timestamp to delete the event after
     # cf https://github.com/matrix-org/matrix-doc/pull/2228
-    SELF_DESTRUCT_AFTER = "org.matrix.self_destruct_after"
+    SELF_DESTRUCT_AFTER: Final = "org.matrix.self_destruct_after"
 
     # cf https://github.com/matrix-org/matrix-doc/pull/1772
-    ROOM_TYPE = "type"
+    ROOM_TYPE: Final = "type"
 
     # Whether a room can federate.
-    FEDERATE = "m.federate"
+    FEDERATE: Final = "m.federate"
 
     # The creator of the room, as used in `m.room.create` events.
-    ROOM_CREATOR = "creator"
+    ROOM_CREATOR: Final = "creator"
 
     # Used in m.room.guest_access events.
-    GUEST_ACCESS = "guest_access"
+    GUEST_ACCESS: Final = "guest_access"
 
     # Used on normal messages to indicate they were historically imported after the fact
-    MSC2716_HISTORICAL = "org.matrix.msc2716.historical"
+    MSC2716_HISTORICAL: Final = "org.matrix.msc2716.historical"
     # For "insertion" events to indicate what the next batch ID should be in
     # order to connect to it
-    MSC2716_NEXT_BATCH_ID = "org.matrix.msc2716.next_batch_id"
+    MSC2716_NEXT_BATCH_ID: Final = "org.matrix.msc2716.next_batch_id"
     # Used on "batch" events to indicate which insertion event it connects to
-    MSC2716_BATCH_ID = "org.matrix.msc2716.batch_id"
+    MSC2716_BATCH_ID: Final = "org.matrix.msc2716.batch_id"
     # For "marker" events
-    MSC2716_MARKER_INSERTION = "org.matrix.msc2716.marker.insertion"
+    MSC2716_MARKER_INSERTION: Final = "org.matrix.msc2716.marker.insertion"
 
     # The authorising user for joining a restricted room.
-    AUTHORISING_USER = "join_authorised_via_users_server"
+    AUTHORISING_USER: Final = "join_authorised_via_users_server"
 
 
-class RoomTypes(StrEnum):
+class RoomTypes:
     """Understood values of the room_type field of m.room.create events."""
 
-    SPACE = "m.space"
+    SPACE: Final = "m.space"
 
 
-class RoomEncryptionAlgorithms(StrEnum):
-    MEGOLM_V1_AES_SHA2 = "m.megolm.v1.aes-sha2"
-    DEFAULT = MEGOLM_V1_AES_SHA2
+class RoomEncryptionAlgorithms:
+    MEGOLM_V1_AES_SHA2: Final = "m.megolm.v1.aes-sha2"
+    DEFAULT: Final = MEGOLM_V1_AES_SHA2
 
 
-class AccountDataTypes(StrEnum):
-    DIRECT = "m.direct"
-    IGNORED_USER_LIST = "m.ignored_user_list"
+class AccountDataTypes:
+    DIRECT: Final = "m.direct"
+    IGNORED_USER_LIST: Final = "m.ignored_user_list"
 
 
-class HistoryVisibility(StrEnum):
-    INVITED = "invited"
-    JOINED = "joined"
-    SHARED = "shared"
-    WORLD_READABLE = "world_readable"
+class HistoryVisibility:
+    INVITED: Final = "invited"
+    JOINED: Final = "joined"
+    SHARED: Final = "shared"
+    WORLD_READABLE: Final = "world_readable"
 
 
-class GuestAccess(StrEnum):
-    CAN_JOIN = "can_join"
+class GuestAccess:
+    CAN_JOIN: Final = "can_join"
     # anything that is not "can_join" is considered "forbidden", but for completeness:
-    FORBIDDEN = "forbidden"
+    FORBIDDEN: Final = "forbidden"
 
 
-class ReadReceiptEventFields(StrEnum):
-    MSC2285_HIDDEN = "org.matrix.msc2285.hidden"
+class ReadReceiptEventFields:
+    MSC2285_HIDDEN: Final = "org.matrix.msc2285.hidden"

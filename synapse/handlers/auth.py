@@ -28,7 +28,6 @@ from typing import (
     List,
     Mapping,
     Optional,
-    Set,
     Tuple,
     Type,
     Union,
@@ -383,7 +382,7 @@ class AuthHandler:
     async def _get_available_ui_auth_types(self, user: UserID) -> Iterable[str]:
         """Get a list of the authentication types this user can use"""
 
-        ui_auth_types: Set[str] = set()
+        ui_auth_types = set()
 
         # if the HS supports password auth, and the user has a non-null password, we
         # support password auth
@@ -736,7 +735,7 @@ class AuthHandler:
         for f in flows:
             public_flows.append(f)
 
-        get_params: Dict[str, Any] = {
+        get_params = {
             LoginType.RECAPTCHA: self._get_params_recaptcha,
             LoginType.TERMS: self._get_params_terms,
         }

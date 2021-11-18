@@ -1,1 +1,1 @@
-Convert most string constants in `synapse.api.constants` into enums, so that they are usable as `Literal`s, and make the rest `Final`.
+Add `Final` annotation to string constants in `synapse.api.constants` so that they get typed as `Literal`s.

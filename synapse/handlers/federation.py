@@ -686,7 +686,7 @@ class FederationHandler:
             )
             raise NotFoundError("Not an active room on this server")
 
-        event_content: JsonDict = {"membership": Membership.JOIN}
+        event_content = {"membership": Membership.JOIN}
 
         # If the current room is using restricted join rules, additional information
         # may need to be included in the event content in order to efficiently

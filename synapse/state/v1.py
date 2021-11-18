@@ -204,7 +204,7 @@ def _create_auth_events_from_maps(
     Returns:
         A map from state key to event id.
     """
-    auth_events: MutableStateMap[str] = {}
+    auth_events = {}
     for event_ids in conflicted_state.values():
         for event_id in event_ids:
             if event_id in state_map:
@@ -269,7 +269,7 @@ def _resolve_state_events(
         3. memberships
         4. other events.
     """
-    resolved_state: MutableStateMap[EventBase] = {}
+    resolved_state = {}
     if POWER_KEY in conflicted_state:
         events = conflicted_state[POWER_KEY]
         logger.debug("Resolving conflicted power levels %r", events)
@@ -316,7 +316,7 @@ def _resolve_auth_events(
         for key in event_auth.auth_types_for_event(room_version, event)
     }
 
-    new_auth_events: MutableStateMap[EventBase] = {}
+    new_auth_events = {}
     for key in auth_keys:
         auth_event = auth_events.get(key, None)
         if auth_event:

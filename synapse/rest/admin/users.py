@@ -209,11 +209,8 @@ class UserRestServletV2(RestServlet):
                 assert_params_in_dict(external_id, ["auth_provider", "external_id"])
 
         user_type = body.get("user_type", None)
-        if user_type is not None:
-            try:
-                UserTypes(user_type)
-            except ValueError:
-                raise SynapseError(400, "Invalid user type")
+        if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
+            raise SynapseError(400, "Invalid user type")
 
         set_admin_to = body.get("admin", False)
         if not isinstance(set_admin_to, bool):
@@ -484,11 +481,8 @@ class UserRegisterServlet(RestServlet):
         user_type = body.get("user_type", None)
         displayname = body.get("displayname", None)
 
-        if user_type is not None:
-            try:
-                UserTypes(user_type)
-            except ValueError:
-                raise SynapseError(400, "Invalid user type")
+        if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
+            raise SynapseError(400, "Invalid user type")
 
         if "mac" not in body:
             raise SynapseError(400, "mac must be specified", errcode=Codes.BAD_JSON)

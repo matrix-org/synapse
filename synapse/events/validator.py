@@ -189,9 +189,7 @@ class EventValidator:
             if "membership" not in event.content:
                 raise SynapseError(400, "Content has not membership key")
 
-            try:
-                Membership(event.content["membership"])
-            except ValueError:
+            if event.content["membership"] not in Membership.LIST:
                 raise SynapseError(400, "Invalid membership key")
 
             self._ensure_state_event(event)
