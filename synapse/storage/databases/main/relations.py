@@ -133,7 +133,7 @@ class RelationsWorkerStore(SQLBaseStore):
         )
 
     async def event_includes_relation(self, event_id: str) -> bool:
-        """Check if the given event includes a valid relation.
+        """Check if the given event relates to another event.
 
         An event has a relation if it has a valid m.relates_to with a rel_type
         and event_id in the content:
@@ -163,10 +163,10 @@ class RelationsWorkerStore(SQLBaseStore):
         )
         return result is not None
 
-    async def event_has_relation(self, parent_id: str) -> bool:
-        """Check if the given event is referred to via another event's relation.
+    async def event_is_target_of_relation(self, parent_id: str) -> bool:
+        """Check if the given event is the target of another event's relation.
 
-        An event is the target of a relation if another event has a valid
+        An event is the target of an event relation if it has a valid
         m.relates_to with a rel_type and event_id pointing to parent_id in the
         content:
 
@@ -191,7 +191,7 @@ class RelationsWorkerStore(SQLBaseStore):
             keyvalues={"relates_to_id": parent_id},
             retcol="event_id",
             allow_none=True,
-            desc="event_has_relation",
+            desc="event_is_target_of_relation",
         )
         return result is not None
 
