@@ -461,7 +461,7 @@ The following parameters should be set in the URL:
 The following fields are possible in the JSON response body:
 
 - `block` - A boolean. `true` if the room is blocked, otherwise `false`
-- `user_id` - A optional string. If the room is blocked (`block` is `true`) shows
+- `user_id` - An optional string. If the room is blocked (`block` is `true`) shows
   the user who has add the room to blocking list. Otherwise it is not displayed.
 
 # Delete Room API
