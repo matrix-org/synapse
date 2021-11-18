@@ -789,6 +789,14 @@ class AuthHandler:
                 403, "refresh token isn't valid anymore", Codes.FORBIDDEN
             )
 
+        if (
+            existing_token.expiry_ts is not None
+            and existing_token.expiry_ts < self._clock.time_msec()
+        ):
+            raise SynapseError(
+                403, "The supplied refresh token has expired", Codes.FORBIDDEN
+            )
+
         (
             new_refresh_token,
             new_refresh_token_id,
