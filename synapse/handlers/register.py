@@ -116,7 +116,9 @@ class RegistrationHandler:
             self.pusher_pool = hs.get_pusherpool()
 
         self.session_lifetime = hs.config.registration.session_lifetime
-        self.access_token_lifetime = hs.config.registration.access_token_lifetime
+        self.access_token_lifetime = (
+            hs.config.registration.refreshable_access_token_lifetime
+        )
 
         init_counters_for_auth_provider("")
 
