@@ -37,9 +37,7 @@ class BackgroundUpdateEnabledRestServlet(RestServlet):
     PATTERNS = admin_patterns("/background_updates/enabled$")
 
     def __init__(self, hs: "HomeServer"):
-        self._is_mine_id = hs.is_mine_id
         self._auth = hs.get_auth()
-
         self._data_stores = hs.get_datastores()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
@@ -50,7 +48,7 @@ class BackgroundUpdateEnabledRestServlet(RestServlet):
         # (They *should* all be in sync.)
         enabled = all(db.updates.enabled for db in self._data_stores.databases)
 
-        return 200, {"enabled": enabled}
+        return HTTPStatus.OK, {"enabled": enabled}
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self._auth.get_user_by_req(request)
@@ -73,7 +71,7 @@ class BackgroundUpdateEnabledRestServlet(RestServlet):
             if enabled:
                 db.updates.start_doing_background_updates()
 
-        return 200, {"enabled": enabled}
+        return HTTPStatus.OK, {"enabled": enabled}
 
 
 class BackgroundUpdateRestServlet(RestServlet):
@@ -82,9 +80,7 @@ class BackgroundUpdateRestServlet(RestServlet):
     PATTERNS = admin_patterns("/background_updates/status$")
 
     def __init__(self, hs: "HomeServer"):
-        self._is_mine_id = hs.is_mine_id
         self._auth = hs.get_auth()
-
         self._data_stores = hs.get_datastores()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
@@ -109,7 +105,7 @@ class BackgroundUpdateRestServlet(RestServlet):
                 "average_items_per_ms": update.average_items_per_ms(),
             }
 
-        return 200, {"enabled": enabled, "current_updates": current_updates}
+        return HTTPStatus.OK, {"enabled": enabled, "current_updates": current_updates}
 
 
 class BackgroundUpdateStartJobRestServlet(RestServlet):
@@ -118,9 +114,7 @@ class BackgroundUpdateStartJobRestServlet(RestServlet):
     PATTERNS = admin_patterns("/background_updates/start_job")
 
     def __init__(self, hs: "HomeServer"):
-        self._is_mine_id = hs.is_mine_id
         self._auth = hs.get_auth()
-
         self._store = hs.get_datastore()
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
@@ -170,8 +164,8 @@ class BackgroundUpdateStartJobRestServlet(RestServlet):
                 desc="admin_api_regenerate_directory",
             )
         else:
-            raise SynapseError(400, "Invalid job_name")
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Invalid job_name")
 
         self._store.db_pool.updates.start_doing_background_updates()
 
-        return 200, {"job_name": job_name}
+        return HTTPStatus.OK, {"job_name": job_name}
