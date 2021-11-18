@@ -756,7 +756,8 @@ class AuthHandler:
     async def refresh_token(
         self,
         refresh_token: str,
-        valid_until_ms: Optional[int],
+        access_token_valid_until_ms: Optional[int],
+        refresh_token_valid_until_ms: Optional[int],
     ) -> Tuple[str, str]:
         """
         Consumes a refresh token and generate both a new access token and a new refresh token from it.
@@ -765,8 +766,9 @@ class AuthHandler:
 
         Args:
             refresh_token: The token to consume.
-            valid_until_ms: The expiration timestamp of the new access token.
-
+            access_token_valid_until_ms: The expiration timestamp of the new access token.
+            refresh_token_valid_until_ms: The expiration timestamp of the new refresh token.
+                None if the refresh token does not expire.
         Returns:
             A tuple containing the new access token and refresh token
         """
@@ -791,12 +793,15 @@ class AuthHandler:
             new_refresh_token,
             new_refresh_token_id,
         ) = await self.create_refresh_token_for_user_id(
-            user_id=existing_token.user_id, device_id=existing_token.device_id
+            user_id=existing_token.user_id,
+            device_id=existing_token.device_id,
+            expiry_ts=refresh_token_valid_until_ms,
+            ultimate_session_expiry_ts=existing_token.ultimate_session_expiry_ts,
         )
         access_token = await self.create_access_token_for_user_id(
             user_id=existing_token.user_id,
             device_id=existing_token.device_id,
-            valid_until_ms=valid_until_ms,
+            valid_until_ms=access_token_valid_until_ms,
             refresh_token_id=new_refresh_token_id,
         )
         await self.store.replace_refresh_token(
