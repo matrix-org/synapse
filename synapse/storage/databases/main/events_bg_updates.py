@@ -171,9 +171,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             self._purged_chain_cover_index,
         )
 
-        self.db_pool.updates.register_background_update_handler(
-            "event_thread_relation", self._event_thread_relation
-        )
+        self.db_pool.updates.register_noop_background_update("event_thread_relation")
 
         ################################################################################
 
