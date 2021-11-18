@@ -813,7 +813,7 @@ class BlockRoomRestServlet(RestServlet):
         else:
             response = {"block": False}
 
-        return 200, response
+        return HTTPStatus.OK, response
 
     async def on_PUT(
         self, request: SynapseRequest, room_id: str
@@ -842,4 +842,4 @@ class BlockRoomRestServlet(RestServlet):
         else:
             await self._store.unblock_room(room_id)
 
-        return 200, {"block": block}
+        return HTTPStatus.OK, {"block": block}
