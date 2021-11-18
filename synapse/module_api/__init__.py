@@ -71,6 +71,7 @@ from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
     CHECK_AUTH_CALLBACK,
     ON_LOGGED_OUT_CALLBACK,
+    AuthHandler,
 )
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
@@ -150,7 +151,7 @@ class ModuleApi:
     can register new users etc if necessary.
     """
 
-    def __init__(self, hs: "HomeServer", auth_handler) -> None:
+    def __init__(self, hs: "HomeServer", auth_handler: AuthHandler) -> None:
         self._hs = hs
 
         # TODO: Fix this type hint once the types for the data stores have been ironed
@@ -428,7 +429,7 @@ class ModuleApi:
         Added in Synapse v0.25.0.
 
         Args:
-            username (str): provided user id
+            username: provided user id
 
         Returns:
             str: qualified @user:id
@@ -473,7 +474,7 @@ class ModuleApi:
         Added in Synapse v0.25.0.
 
         Args:
-            user_id (str): Complete @user:id
+            user_id: Complete @user:id
 
         Returns:
             Deferred[str|None]: Canonical (case-corrected) user_id, or None
