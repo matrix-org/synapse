@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING
 
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.state import StateGroupWorkerStore
-from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.databases.main.user_erasure_store import UserErasureWorkerStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
@@ -42,7 +41,6 @@ class SlavedEventStore(
     StateGroupWorkerStore,
     UserErasureWorkerStore,
     BaseSlavedStore,
-    StreamWorkerStore,
 ):
     def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
