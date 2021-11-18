@@ -740,7 +740,7 @@ class EventsWorkerStore(SQLBaseStore):
         """Services requests for events from the `_event_fetch_list` queue."""
         try:
             await self.db_pool.runWithConnection(self._do_fetch_txn)
-        except BaseException as e:
+        except Exception as e:
             failed_event_list = []
             with self._event_fetch_lock:
                 if self._event_fetch_ongoing == 1 and self._event_fetch_list:
