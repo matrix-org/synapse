@@ -1,4 +1,5 @@
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2021 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from unittest.mock import Mock
 
 import synapse.api.errors
 import synapse.rest.admin
 from synapse.api.constants import EventTypes
-from synapse.config.room_directory import RoomDirectoryConfig
 from synapse.rest.client import directory, login, room
 from synapse.types import RoomAlias, create_requester
 
