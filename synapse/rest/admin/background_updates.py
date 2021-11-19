@@ -168,7 +168,7 @@ class BackgroundUpdateStartJobRestServlet(RestServlet):
         except self._store.db_pool.engine.module.IntegrityError:
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
-                "Job %s is already in queue of background updates." % job_name,
+                "Job %s is already in queue of background updates." % (job_name,),
             )
 
         self._store.db_pool.updates.start_doing_background_updates()
