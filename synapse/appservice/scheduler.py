@@ -105,6 +105,18 @@ class ApplicationServiceScheduler:
     def submit_ephemeral_events_for_as(
         self, service: ApplicationService, events: Iterable[JsonDict]
     ) -> None:
+        """
+        Send ephemeral events to application services, and schedule a new
+        outgoing AS transaction.
+
+        Args:
+            service: The service to send ephemeral events to.
+            events: The ephemeral events to send.
+        """
+        # Ensure we have some events to send
+        if not events:
+            return
+
         self.queuer.enqueue_ephemeral(service, events)
 
 
