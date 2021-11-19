@@ -81,12 +81,6 @@ class JWTConfig(Config):
             #
             #secret: "provided-by-your-issuer"
 
-            # Name of the claim containing a unique identifier for the user.
-            #
-            # Optional, defaults to `sub`.
-            #
-            #subject_claim: "sub"
-
             # The algorithm used to sign the JSON web token.
             #
             # Supported algorithms are listed at
@@ -95,6 +89,12 @@ class JWTConfig(Config):
             # Required if 'enabled' is true.
             #
             #algorithm: "provided-by-your-issuer"
+
+            # Name of the claim containing a unique identifier for the user.
+            #
+            # Optional, defaults to `sub`.
+            #
+            #subject_claim: "sub"
 
             # The issuer to validate the "iss" claim against.
             #
