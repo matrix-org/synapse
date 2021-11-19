@@ -17,7 +17,7 @@ from typing import Any, Dict, List
 
 from synapse.api.errors import SynapseError
 from synapse.storage.database import LoggingTransaction
-from synapse.storage.databases.main import CacheInvalidationWorkerStore
+from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
 
 logger = logging.getLogger(__name__)

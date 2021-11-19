@@ -15,7 +15,7 @@
 from typing import Dict, Iterable
 
 from synapse.storage.database import LoggingTransaction
-from synapse.storage.databases.main import CacheInvalidationWorkerStore
+from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.util.caches.descriptors import cached, cachedList
 
 
