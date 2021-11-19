@@ -73,12 +73,11 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         store,
         room_id,
         event_and_contexts,
-        *,
-        inhibit_push_notifications: bool = False,
-        should_calculate_state_and_forward_extrems: bool = True,
-        use_negative_stream_ordering: bool = False,
-        inhibit_local_membership_updates: bool = False,
-        update_room_forward_stream_ordering: bool = True,
+        inhibit_push_notifications,
+        should_calculate_state_and_forward_extrems,
+        use_negative_stream_ordering,
+        inhibit_local_membership_updates,
+        update_room_forward_stream_ordering,
     ):
         """
         Args:
