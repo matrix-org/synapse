@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-UPDATE_HANDLER_CALLBACK = Callable[[str, str, bool], AsyncContextManager[int]]
+ON_UPDATE_CALLBACK = Callable[[str, str, bool], AsyncContextManager[int]]
 DEFAULT_BATCH_SIZE_CALLBACK = Callable[[str, str], Awaitable[int]]
 MIN_BATCH_SIZE_CALLBACK = Callable[[str, str], Awaitable[int]]
 
@@ -140,7 +140,7 @@ class BackgroundUpdater:
         # if a background update is currently running, its name.
         self._current_background_update: Optional[str] = None
 
-        self._update_handler_callback: Optional[UPDATE_HANDLER_CALLBACK] = None
+        self._on_update_callback: Optional[ON_UPDATE_CALLBACK] = None
         self._default_batch_size_callback: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None
         self._min_batch_size_callback: Optional[MIN_BATCH_SIZE_CALLBACK] = None
 
@@ -157,12 +157,12 @@ class BackgroundUpdater:
 
     def register_update_controller_callbacks(
         self,
-        update_handler: UPDATE_HANDLER_CALLBACK,
+        on_update: ON_UPDATE_CALLBACK,
         default_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
         min_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
     ) -> None:
         """Register callbacks from a module for each hook."""
-        if self._update_handler_callback is not None:
+        if self._on_update_callback is not None:
             logger.warning(
                 "More than one module tried to register callbacks for controlling"
                 " background updates. Only the callbacks registered by the first module"
@@ -172,7 +172,7 @@ class BackgroundUpdater:
 
             return
 
-        self._update_handler_callback = update_handler
+        self._on_update_callback = on_update
 
         if default_batch_size is not None:
             self._default_batch_size_callback = default_batch_size
@@ -208,8 +208,8 @@ class BackgroundUpdater:
             Note: this is a *target*, and an iteration may take substantially longer or
             shorter.
         """
-        if self._update_handler_callback is not None:
-            return self._update_handler_callback(update_name, database_name, oneshot)
+        if self._on_update_callback is not None:
+            return self._on_update_callback(update_name, database_name, oneshot)
 
         return _BackgroundUpdateContextManager(sleep, self._clock)
 

@@ -51,7 +51,7 @@ from synapse.storage import DataStore
 from synapse.storage.background_updates import (
     DEFAULT_BATCH_SIZE_CALLBACK,
     MIN_BATCH_SIZE_CALLBACK,
-    UPDATE_HANDLER_CALLBACK,
+    ON_UPDATE_CALLBACK,
 )
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
@@ -201,6 +201,24 @@ class ModuleApi:
         """
         return self._password_auth_provider.register_password_auth_provider_callbacks
 
+    def register_background_update_controller_callbacks(
+        self,
+        on_update: ON_UPDATE_CALLBACK,
+        default_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
+        min_batch_size: Optional[MIN_BATCH_SIZE_CALLBACK] = None,
+    ) -> None:
+        """Registers background update controller callbacks.
+
+        Added in Synapse v1.48.0.
+        """
+
+        for db in self._hs.get_datastores().databases:
+            db.updates.register_update_controller_callbacks(
+                on_update=on_update,
+                default_batch_size=default_batch_size,
+                min_batch_size=min_batch_size,
+            )
+
     def register_web_resource(self, path: str, resource: Resource):
         """Registers a web resource to be served at the given path.
 
@@ -216,24 +234,6 @@ class ModuleApi:
             resource: The resource to attach to this path.
         """
         self._hs.register_module_web_resource(path, resource)
-
-    def register_background_update_controller_callbacks(
-        self,
-        update_handler: UPDATE_HANDLER_CALLBACK,
-        default_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
-        min_batch_size: Optional[MIN_BATCH_SIZE_CALLBACK] = None,
-    ) -> None:
-        """Registers background update controller callbacks.
-
-        Added in v1.48.0
-        """
-
-        for db in self._hs.get_datastores().databases:
-            db.updates.register_update_controller_callbacks(
-                update_handler=update_handler,
-                default_batch_size=default_batch_size,
-                min_batch_size=min_batch_size,
-            )
 
     #########################################################################
     # The following methods can be called by the module at any point in time.

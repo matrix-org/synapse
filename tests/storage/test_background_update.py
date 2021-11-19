@@ -106,7 +106,7 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
         self._update_ctx_manager.__aexit__ = Mock(return_value=make_awaitable(None))
 
         # Mock out the `update_handler` callback
-        self._update_handler_callback = Mock(return_value=self._update_ctx_manager)
+        self._on_update = Mock(return_value=self._update_ctx_manager)
 
         # Define a default batch size value that's not the same as the internal default
         # value (100).
@@ -114,7 +114,7 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
 
         # Register the callbacks with more mocks
         self.hs.get_module_api().register_background_update_controller_callbacks(
-            update_handler=self._update_handler_callback,
+            on_update=self._on_update,
             min_batch_size=Mock(return_value=make_awaitable(self._default_batch_size)),
             default_batch_size=Mock(
                 return_value=make_awaitable(self._default_batch_size),
@@ -141,7 +141,7 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
 
         # `run_update` should have been called, but the update handler won't be
         # called until the `enter_defer` (returned by `__aenter__`) is resolved.
-        self._update_handler_callback.assert_called_once_with(
+        self._on_update.assert_called_once_with(
             "test_update",
             "master",
             False,
