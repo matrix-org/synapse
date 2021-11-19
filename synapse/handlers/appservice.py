@@ -302,10 +302,7 @@ class ApplicationServicesHandler:
                 ):
                     if stream_key == "receipt_key":
                         events = await self._handle_receipts(service, new_token)
-                        if events:
-                            self.scheduler.submit_ephemeral_events_for_as(
-                                service, events
-                            )
+                        self.scheduler.submit_ephemeral_events_for_as(service, events)
 
                         # Persist the latest handled stream token for this appservice
                         await self.store.set_type_stream_id_for_appservice(
@@ -314,10 +311,7 @@ class ApplicationServicesHandler:
 
                     elif stream_key == "presence_key":
                         events = await self._handle_presence(service, users, new_token)
-                        if events:
-                            self.scheduler.submit_ephemeral_events_for_as(
-                                service, events
-                            )
+                        self.scheduler.submit_ephemeral_events_for_as(service, events)
 
                         # Persist the latest handled stream token for this appservice
                         await self.store.set_type_stream_id_for_appservice(
@@ -328,10 +322,7 @@ class ApplicationServicesHandler:
                         # Retrieve a list of to-device message events, as well as the
                         # maximum stream token of the messages we were able to retrieve.
                         events = await self._handle_to_device(service, new_token, users)
-                        if events:
-                            self.scheduler.submit_ephemeral_events_for_as(
-                                service, events
-                            )
+                        self.scheduler.submit_ephemeral_events_for_as(service, events)
 
                         # Persist the latest handled stream token for this appservice
                         await self.store.set_type_stream_id_for_appservice(
