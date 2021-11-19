@@ -10,7 +10,7 @@ Security advisory
 
 The following issue is fixed in 1.47.1.
 
-- **[GHSA-3hfw-x7gx-437c](https://github.com/matrix-org/synapse/security/advisories/GHSA-3hfw-x7gx-437c) / [CVE-2021-?????](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-?????): Path traversal when downloading remote media.**
+- **[GHSA-3hfw-x7gx-437c](https://github.com/matrix-org/synapse/security/advisories/GHSA-3hfw-x7gx-437c) / [CVE-2021-41281](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-41281): Path traversal when downloading remote media.**
 
   Synapse instances with the media repository enabled can be tricked into downloading a file from a remote server into an arbitrary directory, potentially outside the media store directory.
 
