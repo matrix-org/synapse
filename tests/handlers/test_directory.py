@@ -396,8 +396,7 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
     def default_config(self):
         config = super().default_config()
 
-        # We cheekily override the config to add custom alias creation and
-        # room publication rules.
+        # Add custom alias creation rules to the config.
         config["alias_creation_rules"] = [
             {"user_id": "*", "alias": "#unofficial_*", "action": "allow"}
         ]
@@ -463,7 +462,7 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
     def default_config(self):
         config = super().default_config()
 
-        # This time we add custom room list publication rules
+        # Add custom room list publication rules to the config.
         config["room_list_publication_rules"] = [
             {
                 "user_id": "@" + self.allowed_localpart + "*",
@@ -530,7 +529,6 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
         """
         Try to create a room, register an alias for it, and publish it,
         as a user WITH permission to publish rooms.
-        (This is used as both a standalone test & as a helper function.)
         """
         self.helper.create_room_as(
             self.allowed_user_id,
