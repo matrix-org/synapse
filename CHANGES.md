@@ -8,7 +8,7 @@ Server administrators who are unable to update Synapse may use the workarounds d
 Security advisory
 -----------------
 
-The following issue is fixed in v1.47.1.
+The following issue is fixed in 1.47.1.
 
 - **[GHSA-3hfw-x7gx-437c](https://github.com/matrix-org/synapse/security/advisories/GHSA-3hfw-x7gx-437c) / [CVE-2021-?????](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-?????): Path traversal when downloading remote media.**
 
