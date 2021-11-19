@@ -813,13 +813,13 @@ class RegistrationHandler:
                 (
                     refresh_token,
                     refresh_token_id,
-                ) = await self._auth_handler.get_refresh_token_for_user_id(
+                ) = await self._auth_handler.create_refresh_token_for_user_id(
                     user_id,
                     device_id=registered_device_id,
                 )
                 valid_until_ms = self.clock.time_msec() + self.access_token_lifetime
 
-            access_token = await self._auth_handler.get_access_token_for_user_id(
+            access_token = await self._auth_handler.create_access_token_for_user_id(
                 user_id,
                 device_id=registered_device_id,
                 valid_until_ms=valid_until_ms,

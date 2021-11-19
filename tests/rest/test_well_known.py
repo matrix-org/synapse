@@ -11,17 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from twisted.web.resource import Resource
 
-
-from synapse.rest.well_known import WellKnownResource
+from synapse.rest.well_known import well_known_resource
 
 from tests import unittest
 
 
 class WellKnownTests(unittest.HomeserverTestCase):
     def create_test_resource(self):
-        # replace the JsonResource with a WellKnownResource
-        return WellKnownResource(self.hs)
+        # replace the JsonResource with a Resource wrapping the WellKnownResource
+        res = Resource()
+        res.putChild(b".well-known", well_known_resource(self.hs))
+        return res
 
     @unittest.override_config(
         {
@@ -29,7 +31,7 @@ class WellKnownTests(unittest.HomeserverTestCase):
             "default_identity_server": "https://testis",
         }
     )
-    def test_well_known(self):
+    def test_client_well_known(self):
         channel = self.make_request(
             "GET", "/.well-known/matrix/client", shorthand=False
         )
@@ -48,9 +50,27 @@ class WellKnownTests(unittest.HomeserverTestCase):
             "public_baseurl": None,
         }
     )
-    def test_well_known_no_public_baseurl(self):
+    def test_client_well_known_no_public_baseurl(self):
         channel = self.make_request(
             "GET", "/.well-known/matrix/client", shorthand=False
         )
 
+        self.assertEqual(channel.code, 404)
+
+    @unittest.override_config({"serve_server_wellknown": True})
+    def test_server_well_known(self):
+        channel = self.make_request(
+            "GET", "/.well-known/matrix/server", shorthand=False
+        )
+
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(
+            channel.json_body,
+            {"m.server": "test:443"},
+        )
+
+    def test_server_well_known_disabled(self):
+        channel = self.make_request(
+            "GET", "/.well-known/matrix/server", shorthand=False
+        )
         self.assertEqual(channel.code, 404)

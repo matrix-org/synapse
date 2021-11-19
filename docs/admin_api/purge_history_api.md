@@ -27,7 +27,7 @@ Room state data (such as joins, leaves, topic) is always preserved.
 
 To delete local message events as well, set `delete_local_events` in the body:
 
-```
+```json
 {
    "delete_local_events": true
 }
@@ -69,6 +69,8 @@ This API returns a JSON body like the following:
 ```
 
 The status will be one of `active`, `complete`, or `failed`.
+
+If `status` is `failed` there will be a string `error` with the error message.
 
 ## Reclaim disk space (Postgres)
 

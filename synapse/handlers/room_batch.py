@@ -221,6 +221,7 @@ class RoomBatchHandler:
                     action=membership,
                     content=event_dict["content"],
                     outlier=True,
+                    historical=True,
                     prev_event_ids=[prev_event_id_for_state_chain],
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
@@ -240,6 +241,7 @@ class RoomBatchHandler:
                     ),
                     event_dict,
                     outlier=True,
+                    historical=True,
                     prev_event_ids=[prev_event_id_for_state_chain],
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
@@ -355,7 +357,7 @@ class RoomBatchHandler:
         for (event, context) in reversed(events_to_persist):
             await self.event_creation_handler.handle_new_client_event(
                 await self.create_requester_for_user_id_from_app_service(
-                    event["sender"], app_service_requester.app_service
+                    event.sender, app_service_requester.app_service
                 ),
                 event=event,
                 context=context,

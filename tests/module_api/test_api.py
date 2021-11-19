@@ -116,7 +116,6 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         # Insert a second ip, agent at a later date. We should be able to retrieve it.
         last_seen_2 = last_seen_1 + 10000
-        print("%s => %s" % (last_seen_1, last_seen_2))
         self.get_success(
             self.store.insert_client_ip(
                 user_id, "access_token", "ip_2", "user_agent_2", "device_2", last_seen_2

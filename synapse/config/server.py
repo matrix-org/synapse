@@ -262,6 +262,7 @@ class ServerConfig(Config):
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
+        self.serve_server_wellknown = config.get("serve_server_wellknown", False)
 
         self.public_baseurl = config.get("public_baseurl")
         # Commented out due to https://github.com/matrix-org/synapse/issues/8308
