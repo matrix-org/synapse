@@ -736,8 +736,8 @@ class EventsWorkerStore(SQLBaseStore):
             for e in state_to_include.values()
         ]
 
-    def _start_fetch_thread(self) -> None:
-        """Starts an event fetcher."""
+    def _maybe_start_fetch_thread(self) -> None:
+        """Starts an event fetch thread if we are not yet at the maximum number."""
         with self._event_fetch_lock:
             if (
                 self._event_fetch_list
@@ -774,7 +774,7 @@ class EventsWorkerStore(SQLBaseStore):
                             self._event_fetch_list = []
 
                 if should_restart:
-                    self._start_fetch_thread()
+                    self._maybe_start_fetch_thread()
 
                 if exc is not None:
                     for _, deferred in failed_event_list:
@@ -1030,7 +1030,7 @@ class EventsWorkerStore(SQLBaseStore):
             self._event_fetch_list.append((events, events_d))
             self._event_fetch_lock.notify()
 
-        self._start_fetch_thread()
+        self._maybe_start_fetch_thread()
 
         logger.debug("Loading %d events: %s", len(events), events)
         with PreserveLoggingContext():
