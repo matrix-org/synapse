@@ -5428,8 +5428,8 @@ user_directory:
     # indexes were (re)built was before Synapse 1.44, you'll have to
     # rebuild the indexes in order to search through all known users.
     # These indexes are built the first time Synapse starts; admins can
-    # manually trigger a rebuild following the instructions at
-    #     https://matrix-org.github.io/synapse/latest/user_directory.html
+    # manually trigger a rebuild via API following the instructions at
+    #     https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/background_updates.html#run
     #
     # Uncomment to return search results containing all known users, even if that
     # user does not share a room with the requester.
@@ -7555,9 +7555,9 @@ deleted every 10 seconds. The default expiration time is 1 hour from download.</
 on this particular server - i.e. ones which your account shares a room with, or
 who are present in a publicly viewable room present on the server.</p>
 <p>The directory info is stored in various tables, which can (typically after
-DB corruption) get stale or out of sync.  If this happens, for now the
-solution to fix it is to execute the SQL <a href="https://github.com/matrix-org/synapse/blob/master/synapse/storage/schema/main/delta/53/user_dir_populate.sql">here</a>
-and then restart synapse. This should then start a background task to
+DB corruption) get stale or out of sync. If this happens, for now the
+solution to fix it is to use the <a href="usage/administration/admin_api/background_updates.html#run">admin API</a>
+and execute the job <code>regenerate_directory</code>. This should then start a background task to
 flush the current tables and regenerate the directory.</p>
 <h2 id="data-model"><a class="header" href="#data-model">Data model</a></h2>
 <p>There are five relevant tables that collectively form the &quot;user directory&quot;.
@@ -9145,6 +9145,25 @@ background updates which won't be cancelled once started.</p>
 }
 </code></pre>
 <p>There is also a <code>GET</code> version which returns the <code>enabled</code> state.</p>
+<h2 id="run"><a class="header" href="#run">Run</a></h2>
+<p>This API schedules a specific background update to run. The job starts immediately after calling the API.</p>
+<p>The API is:</p>
+<pre><code>POST /_synapse/admin/v1/background_updates/start_job
+</code></pre>
+<p>with the following body:</p>
+<pre><code class="language-json">{
+    &quot;job_name&quot;: &quot;populate_stats_process_rooms&quot;
+}
+</code></pre>
+<p>The following JSON body parameters are available:</p>
+<ul>
+<li><code>job_name</code> - A string which job to run. Valid values are:
+<ul>
+<li><code>populate_stats_process_rooms</code> - Recalculate the stats for all rooms.</li>
+<li><code>regenerate_directory</code> - Recalculate the <a href="usage/administration/admin_api/../../../user_directory.html">user directory</a> if it is stale or out of sync.</li>
+</ul>
+</li>
+</ul>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="delete-a-local-group"><a class="header" href="#delete-a-local-group">Delete a local group</a></h1>
 <p>This API lets a server admin delete a local group. Doing so will kick all
 users out of the group so that their clients will correctly handle the group

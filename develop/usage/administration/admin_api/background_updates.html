@@ -233,6 +233,25 @@ background updates which won't be cancelled once started.</p>
 }
 </code></pre>
 <p>There is also a <code>GET</code> version which returns the <code>enabled</code> state.</p>
+<h2 id="run"><a class="header" href="#run">Run</a></h2>
+<p>This API schedules a specific background update to run. The job starts immediately after calling the API.</p>
+<p>The API is:</p>
+<pre><code>POST /_synapse/admin/v1/background_updates/start_job
+</code></pre>
+<p>with the following body:</p>
+<pre><code class="language-json">{
+    &quot;job_name&quot;: &quot;populate_stats_process_rooms&quot;
+}
+</code></pre>
+<p>The following JSON body parameters are available:</p>
+<ul>
+<li><code>job_name</code> - A string which job to run. Valid values are:
+<ul>
+<li><code>populate_stats_process_rooms</code> - Recalculate the stats for all rooms.</li>
+<li><code>regenerate_directory</code> - Recalculate the <a href="../../../user_directory.html">user directory</a> if it is stale or out of sync.</li>
+</ul>
+</li>
+</ul>
 
                     </main>
 

@@ -187,9 +187,9 @@
 on this particular server - i.e. ones which your account shares a room with, or
 who are present in a publicly viewable room present on the server.</p>
 <p>The directory info is stored in various tables, which can (typically after
-DB corruption) get stale or out of sync.  If this happens, for now the
-solution to fix it is to execute the SQL <a href="https://github.com/matrix-org/synapse/blob/master/synapse/storage/schema/main/delta/53/user_dir_populate.sql">here</a>
-and then restart synapse. This should then start a background task to
+DB corruption) get stale or out of sync. If this happens, for now the
+solution to fix it is to use the <a href="usage/administration/admin_api/background_updates.html#run">admin API</a>
+and execute the job <code>regenerate_directory</code>. This should then start a background task to
 flush the current tables and regenerate the directory.</p>
 <h2 id="data-model"><a class="header" href="#data-model">Data model</a></h2>
 <p>There are five relevant tables that collectively form the &quot;user directory&quot;.
