@@ -50,12 +50,18 @@ class SpaceHierarchyHandler:
         self._server_name = hs.hostname
 
     async def get_space_descendants(
-        self, space_id: str, via: Optional[Iterable[str]] = None
+        self,
+        space_id: str,
+        via: Optional[Iterable[str]] = None,
+        enable_federation: Optional[bool] = True,
     ) -> Tuple[Sequence[Tuple[str, Iterable[str]]], Sequence[str]]:
         """Gets the children of a space, recursively.
 
         Args:
             space_id: The room ID of the space.
+            via: A list of servers which may know about the space.
+            enable_federation: A boolean controlling whether children of unknown rooms
+                should be fetched over federation. Defaults to `True`.
 
         Returns:
             A tuple containing:
@@ -65,6 +71,8 @@ class SpaceHierarchyHandler:
                Rooms in this list are either spaces not known locally, and thus require
                listing over federation, or are unknown rooms or subspaces completely
                inaccessible to the local homeserver which may contain further rooms.
+               Subspaces requiring listing over federation are always included here,
+               regardless of the value of the `enable_federation` flag.
 
                This list is a subset of the previous list, except it may include
                `space_id`.
@@ -91,12 +99,20 @@ class SpaceHierarchyHandler:
                     children,
                     federation_room_chunks,
                 ) = await self._get_space_children(
-                    space_id, via, federation_room_chunks
+                    space_id,
+                    via,
+                    federation_room_chunks,
+                    enable_federation=enable_federation,
                 )
             except SynapseError:
                 # Could not list children over federation
                 inaccessible_room_ids.append(space_id)
                 continue
+
+            # Children were retrieved over federation, which is not guaranteed to be
+            # the full list.
+            if not is_in_room:
+                inaccessible_room_ids.append(space_id)
 
             for child_room_id, child_via in reversed(children):
                 if child_room_id in seen:
@@ -109,11 +125,6 @@ class SpaceHierarchyHandler:
                 # `_get_space_children`.
                 todo.append((child_room_id, child_via, federation_room_chunks))
 
-            # Children were retrieved over federation, which is not guaranteed to be
-            # the full list.
-            if not is_in_room:
-                inaccessible_room_ids.append(space_id)
-
         return descendants, inaccessible_room_ids
 
     async def _get_space_children(
@@ -121,6 +132,7 @@ class SpaceHierarchyHandler:
         space_id: str,
         via: Optional[Iterable[str]] = None,
         federation_room_chunks: Optional[Mapping[str, Optional[JsonDict]]] = None,
+        enable_federation: Optional[bool] = True,
     ) -> Tuple[
         bool, Sequence[Tuple[str, Iterable[str]]], Mapping[str, Optional[JsonDict]]
     ]:
@@ -152,7 +164,7 @@ class SpaceHierarchyHandler:
 
         Raises:
             SynapseError: if `space_id` is not known locally and its children could not
-                be retrieved over federation.
+                be retrieved over federation or `enable_federation` is `False`.
         """
         via = via or []
         federation_room_chunks = federation_room_chunks or {}
@@ -177,6 +189,11 @@ class SpaceHierarchyHandler:
                 elif room_chunk.get("room_type") != RoomTypes.SPACE:
                     # `space_id` is not a space according to federation.
                     return False, [], {}
+
+            if not enable_federation:
+                raise SynapseError(
+                    502, f"{space_id} is not accessible to the local homeserver"
+                )
 
             children, room_chunks = await self._get_space_children_remote(space_id, via)
             return False, children, room_chunks

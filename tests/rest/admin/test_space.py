@@ -164,9 +164,14 @@ class RemoveSpaceMemberTestCase(unittest.HomeserverTestCase):
         )
 
         response = self._remove_from_space(self.target_user)
-
-        self.assertCountEqual(response["left"], [self.space_id])
-        self.assertEqual(response["failed"], {})
+        self.assertEqual(
+            response,
+            {
+                "left_rooms": [self.space_id],
+                "inaccessible_rooms": [],
+                "failed_rooms": {},
+            },
+        )
 
         membership, _ = self.get_success(
             self.store.get_local_current_membership_for_user_in_room(
@@ -183,9 +188,14 @@ class RemoveSpaceMemberTestCase(unittest.HomeserverTestCase):
         self.helper.join(public_room_id, self.target_user, tok=self.target_user_tok)
 
         response = self._remove_from_space(self.target_user)
-
-        self.assertCountEqual(response["left"], [self.space_id])
-        self.assertEqual(response["failed"], {})
+        self.assertEqual(
+            response,
+            {
+                "left_rooms": [self.space_id],
+                "inaccessible_rooms": [],
+                "failed_rooms": {},
+            },
+        )
 
         membership, _ = self.get_success(
             self.store.get_local_current_membership_for_user_in_room(
@@ -207,9 +217,14 @@ class RemoveSpaceMemberTestCase(unittest.HomeserverTestCase):
         )
 
         response = self._remove_from_space(self.target_user)
-
-        self.assertCountEqual(response["left"], [self.space_id, invite_only_room_id])
-        self.assertEqual(response["failed"], {})
+        self.assertEqual(
+            response,
+            {
+                "left_rooms": [self.space_id, invite_only_room_id],
+                "inaccessible_rooms": [],
+                "failed_rooms": {},
+            },
+        )
 
         membership, _ = self.get_success(
             self.store.get_local_current_membership_for_user_in_room(
@@ -234,9 +249,14 @@ class RemoveSpaceMemberTestCase(unittest.HomeserverTestCase):
         )
 
         response = self._remove_from_space(self.target_user)
-
-        self.assertCountEqual(response["left"], [self.space_id, invite_only_room_id])
-        self.assertEqual(response["failed"], {})
+        self.assertEqual(
+            response,
+            {
+                "left_rooms": [self.space_id, invite_only_room_id],
+                "inaccessible_rooms": [],
+                "failed_rooms": {},
+            },
+        )
 
         membership, _ = self.get_success(
             self.store.get_local_current_membership_for_user_in_room(
@@ -252,9 +272,14 @@ class RemoveSpaceMemberTestCase(unittest.HomeserverTestCase):
         self.helper.join(restricted_room_id, self.target_user, tok=self.target_user_tok)
 
         response = self._remove_from_space(self.target_user)
-
-        self.assertCountEqual(response["left"], [self.space_id, restricted_room_id])
-        self.assertEqual(response["failed"], {})
+        self.assertEqual(
+            response,
+            {
+                "left_rooms": [self.space_id, restricted_room_id],
+                "inaccessible_rooms": [],
+                "failed_rooms": {},
+            },
+        )
 
         membership, _ = self.get_success(
             self.store.get_local_current_membership_for_user_in_room(

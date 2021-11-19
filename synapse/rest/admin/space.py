@@ -12,11 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import SynapseError
-from synapse.http.servlet import ResolveRoomIdMixin, RestServlet
+from synapse.http.servlet import (
+    ResolveRoomIdMixin,
+    RestServlet,
+    parse_json_object_from_request,
+)
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_user_is_admin
 from synapse.storage.state import StateFilter
@@ -56,26 +61,38 @@ class RemoveSpaceMemberRestServlet(ResolveRoomIdMixin, RestServlet):
 
         Returns:
             A tuple containing the HTTP status code and a JSON dictionary containing:
-             * `left`: A list of rooms that the user has been made to leave.
-             * `failed`: A with entries for rooms that could not be fully processed.
-                The values of the dictionary are lists of failure reasons.
-                Rooms may appear here if:
-                 * The user failed to leave them for any reason.
+             * `left_rooms`: A list of rooms that the user has been made to leave.
+             * `inaccessible_rooms`: A list of rooms and spaces that the local
+                homeserver is not in, and may have not been fully processed. Rooms may
+                appear here if:
                  * The room is a space that the local homeserver is not in, and so its
                    full list of child rooms could not be determined.
                  * The room is inaccessible to the local homeserver, and it is not known
                    whether the room is a subspace containing further rooms.
-                 * Some combination of the above.
+             * `failed_rooms`: A dictionary of errors encountered when leaving rooms.
+                The keys of the dictionary are room IDs and the values of the dictionary
+                are error messages.
         """
         requester = await self._auth.get_user_by_req(request)
         await assert_user_is_admin(self._auth, requester.user)
+
+        content = parse_json_object_from_request(request, allow_empty_body=True)
+        include_remote_spaces = content.get("include_remote_spaces", True)
+        if not isinstance(include_remote_spaces, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "'include_remote_spaces' parameter must be a boolean",
+            )
 
         space_id, _ = await self.resolve_room_id(space_id)
 
         target_user = UserID.from_string(user_id)
 
         if not self._hs.is_mine(target_user):
-            raise SynapseError(400, "This endpoint can only be used with local users")
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "This endpoint can only be used with local users",
+            )
 
         # Fetch the list of rooms the target user is currently in
         user_rooms = await self._store.get_rooms_for_local_user_where_membership_is(
@@ -87,7 +104,9 @@ class RemoveSpaceMemberRestServlet(ResolveRoomIdMixin, RestServlet):
         (
             descendants,
             inaccessible_room_ids,
-        ) = await self._space_hierarchy_handler.get_space_descendants(space_id)
+        ) = await self._space_hierarchy_handler.get_space_descendants(
+            space_id, enable_federation=include_remote_spaces
+        )
 
         # Determine which rooms to leave by checking join rules
         rooms_to_leave: List[str] = []
@@ -116,10 +135,7 @@ class RemoveSpaceMemberRestServlet(ResolveRoomIdMixin, RestServlet):
                 rooms_to_leave.append(room_id)
 
         # Now start leaving rooms
-        failures: Dict[str, List[str]] = {
-            room_id: ["Could not fully explore space or room."]
-            for room_id in inaccessible_room_ids
-        }
+        failures: Dict[str, str] = {}
         left_rooms: List[str] = []
 
         fake_requester = create_requester(
@@ -144,6 +160,10 @@ class RemoveSpaceMemberRestServlet(ResolveRoomIdMixin, RestServlet):
                 )
                 left_rooms.append(room_id)
             except Exception as e:
-                failures.get(room_id, []).append(str(e))
+                failures[room_id] = str(e)
 
-        return 200, {"left": left_rooms, "failed": failures}
+        return 200, {
+            "left_rooms": left_rooms,
+            "inaccessible_rooms": inaccessible_room_ids,
+            "failed_rooms": failures,
+        }
