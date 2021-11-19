@@ -141,15 +141,19 @@ class PersistEventsStore:
             new_forward_extremities: Map from room_id to list of event IDs
                 that are the new forward extremities of the room.
             use_negative_stream_ordering: Whether to start stream_ordering on
-                the negative side and decrement. Usually this is done for any
-                backfilled event.
+                the negative side and decrement. This should be set as True
+                for backfilled events because backfilled events get a negative
+                stream ordering so they don't come down incremental `/sync`.
             inhibit_local_membership_updates: Stop the local_current_membership
-                from being updated by these events. Usually this is done for
-                backfilled events.
+                from being updated by these events. This should be set to True
+                for backfilled events because backfilled events in the past do
+                not affect the current local state.
             update_room_forward_stream_ordering: Whether to update the
                 stream_ordering position to mark the latest event as the front
-                of the room. This should only be set as false for backfilled
-                events.
+                of the room. This should be set as False for backfilled
+                events because backfilled events have negative stream_ordering
+                and happened in the past so we know that we don't need to
+                update the stream_ordering tip for the room.
 
         Returns:
             Resolves when the events have been persisted
@@ -348,12 +352,15 @@ class PersistEventsStore:
             events_and_contexts: events to persist
             backfilled: True if the events were backfilled
             inhibit_local_membership_updates: Stop the local_current_membership
-                from being updated by these events. Usually this is done for
-                backfilled events.
+                from being updated by these events. This should be set to True
+                for backfilled events because backfilled events in the past do
+                not affect the current local state.
             update_room_forward_stream_ordering: Whether to update the
                 stream_ordering position to mark the latest event as the front
-                of the room. This should only be set as false for backfilled
-                events.
+                of the room. This should be set as False for backfilled
+                events because backfilled events have negative stream_ordering
+                and happened in the past so we know that we don't need to
+                update the stream_ordering tip for the room.
             delete_existing True to purge existing table rows for the events
                 from the database. This is useful when retrying due to
                 IntegrityError.
@@ -1234,10 +1241,12 @@ class PersistEventsStore:
             txn (twisted.enterprise.adbapi.Connection): db connection
             events_and_contexts (list[(EventBase, EventContext)]): events
                 we are persisting
-            update_room_forward_stream_ordering (bool): Whether to update the
+            update_room_forward_stream_ordering: Whether to update the
                 stream_ordering position to mark the latest event as the front
-                of the room. This should only be set as false for backfilled
-                events.
+                of the room. This should be set as False for backfilled
+                events because backfilled events have negative stream_ordering
+                and happened in the past so we know that we don't need to
+                update the stream_ordering tip for the room.
         """
         depth_updates: Dict[str, int] = {}
         for event, context in events_and_contexts:
@@ -1474,8 +1483,9 @@ class PersistEventsStore:
                 we've already persisted, etc, that wouldn't appear in
                 events_and_context.
             inhibit_local_membership_updates: Stop the local_current_membership
-                from being updated by these events. Usually this is done for
-                backfilled events.
+                from being updated by these events. This should be set to True
+                for backfilled events because backfilled events in the past do
+                not affect the current local state.
         """
 
         # Insert all the push actions into the event_push_actions table.
@@ -1684,8 +1694,9 @@ class PersistEventsStore:
             txn: The transaction to use.
             events: List of events to store.
             inhibit_local_membership_updates: Stop the local_current_membership
-                from being updated by these events. Usually this is done for
-                backfilled events.
+                from being updated by these events. This should be set to True
+                for backfilled events because backfilled events in the past do
+                not affect the current local state.
         """
 
         def non_null_str_or_none(val: Any) -> Optional[str]:

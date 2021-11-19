@@ -180,17 +180,25 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
             events_and_contexts (list[(EventBase, EventContext)]):
             should_calculate_state_and_forward_extrems: Determines whether we
                 need to calculate the state and new forward extremities for the
-                room. This should be set to false for backfilled events.
+                room. This should be set to false for backfilled events because
+                we don't need to calculate the state for backfilled events and
+                there is no need to update the forward extrems because we
+                already know this event happened in the past if it was
+                backfilled.
             use_negative_stream_ordering: Whether to start stream_ordering on
-                the negative side and decrement. Usually this is done for any
-                backfilled event.
+                the negative side and decrement. This should be set as True
+                for backfilled events because backfilled events get a negative
+                stream ordering so they don't come down incremental `/sync`.
             inhibit_local_membership_updates: Stop the local_current_membership
-                from being updated by these events. Usually this is done for
-                backfilled events.
+                from being updated by these events. This should be set to True
+                for backfilled events because backfilled events in the past do
+                not affect the current local state.
             update_room_forward_stream_ordering: Whether to update the
                 stream_ordering position to mark the latest event as the front
-                of the room. This should only be set as false for backfilled
-                events.
+                of the room. This should be set as False for backfilled
+                events because backfilled events have negative stream_ordering
+                and happened in the past so we know that we don't need to
+                update the stream_ordering tip for the room.
 
         Returns:
             the result returned by the `_per_item_callback` passed to
@@ -348,17 +356,25 @@ class EventsPersistenceStorage:
             events_and_contexts: list of tuples of (event, context)
             should_calculate_state_and_forward_extrems: Determines whether we
                 need to calculate the state and new forward extremities for the
-                room. This should be set to false for backfilled events.
+                room. This should be set to false for backfilled events because
+                we don't need to calculate the state for backfilled events and
+                there is no need to update the forward extrems because we
+                already know this event happened in the past if it was
+                backfilled.
             use_negative_stream_ordering: Whether to start stream_ordering on
-                the negative side and decrement. Usually this is done for any
-                backfilled event.
+                the negative side and decrement. This should be set as True
+                for backfilled events because backfilled events get a negative
+                stream ordering so they don't come down incremental `/sync`.
             inhibit_local_membership_updates: Stop the local_current_membership
-                from being updated by these events. Usually this is done for
-                backfilled events.
+                from being updated by these events. This should be set to True
+                for backfilled events because backfilled events in the past do
+                not affect the current local state.
             update_room_forward_stream_ordering: Whether to update the
                 stream_ordering position to mark the latest event as the front
-                of the room. This should only be set as false for backfilled
-                events.
+                of the room. This should be set as False for backfilled
+                events because backfilled events have negative stream_ordering
+                and happened in the past so we know that we don't need to
+                update the stream_ordering tip for the room.
 
         Returns:
             List of events persisted, the current position room stream position.
@@ -426,17 +442,25 @@ class EventsPersistenceStorage:
             context:
             should_calculate_state_and_forward_extrems: Determines whether we
                 need to calculate the state and new forward extremities for the
-                room. This should be set to false for backfilled events.
+                room. This should be set to false for backfilled events because
+                we don't need to calculate the state for backfilled events and
+                there is no need to update the forward extrems because we
+                already know this event happened in the past if it was
+                backfilled.
             use_negative_stream_ordering: Whether to start stream_ordering on
-                the negative side and decrement. Usually this is done for any
-                backfilled event.
+                the negative side and decrement. This should be set as True
+                for backfilled events because backfilled events get a negative
+                stream ordering so they don't come down incremental `/sync`.
             inhibit_local_membership_updates: Stop the local_current_membership
-                from being updated by these events. Usually this is done for
-                backfilled events.
+                from being updated by these events. This should be set to True
+                for backfilled events because backfilled events in the past do
+                not affect the current local state.
             update_room_forward_stream_ordering: Whether to update the
                 stream_ordering position to mark the latest event as the front
-                of the room. This should only be set as false for backfilled
-                events.
+                of the room. This should be set as False for backfilled
+                events because backfilled events have negative stream_ordering
+                and happened in the past so we know that we don't need to
+                update the stream_ordering tip for the room.
 
         Returns:
             The event, stream ordering of `event`, and the stream ordering of the
@@ -484,17 +508,25 @@ class EventsPersistenceStorage:
             events_and_contexts:
             should_calculate_state_and_forward_extrems: Determines whether we
                 need to calculate the state and new forward extremities for the
-                room. This should be set to false for backfilled events.
+                room. This should be set to false for backfilled events because
+                we don't need to calculate the state for backfilled events and
+                there is no need to update the forward extrems because we
+                already know this event happened in the past if it was
+                backfilled.
             use_negative_stream_ordering: Whether to start stream_ordering on
-                the negative side and decrement. Usually this is done for any
-                backfilled event.
+                the negative side and decrement. This should be set as True
+                for backfilled events because backfilled events get a negative
+                stream ordering so they don't come down incremental `/sync`.
             inhibit_local_membership_updates: Stop the local_current_membership
-                from being updated by these events. Usually this is done for
-                backfilled events.
+                from being updated by these events. This should be set to True
+                for backfilled events because backfilled events in the past do
+                not affect the current local state.
             update_room_forward_stream_ordering: Whether to update the
                 stream_ordering position to mark the latest event as the front
-                of the room. This should only be set as false for backfilled
-                events.
+                of the room. This should be set as False for backfilled
+                events because backfilled events have negative stream_ordering
+                and happened in the past so we know that we don't need to
+                update the stream_ordering tip for the room.
 
         Returns:
             A dictionary of event ID to event ID we didn't persist as we already
