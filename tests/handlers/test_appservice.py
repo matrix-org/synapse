@@ -338,6 +338,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
     Tests that the ApplicationServicesHandler sends events to application
     services correctly.
     """
+
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
@@ -353,22 +354,28 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         self.mock_service_queuer.enqueue_ephemeral = Mock()
         hs.get_application_service_handler().scheduler.queuer = self.mock_service_queuer
 
-        self.device1 = "device1"
-        self.user1 = self.register_user("user1", "password")
-        self.token1 = self.login("user1", "password", self.device1)
+        # A user on the homeserver.
+        self.local_user_device_id = "local_device"
+        self.local_user = self.register_user("local_user", "password")
+        self.local_user_token = self.login(
+            "local_user", "password", self.local_user_device_id
+        )
 
-        self.device2 = "device2"
-        self.user2 = self.register_user("user2", "password")
-        self.token2 = self.login("user2", "password", self.device2)
+        # A user on the homeserver which lies within an appservice's exclusive user namespace.
+        self.exclusive_as_user_device_id = "exclusive_as_device"
+        self.exclusive_as_user = self.register_user("exclusive_as_user", "password")
+        self.exclusive_as_user_token = self.login(
+            "exclusive_as_user", "password", self.exclusive_as_user_device_id
+        )
 
     @unittest.override_config(
         {"experimental_features": {"msc2409_to_device_messages_enabled": True}}
     )
     def test_application_services_receive_local_to_device(self):
         """
-        Test that when a user sends a to-device message to another user, and
-        that is in an application service's user namespace, that application
-        service will receive it.
+        Test that when a user sends a to-device message to another user
+        that is an application service's user namespace, the
+        application service will receive it.
         """
         (
             interested_services,
@@ -376,28 +383,38 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         ) = self._register_interested_and_uninterested_application_services()
         interested_service = interested_services[0]
 
-        # Have user1 send a to-device message to user2
+        # Have local_user send a to-device message to exclusive_as_user
         message_content = {"some_key": "some really interesting value"}
         chan = self.make_request(
             "PUT",
             "/_matrix/client/r0/sendToDevice/m.room_key_request/3",
-            content={"messages": {self.user2: {self.device2: message_content}}},
-            access_token=self.token1,
+            content={
+                "messages": {
+                    self.exclusive_as_user: {
+                        self.exclusive_as_user_device_id: message_content
+                    }
+                }
+            },
+            access_token=self.local_user_token,
         )
         self.assertEqual(chan.code, 200, chan.result)
 
-        # Have user2 send a to-device message to user1
+        # Have exclusive_as_user send a to-device message to local_user
         chan = self.make_request(
             "PUT",
             "/_matrix/client/r0/sendToDevice/m.room_key_request/4",
-            content={"messages": {self.user1: {self.device1: message_content}}},
-            access_token=self.token2,
+            content={
+                "messages": {
+                    self.local_user: {self.local_user_device_id: message_content}
+                }
+            },
+            access_token=self.exclusive_as_user_token,
         )
         self.assertEqual(chan.code, 200, chan.result)
 
-        # Check if our application service - that is interested in user2 - received
+        # Check if our application service - that is interested in exclusive_as_user - received
         # the to-device message as part of an AS transaction.
-        # Only the user1 -> user2 to-device message should have been forwarded to the AS.
+        # Only the local_user -> exclusive_as_user to-device message should have been forwarded to the AS.
         #
         # The uninterested application service should not have been notified at all.
         self.mock_service_queuer.enqueue_ephemeral.assert_called_once()
@@ -405,15 +422,15 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             0
         ]
 
-        # Assert that this was the same to-device message that user1 sent
+        # Assert that this was the same to-device message that local_user sent
         self.assertEqual(service, interested_service)
         self.assertEqual(events[0]["type"], "m.room_key_request")
-        self.assertEqual(events[0]["sender"], self.user1)
+        self.assertEqual(events[0]["sender"], self.local_user)
 
         # Additional fields 'to_user_id' and 'to_device_id' specifically for
         # to-device messages via the AS API
-        self.assertEqual(events[0]["to_user_id"], self.user2)
-        self.assertEqual(events[0]["to_device_id"], self.device2)
+        self.assertEqual(events[0]["to_user_id"], self.exclusive_as_user)
+        self.assertEqual(events[0]["to_device_id"], self.exclusive_as_user_device_id)
         self.assertEqual(events[0]["content"], message_content)
 
     @unittest.override_config(
@@ -449,7 +466,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         number_of_messages = 150
         fake_device_ids = [f"device_{num}" for num in range(number_of_messages - 1)]
         messages = {
-            self.user2: {
+            self.exclusive_as_user: {
                 device_id: to_device_message_content for device_id in fake_device_ids
             }
         }
@@ -462,7 +479,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
                 table="devices",
                 values=[
                     {
-                        "user_id": self.user2,
+                        "user_id": self.exclusive_as_user,
                         "device_id": device_id,
                     }
                     for device_id in fake_device_ids
@@ -475,16 +492,20 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             self.hs.get_datastore().add_messages_to_device_inbox(messages, {})
         )
 
-        # Now have user1 send a final to-device message to user2. All unsent
+        # Now have local_user send a final to-device message to exclusive_as_user. All unsent
         # to-device messages should be sent to any application services
-        # interested in user2.
+        # interested in exclusive_as_user.
         chan = self.make_request(
             "PUT",
             "/_matrix/client/r0/sendToDevice/m.room_key_request/4",
             content={
-                "messages": {self.user2: {self.device2: to_device_message_content}}
+                "messages": {
+                    self.exclusive_as_user: {
+                        self.exclusive_as_user_device_id: to_device_message_content
+                    }
+                }
             },
-            access_token=self.token1,
+            access_token=self.local_user_token,
         )
         self.assertEqual(chan.code, 200, chan.result)
 
@@ -516,7 +537,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
     ) -> Tuple[List[ApplicationService], List[ApplicationService]]:
         """
         Create application services with and without exclusive interest
-        in user2.
+        in exclusive_as_user.
 
         Args:
             interested_count: The number of application services to create
@@ -529,7 +550,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
                 * Interested application services
                 * Uninterested application services
         """
-        # Create an application service with exclusive interest in user2
+        # Create an application service with exclusive interest in exclusive_as_user
         interested_services = []
         uninterested_services = []
         for _ in range(interested_count):
@@ -537,7 +558,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
                 namespaces={
                     ApplicationService.NS_USERS: [
                         {
-                            "regex": "@user2:.+",
+                            "regex": "@exclusive_as_user:.+",
                             "exclusive": True,
                         }
                     ],
