@@ -72,7 +72,7 @@ from synapse.util.metrics import Measure
 logger = logging.getLogger(__name__)
 
 
-# These values are used in the `enqueus_event` and `_do_fetch` methods to
+# These values are used in the `enqueue_event` and `_fetch_loop` methods to
 # control how we batch/bulk fetch events from the database.
 # The values are plucked out of thing air to make initial sync run faster
 # on jki.re
@@ -749,11 +749,11 @@ class EventsWorkerStore(SQLBaseStore):
             else:
                 should_start = False
 
-        async def _do_fetch() -> None:
+        async def _fetch_thread() -> None:
             """Services requests for events from the `_event_fetch_list` queue."""
             exc = None
             try:
-                await self.db_pool.runWithConnection(self._do_fetch)
+                await self.db_pool.runWithConnection(self._fetch_loop)
             except Exception as e:
                 exc = e
                 raise
@@ -783,9 +783,9 @@ class EventsWorkerStore(SQLBaseStore):
                                 deferred.errback(exc)
 
         if should_start:
-            run_as_background_process("fetch_events", _do_fetch)
+            run_as_background_process("fetch_events", _fetch_thread)
 
-    def _do_fetch(self, conn: Connection) -> None:
+    def _fetch_loop(self, conn: Connection) -> None:
         """Takes a database connection and waits for requests for events from
         the _event_fetch_list queue.
         """
