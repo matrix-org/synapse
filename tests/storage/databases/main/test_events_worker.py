@@ -212,10 +212,20 @@ class DatabaseOutageTestCase(unittest.HomeserverTestCase):
 
     @contextmanager
     def _outage(self) -> Generator[None, None, None]:
-        """Simulate a database outage."""
+        """Simulate a database outage.
+
+        Returns:
+            A context manager. While the context is active, any attempts to connect to
+            the database will fail.
+        """
         connection_pool = self.store.db_pool._db_pool
+
+        # Close all connections and shut down the database `ThreadPool`.
         connection_pool.close()
+
+        # Restart the database `ThreadPool`.
         connection_pool.start()
+
         original_connection_factory = connection_pool.connectionFactory
 
         def connection_factory(_pool: ConnectionPool) -> Connection:
