@@ -16,14 +16,16 @@ import ctypes
 import logging
 import os
 import re
-from typing import Optional
+from typing import Iterable, Optional
+
+from prometheus_client import Metric
 
 from synapse.metrics import REGISTRY, GaugeMetricFamily
 
 logger = logging.getLogger(__name__)
 
 
-def _setup_jemalloc_stats():
+def _setup_jemalloc_stats() -> None:
     """Checks to see if jemalloc is loaded, and hooks up a collector to record
     statistics exposed by jemalloc.
     """
@@ -135,7 +137,7 @@ def _setup_jemalloc_stats():
     class JemallocCollector:
         """Metrics for internal jemalloc stats."""
 
-        def collect(self):
+        def collect(self) -> Iterable[Metric]:
             _jemalloc_refresh_stats()
 
             g = GaugeMetricFamily(
@@ -185,7 +187,7 @@ def _setup_jemalloc_stats():
     logger.debug("Added jemalloc stats")
 
 
-def setup_jemalloc_stats():
+def setup_jemalloc_stats() -> None:
     """Try to setup jemalloc stats, if jemalloc is loaded."""
 
     try:
