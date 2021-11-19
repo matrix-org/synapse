@@ -31,7 +31,6 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from .account_data import AccountDataStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
-from .cache import CacheInvalidationWorkerStore
 from .censor_events import CensorEventsStore
 from .client_ips import ClientIpStore
 from .deviceinbox import DeviceInboxStore
@@ -49,7 +48,6 @@ from .keys import KeyStore
 from .lock import LockStore
 from .media_repository import MediaRepositoryStore
 from .metrics import ServerMetricsStore
-from .monthly_active_users import MonthlyActiveUsersStore
 from .openid import OpenIdStore
 from .presence import PresenceStore
 from .profile import ProfileStore
@@ -63,11 +61,9 @@ from .relations import RelationsStore
 from .room import RoomStore
 from .room_batch import RoomBatchStore
 from .roommember import RoomMemberStore
-from .search import SearchStore
 from .session import SessionStore
 from .signatures import SignatureStore
 from .state import StateStore
-from .stats import StatsStore
 from .stream import StreamStore
 from .tags import TagsStore
 from .transactions import TransactionWorkerStore
@@ -107,7 +103,6 @@ class DataStore(
     ReceiptsStore,
     EndToEndKeyStore,
     EndToEndRoomKeyStore,
-    SearchStore,
     TagsStore,
     AccountDataStore,
     EventPushActionsStore,
@@ -118,13 +113,10 @@ class DataStore(
     UserDirectoryStore,
     GroupServerStore,
     UserErasureStore,
-    MonthlyActiveUsersStore,
-    StatsStore,
     RelationsStore,
     CensorEventsStore,
     UIAuthStore,
     EventForwardExtremitiesStore,
-    CacheInvalidationWorkerStore,
     ServerMetricsStore,
     LockStore,
     SessionStore,
