@@ -325,7 +325,7 @@ class ApplicationServicesHandler:
                         )
 
                     elif stream_key == "to_device_key":
-                        # Retrieve an iterable of to-device message events, as well as the
+                        # Retrieve a list of to-device message events, as well as the
                         # maximum stream token of the messages we were able to retrieve.
                         events = await self._handle_to_device(service, new_token, users)
                         if events:
