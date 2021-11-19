@@ -914,7 +914,7 @@ class RoomTypingRestServlet(RestServlet):
         # If we're not on the typing writer instance we should scream if we get
         # requests.
         self._is_typing_writer = (
-            hs.config.worker.writers.typing == hs.get_instance_name()
+            hs.get_instance_name() in hs.config.worker.writers.typing
         )
 
     async def on_PUT(

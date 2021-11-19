@@ -43,6 +43,7 @@ from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyBackground
 from synapse.storage.databases.main.events_bg_updates import (
     EventsBackgroundUpdatesStore,
 )
+from synapse.storage.databases.main.group_server import GroupServerWorkerStore
 from synapse.storage.databases.main.media_repository import (
     MediaRepositoryBackgroundUpdateStore,
 )
@@ -181,6 +182,7 @@ class Store(
     StatsStore,
     PusherWorkerStore,
     PresenceBackgroundUpdateStore,
+    GroupServerWorkerStore,
 ):
     def execute(self, f, *args, **kwargs):
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)

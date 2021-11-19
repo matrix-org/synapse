@@ -55,7 +55,7 @@ class EventValidator:
         ]
 
         for k in required:
-            if not hasattr(event, k):
+            if k not in event:
                 raise SynapseError(400, "Event does not have key %s" % (k,))
 
         # Check that the following keys have string values

@@ -15,6 +15,11 @@ license - in our case, this is almost always Apache Software License v2 (see
 
 # 2. What do I need?
 
+If you are running Windows, the Windows Subsystem for Linux (WSL) is strongly
+recommended for development. More information about WSL can be found at
+<https://docs.microsoft.com/en-us/windows/wsl/install>. Running Synapse natively
+on Windows is not officially supported.
+
 The code of Synapse is written in Python 3. To do pretty much anything, you'll need [a recent version of Python 3](https://wiki.python.org/moin/BeginnersGuide/Download).
 
 The source code of Synapse is hosted on GitHub. You will also need [a recent version of git](https://github.com/git-guides/install-git).
@@ -41,8 +46,6 @@ can find many good git tutorials on the web.
 
 # 4. Install the dependencies
 
-## Under Unix (macOS, Linux, BSD, ...)
-
 Once you have installed Python 3 and added the source, please open a terminal and
 setup a *virtualenv*, as follows:
 
@@ -55,10 +58,6 @@ pip install tox
 ```
 
 This will install the developer dependencies for the project.
-
-## Under Windows
-
-TBD
 
 
 # 5. Get in touch.

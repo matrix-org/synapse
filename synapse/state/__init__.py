@@ -26,6 +26,7 @@ from typing import (
     FrozenSet,
     Iterable,
     List,
+    Mapping,
     Optional,
     Sequence,
     Set,
@@ -246,7 +247,7 @@ class StateHandler:
         return await self.get_hosts_in_room_at_events(room_id, event_ids)
 
     async def get_hosts_in_room_at_events(
-        self, room_id: str, event_ids: List[str]
+        self, room_id: str, event_ids: Iterable[str]
     ) -> Set[str]:
         """Get the hosts that were in a room at the given event ids
 
@@ -519,7 +520,7 @@ class StateResolutionHandler:
         self,
         room_id: str,
         room_version: str,
-        state_groups_ids: Dict[int, StateMap[str]],
+        state_groups_ids: Mapping[int, StateMap[str]],
         event_map: Optional[Dict[str, EventBase]],
         state_res_store: "StateResolutionStore",
     ) -> _StateCacheEntry:
@@ -703,7 +704,7 @@ class StateResolutionHandler:
 
 
 def _make_state_cache_entry(
-    new_state: StateMap[str], state_groups_ids: Dict[int, StateMap[str]]
+    new_state: StateMap[str], state_groups_ids: Mapping[int, StateMap[str]]
 ) -> _StateCacheEntry:
     """Given a resolved state, and a set of input state groups, pick one to base
     a new state group on (if any), and return an appropriately-constructed

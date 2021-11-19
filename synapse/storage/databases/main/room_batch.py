@@ -18,7 +18,7 @@ from synapse.storage._base import SQLBaseStore
 
 
 class RoomBatchStore(SQLBaseStore):
-    async def get_insertion_event_by_batch_id(
+    async def get_insertion_event_id_by_batch_id(
         self, room_id: str, batch_id: str
     ) -> Optional[str]:
         """Retrieve a insertion event ID.
