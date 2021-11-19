@@ -321,8 +321,12 @@ class ApplicationServicesHandler:
                     elif stream_key == "to_device_key":
                         # Retrieve a list of to-device message events, as well as the
                         # maximum stream token of the messages we were able to retrieve.
-                        events = await self._handle_to_device(service, new_token, users)
-                        self.scheduler.submit_ephemeral_events_for_as(service, events)
+                        to_device_messages = await self._get_to_device_messages(
+                            service, new_token, users
+                        )
+                        self.scheduler.submit_ephemeral_events_for_as(
+                            service, to_device_messages
+                        )
 
                         # Persist the latest handled stream token for this appservice
                         await self.store.set_type_stream_id_for_appservice(
@@ -462,7 +466,7 @@ class ApplicationServicesHandler:
 
         return events
 
-    async def _handle_to_device(
+    async def _get_to_device_messages(
         self,
         service: ApplicationService,
         new_token: int,
