@@ -31,9 +31,10 @@ class JWTConfig(Config):
             self.jwt_secret = jwt_config["secret"]
             self.jwt_algorithm = jwt_config["algorithm"]
 
+            self.jwt_subject_claim = jwt_config.get("subject_claim", "sub")
+
             # The issuer and audiences are optional, if provided, it is asserted
             # that the claims exist on the JWT.
-            self.jwt_subject_claim = jwt_config.get("subject_claim", "sub")
             self.jwt_issuer = jwt_config.get("issuer")
             self.jwt_audiences = jwt_config.get("audiences")
 
