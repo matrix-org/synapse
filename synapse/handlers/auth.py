@@ -758,11 +758,14 @@ class AuthHandler:
         refresh_token: str,
         access_token_valid_until_ms: Optional[int],
         refresh_token_valid_until_ms: Optional[int],
-    ) -> Tuple[str, str]:
+    ) -> Tuple[str, str, int]:
         """
         Consumes a refresh token and generate both a new access token and a new refresh token from it.
 
         The consumed refresh token is considered invalid after the first use of the new access token or the new refresh token.
+
+        The lifetime of both the access token and refresh token will be capped so that they
+        do not exceed the session's ultimate expiry time, if applicable.
 
         Args:
             refresh_token: The token to consume.
@@ -770,7 +773,11 @@ class AuthHandler:
             refresh_token_valid_until_ms: The expiration timestamp of the new refresh token.
                 None if the refresh token does not expire.
         Returns:
-            A tuple containing the new access token and refresh token
+            A tuple containing:
+              - the new access token
+              - the new refresh token
+              - the actual expiry time of the access token, which may be earlier than
+                `access_token_valid_until_ms`.
         """
 
         # Verify the token signature first before looking up the token
@@ -789,13 +796,28 @@ class AuthHandler:
                 403, "refresh token isn't valid anymore", Codes.FORBIDDEN
             )
 
-        if (
-            existing_token.expiry_ts is not None
-            and existing_token.expiry_ts < self._clock.time_msec()
-        ):
+        now_ms = self._clock.time_msec()
+
+        if existing_token.expiry_ts is not None and existing_token.expiry_ts < now_ms:
             raise SynapseError(
                 403, "The supplied refresh token has expired", Codes.FORBIDDEN
             )
+
+        if existing_token.ultimate_session_expiry_ts is not None:
+            # This session has a bounded lifetime, even across refreshes.
+            access_token_valid_until_ms = min(
+                access_token_valid_until_ms, existing_token.ultimate_session_expiry_ts
+            )
+            refresh_token_valid_until_ms = min(
+                refresh_token_valid_until_ms, existing_token.ultimate_session_expiry_ts
+            )
+
+            if existing_token.ultimate_session_expiry_ts < now_ms:
+                raise SynapseError(
+                    403,
+                    "The session has expired and can no longer be refreshed",
+                    Codes.FORBIDDEN,
+                )
 
         (
             new_refresh_token,
@@ -815,7 +837,7 @@ class AuthHandler:
         await self.store.replace_refresh_token(
             existing_token.token_id, new_refresh_token_id
         )
-        return access_token, new_refresh_token
+        return access_token, new_refresh_token, access_token_valid_until_ms
 
     def _verify_refresh_token(self, token: str) -> bool:
         """
