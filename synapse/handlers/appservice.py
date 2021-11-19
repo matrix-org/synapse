@@ -55,7 +55,7 @@ class ApplicationServicesHandler:
         self.clock = hs.get_clock()
         self.notify_appservices = hs.config.appservice.notify_appservices
         self.event_sources = hs.get_event_sources()
-        self.msc2409_to_device_messages_enabled = (
+        self._msc2409_to_device_messages_enabled = (
             hs.config.experimental.msc2409_to_device_messages_enabled
         )
 
@@ -236,7 +236,7 @@ class ApplicationServicesHandler:
         # Ignore to-device messages if the feature flag is not enabled
         if (
             stream_key == "to_device_key"
-            and not self.msc2409_to_device_messages_enabled
+            and not self._msc2409_to_device_messages_enabled
         ):
             return
 
@@ -314,10 +314,7 @@ class ApplicationServicesHandler:
                             service, "presence", new_token
                         )
 
-                    elif (
-                        stream_key == "to_device_key"
-                        and self.msc2409_to_device_messages_enabled
-                    ):
+                    elif stream_key == "to_device_key":
                         # Retrieve an iterable of to-device message events, as well as the
                         # maximum stream token of the messages we were able to retrieve.
                         events = await self._handle_to_device(service, new_token, users)
