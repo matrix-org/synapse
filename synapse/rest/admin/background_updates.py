@@ -112,7 +112,6 @@ class BackgroundUpdateStartJobRestServlet(RestServlet):
     """Allows to start specific background updates"""
 
     PATTERNS = admin_patterns("/background_updates/start_job")
-    ERROR_DUPLICATE_JOB = "Job %s is already in queue of background updates."
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()
@@ -128,19 +127,12 @@ class BackgroundUpdateStartJobRestServlet(RestServlet):
         job_name = body["job_name"]
 
         if job_name == "populate_stats_process_rooms":
-            try:
-                await self._store.db_pool.simple_insert(
-                    "background_updates",
-                    {
-                        "update_name": "populate_stats_process_rooms",
-                        "progress_json": "{}",
-                    },
-                    desc="admin_api_populate_stats_process_rooms",
-                )
-            except self._store.db_pool.engine.module.IntegrityError:
-                raise SynapseError(
-                    HTTPStatus.BAD_REQUEST, self.ERROR_DUPLICATE_JOB % job_name
-                )
+            jobs = [
+                {
+                    "update_name": "populate_stats_process_rooms",
+                    "progress_json": "{}",
+                },
+            ]
         elif job_name == "regenerate_directory":
             jobs = [
                 {
@@ -164,18 +156,20 @@ class BackgroundUpdateStartJobRestServlet(RestServlet):
                     "depends_on": "populate_user_directory_process_users",
                 },
             ]
-            try:
-                await self._store.db_pool.simple_insert_many(
-                    table="background_updates",
-                    values=jobs,
-                    desc="admin_api_regenerate_directory",
-                )
-            except self._store.db_pool.engine.module.IntegrityError:
-                raise SynapseError(
-                    HTTPStatus.BAD_REQUEST, self.ERROR_DUPLICATE_JOB % job_name
-                )
         else:
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Invalid job_name")
+
+        try:
+            await self._store.db_pool.simple_insert_many(
+                table="background_updates",
+                values=jobs,
+                desc=f"admin_api_run_{job_name}",
+            )
+        except self._store.db_pool.engine.module.IntegrityError:
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Job %s is already in queue of background updates." % job_name,
+            )
 
         self._store.db_pool.updates.start_doing_background_updates()
 
