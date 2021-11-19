@@ -1809,7 +1809,24 @@ class FederationEventHandler:
 
         try:
             await self.persist_events_and_notify(
-                event.room_id, [(event, context)], backfilled=backfilled
+                event.room_id,
+                [(event, context)],
+                # We should not send notifications about backfilled events.
+                inhibit_push_notifications=backfilled,
+                # We don't need to calculate the state for backfilled events and
+                # we there is no need to update the forward extrems because we
+                # already know this event happened in the past if it was
+                # backfilled.
+                should_calculate_state_and_forward_extrems=not backfilled,
+                # Backfilled events get a negative stream ordering so they don't
+                # come down incremental `/sync`
+                use_negative_stream_ordering=backfilled,
+                # Backfilled events do not affect the current local state
+                inhibit_local_membership_updates=backfilled,
+                # Backfilled events have negative stream ordering and happened
+                # in the past so we know that we don't need to update the
+                # stream_ordering tip for the room.
+                update_room_forward_stream_ordering=not backfilled,
             )
         except Exception:
             run_in_background(
@@ -1823,6 +1840,10 @@ class FederationEventHandler:
         event_and_contexts: Sequence[Tuple[EventBase, EventContext]],
         *,
         inhibit_push_notifications: bool = False,
+        should_calculate_state_and_forward_extrems: bool = True,
+        use_negative_stream_ordering: bool = False,
+        inhibit_local_membership_updates: bool = False,
+        update_room_forward_stream_ordering: bool = True,
     ) -> int:
         """Persists events and tells the notifier/pushers about them, if
         necessary.
@@ -1835,6 +1856,19 @@ class FederationEventHandler:
             inhibit_push_notifications: Whether to stop the notifiers/pushers
                 from knowing about the event. Usually this is done for any backfilled
                 event.
+            should_calculate_state_and_forward_extrems: Determines whether we
+                need to calculate the state and new forward extremities for the
+                room. This should be set to false for backfilled events.
+            use_negative_stream_ordering: Whether to start stream_ordering on
+                the negative side and decrement. Usually this is done for any
+                backfilled event.
+            inhibit_local_membership_updates: Stop the local_current_membership
+                from being updated by these events. Usually this is done for
+                backfilled events.
+            update_room_forward_stream_ordering: Whether to update the
+                stream_ordering position to mark the latest event as the front
+                of the room. This should only be set as false for backfilled
+                events.
 
         Returns:
             The stream ID after which all events have been persisted.
@@ -1861,7 +1895,11 @@ class FederationEventHandler:
             # Note that this returns the events that were persisted, which may not be
             # the same as were passed in if some were deduplicated due to transaction IDs.
             events, max_stream_token = await self._storage.persistence.persist_events(
-                event_and_contexts, backfilled=backfilled
+                event_and_contexts,
+                should_calculate_state_and_forward_extrems=should_calculate_state_and_forward_extrems,
+                use_negative_stream_ordering=use_negative_stream_ordering,
+                inhibit_local_membership_updates=inhibit_local_membership_updates,
+                update_room_forward_stream_ordering=update_room_forward_stream_ordering,
             )
 
             if self._ephemeral_messages_enabled:

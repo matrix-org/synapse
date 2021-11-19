@@ -323,7 +323,12 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         if backfill:
             self.get_success(
                 self.storage.persistence.persist_events(
-                    [(event, context)], backfilled=True
+                    [(event, context)],
+                    # Backfilled event
+                    should_calculate_state_and_forward_extrems=False,
+                    use_negative_stream_ordering=True,
+                    inhibit_local_membership_updates=True,
+                    update_room_forward_stream_ordering=False,
                 )
             )
         else:

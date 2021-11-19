@@ -70,16 +70,37 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
 
     @staticmethod
     async def _serialize_payload(
-        store, room_id, event_and_contexts, inhibit_push_notifications: bool = False
+        store,
+        room_id,
+        event_and_contexts,
+        *,
+        inhibit_push_notifications: bool = False,
+        should_calculate_state_and_forward_extrems: bool = True,
+        use_negative_stream_ordering: bool = False,
+        inhibit_local_membership_updates: bool = False,
+        update_room_forward_stream_ordering: bool = True,
     ):
         """
         Args:
             store
             room_id (str)
             event_and_contexts (list[tuple[FrozenEvent, EventContext]])
-            inhibit_push_notifications (bool): Whether to stop the notifiers/pushers
+            inhibit_push_notifications: Whether to stop the notifiers/pushers
                 from knowing about the event. Usually this is done for any backfilled
                 event.
+            should_calculate_state_and_forward_extrems: Determines whether we
+                need to calculate the state and new forward extremities for the
+                room. This should be set to false for backfilled events.
+            use_negative_stream_ordering: Whether to start stream_ordering on
+                the negative side and decrement. Usually this is done for any
+                backfilled event.
+            inhibit_local_membership_updates: Stop the local_current_membership
+                from being updated by these events. Usually this is done for
+                backfilled events.
+            update_room_forward_stream_ordering: Whether to update the
+                stream_ordering position to mark the latest event as the front
+                of the room. This should only be set as false for backfilled
+                events.
         """
         event_payloads = []
         for event, context in event_and_contexts:
@@ -100,6 +121,10 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         payload = {
             "events": event_payloads,
             "inhibit_push_notifications": inhibit_push_notifications,
+            "should_calculate_state_and_forward_extrems": should_calculate_state_and_forward_extrems,
+            "use_negative_stream_ordering": use_negative_stream_ordering,
+            "inhibit_local_membership_updates": inhibit_local_membership_updates,
+            "update_room_forward_stream_ordering": update_room_forward_stream_ordering,
             "room_id": room_id,
         }
 
@@ -111,6 +136,22 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
 
             room_id = content["room_id"]
             inhibit_push_notifications = content["inhibit_push_notifications"]
+            should_calculate_state_and_forward_extrems = content[
+                "should_calculate_state_and_forward_extrems"
+            ]
+            use_negative_stream_ordering = content["use_negative_stream_ordering"]
+            inhibit_local_membership_updates = content[
+                "inhibit_local_membership_updates"
+            ]
+            update_room_forward_stream_ordering = content[
+                "update_room_forward_stream_ordering"
+            ]
+
+            assert inhibit_push_notifications is not None
+            assert should_calculate_state_and_forward_extrems is not None
+            assert use_negative_stream_ordering is not None
+            assert inhibit_local_membership_updates is not None
+            assert update_room_forward_stream_ordering is not None
 
             event_payloads = content["events"]
 
@@ -135,7 +176,13 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         logger.info("Got %d events from federation", len(event_and_contexts))
 
         max_stream_id = await self.federation_event_handler.persist_events_and_notify(
-            room_id, event_and_contexts, inhibit_push_notifications
+            room_id,
+            event_and_contexts,
+            inhibit_push_notifications=inhibit_push_notifications,
+            should_calculate_state_and_forward_extrems=should_calculate_state_and_forward_extrems,
+            use_negative_stream_ordering=use_negative_stream_ordering,
+            inhibit_local_membership_updates=inhibit_local_membership_updates,
+            update_room_forward_stream_ordering=update_room_forward_stream_ordering,
         )
 
         return 200, {"max_stream_id": max_stream_id}

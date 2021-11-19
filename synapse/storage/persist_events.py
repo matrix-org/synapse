@@ -296,15 +296,29 @@ class EventsPersistenceStorage:
     async def persist_events(
         self,
         events_and_contexts: Iterable[Tuple[EventBase, EventContext]],
-        backfilled: bool = False,
+        *,
+        should_calculate_state_and_forward_extrems: bool = True,
+        use_negative_stream_ordering: bool = False,
+        inhibit_local_membership_updates: bool = False,
+        update_room_forward_stream_ordering: bool = True,
     ) -> Tuple[List[EventBase], RoomStreamToken]:
         """
         Write events to the database
         Args:
             events_and_contexts: list of tuples of (event, context)
-            backfilled: Whether the results are retrieved from federation
-                via backfill or not. Used to determine if they're "new" events
-                which might update the current state etc.
+            should_calculate_state_and_forward_extrems: Determines whether we
+                need to calculate the state and new forward extremities for the
+                room. This should be set to false for backfilled events.
+            use_negative_stream_ordering: Whether to start stream_ordering on
+                the negative side and decrement. Usually this is done for any
+                backfilled event.
+            inhibit_local_membership_updates: Stop the local_current_membership
+                from being updated by these events. Usually this is done for
+                backfilled events.
+            update_room_forward_stream_ordering: Whether to update the
+                stream_ordering position to mark the latest event as the front
+                of the room. This should only be set as false for backfilled
+                events.
 
         Returns:
             List of events persisted, the current position room stream position.
@@ -320,7 +334,12 @@ class EventsPersistenceStorage:
         async def enqueue(item):
             room_id, evs_ctxs = item
             return await self._event_persist_queue.add_to_queue(
-                room_id, evs_ctxs, backfilled=backfilled
+                room_id,
+                evs_ctxs,
+                should_calculate_state_and_forward_extrems=should_calculate_state_and_forward_extrems,
+                use_negative_stream_ordering=use_negative_stream_ordering,
+                inhibit_local_membership_updates=inhibit_local_membership_updates,
+                update_room_forward_stream_ordering=update_room_forward_stream_ordering,
             )
 
         ret_vals = await yieldable_gather_results(enqueue, partitioned.items())
@@ -350,9 +369,35 @@ class EventsPersistenceStorage:
 
     @opentracing.trace
     async def persist_event(
-        self, event: EventBase, context: EventContext, backfilled: bool = False
+        self,
+        event: EventBase,
+        context: EventContext,
+        *,
+        should_calculate_state_and_forward_extrems: bool = True,
+        use_negative_stream_ordering: bool = False,
+        inhibit_local_membership_updates: bool = False,
+        update_room_forward_stream_ordering: bool = True,
     ) -> Tuple[EventBase, PersistedEventPosition, RoomStreamToken]:
         """
+        Write a single event to the database.
+
+        Args:
+            event:
+            context:
+            should_calculate_state_and_forward_extrems: Determines whether we
+                need to calculate the state and new forward extremities for the
+                room. This should be set to false for backfilled events.
+            use_negative_stream_ordering: Whether to start stream_ordering on
+                the negative side and decrement. Usually this is done for any
+                backfilled event.
+            inhibit_local_membership_updates: Stop the local_current_membership
+                from being updated by these events. Usually this is done for
+                backfilled events.
+            update_room_forward_stream_ordering: Whether to update the
+                stream_ordering position to mark the latest event as the front
+                of the room. This should only be set as false for backfilled
+                events.
+
         Returns:
             The event, stream ordering of `event`, and the stream ordering of the
             latest persisted event. The returned event may not match the given
@@ -363,7 +408,12 @@ class EventsPersistenceStorage:
         # event was deduplicated. (The dict may also include other entries if
         # the event was persisted in a batch with other events.)
         replaced_events = await self._event_persist_queue.add_to_queue(
-            event.room_id, [(event, context)], backfilled=backfilled
+            event.room_id,
+            [(event, context)],
+            should_calculate_state_and_forward_extrems=should_calculate_state_and_forward_extrems,
+            use_negative_stream_ordering=use_negative_stream_ordering,
+            inhibit_local_membership_updates=inhibit_local_membership_updates,
+            update_room_forward_stream_ordering=update_room_forward_stream_ordering,
         )
         replaced_event = replaced_events.get(event.event_id)
         if replaced_event:
@@ -379,7 +429,11 @@ class EventsPersistenceStorage:
     async def _persist_event_batch(
         self,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
+        *,
         should_calculate_state_and_forward_extrems: bool = True,
+        use_negative_stream_ordering: bool = False,
+        inhibit_local_membership_updates: bool = False,
+        update_room_forward_stream_ordering: bool = True,
     ) -> Dict[str, str]:
         """Callback for the _event_persist_queue
 
@@ -391,6 +445,16 @@ class EventsPersistenceStorage:
             should_calculate_state_and_forward_extrems: Determines whether we
                 need to calculate the state and new forward extremities for the
                 room. This should be set to false for backfilled events.
+            use_negative_stream_ordering: Whether to start stream_ordering on
+                the negative side and decrement. Usually this is done for any
+                backfilled event.
+            inhibit_local_membership_updates: Stop the local_current_membership
+                from being updated by these events. Usually this is done for
+                backfilled events.
+            update_room_forward_stream_ordering: Whether to update the
+                stream_ordering position to mark the latest event as the front
+                of the room. This should only be set as false for backfilled
+                events.
 
         Returns:
             A dictionary of event ID to event ID we didn't persist as we already
@@ -589,7 +653,9 @@ class EventsPersistenceStorage:
                 current_state_for_room=current_state_for_room,
                 state_delta_for_room=state_delta_for_room,
                 new_forward_extremeties=new_forward_extremeties,
-                backfilled=backfilled,
+                use_negative_stream_ordering=use_negative_stream_ordering,
+                inhibit_local_membership_updates=inhibit_local_membership_updates,
+                update_room_forward_stream_ordering=update_room_forward_stream_ordering,
             )
 
             await self._handle_potentially_left_users(potentially_left_users)

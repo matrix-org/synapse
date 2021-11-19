@@ -126,6 +126,8 @@ class PersistEventsStore:
         state_delta_for_room: Dict[str, DeltaState],
         new_forward_extremeties: Dict[str, List[str]],
         use_negative_stream_ordering: bool = False,
+        inhibit_local_membership_updates: bool = False,
+        update_room_forward_stream_ordering: bool = True,
     ) -> None:
         """Persist a set of events alongside updates to the current state and
         forward extremities tables.
@@ -141,6 +143,13 @@ class PersistEventsStore:
             use_negative_stream_ordering: Whether to start stream_ordering on
                 the negative side and decrement. Usually this is done for any
                 backfilled event.
+            inhibit_local_membership_updates: Stop the local_current_membership
+                from being updated by these events. Usually this is done for
+                backfilled events.
+            update_room_forward_stream_ordering: Whether to update the
+                stream_ordering position to mark the latest event as the front
+                of the room. This should only be set as false for backfilled
+                events.
 
         Returns:
             Resolves when the events have been persisted
@@ -179,7 +188,8 @@ class PersistEventsStore:
                 "persist_events",
                 self._persist_events_txn,
                 events_and_contexts=events_and_contexts,
-                backfilled=backfilled,
+                inhibit_local_membership_updates=inhibit_local_membership_updates,
+                update_room_forward_stream_ordering=update_room_forward_stream_ordering,
                 state_delta_for_room=state_delta_for_room,
                 new_forward_extremeties=new_forward_extremeties,
             )
@@ -320,8 +330,10 @@ class PersistEventsStore:
     def _persist_events_txn(
         self,
         txn: LoggingTransaction,
+        *,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
-        backfilled: bool,
+        inhibit_local_membership_updates: bool = False,
+        update_room_forward_stream_ordering: bool = True,
         state_delta_for_room: Optional[Dict[str, DeltaState]] = None,
         new_forward_extremeties: Optional[Dict[str, List[str]]] = None,
     ):
@@ -335,11 +347,18 @@ class PersistEventsStore:
             txn
             events_and_contexts: events to persist
             backfilled: True if the events were backfilled
+            inhibit_local_membership_updates: Stop the local_current_membership
+                from being updated by these events. Usually this is done for
+                backfilled events.
+            update_room_forward_stream_ordering: Whether to update the
+                stream_ordering position to mark the latest event as the front
+                of the room. This should only be set as false for backfilled
+                events.
             delete_existing True to purge existing table rows for the events
                 from the database. This is useful when retrying due to
                 IntegrityError.
             state_delta_for_room: The current-state delta for each room.
-            new_forward_extremetie: The new forward extremities for each room.
+            new_forward_extremeties: The new forward extremities for each room.
                 For each room, a list of the event ids which are the forward
                 extremities.
 
@@ -368,7 +387,9 @@ class PersistEventsStore:
         )
 
         self._update_room_depths_txn(
-            txn, events_and_contexts=events_and_contexts, backfilled=backfilled
+            txn,
+            events_and_contexts=events_and_contexts,
+            update_room_forward_stream_ordering=update_room_forward_stream_ordering,
         )
 
         # _update_outliers_txn filters out any events which have already been
@@ -402,7 +423,7 @@ class PersistEventsStore:
             txn,
             events_and_contexts=events_and_contexts,
             all_events_and_contexts=all_events_and_contexts,
-            backfilled=backfilled,
+            inhibit_local_membership_updates=inhibit_local_membership_updates,
         )
 
         # We call this last as it assumes we've inserted the events into
@@ -1435,7 +1456,12 @@ class PersistEventsStore:
         return [ec for ec in events_and_contexts if ec[0] not in to_remove]
 
     def _update_metadata_tables_txn(
-        self, txn, events_and_contexts, all_events_and_contexts, backfilled
+        self,
+        txn,
+        *,
+        events_and_contexts,
+        all_events_and_contexts,
+        inhibit_local_membership_updates: bool = False,
     ):
         """Update all the miscellaneous tables for new events
 
@@ -1447,7 +1473,9 @@ class PersistEventsStore:
                 events that we were going to persist. This includes events
                 we've already persisted, etc, that wouldn't appear in
                 events_and_context.
-            backfilled (bool): True if the events were backfilled
+            inhibit_local_membership_updates: Stop the local_current_membership
+                from being updated by these events. Usually this is done for
+                backfilled events.
         """
 
         # Insert all the push actions into the event_push_actions table.
@@ -1521,7 +1549,7 @@ class PersistEventsStore:
                 for event, _ in events_and_contexts
                 if event.type == EventTypes.Member
             ],
-            backfilled=backfilled,
+            inhibit_local_membership_updates=inhibit_local_membership_updates,
         )
 
         # Insert event_reference_hashes table.

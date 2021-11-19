@@ -1565,12 +1565,6 @@ class EventCreationHandler:
                         errcode=Codes.INVALID_PARAM,
                     )
 
-        # Mark any `m.historical` messages as backfilled so they don't appear
-        # in `/sync` and have the proper decrementing `stream_ordering` as we import
-        backfilled = False
-        if event.internal_metadata.is_historical():
-            backfilled = True
-
         # Note that this returns the event that was persisted, which may not be
         # the same as we passed in if it was deduplicated due transaction IDs.
         (
@@ -1578,7 +1572,17 @@ class EventCreationHandler:
             event_pos,
             max_stream_token,
         ) = await self.storage.persistence.persist_event(
-            event, context=context, backfilled=backfilled
+            event,
+            context=context,
+            # Make any historical messages behave like backfilled events
+            should_calculate_state_and_forward_extrems=not event.internal_metadata.is_historical(),
+            # We use a negative `stream_ordering`` for historical messages so
+            # they don't come down an incremental `/sync` and have the proper
+            # decrementing `stream_ordering` as we import so they sort
+            # as expected between two depths.
+            use_negative_stream_ordering=event.internal_metadata.is_historical(),
+            inhibit_local_membership_updates=event.internal_metadata.is_historical(),
+            update_room_forward_stream_ordering=not event.internal_metadata.is_historical(),
         )
 
         if self._ephemeral_events_enabled:
