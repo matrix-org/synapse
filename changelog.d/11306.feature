@@ -1,1 +1,1 @@
-Add new plugin support for controlling background update timings.
+Add plugin support for controlling database background updates.
