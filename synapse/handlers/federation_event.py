@@ -1821,7 +1821,8 @@ class FederationEventHandler:
         self,
         room_id: str,
         event_and_contexts: Sequence[Tuple[EventBase, EventContext]],
-        backfilled: bool = False,
+        *,
+        inhibit_push_notifications: bool = False,
     ) -> int:
         """Persists events and tells the notifier/pushers about them, if
         necessary.
@@ -1831,8 +1832,9 @@ class FederationEventHandler:
             event_and_contexts: Sequence of events with their associated
                 context that should be persisted. All events must belong to
                 the same room.
-            backfilled: Whether these events are a result of
-                backfilling or not
+            inhibit_push_notifications: Whether to stop the notifiers/pushers
+                from knowing about the event. Usually this is done for any backfilled
+                event.
 
         Returns:
             The stream ID after which all events have been persisted.
@@ -1850,7 +1852,7 @@ class FederationEventHandler:
                     store=self._store,
                     room_id=room_id,
                     event_and_contexts=batch,
-                    backfilled=backfilled,
+                    inhibit_push_notifications=inhibit_push_notifications,
                 )
             return result["max_stream_id"]
         else:
@@ -1867,7 +1869,7 @@ class FederationEventHandler:
                     # If there's an expiry timestamp on the event, schedule its expiry.
                     self._message_handler.maybe_schedule_expiry(event)
 
-            if not backfilled:  # Never notify for backfilled events
+            if not inhibit_push_notifications:  # Never notify for backfilled events
                 for event in events:
                     await self._notify_persisted_event(event, max_stream_token)
 

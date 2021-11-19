@@ -379,12 +379,18 @@ class EventsPersistenceStorage:
     async def _persist_event_batch(
         self,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
-        backfilled: bool = False,
+        should_calculate_state_and_forward_extrems: bool = True,
     ) -> Dict[str, str]:
         """Callback for the _event_persist_queue
 
         Calculates the change to current state and forward extremities, and
         persists the given events and with those updates.
+
+        Args:
+            events_and_contexts:
+            should_calculate_state_and_forward_extrems: Determines whether we
+                need to calculate the state and new forward extremities for the
+                room. This should be set to false for backfilled events.
 
         Returns:
             A dictionary of event ID to event ID we didn't persist as we already
@@ -448,7 +454,7 @@ class EventsPersistenceStorage:
             # device lists as stale.
             potentially_left_users: Set[str] = set()
 
-            if not backfilled:
+            if should_calculate_state_and_forward_extrems:
                 with Measure(self._clock, "_calculate_state_and_extrem"):
                     # Work out the new "current state" for each room.
                     # We do this by working out what the new extremities are and then

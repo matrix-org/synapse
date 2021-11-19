@@ -47,7 +47,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
                 "rejected_reason": ..,   // The event.rejected_reason field
                 "context": { .. serialized event context .. },
             }],
-            "backfilled": false
+            "inhibit_push_notifications": false
         }
 
         200 OK
@@ -69,14 +69,17 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         self.federation_event_handler = hs.get_federation_event_handler()
 
     @staticmethod
-    async def _serialize_payload(store, room_id, event_and_contexts, backfilled):
+    async def _serialize_payload(
+        store, room_id, event_and_contexts, inhibit_push_notifications: bool = False
+    ):
         """
         Args:
             store
             room_id (str)
             event_and_contexts (list[tuple[FrozenEvent, EventContext]])
-            backfilled (bool): Whether or not the events are the result of
-                backfilling
+            inhibit_push_notifications (bool): Whether to stop the notifiers/pushers
+                from knowing about the event. Usually this is done for any backfilled
+                event.
         """
         event_payloads = []
         for event, context in event_and_contexts:
@@ -96,7 +99,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
 
         payload = {
             "events": event_payloads,
-            "backfilled": backfilled,
+            "inhibit_push_notifications": inhibit_push_notifications,
             "room_id": room_id,
         }
 
@@ -107,7 +110,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
             content = parse_json_object_from_request(request)
 
             room_id = content["room_id"]
-            backfilled = content["backfilled"]
+            inhibit_push_notifications = content["inhibit_push_notifications"]
 
             event_payloads = content["events"]
 
@@ -132,7 +135,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         logger.info("Got %d events from federation", len(event_and_contexts))
 
         max_stream_id = await self.federation_event_handler.persist_events_and_notify(
-            room_id, event_and_contexts, backfilled
+            room_id, event_and_contexts, inhibit_push_notifications
         )
 
         return 200, {"max_stream_id": max_stream_id}
