@@ -28,13 +28,11 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.events import EventBase
 from synapse.handlers.admin import ExfiltrationWriter
-from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
 from synapse.replication.slave.storage.deviceinbox import SlavedDeviceInboxStore
 from synapse.replication.slave.storage.devices import SlavedDeviceStore
-from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
 from synapse.replication.slave.storage.groups import SlavedGroupServerStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
@@ -59,9 +57,7 @@ class AdminCmdSlavedStore(
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
     SlavedPushRuleStore,
-    SlavedEventStore,
     SlavedClientIpStore,
-    BaseSlavedStore,
     RoomWorkerStore,
 ):
     pass
