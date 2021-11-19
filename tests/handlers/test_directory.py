@@ -527,6 +527,20 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
             expect_code=200,
         )
 
+    def test_denied_publication_with_invalid_alias(self):
+        """
+        Try to create a room, register an alias for it, and publish it,
+        as a user WITH permission to publish rooms.
+        (This is used as both a standalone test & as a helper function.)
+        """
+        self.helper.create_room_as(
+            self.allowed_user_id,
+            tok=self.allowed_access_token,
+            extra_content={"room_alias_name": "foo"},
+            is_public=True,
+            expect_code=403,
+        )
+
     def test_can_create_as_private_room_after_rejection(self):
         """
         After failing to publish a room with an alias as a user without publish permission,
