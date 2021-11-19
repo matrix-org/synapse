@@ -1731,6 +1731,10 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             "users_set_deactivated_flag", self._background_update_set_deactivated_flag
         )
 
+        self.db_pool.updates.register_noop_background_update(
+            "user_threepids_grandfather"
+        )
+
         self.db_pool.updates.register_background_index_update(
             "user_external_ids_user_id_idx",
             index_name="user_external_ids_user_id_idx",
