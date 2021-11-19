@@ -166,7 +166,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         # public_baseurl uses an http:// scheme because FakeChannel.isSecure() returns
         # False, so synapse will see the requested uri as http://..., so using http in
         # the public_baseurl stops Synapse trying to redirect to https.
-        config["public_baseurl"] = "http://synapse.test"
+        config["public_baseurl"] = "http://synapse.test/"
 
         if HAS_OIDC:
             # we enable OIDC as a way of testing SSO flows

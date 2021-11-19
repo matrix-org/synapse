@@ -104,8 +104,11 @@ class SSOConfig(Config):
         # public_baseurl is an optional setting, so we only add the fallback's URL to the
         # list if it's provided (because we can't figure out what that URL is otherwise).
         if self.root.server.public_baseurl:
+            _b_url = self.root.server.public_baseurl
+            if not _b_url.endswith("/"):
+                _b_url = _b_url + "/"
             login_fallback_url = (
-                self.root.server.public_baseurl + "_matrix/static/client/login"
+                _b_url + "_matrix/static/client/login"
             )
             self.sso_client_whitelist.append(login_fallback_url)
 
