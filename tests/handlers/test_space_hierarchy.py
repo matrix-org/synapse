@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Optional
+from typing import Dict, Iterable, Mapping, NoReturn, Optional, Sequence, Tuple
+from unittest import mock
 
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventContentFields, EventTypes, RoomTypes
+from synapse.handlers.space_hierarchy import SpaceHierarchyHandler
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
@@ -119,6 +121,66 @@ class SpaceDescendantsTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(descendants, [(space_id, []), (room_id, [self.hs.hostname])])
         self.assertEqual(inaccessible_room_ids, [room_id])
+
+    def test_remote_space_with_federation_enabled(self):
+        """Tests iteration over a remote space with federation enabled."""
+        space_id = "!space:remote"
+        room_id = "!room:remote"
+
+        async def _get_space_children_remote(
+            _self: SpaceHierarchyHandler, space_id: str, via: Iterable[str]
+        ) -> Tuple[
+            Sequence[Tuple[str, Iterable[str]]], Mapping[str, Optional[JsonDict]]
+        ]:
+            if space_id == "!space:remote":
+                self.assertEqual(via, ["remote"])
+                return [("!room:remote", ["remote"])], {}
+            elif space_id == "!room:remote":
+                self.assertEqual(via, ["remote"])
+                return [], {}
+            else:
+                self.fail(
+                    f"Unexpected _get_space_children_remote({space_id!r}, {via!r}) call"
+                )
+                raise  # `fail` is missing type hints
+
+        with mock.patch(
+            "synapse.handlers.space_hierarchy.SpaceHierarchyHandler._get_space_children_remote",
+            new=_get_space_children_remote,
+        ):
+            descendants, inaccessible_room_ids = self.get_success(
+                self.handler.get_space_descendants(
+                    space_id, via=["remote"], enable_federation=True
+                )
+            )
+
+        self.assertEqual(descendants, [(space_id, ["remote"]), (room_id, ["remote"])])
+        self.assertEqual(inaccessible_room_ids, [space_id, room_id])
+
+    def test_remote_space_with_federation_disabled(self):
+        """Tests iteration over a remote space with federation disabled."""
+        space_id = "!space:remote"
+
+        async def _get_space_children_remote(
+            _self: SpaceHierarchyHandler, space_id: str, via: Iterable[str]
+        ) -> NoReturn:
+            self.fail(
+                f"Unexpected _get_space_children_remote({space_id!r}, {via!r}) call"
+            )
+            raise  # `fail` is missing type hints
+
+        with mock.patch(
+            "synapse.handlers.space_hierarchy.SpaceHierarchyHandler._get_space_children_remote",
+            new=_get_space_children_remote,
+        ):
+            descendants, inaccessible_room_ids = self.get_success(
+                self.handler.get_space_descendants(
+                    space_id, via=["remote"], enable_federation=False
+                )
+            )
+
+        self.assertEqual(descendants, [(space_id, ["remote"])])
+        self.assertEqual(inaccessible_room_ids, [space_id])
 
     def test_cycle(self):
         """Tests iteration over a cyclic space."""
