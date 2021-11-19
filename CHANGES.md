@@ -1,4 +1,4 @@
-Synapse 1.47.1 (2021-11-19)
+Synapse 1.47.1 (2021-11-23)
 ===========================
 
 This release fixes a security issue in the media store, affecting all prior releases of Synapse. Server administrators are encouraged to update Synapse as soon as possible. We are not aware of these vulnerabilities being exploited in the wild.
