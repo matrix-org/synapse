@@ -394,22 +394,16 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
 
     servlets = [directory.register_servlets, room.register_servlets]
 
-    def prepare(self, reactor, clock, hs):
-        # We cheekily override the config to add custom alias creation rules
-        config = {}
+    def default_config(self):
+        config = super().default_config()
+
+        # We cheekily override the config to add custom alias creation and
+        # room publication rules.
         config["alias_creation_rules"] = [
             {"user_id": "*", "alias": "#unofficial_*", "action": "allow"}
         ]
-        config["room_list_publication_rules"] = []
 
-        rd_config = RoomDirectoryConfig()
-        rd_config.read_config(config)
-
-        self.hs.config.roomdirectory.is_alias_creation_allowed = (
-            rd_config.is_alias_creation_allowed
-        )
-
-        return hs
+        return config
 
     def test_denied(self):
         room_id = self.helper.create_room_as(self.user_id)
@@ -417,7 +411,7 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
         channel = self.make_request(
             "PUT",
             b"directory/room/%23test%3Atest",
-            ('{"room_id":"%s"}' % (room_id,)).encode("ascii"),
+            {"room_id": room_id},
         )
         self.assertEquals(403, channel.code, channel.result)
 
@@ -427,14 +421,12 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
         channel = self.make_request(
             "PUT",
             b"directory/room/%23unofficial_test%3Atest",
-            ('{"room_id":"%s"}' % (room_id,)).encode("ascii"),
+            {"room_id": room_id},
         )
         self.assertEquals(200, channel.code, channel.result)
 
 
 class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
-    data = {"room_alias_name": "unofficial_test"}
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
@@ -443,27 +435,30 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
     ]
     hijack_auth = False
 
+    data = {"room_alias_name": "unofficial_test"}
+    allowed_localpart = "allowed"
+
+    def default_config(self):
+        config = super().default_config()
+
+        # This time we add custom room list publication rules
+        config["room_list_publication_rules"] = [
+            {"user_id": "*", "alias": "*", "action": "deny"},
+            {
+                "user_id": "@" + self.allowed_localpart + "*",
+                "alias": "*",
+                "action": "allow",
+            },
+        ]
+
+        return config
+
     def prepare(self, reactor, clock, hs):
-        self.allowed_user_id = self.register_user("allowed", "pass")
-        self.allowed_access_token = self.login("allowed", "pass")
+        self.allowed_user_id = self.register_user(self.allowed_localpart, "pass")
+        self.allowed_access_token = self.login(self.allowed_localpart, "pass")
 
         self.denied_user_id = self.register_user("denied", "pass")
         self.denied_access_token = self.login("denied", "pass")
-
-        # This time we add custom room list publication rules
-        config = {}
-        config["alias_creation_rules"] = []
-        config["room_list_publication_rules"] = [
-            {"user_id": "*", "alias": "*", "action": "deny"},
-            {"user_id": self.allowed_user_id, "alias": "*", "action": "allow"},
-        ]
-
-        rd_config = RoomDirectoryConfig()
-        rd_config.read_config(config)
-
-        self.hs.config.roomdirectory.is_publishing_room_allowed = (
-            rd_config.is_publishing_room_allowed
-        )
 
         return hs
 
