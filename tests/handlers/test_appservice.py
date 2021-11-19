@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional
 from unittest.mock import Mock
 
 from twisted.internet import defer
@@ -354,6 +354,10 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         self.mock_service_queuer.enqueue_ephemeral = Mock()
         hs.get_application_service_handler().scheduler.queuer = self.mock_service_queuer
 
+        # Mock out application services, and allow defining our own in tests
+        self._services: List[ApplicationService] = []
+        self.hs.get_datastore().get_app_services = Mock(return_value=self._services)
+
         # A user on the homeserver.
         self.local_user_device_id = "local_device"
         self.local_user = self.register_user("local_user", "password")
@@ -377,11 +381,16 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         that is an application service's user namespace, the
         application service will receive it.
         """
-        (
-            interested_services,
-            _,
-        ) = self._register_interested_and_uninterested_application_services()
-        interested_service = interested_services[0]
+        interested_appservice = self._register_application_service(
+            namespaces={
+                ApplicationService.NS_USERS: [
+                    {
+                        "regex": "@exclusive_as_user:.+",
+                        "exclusive": True,
+                    }
+                ],
+            },
+        )
 
         # Have local_user send a to-device message to exclusive_as_user
         message_content = {"some_key": "some really interesting value"}
@@ -418,12 +427,10 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         #
         # The uninterested application service should not have been notified at all.
         self.mock_service_queuer.enqueue_ephemeral.assert_called_once()
-        service, events = self.mock_service_queuer.enqueue_ephemeral.call_args[
-            0
-        ]
+        service, events = self.mock_service_queuer.enqueue_ephemeral.call_args[0]
 
         # Assert that this was the same to-device message that local_user sent
-        self.assertEqual(service, interested_service)
+        self.assertEqual(service, interested_appservice)
         self.assertEqual(events[0]["type"], "m.room_key_request")
         self.assertEqual(events[0]["sender"], self.local_user)
 
@@ -440,14 +447,26 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         """
         Test that when a user sends >100 to-device messages at once, any
         interested AS's will receive them in separate transactions.
+
+        Also tests that uninterested application services do not receive messages.
         """
-        (
-            interested_services,
-            _,
-        ) = self._register_interested_and_uninterested_application_services(
-            interested_count=2,
-            uninterested_count=2,
-        )
+        # Register two application services with exclusive interest in a user
+        interested_appservices = []
+        for _ in range(2):
+            appservice = self._register_application_service(
+                namespaces={
+                    ApplicationService.NS_USERS: [
+                        {
+                            "regex": "@exclusive_as_user:.+",
+                            "exclusive": True,
+                        }
+                    ],
+                },
+            )
+            interested_appservices.append(appservice)
+
+        # ...and an application service which does not have any user interest.
+        self._register_application_service()
 
         to_device_message_content = {
             "some key": "some interesting value",
@@ -520,7 +539,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             service, events = call[0]
 
             # Check that this was made to an interested service
-            self.assertIn(service, interested_services)
+            self.assertIn(service, interested_appservices)
 
             # Add to the count of messages for this application service
             service_id_to_message_count.setdefault(service.id, 0)
@@ -530,59 +549,22 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         for count in service_id_to_message_count.values():
             self.assertEqual(count, number_of_messages)
 
-    def _register_interested_and_uninterested_application_services(
-        self,
-        interested_count: int = 1,
-        uninterested_count: int = 1,
-    ) -> Tuple[List[ApplicationService], List[ApplicationService]]:
-        """
-        Create application services with and without exclusive interest
-        in exclusive_as_user.
-
-        Args:
-            interested_count: The number of application services to create
-                and register with exclusive interest.
-            uninterested_count: The number of application services to create
-                and register without any interest.
-
-        Returns:
-            A two-tuple containing:
-                * Interested application services
-                * Uninterested application services
-        """
-        # Create an application service with exclusive interest in exclusive_as_user
-        interested_services = []
-        uninterested_services = []
-        for _ in range(interested_count):
-            interested_service = self._make_application_service(
-                namespaces={
-                    ApplicationService.NS_USERS: [
-                        {
-                            "regex": "@exclusive_as_user:.+",
-                            "exclusive": True,
-                        }
-                    ],
-                },
-            )
-            interested_services.append(interested_service)
-
-        for _ in range(uninterested_count):
-            uninterested_services.append(self._make_application_service())
-
-        # Register this application service, along with another, uninterested one
-        services = [
-            *uninterested_services,
-            *interested_services,
-        ]
-        self.hs.get_datastore().get_app_services = Mock(return_value=services)
-
-        return interested_services, uninterested_services
-
-    def _make_application_service(
+    def _register_application_service(
         self,
         namespaces: Optional[Dict[str, Iterable[Dict]]] = None,
     ) -> ApplicationService:
-        return ApplicationService(
+        """
+        Register a new application service, with the given namespaces of interest.
+
+        Args:
+            namespaces: A dictionary containing any user, room or alias namespaces that
+                the application service is interested in.
+
+        Returns:
+            The registered application service.
+        """
+        # Create an application service
+        appservice = ApplicationService(
             token=None,
             hostname="example.com",
             id=random_string(10),
@@ -591,3 +573,8 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             namespaces=namespaces,
             supports_ephemeral=True,
         )
+
+        # Register the application service
+        self._services.append(appservice)
+
+        return appservice
