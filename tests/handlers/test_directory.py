@@ -425,6 +425,29 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
         )
         self.assertEquals(200, channel.code, channel.result)
 
+    def test_denied_during_creation(self):
+        """A room alias that is not allowed should be rejected during creation."""
+        # Invalid room alias.
+        self.helper.create_room_as(
+            self.user_id,
+            expect_code=403,
+            extra_content={"room_alias_name": "foo"},
+        )
+
+    def test_allowed_during_creation(self):
+        """A valid room alias should be allowed during creation."""
+        room_id = self.helper.create_room_as(
+            self.user_id,
+            extra_content={"room_alias_name": "unofficial_test"},
+        )
+
+        channel = self.make_request(
+            "GET",
+            b"directory/room/%23unofficial_test%3Atest",
+        )
+        self.assertEquals(200, channel.code, channel.result)
+        self.assertEquals(channel.json_body["room_id"], room_id)
+
 
 class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
     servlets = [
