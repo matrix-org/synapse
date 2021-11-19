@@ -333,7 +333,11 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         return service
 
 
-class ApplicationServiceEphemeralEventsTestCase(unittest.HomeserverTestCase):
+class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
+    """
+    Tests that the ApplicationServicesHandler sends events to application
+    services correctly.
+    """
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
