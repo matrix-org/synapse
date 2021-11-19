@@ -220,6 +220,16 @@ class ApplicationServicesHandler:
         if not self.notify_appservices:
             return
 
+        # Notify appservices of updates in ephemeral event streams.
+        # Only the following streams are currently supported.
+        if stream_key not in (
+            "typing_key",
+            "receipt_key",
+            "presence_key",
+            "to_device_key",
+        ):
+            return
+
         # Assert that new_token is an integer (and not a RoomStreamToken).
         # All of the supported streams that this function handles use an
         # integer to track progress (rather than a RoomStreamToken - a
