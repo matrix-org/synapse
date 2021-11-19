@@ -466,12 +466,12 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
 
         # This time we add custom room list publication rules
         config["room_list_publication_rules"] = [
-            {"user_id": "*", "alias": "*", "action": "deny"},
             {
                 "user_id": "@" + self.allowed_localpart + "*",
-                "alias": "*",
+                "alias": "#unofficial_*",
                 "action": "allow",
             },
+            {"user_id": "*", "alias": "*", "action": "deny"},
         ]
 
         return config
@@ -523,7 +523,7 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
             self.allowed_user_id,
             tok=self.allowed_access_token,
             extra_content=self.data,
-            is_public=False,
+            is_public=True,
             expect_code=200,
         )
 
