@@ -28,6 +28,7 @@ from netaddr import AddrFormatError, IPNetwork, IPSet
 from twisted.conch.ssh.keys import Key
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.types import JsonDict
 from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_server_name
 
@@ -1275,14 +1276,16 @@ class ServerConfig(Config):
             )
 
 
-def is_threepid_reserved(reserved_threepids, threepid):
+def is_threepid_reserved(
+    reserved_threepids: List[JsonDict], threepid: JsonDict
+) -> bool:
     """Check the threepid against the reserved threepid config
     Args:
-        reserved_threepids([dict]) - list of reserved threepids
-        threepid(dict) - The threepid to test for
+        reserved_threepids: List of reserved threepids
+        threepid: The threepid to test for
 
     Returns:
-        boolean Is the threepid undertest reserved_user
+        Is the threepid undertest reserved_user
     """
 
     for tp in reserved_threepids:
@@ -1291,7 +1294,9 @@ def is_threepid_reserved(reserved_threepids, threepid):
     return False
 
 
-def read_gc_thresholds(thresholds):
+def read_gc_thresholds(
+    thresholds: Optional[List[Any]],
+) -> Optional[Tuple[int, int, int]]:
     """Reads the three integer thresholds for garbage collection. Ensures that
     the thresholds are integers if thresholds are supplied.
     """
