@@ -567,6 +567,7 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
                 sid, client_secret, token, self.clock.time_msec()
             )
 
+
             # Perform a 302 redirect if next_link is set
             if next_link:
                 request.setResponseCode(302)

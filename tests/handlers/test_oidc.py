@@ -380,7 +380,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         # The cookie name and path don't really matter, just that it has to be coherent
         # between the callback & redirect handlers.
         parts = [p.strip() for p in cookie_header.split(b";")]
-        self.assertIn(b"Path=/_synapse/client/oidc", parts)
+        self.assertIn(b"Path=_synapse/client/oidc", parts)
         name, cookie = parts[0].split(b"=")
         self.assertEqual(name, b"oidc_session")
 

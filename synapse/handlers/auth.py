@@ -1652,6 +1652,7 @@ class AuthHandler:
             registered_user_id, auth_provider_id=auth_provider_id
         )
 
+
         # Append the login token to the original redirect URL (i.e. with its query
         # parameters kept intact) to build the URL to which the template needs to
         # redirect the users once they have clicked on the confirmation link.

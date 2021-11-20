@@ -37,6 +37,8 @@ class CasConfig(Config):
 
             # TODO Update this to a _synapse URL.
             public_baseurl = self.root.server.public_baseurl
+            if not public_baseurl.endswith("/"):
+                public_baseurl = public_baseurl + "/"
             self.cas_service_url = public_baseurl + "_matrix/client/r0/login/cas/ticket"
 
             self.cas_displayname_attribute = cas_config.get("displayname_attribute")

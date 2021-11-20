@@ -100,8 +100,6 @@ def _create_mxc_to_http_filter(
             fragment = "#" + fragment
 
         params = {"width": width, "height": height, "method": resize_method}
-        if not public_baseurl.endswith("/"):
-            public_baseurl = public_baseurl + "/"
         return "%s_matrix/media/v1/thumbnail/%s?%s%s" % (
             public_baseurl,
             server_and_media_id,

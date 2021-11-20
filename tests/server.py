@@ -323,7 +323,6 @@ def make_request(
     req.requestReceived(method, path, b"1.1")
 
     if await_result:
-        import ipdb; ipdb.set_trace()
         channel.await_result()
 
     return channel
