@@ -13,10 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import time
 from typing import TYPE_CHECKING, Any, Dict, Optional, Set
 
 import attr
 
+from prometheus_client import Histogram
 from twisted.python.failure import Failure
 
 from synapse.api.constants import EventTypes, Membership
@@ -36,6 +38,8 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+purge_time = Histogram("room_purge_time", "Time taken to purge rooms (sec)")
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -319,6 +323,8 @@ class PaginationHandler:
             room_id: room to be purged
             force: set true to skip checking for joined users.
         """
+        logger.info(f"[purge room] purging {room_id}, force={force}")
+        purge_start = time.time()
         with await self.pagination_lock.write(room_id):
             # check we know about the room
             await self.store.get_room_version_id(room_id)
@@ -330,6 +336,11 @@ class PaginationHandler:
                     raise SynapseError(400, "Users are still joined to this room")
 
             await self.storage.purge_events.purge_room(room_id)
+        purge_end = time.time()
+        logger.info(
+            f"[purge room] purging {room_id} took {purge_end - purge_start} seconds"
+        )
+        purge_time.observe(purge_end - purge_start)
 
     async def get_messages(
         self,
