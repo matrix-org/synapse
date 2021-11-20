@@ -283,8 +283,8 @@ class OidcProvider:
         # We'll insert this into the Path= parameter of any session cookies we set.
         public_baseurl_path = urlparse(hs.config.server.public_baseurl).path
         _b_url = public_baseurl_path
-        if not _b_url.endswith("/"):
-            _b_url = _b_url + "/"
+        if _b_url.endswith("/"):
+            _b_url = _b_url[:-1]
         self._callback_path_prefix = (
             _b_url.encode("utf-8") + b"_synapse/client/oidc"
         )

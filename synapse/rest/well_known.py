@@ -38,8 +38,8 @@ class WellKnownBuilder:
             return None
         
         _b_url = self._config.server.public_baseurl
-        if not _b_url.endswith("/"):
-            _b_url = _b_url + "/"
+        if _b_url.endswith("/"):
+            _b_url = _b_url[:-1]
 
         result = {"m.homeserver": {"base_url": _b_url, }}
 

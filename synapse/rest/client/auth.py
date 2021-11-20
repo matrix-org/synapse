@@ -68,8 +68,8 @@ class AuthRestServlet(RestServlet):
             )
         elif stagetype == LoginType.TERMS:
             _b_url = self.hs.config.server.public_baseurl
-            if not _b_url.endswith("/"):
-                _b_url = _b_url + "/"
+            if _b_url.endswith("/"):
+                _b_url = _b_url[:-1]
             html = self.terms_template.render(
                 session=session,
                 terms_url="%s_matrix/consent?v=%s"

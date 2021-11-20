@@ -278,7 +278,7 @@ def make_request(
     ):
         if path.startswith(b"/"):
             path = path[1:]
-        path = b"/_matrix/client/r0/" + path
+        path = b"_matrix/client/r0/" + path
 
     if not path.startswith(b"/"):
         path = b"/" + path
@@ -323,6 +323,7 @@ def make_request(
     req.requestReceived(method, path, b"1.1")
 
     if await_result:
+        import ipdb; ipdb.set_trace()
         channel.await_result()
 
     return channel

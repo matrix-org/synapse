@@ -354,8 +354,8 @@ class ModuleApi:
         Added in Synapse v1.39.0.
         """
         _b_url = self._hs.config.server.public_baseurl
-        if not _b_url.endswith("/"):
-            _b_url = _b_url + "/"
+        if _b_url.endswith("/"):
+            _b_url = _b_url[:-1]
         return _b_url
 
     @property

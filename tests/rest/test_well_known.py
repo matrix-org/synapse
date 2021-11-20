@@ -29,6 +29,7 @@ class WellKnownTests(unittest.HomeserverTestCase):
         {
             "public_baseurl": "https://tesths",
             "default_identity_server": "https://testis",
+            "serve_server_wellknown": True,
         }
     )
     def test_client_well_known(self):
@@ -36,6 +37,7 @@ class WellKnownTests(unittest.HomeserverTestCase):
             "GET", "/.well-known/matrix/client", shorthand=False
         )
 
+        # import ipdb; ipdb.set_trace()
         self.assertEqual(channel.code, 200)
         self.assertEqual(
             channel.json_body,

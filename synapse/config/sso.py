@@ -103,8 +103,8 @@ class SSOConfig(Config):
         # the client's.
 
         _b_url = self.root.server.public_baseurl or "/"
-        if not _b_url.endswith("/"):
-            _b_url = _b_url + "/"
+        if _b_url.endswith("/"):
+            _b_url = _b_url[:-1]
         login_fallback_url = (
             _b_url + "_matrix/static/client/login"
         )
