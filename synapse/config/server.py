@@ -264,7 +264,9 @@ class ServerConfig(Config):
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.serve_server_wellknown = config.get("serve_server_wellknown", False)
 
-        self.public_baseurl = config.get("public_baseurl")
+        self.public_baseurl = config.get("public_baseurl") or "/"
+        if not self.public_baseurl.endswith("/"):
+            self.public_baseurl = self.public_baseurl + "/"
         # Commented out due to https://github.com/matrix-org/synapse/issues/8308
         # if self.public_baseurl is not None:
         #     if self.public_baseurl[-1] != "/":

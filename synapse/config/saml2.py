@@ -204,6 +204,8 @@ class SAML2Config(Config):
         optional_attributes -= required_attributes
 
         public_baseurl = self.root.server.public_baseurl
+        if not public_baseurl.endswith("/"):
+            public_baseurl = public_baseurl + "/"
         metadata_url = public_baseurl + "_synapse/client/saml2/metadata.xml"
         response_url = public_baseurl + "_synapse/client/saml2/authn_response"
         return {

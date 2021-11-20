@@ -102,7 +102,7 @@ class SSOConfig(Config):
         # confirmation, since the URL the confirmation page would be showing wouldn't be
         # the client's.
 
-	_b_url = self.root.server.public_baseurl
+        _b_url = self.root.server.public_baseurl or "/"
         if not _b_url.endswith("/"):
             _b_url = _b_url + "/"
         login_fallback_url = (

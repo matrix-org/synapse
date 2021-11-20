@@ -353,7 +353,10 @@ class ModuleApi:
 
         Added in Synapse v1.39.0.
         """
-        return self._hs.config.server.public_baseurl
+        _b_url = self._hs.config.server.public_baseurl
+        if not _b_url.endswith("/"):
+            _b_url = _b_url + "/"
+        return _b_url
 
     @property
     def email_app_name(self) -> str:

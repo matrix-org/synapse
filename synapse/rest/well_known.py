@@ -34,10 +34,14 @@ class WellKnownBuilder:
         self._config = hs.config
 
     def get_well_known(self) -> Optional[JsonDict]:
-        if not self._config.server.serve_client_wellknown:
+        if not self._config.server.serve_server_wellknown:
             return None
+        
+        _b_url = self._config.server.public_baseurl
+        if not _b_url.endswith("/"):
+            _b_url = _b_url + "/"
 
-        result = {"m.homeserver": {"base_url": self._config.server.public_baseurl}}
+        result = {"m.homeserver": {"base_url": _b_url, }}
 
         if self._config.registration.default_identity_server:
             result["m.identity_server"] = {

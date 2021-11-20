@@ -67,11 +67,14 @@ class AuthRestServlet(RestServlet):
                 sitekey=self.hs.config.captcha.recaptcha_public_key,
             )
         elif stagetype == LoginType.TERMS:
+            _b_url = self.hs.config.server.public_baseurl
+            if not _b_url.endswith("/"):
+                _b_url = _b_url + "/"
             html = self.terms_template.render(
                 session=session,
                 terms_url="%s_matrix/consent?v=%s"
                 % (
-                    self.hs.config.server.public_baseurl,
+                    _b_url,
                     self.hs.config.consent.user_consent_version,
                 ),
                 myurl="%s/r0/auth/%s/fallback/web"

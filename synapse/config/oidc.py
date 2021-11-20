@@ -59,6 +59,8 @@ class OIDCConfig(Config):
                 )
 
         public_baseurl = self.root.server.public_baseurl
+        if not public_baseurl.endswith("/"):
+            public_baseurl = public_baseurl + "/"
         self.oidc_callback_url = public_baseurl + "_synapse/client/oidc/callback"
 
     @property
