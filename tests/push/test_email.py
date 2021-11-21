@@ -273,7 +273,7 @@ class EmailPusherTests(HomeserverTestCase):
 
         # The other users send some messages.
         # TODO It seems that two messages are required to trigger an email?
-        send_event = self.helper.send(room, body="Alpha", tok=self.others[0].token)
+        self.helper.send(room, body="Alpha", tok=self.others[0].token)
         self.helper.send(room, body="Beta", tok=self.others[1].token)
 
         # We should get emailed about those messages
