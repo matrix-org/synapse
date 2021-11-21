@@ -285,9 +285,7 @@ class OidcProvider:
         _b_url = public_baseurl_path
         if _b_url.endswith("/"):
             _b_url = _b_url[:-1]
-        self._callback_path_prefix = (
-            _b_url.encode("utf-8") + b"_synapse/client/oidc"
-        )
+        self._callback_path_prefix = _b_url.encode("utf-8") + b"_synapse/client/oidc"
 
         self._oidc_attribute_requirements = provider.attribute_requirements
         self._scopes = provider.scopes

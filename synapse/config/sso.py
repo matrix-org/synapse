@@ -105,9 +105,7 @@ class SSOConfig(Config):
         _b_url = self.root.server.public_baseurl or "/"
         # if _b_url.endswith("/"):
         #     _b_url = _b_url[:-1]
-        login_fallback_url = (
-            _b_url + "_matrix/static/client/login"
-        )
+        login_fallback_url = _b_url + "_matrix/static/client/login"
         self.sso_client_whitelist.append(login_fallback_url)
 
     def generate_config_section(self, **kwargs):
