@@ -15,6 +15,7 @@
 import functools
 import logging
 import re
+from http import HTTPStatus
 
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.urls import FEDERATION_V1_PREFIX
@@ -77,7 +78,9 @@ class Authenticator:
 
         if not auth_headers:
             raise NoAuthenticationError(
-                401, "Missing Authorization headers", Codes.UNAUTHORIZED
+                HTTPStatus.UNAUTHORIZED,
+                "Missing Authorization headers",
+                Codes.UNAUTHORIZED,
             )
 
         for auth in auth_headers:
@@ -89,7 +92,9 @@ class Authenticator:
                 # if the origin_server sent a destination along it needs to match our own server_name
                 if destination is not None and destination != self.server_name:
                     raise AuthenticationError(
-                        400, "Destination mismatch in auth header", Codes.UNAUTHORIZED
+                        HTTPStatus.BAD_REQUEST,
+                        "Destination mismatch in auth header",
+                        Codes.UNAUTHORIZED,
                     )
         if (
             self.federation_domain_whitelist is not None
@@ -99,7 +104,9 @@ class Authenticator:
 
         if origin is None or not json_request["signatures"]:
             raise NoAuthenticationError(
-                401, "Missing Authorization headers", Codes.UNAUTHORIZED
+                HTTPStatus.UNAUTHORIZED,
+                "Missing Authorization headers",
+                Codes.UNAUTHORIZED,
             )
 
         await self.keyring.verify_json_for_server(
@@ -183,7 +190,7 @@ def _parse_auth_header(header_bytes):
             e,
         )
         raise AuthenticationError(
-            400, "Malformed Authorization header", Codes.UNAUTHORIZED
+            HTTPStatus.BAD_REQUEST, "Malformed Authorization header", Codes.UNAUTHORIZED
         )
 
 
