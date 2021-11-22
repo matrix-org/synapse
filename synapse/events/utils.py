@@ -1,4 +1,5 @@
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -400,7 +401,8 @@ class EventClientSerializer:
         Args:
             event: The event being serialized.
             time_now: The current time in milliseconds
-            bundle_relations: Whether to bundle in related events
+            bundle_relations: Whether to include the bundled relations for this
+                event.
             **kwargs: Arguments to pass to `serialize_event`
 
         Returns:
