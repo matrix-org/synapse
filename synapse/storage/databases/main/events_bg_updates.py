@@ -1123,7 +1123,8 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             )
 
             results = list(txn)
-            missing_relations = []
+            # (event_id, parent_id, rel_type) for each relation
+            missing_relations: List[Tuple[str, str, str]] = []
             for (event_id, event_json_raw) in results:
                 try:
                     event_json = db_to_json(event_json_raw)
