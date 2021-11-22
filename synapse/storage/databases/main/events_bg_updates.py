@@ -1142,11 +1142,10 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 if not relates_to or not isinstance(relates_to, dict):
                     continue
 
-                # If the relation type or parent event ID is not a string a
-                # string, skip it.
+                # If the relation type or parent event ID is not a string, skip it.
                 #
                 # Do not consider relation types that have existed for a long time,
-                # only include the new thread relation and any unknown relations.
+                # since they will already be listed in the `event_relations` table.
                 rel_type = relates_to.get("rel_type")
                 if not isinstance(rel_type, str) or rel_type in (
                     RelationTypes.ANNOTATION,
@@ -1161,7 +1160,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
                 missing_relations.append((event_id, parent_id, rel_type))
 
-            # Insert the missing data, note that we upsert here in-case the event
+            # Insert the missing data, note that we upsert here in case the event
             # has already been processed.
             if missing_relations:
                 self.db_pool.simple_upsert_many_txn(
