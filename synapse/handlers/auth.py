@@ -790,7 +790,7 @@ class AuthHandler:
         (
             new_refresh_token,
             new_refresh_token_id,
-        ) = await self.get_refresh_token_for_user_id(
+        ) = await self.create_refresh_token_for_user_id(
             user_id=existing_token.user_id, device_id=existing_token.device_id
         )
         access_token = await self.create_access_token_for_user_id(
@@ -832,7 +832,7 @@ class AuthHandler:
 
         return True
 
-    async def get_refresh_token_for_user_id(
+    async def create_refresh_token_for_user_id(
         self,
         user_id: str,
         device_id: str,

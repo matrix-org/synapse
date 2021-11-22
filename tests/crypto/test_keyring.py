@@ -1,4 +1,4 @@
-# Copyright 2017 New Vector Ltd
+# Copyright 2017-2021 The Matrix.org Foundation C.I.C
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ from synapse.storage.keys import FetchKeyResult
 
 from tests import unittest
 from tests.test_utils import make_awaitable
-from tests.unittest import logcontext_clean
+from tests.unittest import logcontext_clean, override_config
 
 
 class MockPerspectiveServer:
@@ -197,7 +197,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         # self.assertFalse(d.called)
         self.get_success(d)
 
-    def test_verify_for_server_locally(self):
+    def test_verify_for_local_server(self):
         """Ensure that locally signed JSON can be verified without fetching keys
         over federation
         """
@@ -206,6 +206,56 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         signedjson.sign.sign_json(json1, self.hs.hostname, self.hs.signing_key)
 
         # Test that verify_json_for_server succeeds on a object signed by ourselves
+        d = kr.verify_json_for_server(self.hs.hostname, json1, 0)
+        self.get_success(d)
+
+    OLD_KEY = signedjson.key.generate_signing_key("old")
+
+    @override_config(
+        {
+            "old_signing_keys": {
+                f"{OLD_KEY.alg}:{OLD_KEY.version}": {
+                    "key": encode_verify_key_base64(OLD_KEY.verify_key),
+                    "expired_ts": 1000,
+                }
+            }
+        }
+    )
+    def test_verify_for_local_server_old_key(self):
+        """Can also use keys in old_signing_keys for verification"""
+        json1 = {}
+        signedjson.sign.sign_json(json1, self.hs.hostname, self.OLD_KEY)
+
+        kr = keyring.Keyring(self.hs)
+        d = kr.verify_json_for_server(self.hs.hostname, json1, 0)
+        self.get_success(d)
+
+    def test_verify_for_local_server_unknown_key(self):
+        """Local keys that we no longer have should be fetched via the fetcher"""
+
+        # the key we'll sign things with (nb, not known to the Keyring)
+        key2 = signedjson.key.generate_signing_key("2")
+
+        # set up a mock fetcher which will return the key
+        async def get_keys(
+            server_name: str, key_ids: List[str], minimum_valid_until_ts: int
+        ) -> Dict[str, FetchKeyResult]:
+            self.assertEqual(server_name, self.hs.hostname)
+            self.assertEqual(key_ids, [get_key_id(key2)])
+
+            return {get_key_id(key2): FetchKeyResult(get_verify_key(key2), 1200)}
+
+        mock_fetcher = Mock()
+        mock_fetcher.get_keys = Mock(side_effect=get_keys)
+        kr = keyring.Keyring(
+            self.hs, key_fetchers=(StoreKeyFetcher(self.hs), mock_fetcher)
+        )
+
+        # sign the json
+        json1 = {}
+        signedjson.sign.sign_json(json1, self.hs.hostname, key2)
+
+        # ... and check we can verify it.
         d = kr.verify_json_for_server(self.hs.hostname, json1, 0)
         self.get_success(d)
 
