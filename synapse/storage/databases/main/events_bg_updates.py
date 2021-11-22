@@ -1173,6 +1173,19 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                     value_values=[r[1:] for r in missing_relations],
                 )
 
+                # Iterate the parent IDs and invalidate caches.
+                for parent_id in {r[1] for r in missing_relations}:
+                    cache_tuple = (parent_id,)
+                    self._invalidate_cache_and_stream(
+                        txn, self.get_relations_for_event, cache_tuple
+                    )
+                    self._invalidate_cache_and_stream(
+                        txn, self.get_aggregation_groups_for_event, cache_tuple
+                    )
+                    self._invalidate_cache_and_stream(
+                        txn, self.get_thread_summary, cache_tuple
+                    )
+
             if results:
                 latest_event_id = results[-1][0]
                 self.db_pool.updates._background_update_progress_txn(
