@@ -392,7 +392,7 @@ class EventClientSerializer:
         self,
         event: Union[JsonDict, EventBase],
         time_now: int,
-        bundle_aggregations: bool = True,
+        bundle_relations: bool = True,
         **kwargs: Any,
     ) -> JsonDict:
         """Serializes a single event.
@@ -400,7 +400,7 @@ class EventClientSerializer:
         Args:
             event: The event being serialized.
             time_now: The current time in milliseconds
-            bundle_aggregations: Whether to bundle in related events
+            bundle_relations: Whether to bundle in related events
             **kwargs: Arguments to pass to `serialize_event`
 
         Returns:
@@ -416,7 +416,7 @@ class EventClientSerializer:
         # we need to bundle in with the event.
         # Do not bundle relations if the event has been redacted
         if not event.internal_metadata.is_redacted() and (
-            self._msc1849_enabled and bundle_aggregations
+            self._msc1849_enabled and bundle_relations
         ):
             await self._injected_bundled_relations(event, time_now, serialized_event)
 
@@ -486,9 +486,9 @@ class EventClientSerializer:
             ) = await self.store.get_thread_summary(event_id)
             if latest_thread_event:
                 relations[RelationTypes.THREAD] = {
-                    # Don't bundle aggregations as this could recurse forever.
+                    # Don't bundle relations as this could recurse forever.
                     "latest_event": await self.serialize_event(
-                        latest_thread_event, time_now, bundle_aggregations=False
+                        latest_thread_event, time_now, bundle_relations=False
                     ),
                     "count": thread_count,
                 }
