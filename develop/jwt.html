@@ -200,8 +200,9 @@ follows:</p>
 will be removed in a future version of Synapse.</p>
 <p>The <code>token</code> field should include the JSON web token with the following claims:</p>
 <ul>
-<li>The <code>sub</code> (subject) claim is required and should encode the local part of the
-user ID.</li>
+<li>A claim that encodes the local part of the user ID is required. By default,
+the <code>sub</code> (subject) claim is used, or a custom claim can be set in the
+configuration file.</li>
 <li>The expiration time (<code>exp</code>), not before time (<code>nbf</code>), and issued at (<code>iat</code>)
 claims are optional, but validated if present.</li>
 <li>The issuer (<code>iss</code>) claim is optional, but required and validated if configured.</li>
