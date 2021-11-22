@@ -48,9 +48,9 @@ class JWTConfig(Config):
             self.jwt_enabled = False
             self.jwt_secret = None
             self.jwt_algorithm = None
+            self.jwt_subject_claim = None
             self.jwt_issuer = None
             self.jwt_audiences = None
-            self.jwt_subject_claim = None
 
     def generate_config_section(self, **kwargs):
         return """\
