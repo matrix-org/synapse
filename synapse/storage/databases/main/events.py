@@ -1712,11 +1712,11 @@ class PersistEventsStore:
 
         # Relations must have a type and parent event ID.
         rel_type = relation.get("rel_type")
-        if not rel_type:
+        if not isinstance(rel_type, str):
             return
 
         parent_id = relation.get("event_id")
-        if not parent_id:
+        if not isinstance(parent_id, str):
             return
 
         # Annotations have a key field.
