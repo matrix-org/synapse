@@ -14,9 +14,9 @@
 # limitations under the License.
 import logging
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
-from typing_extensions import TypedDict
 
 import attr
+from typing_extensions import TypedDict
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json
