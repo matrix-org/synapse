@@ -1,1 +1,0 @@
-Remove code related to deprecated 'trust_identity_servers_for_password_resets' config flag.
