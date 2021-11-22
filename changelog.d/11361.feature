@@ -1,1 +1,1 @@
-Update JWT login type to support custom `sub` claim.
+Update the JWT login type to support custom a `sub` claim.
