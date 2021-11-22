@@ -425,7 +425,7 @@ class EventClientSerializer:
     async def _injected_bundled_relations(
         self, event: EventBase, time_now: int, serialized_event: JsonDict
     ) -> None:
-        """Potentially injects bundled relations into the unsigend portion of the serialized event.
+        """Potentially injects bundled relations into the unsigned portion of the serialized event.
 
         Args:
             event: The event being serialized.
