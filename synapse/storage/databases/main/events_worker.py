@@ -814,7 +814,7 @@ class EventsWorkerStore(SQLBaseStore):
                     self.hs.get_reactor().callFromThread(fire, event_list, e)
 
     async def _get_events_from_db(
-        self, event_ids: Iterable[str]
+        self, event_ids: Collection[str]
     ) -> Dict[str, EventCacheEntry]:
         """Fetch a bunch of events from the database.
 
@@ -967,7 +967,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         return result_map
 
-    async def _enqueue_events(self, events: Iterable[str]) -> Dict[str, _EventRow]:
+    async def _enqueue_events(self, events: Collection[str]) -> Dict[str, _EventRow]:
         """Fetches events from the database using the _event_fetch_list. This
         allows batch and bulk fetching of events - it allows us to fetch events
         without having to create a new transaction for each request for events.
