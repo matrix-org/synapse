@@ -1125,7 +1125,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
             results = list(txn)
             # (event_id, parent_id, rel_type) for each relation
-            missing_relations: List[Tuple[str, str, str]] = []
+            relations_to_insert: List[Tuple[str, str, str]] = []
             for (event_id, event_json_raw) in results:
                 try:
                     event_json = db_to_json(event_json_raw)
@@ -1158,22 +1158,22 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 if not isinstance(parent_id, str):
                     continue
 
-                missing_relations.append((event_id, parent_id, rel_type))
+                relations_to_insert.append((event_id, parent_id, rel_type))
 
             # Insert the missing data, note that we upsert here in case the event
             # has already been processed.
-            if missing_relations:
+            if relations_to_insert:
                 self.db_pool.simple_upsert_many_txn(
                     txn=txn,
                     table="event_relations",
                     key_names=("event_id",),
-                    key_values=[(r[0],) for r in missing_relations],
+                    key_values=[(r[0],) for r in relations_to_insert],
                     value_names=("relates_to_id", "relation_type"),
-                    value_values=[r[1:] for r in missing_relations],
+                    value_values=[r[1:] for r in relations_to_insert],
                 )
 
                 # Iterate the parent IDs and invalidate caches.
-                for parent_id in {r[1] for r in missing_relations}:
+                for parent_id in {r[1] for r in relations_to_insert}:
                     cache_tuple = (parent_id,)
                     self._invalidate_cache_and_stream(
                         txn, self.get_relations_for_event, cache_tuple
