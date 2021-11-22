@@ -16,6 +16,7 @@ import functools
 import logging
 import re
 from http import HTTPStatus
+from typing import Optional, Tuple
 
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.urls import FEDERATION_V1_PREFIX
@@ -145,14 +146,14 @@ class Authenticator:
             logger.exception("Error resetting retry timings on %s", origin)
 
 
-def _parse_auth_header(header_bytes):
+def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str, Optional[str]]:
     """Parse an X-Matrix auth header
 
     Args:
-        header_bytes (bytes): header value
+        header_bytes: header value
 
     Returns:
-        Tuple[str, str, str, Optional[str]]: origin, key id, signature, destination.
+        origin, key id, signature, destination.
 
     Raises:
         AuthenticationError if the header could not be parsed
