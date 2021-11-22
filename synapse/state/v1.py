@@ -17,6 +17,7 @@ import logging
 from typing import (
     Awaitable,
     Callable,
+    Collection,
     Dict,
     Iterable,
     List,
@@ -44,7 +45,7 @@ async def resolve_events_with_store(
     room_version: RoomVersion,
     state_sets: Sequence[StateMap[str]],
     event_map: Optional[Dict[str, EventBase]],
-    state_map_factory: Callable[[Iterable[str]], Awaitable[Dict[str, EventBase]]],
+    state_map_factory: Callable[[Collection[str]], Awaitable[Dict[str, EventBase]]],
 ) -> StateMap[str]:
     """
     Args:
