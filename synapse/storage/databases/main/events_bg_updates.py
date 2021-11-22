@@ -1161,7 +1161,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 values=[
                     {
                         "event_id": event_id,
-                        "relates_to_Id": parent_id,
+                        "relates_to_id": parent_id,
                         "relation_type": rel_type,
                     }
                     for event_id, parent_id, rel_type in missing_relations
