@@ -1,1 +1,1 @@
-Removes unnecessary use of jquery on the recaptcha page.
+Removes unnecessary use of jquery on the recaptcha page from `synapse/synapse/res/templates/recaptcha.html`.
