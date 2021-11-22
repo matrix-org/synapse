@@ -758,7 +758,7 @@ class AuthHandler:
         refresh_token: str,
         access_token_valid_until_ms: Optional[int],
         refresh_token_valid_until_ms: Optional[int],
-    ) -> Tuple[str, str, int]:
+    ) -> Tuple[str, str, Optional[int]]:
         """
         Consumes a refresh token and generate both a new access token and a new refresh token from it.
 
@@ -805,13 +805,22 @@ class AuthHandler:
 
         if existing_token.ultimate_session_expiry_ts is not None:
             # This session has a bounded lifetime, even across refreshes.
-            access_token_valid_until_ms = min(
-                access_token_valid_until_ms, existing_token.ultimate_session_expiry_ts
-            )
-            refresh_token_valid_until_ms = min(
-                refresh_token_valid_until_ms, existing_token.ultimate_session_expiry_ts
-            )
 
+            if access_token_valid_until_ms is not None:
+                access_token_valid_until_ms = min(
+                    access_token_valid_until_ms,
+                    existing_token.ultimate_session_expiry_ts,
+                )
+            else:
+                access_token_valid_until_ms = existing_token.ultimate_session_expiry_ts
+
+            if refresh_token_valid_until_ms is not None:
+                refresh_token_valid_until_ms = min(
+                    refresh_token_valid_until_ms,
+                    existing_token.ultimate_session_expiry_ts,
+                )
+            else:
+                refresh_token_valid_until_ms = existing_token.ultimate_session_expiry_ts
             if existing_token.ultimate_session_expiry_ts < now_ms:
                 raise SynapseError(
                     403,

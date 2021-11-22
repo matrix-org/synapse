@@ -478,14 +478,17 @@ class RefreshTokenServlet(RestServlet):
         ) = await self._auth_handler.refresh_token(
             token, access_valid_until_ms, refresh_valid_until_ms
         )
-        return (
-            200,
-            {
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "expires_in_ms": (actual_access_token_expiry - now),
-            },
-        )
+
+        response: Dict[str, Union[str, int]] = {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+        }
+
+        # expires_in_ms is only present if the token expires
+        if actual_access_token_expiry is not None:
+            response["expires_in_ms"] = actual_access_token_expiry - now
+
+        return 200, response
 
 
 class SsoRedirectServlet(RestServlet):
