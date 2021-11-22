@@ -546,7 +546,7 @@ class CasTicketServlet(RestServlet):
     async def on_GET(self, request: SynapseRequest) -> None:
         client_redirect_url = parse_string(request, "redirectUrl")
 
-        if not client_redirect_url.endswith("/"):
+        if client_redirect_url and not (client_redirect_url.endswith("/")):
             client_redirect_url = client_redirect_url + "/"
 
         ticket = parse_string(request, "ticket", required=True)
