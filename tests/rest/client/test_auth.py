@@ -624,6 +624,51 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             refresh_response.json_body["expires_in_ms"], 60 * 1000, 100
         )
 
+    @override_config({"access_token_lifetime": "1m", "refresh_token_lifetime": "2m"})
+    def test_refresh_token_expiry(self):
+        """
+        The refresh token can be configured to have a limited lifetime.
+        """
+
+        def use_refresh_token(refresh_token: str) -> FakeChannel:
+            """
+            Helper that makes a request to use a refresh token.
+            """
+            return self.make_request(
+                "POST",
+                "/_matrix/client/unstable/org.matrix.msc2918.refresh_token/refresh",
+                {"refresh_token": refresh_token},
+            )
+
+        body = {"type": "m.login.password", "user": "test", "password": self.user_pass}
+        login_response = self.make_request(
+            "POST",
+            "/_matrix/client/r0/login?org.matrix.msc2918.refresh_token=true",
+            body,
+        )
+        self.assertEqual(login_response.code, 200, login_response.result)  #
+        refresh_token = login_response.json_body["refresh_token"]
+
+        # Advance 119 seconds in the future (just shy of 2 minutes)
+        self.reactor.advance(119.0)
+
+        # Refresh our access token. It should still JUST be valid right now.
+        refresh_response = use_refresh_token(refresh_token)
+        self.assertEqual(refresh_response.code, 200, refresh_response.result)
+        self.assertIn(
+            "refresh_token",
+            refresh_response.json_body,
+            "No new refresh token returned after refresh.",
+        )
+        refresh_token = refresh_response.json_body["refresh_token"]
+
+        # Advance 121 seconds in the future (just a bit more than 2 minutes)
+        self.reactor.advance(121.0)
+
+        # Refresh our access token. It shouldn't be valid anymore.
+        refresh_response = use_refresh_token(refresh_token)
+        self.assertEqual(refresh_response.code, 403, refresh_response.result)
+
     def test_refresh_token_invalidation(self):
         """Refresh tokens are invalidated after first use of the next token.
 
