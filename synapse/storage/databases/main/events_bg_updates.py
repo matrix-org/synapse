@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 import attr
 
-from synapse.api.constants import EventContentFields
+from synapse.api.constants import EventContentFields, RelationTypes
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import make_event_from_dict
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
@@ -1112,14 +1112,12 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         last_event_id = progress.get("last_event_id", "")
 
         def _event_arbitrary_relations_txn(txn: LoggingTransaction) -> int:
-            # Iterate over events which do not appear in the event_relations
-            # table -- they might have a relation that was not previously stored
-            # due to an unknown relation type.
+            # Fetch events and then filter based on whether the event has a
+            # relation or not.
             txn.execute(
                 """
                 SELECT event_id, json FROM event_json
-                LEFT JOIN event_relations USING (event_id)
-                WHERE event_id > ? AND event_relations.event_id IS NULL
+                WHERE event_id > ?
                 ORDER BY event_id LIMIT ?
                 """,
                 (last_event_id, batch_size),
@@ -1144,32 +1142,36 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 if not relates_to or not isinstance(relates_to, dict):
                     continue
 
-                # The only expected relation type would be from threads, but
-                # there could be other unknown ones.
+                # If the relation type or parent event ID is not a string a
+                # string, skip it.
+                #
+                # Do not consider relation types that have existed for a long time,
+                # only include the new thread relation and any unknown relations.
                 rel_type = relates_to.get("rel_type")
-                if not isinstance(rel_type, str):
+                if not isinstance(rel_type, str) or rel_type in (
+                    RelationTypes.ANNOTATION,
+                    RelationTypes.REFERENCE,
+                    RelationTypes.REPLACE,
+                ):
                     continue
 
-                # Get the parent ID.
                 parent_id = relates_to.get("event_id")
                 if not isinstance(parent_id, str):
                     continue
 
                 missing_relations.append((event_id, parent_id, rel_type))
 
-            # Insert the missing data.
-            self.db_pool.simple_insert_many_txn(
-                txn=txn,
-                table="event_relations",
-                values=[
-                    {
-                        "event_id": event_id,
-                        "relates_to_id": parent_id,
-                        "relation_type": rel_type,
-                    }
-                    for event_id, parent_id, rel_type in missing_relations
-                ],
-            )
+            # Insert the missing data, note that we upsert here in-case the event
+            # has already been processed.
+            if missing_relations:
+                self.db_pool.simple_upsert_many_txn(
+                    txn=txn,
+                    table="event_relations",
+                    key_names=("event_id",),
+                    key_values=[(r[0],) for r in missing_relations],
+                    value_names=("relates_to_id", "relation_type"),
+                    value_values=[r[1:] for r in missing_relations],
+                )
 
             if results:
                 latest_event_id = results[-1][0]
