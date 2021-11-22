@@ -64,6 +64,7 @@
       - [Statistics](admin_api/statistics.md)
       - [Users](admin_api/user_admin_api.md)
       - [Server Version](admin_api/version_api.md)
+      - [Federation](usage/administration/admin_api/federation.md)
     - [Manhole](manhole.md)
     - [Monitoring](metrics-howto.md)
     - [Request log format](usage/administration/request_log.md)
