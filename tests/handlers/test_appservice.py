@@ -47,12 +47,6 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.handler = ApplicationServicesHandler(hs)
         self.event_source = hs.get_event_sources()
 
-        # Mock the ApplicationServiceScheduler queuer so that we can track any
-        # outgoing ephemeral events
-        self.mock_service_queuer = Mock()
-        self.mock_service_queuer.enqueue_ephemeral = Mock()
-        hs.get_application_service_handler().scheduler.queuer = self.mock_service_queuer
-
     def test_notify_interested_services(self):
         interested_service = self._mkservice(is_interested=True)
         services = [
@@ -285,7 +279,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.handler.notify_interested_services_ephemeral(
             "receipt_key", 580, ["@fakerecipient:example.com"]
         )
-        self.mock_service_queuer.enqueue_ephemeral.assert_called_once_with(
+        self.mock_scheduler.submit_ephemeral_events_for_as.assert_called_once_with(
             interested_service, [event]
         )
         self.mock_store.set_type_stream_id_for_appservice.assert_called_once_with(
@@ -315,7 +309,10 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.handler.notify_interested_services_ephemeral(
             "receipt_key", 580, ["@fakerecipient:example.com"]
         )
-        self.mock_service_queuer.enqueue_ephemeral.assert_not_called()
+        # This method will be called, but with an empty list of events
+        self.mock_scheduler.submit_ephemeral_events_for_as.assert_called_once_with(
+            interested_service, []
+        )
 
     def _mkservice(self, is_interested, protocols=None):
         service = Mock()
