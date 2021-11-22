@@ -28,6 +28,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import Pusher, PusherConfig, PusherConfigException
 
 from . import push_rule_evaluator, push_tools
+from ..storage.databases.main.event_push_actions import HttpPushAction
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -273,7 +274,7 @@ class HttpPusher(Pusher):
                     )
                     break
 
-    async def _process_one(self, push_action: dict) -> bool:
+    async def _process_one(self, push_action: HttpPushAction) -> bool:
         if "notify" not in push_action["actions"]:
             return True
 
