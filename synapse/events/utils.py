@@ -435,16 +435,16 @@ class EventClientSerializer:
         """
         event_id = event.event_id
 
-        annotations = await self.store.get_aggregation_groups_for_event(event_id)
-        references = await self.store.get_relations_for_event(
-            event_id, RelationTypes.REFERENCE, direction="f"
-        )
-
+        # The bundled relations to include.
         relations = {}
 
+        annotations = await self.store.get_aggregation_groups_for_event(event_id)
         if annotations.chunk:
             relations[RelationTypes.ANNOTATION] = annotations.to_dict()
 
+        references = await self.store.get_relations_for_event(
+            event_id, RelationTypes.REFERENCE, direction="f"
+        )
         if references.chunk:
             relations[RelationTypes.REFERENCE] = references.to_dict()
 
