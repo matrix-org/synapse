@@ -513,6 +513,16 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         self.user_pass = "pass"
         self.user = self.register_user("test", self.user_pass)
 
+    def use_refresh_token(self, refresh_token: str) -> FakeChannel:
+        """
+        Helper that makes a request to use a refresh token.
+        """
+        return self.make_request(
+            "POST",
+            "/_matrix/client/unstable/org.matrix.msc2918.refresh_token/refresh",
+            {"refresh_token": refresh_token},
+        )
+
     def test_login_issue_refresh_token(self):
         """
         A login response should include a refresh_token only if asked.
@@ -630,16 +640,6 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         The refresh token can be configured to have a limited lifetime.
         """
 
-        def use_refresh_token(refresh_token: str) -> FakeChannel:
-            """
-            Helper that makes a request to use a refresh token.
-            """
-            return self.make_request(
-                "POST",
-                "/_matrix/client/unstable/org.matrix.msc2918.refresh_token/refresh",
-                {"refresh_token": refresh_token},
-            )
-
         body = {"type": "m.login.password", "user": "test", "password": self.user_pass}
         login_response = self.make_request(
             "POST",
@@ -653,7 +653,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         self.reactor.advance(119.0)
 
         # Refresh our access token. It should still JUST be valid right now.
-        refresh_response = use_refresh_token(refresh_token)
+        refresh_response = self.use_refresh_token(refresh_token)
         self.assertEqual(refresh_response.code, 200, refresh_response.result)
         self.assertIn(
             "refresh_token",
@@ -666,7 +666,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         self.reactor.advance(121.0)
 
         # Refresh our access token. It shouldn't be valid anymore.
-        refresh_response = use_refresh_token(refresh_token)
+        refresh_response = self.use_refresh_token(refresh_token)
         self.assertEqual(refresh_response.code, 403, refresh_response.result)
 
     def test_refresh_token_invalidation(self):
