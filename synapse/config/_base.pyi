@@ -1,4 +1,18 @@
-from typing import Any, Iterable, List, Optional
+import argparse
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    MutableMapping,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
+
+import jinja2
 
 from synapse.config import (
     account_validity,
@@ -19,6 +33,7 @@ from synapse.config import (
     logger,
     metrics,
     modules,
+    oembed,
     oidc,
     password_auth_providers,
     push,
@@ -27,6 +42,7 @@ from synapse.config import (
     registration,
     repository,
     retention,
+    room,
     room_directory,
     saml2,
     server,
@@ -51,7 +67,9 @@ MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS: str
 MISSING_REPORT_STATS_SPIEL: str
 MISSING_SERVER_NAME: str
 
-def path_exists(file_path: str): ...
+def path_exists(file_path: str) -> bool: ...
+
+TRootConfig = TypeVar("TRootConfig", bound="RootConfig")
 
 class RootConfig:
     server: server.ServerConfig
@@ -61,6 +79,7 @@ class RootConfig:
     logging: logger.LoggingConfig
     ratelimiting: ratelimiting.RatelimitConfig
     media: repository.ContentRepositoryConfig
+    oembed: oembed.OembedConfig
     captcha: captcha.CaptchaConfig
     voip: voip.VoipConfig
     registration: registration.RegistrationConfig
@@ -80,6 +99,7 @@ class RootConfig:
     authproviders: password_auth_providers.PasswordAuthProviderConfig
     push: push.PushConfig
     spamchecker: spam_checker.SpamCheckerConfig
+    room: room.RoomConfig
     groups: groups.GroupsConfig
     userdirectory: user_directory.UserDirectoryConfig
     consent: consent.ConsentConfig
@@ -87,72 +107,85 @@ class RootConfig:
     servernotices: server_notices.ServerNoticesConfig
     roomdirectory: room_directory.RoomDirectoryConfig
     thirdpartyrules: third_party_event_rules.ThirdPartyRulesConfig
-    tracer: tracer.TracerConfig
+    tracing: tracer.TracerConfig
     redis: redis.RedisConfig
     modules: modules.ModulesConfig
     caches: cache.CacheConfig
     federation: federation.FederationConfig
     retention: retention.RetentionConfig
 
-    config_classes: List = ...
+    config_classes: List[Type["Config"]] = ...
     def __init__(self) -> None: ...
-    def invoke_all(self, func_name: str, *args: Any, **kwargs: Any): ...
+    def invoke_all(
+        self, func_name: str, *args: Any, **kwargs: Any
+    ) -> MutableMapping[str, Any]: ...
     @classmethod
     def invoke_all_static(cls, func_name: str, *args: Any, **kwargs: Any) -> None: ...
-    def __getattr__(self, item: str): ...
     def parse_config_dict(
         self,
-        config_dict: Any,
-        config_dir_path: Optional[Any] = ...,
-        data_dir_path: Optional[Any] = ...,
+        config_dict: Dict[str, Any],
+        config_dir_path: Optional[str] = ...,
+        data_dir_path: Optional[str] = ...,
     ) -> None: ...
-    read_config: Any = ...
     def generate_config(
         self,
         config_dir_path: str,
         data_dir_path: str,
         server_name: str,
         generate_secrets: bool = ...,
-        report_stats: Optional[str] = ...,
+        report_stats: Optional[bool] = ...,
         open_private_ports: bool = ...,
         listeners: Optional[Any] = ...,
-        database_conf: Optional[Any] = ...,
         tls_certificate_path: Optional[str] = ...,
         tls_private_key_path: Optional[str] = ...,
-    ): ...
+    ) -> str: ...
     @classmethod
-    def load_or_generate_config(cls, description: Any, argv: Any): ...
+    def load_or_generate_config(
+        cls: Type[TRootConfig], description: str, argv: List[str]
+    ) -> Optional[TRootConfig]: ...
     @classmethod
-    def load_config(cls, description: Any, argv: Any): ...
+    def load_config(
+        cls: Type[TRootConfig], description: str, argv: List[str]
+    ) -> TRootConfig: ...
     @classmethod
-    def add_arguments_to_parser(cls, config_parser: Any) -> None: ...
+    def add_arguments_to_parser(
+        cls, config_parser: argparse.ArgumentParser
+    ) -> None: ...
     @classmethod
-    def load_config_with_parser(cls, parser: Any, argv: Any): ...
+    def load_config_with_parser(
+        cls: Type[TRootConfig], parser: argparse.ArgumentParser, argv: List[str]
+    ) -> Tuple[TRootConfig, argparse.Namespace]: ...
     def generate_missing_files(
         self, config_dict: dict, config_dir_path: str
     ) -> None: ...
 
 class Config:
     root: RootConfig
+    default_template_dir: str
     def __init__(self, root_config: Optional[RootConfig] = ...) -> None: ...
-    def __getattr__(self, item: str, from_root: bool = ...): ...
     @staticmethod
-    def parse_size(value: Any): ...
+    def parse_size(value: Union[str, int]) -> int: ...
     @staticmethod
-    def parse_duration(value: Any): ...
+    def parse_duration(value: Union[str, int]) -> int: ...
     @staticmethod
-    def abspath(file_path: Optional[str]): ...
+    def abspath(file_path: Optional[str]) -> str: ...
     @classmethod
-    def path_exists(cls, file_path: str): ...
+    def path_exists(cls, file_path: str) -> bool: ...
     @classmethod
-    def check_file(cls, file_path: str, config_name: str): ...
+    def check_file(cls, file_path: str, config_name: str) -> str: ...
     @classmethod
-    def ensure_directory(cls, dir_path: str): ...
+    def ensure_directory(cls, dir_path: str) -> str: ...
     @classmethod
-    def read_file(cls, file_path: str, config_name: str): ...
+    def read_file(cls, file_path: str, config_name: str) -> str: ...
+    def read_template(self, filenames: str) -> jinja2.Template: ...
+    def read_templates(
+        self,
+        filenames: List[str],
+        custom_template_directories: Optional[Iterable[str]] = None,
+    ) -> List[jinja2.Template]: ...
 
-def read_config_files(config_files: List[str]): ...
-def find_config_files(search_paths: List[str]): ...
+def read_config_files(config_files: Iterable[str]) -> Dict[str, Any]: ...
+def find_config_files(search_paths: List[str]) -> List[str]: ...
 
 class ShardedWorkerHandlingConfig:
     instances: List[str]
