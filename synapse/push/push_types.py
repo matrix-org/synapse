@@ -32,6 +32,7 @@ class EmailReason(TypedDict, total=False):
     throttle_ms: the minimum amount of time in milliseconds between two
             notifications can be sent for this room
     """
+
     room_id: str
     now: int
     room_name: Optional[str]
@@ -59,6 +60,7 @@ class MessageVars(TypedDict, total=False):
     body_text_plain: plaintext representation of the message
     image_url: mxc url of an image, when "msgtype" is "m.image"
     """
+
     event_type: str
     is_historical: bool
     id: str
@@ -81,6 +83,7 @@ class NotifVars(TypedDict):
     messages: a list of messages containing one message before the event, the
               message in the event, and one message after the event.
     """
+
     link: str
     ts: Optional[int]
     messages: List[MessageVars]
@@ -98,6 +101,7 @@ class RoomVars(TypedDict):
     link: a `matrix.to` link to the room
     avator_url: url to the room's avator
     """
+
     title: Optional[str]
     hash: int
     invite: bool
@@ -121,6 +125,7 @@ class TemplateVars(TypedDict, total=False):
     rooms: a list of rooms containing events to include in the email
     reason: information on the event that triggered the email to be sent
     """
+
     app_name: str
     server_name: str
     link: str
