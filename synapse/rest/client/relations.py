@@ -224,17 +224,17 @@ class RelationPaginationServlet(RestServlet):
         )
 
         now = self.clock.time_msec()
-        # We set bundle_aggregations to False when retrieving the original
+        # We set bundle_relations to False when retrieving the original
         # event because we want the content before relations were applied to
         # it.
         original_event = await self._event_serializer.serialize_event(
-            event, now, bundle_aggregations=False
+            event, now, bundle_relations=False
         )
         # Similarly, we don't allow relations to be applied to relations, so we
         # return the original relations without any aggregations on top of them
         # here.
         serialized_events = await self._event_serializer.serialize_events(
-            events, now, bundle_aggregations=False
+            events, now, bundle_relations=False
         )
 
         return_value = pagination_chunk.to_dict()
