@@ -558,8 +558,6 @@ class Mailer:
         if not isinstance(msgformat, str):
             msgformat = None
 
-        messagevars["format"] = msgformat
-
         formatted_body = event.content.get("formatted_body")
         body = event.content.get("body")
 

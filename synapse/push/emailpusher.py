@@ -194,6 +194,7 @@ class EmailPusher(Pusher):
 
                 reason: EmailReason = {
                     "room_id": push_action["room_id"],
+                    "now": self.clock.time_msec(),
                     "received_at": received_at,
                     "delay_before_mail_ms": DELAY_BEFORE_MAIL_MS,
                     "last_sent_ts": self.get_room_last_sent_ts(push_action["room_id"]),
