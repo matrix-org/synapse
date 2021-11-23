@@ -49,12 +49,12 @@ A record of remote media is stored in the `remote_media_cache` table.
 A file from `matrix.org` with `filesystem_id` `aabbcccccccccccccccccccc` and its
 `128x96` `image/jpeg` thumbnail, created by scaling, would be stored at:
 ```
-remote_content/server_name/aa/bb/cccccccccccccccccccc
-remote_thumbnail/server_name/aa/bb/cccccccccccccccccccc/128-96-image-jpeg-scale
+remote_content/matrix.org/aa/bb/cccccccccccccccccccc
+remote_thumbnail/matrix.org/aa/bb/cccccccccccccccccccc/128-96-image-jpeg-scale
 ```
 Older thumbnails may omit the thumbnailing method:
 ```
-remote_thumbnail/server_name/aa/bb/cccccccccccccccccccc/128-96-image-jpeg
+remote_thumbnail/matrix.org/aa/bb/cccccccccccccccccccc/128-96-image-jpeg
 ```
 
 Note that `remote_thumbnail/` does not have an `s`.
