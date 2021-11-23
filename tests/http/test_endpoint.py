@@ -36,8 +36,11 @@ class ServerNameTestCase(unittest.TestCase):
             "localhost:http",  # non-numeric port
             "1234]",  # smells like ipv6 literal but isn't
             "[1234",
+            "[1.2.3.4]",
             "underscore_.com",
             "percent%65.com",
+            "newline.com\n",
+            ".empty-label.com",
             "1234:5678:80",  # too many colons
         ]
         for i in test_data:
