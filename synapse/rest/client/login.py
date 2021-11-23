@@ -454,7 +454,7 @@ class RefreshTokenServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self._auth_handler = hs.get_auth_handler()
         self._clock = hs.get_clock()
-        self.access_token_lifetime = (
+        self.refreshable_access_token_lifetime = (
             hs.config.registration.refreshable_access_token_lifetime
         )
 
@@ -466,7 +466,9 @@ class RefreshTokenServlet(RestServlet):
         if not isinstance(token, str):
             raise SynapseError(400, "Invalid param: refresh_token", Codes.INVALID_PARAM)
 
-        valid_until_ms = self._clock.time_msec() + self.access_token_lifetime
+        valid_until_ms = (
+            self._clock.time_msec() + self.refreshable_access_token_lifetime
+        )
         access_token, refresh_token = await self._auth_handler.refresh_token(
             token, valid_until_ms
         )
