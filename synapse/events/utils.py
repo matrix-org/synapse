@@ -435,7 +435,8 @@ class EventClientSerializer:
             serialized_event: The serialized event which may be modified.
 
         """
-        # Do not bundle aggregations for an event which represents an edit or annotation.
+        # Do not bundle relations for an event which represents an edit or an
+        # annotation. It does not make sense for them to have related events.
         relates_to = event.content.get("m.relates_to")
         if isinstance(relates_to, (dict, frozendict)):
             relation_type = relates_to.get("rel_type")
