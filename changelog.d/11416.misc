@@ -1,0 +1,1 @@
+Add a check to ensure that users cannot start the Synapse master process when `worker_app` is set.
