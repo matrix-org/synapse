@@ -24,6 +24,7 @@ from typing import (
     List,
     Optional,
     Tuple,
+    TypeVar,
     Union,
 )
 
@@ -81,7 +82,11 @@ from synapse.http.server import (
 )
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
-from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.logging.context import (
+    defer_to_thread,
+    make_deferred_yieldable,
+    run_in_background
+)
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
@@ -108,6 +113,8 @@ from synapse.util.caches.descriptors import cached
 if TYPE_CHECKING:
     from synapse.app.generic_worker import GenericWorkerSlavedStore
     from synapse.server import HomeServer
+
+TV = TypeVar("TV")
 
 """
 This package defines the 'stable' API which can be used by extension modules which
@@ -320,7 +327,7 @@ class ModuleApi:
     ) -> None:
         """Registers background update controller callbacks.
 
-        Added in Synapse v1.48.0.
+        Added in Synapse v1.49.0.
         """
 
         for db in self._hs.get_datastores().databases:
@@ -1151,6 +1158,26 @@ class ModuleApi:
         state_events = await self._store.get_events(state_ids.values())
 
         return {key: state_events[event_id] for key, event_id in state_ids.items()}
+
+    async def defer_to_thread(
+        self,
+        f: Callable[[...], TV],
+        *args: Any,
+        **kwargs: Any,
+    ) -> TV:
+        """Runs the given function in a separate thread from Synapse's thread pool.
+
+        Added in Synapse v1.49.0.
+
+        Args:
+            f: The function to run.
+            args: The function's arguments.
+            kwargs: The function's keyword arguments.
+
+        Returns:
+            The return value of the function once ran in a thread.
+        """
+        return await defer_to_thread(self._hs.get_reactor(), f, *args, **kwargs)
 
 
 class PublicRoomListManager:
