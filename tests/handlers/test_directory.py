@@ -1,4 +1,5 @@
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2021 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from unittest.mock import Mock
 
 import synapse.api.errors
 import synapse.rest.admin
 from synapse.api.constants import EventTypes
-from synapse.config.room_directory import RoomDirectoryConfig
 from synapse.rest.client import directory, login, room
 from synapse.types import RoomAlias, create_requester
 
@@ -394,22 +393,15 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
 
     servlets = [directory.register_servlets, room.register_servlets]
 
-    def prepare(self, reactor, clock, hs):
-        # We cheekily override the config to add custom alias creation rules
-        config = {}
+    def default_config(self):
+        config = super().default_config()
+
+        # Add custom alias creation rules to the config.
         config["alias_creation_rules"] = [
             {"user_id": "*", "alias": "#unofficial_*", "action": "allow"}
         ]
-        config["room_list_publication_rules"] = []
 
-        rd_config = RoomDirectoryConfig()
-        rd_config.read_config(config)
-
-        self.hs.config.roomdirectory.is_alias_creation_allowed = (
-            rd_config.is_alias_creation_allowed
-        )
-
-        return hs
+        return config
 
     def test_denied(self):
         room_id = self.helper.create_room_as(self.user_id)
@@ -417,7 +409,7 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
         channel = self.make_request(
             "PUT",
             b"directory/room/%23test%3Atest",
-            ('{"room_id":"%s"}' % (room_id,)).encode("ascii"),
+            {"room_id": room_id},
         )
         self.assertEquals(403, channel.code, channel.result)
 
@@ -427,14 +419,35 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
         channel = self.make_request(
             "PUT",
             b"directory/room/%23unofficial_test%3Atest",
-            ('{"room_id":"%s"}' % (room_id,)).encode("ascii"),
+            {"room_id": room_id},
         )
         self.assertEquals(200, channel.code, channel.result)
 
+    def test_denied_during_creation(self):
+        """A room alias that is not allowed should be rejected during creation."""
+        # Invalid room alias.
+        self.helper.create_room_as(
+            self.user_id,
+            expect_code=403,
+            extra_content={"room_alias_name": "foo"},
+        )
+
+    def test_allowed_during_creation(self):
+        """A valid room alias should be allowed during creation."""
+        room_id = self.helper.create_room_as(
+            self.user_id,
+            extra_content={"room_alias_name": "unofficial_test"},
+        )
+
+        channel = self.make_request(
+            "GET",
+            b"directory/room/%23unofficial_test%3Atest",
+        )
+        self.assertEquals(200, channel.code, channel.result)
+        self.assertEquals(channel.json_body["room_id"], room_id)
+
 
 class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
-    data = {"room_alias_name": "unofficial_test"}
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
@@ -443,27 +456,30 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
     ]
     hijack_auth = False
 
+    data = {"room_alias_name": "unofficial_test"}
+    allowed_localpart = "allowed"
+
+    def default_config(self):
+        config = super().default_config()
+
+        # Add custom room list publication rules to the config.
+        config["room_list_publication_rules"] = [
+            {
+                "user_id": "@" + self.allowed_localpart + "*",
+                "alias": "#unofficial_*",
+                "action": "allow",
+            },
+            {"user_id": "*", "alias": "*", "action": "deny"},
+        ]
+
+        return config
+
     def prepare(self, reactor, clock, hs):
-        self.allowed_user_id = self.register_user("allowed", "pass")
-        self.allowed_access_token = self.login("allowed", "pass")
+        self.allowed_user_id = self.register_user(self.allowed_localpart, "pass")
+        self.allowed_access_token = self.login(self.allowed_localpart, "pass")
 
         self.denied_user_id = self.register_user("denied", "pass")
         self.denied_access_token = self.login("denied", "pass")
-
-        # This time we add custom room list publication rules
-        config = {}
-        config["alias_creation_rules"] = []
-        config["room_list_publication_rules"] = [
-            {"user_id": "*", "alias": "*", "action": "deny"},
-            {"user_id": self.allowed_user_id, "alias": "*", "action": "allow"},
-        ]
-
-        rd_config = RoomDirectoryConfig()
-        rd_config.read_config(config)
-
-        self.hs.config.roomdirectory.is_publishing_room_allowed = (
-            rd_config.is_publishing_room_allowed
-        )
 
         return hs
 
@@ -505,8 +521,21 @@ class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
             self.allowed_user_id,
             tok=self.allowed_access_token,
             extra_content=self.data,
-            is_public=False,
+            is_public=True,
             expect_code=200,
+        )
+
+    def test_denied_publication_with_invalid_alias(self):
+        """
+        Try to create a room, register an alias for it, and publish it,
+        as a user WITH permission to publish rooms.
+        """
+        self.helper.create_room_as(
+            self.allowed_user_id,
+            tok=self.allowed_access_token,
+            extra_content={"room_alias_name": "foo"},
+            is_public=True,
+            expect_code=403,
         )
 
     def test_can_create_as_private_room_after_rejection(self):

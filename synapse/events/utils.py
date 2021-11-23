@@ -1,4 +1,5 @@
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -392,7 +393,7 @@ class EventClientSerializer:
         self,
         event: Union[JsonDict, EventBase],
         time_now: int,
-        bundle_aggregations: bool = True,
+        bundle_relations: bool = True,
         **kwargs: Any,
     ) -> JsonDict:
         """Serializes a single event.
@@ -400,7 +401,8 @@ class EventClientSerializer:
         Args:
             event: The event being serialized.
             time_now: The current time in milliseconds
-            bundle_aggregations: Whether to bundle in related events
+            bundle_relations: Whether to include the bundled relations for this
+                event.
             **kwargs: Arguments to pass to `serialize_event`
 
         Returns:
@@ -416,7 +418,7 @@ class EventClientSerializer:
         # we need to bundle in with the event.
         # Do not bundle relations if the event has been redacted
         if not event.internal_metadata.is_redacted() and (
-            self._msc1849_enabled and bundle_aggregations
+            self._msc1849_enabled and bundle_relations
         ):
             await self._injected_bundled_relations(event, time_now, serialized_event)
 
@@ -442,16 +444,16 @@ class EventClientSerializer:
 
         event_id = event.event_id
 
-        annotations = await self.store.get_aggregation_groups_for_event(event_id)
-        references = await self.store.get_relations_for_event(
-            event_id, RelationTypes.REFERENCE, direction="f"
-        )
-
+        # The bundled relations to include.
         relations = {}
 
+        annotations = await self.store.get_aggregation_groups_for_event(event_id)
         if annotations.chunk:
             relations[RelationTypes.ANNOTATION] = annotations.to_dict()
 
+        references = await self.store.get_relations_for_event(
+            event_id, RelationTypes.REFERENCE, direction="f"
+        )
         if references.chunk:
             relations[RelationTypes.REFERENCE] = references.to_dict()
 
@@ -472,6 +474,7 @@ class EventClientSerializer:
             serialized_event["content"] = edit_content.get("m.new_content", {})
 
             # Check for existing relations
+            relates_to = event.content.get("m.relates_to")
             if relates_to:
                 # Keep the relations, ensuring we use a dict copy of the original
                 serialized_event["content"]["m.relates_to"] = relates_to.copy()
@@ -492,9 +495,9 @@ class EventClientSerializer:
             ) = await self.store.get_thread_summary(event_id)
             if latest_thread_event:
                 relations[RelationTypes.THREAD] = {
-                    # Don't bundle aggregations as this could recurse forever.
+                    # Don't bundle relations as this could recurse forever.
                     "latest_event": await self.serialize_event(
-                        latest_thread_event, time_now, bundle_aggregations=False
+                        latest_thread_event, time_now, bundle_relations=False
                     ),
                     "count": thread_count,
                 }
