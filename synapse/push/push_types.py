@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from typing_extensions import TypedDict
 
@@ -49,11 +49,11 @@ class MessageVars(TypedDict, total=False):
     sender_name: str
     sender_avatar_url: Optional[str]
     sender_hash: int
-    msgtype: Optional[Any]
+    msgtype: Optional[str]
     body_text_html: str
     body_text_plain: str
     image_url: str
-    format: Optional[Any]
+    format: Optional[str]
 
 
 class TemplateVars(TypedDict, total=False):

@@ -529,6 +529,8 @@ class Mailer:
             return ret
 
         msgtype = event.content.get("msgtype")
+        if not isinstance(msgtype, str):
+            msgtype = None
 
         ret["msgtype"] = msgtype
 
@@ -553,6 +555,8 @@ class Mailer:
             event: The event under consideration.
         """
         msgformat = event.content.get("format")
+        if not isinstance(msgformat, str):
+            msgformat = None
 
         messagevars["format"] = msgformat
 
