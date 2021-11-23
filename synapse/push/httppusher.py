@@ -27,7 +27,7 @@ from synapse.logging import opentracing
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import Pusher, PusherConfig, PusherConfigException
 
-from ..storage.databases.main.event_push_actions import HttpPushAction
+from synapse.storage.databases.main.event_push_actions import HttpPushAction
 from . import push_rule_evaluator, push_tools
 
 if TYPE_CHECKING:
