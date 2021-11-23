@@ -17,9 +17,23 @@ from typing_extensions import TypedDict
 
 
 class EmailReason(TypedDict, total=False):
+    """
+    Information on the event that triggered the email to be sent
+
+    Params:
+        room_id: the ID of the room the event was sent in
+        room_name: a human-readable name for the room the event was sent in
+        received_at: the time in milliseconds at which the event was received
+        delay_before_mail_ms: the amount of time in milliseconds Synapse always waits
+                before ever emailing about a notification (to give the user a chance to respond
+                to other push or notice the window)
+        last_sent_ts: the time in milliseconds at which a notification was last sent
+                for an event in this room
+        throttle_ms: the minimum amount of time in milliseconds between two
+                notifications can be sent for this room
+    """
     room_id: str
     room_name: Optional[str]
-    now: int
     received_at: int
     delay_before_mail_ms: int
     last_sent_ts: int
