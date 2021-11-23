@@ -10,3 +10,7 @@ build:
   - if [ $CI_COMMIT_BRANCH != "master" ]; then tag=$CI_COMMIT_BRANCH; fi
   - docker build --tag $CI_REGISTRY_IMAGE:$tag-$CI_COMMIT_SHA -f docker/Dockerfile .
   - docker push $CI_REGISTRY_IMAGE:$tag-$CI_COMMIT_SHA
+  - if [ $CI_COMMIT_BRANCH == "master" ]; then
+      docker tag $CI_REGISTRY_IMAGE:$tag-$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest;
+      docker push $CI_REGISTRY_IMAGE:latest;
+    fi
