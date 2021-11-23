@@ -85,7 +85,7 @@ from synapse.http.site import SynapseRequest
 from synapse.logging.context import (
     defer_to_thread,
     make_deferred_yieldable,
-    run_in_background
+    run_in_background,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client.login import LoginResponse
@@ -1161,7 +1161,7 @@ class ModuleApi:
 
     async def defer_to_thread(
         self,
-        f: Callable[[...], TV],
+        f: Callable[..., TV],
         *args: Any,
         **kwargs: Any,
     ) -> TV:
