@@ -282,7 +282,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_scheduler.submit_ephemeral_events_for_as.assert_called_once_with(
             interested_service, [event]
         )
-        self.mock_store.set_type_stream_id_for_appservice.assert_called_once_with(
+        self.mock_store.set_appservice_stream_type_pos.assert_called_once_with(
             interested_service,
             "read_receipt",
             580,
