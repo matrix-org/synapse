@@ -741,64 +741,28 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
             # arguments depending on whether we want to filter for hidden devices.
             args += (True,)  # type: ignore[assignment]
 
-        if self.database_engine.supports_returning:
-            # If the database engine supports the RETURNING clause, use it and do
-            # everything in one go.
-            sql = (
-                """
-                DELETE FROM device_inbox
-                WHERE
-                    stream_id >= ? AND stream_id < ?
-                    AND (device_id, user_id) NOT IN (
-                        %s
-                    )
-                RETURNING device_id, user_id, stream_id
+        sql = (
             """
-                % nested_select
-            )
-
-            txn.execute(sql, args)
-            num_deleted = txn.rowcount
-            rows = txn.fetchall()
-        else:
-            # Otherwise do the select and delete separately.
-            sql = (
-                """
-                SELECT device_id, user_id, stream_id
-                FROM device_inbox
-                WHERE
-                    stream_id >= ? AND stream_id < ?
-                    AND (device_id, user_id) NOT IN (
-                        %s
-                    )
-                ORDER BY stream_id
-            """
-                % nested_select
-            )
-
-            txn.execute(sql, args)
-            rows = txn.fetchall()
-
-            num_deleted = 0
-            for row in rows:
-                num_deleted += self.db_pool.simple_delete_txn(
-                    txn,
-                    "device_inbox",
-                    {"device_id": row[0], "user_id": row[1], "stream_id": row[2]},
+            DELETE FROM device_inbox
+            WHERE
+                stream_id >= ? AND stream_id < ?
+                AND (device_id, user_id) NOT IN (
+                    %s
                 )
+        """
+            % nested_select
+        )
+
+        txn.execute(sql, args)
+        num_deleted = txn.rowcount
+        rows = txn.fetchall()
 
         if rows:
-            # send more than stream_id to progress
-            # otherwise it can happen in large deployments that
-            # no change of status is visible in the log file
-            # it may be that the stream_id does not change in several runs
             self.db_pool.updates._background_update_progress_txn(
                 txn,
                 update_name,
                 {
-                    "device_id": rows[-1][0],
-                    "user_id": rows[-1][1],
-                    "stream_id": rows[-1][2],
+                    "stream_id": stop,
                     "max_stream_id": max_stream_id,
                 },
             )
