@@ -653,7 +653,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
 
         def _remove_deleted_devices_from_device_inbox_txn(
             txn: LoggingTransaction,
-        ) -> bool:
+        ) -> Tuple[int, bool]:
             """stream_id is not unique
             we need to use an inclusive `stream_id >= ?` clause,
             since we might not have deleted all dead device messages for the stream_id
@@ -666,7 +666,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
 
             txn.execute("SELECT max(stream_id) FROM device_inbox")
             row = txn.fetchone()
-            if row[0] is None:
+            if row is None or row[0] is None:
                 max_stream_id = 0
             else:
                 max_stream_id = row[0]
@@ -724,7 +724,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
                 self.REMOVE_DELETED_DEVICES
             )
 
-        return (number_deleted)
+        return number_deleted
 
     async def _remove_hidden_devices_from_device_inbox(
         self, progress: JsonDict, batch_size: int
