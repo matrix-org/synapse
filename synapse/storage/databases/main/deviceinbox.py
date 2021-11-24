@@ -653,7 +653,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
 
         def _remove_deleted_devices_from_device_inbox_txn(
             txn: LoggingTransaction,
-        ) -> int:
+        ) -> bool:
             """stream_id is not unique
             we need to use an inclusive `stream_id >= ?` clause,
             since we might not have deleted all dead device messages for the stream_id
@@ -664,21 +664,28 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
             due to a single device having lots of device messages.
             """
 
-            last_stream_id = progress.get("stream_id", 0)
+            txn.execute("SELECT max(stream_id) FROM device_inbox")
+            row = txn.fetchone()
+            if row[0] is None:
+                max_stream_id = 0
+            else:
+                max_stream_id = row[0]
+
+            start = progress.get("stream_id", 0)
+            stop = start + batch_size
 
             sql = """
                 SELECT device_id, user_id, stream_id
                 FROM device_inbox
                 WHERE
-                    stream_id >= ?
+                    stream_id >= ? AND stream_id < ?
                     AND (device_id, user_id) NOT IN (
                         SELECT device_id, user_id FROM devices
                     )
                 ORDER BY stream_id
-                LIMIT ?
             """
 
-            txn.execute(sql, (last_stream_id, batch_size))
+            txn.execute(sql, (start, stop))
             rows = txn.fetchall()
 
             num_deleted = 0
@@ -704,20 +711,20 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
                     },
                 )
 
-            return num_deleted
+            return num_deleted, stop >= max_stream_id
 
-        number_deleted = await self.db_pool.runInteraction(
+        number_deleted, finished = await self.db_pool.runInteraction(
             "_remove_deleted_devices_from_device_inbox",
             _remove_deleted_devices_from_device_inbox_txn,
         )
 
         # The task is finished when no more lines are deleted.
-        if not number_deleted:
+        if finished:
             await self.db_pool.updates._end_background_update(
                 self.REMOVE_DELETED_DEVICES
             )
 
-        return number_deleted
+        return (number_deleted)
 
     async def _remove_hidden_devices_from_device_inbox(
         self, progress: JsonDict, batch_size: int
