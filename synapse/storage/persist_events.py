@@ -583,7 +583,8 @@ class EventsPersistenceStorage:
                 current_state_for_room=current_state_for_room,
                 state_delta_for_room=state_delta_for_room,
                 new_forward_extremeties=new_forward_extremeties,
-                backfilled=backfilled,
+                use_negative_stream_ordering=backfilled,
+                inhibit_local_membership_updates=backfilled,
             )
 
             await self._handle_potentially_left_users(potentially_left_users)
