@@ -7,7 +7,8 @@ The media repository
    users.
  * caches avatars, attachments and their thumbnails for media uploaded by remote
    users.
- * caches resources and thumbnails used for URL previews.
+ * caches resources and thumbnails used for
+   [URL previews](development/url_previews.md).
 
 All media in Matrix can be identified by a unique
 [MXC URI](https://spec.matrix.org/latest/client-server-api/#matrix-content-mxc-uris),
@@ -33,17 +34,15 @@ thumbnail, created by scaling, would be stored at:
 local_content/aa/bb/cccccccccccccccccccc
 local_thumbnails/aa/bb/cccccccccccccccccccc/128-96-image-jpeg-scale
 ```
-Older thumbnails may omit the thumbnailing method:
-```
-local_thumbnails/aa/bb/cccccccccccccccccccc/128-96-image-jpeg
-```
 
 ## Remote Media
 When media from a remote homeserver is requested from Synapse, it is assigned
 a local `filesystem_id`, with the same format as locally-generated media IDs,
 as described above.
 
-A record of remote media is stored in the `remote_media_cache` table.
+A record of remote media is stored in the `remote_media_cache` table, which
+can be used to map remote MXC URIs (server names and media IDs) to local
+`filesystem_id`s.
 
 ### Paths
 A file from `matrix.org` with `filesystem_id` `aabbcccccccccccccccccccc` and its
@@ -60,6 +59,9 @@ remote_thumbnail/matrix.org/aa/bb/cccccccccccccccccccc/128-96-image-jpeg
 Note that `remote_thumbnail/` does not have an `s`.
 
 ## URL Previews
+See [URL Previews](development/url_previews.md) for documentation on the URL preview
+process.
+
 When generating previews for URLs, Synapse may download and cache various
 resources, including images. These resources are assigned temporary media IDs
 of the form `yyyy-mm-dd_aaaaaaaaaaaaaaaa`, where `yyyy-mm-dd` is the current
