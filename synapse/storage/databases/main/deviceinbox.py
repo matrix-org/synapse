@@ -737,31 +737,28 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
         def _remove_hidden_devices_from_device_inbox_txn(
             txn: LoggingTransaction,
         ) -> int:
-            """stream_id is not unique
-            we need to use an inclusive `stream_id >= ?` clause,
-            since we might not have deleted all hidden device messages for the stream_id
-            returned from the previous query
+            """Retrieve the list of hidden devices that appear in the device_inbox table,
+            ordered by user_id so the query uses the index on the devices table.
 
             Then delete only rows matching the `(user_id, device_id, stream_id)` tuple,
             to avoid problems of deleting a large number of rows all at once
             due to a single device having lots of device messages.
             """
 
-            last_stream_id = progress.get("stream_id", 0)
+            last_user_id = progress.get("user_id", "")
 
             sql = """
-                SELECT device_id, user_id, stream_id
-                FROM device_inbox
+                SELECT user_id, device_id, stream_id
+                FROM devices
+                INNER JOIN device_inbox USING (device_id, user_id)
                 WHERE
-                    stream_id >= ?
-                    AND (device_id, user_id) IN (
-                        SELECT device_id, user_id FROM devices WHERE hidden = ?
-                    )
-                ORDER BY stream_id
+                    user_id >= ?
+                    AND hidden = ?
+                ORDER BY user_id
                 LIMIT ?
             """
 
-            txn.execute(sql, (last_stream_id, True, batch_size))
+            txn.execute(sql, (last_user_id, True, batch_size))
             rows = txn.fetchall()
 
             num_deleted = 0
