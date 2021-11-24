@@ -1,1 +1,1 @@
-Fix performance issues with the `remove_hidden_devices_from_device_inbox` database background update.
+Improve performance of various background updates related to device inboxes.
