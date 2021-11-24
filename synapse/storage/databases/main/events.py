@@ -121,10 +121,10 @@ class PersistEventsStore:
     async def _persist_events_and_state_updates(
         self,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
+        *,
         current_state_for_room: Dict[str, StateMap[str]],
         state_delta_for_room: Dict[str, DeltaState],
         new_forward_extremeties: Dict[str, List[str]],
-        *,
         use_negative_stream_ordering: bool = False,
         inhibit_local_membership_updates: bool = False,
     ) -> None:
@@ -1220,8 +1220,8 @@ class PersistEventsStore:
     def _update_room_depths_txn(
         self,
         txn,
-        events_and_contexts: List[Tuple[EventBase, EventContext]],
         *,
+        events_and_contexts: List[Tuple[EventBase, EventContext]],
         use_negative_stream_ordering: bool = False,
     ):
         """Update min_depth for each room
@@ -1459,6 +1459,7 @@ class PersistEventsStore:
     def _update_metadata_tables_txn(
         self,
         txn,
+        *,
         events_and_contexts,
         all_events_and_contexts,
         inhibit_local_membership_updates: bool = False,
