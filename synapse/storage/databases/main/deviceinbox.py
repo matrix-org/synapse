@@ -745,7 +745,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
             due to a single device having lots of device messages.
             """
 
-            last_user_id = progress.get("user_id", "")
+            last_user_id = progress.get("mxid", "")
 
             sql = """
                 SELECT device_id, user_id, stream_id
@@ -779,7 +779,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
                     self.REMOVE_HIDDEN_DEVICES,
                     {
                         "device_id": rows[-1][0],
-                        "user_id": rows[-1][1],
+                        "mxid": rows[-1][1],
                         "stream_id": rows[-1][2],
                     },
                 )
