@@ -127,14 +127,6 @@ class RegistrationConfig(Config):
             access_token_lifetime = self.parse_duration(access_token_lifetime)
         self.access_token_lifetime = access_token_lifetime
 
-        if session_lifetime is not None and access_token_lifetime is not None:
-            raise ConfigError(
-                "The refresh token mechanism is incompatible with the "
-                "`session_lifetime` option. Consider disabling the "
-                "`session_lifetime` option or disabling the refresh token "
-                "mechanism by removing the `access_token_lifetime` option."
-            )
-
         refresh_token_lifetime = config.get("refresh_token_lifetime")
         if refresh_token_lifetime is not None:
             refresh_token_lifetime = self.parse_duration(refresh_token_lifetime)
