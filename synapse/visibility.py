@@ -146,7 +146,9 @@ async def filter_events_for_client(
                 max_lifetime = retention_policy.get("max_lifetime")
 
                 if max_lifetime is not None:
-                    oldest_allowed_ts = storage.main.clock.time_msec() - max_lifetime
+                    # TODO: reveal_type(storage.main) yields Any. Can we find a way of
+                    # telling mypy that storage.main is a generic `DataStoreT`?
+                    oldest_allowed_ts = storage.main._clock.time_msec() - max_lifetime
 
                     if event.origin_server_ts < oldest_allowed_ts:
                         return None
