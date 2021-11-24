@@ -654,47 +654,66 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
         def _remove_deleted_devices_from_device_inbox_txn(
             txn: LoggingTransaction,
         ) -> Tuple[int, bool]:
-            """stream_id is not unique
-            we need to use an inclusive `stream_id >= ?` clause,
-            since we might not have deleted all dead device messages for the stream_id
-            returned from the previous query
-
-            Then delete only rows matching the `(user_id, device_id, stream_id)` tuple,
+            """We delete only rows matching the `(user_id, device_id, stream_id)` tuple,
             to avoid problems of deleting a large number of rows all at once
             due to a single device having lots of device messages.
             """
 
-            txn.execute("SELECT max(stream_id) FROM device_inbox")
-            row = txn.fetchone()
-            if row is None or row[0] is None:
-                max_stream_id = 0
+            if "max_stream_id" in progress:
+                max_stream_id = progress["max_stream_id"]
             else:
-                max_stream_id = row[0]
+                txn.execute("SELECT max(stream_id) FROM device_inbox")
+                # There's a type mismatch here between how we want to type the row and
+                # what fetchone says it returns, but we silence it because we know that
+                # res can't be None.
+                res: Tuple[Optional[int]] = txn.fetchone()  # type: ignore[assignment]
+                if res[0] is None:
+                    return 0, True
+                else:
+                    max_stream_id = res[0]
 
             start = progress.get("stream_id", 0)
             stop = start + batch_size
 
-            sql = """
-                SELECT device_id, user_id, stream_id
-                FROM device_inbox
-                WHERE
-                    stream_id >= ? AND stream_id < ?
-                    AND (device_id, user_id) NOT IN (
-                        SELECT device_id, user_id FROM devices
+            if self.database_engine.supports_returning:
+                # If the database engine supports the RETURNING clause, use it and do
+                # everything in one go.
+                sql = """
+                    DELETE FROM device_inbox
+                    WHERE
+                        stream_id >= ? AND stream_id < ?
+                        AND (device_id, user_id) NOT IN (
+                            SELECT device_id, user_id FROM devices
+                        )
+                    RETURNING device_id, user_id, stream_id
+                """
+
+                txn.execute(sql, (start, stop))
+                num_deleted = txn.rowcount
+                rows = txn.fetchall()
+            else:
+                # Otherwise do the select and delete separately.
+                sql = """
+                    SELECT device_id, user_id, stream_id
+                    FROM device_inbox
+                    WHERE
+                        stream_id >= ? AND stream_id < ?
+                        AND (device_id, user_id) NOT IN (
+                            SELECT device_id, user_id FROM devices
+                        )
+                    ORDER BY stream_id
+                """
+
+                txn.execute(sql, (start, stop))
+                rows = txn.fetchall()
+
+                num_deleted = 0
+                for row in rows:
+                    num_deleted += self.db_pool.simple_delete_txn(
+                        txn,
+                        "device_inbox",
+                        {"device_id": row[0], "user_id": row[1], "stream_id": row[2]},
                     )
-                ORDER BY stream_id
-            """
-
-            txn.execute(sql, (start, stop))
-            rows = txn.fetchall()
-
-            num_deleted = 0
-            for row in rows:
-                num_deleted += self.db_pool.simple_delete_txn(
-                    txn,
-                    "device_inbox",
-                    {"device_id": row[0], "user_id": row[1], "stream_id": row[2]},
-                )
 
             if rows:
                 # send more than stream_id to progress
@@ -708,6 +727,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
                         "device_id": rows[-1][0],
                         "user_id": rows[-1][1],
                         "stream_id": rows[-1][2],
+                        "max_stream_id": max_stream_id,
                     },
                 )
 
