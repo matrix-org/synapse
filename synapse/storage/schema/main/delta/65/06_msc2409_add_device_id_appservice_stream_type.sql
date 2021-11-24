@@ -15,4 +15,9 @@
 
 -- Add a column to track what to_device stream id that this application
 -- service has been caught up to.
+
+-- We explicitly don't set this field as "NOT NULL", as having NULL as a possible
+-- state is useful for determining if we've ever sent traffic for a stream type
+-- to an appservice. See https://github.com/matrix-org/synapse/issues/10836 for
+-- one way this can be used.
 ALTER TABLE application_services_state ADD COLUMN to_device_stream_id BIGINT;
