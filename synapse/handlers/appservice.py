@@ -283,7 +283,7 @@ class ApplicationServicesHandler:
         with Measure(self.clock, "notify_interested_services_ephemeral"):
             for service in services:
                 if stream_key == "typing_key":
-                    # Note that we don't persist the token (via set_type_stream_id_for_appservice)
+                    # Note that we don't persist the token (via set_appservice_stream_type_pos)
                     # for typing_key due to performance reasons and due to their highly
                     # ephemeral nature.
                     #
@@ -305,7 +305,7 @@ class ApplicationServicesHandler:
                         self.scheduler.submit_ephemeral_events_for_as(service, events)
 
                         # Persist the latest handled stream token for this appservice
-                        await self.store.set_type_stream_id_for_appservice(
+                        await self.store.set_appservice_stream_type_pos(
                             service, "read_receipt", new_token
                         )
 
@@ -314,7 +314,7 @@ class ApplicationServicesHandler:
                         self.scheduler.submit_ephemeral_events_for_as(service, events)
 
                         # Persist the latest handled stream token for this appservice
-                        await self.store.set_type_stream_id_for_appservice(
+                        await self.store.set_appservice_stream_type_pos(
                             service, "presence", new_token
                         )
 
@@ -329,7 +329,7 @@ class ApplicationServicesHandler:
                         )
 
                         # Persist the latest handled stream token for this appservice
-                        await self.store.set_type_stream_id_for_appservice(
+                        await self.store.set_appservice_stream_type_pos(
                             service, "to_device", new_token
                         )
 

@@ -433,10 +433,10 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
             ValueError,
         )
 
-    def test_set_type_stream_id_for_appservice(self):
+    def test_set_appservice_stream_type_pos(self):
         read_receipt_value = 1024
         self.get_success(
-            self.store.set_type_stream_id_for_appservice(
+            self.store.set_appservice_stream_type_pos(
                 self.service, "read_receipt", read_receipt_value
             )
         )
@@ -446,7 +446,7 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
         self.assertEqual(result, read_receipt_value)
 
         self.get_success(
-            self.store.set_type_stream_id_for_appservice(
+            self.store.set_appservice_stream_type_pos(
                 self.service, "presence", read_receipt_value
             )
         )
@@ -455,9 +455,9 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
         )
         self.assertEqual(result, read_receipt_value)
 
-    def test_set_type_stream_id_for_appservice_invalid_type(self):
+    def test_set_appservice_stream_type_pos_invalid_type(self):
         self.get_failure(
-            self.store.set_type_stream_id_for_appservice(self.service, "foobar", 1024),
+            self.store.set_appservice_stream_type_pos(self.service, "foobar", 1024),
             ValueError,
         )
 
