@@ -186,7 +186,6 @@ class PersistEventsStore:
                 self._persist_events_txn,
                 events_and_contexts=events_and_contexts,
                 inhibit_local_membership_updates=inhibit_local_membership_updates,
-                use_negative_stream_ordering=use_negative_stream_ordering,
                 state_delta_for_room=state_delta_for_room,
                 new_forward_extremeties=new_forward_extremeties,
             )
@@ -329,7 +328,6 @@ class PersistEventsStore:
         *,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
         inhibit_local_membership_updates: bool = False,
-        use_negative_stream_ordering: bool = False,
         state_delta_for_room: Optional[Dict[str, DeltaState]] = None,
         new_forward_extremeties: Optional[Dict[str, List[str]]] = None,
     ):
@@ -346,10 +344,6 @@ class PersistEventsStore:
                 from being updated by these events. This should be set to True
                 for backfilled events because backfilled events in the past do
                 not affect the current local state.
-            use_negative_stream_ordering: Whether to start stream_ordering on
-                the negative side and decrement. This should be set as True
-                for backfilled events because backfilled events get a negative
-                stream ordering so they don't come down incremental `/sync`.
             delete_existing True to purge existing table rows for the events
                 from the database. This is useful when retrying due to
                 IntegrityError.
@@ -382,11 +376,7 @@ class PersistEventsStore:
             events_and_contexts
         )
 
-        self._update_room_depths_txn(
-            txn,
-            events_and_contexts=events_and_contexts,
-            use_negative_stream_ordering=use_negative_stream_ordering,
-        )
+        self._update_room_depths_txn(txn, events_and_contexts=events_and_contexts)
 
         # _update_outliers_txn filters out any events which have already been
         # persisted, and returns the filtered list.
@@ -1220,9 +1210,7 @@ class PersistEventsStore:
     def _update_room_depths_txn(
         self,
         txn,
-        *,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
-        use_negative_stream_ordering: bool = False,
     ):
         """Update min_depth for each room
 
@@ -1230,21 +1218,17 @@ class PersistEventsStore:
             txn (twisted.enterprise.adbapi.Connection): db connection
             events_and_contexts (list[(EventBase, EventContext)]): events
                 we are persisting
-            use_negative_stream_ordering: Whether to start stream_ordering on
-                the negative side and decrement. This should be set as True
-                for backfilled events because backfilled events get a negative
-                stream ordering so they don't come down incremental `/sync`.
         """
         depth_updates: Dict[str, int] = {}
         for event, context in events_and_contexts:
             # Remove the any existing cache entries for the event_ids
             txn.call_after(self.store._invalidate_get_event_cache, event.event_id)
-            # This will update the `stream_ordering` position to mark the latest
+            # Then update the `stream_ordering` position to mark the latest
             # event as the front of the room. This should not be done for
             # backfilled events because backfilled events have negative
             # stream_ordering and happened in the past so we know that we don't
-            # need to update the stream_ordering tip for the room.
-            if not use_negative_stream_ordering:
+            # need to update the stream_ordering tip/front for the room.
+            if event.internal_metadata.stream_ordering >= 0:
                 txn.call_after(
                     self.store._events_stream_cache.entity_has_changed,
                     event.room_id,
