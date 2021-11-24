@@ -748,7 +748,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
             last_user_id = progress.get("user_id", "")
 
             sql = """
-                SELECT user_id, device_id, stream_id
+                SELECT device_id, user_id, stream_id
                 FROM devices
                 INNER JOIN device_inbox USING (device_id, user_id)
                 WHERE
