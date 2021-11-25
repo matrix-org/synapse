@@ -3,18 +3,20 @@ Synapse 1.48.0rc1 (2021-11-25)
 
 This release removes support for the long-deprecated `trust_identity_server_for_password_resets` configuration flag.
 
+This release also fixes some performance issues with some background database updates introduced in Synapse 1.47.0.
+
 Features
 --------
 
 - Experimental support for the thread relation defined in [MSC3440](https://github.com/matrix-org/matrix-doc/pull/3440). ([\#11161](https://github.com/matrix-org/synapse/issues/11161))
-- Add a new version of delete room admin API `DELETE /_synapse/admin/v2/rooms/<room_id>` to run it in background. Contributed by @dklimpel. ([\#11223](https://github.com/matrix-org/synapse/issues/11223))
-- Allow the admin [Delete Room API](https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#delete-room-api) to block a room without the need to join it. ([\#11228](https://github.com/matrix-org/synapse/issues/11228))
 - Support filtering by relation senders & types per [MSC3440](https://github.com/matrix-org/matrix-doc/pull/3440). ([\#11236](https://github.com/matrix-org/synapse/issues/11236))
 - Add support for the `/_matrix/client/v3` and `/_matrix/media/v3` APIs from Matrix v1.1. ([\#11318](https://github.com/matrix-org/synapse/issues/11318), [\#11371](https://github.com/matrix-org/synapse/issues/11371))
-- Add dedicated admin API for blocking a room. ([\#11324](https://github.com/matrix-org/synapse/issues/11324))
 - Support the stable version of [MSC2778](https://github.com/matrix-org/matrix-doc/pull/2778): the `m.login.application_service` login type. Contributed by @tulir. ([\#11335](https://github.com/matrix-org/synapse/issues/11335))
-- Add admin API to un-shadow-ban a user. ([\#11347](https://github.com/matrix-org/synapse/issues/11347))
-- Add admin API to run background database schema updates. ([\#11352](https://github.com/matrix-org/synapse/issues/11352))
+- Add a new version of delete room admin API `DELETE /_synapse/admin/v2/rooms/<room_id>` to run it in the background. Contributed by @dklimpel. ([\#11223](https://github.com/matrix-org/synapse/issues/11223))
+- Allow the admin [Delete Room API](https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#delete-room-api) to block a room without the need to join it. ([\#11228](https://github.com/matrix-org/synapse/issues/11228))
+- Add an admin API to un-shadow-ban a user. ([\#11347](https://github.com/matrix-org/synapse/issues/11347))
+- Add an admin API to run background database schema updates. ([\#11352](https://github.com/matrix-org/synapse/issues/11352))
+- Add an admin API for blocking a room. ([\#11324](https://github.com/matrix-org/synapse/issues/11324))
 - Update the JWT login type to support custom a `sub` claim. ([\#11361](https://github.com/matrix-org/synapse/issues/11361))
 - Store and allow querying of arbitrary event relations. ([\#11391](https://github.com/matrix-org/synapse/issues/11391))
 
@@ -26,11 +28,11 @@ Bugfixes
 - Prevent [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) historical state events from being pushed to an application service via `/transactions`. ([\#11265](https://github.com/matrix-org/synapse/issues/11265))
 - Fix a long-standing bug where uploading extremely thin images (e.g. 1000x1) would fail. Contributed by @Neeeflix. ([\#11288](https://github.com/matrix-org/synapse/issues/11288))
 - Fix a bug, introduced in Synapse 1.46.0, which caused the `check_3pid_auth` and `on_logged_out` callbacks in legacy password authentication provider modules to not be registered. Modules using the generic module interface were not affected. ([\#11340](https://github.com/matrix-org/synapse/issues/11340))
-- Fix a bug introduced in v1.41.0 where space hierarchy responses would be incorrectly reused if multiple users were to make the same request at the same time. ([\#11355](https://github.com/matrix-org/synapse/issues/11355))
-- Fix a bug introduced in v1.45.0 where the `read_templates` method of the module API would error. ([\#11377](https://github.com/matrix-org/synapse/issues/11377))
-- Fix an issue introduced in v1.47.0 which prevented servers re-joining rooms they had previously left, if their signing keys were replaced. ([\#11379](https://github.com/matrix-org/synapse/issues/11379))
-- Fix a bug introduced in v1.13.0 where creating and publishing a room could cause errors if `room_list_publication_rules` is configured. ([\#11392](https://github.com/matrix-org/synapse/issues/11392))
-- Improve performance of various background database schema updates. ([\#11421](https://github.com/matrix-org/synapse/issues/11421), [\#11422](https://github.com/matrix-org/synapse/issues/11422))
+- Fix a bug introduced in 1.41.0 where space hierarchy responses would be incorrectly reused if multiple users were to make the same request at the same time. ([\#11355](https://github.com/matrix-org/synapse/issues/11355))
+- Fix a bug introduced in 1.45.0 where the `read_templates` method of the module API would error. ([\#11377](https://github.com/matrix-org/synapse/issues/11377))
+- Fix an issue introduced in 1.47.0 which prevented servers re-joining rooms they had previously left, if their signing keys were replaced. ([\#11379](https://github.com/matrix-org/synapse/issues/11379))
+- Fix a bug introduced in 1.13.0 where creating and publishing a room could cause errors if `room_list_publication_rules` is configured. ([\#11392](https://github.com/matrix-org/synapse/issues/11392))
+- Improve performance of various background database updates. ([\#11421](https://github.com/matrix-org/synapse/issues/11421), [\#11422](https://github.com/matrix-org/synapse/issues/11422))
 
 
 Improved Documentation
