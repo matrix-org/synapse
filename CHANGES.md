@@ -73,7 +73,7 @@ Internal Changes
 - Fix running `scripts-dev/complement.sh`, which was broken in v1.47.0rc1. ([\#11368](https://github.com/matrix-org/synapse/issues/11368))
 - Rename internal functions for token generation to better reflect what they do. ([\#11369](https://github.com/matrix-org/synapse/issues/11369), [\#11370](https://github.com/matrix-org/synapse/issues/11370))
 - Add type hints to configuration classes. ([\#11377](https://github.com/matrix-org/synapse/issues/11377))
-- Publish a `develop` image to dockerhub. ([\#11380](https://github.com/matrix-org/synapse/issues/11380))
+- Publish a `develop` image to Docker Hub. ([\#11380](https://github.com/matrix-org/synapse/issues/11380))
 - Keep fallback key marked as used if it's re-uploaded. ([\#11382](https://github.com/matrix-org/synapse/issues/11382))
 - Use `auto_attribs` on the `attrs` class `RefreshTokenLookupResult`. ([\#11386](https://github.com/matrix-org/synapse/issues/11386))
 - Rename unstable `access_token_lifetime` configuration option to `refreshable_access_token_lifetime` to make it clear it only concerns refreshable access tokens. ([\#11388](https://github.com/matrix-org/synapse/issues/11388))
