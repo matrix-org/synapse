@@ -705,7 +705,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
                 },
             )
 
-            return stop >= max_stream_id
+            return stop > max_stream_id
 
         finished = await self.db_pool.runInteraction(
             "_remove_devices_from_device_inbox_txn",
