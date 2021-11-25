@@ -745,79 +745,80 @@ class EventsWorkerStore(SQLBaseStore):
             ):
                 self._event_fetch_ongoing += 1
                 event_fetch_ongoing_gauge.set(self._event_fetch_ongoing)
+                # `_event_fetch_ongoing` is decremented in `_fetch_thread`.
                 should_start = True
             else:
                 should_start = False
 
-        async def _fetch_thread() -> None:
-            """Services requests for events from `_event_fetch_list`."""
-            exc = None
-            try:
-                await self.db_pool.runWithConnection(self._fetch_loop)
-            except BaseException as e:
-                exc = e
-                raise
-            finally:
-                should_restart = False
-                event_fetches_to_fail = []
-                with self._event_fetch_lock:
-                    self._event_fetch_ongoing -= 1
-                    event_fetch_ongoing_gauge.set(self._event_fetch_ongoing)
-
-                    # There may still be work remaining in `_event_fetch_list` if we
-                    # failed, or it was added in between us deciding to exit and
-                    # decrementing `_event_fetch_ongoing`.
-                    if self._event_fetch_list:
-                        if exc is None:
-                            # We decided to exit, but then some more work was added
-                            # before `_event_fetch_ongoing` was decremented.
-                            # If a new event fetch thread was not started, we should
-                            # restart ourselves since the remaining event fetch threads
-                            # may take a while to get around to the new work.
-                            #
-                            # Unfortunately it is not possible to tell whether a new
-                            # event fetch thread was started, so we restart
-                            # unconditionally. If we are unlucky, we will end up with
-                            # an idle fetch thread, but it will time out after
-                            # `EVENT_QUEUE_ITERATIONS * EVENT_QUEUE_TIMEOUT_S` seconds
-                            # in any case.
-                            #
-                            # Note that multiple fetch threads may run down this path at
-                            # the same time.
-                            should_restart = True
-                        elif isinstance(exc, Exception):
-                            if self._event_fetch_ongoing == 0:
-                                # We were the last remaining fetcher and failed.
-                                # Fail any outstanding fetches since no one else will
-                                # handle them.
-                                event_fetches_to_fail = self._event_fetch_list
-                                self._event_fetch_list = []
-                            else:
-                                # We weren't the last remaining fetcher, so another
-                                # fetcher will pick up the work. This will either happen
-                                # after their existing work, however long that takes,
-                                # or after at most `EVENT_QUEUE_TIMEOUT_S` seconds if
-                                # they are idle.
-                                pass
-                        else:
-                            # The exception is a `SystemExit`, `KeyboardInterrupt` or
-                            # `GeneratorExit`. Don't try to do anything clever here.
-                            pass
-
-                if should_restart:
-                    # We exited cleanly but noticed more work.
-                    self._maybe_start_fetch_thread()
-
-                if event_fetches_to_fail:
-                    # We were the last remaining fetcher and failed.
-                    # Fail any outstanding fetches since no one else will handle them.
-                    assert exc is not None
-                    with PreserveLoggingContext():
-                        for _, deferred in event_fetches_to_fail:
-                            deferred.errback(exc)
-
         if should_start:
-            run_as_background_process("fetch_events", _fetch_thread)
+            run_as_background_process("fetch_events", self._fetch_thread)
+
+    async def _fetch_thread(self) -> None:
+        """Services requests for events from `_event_fetch_list`."""
+        exc = None
+        try:
+            await self.db_pool.runWithConnection(self._fetch_loop)
+        except BaseException as e:
+            exc = e
+            raise
+        finally:
+            should_restart = False
+            event_fetches_to_fail = []
+            with self._event_fetch_lock:
+                self._event_fetch_ongoing -= 1
+                event_fetch_ongoing_gauge.set(self._event_fetch_ongoing)
+
+                # There may still be work remaining in `_event_fetch_list` if we
+                # failed, or it was added in between us deciding to exit and
+                # decrementing `_event_fetch_ongoing`.
+                if self._event_fetch_list:
+                    if exc is None:
+                        # We decided to exit, but then some more work was added
+                        # before `_event_fetch_ongoing` was decremented.
+                        # If a new event fetch thread was not started, we should
+                        # restart ourselves since the remaining event fetch threads
+                        # may take a while to get around to the new work.
+                        #
+                        # Unfortunately it is not possible to tell whether a new
+                        # event fetch thread was started, so we restart
+                        # unconditionally. If we are unlucky, we will end up with
+                        # an idle fetch thread, but it will time out after
+                        # `EVENT_QUEUE_ITERATIONS * EVENT_QUEUE_TIMEOUT_S` seconds
+                        # in any case.
+                        #
+                        # Note that multiple fetch threads may run down this path at
+                        # the same time.
+                        should_restart = True
+                    elif isinstance(exc, Exception):
+                        if self._event_fetch_ongoing == 0:
+                            # We were the last remaining fetcher and failed.
+                            # Fail any outstanding fetches since no one else will
+                            # handle them.
+                            event_fetches_to_fail = self._event_fetch_list
+                            self._event_fetch_list = []
+                        else:
+                            # We weren't the last remaining fetcher, so another
+                            # fetcher will pick up the work. This will either happen
+                            # after their existing work, however long that takes,
+                            # or after at most `EVENT_QUEUE_TIMEOUT_S` seconds if
+                            # they are idle.
+                            pass
+                    else:
+                        # The exception is a `SystemExit`, `KeyboardInterrupt` or
+                        # `GeneratorExit`. Don't try to do anything clever here.
+                        pass
+
+            if should_restart:
+                # We exited cleanly but noticed more work.
+                self._maybe_start_fetch_thread()
+
+            if event_fetches_to_fail:
+                # We were the last remaining fetcher and failed.
+                # Fail any outstanding fetches since no one else will handle them.
+                assert exc is not None
+                with PreserveLoggingContext():
+                    for _, deferred in event_fetches_to_fail:
+                        deferred.errback(exc)
 
     def _fetch_loop(self, conn: Connection) -> None:
         """Takes a database connection and waits for requests for events from
