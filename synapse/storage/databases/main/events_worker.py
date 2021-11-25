@@ -804,9 +804,10 @@ class EventsWorkerStore(SQLBaseStore):
                     # We exited cleanly but noticed more work.
                     self._maybe_start_fetch_thread()
 
-                if exc is not None and event_fetches_to_fail:
+                if event_fetches_to_fail:
                     # We were the last remaining fetcher and failed.
                     # Fail any outstanding fetches since no one else will handle them.
+                    assert exc is not None
                     with PreserveLoggingContext():
                         for _, deferred in event_fetches_to_fail:
                             deferred.errback(exc)
