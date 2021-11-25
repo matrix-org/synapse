@@ -715,14 +715,14 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
             stop = start + batch_size
 
             sql = """
-                DELETE FROM device_inbox AS di
+                DELETE FROM device_inbox
                 WHERE
                     stream_id >= ? AND stream_id < ?
                     AND NOT EXISTS (
-                        SELECT * FROM devices AS d
+                        SELECT * FROM devices d
                         WHERE
-                            d.device_id=di.device_id
-                            AND d.user_id=di.user_id
+                            d.device_id=device_inbox.device_id
+                            AND d.user_id=device_inbox.user_id
                             AND NOT hidden
                     )
                 """
