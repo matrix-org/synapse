@@ -448,13 +448,9 @@ class RegisterRestServlet(RestServlet):
         if self._msc2918_enabled:
             # Check if this registration should also issue a refresh token, as
             # per MSC2918
-            should_issue_refresh_token = body.get(
-                "org.matrix.msc2918.refresh_token", False
-            )
+            should_issue_refresh_token = body.get("refresh_token", False)
             if not isinstance(should_issue_refresh_token, bool):
-                raise SynapseError(
-                    400, "`org.matrix.msc2918.refresh_token` should be true or false."
-                )
+                raise SynapseError(400, "`refresh_token` should be true or false.")
         else:
             should_issue_refresh_token = False
 
