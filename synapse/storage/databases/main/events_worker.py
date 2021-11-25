@@ -1627,10 +1627,8 @@ class EventsWorkerStore(SQLBaseStore):
             _cleanup_old_transaction_ids_txn,
         )
 
-    async def check_if_event_is_extremity(self, room_id: str, event_id: str) -> bool:
-        """Check if the given `event_id` is a forward or backward extremity.
-        More specifically, we're looking whether it's next to a gap of missing
-        events.
+    async def event_next_to_gap(self, room_id: str, event_id: str) -> bool:
+        """Check if the given `event_id` is  next to a gap of missing events.
 
         Args:
             room_id: room where the event lives
@@ -1640,12 +1638,17 @@ class EventsWorkerStore(SQLBaseStore):
             Boolean indicating whether it's an extremity
         """
 
-        def check_if_event_is_extremity_txn(txn) -> bool:
-            # If the event in question, is listed as a backward extremity, it's
-            # an extremity.
+        def event_next_to_gap_txn(txn) -> bool:
+            # If the event in question is listed as a backward extremity, it's
+            # next to a gap.
             backward_extremity_query = """
-                SELECT event_id FROM event_backward_extremities
-                WHERE room_id = ? AND event_id = ?
+                SELECT 1 FROM event_backward_extremities
+                LEFT JOIN rejections USING (event_id)
+                WHERE
+                    room_id = ?
+                    AND event_id = ?
+                    /* Make sure event is not rejected */
+                    AND rejections.event_id IS NULL
                 LIMIT 1
             """
 
@@ -1653,18 +1656,32 @@ class EventsWorkerStore(SQLBaseStore):
             # by another event. If we don't see any edges, we're next to a
             # forward gap.
             #
-            # We can't just check `event_forward_extremities` here because those
-            # can only be .... (pending discussion on https://github.com/matrix-org/synapse/pull/9445#discussion_r750946180)
+            # We can't just check `event_forward_extremities` directly because that
+            # doesn't include potential backfilled and outlier events.
+            #
+            # We consider any event that is an `event_forward_extremities` as
+            # the latest in the room and not next to a gap.
             forward_edge_query = """
-                SELECT event_id FROM event_edges
-                WHERE room_id = ? AND prev_event_id = ?
+                SELECT 1 FROM event_edges
+                LEFT JOIN rejections ON event_edges.prev_event_id == rejections.event_id
+                LEFT JOIN event_forward_extremities ON event_edges.prev_event_id == event_forward_extremities.event_id
+                WHERE
+                    event_edges.room_id = ?
+                    AND event_edges.prev_event_id = ?
+                    /* If the event in question is a forward extremity, we will
+                     * just consider the forward gap as not a gap since it's one
+                     *  of the latest events in the room.
+                     */
+                    AND event_forward_extremities.event_id IS NOT NULL
+                    /* Make sure event is not rejected */
+                    AND rejections.event_id IS NULL
                 LIMIT 1
             """
 
             txn.execute(backward_extremity_query, (room_id, event_id))
-            backward_extremties = txn.fetchall()
+            backward_extremities = txn.fetchall()
 
-            if len(backward_extremties):
+            if len(backward_extremities):
                 return True
 
             txn.execute(forward_edge_query, (room_id, event_id))
@@ -1676,8 +1693,8 @@ class EventsWorkerStore(SQLBaseStore):
             return False
 
         return await self.db_pool.runInteraction(
-            "check_if_event_is_extremity_txn",
-            check_if_event_is_extremity_txn,
+            "event_next_to_gap_txn",
+            event_next_to_gap_txn,
         )
 
     async def get_event_for_timestamp(
@@ -1685,9 +1702,12 @@ class EventsWorkerStore(SQLBaseStore):
     ) -> Optional[str]:
         sql_template = """
             SELECT event_id FROM events
+            LEFT JOIN rejections USING (event_id)
             WHERE
                 origin_server_ts %s ?
                 AND room_id = ?
+                /* Make sure event is not rejected */
+                AND rejections.event_id IS NULL
             ORDER BY origin_server_ts %s
             LIMIT 1;
         """

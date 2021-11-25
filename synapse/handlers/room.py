@@ -1261,16 +1261,16 @@ class TimestampLookupHandler:
             timestamp,
         )
 
-        # If we found an extremity, we should probably ask another homeserver
-        # first about more history in between
-        is_extremity = False
+        # If we found a gap, we should probably ask another homeserver first
+        # about more history in between
         if local_event_id:
-            is_extremity = await self.store.check_if_event_is_extremity(
+            event_next_to_gap = await self.store.event_next_to_gap(
                 room_id, local_event_id
             )
-        if not local_event_id or is_extremity:
+
+        if not local_event_id or event_next_to_gap:
             logger.debug(
-                "get_event_for_timestamp: locally, we found event_id=%s closest to timestamp=%s which is an extremity so we're asking other homeservers first",
+                "get_event_for_timestamp: locally, we found event_id=%s closest to timestamp=%s which is next to a gap in event history so we're asking other homeservers first",
                 local_event_id,
                 timestamp,
             )
