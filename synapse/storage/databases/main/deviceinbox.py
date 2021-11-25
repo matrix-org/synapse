@@ -645,9 +645,9 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
     async def _remove_deleted_devices_from_device_inbox(
         self, progress: JsonDict, batch_size: int
     ) -> int:
-        """A background update that deletes all device_inboxes for deleted devices.
+        """No-op.
 
-        This should only need to be run once (when users upgrade to v1.47.0)
+        Used to be a background update that deletes all device_inboxes for deleted devices.
 
         Args:
             progress: JsonDict used to store progress of this background update
@@ -663,9 +663,9 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
     async def _remove_hidden_devices_from_device_inbox(
         self, progress: JsonDict, batch_size: int
     ) -> int:
-        """A background update that deletes all device_inboxes for hidden devices.
+        """No-op.
 
-        This should only need to be run once (when users upgrade to v1.47.0)
+        Used to be a background update that deletes all device_inboxes for hidden devices.
 
         Args:
             progress: JsonDict used to store progress of this background update
@@ -729,17 +729,15 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
 
             txn.execute(sql, (stop, start))
             num_deleted = txn.rowcount
-            rows = txn.fetchall()
 
-            if rows:
-                self.db_pool.updates._background_update_progress_txn(
-                    txn,
-                    self.REMOVE_DEVICES_FROM_INBOX,
-                    {
-                        "stream_id": stop,
-                        "max_stream_id": max_stream_id,
-                    },
-                )
+            self.db_pool.updates._background_update_progress_txn(
+                txn,
+                self.REMOVE_DEVICES_FROM_INBOX,
+                {
+                    "stream_id": stop,
+                    "max_stream_id": max_stream_id,
+                },
+            )
 
             return num_deleted, stop >= max_stream_id
 
