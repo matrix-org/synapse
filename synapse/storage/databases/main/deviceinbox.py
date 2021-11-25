@@ -727,7 +727,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
                     )
                 """
 
-            txn.execute(sql, (stop, start))
+            txn.execute(sql, (start, stop))
             num_deleted = txn.rowcount
 
             self.db_pool.updates._background_update_progress_txn(
