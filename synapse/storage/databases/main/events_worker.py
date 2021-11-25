@@ -774,12 +774,16 @@ class EventsWorkerStore(SQLBaseStore):
                             # If a new event fetch thread was not started, we should
                             # restart ourselves since the remaining event fetch threads
                             # may take a while to get around to the new work.
+                            #
                             # Unfortunately it is not possible to tell whether a new
                             # event fetch thread was started, so we restart
                             # unconditionally. If we are unlucky, we will end up with
-                            # an idle fetch thread, but it will time out after 
+                            # an idle fetch thread, but it will time out after
                             # `EVENT_QUEUE_ITERATIONS * EVENT_QUEUE_TIMEOUT_S` seconds
                             # in any case.
+                            #
+                            # Note that multiple fetch threads may run down this path at
+                            # the same time.
                             should_restart = True
                         elif isinstance(exc, Exception):
                             if self._event_fetch_ongoing == 0:
