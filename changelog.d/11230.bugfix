@@ -1,2 +1,0 @@
-Fix a long-standing bug wherein display names or avatar URLs containing null bytes cause an internal server error
-when stored in the DB.

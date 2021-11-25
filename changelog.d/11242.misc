@@ -1,1 +1,0 @@
-Split out federated PDU retrieval function into a non-cached version.

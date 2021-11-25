@@ -1,1 +1,0 @@
-Suggest users of the Debian packages add configuration to `/etc/matrix-synapse/conf.d/` to prevent, upon upgrade, being asked to choose between their configuration and the maintainer's.

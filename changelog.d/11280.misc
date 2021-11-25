@@ -1,1 +1,0 @@
-Drop unused db tables `room_stats_historical` and `user_stats_historical`.
