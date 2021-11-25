@@ -599,7 +599,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
     DEVICE_INBOX_STREAM_ID = "device_inbox_stream_drop"
     REMOVE_DELETED_DEVICES = "remove_deleted_devices_from_device_inbox"
     REMOVE_HIDDEN_DEVICES = "remove_hidden_devices_from_device_inbox"
-    REMOVE_DEVICES_FROM_INBOX = "remove_devices_from_device_inbox"
+    REMOVE_DEAD_DEVICES_FROM_INBOX = "remove_dead_devices_from_device_inbox"
 
     def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
@@ -615,19 +615,18 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
             self.DEVICE_INBOX_STREAM_ID, self._background_drop_index_device_inbox
         )
 
-        self.db_pool.updates.register_background_update_handler(
-            self.REMOVE_DELETED_DEVICES,
-            self._remove_deleted_devices_from_device_inbox,
+        # Used to be a background update that deletes all device_inboxes for deleted
+        # devices.
+        self.db_pool.updates.register_noop_background_update(
+            self.REMOVE_DELETED_DEVICES
         )
+        # Used to be a background update that deletes all device_inboxes for hidden
+        # devices.
+        self.db_pool.updates.register_noop_background_update(self.REMOVE_HIDDEN_DEVICES)
 
         self.db_pool.updates.register_background_update_handler(
-            self.REMOVE_HIDDEN_DEVICES,
-            self._remove_hidden_devices_from_device_inbox,
-        )
-
-        self.db_pool.updates.register_background_update_handler(
-            self.REMOVE_DEVICES_FROM_INBOX,
-            self._remove_devices_from_device_inbox,
+            self.REMOVE_DEAD_DEVICES_FROM_INBOX,
+            self._remove_dead_devices_from_device_inbox,
         )
 
     async def _background_drop_index_device_inbox(self, progress, batch_size):
@@ -642,43 +641,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
 
         return 1
 
-    async def _remove_deleted_devices_from_device_inbox(
-        self, progress: JsonDict, batch_size: int
-    ) -> int:
-        """No-op.
-
-        Used to be a background update that deletes all device_inboxes for deleted devices.
-
-        Args:
-            progress: JsonDict used to store progress of this background update
-            batch_size: the maximum number of rows to retrieve in a single select query
-
-        Returns:
-            The number of deleted rows
-        """
-        await self.db_pool.updates._end_background_update(self.REMOVE_DELETED_DEVICES)
-
-        return 0
-
-    async def _remove_hidden_devices_from_device_inbox(
-        self, progress: JsonDict, batch_size: int
-    ) -> int:
-        """No-op.
-
-        Used to be a background update that deletes all device_inboxes for hidden devices.
-
-        Args:
-            progress: JsonDict used to store progress of this background update
-            batch_size: the maximum number of rows to retrieve in a single select query
-
-        Returns:
-            The number of deleted rows
-        """
-        await self.db_pool.updates._end_background_update(self.REMOVE_HIDDEN_DEVICES)
-
-        return 0
-
-    async def _remove_devices_from_device_inbox(
+    async def _remove_dead_devices_from_device_inbox(
         self,
         progress: JsonDict,
         batch_size: int,
@@ -694,7 +657,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
             The number of rows deleted.
         """
 
-        def _remove_devices_from_device_inbox_txn(
+        def _remove_dead_devices_from_device_inbox_txn(
             txn: LoggingTransaction,
         ) -> Tuple[int, bool]:
 
@@ -736,7 +699,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
 
             self.db_pool.updates._background_update_progress_txn(
                 txn,
-                self.REMOVE_DEVICES_FROM_INBOX,
+                self.REMOVE_DEAD_DEVICES_FROM_INBOX,
                 {
                     "stream_id": stop,
                     "max_stream_id": max_stream_id,
@@ -747,12 +710,12 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
 
         num_deleted, finished = await self.db_pool.runInteraction(
             "_remove_devices_from_device_inbox_txn",
-            _remove_devices_from_device_inbox_txn,
+            _remove_dead_devices_from_device_inbox_txn,
         )
 
         if finished:
             await self.db_pool.updates._end_background_update(
-                self.REMOVE_DEVICES_FROM_INBOX,
+                self.REMOVE_DEAD_DEVICES_FROM_INBOX,
             )
 
         return batch_size

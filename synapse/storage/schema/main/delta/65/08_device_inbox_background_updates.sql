@@ -15,4 +15,4 @@
 
 -- Background update to clear the inboxes of hidden and deleted devices.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (6508, 'remove_devices_from_device_inbox', '{}');
+  (6508, 'remove_dead_devices_from_device_inbox', '{}');
