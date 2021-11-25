@@ -599,6 +599,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
     DEVICE_INBOX_STREAM_ID = "device_inbox_stream_drop"
     REMOVE_DELETED_DEVICES = "remove_deleted_devices_from_device_inbox"
     REMOVE_HIDDEN_DEVICES = "remove_hidden_devices_from_device_inbox"
+    REMOVE_DEVICES_FROM_INBOX = "remove_devices_from_device_inbox"
 
     def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
@@ -622,6 +623,11 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
         self.db_pool.updates.register_background_update_handler(
             self.REMOVE_HIDDEN_DEVICES,
             self._remove_hidden_devices_from_device_inbox,
+        )
+
+        self.db_pool.updates.register_background_update_handler(
+            self.REMOVE_DEVICES_FROM_INBOX,
+            self._remove_devices_from_device_inbox,
         )
 
     async def _background_drop_index_device_inbox(self, progress, batch_size):
@@ -650,21 +656,9 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
         Returns:
             The number of deleted rows
         """
-        number_deleted, finished = await self.db_pool.runInteraction(
-            "_remove_deleted_devices_from_device_inbox",
-            self._remove_devices_from_device_inbox_txn,
-            self.REMOVE_DELETED_DEVICES,
-            progress,
-            batch_size,
-        )
+        await self.db_pool.updates._end_background_update(self.REMOVE_DELETED_DEVICES)
 
-        # The task is finished when no more lines are deleted.
-        if finished:
-            await self.db_pool.updates._end_background_update(
-                self.REMOVE_DELETED_DEVICES
-            )
-
-        return number_deleted
+        return 0
 
     async def _remove_hidden_devices_from_device_inbox(
         self, progress: JsonDict, batch_size: int
@@ -680,94 +674,86 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
         Returns:
             The number of deleted rows
         """
-        number_deleted, finished = await self.db_pool.runInteraction(
-            "_remove_hidden_devices_from_device_inbox_txn",
-            self._remove_devices_from_device_inbox_txn,
-            self.REMOVE_HIDDEN_DEVICES,
-            progress,
-            batch_size,
-        )
+        await self.db_pool.updates._end_background_update(self.REMOVE_HIDDEN_DEVICES)
 
-        # The task is finished when no more lines are deleted.
-        if finished:
-            await self.db_pool.updates._end_background_update(
-                self.REMOVE_HIDDEN_DEVICES
-            )
+        return 0
 
-        return number_deleted
-
-    def _remove_devices_from_device_inbox_txn(
+    async def _remove_devices_from_device_inbox(
         self,
-        txn: LoggingTransaction,
-        update_name: str,
         progress: JsonDict,
         batch_size: int,
-    ) -> Tuple[int, bool]:
-        """Remove devices that were either deleted or hidden from the device_inbox table.
+    ) -> int:
+        """A background update to remove devices that were either deleted or hidden from
+        the device_inbox table.
 
         Args:
-            update_name: The name of the update to run, used to determine how to read the
-                devices table.
             progress: The update's progress dict.
             batch_size: The batch size for this update.
 
         Returns:
-            The number of rows deleted, and whether the update should be ended.
+            The number of rows deleted.
         """
 
-        if "max_stream_id" in progress:
-            max_stream_id = progress["max_stream_id"]
-        else:
-            txn.execute("SELECT max(stream_id) FROM device_inbox")
-            # There's a type mismatch here between how we want to type the row and
-            # what fetchone says it returns, but we silence it because we know that
-            # res can't be None.
-            res: Tuple[Optional[int]] = txn.fetchone()  # type: ignore[assignment]
-            if res[0] is None:
-                return 0, True
+        def _remove_devices_from_device_inbox_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[int, bool]:
+
+            if "max_stream_id" in progress:
+                max_stream_id = progress["max_stream_id"]
             else:
-                max_stream_id = res[0]
+                txn.execute("SELECT max(stream_id) FROM device_inbox")
+                # There's a type mismatch here between how we want to type the row and
+                # what fetchone says it returns, but we silence it because we know that
+                # res can't be None.
+                res: Tuple[Optional[int]] = txn.fetchone()  # type: ignore[assignment]
+                if res[0] is None:
+                    return 0, True
+                else:
+                    max_stream_id = res[0]
 
-        start = progress.get("stream_id", 0)
-        stop = start + batch_size
+            start = progress.get("stream_id", 0)
+            stop = start + batch_size
 
-        nested_select = "SELECT device_id, user_id FROM devices"
-        args = (start, stop)
-        if update_name == self.REMOVE_HIDDEN_DEVICES:
-            # If we want to remove hidden devices, select only rows from the devices table
-            # that have `hidden = TRUE`.
-            nested_select += " WHERE hidden = ?"
-            # We need to ignore mypy's error here, otherwise we can't use different
-            # arguments depending on whether we want to filter for hidden devices.
-            args += (True,)  # type: ignore[assignment]
+            sql = """
+                DELETE FROM device_inbox di
+                WHERE
+                    stream_id >= ? AND stream_id < ?
+                    AND NOT EXISTS (
+                        SELECT * FROM devices d
+                        WHERE
+                            d.device_id=di.device_id
+                            AND d.user_id=di.user_id
+                            AND NOT hidden
+                    )
+                """
 
-        sql = (
-            """
-            DELETE FROM device_inbox
-            WHERE
-                stream_id >= ? AND stream_id < ?
-                AND (device_id, user_id) NOT IN (
-                    %s
+            txn.execute(sql, (stop, start))
+            num_deleted = txn.rowcount
+            rows = txn.fetchall()
+
+            if rows:
+                self.db_pool.updates._background_update_progress_txn(
+                    txn,
+                    self.REMOVE_DEVICES_FROM_INBOX,
+                    {
+                        "stream_id": stop,
+                        "max_stream_id": max_stream_id,
+                    },
                 )
-        """
-            % nested_select
+
+            return num_deleted, stop >= max_stream_id
+
+        num_deleted, finished = await self.db_pool.runInteraction(
+            "_remove_devices_from_device_inbox_txn",
+            _remove_devices_from_device_inbox_txn,
         )
 
-        txn.execute(sql, args)
-        num_deleted = txn.rowcount
-        rows = txn.fetchall()
-
-        if rows:
-            self.db_pool.updates._background_update_progress_txn(
-                txn,
-                update_name,
-                {
-                    "stream_id": stop,
-                    "max_stream_id": max_stream_id,
-                },
+        if finished:
+            await self.db_pool.updates._end_background_update(
+                self.REMOVE_DEVICES_FROM_INBOX,
             )
 
-        return num_deleted, stop >= max_stream_id
+        return num_deleted
 
 
 class DeviceInboxStore(DeviceInboxWorkerStore, DeviceInboxBackgroundUpdateStore):
