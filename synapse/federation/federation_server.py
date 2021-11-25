@@ -228,36 +228,37 @@ class FederationServer(FederationBase):
             event_id = await self.store.get_event_for_timestamp(
                 room_id, timestamp, direction
             )
-            event = await self.store.get_event(
-                event_id, allow_none=True, allow_rejected=True
-            )
-            filtered_events = await filter_events_for_server(
-                self.storage,
-                origin,
-                [event],
-                # TODO: Is returning an event_id for an event that's hidden by
-                # history_visibility considered leaking? It looks like we
-                # already return redacted copies of hidden events in the
-                # `/backfill` endpoint.
-                redact=True,
-            )
-            logger.debug(
-                "FederationServer.on_timestamp_to_event_request: filtered_events origin=%s room_id=%s before=%s after=%s",
-                origin,
-                room_id,
-                event_id,
-                filtered_events,
-            )
+            if event_id:
+                event = await self.store.get_event(
+                    event_id, allow_none=False, allow_rejected=False
+                )
+                filtered_events = await filter_events_for_server(
+                    self.storage,
+                    origin,
+                    [event],
+                    # TODO: Is returning an event_id for an event that's hidden by
+                    # history_visibility considered leaking? It looks like we
+                    # already return redacted copies of hidden events in the
+                    # `/backfill` endpoint.
+                    redact=True,
+                )
+                logger.debug(
+                    "FederationServer.on_timestamp_to_event_request: filtered_events origin=%s room_id=%s before=%s after=%s",
+                    origin,
+                    room_id,
+                    event_id,
+                    filtered_events,
+                )
 
-            # TODO: There is an edge case here where if the closest event isn't
-            # visible to the origin homeserver, we will return a 404 when there
-            # could potentially be some visible event in the given direction.
-            # The query for selecting the events would need to be smarter if we
-            # wanted to handle this.
-            if len(filtered_events):
-                return 200, {
-                    "event_id": filtered_events[0].event_id,
-                }
+                # TODO: There is an edge case here where if the closest event isn't
+                # visible to the origin homeserver, we will return a 404 when there
+                # could potentially be some visible event in the given direction.
+                # The query for selecting the events would need to be smarter if we
+                # wanted to handle this.
+                if len(filtered_events):
+                    return 200, {
+                        "event_id": filtered_events[0].event_id,
+                    }
 
         raise SynapseError(
             404,

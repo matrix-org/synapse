@@ -34,7 +34,7 @@ from typing_extensions import Literal
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import Codes, NotFoundError, SynapseError
+from synapse.api.errors import NotFoundError, SynapseError
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
     EventFormatVersions,
