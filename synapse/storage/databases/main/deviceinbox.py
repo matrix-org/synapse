@@ -695,7 +695,6 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
                 """
 
             txn.execute(sql, (start, stop))
-            num_deleted = txn.rowcount
 
             self.db_pool.updates._background_update_progress_txn(
                 txn,
@@ -706,9 +705,9 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
                 },
             )
 
-            return num_deleted, stop >= max_stream_id
+            return stop >= max_stream_id
 
-        num_deleted, finished = await self.db_pool.runInteraction(
+        finished = await self.db_pool.runInteraction(
             "_remove_devices_from_device_inbox_txn",
             _remove_dead_devices_from_device_inbox_txn,
         )
