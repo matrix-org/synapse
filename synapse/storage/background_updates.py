@@ -82,7 +82,7 @@ class BackgroundUpdater:
     process and autotuning the batch size.
     """
 
-    MINIMUM_BACKGROUND_BATCH_SIZE = 100
+    MINIMUM_BACKGROUND_BATCH_SIZE = 1
     DEFAULT_BACKGROUND_BATCH_SIZE = 100
     BACKGROUND_UPDATE_INTERVAL_MS = 1000
     BACKGROUND_UPDATE_DURATION_MS = 100
@@ -122,6 +122,8 @@ class BackgroundUpdater:
 
     def start_doing_background_updates(self) -> None:
         if self.enabled:
+            # if we start a new background update, not all updates are done.
+            self._all_done = False
             run_as_background_process("background_updates", self.run_background_updates)
 
     async def run_background_updates(self, sleep: bool = True) -> None:

@@ -137,33 +137,14 @@ class EmailConfig(Config):
             if self.root.registration.account_threepid_delegate_email
             else ThreepidBehaviour.LOCAL
         )
-        # Prior to Synapse v1.4.0, there was another option that defined whether Synapse would
-        # use an identity server to password reset tokens on its behalf. We now warn the user
-        # if they have this set and tell them to use the updated option, while using a default
-        # identity server in the process.
-        self.using_identity_server_from_trusted_list = False
-        if (
-            not self.root.registration.account_threepid_delegate_email
-            and config.get("trust_identity_server_for_password_resets", False) is True
-        ):
-            # Use the first entry in self.trusted_third_party_id_servers instead
-            if self.trusted_third_party_id_servers:
-                # XXX: It's a little confusing that account_threepid_delegate_email is modified
-                # both in RegistrationConfig and here. We should factor this bit out
 
-                first_trusted_identity_server = self.trusted_third_party_id_servers[0]
-
-                # trusted_third_party_id_servers does not contain a scheme whereas
-                # account_threepid_delegate_email is expected to. Presume https
-                self.root.registration.account_threepid_delegate_email = (
-                    "https://" + first_trusted_identity_server
-                )
-                self.using_identity_server_from_trusted_list = True
-            else:
-                raise ConfigError(
-                    "Attempted to use an identity server from"
-                    '"trusted_third_party_id_servers" but it is empty.'
-                )
+        if config.get("trust_identity_server_for_password_resets"):
+            raise ConfigError(
+                'The config option "trust_identity_server_for_password_resets" '
+                'has been replaced by "account_threepid_delegate". '
+                "Please consult the sample config at docs/sample_config.yaml for "
+                "details and update your config file."
+            )
 
         self.local_threepid_handling_disabled_due_to_email_config = False
         if (

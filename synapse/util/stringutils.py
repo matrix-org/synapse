@@ -19,6 +19,8 @@ import string
 from collections.abc import Iterable
 from typing import Optional, Tuple
 
+from netaddr import valid_ipv6
+
 from synapse.api.errors import Codes, SynapseError
 
 _string_with_symbols = string.digits + string.ascii_letters + ".,;:^&*-_+=#~@"
@@ -97,7 +99,10 @@ def parse_server_name(server_name: str) -> Tuple[str, Optional[int]]:
         raise ValueError("Invalid server name '%s'" % server_name)
 
 
-VALID_HOST_REGEX = re.compile("\\A[0-9a-zA-Z.-]+\\Z")
+# An approximation of the domain name syntax in RFC 1035, section 2.3.1.
+# NB: "\Z" is not equivalent to "$".
+#     The latter will match the position before a "\n" at the end of a string.
+VALID_HOST_REGEX = re.compile("\\A[0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*\\Z")
 
 
 def parse_and_validate_server_name(server_name: str) -> Tuple[str, Optional[int]]:
@@ -122,13 +127,15 @@ def parse_and_validate_server_name(server_name: str) -> Tuple[str, Optional[int]
     if host[0] == "[":
         if host[-1] != "]":
             raise ValueError("Mismatched [...] in server name '%s'" % (server_name,))
-        return host, port
 
-    # otherwise it should only be alphanumerics.
-    if not VALID_HOST_REGEX.match(host):
-        raise ValueError(
-            "Server name '%s' contains invalid characters" % (server_name,)
-        )
+        # valid_ipv6 raises when given an empty string
+        ipv6_address = host[1:-1]
+        if not ipv6_address or not valid_ipv6(ipv6_address):
+            raise ValueError(
+                "Server name '%s' is not a valid IPv6 address" % (server_name,)
+            )
+    elif not VALID_HOST_REGEX.match(host):
+        raise ValueError("Server name '%s' has an invalid format" % (server_name,))
 
     return host, port
 

@@ -116,7 +116,9 @@ class RegistrationHandler:
             self.pusher_pool = hs.get_pusherpool()
 
         self.session_lifetime = hs.config.registration.session_lifetime
-        self.access_token_lifetime = hs.config.registration.access_token_lifetime
+        self.refreshable_access_token_lifetime = (
+            hs.config.registration.refreshable_access_token_lifetime
+        )
         self.refresh_token_lifetime = hs.config.registration.refresh_token_lifetime
 
         init_counters_for_auth_provider("")
@@ -824,7 +826,7 @@ class RegistrationHandler:
                     ultimate_session_expiry_ts = now_ms + self.session_lifetime
 
                 # Set the expiry time of the refreshable access token
-                valid_until_ms = now_ms + self.access_token_lifetime
+                valid_until_ms = now_ms + self.refreshable_access_token_lifetime
 
                 (
                     refresh_token,

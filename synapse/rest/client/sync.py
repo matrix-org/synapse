@@ -522,7 +522,7 @@ class SyncRestServlet(RestServlet):
                 time_now=time_now,
                 # We don't bundle "live" events, as otherwise clients
                 # will end up double counting annotations.
-                bundle_aggregations=False,
+                bundle_relations=False,
                 token_id=token_id,
                 event_format=event_formatter,
                 only_event_fields=only_fields,
