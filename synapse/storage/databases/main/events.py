@@ -1,6 +1,6 @@
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-2019 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1641,8 +1641,8 @@ class PersistEventsStore:
     def _store_room_members_txn(self, txn, events, backfilled):
         """Store a room member in the database."""
 
-        def str_or_none(val: Any) -> Optional[str]:
-            return val if isinstance(val, str) else None
+        def non_null_str_or_none(val: Any) -> Optional[str]:
+            return val if isinstance(val, str) and "\u0000" not in val else None
 
         self.db_pool.simple_insert_many_txn(
             txn,
@@ -1654,8 +1654,10 @@ class PersistEventsStore:
                     "sender": event.user_id,
                     "room_id": event.room_id,
                     "membership": event.membership,
-                    "display_name": str_or_none(event.content.get("displayname")),
-                    "avatar_url": str_or_none(event.content.get("avatar_url")),
+                    "display_name": non_null_str_or_none(
+                        event.content.get("displayname")
+                    ),
+                    "avatar_url": non_null_str_or_none(event.content.get("avatar_url")),
                 }
                 for event in events
             ],
@@ -1694,34 +1696,33 @@ class PersistEventsStore:
                     },
                 )
 
-    def _handle_event_relations(self, txn, event):
-        """Handles inserting relation data during peristence of events
+    def _handle_event_relations(
+        self, txn: LoggingTransaction, event: EventBase
+    ) -> None:
+        """Handles inserting relation data during persistence of events
 
         Args:
-            txn
-            event (EventBase)
+            txn: The current database transaction.
+            event: The event which might have relations.
         """
         relation = event.content.get("m.relates_to")
         if not relation:
             # No relations
             return
 
+        # Relations must have a type and parent event ID.
         rel_type = relation.get("rel_type")
-        if rel_type not in (
-            RelationTypes.ANNOTATION,
-            RelationTypes.REFERENCE,
-            RelationTypes.REPLACE,
-            RelationTypes.THREAD,
-        ):
-            # Unknown relation type
+        if not isinstance(rel_type, str):
             return
 
         parent_id = relation.get("event_id")
-        if not parent_id:
-            # Invalid relation
+        if not isinstance(parent_id, str):
             return
 
-        aggregation_key = relation.get("key")
+        # Annotations have a key field.
+        aggregation_key = None
+        if rel_type == RelationTypes.ANNOTATION:
+            aggregation_key = relation.get("key")
 
         self.db_pool.simple_insert_txn(
             txn,

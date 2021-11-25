@@ -70,6 +70,8 @@ This API returns a JSON body like the following:
 
 The status will be one of `active`, `complete`, or `failed`.
 
+If `status` is `failed` there will be a string `error` with the error message.
+
 ## Reclaim disk space (Postgres)
 
 To reclaim the disk space and return it to the operating system, you need to run

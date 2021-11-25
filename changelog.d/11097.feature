@@ -1,1 +1,0 @@
-Advertise support for Client-Server API r0.6.1.

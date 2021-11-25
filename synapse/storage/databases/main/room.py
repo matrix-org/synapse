@@ -397,6 +397,20 @@ class RoomWorkerStore(SQLBaseStore):
             desc="is_room_blocked",
         )
 
+    async def room_is_blocked_by(self, room_id: str) -> Optional[str]:
+        """
+        Function to retrieve user who has blocked the room.
+        user_id is non-nullable
+        It returns None if the room is not blocked.
+        """
+        return await self.db_pool.simple_select_one_onecol(
+            table="blocked_rooms",
+            keyvalues={"room_id": room_id},
+            retcol="user_id",
+            allow_none=True,
+            desc="room_is_blocked_by",
+        )
+
     async def get_rooms_paginate(
         self,
         start: int,
@@ -1768,6 +1782,24 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             values={},
             insertion_values={"user_id": user_id},
             desc="block_room",
+        )
+        await self.db_pool.runInteraction(
+            "block_room_invalidation",
+            self._invalidate_cache_and_stream,
+            self.is_room_blocked,
+            (room_id,),
+        )
+
+    async def unblock_room(self, room_id: str) -> None:
+        """Remove the room from blocking list.
+
+        Args:
+            room_id: Room to unblock
+        """
+        await self.db_pool.simple_delete(
+            table="blocked_rooms",
+            keyvalues={"room_id": room_id},
+            desc="unblock_room",
         )
         await self.db_pool.runInteraction(
             "block_room_invalidation",

@@ -776,8 +776,11 @@ class RoomCreationHandler:
             raise SynapseError(403, "Room visibility value not allowed.")
 
         if is_public:
+            room_aliases = []
+            if room_alias:
+                room_aliases.append(room_alias.to_string())
             if not self.config.roomdirectory.is_publishing_room_allowed(
-                user_id, room_id, room_alias
+                user_id, room_id, room_aliases
             ):
                 # Let's just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages
@@ -1388,6 +1391,17 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
 
 
 class ShutdownRoomResponse(TypedDict):
+    """
+    Attributes:
+        kicked_users: An array of users (`user_id`) that were kicked.
+        failed_to_kick_users:
+            An array of users (`user_id`) that that were not kicked.
+        local_aliases:
+            An array of strings representing the local aliases that were
+            migrated from the old room to the new.
+        new_room_id: A string representing the room ID of the new room.
+    """
+
     kicked_users: List[str]
     failed_to_kick_users: List[str]
     local_aliases: List[str]
@@ -1395,7 +1409,6 @@ class ShutdownRoomResponse(TypedDict):
 
 
 class RoomShutdownHandler:
-
     DEFAULT_MESSAGE = (
         "Sharing illegal content on this server is not permitted and rooms in"
         " violation will be blocked."
@@ -1408,7 +1421,6 @@ class RoomShutdownHandler:
         self._room_creation_handler = hs.get_room_creation_handler()
         self._replication = hs.get_replication_data_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.state = hs.get_state_handler()
         self.store = hs.get_datastore()
 
     async def shutdown_room(

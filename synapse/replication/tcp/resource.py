@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 from prometheus_client import Counter
 
-from twisted.internet.protocol import Factory
+from twisted.internet.protocol import ServerFactory
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.tcp.commands import PositionCommand
@@ -38,7 +38,7 @@ stream_updates_counter = Counter(
 logger = logging.getLogger(__name__)
 
 
-class ReplicationStreamProtocolFactory(Factory):
+class ReplicationStreamProtocolFactory(ServerFactory):
     """Factory for new replication connections."""
 
     def __init__(self, hs: "HomeServer"):
