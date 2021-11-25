@@ -520,7 +520,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         """
         return self.make_request(
             "POST",
-            "/_matrix/client/unstable/org.matrix.msc2918.refresh_token/refresh",
+            "/_matrix/client/v1/refresh",
             {"refresh_token": refresh_token},
         )
 
@@ -601,7 +601,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
 
         refresh_response = self.make_request(
             "POST",
-            "/_matrix/client/unstable/org.matrix.msc2918.refresh_token/refresh",
+            "/_matrix/client/v1/refresh",
             {"refresh_token": login_response.json_body["refresh_token"]},
         )
         self.assertEqual(refresh_response.code, 200, refresh_response.result)
@@ -642,7 +642,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
 
         refresh_response = self.make_request(
             "POST",
-            "/_matrix/client/unstable/org.matrix.msc2918.refresh_token/refresh",
+            "/_matrix/client/v1/refresh",
             {"refresh_token": login_response.json_body["refresh_token"]},
         )
         self.assertEqual(refresh_response.code, 200, refresh_response.result)
@@ -804,7 +804,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         # This first refresh should work properly
         first_refresh_response = self.make_request(
             "POST",
-            "/_matrix/client/unstable/org.matrix.msc2918.refresh_token/refresh",
+            "/_matrix/client/v1/refresh",
             {"refresh_token": login_response.json_body["refresh_token"]},
         )
         self.assertEqual(
@@ -814,7 +814,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         # This one as well, since the token in the first one was never used
         second_refresh_response = self.make_request(
             "POST",
-            "/_matrix/client/unstable/org.matrix.msc2918.refresh_token/refresh",
+            "/_matrix/client/v1/refresh",
             {"refresh_token": login_response.json_body["refresh_token"]},
         )
         self.assertEqual(
@@ -824,7 +824,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         # This one should not, since the token from the first refresh is not valid anymore
         third_refresh_response = self.make_request(
             "POST",
-            "/_matrix/client/unstable/org.matrix.msc2918.refresh_token/refresh",
+            "/_matrix/client/v1/refresh",
             {"refresh_token": first_refresh_response.json_body["refresh_token"]},
         )
         self.assertEqual(
@@ -852,7 +852,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         # Now that the access token from the last valid refresh was used once, refreshing with the N-1 token should fail
         fourth_refresh_response = self.make_request(
             "POST",
-            "/_matrix/client/unstable/org.matrix.msc2918.refresh_token/refresh",
+            "/_matrix/client/v1/refresh",
             {"refresh_token": login_response.json_body["refresh_token"]},
         )
         self.assertEqual(
@@ -862,7 +862,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         # But refreshing from the last valid refresh token still works
         fifth_refresh_response = self.make_request(
             "POST",
-            "/_matrix/client/unstable/org.matrix.msc2918.refresh_token/refresh",
+            "/_matrix/client/v1/refresh",
             {"refresh_token": second_refresh_response.json_body["refresh_token"]},
         )
         self.assertEqual(
