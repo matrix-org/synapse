@@ -555,11 +555,12 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
 
         register_with_refresh = self.make_request(
             "POST",
-            "/_matrix/client/r0/register?org.matrix.msc2918.refresh_token=true",
+            "/_matrix/client/r0/register",
             {
                 "username": "test3",
                 "password": self.user_pass,
                 "auth": {"type": LoginType.DUMMY},
+                "org.matrix.msc2918.refresh_token": True
             },
         )
         self.assertEqual(register_with_refresh.code, 200, register_with_refresh.result)
