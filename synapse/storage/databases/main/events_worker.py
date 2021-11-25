@@ -1629,6 +1629,8 @@ class EventsWorkerStore(SQLBaseStore):
 
     async def event_next_to_gap(self, room_id: str, event_id: str) -> bool:
         """Check if the given `event_id` is  next to a gap of missing events.
+        Looks at gaps going forwards and backwards. The gap in front of the
+        latest events is not considered a gap.
 
         Args:
             room_id: room where the event lives
