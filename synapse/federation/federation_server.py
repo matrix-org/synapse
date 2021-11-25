@@ -70,6 +70,7 @@ from synapse.util import glob_to_regex, json_decoder, unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_server_name
+from synapse.visibility import filter_events_for_server
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -110,6 +111,7 @@ class FederationServer(FederationBase):
         super().__init__(hs)
 
         self.handler = hs.get_federation_handler()
+        self.storage = hs.get_storage()
         self._federation_event_handler = hs.get_federation_event_handler()
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
@@ -226,10 +228,41 @@ class FederationServer(FederationBase):
             event_id = await self.store.get_event_for_timestamp(
                 room_id, timestamp, direction
             )
+            event = await self.store.get_event(
+                event_id, allow_none=True, allow_rejected=True
+            )
+            filtered_events = await filter_events_for_server(
+                self.storage,
+                origin,
+                [event],
+                # TODO: Is returning an event_id considered leaking? It looks
+                # like we already return redacted copies in other parts of the
+                # code.
+                redact=False,
+            )
+            logger.debug(
+                "FederationServer.on_timestamp_to_event_request: filtered_events origin=%s room_id=%s before=%s after=%s",
+                origin,
+                room_id,
+                event_id,
+                filtered_events,
+            )
 
-        return 200, {
-            "event_id": event_id,
-        }
+            # TODO: There is an edge case here where if the closest event isn't
+            # visible to the origin homeserver, we will return a 404 when there
+            # could potentially be some visible event in the given direction.
+            # The query for selecting the events would need to be smarter if we
+            # wanted to handle this.
+            if len(filtered_events):
+                return 200, {
+                    "event_id": filtered_events[0].event_id,
+                }
+
+        raise SynapseError(
+            404,
+            "Unable to find event from %s in direction %s" % (timestamp, direction),
+            errcode=Codes.NOT_FOUND,
+        )
 
     async def on_incoming_transaction(
         self,
