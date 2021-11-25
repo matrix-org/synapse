@@ -18,7 +18,7 @@ server {
 {{ worker_locations }}
 
     # Send all other traffic to the main process
-    location ~* ^(\\/_matrix|\\/_synapse) {
+    location ~* ^(\\/_matrix|\\/_synapse|\\/health) {
         proxy_pass http://localhost:8080;
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
