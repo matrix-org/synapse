@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional
 
 from synapse.api.constants import RoomCreationPreset
 from synapse.config._base import Config, ConfigError
@@ -123,7 +124,9 @@ class RegistrationConfig(Config):
             refreshable_access_token_lifetime = self.parse_duration(
                 refreshable_access_token_lifetime
             )
-        self.refreshable_access_token_lifetime = refreshable_access_token_lifetime
+        self.refreshable_access_token_lifetime: Optional[
+            int
+        ] = refreshable_access_token_lifetime
 
         refresh_token_lifetime = config.get("refresh_token_lifetime")
         if refresh_token_lifetime is not None:
