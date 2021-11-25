@@ -235,10 +235,11 @@ class FederationServer(FederationBase):
                 self.storage,
                 origin,
                 [event],
-                # TODO: Is returning an event_id considered leaking? It looks
-                # like we already return redacted copies in other parts of the
-                # code.
-                redact=False,
+                # TODO: Is returning an event_id for an event that's hidden by
+                # history_visibility considered leaking? It looks like we
+                # already return redacted copies of hidden events in the
+                # `/backfill` endpoint.
+                redact=True,
             )
             logger.debug(
                 "FederationServer.on_timestamp_to_event_request: filtered_events origin=%s room_id=%s before=%s after=%s",
