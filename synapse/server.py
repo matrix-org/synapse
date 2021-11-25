@@ -33,9 +33,10 @@ from typing import (
     cast,
 )
 
-import twisted.internet.tcp
+from twisted.internet.interfaces import IOpenSSLContextFactory
+from twisted.internet.tcp import Port
 from twisted.web.iweb import IPolicyForHTTPS
-from twisted.web.resource import IResource
+from twisted.web.resource import Resource
 
 from synapse.api.auth import Auth
 from synapse.api.filtering import Filtering
@@ -206,7 +207,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     Attributes:
         config (synapse.config.homeserver.HomeserverConfig):
-        _listening_services (list[twisted.internet.tcp.Port]): TCP ports that
+        _listening_services (list[Port]): TCP ports that
             we are listening on to provide HTTP services.
     """
 
@@ -224,6 +225,8 @@ class HomeServer(metaclass=abc.ABCMeta):
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
     # instantiated during setup() for future return by get_datastore()
     DATASTORE_CLASS = abc.abstractproperty()
+
+    tls_server_context_factory: Optional[IOpenSSLContextFactory]
 
     def __init__(
         self,
@@ -247,7 +250,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         # the key we use to sign events and requests
         self.signing_key = config.key.signing_key[0]
         self.config = config
-        self._listening_services: List[twisted.internet.tcp.Port] = []
+        self._listening_services: List[Port] = []
         self.start_time: Optional[int] = None
 
         self._instance_id = random_string(5)
@@ -257,10 +260,10 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         self.datastores: Optional[Databases] = None
 
-        self._module_web_resources: Dict[str, IResource] = {}
+        self._module_web_resources: Dict[str, Resource] = {}
         self._module_web_resources_consumed = False
 
-    def register_module_web_resource(self, path: str, resource: IResource):
+    def register_module_web_resource(self, path: str, resource: Resource):
         """Allows a module to register a web resource to be served at the given path.
 
         If multiple modules register a resource for the same path, the module that

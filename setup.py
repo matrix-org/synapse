@@ -17,6 +17,7 @@
 # limitations under the License.
 import glob
 import os
+from typing import Any, Dict
 
 from setuptools import Command, find_packages, setup
 
@@ -49,8 +50,6 @@ here = os.path.abspath(os.path.dirname(__file__))
 # [1]: http://tox.readthedocs.io/en/2.5.0/example/basic.html#integration-with-setup-py-test-command
 # [2]: https://pypi.python.org/pypi/setuptools_trial
 class TestCommand(Command):
-    user_options = []
-
     def initialize_options(self):
         pass
 
@@ -75,7 +74,7 @@ def read_file(path_segments):
 
 def exec_file(path_segments):
     """Execute a single python file to get the variables defined in it"""
-    result = {}
+    result: Dict[str, Any] = {}
     code = read_file(path_segments)
     exec(code, result)
     return result
@@ -111,6 +110,7 @@ CONDITIONAL_REQUIREMENTS["mypy"] = [
     "types-Pillow>=8.3.4",
     "types-pyOpenSSL>=20.0.7",
     "types-PyYAML>=5.4.10",
+    "types-requests>=2.26.0",
     "types-setuptools>=57.4.0",
 ]
 

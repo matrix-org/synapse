@@ -98,7 +98,7 @@ def return_json_error(f: failure.Failure, request: SynapseRequest) -> None:
             "Failed handle request via %r: %r",
             request.request_metrics.name,
             request,
-            exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+            exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
         )
 
     # Only respond with an error response if we haven't already started writing,
@@ -150,7 +150,7 @@ def return_html_error(
             logger.error(
                 "Failed handle request %r",
                 request,
-                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
             )
     else:
         code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -159,7 +159,7 @@ def return_html_error(
         logger.error(
             "Failed handle request %r",
             request,
-            exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+            exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
         )
 
     if isinstance(error_template, str):

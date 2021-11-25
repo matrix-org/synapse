@@ -790,10 +790,10 @@ class AuthHandler:
         (
             new_refresh_token,
             new_refresh_token_id,
-        ) = await self.get_refresh_token_for_user_id(
+        ) = await self.create_refresh_token_for_user_id(
             user_id=existing_token.user_id, device_id=existing_token.device_id
         )
-        access_token = await self.get_access_token_for_user_id(
+        access_token = await self.create_access_token_for_user_id(
             user_id=existing_token.user_id,
             device_id=existing_token.device_id,
             valid_until_ms=valid_until_ms,
@@ -832,7 +832,7 @@ class AuthHandler:
 
         return True
 
-    async def get_refresh_token_for_user_id(
+    async def create_refresh_token_for_user_id(
         self,
         user_id: str,
         device_id: str,
@@ -855,7 +855,7 @@ class AuthHandler:
         )
         return refresh_token, refresh_token_id
 
-    async def get_access_token_for_user_id(
+    async def create_access_token_for_user_id(
         self,
         user_id: str,
         device_id: Optional[str],
@@ -1828,13 +1828,6 @@ def load_single_legacy_password_auth_provider(
         logger.error("Error while initializing %r: %s", module, e)
         raise
 
-    # The known hooks. If a module implements a method who's name appears in this set
-    # we'll want to register it
-    password_auth_provider_methods = {
-        "check_3pid_auth",
-        "on_logged_out",
-    }
-
     # All methods that the module provides should be async, but this wasn't enforced
     # in the old module system, so we wrap them if needed
     def async_wrapper(f: Optional[Callable]) -> Optional[Callable[..., Awaitable]]:
@@ -1919,11 +1912,14 @@ def load_single_legacy_password_auth_provider(
 
         return run
 
-    # populate hooks with the implemented methods, wrapped with async_wrapper
-    hooks = {
-        hook: async_wrapper(getattr(provider, hook, None))
-        for hook in password_auth_provider_methods
-    }
+    # If the module has these methods implemented, then we pull them out
+    # and register them as hooks.
+    check_3pid_auth_hook: Optional[CHECK_3PID_AUTH_CALLBACK] = async_wrapper(
+        getattr(provider, "check_3pid_auth", None)
+    )
+    on_logged_out_hook: Optional[ON_LOGGED_OUT_CALLBACK] = async_wrapper(
+        getattr(provider, "on_logged_out", None)
+    )
 
     supported_login_types = {}
     # call get_supported_login_types and add that to the dict
@@ -1950,7 +1946,11 @@ def load_single_legacy_password_auth_provider(
         # need to use a tuple here for ("password",) not a list since lists aren't hashable
         auth_checkers[(LoginType.PASSWORD, ("password",))] = check_password
 
-    api.register_password_auth_provider_callbacks(hooks, auth_checkers=auth_checkers)
+    api.register_password_auth_provider_callbacks(
+        check_3pid_auth=check_3pid_auth_hook,
+        on_logged_out=on_logged_out_hook,
+        auth_checkers=auth_checkers,
+    )
 
 
 CHECK_3PID_AUTH_CALLBACK = Callable[

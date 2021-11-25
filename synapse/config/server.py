@@ -421,7 +421,7 @@ class ServerConfig(Config):
         # before redacting them.
         redaction_retention_period = config.get("redaction_retention_period", "7d")
         if redaction_retention_period is not None:
-            self.redaction_retention_period = self.parse_duration(
+            self.redaction_retention_period: Optional[int] = self.parse_duration(
                 redaction_retention_period
             )
         else:
@@ -430,7 +430,7 @@ class ServerConfig(Config):
         # How long to keep entries in the `users_ips` table.
         user_ips_max_age = config.get("user_ips_max_age", "28d")
         if user_ips_max_age is not None:
-            self.user_ips_max_age = self.parse_duration(user_ips_max_age)
+            self.user_ips_max_age: Optional[int] = self.parse_duration(user_ips_max_age)
         else:
             self.user_ips_max_age = None
 

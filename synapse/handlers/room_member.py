@@ -269,6 +269,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         content: Optional[dict] = None,
         require_consent: bool = True,
         outlier: bool = False,
+        historical: bool = False,
     ) -> Tuple[str, int]:
         """
         Internal membership update function to get an existing event or create
@@ -294,6 +295,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
+            historical: Indicates whether the message is being inserted
+                back in time around some existing events. This is used to skip
+                a few checks and mark the event as backfilled.
 
         Returns:
             Tuple of event ID and stream ordering position
@@ -338,6 +342,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             auth_event_ids=auth_event_ids,
             require_consent=require_consent,
             outlier=outlier,
+            historical=historical,
         )
 
         prev_state_ids = await context.get_prev_state_ids()
@@ -434,6 +439,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         new_room: bool = False,
         require_consent: bool = True,
         outlier: bool = False,
+        historical: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
@@ -455,6 +461,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
+            historical: Indicates whether the message is being inserted
+                back in time around some existing events. This is used to skip
+                a few checks and mark the event as backfilled.
             prev_event_ids: The event IDs to use as the prev events
             auth_event_ids:
                 The event ids to use as the auth_events for the new event.
@@ -507,6 +516,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     new_room=new_room,
                     require_consent=require_consent,
                     outlier=outlier,
+                    historical=historical,
                     prev_event_ids=prev_event_ids,
                     auth_event_ids=auth_event_ids,
                 )
@@ -527,6 +537,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         new_room: bool = False,
         require_consent: bool = True,
         outlier: bool = False,
+        historical: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
@@ -550,6 +561,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
+            historical: Indicates whether the message is being inserted
+                back in time around some existing events. This is used to skip
+                a few checks and mark the event as backfilled.
             prev_event_ids: The event IDs to use as the prev events
             auth_event_ids:
                 The event ids to use as the auth_events for the new event.
@@ -677,6 +691,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 content=content,
                 require_consent=require_consent,
                 outlier=outlier,
+                historical=historical,
             )
 
         latest_event_ids = await self.store.get_prev_events_for_room(room_id)
