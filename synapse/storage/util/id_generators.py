@@ -90,7 +90,16 @@ def _load_current_id(
 
 
 class AbstractStreamIdTracker(metaclass=abc.ABCMeta):
-    """Tracks a stream that can have multiple writers."""
+    """Tracks the "current" stream ID of a stream that may have multiple writers.
+
+    Stream IDs are monotonically increasing or decreasing integers representing write
+    transactions. The "current" stream ID is the stream ID such that all transactions
+    with equal or smaller stream IDs have completed. Since transactions may complete out
+    of order, this is not the same the stream ID of the last completed transaction.
+
+    Completed transactions include both committed transactions and transactions that
+    have been rolled back.
+    """
 
     @abc.abstractmethod
     def advance(self, instance_name: str, new_id: int) -> None:
@@ -119,6 +128,14 @@ class AbstractStreamIdTracker(metaclass=abc.ABCMeta):
 
 
 class AbstractStreamIdGenerator(AbstractStreamIdTracker):
+    """Generates stream IDs for a stream that may have multiple writers.
+
+    Each stream ID represents a write transaction, whose completion is tracked
+    so that the "current" stream ID of the stream can be determined.
+
+    See `AbstractStreamIdTracker` for more details.
+    """
+
     @abc.abstractmethod
     def get_next(self) -> AsyncContextManager[int]:
         """
@@ -139,12 +156,10 @@ class AbstractStreamIdGenerator(AbstractStreamIdTracker):
 
 
 class StreamIdGenerator(AbstractStreamIdGenerator):
-    """Used to generate new stream ids when persisting events while keeping
-    track of which transactions have been completed.
+    """Generates and tracks stream IDs for a stream with a single writer.
 
-    This allows us to get the "current" stream id, i.e. the stream id such that
-    all ids less than or equal to it have completed. This handles the fact that
-    persistence of events can complete out of order.
+    This class must only be used when the current Synapse process is the sole
+    writer for a stream.
 
     Args:
         db_conn(connection):  A database connection to use to fetch the
@@ -189,6 +204,8 @@ class StreamIdGenerator(AbstractStreamIdGenerator):
         self._unfinished_ids: OrderedDict[int, int] = OrderedDict()
 
     def advance(self, instance_name: str, new_id: int) -> None:
+        # `StreamIdGenerator` should only be used when there is a single writer,
+        # so replication should never happen.
         raise Exception("Replication is not supported by StreamIdGenerator")
 
     def get_next(self) -> AsyncContextManager[int]:
@@ -243,7 +260,7 @@ class StreamIdGenerator(AbstractStreamIdGenerator):
 
 
 class MultiWriterIdGenerator(AbstractStreamIdGenerator):
-    """An ID generator that tracks a stream that can have multiple writers.
+    """Generates and tracks stream IDs for a stream with multiple writers.
 
     Uses a Postgres sequence to coordinate ID assignment, but positions of other
     writers will only get updated when `advance` is called (by replication).

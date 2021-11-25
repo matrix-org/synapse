@@ -18,6 +18,14 @@ from synapse.storage.util.id_generators import AbstractStreamIdTracker, _load_cu
 
 
 class SlavedIdTracker(AbstractStreamIdTracker):
+    """Tracks the "current" stream ID of a stream with a single writer.
+
+    See `AbstractStreamIdTracker` for more details.
+
+    Note that this class does not work correctly when there are multiple
+    writers.
+    """
+
     def __init__(
         self,
         db_conn: LoggingDatabaseConnection,
