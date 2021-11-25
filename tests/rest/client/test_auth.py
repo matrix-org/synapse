@@ -646,7 +646,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             "/_matrix/client/r0/login?org.matrix.msc2918.refresh_token=true",
             body,
         )
-        self.assertEqual(login_response.code, 200, login_response.result)  #
+        self.assertEqual(login_response.code, 200, login_response.result)
         refresh_token = login_response.json_body["refresh_token"]
 
         # Advance 119 seconds in the future (just shy of 2 minutes)
@@ -666,6 +666,53 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         self.reactor.advance(121.0)
 
         # Refresh our access token. It shouldn't be valid anymore.
+        refresh_response = self.use_refresh_token(refresh_token)
+        self.assertEqual(refresh_response.code, 403, refresh_response.result)
+
+    @override_config(
+        {
+            "access_token_lifetime": "2m",
+            "refresh_token_lifetime": "2m",
+            "session_lifetime": "3m",
+        }
+    )
+    def test_ultimate_session_expiry(self):
+        """
+        The session can be configured to have an ultimate, limited lifetime.
+        """
+
+        body = {"type": "m.login.password", "user": "test", "password": self.user_pass}
+        login_response = self.make_request(
+            "POST",
+            "/_matrix/client/r0/login?org.matrix.msc2918.refresh_token=true",
+            body,
+        )
+        self.assertEqual(login_response.code, 200, login_response.result)
+        refresh_token = login_response.json_body["refresh_token"]
+
+        # Advance shy of 2 minutes into the future
+        self.reactor.advance(119.0)
+
+        # Refresh our access token. It should still be valid right now.
+        refresh_response = self.use_refresh_token(refresh_token)
+        self.assertEqual(refresh_response.code, 200, refresh_response.result)
+        self.assertIn(
+            "refresh_token",
+            refresh_response.json_body,
+            "No new refresh token returned after refresh.",
+        )
+        # Notice that our access token lifetime has been diminished to match the
+        # session length.
+        # 3 minutes - 119 seconds = 61 seconds.
+        self.assertEqual(refresh_response.json_body["expires_in_ms"], 61_000)
+        refresh_token = refresh_response.json_body["refresh_token"]
+
+        # Advance 61 seconds into the future. Our session should have expired
+        # now, because we've had our 3 minutes.
+        self.reactor.advance(61.0)
+
+        # Try to refresh our access token. This should fail because the refresh
+        # token's lifetime has also been diminished as our session expired.
         refresh_response = self.use_refresh_token(refresh_token)
         self.assertEqual(refresh_response.code, 403, refresh_response.result)
 
