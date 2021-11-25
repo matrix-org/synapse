@@ -1700,6 +1700,20 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_event_for_timestamp(
         self, room_id: str, timestamp: int, direction: str
     ) -> Optional[str]:
+        """Find the closest event to the given timestamp in the given direction.
+
+        Args:
+            room_id: Room to fetch the event from
+            timestamp: The point in time (inclusive) we should navigate from in
+                 the given direction to find the closest event.
+            direction: ["f"|"b"] to indicate whether we should navigate forward
+                or backward from the given timestamp to find the closest event.
+
+        Returns:
+            The closest event_id otherwise None if we can't find any event in
+            the given direction.
+        """
+
         sql_template = """
             SELECT event_id FROM events
             LEFT JOIN rejections USING (event_id)
