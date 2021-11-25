@@ -131,7 +131,7 @@ class RegistrationConfig(Config):
         refresh_token_lifetime = config.get("refresh_token_lifetime")
         if refresh_token_lifetime is not None:
             refresh_token_lifetime = self.parse_duration(refresh_token_lifetime)
-        self.refresh_token_lifetime = refresh_token_lifetime
+        self.refresh_token_lifetime: Optional[int] = refresh_token_lifetime
 
         # The fallback template used for authenticating using a registration token
         self.registration_token_template = self.read_template("registration_token.html")
