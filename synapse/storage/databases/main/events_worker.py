@@ -1737,9 +1737,7 @@ class EventsWorkerStore(SQLBaseStore):
             return None
 
         if direction not in ("f", "b"):
-            raise SynapseError(
-                400, "Unknown direction: %s" % (direction,), errcode=Codes.INVALID_PARAM
-            )
+            raise ValueError("Unknown direction: %s" % (direction,))
 
         return await self.db_pool.runInteraction(
             "get_event_for_timestamp_txn",
