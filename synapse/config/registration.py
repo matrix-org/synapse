@@ -113,14 +113,11 @@ class RegistrationConfig(Config):
         self.session_lifetime = session_lifetime
 
         # The `refreshable_access_token_lifetime` applies for tokens that can be renewed
-        # using a refresh token, as per MSC2918. If it is `None`, the refresh
-        # token mechanism is disabled.
-        #
-        # Since it is incompatible with the `session_lifetime` mechanism, it is set to
-        # `None` by default if a `session_lifetime` is set.
+        # using a refresh token, as per MSC2918.
+        # If it is `None`, the refresh token mechanism is disabled.
         refreshable_access_token_lifetime = config.get(
             "refreshable_access_token_lifetime",
-            "5m" if session_lifetime is None else None,
+            "5m",
         )
         if refreshable_access_token_lifetime is not None:
             refreshable_access_token_lifetime = self.parse_duration(
