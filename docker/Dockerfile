@@ -82,6 +82,14 @@ COPY --from=builder /install /usr/local
 COPY ./docker/start.py /start.py
 COPY ./docker/conf /conf
 
+RUN mkdir /data
+
+# Set permissions for GID=0 to be able to interact with /conf and /data
+# Allows container to be deployed in OpenShift without UID 0
+# https://docs.openshift.com/container-platform/4.7/openshift_images/create-images.html#images-create-guide-openshift_create-images
+RUN chgrp -R 0 /conf /data && \
+    chmod -R g+rw /conf /data
+
 VOLUME ["/data"]
 
 EXPOSE 8008/tcp 8009/tcp 8448/tcp
