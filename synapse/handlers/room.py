@@ -1307,7 +1307,7 @@ class TimestampLookupHandler:
 
                     continue
                 except Exception as ex:
-                    logger.exception(
+                    logger.debug(
                         "Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
                         domain,
                         type(ex).__name__,
