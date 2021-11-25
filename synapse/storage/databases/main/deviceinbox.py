@@ -707,6 +707,8 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
                 # res can't be None.
                 res: Tuple[Optional[int]] = txn.fetchone()  # type: ignore[assignment]
                 if res[0] is None:
+                    # this can only happen if the `device_inbox` table is empty, in which
+                    # case we have no work to do.
                     return 0, True
                 else:
                     max_stream_id = res[0]
@@ -714,6 +716,8 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
             start = progress.get("stream_id", 0)
             stop = start + batch_size
 
+            # delete rows in `device_inbox` which do *not* correspond to a known,
+            # unhidden device.
             sql = """
                 DELETE FROM device_inbox
                 WHERE
@@ -751,7 +755,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
                 self.REMOVE_DEVICES_FROM_INBOX,
             )
 
-        return num_deleted
+        return batch_size
 
 
 class DeviceInboxStore(DeviceInboxWorkerStore, DeviceInboxBackgroundUpdateStore):
