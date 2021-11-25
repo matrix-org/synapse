@@ -1231,7 +1231,7 @@ class TimestampLookupHandler:
         room_id: str,
         timestamp: int,
         direction: str,
-    ) -> Optional[str]:
+    ) -> str:
         """Find the closest event to the given timestamp in the given direction.
         If we can't find an event locally or the event we have locally is next to a gap,
         it will ask other federated homeservers for an event.
