@@ -21,3 +21,6 @@ VOLUME ["/data"]
 # files to run the desired worker configuration. Will start supervisord.
 COPY ./docker/configure_workers_and_start.py /configure_workers_and_start.py
 ENTRYPOINT ["/configure_workers_and_start.py"]
+
+HEALTHCHECK --start-period=5s --interval=15s --timeout=5s \
+    CMD /bin/sh /healthcheck.sh
