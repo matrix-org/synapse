@@ -263,7 +263,7 @@ class Auth:
         if app_service.sender == user_id:
             pass
         # Check to make sure the app service is allowed to control the user
-        elif not app_service.is_interested_in_user(user_id):
+        elif not app_service.is_user_in_namespace(user_id):
             raise AuthError(
                 403,
                 "Application service cannot masquerade as this user (%s)." % user_id,

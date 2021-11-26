@@ -249,7 +249,7 @@ class LoginRestServlet(RestServlet):
         else:
             qualified_user_id = UserID(user, self.hs.hostname).to_string()
 
-        if not appservice.is_interested_in_user(qualified_user_id):
+        if not appservice.is_user_in_namespace(qualified_user_id):
             raise LoginError(403, "Invalid access_token", errcode=Codes.FORBIDDEN)
 
         return await self._complete_login(

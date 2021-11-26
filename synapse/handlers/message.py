@@ -280,7 +280,7 @@ class MessageHandler:
         # is a user in the room that the AS is "interested in"
         if requester.app_service and user_id not in users_with_profile:
             for uid in users_with_profile:
-                if requester.app_service.is_interested_in_user(uid):
+                if requester.app_service.is_user_in_namespace(uid):
                     break
             else:
                 # Loop fell through, AS has no interested users in room

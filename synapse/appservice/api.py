@@ -293,7 +293,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                         e.membership == Membership.INVITE
                         or e.membership == Membership.KNOCK
                     )
-                    and service.is_interested_in_user(e.state_key)
+                    and service.is_user_in_namespace(e.state_key)
                 ),
             )
             for e in events
