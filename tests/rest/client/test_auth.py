@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from http import HTTPStatus
 from typing import Optional, Union
 
 from twisted.internet.defer import succeed
@@ -648,28 +649,31 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             "/_matrix/client/r0/login?org.matrix.msc2918.refresh_token=true",
             body,
         )
-        self.assertEqual(login_response.code, 200, login_response.result)
-        refresh_token = login_response.json_body["refresh_token"]
+        self.assertEqual(login_response.code, HTTPStatus.OK, login_response.result)
+        refresh_token1 = login_response.json_body["refresh_token"]
 
         # Advance 119 seconds in the future (just shy of 2 minutes)
         self.reactor.advance(119.0)
 
         # Refresh our access token. It should still JUST be valid right now.
-        refresh_response = self.use_refresh_token(refresh_token)
-        self.assertEqual(refresh_response.code, 200, refresh_response.result)
+        refresh_response = self.use_refresh_token(refresh_token1)
+        self.assertEqual(refresh_response.code, HTTPStatus.OK, refresh_response.result)
         self.assertIn(
             "refresh_token",
             refresh_response.json_body,
             "No new refresh token returned after refresh.",
         )
-        refresh_token = refresh_response.json_body["refresh_token"]
+        refresh_token2 = refresh_response.json_body["refresh_token"]
 
         # Advance 121 seconds in the future (just a bit more than 2 minutes)
         self.reactor.advance(121.0)
 
-        # Refresh our access token. It shouldn't be valid anymore.
-        refresh_response = self.use_refresh_token(refresh_token)
-        self.assertEqual(refresh_response.code, 403, refresh_response.result)
+        # Try to refresh our access token, but instead notice that it's not
+        # valid (it just expired).
+        refresh_response = self.use_refresh_token(refresh_token2)
+        self.assertEqual(
+            refresh_response.code, HTTPStatus.FORBIDDEN, refresh_response.result
+        )
 
     @override_config(
         {
