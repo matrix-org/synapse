@@ -2,11 +2,12 @@ import json
 
 from synapse.api.room_versions import RoomVersions
 from synapse.federation.transport.client import SendJoinParser
+
 from tests.unittest import TestCase
 
 
 class SendJoinParserTestCase(TestCase):
-    def test_two_writes(self):
+    def test_two_writes(self) -> None:
         """Test that the parser can sensibly deserialise an input given in two slices."""
         parser = SendJoinParser(RoomVersions.V1, True)
         parent_event = {
@@ -40,10 +41,10 @@ class SendJoinParserTestCase(TestCase):
         parser.write(serialised_response[100:])
 
         # Retrieve the parsed SendJoinResponse
-        response = parser.finish()
+        parsed_response = parser.finish()
 
         # Sanity check the parsing gave us sensible data.
-        self.assertEqual(len(response.auth_events), 1, response)
-        self.assertEqual(len(response.state), 1, response)
-        self.assertEqual(response.event_dict, {}, response)
-        self.assertIsNone(response.event, response)
+        self.assertEqual(len(parsed_response.auth_events), 1, parsed_response)
+        self.assertEqual(len(parsed_response.state), 1, parsed_response)
+        self.assertEqual(parsed_response.event_dict, {}, parsed_response)
+        self.assertIsNone(parsed_response.event, parsed_response)
