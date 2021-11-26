@@ -245,7 +245,7 @@ class TlsConfig(Config):
         cert_path = self.tls_certificate_file
         logger.info("Loading TLS certificate from %s", cert_path)
         cert_pem = self.read_file(cert_path, "tls_certificate_path")
-        cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
+        cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem.encode())
 
         return cert
 

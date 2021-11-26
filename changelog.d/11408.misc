@@ -1,0 +1,1 @@
+Refactor including the bundled relations when serializing an event.

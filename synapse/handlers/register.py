@@ -116,7 +116,9 @@ class RegistrationHandler:
             self.pusher_pool = hs.get_pusherpool()
 
         self.session_lifetime = hs.config.registration.session_lifetime
-        self.access_token_lifetime = hs.config.registration.access_token_lifetime
+        self.refreshable_access_token_lifetime = (
+            hs.config.registration.refreshable_access_token_lifetime
+        )
 
         init_counters_for_auth_provider("")
 
@@ -817,7 +819,9 @@ class RegistrationHandler:
                     user_id,
                     device_id=registered_device_id,
                 )
-                valid_until_ms = self.clock.time_msec() + self.access_token_lifetime
+                valid_until_ms = (
+                    self.clock.time_msec() + self.refreshable_access_token_lifetime
+                )
 
             access_token = await self._auth_handler.create_access_token_for_user_id(
                 user_id,
