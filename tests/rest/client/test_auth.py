@@ -685,7 +685,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             "type": "m.login.password",
             "user": "test",
             "password": self.user_pass,
-            "org.matrix.msc2918.refresh_token": True,
+            "refresh_token": True,
         }
         login_response = self.make_request(
             "POST",
@@ -735,7 +735,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             "type": "m.login.password",
             "user": "test",
             "password": self.user_pass,
-            "org.matrix.msc2918.refresh_token": True,
+            "refresh_token": True,
         }
         login_response = self.make_request(
             "POST",
