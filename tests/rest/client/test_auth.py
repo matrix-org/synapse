@@ -662,6 +662,8 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
     def test_refresh_token_expiry(self):
         """
         The refresh token can be configured to have a limited lifetime.
+        When that lifetime has ended, the refresh token can no longer be used to
+        refresh the session.
         """
 
         body = {"type": "m.login.password", "user": "test", "password": self.user_pass}
@@ -676,7 +678,8 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         # Advance 119 seconds in the future (just shy of 2 minutes)
         self.reactor.advance(119.0)
 
-        # Refresh our access token. It should still JUST be valid right now.
+        # Refresh our session. The refresh token should still JUST be valid right now.
+        # By doing so, we get a new access token and a new refresh token.
         refresh_response = self.use_refresh_token(refresh_token1)
         self.assertEqual(refresh_response.code, HTTPStatus.OK, refresh_response.result)
         self.assertIn(
@@ -689,8 +692,8 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         # Advance 121 seconds in the future (just a bit more than 2 minutes)
         self.reactor.advance(121.0)
 
-        # Try to refresh our access token, but instead notice that it's not
-        # valid (it just expired).
+        # Try to refresh our session, but instead notice that the refresh token is
+        # not valid (it just expired).
         refresh_response = self.use_refresh_token(refresh_token2)
         self.assertEqual(
             refresh_response.code, HTTPStatus.FORBIDDEN, refresh_response.result
@@ -720,7 +723,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         # Advance shy of 2 minutes into the future
         self.reactor.advance(119.0)
 
-        # Refresh our access token. It should still be valid right now.
+        # Refresh our session. The refresh token should still be valid right now.
         refresh_response = self.use_refresh_token(refresh_token)
         self.assertEqual(refresh_response.code, 200, refresh_response.result)
         self.assertIn(
@@ -729,7 +732,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             "No new refresh token returned after refresh.",
         )
         # Notice that our access token lifetime has been diminished to match the
-        # session length.
+        # session lifetime.
         # 3 minutes - 119 seconds = 61 seconds.
         self.assertEqual(refresh_response.json_body["expires_in_ms"], 61_000)
         refresh_token = refresh_response.json_body["refresh_token"]
@@ -738,8 +741,9 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         # now, because we've had our 3 minutes.
         self.reactor.advance(61.0)
 
-        # Try to refresh our access token. This should fail because the refresh
-        # token's lifetime has also been diminished as our session expired.
+        # Try to issue a new, refreshed, access token.
+        # This should fail because the refresh token's lifetime has also been
+        # diminished as our session expired.
         refresh_response = self.use_refresh_token(refresh_token)
         self.assertEqual(refresh_response.code, 403, refresh_response.result)
 
