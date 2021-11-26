@@ -154,8 +154,7 @@ class LoginRestServlet(RestServlet):
         login_submission = parse_json_object_from_request(request)
 
         if self._msc2918_enabled:
-            # Check if this registration should also issue a refresh token, as
-            # per MSC2918
+            # Check if this login should also issue a refresh token, as per MSC2918
             should_issue_refresh_token = login_submission.get(
                 "org.matrix.msc2918.refresh_token", False
             )
