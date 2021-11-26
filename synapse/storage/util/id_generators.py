@@ -95,7 +95,7 @@ class AbstractStreamIdTracker(metaclass=abc.ABCMeta):
     Stream IDs are monotonically increasing or decreasing integers representing write
     transactions. The "current" stream ID is the stream ID such that all transactions
     with equal or smaller stream IDs have completed. Since transactions may complete out
-    of order, this is not the same the stream ID of the last completed transaction.
+    of order, this is not the same as the stream ID of the last completed transaction.
 
     Completed transactions include both committed transactions and transactions that
     have been rolled back.
