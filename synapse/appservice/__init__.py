@@ -192,7 +192,7 @@ class ApplicationService:
 
     def _matches_room_id(self, event: EventBase) -> bool:
         if hasattr(event, "room_id"):
-            return self.is_interested_in_room(event.room_id)
+            return self.is_room_id_in_namespace(event.room_id)
         return False
 
     async def _matches_aliases(
@@ -267,7 +267,7 @@ class ApplicationService:
     def is_room_alias_in_namespace(self, alias: str) -> bool:
         return bool(self._matches_regex(alias, ApplicationService.NS_ALIASES))
 
-    def is_interested_in_room(self, room_id: str) -> bool:
+    def is_room_id_in_namespace(self, room_id: str) -> bool:
         return bool(self._matches_regex(room_id, ApplicationService.NS_ROOMS))
 
     def is_exclusive_user(self, user_id: str) -> bool:
