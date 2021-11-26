@@ -173,8 +173,8 @@ class DatabaseOutageTestCase(unittest.HomeserverTestCase):
     def _populate_events(self) -> None:
         """Ensure that there are test events in the database.
 
-        When testing with the in-memory SQLite database is being used, all the events
-        are lost during the simulated outage.
+        When testing with the in-memory SQLite database, all the events are lost during
+        the simulated outage.
 
         To ensure consistency between `room_id`s and `event_id`s before and after the
         outage, rows are built and inserted manually.
