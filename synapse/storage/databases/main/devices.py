@@ -581,6 +581,52 @@ class DeviceWorkerStore(SQLBaseStore):
             changes = set()
 
             sql = """
+                SELECT DISTINCT FROM device_lists_stream
+                WHERE stream_id > ?
+                AND
+            """
+
+            for chunk in batch_iter(to_check, 100):
+                clause, args = make_in_list_sql_clause(
+                    txn.database_engine, "user_id", chunk
+                )
+                txn.execute(sql + clause, (from_key,) + tuple(args))
+                changes.update(user_id for user_id, in txn)
+
+            return changes
+
+        return await self.db_pool.runInteraction(
+            "get_users_whose_devices_changed", _get_users_whose_devices_changed_txn
+        )
+
+    async def get_all_device_list_changes_for_users(
+        self, user_ids: Iterable[str], from_key: int
+    ) -> List[JsonDict]:
+        """
+        Get a list of device updates for a collection of users between the
+        given stream ID and now.
+
+        Args:
+            user_ids: The user IDs to fetch device list updates for.
+            from_key: The minimum device list stream ID to fetch updates from, inclusive.
+
+        Returns:
+            The device list changes, ordered by ascending stream ID.
+            # TODO: Should return max_stream_id?
+        """
+        # Get set of users who *may* have changed. Users not in the returned
+        # list have definitely not changed.
+        to_check = self._device_list_stream_cache.get_entities_changed(
+            user_ids, from_key
+        )
+
+        if not to_check:
+            return []
+
+        def _get_all_device_list_changes_for_users_txn(txn):
+            changes = set()
+
+            sql = """
                 SELECT DISTINCT user_id FROM device_lists_stream
                 WHERE stream_id > ?
                 AND

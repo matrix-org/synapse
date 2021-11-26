@@ -58,6 +58,7 @@ class ApplicationServicesHandler:
         self._msc2409_to_device_messages_enabled = (
             hs.config.experimental.msc2409_to_device_messages_enabled
         )
+        self._msc3202_enabled = hs.config.experimental.msc3202_enabled
 
         self.current_max = 0
         self.is_processing = False
@@ -204,9 +205,9 @@ class ApplicationServicesHandler:
         Args:
             stream_key: The stream the event came from.
 
-                `stream_key` can be "typing_key", "receipt_key", "presence_key" or
-                "to_device_key". Any other value for `stream_key` will cause this function
-                to return early.
+                `stream_key` can be "typing_key", "receipt_key", "presence_key",
+                "to_device_key" or "device_list_key". Any other value fo
+                `stream_key` will cause this function to return early.
 
                 Ephemeral events will only be pushed to appservices that have opted into
                 receiving them by setting `push_ephemeral` to true in their registration
@@ -230,6 +231,7 @@ class ApplicationServicesHandler:
             "receipt_key",
             "presence_key",
             "to_device_key",
+            "device_list_key",
         ):
             return
 
@@ -251,6 +253,10 @@ class ApplicationServicesHandler:
             stream_key == "to_device_key"
             and not self._msc2409_to_device_messages_enabled
         ):
+            return
+
+        # Ignore device lists if the feature flag is not enabled
+        if stream_key == "device_list_key" and not self._msc3202_enabled:
             return
 
         # Check whether there are any appservices which have registered to receive
@@ -334,6 +340,20 @@ class ApplicationServicesHandler:
                         # Persist the latest handled stream token for this appservice
                         await self.store.set_appservice_stream_type_pos(
                             service, "to_device", new_token
+                        )
+
+                    elif stream_key == "device_list_key":
+                        events = await self._handle_device_list_updates(
+                            service, new_token, users
+                        )
+                        if events:
+                            self.scheduler.submit_ephemeral_events_for_as(
+                                service, events
+                            )
+
+                        # Persist the latest handled stream token for this appservice
+                        await self.store.set_type_stream_id_for_appservice(
+                            service, "device_list", new_token
                         )
 
     async def _handle_typing(
@@ -540,6 +560,39 @@ class ApplicationServicesHandler:
                 )
 
         return message_payload
+
+    async def _get_device_list_updates(
+        self,
+        service: ApplicationService,
+        new_token: int,
+        users: Collection[Union[UserID, str]],
+    ) -> List[JsonDict]:
+        """
+
+
+        Args:
+            service:
+            new_token:
+            users:
+
+        Returns:
+
+        """
+        users_appservice_is_interested_in = [
+            user for user in users if service.is_interested_in_user(user)
+        ]
+
+        if not users_appservice_is_interested_in:
+            # This appservice was not interested in any of these users.
+            return []
+
+        # Fetch the last successfully processed device list update stream ID
+        # for this appservice.
+        from_key = await self.store.get_type_stream_id_for_appservice(
+            service, "device_list"
+        )
+
+        # Fetch device lists updates for each user.
 
     async def query_user_exists(self, user_id: str) -> bool:
         """Check if any application service knows this user_id exists.
