@@ -634,6 +634,27 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         self.assertApproximates(
             refresh_response.json_body["expires_in_ms"], 60 * 1000, 100
         )
+        access_token = refresh_response.json_body["access_token"]
+
+        # Advance 59 seconds in the future (just shy of 1 minute, the time of expiry)
+        self.reactor.advance(59.0)
+        # Check that our token is valid
+        self.assertEqual(
+            self.make_request(
+                "GET", "/_matrix/client/v3/account/whoami", access_token=access_token
+            ).code,
+            HTTPStatus.OK,
+        )
+
+        # Advance 2 more seconds (just past the time of expiry)
+        self.reactor.advance(2.0)
+        # Check that our token is invalid
+        self.assertEqual(
+            self.make_request(
+                "GET", "/_matrix/client/v3/account/whoami", access_token=access_token
+            ).code,
+            HTTPStatus.UNAUTHORIZED,
+        )
 
     @override_config(
         {"refreshable_access_token_lifetime": "1m", "refresh_token_lifetime": "2m"}
