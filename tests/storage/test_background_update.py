@@ -22,8 +22,8 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         )
 
     def test_do_background_update(self):
-        # the time we claim each update takes
-        duration_ms = 0.2
+        # the time we claim it takes to update one item when running the update
+        duration_ms = 10
 
         # the target runtime for each bg update
         target_background_update_duration_ms = 100
@@ -57,7 +57,9 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         self.assertFalse(res)
 
         # on the first call, we should get run with the default background update size
-        self.update_handler.assert_called_once_with({"my_key": 1}, 100)
+        self.update_handler.assert_called_once_with(
+            {"my_key": 1}, self.updates.MINIMUM_BACKGROUND_BATCH_SIZE
+        )
 
         # second step: complete the update
         # we should now get run with a much bigger number of items to update

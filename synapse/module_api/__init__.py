@@ -1049,7 +1049,7 @@ class ModuleApi:
             A list containing the loaded templates, with the orders matching the one of
             the filenames parameter.
         """
-        return self._hs.config.read_templates(
+        return self._hs.config.server.read_templates(
             filenames,
             (td for td in (self.custom_template_dir, custom_template_directory) if td),
         )

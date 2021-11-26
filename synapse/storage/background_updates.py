@@ -131,6 +131,9 @@ class BackgroundUpdater:
     process and autotuning the batch size.
     """
 
+    MINIMUM_BACKGROUND_BATCH_SIZE = 1
+    DEFAULT_BACKGROUND_BATCH_SIZE = 100
+
     def __init__(self, hs: "HomeServer", database: "DatabasePool"):
         self._clock = hs.get_clock()
         self.db_pool = database
@@ -220,7 +223,7 @@ class BackgroundUpdater:
         if self._default_batch_size_callback is not None:
             return await self._default_batch_size_callback(update_name, database_name)
 
-        return 100
+        return self.DEFAULT_BACKGROUND_BATCH_SIZE
 
     async def _min_batch_size(self, update_name: str, database_name: str) -> int:
         """A lower bound on the batch size of a new background update.
@@ -230,7 +233,7 @@ class BackgroundUpdater:
         if self._min_batch_size_callback is not None:
             return await self._min_batch_size_callback(update_name, database_name)
 
-        return 100
+        return self.MINIMUM_BACKGROUND_BATCH_SIZE
 
     def get_current_update(self) -> Optional[BackgroundUpdatePerformance]:
         """Returns the current background update, if any."""

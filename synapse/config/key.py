@@ -16,6 +16,7 @@
 import hashlib
 import logging
 import os
+from typing import Any, Dict
 
 import attr
 import jsonschema
@@ -312,7 +313,7 @@ class KeyConfig(Config):
                 )
         return keys
 
-    def generate_files(self, config, config_dir_path):
+    def generate_files(self, config: Dict[str, Any], config_dir_path: str) -> None:
         if "signing_key" in config:
             return
 
