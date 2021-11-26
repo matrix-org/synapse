@@ -38,7 +38,6 @@ from synapse.http.server import HttpServer, finish_request
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
-    parse_boolean,
     parse_bytes_from_args,
     parse_json_object_from_request,
     parse_string,
@@ -165,11 +164,14 @@ class LoginRestServlet(RestServlet):
         login_submission = parse_json_object_from_request(request)
 
         if self._msc2918_enabled:
-            # Check if this login should also issue a refresh token, as per
-            # MSC2918
-            should_issue_refresh_token = parse_boolean(
-                request, name=LoginRestServlet.REFRESH_TOKEN_PARAM, default=False
+            # Check if this login should also issue a refresh token, as per MSC2918
+            should_issue_refresh_token = login_submission.get(
+                "org.matrix.msc2918.refresh_token", False
             )
+            if not isinstance(should_issue_refresh_token, bool):
+                raise SynapseError(
+                    400, "`org.matrix.msc2918.refresh_token` should be true or false."
+                )
         else:
             should_issue_refresh_token = False
 

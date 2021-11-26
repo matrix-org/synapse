@@ -529,7 +529,11 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         A login response should include a refresh_token only if asked.
         """
         # Test login
-        body = {"type": "m.login.password", "user": "test", "password": self.user_pass}
+        body = {
+            "type": "m.login.password",
+            "user": "test",
+            "password": self.user_pass,
+        }
 
         login_without_refresh = self.make_request(
             "POST", "/_matrix/client/r0/login", body
@@ -539,8 +543,8 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
 
         login_with_refresh = self.make_request(
             "POST",
-            "/_matrix/client/r0/login?org.matrix.msc2918.refresh_token=true",
-            body,
+            "/_matrix/client/r0/login",
+            {"org.matrix.msc2918.refresh_token": True, **body},
         )
         self.assertEqual(login_with_refresh.code, 200, login_with_refresh.result)
         self.assertIn("refresh_token", login_with_refresh.json_body)
@@ -566,11 +570,12 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
 
         register_with_refresh = self.make_request(
             "POST",
-            "/_matrix/client/r0/register?org.matrix.msc2918.refresh_token=true",
+            "/_matrix/client/r0/register",
             {
                 "username": "test3",
                 "password": self.user_pass,
                 "auth": {"type": LoginType.DUMMY},
+                "org.matrix.msc2918.refresh_token": True,
             },
         )
         self.assertEqual(register_with_refresh.code, 200, register_with_refresh.result)
@@ -581,10 +586,15 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         """
         A refresh token can be used to issue a new access token.
         """
-        body = {"type": "m.login.password", "user": "test", "password": self.user_pass}
+        body = {
+            "type": "m.login.password",
+            "user": "test",
+            "password": self.user_pass,
+            "org.matrix.msc2918.refresh_token": True,
+        }
         login_response = self.make_request(
             "POST",
-            "/_matrix/client/r0/login?org.matrix.msc2918.refresh_token=true",
+            "/_matrix/client/r0/login",
             body,
         )
         self.assertEqual(login_response.code, 200, login_response.result)
@@ -614,10 +624,15 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         """
         The access token should have some time as specified in the config.
         """
-        body = {"type": "m.login.password", "user": "test", "password": self.user_pass}
+        body = {
+            "type": "m.login.password",
+            "user": "test",
+            "password": self.user_pass,
+            "org.matrix.msc2918.refresh_token": True,
+        }
         login_response = self.make_request(
             "POST",
-            "/_matrix/client/r0/login?org.matrix.msc2918.refresh_token=true",
+            "/_matrix/client/r0/login",
             body,
         )
         self.assertEqual(login_response.code, 200, login_response.result)
@@ -666,10 +681,15 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         refresh the session.
         """
 
-        body = {"type": "m.login.password", "user": "test", "password": self.user_pass}
+        body = {
+            "type": "m.login.password",
+            "user": "test",
+            "password": self.user_pass,
+            "org.matrix.msc2918.refresh_token": True,
+        }
         login_response = self.make_request(
             "POST",
-            "/_matrix/client/r0/login?org.matrix.msc2918.refresh_token=true",
+            "/_matrix/client/r0/login",
             body,
         )
         self.assertEqual(login_response.code, HTTPStatus.OK, login_response.result)
@@ -711,10 +731,15 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         The session can be configured to have an ultimate, limited lifetime.
         """
 
-        body = {"type": "m.login.password", "user": "test", "password": self.user_pass}
+        body = {
+            "type": "m.login.password",
+            "user": "test",
+            "password": self.user_pass,
+            "org.matrix.msc2918.refresh_token": True,
+        }
         login_response = self.make_request(
             "POST",
-            "/_matrix/client/r0/login?org.matrix.msc2918.refresh_token=true",
+            "/_matrix/client/r0/login",
             body,
         )
         self.assertEqual(login_response.code, 200, login_response.result)
@@ -763,10 +788,15 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
                    |-> fourth_refresh (fails)
         """
 
-        body = {"type": "m.login.password", "user": "test", "password": self.user_pass}
+        body = {
+            "type": "m.login.password",
+            "user": "test",
+            "password": self.user_pass,
+            "org.matrix.msc2918.refresh_token": True,
+        }
         login_response = self.make_request(
             "POST",
-            "/_matrix/client/r0/login?org.matrix.msc2918.refresh_token=true",
+            "/_matrix/client/r0/login",
             body,
         )
         self.assertEqual(login_response.code, 200, login_response.result)
