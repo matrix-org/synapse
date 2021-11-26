@@ -623,7 +623,7 @@ class ApplicationServicesHandler:
         room_alias_str = room_alias.to_string()
         services = self.store.get_app_services()
         alias_query_services = [
-            s for s in services if (s.is_interested_in_alias(room_alias_str))
+            s for s in services if (s.is_room_alias_in_namespace(room_alias_str))
         ]
         for alias_service in alias_query_services:
             is_known_alias = await self.appservice_api.query_alias(

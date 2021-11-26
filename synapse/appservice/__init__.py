@@ -203,7 +203,7 @@ class ApplicationService:
 
         alias_list = await store.get_aliases_for_room(event.room_id)
         for alias in alias_list:
-            if self.is_interested_in_alias(alias):
+            if self.is_room_alias_in_namespace(alias):
                 return True
         return False
 
@@ -264,7 +264,7 @@ class ApplicationService:
             or user_id == self.sender
         )
 
-    def is_interested_in_alias(self, alias: str) -> bool:
+    def is_room_alias_in_namespace(self, alias: str) -> bool:
         return bool(self._matches_regex(alias, ApplicationService.NS_ALIASES))
 
     def is_interested_in_room(self, room_id: str) -> bool:
