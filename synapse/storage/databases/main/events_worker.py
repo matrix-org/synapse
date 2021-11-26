@@ -851,7 +851,7 @@ class EventsWorkerStore(SQLBaseStore):
                     for _, deferred in event_fetches_to_fail:
                         deferred.errback(exc)
 
-    def _fetch_loop(self, conn: Connection) -> None:
+    def _fetch_loop(self, conn: LoggingDatabaseConnection) -> None:
         """Takes a database connection and waits for requests for events from
         the _event_fetch_list queue.
         """
