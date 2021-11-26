@@ -771,6 +771,7 @@ class AuthHandler:
         Args:
             refresh_token: The token to consume.
             access_token_valid_until_ms: The expiration timestamp of the new access token.
+                None if the access token does not expire.
             refresh_token_valid_until_ms: The expiration timestamp of the new refresh token.
                 None if the refresh token does not expire.
         Returns:
