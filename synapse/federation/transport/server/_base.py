@@ -16,7 +16,7 @@ import functools
 import logging
 import re
 from http import HTTPStatus
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.urls import FEDERATION_V1_PREFIX
@@ -161,7 +161,9 @@ def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str, Optional[str
     try:
         header_str = header_bytes.decode("utf-8")
         params = header_str.split(" ")[1].split(",")
-        param_dict = dict(kv.split("=") for kv in params)
+        param_dict: Dict[str, str] = {
+            k: v for k, v in [param.split("=", maxsplit=1) for param in params]
+        }
 
         def strip_quotes(value):
             if value.startswith('"'):
