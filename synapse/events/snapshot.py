@@ -112,7 +112,6 @@ class EventContext:
 
     _current_state_ids = attr.ib(default=None, type=Optional[StateMap[str]])
     _prev_state_ids = attr.ib(default=None, type=Optional[StateMap[str]])
-    _outlier = attr.ib(default=False, type=bool)
 
     @staticmethod
     def with_state(
@@ -138,7 +137,6 @@ class EventContext:
         return EventContext(
             current_state_ids={},
             prev_state_ids={},
-            outlier=True,
         )
 
     async def serialize(self, event: EventBase, store: "DataStore") -> JsonDict:
@@ -172,7 +170,6 @@ class EventContext:
             "prev_group": self.prev_group,
             "delta_ids": _encode_state_dict(self.delta_ids),
             "app_service_id": self.app_service.id if self.app_service else None,
-            "outlier": self._outlier,
         }
 
     @staticmethod
@@ -200,11 +197,6 @@ class EventContext:
             delta_ids=_decode_state_dict(input["delta_ids"]),
             rejected=input["rejected"],
         )
-
-        if input["outlier"]:
-            context._prev_state_ids = {}
-            context._current_state_ids = {}
-            context._outlier = True
 
         app_service_id = input["app_service_id"]
         if app_service_id:
@@ -330,6 +322,11 @@ class _AsyncEventContextImpl(EventContext):
         attributes by loading from the database.
         """
         if self.state_group is None:
+            # No state group means the event is an outlier. Usually the state_ids dicts are also
+            # pre-set to empty dicts, but they get reset when the context is serialized, so set
+            # them to empty dicts again here.
+            self._current_state_ids = {}
+            self._prev_state_ids = {}
             return
 
         current_state_ids = await self._storage.state.get_state_ids_for_group(
