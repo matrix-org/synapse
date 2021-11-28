@@ -97,7 +97,7 @@ class RoomSummaryHandler:
         # If a user tries to fetch the same page multiple times in quick succession,
         # only process the first attempt and return its result to subsequent requests.
         self._pagination_response_cache: ResponseCache[
-            Tuple[str, bool, Optional[int], Optional[int], Optional[str]]
+            Tuple[str, str, bool, Optional[int], Optional[int], Optional[str]]
         ] = ResponseCache(
             hs.get_clock(),
             "get_room_hierarchy",
@@ -282,7 +282,14 @@ class RoomSummaryHandler:
         # This is due to the pagination process mutating internal state, attempting
         # to process multiple requests for the same page will result in errors.
         return await self._pagination_response_cache.wrap(
-            (requested_room_id, suggested_only, max_depth, limit, from_token),
+            (
+                requester,
+                requested_room_id,
+                suggested_only,
+                max_depth,
+                limit,
+                from_token,
+            ),
             self._get_room_hierarchy,
             requester,
             requested_room_id,

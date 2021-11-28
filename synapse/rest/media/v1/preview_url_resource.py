@@ -45,7 +45,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
 from synapse.rest.media.v1.media_storage import MediaStorage
 from synapse.rest.media.v1.oembed import OEmbedProvider
-from synapse.types import JsonDict
+from synapse.types import JsonDict, UserID
 from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -231,7 +231,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         og = await make_deferred_yieldable(observable.observe())
         respond_with_json_bytes(request, 200, og, send_cors=True)
 
-    async def _do_preview(self, url: str, user: str, ts: int) -> bytes:
+    async def _do_preview(self, url: str, user: UserID, ts: int) -> bytes:
         """Check the db, and download the URL and build a preview
 
         Args:
@@ -360,7 +360,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         return jsonog.encode("utf8")
 
-    async def _download_url(self, url: str, user: str) -> MediaInfo:
+    async def _download_url(self, url: str, user: UserID) -> MediaInfo:
         # TODO: we should probably honour robots.txt... except in practice
         # we're most likely being explicitly triggered by a human rather than a
         # bot, so are we really a robot?
@@ -450,7 +450,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         )
 
     async def _precache_image_url(
-        self, user: str, media_info: MediaInfo, og: JsonDict
+        self, user: UserID, media_info: MediaInfo, og: JsonDict
     ) -> None:
         """
         Pre-cache the image (if one exists) for posterity
@@ -718,9 +718,12 @@ def decode_body(
     if not body:
         return None
 
+    # The idea here is that multiple encodings are tried until one works.
+    # Unfortunately the result is never used and then LXML will decode the string
+    # again with the found encoding.
     for encoding in get_html_media_encodings(body, content_type):
         try:
-            body_str = body.decode(encoding)
+            body.decode(encoding)
         except Exception:
             pass
         else:
@@ -732,11 +735,11 @@ def decode_body(
     from lxml import etree
 
     # Create an HTML parser.
-    parser = etree.HTMLParser(recover=True, encoding="utf-8")
+    parser = etree.HTMLParser(recover=True, encoding=encoding)
 
     # Attempt to parse the body. Returns None if the body was successfully
     # parsed, but no tree was found.
-    return etree.fromstring(body_str, parser)
+    return etree.fromstring(body, parser)
 
 
 def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:

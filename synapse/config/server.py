@@ -16,6 +16,7 @@ import itertools
 import logging
 import os.path
 import re
+import urllib.parse
 from textwrap import indent
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
@@ -262,11 +263,46 @@ class ServerConfig(Config):
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
+        self.serve_server_wellknown = config.get("serve_server_wellknown", False)
 
-        self.public_baseurl = config.get("public_baseurl")
-        if self.public_baseurl is not None:
-            if self.public_baseurl[-1] != "/":
-                self.public_baseurl += "/"
+        # Whether we should serve a "client well-known":
+        #  (a) at .well-known/matrix/client on our client HTTP listener
+        #  (b) in the response to /login
+        #
+        # ... which together help ensure that clients use our public_baseurl instead of
+        # whatever they were told by the user.
+        #
+        # For the sake of backwards compatibility with existing installations, this is
+        # True if public_baseurl is specified explicitly, and otherwise False. (The
+        # reasoning here is that we have no way of knowing that the default
+        # public_baseurl is actually correct for existing installations - many things
+        # will not work correctly, but that's (probably?) better than sending clients
+        # to a completely broken URL.
+        self.serve_client_wellknown = False
+
+        public_baseurl = config.get("public_baseurl")
+        if public_baseurl is None:
+            public_baseurl = f"https://{self.server_name}/"
+            logger.info("Using default public_baseurl %s", public_baseurl)
+        else:
+            self.serve_client_wellknown = True
+            if public_baseurl[-1] != "/":
+                public_baseurl += "/"
+        self.public_baseurl = public_baseurl
+
+        # check that public_baseurl is valid
+        try:
+            splits = urllib.parse.urlsplit(self.public_baseurl)
+        except Exception as e:
+            raise ConfigError(f"Unable to parse URL: {e}", ("public_baseurl",))
+        if splits.scheme not in ("https", "http"):
+            raise ConfigError(
+                f"Invalid scheme '{splits.scheme}': only https and http are supported"
+            )
+        if splits.query or splits.fragment:
+            raise ConfigError(
+                "public_baseurl cannot contain query parameters or a #-fragment"
+            )
 
         # Whether to enable user presence.
         presence_config = config.get("presence") or {}
@@ -385,7 +421,7 @@ class ServerConfig(Config):
         # before redacting them.
         redaction_retention_period = config.get("redaction_retention_period", "7d")
         if redaction_retention_period is not None:
-            self.redaction_retention_period = self.parse_duration(
+            self.redaction_retention_period: Optional[int] = self.parse_duration(
                 redaction_retention_period
             )
         else:
@@ -394,7 +430,7 @@ class ServerConfig(Config):
         # How long to keep entries in the `users_ips` table.
         user_ips_max_age = config.get("user_ips_max_age", "28d")
         if user_ips_max_age is not None:
-            self.user_ips_max_age = self.parse_duration(user_ips_max_age)
+            self.user_ips_max_age: Optional[int] = self.parse_duration(user_ips_max_age)
         else:
             self.user_ips_max_age = None
 
@@ -772,7 +808,27 @@ class ServerConfig(Config):
         # Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
         # 'listeners' below).
         #
+        # Defaults to 'https://<server_name>/'.
+        #
         #public_baseurl: https://example.com/
+
+        # Uncomment the following to tell other servers to send federation traffic on
+        # port 443.
+        #
+        # By default, other servers will try to reach our server on port 8448, which can
+        # be inconvenient in some environments.
+        #
+        # Provided 'https://<server_name>/' on port 443 is routed to Synapse, this
+        # option configures Synapse to serve a file at
+        # 'https://<server_name>/.well-known/matrix/server'. This will tell other
+        # servers to send traffic to port 443 instead.
+        #
+        # See https://matrix-org.github.io/synapse/latest/delegate.html for more
+        # information.
+        #
+        # Defaults to 'false'.
+        #
+        #serve_server_wellknown: true
 
         # Set the soft limit on the number of file descriptors synapse can use
         # Zero is used to indicate synapse should set the soft limit to the

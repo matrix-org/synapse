@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 def client_patterns(
     path_regex: str,
-    releases: Iterable[int] = (0,),
+    releases: Iterable[str] = ("r0", "v3"),
     unstable: bool = True,
     v1: bool = False,
 ) -> Iterable[Pattern]:
@@ -52,7 +52,7 @@ def client_patterns(
         v1_prefix = CLIENT_API_PREFIX + "/api/v1"
         patterns.append(re.compile("^" + v1_prefix + path_regex))
     for release in releases:
-        new_prefix = CLIENT_API_PREFIX + "/r%d" % (release,)
+        new_prefix = CLIENT_API_PREFIX + f"/{release}"
         patterns.append(re.compile("^" + new_prefix + path_regex))
 
     return patterns

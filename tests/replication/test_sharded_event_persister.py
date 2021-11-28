@@ -17,6 +17,7 @@ from unittest.mock import patch
 from synapse.api.room_versions import RoomVersion
 from synapse.rest import admin
 from synapse.rest.client import login, room, sync
+from synapse.storage.util.id_generators import MultiWriterIdGenerator
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.server import make_request
@@ -193,7 +194,10 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         #
         # Worker2's event stream position will not advance until we call
         # __aexit__ again.
-        actx = worker_hs2.get_datastore()._stream_id_gen.get_next()
+        worker_store2 = worker_hs2.get_datastore()
+        assert isinstance(worker_store2._stream_id_gen, MultiWriterIdGenerator)
+
+        actx = worker_store2._stream_id_gen.get_next()
         self.get_success(actx.__aenter__())
 
         response = self.helper.send(room_id1, body="Hi!", tok=self.other_access_token)

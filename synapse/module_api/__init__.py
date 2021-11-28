@@ -31,11 +31,48 @@ import attr
 import jinja2
 
 from twisted.internet import defer
-from twisted.web.resource import IResource
+from twisted.web.resource import Resource
 
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
-from synapse.events.presence_router import PresenceRouter
+from synapse.events.presence_router import (
+    GET_INTERESTED_USERS_CALLBACK,
+    GET_USERS_FOR_STATES_CALLBACK,
+    PresenceRouter,
+)
+from synapse.events.spamcheck import (
+    CHECK_EVENT_FOR_SPAM_CALLBACK,
+    CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK,
+    CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
+    CHECK_USERNAME_FOR_SPAM_CALLBACK,
+    USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
+    USER_MAY_CREATE_ROOM_CALLBACK,
+    USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK,
+    USER_MAY_INVITE_CALLBACK,
+    USER_MAY_JOIN_ROOM_CALLBACK,
+    USER_MAY_PUBLISH_ROOM_CALLBACK,
+    USER_MAY_SEND_3PID_INVITE_CALLBACK,
+)
+from synapse.events.third_party_rules import (
+    CHECK_EVENT_ALLOWED_CALLBACK,
+    CHECK_THREEPID_CAN_BE_INVITED_CALLBACK,
+    CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK,
+    ON_CREATE_ROOM_CALLBACK,
+    ON_NEW_EVENT_CALLBACK,
+)
+from synapse.handlers.account_validity import (
+    IS_USER_EXPIRED_CALLBACK,
+    ON_LEGACY_ADMIN_REQUEST,
+    ON_LEGACY_RENEW_CALLBACK,
+    ON_LEGACY_SEND_MAIL_CALLBACK,
+    ON_USER_REGISTRATION_CALLBACK,
+)
+from synapse.handlers.auth import (
+    CHECK_3PID_AUTH_CALLBACK,
+    CHECK_AUTH_CALLBACK,
+    ON_LOGGED_OUT_CALLBACK,
+    AuthHandler,
+)
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
     DirectServeHtmlResource,
@@ -114,7 +151,7 @@ class ModuleApi:
     can register new users etc if necessary.
     """
 
-    def __init__(self, hs: "HomeServer", auth_handler):
+    def __init__(self, hs: "HomeServer", auth_handler: AuthHandler) -> None:
         self._hs = hs
 
         # TODO: Fix this type hint once the types for the data stores have been ironed
@@ -156,47 +193,121 @@ class ModuleApi:
     #################################################################################
     # The following methods should only be called during the module's initialisation.
 
-    @property
-    def register_spam_checker_callbacks(self):
+    def register_spam_checker_callbacks(
+        self,
+        check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
+        user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
+        user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
+        user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
+        user_may_create_room: Optional[USER_MAY_CREATE_ROOM_CALLBACK] = None,
+        user_may_create_room_with_invites: Optional[
+            USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK
+        ] = None,
+        user_may_create_room_alias: Optional[
+            USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
+        ] = None,
+        user_may_publish_room: Optional[USER_MAY_PUBLISH_ROOM_CALLBACK] = None,
+        check_username_for_spam: Optional[CHECK_USERNAME_FOR_SPAM_CALLBACK] = None,
+        check_registration_for_spam: Optional[
+            CHECK_REGISTRATION_FOR_SPAM_CALLBACK
+        ] = None,
+        check_media_file_for_spam: Optional[CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK] = None,
+    ) -> None:
         """Registers callbacks for spam checking capabilities.
 
         Added in Synapse v1.37.0.
         """
-        return self._spam_checker.register_callbacks
+        return self._spam_checker.register_callbacks(
+            check_event_for_spam=check_event_for_spam,
+            user_may_join_room=user_may_join_room,
+            user_may_invite=user_may_invite,
+            user_may_send_3pid_invite=user_may_send_3pid_invite,
+            user_may_create_room=user_may_create_room,
+            user_may_create_room_with_invites=user_may_create_room_with_invites,
+            user_may_create_room_alias=user_may_create_room_alias,
+            user_may_publish_room=user_may_publish_room,
+            check_username_for_spam=check_username_for_spam,
+            check_registration_for_spam=check_registration_for_spam,
+            check_media_file_for_spam=check_media_file_for_spam,
+        )
 
-    @property
-    def register_account_validity_callbacks(self):
+    def register_account_validity_callbacks(
+        self,
+        is_user_expired: Optional[IS_USER_EXPIRED_CALLBACK] = None,
+        on_user_registration: Optional[ON_USER_REGISTRATION_CALLBACK] = None,
+        on_legacy_send_mail: Optional[ON_LEGACY_SEND_MAIL_CALLBACK] = None,
+        on_legacy_renew: Optional[ON_LEGACY_RENEW_CALLBACK] = None,
+        on_legacy_admin_request: Optional[ON_LEGACY_ADMIN_REQUEST] = None,
+    ) -> None:
         """Registers callbacks for account validity capabilities.
 
         Added in Synapse v1.39.0.
         """
-        return self._account_validity_handler.register_account_validity_callbacks
+        return self._account_validity_handler.register_account_validity_callbacks(
+            is_user_expired=is_user_expired,
+            on_user_registration=on_user_registration,
+            on_legacy_send_mail=on_legacy_send_mail,
+            on_legacy_renew=on_legacy_renew,
+            on_legacy_admin_request=on_legacy_admin_request,
+        )
 
-    @property
-    def register_third_party_rules_callbacks(self):
+    def register_third_party_rules_callbacks(
+        self,
+        check_event_allowed: Optional[CHECK_EVENT_ALLOWED_CALLBACK] = None,
+        on_create_room: Optional[ON_CREATE_ROOM_CALLBACK] = None,
+        check_threepid_can_be_invited: Optional[
+            CHECK_THREEPID_CAN_BE_INVITED_CALLBACK
+        ] = None,
+        check_visibility_can_be_modified: Optional[
+            CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
+        ] = None,
+        on_new_event: Optional[ON_NEW_EVENT_CALLBACK] = None,
+    ) -> None:
         """Registers callbacks for third party event rules capabilities.
 
         Added in Synapse v1.39.0.
         """
-        return self._third_party_event_rules.register_third_party_rules_callbacks
+        return self._third_party_event_rules.register_third_party_rules_callbacks(
+            check_event_allowed=check_event_allowed,
+            on_create_room=on_create_room,
+            check_threepid_can_be_invited=check_threepid_can_be_invited,
+            check_visibility_can_be_modified=check_visibility_can_be_modified,
+            on_new_event=on_new_event,
+        )
 
-    @property
-    def register_presence_router_callbacks(self):
+    def register_presence_router_callbacks(
+        self,
+        get_users_for_states: Optional[GET_USERS_FOR_STATES_CALLBACK] = None,
+        get_interested_users: Optional[GET_INTERESTED_USERS_CALLBACK] = None,
+    ) -> None:
         """Registers callbacks for presence router capabilities.
 
         Added in Synapse v1.42.0.
         """
-        return self._presence_router.register_presence_router_callbacks
+        return self._presence_router.register_presence_router_callbacks(
+            get_users_for_states=get_users_for_states,
+            get_interested_users=get_interested_users,
+        )
 
-    @property
-    def register_password_auth_provider_callbacks(self):
+    def register_password_auth_provider_callbacks(
+        self,
+        check_3pid_auth: Optional[CHECK_3PID_AUTH_CALLBACK] = None,
+        on_logged_out: Optional[ON_LOGGED_OUT_CALLBACK] = None,
+        auth_checkers: Optional[
+            Dict[Tuple[str, Tuple[str, ...]], CHECK_AUTH_CALLBACK]
+        ] = None,
+    ) -> None:
         """Registers callbacks for password auth provider capabilities.
 
         Added in Synapse v1.46.0.
         """
-        return self._password_auth_provider.register_password_auth_provider_callbacks
+        return self._password_auth_provider.register_password_auth_provider_callbacks(
+            check_3pid_auth=check_3pid_auth,
+            on_logged_out=on_logged_out,
+            auth_checkers=auth_checkers,
+        )
 
-    def register_web_resource(self, path: str, resource: IResource):
+    def register_web_resource(self, path: str, resource: Resource):
         """Registers a web resource to be served at the given path.
 
         This function should be called during initialisation of the module.
@@ -216,7 +327,7 @@ class ModuleApi:
     # The following methods can be called by the module at any point in time.
 
     @property
-    def http_client(self):
+    def http_client(self) -> SimpleHttpClient:
         """Allows making outbound HTTP requests to remote resources.
 
         An instance of synapse.http.client.SimpleHttpClient
@@ -226,7 +337,7 @@ class ModuleApi:
         return self._http_client
 
     @property
-    def public_room_list_manager(self):
+    def public_room_list_manager(self) -> "PublicRoomListManager":
         """Allows adding to, removing from and checking the status of rooms in the
         public room list.
 
@@ -309,7 +420,7 @@ class ModuleApi:
         """
         return await self._store.is_server_admin(UserID.from_string(user_id))
 
-    def get_qualified_user_id(self, username):
+    def get_qualified_user_id(self, username: str) -> str:
         """Qualify a user id, if necessary
 
         Takes a user id provided by the user and adds the @ and :domain to
@@ -318,7 +429,7 @@ class ModuleApi:
         Added in Synapse v0.25.0.
 
         Args:
-            username (str): provided user id
+            username: provided user id
 
         Returns:
             str: qualified @user:id
@@ -357,13 +468,13 @@ class ModuleApi:
         """
         return await self._store.user_get_threepids(user_id)
 
-    def check_user_exists(self, user_id):
+    def check_user_exists(self, user_id: str):
         """Check if user exists.
 
         Added in Synapse v0.25.0.
 
         Args:
-            user_id (str): Complete @user:id
+            user_id: Complete @user:id
 
         Returns:
             Deferred[str|None]: Canonical (case-corrected) user_id, or None
@@ -903,7 +1014,7 @@ class ModuleApi:
             A list containing the loaded templates, with the orders matching the one of
             the filenames parameter.
         """
-        return self._hs.config.read_templates(
+        return self._hs.config.server.read_templates(
             filenames,
             (td for td in (self.custom_template_dir, custom_template_directory) if td),
         )
