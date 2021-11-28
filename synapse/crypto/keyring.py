@@ -667,7 +667,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             perspective_name,
         )
 
-        request = {}
+        request: JsonDict = {}
         for queue_value in keys_to_fetch:
             # there may be multiple requests for each server, so we have to merge
             # them intelligently.
