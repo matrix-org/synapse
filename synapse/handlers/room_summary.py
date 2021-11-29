@@ -36,6 +36,7 @@ from synapse.api.errors import (
     SynapseError,
     UnsupportedRoomVersionError,
 )
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.events import EventBase
 from synapse.types import JsonDict, Requester
 from synapse.util.caches.response_cache import ResponseCache
@@ -93,7 +94,9 @@ class RoomSummaryHandler:
         self._event_serializer = hs.get_event_client_serializer()
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()
-        self._request_ratelimiter = hs.get_request_ratelimiter()
+        self._ratelimiter = Ratelimiter(
+            store=self._store, clock=hs.get_clock(), rate_hz=5, burst_count=10
+        )
 
         # If a user tries to fetch the same page multiple times in quick succession,
         # only process the first attempt and return its result to subsequent requests.
@@ -277,7 +280,7 @@ class RoomSummaryHandler:
         Returns:
             The JSON hierarchy dictionary.
         """
-        await self._request_ratelimiter.ratelimit(requester)
+        await self._ratelimiter.ratelimit(requester)
 
         # If a user tries to fetch the same page multiple times in quick succession,
         # only process the first attempt and return its result to subsequent requests.
