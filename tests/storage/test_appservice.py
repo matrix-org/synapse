@@ -20,7 +20,7 @@ import yaml
 
 from twisted.internet import defer
 
-from synapse.appservice import ApplicationServiceState
+from synapse.appservice import ApplicationService, ApplicationServiceState
 from synapse.config._base import ConfigError
 from synapse.storage.database import DatabasePool, make_conn
 from synapse.storage.databases.main.appservice import (
@@ -89,9 +89,9 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
         self.assertEquals(stored_service.token, self.as_token)
         self.assertEquals(stored_service.id, self.as_id)
         self.assertEquals(stored_service.url, self.as_url)
-        self.assertEquals(stored_service.namespaces.aliases, [])
-        self.assertEquals(stored_service.namespaces.rooms, [])
-        self.assertEquals(stored_service.namespaces.users, [])
+        self.assertEquals(stored_service.namespaces[ApplicationService.NS_ALIASES], [])
+        self.assertEquals(stored_service.namespaces[ApplicationService.NS_ROOMS], [])
+        self.assertEquals(stored_service.namespaces[ApplicationService.NS_USERS], [])
 
     def test_retrieval_of_all_services(self):
         services = self.store.get_app_services()
