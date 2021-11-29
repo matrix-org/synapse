@@ -513,7 +513,7 @@ class SsoRedirectServlet(RestServlet):
         re.compile(
             "^"
             + CLIENT_API_PREFIX
-            + "/r0/login/sso/redirect/(?P<idp_id>[A-Za-z0-9_.~-]+)$"
+            + "/(r0|v3)/login/sso/redirect/(?P<idp_id>[A-Za-z0-9_.~-]+)$"
         )
     ]
 
