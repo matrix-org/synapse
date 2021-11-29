@@ -1228,10 +1228,8 @@ class PersistEventsStore:
             # backfilled events because backfilled events have negative
             # stream_ordering and happened in the past so we know that we don't
             # need to update the stream_ordering tip/front for the room.
-            if (
-                event.internal_metadata.stream_ordering
-                and event.internal_metadata.stream_ordering >= 0
-            ):
+            assert event.internal_metadata.stream_ordering is not None
+            if event.internal_metadata.stream_ordering >= 0:
                 txn.call_after(
                     self.store._events_stream_cache.entity_has_changed,
                     event.room_id,
