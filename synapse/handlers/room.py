@@ -1307,8 +1307,6 @@ class TimestampLookupHandler:
                         # `get_event_for_timestamp` function again to make sure
                         # they didn't give us an event from their gappy history.
                         return remote_event_id
-
-                    continue
                 except Exception as ex:
                     logger.debug(
                         "Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
@@ -1317,7 +1315,6 @@ class TimestampLookupHandler:
                         ex,
                         ex.args,
                     )
-                    continue
 
         if not local_event_id:
             raise SynapseError(
