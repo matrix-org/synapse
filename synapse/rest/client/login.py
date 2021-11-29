@@ -163,15 +163,16 @@ class LoginRestServlet(RestServlet):
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, LoginResponse]:
         login_submission = parse_json_object_from_request(request)
 
-        if self._refresh_tokens_enabled:
-            # Check if this login should also issue a refresh token, as per MSC2918
-            should_issue_refresh_token = login_submission.get(
-                LoginRestServlet.REFRESH_TOKEN_PARAM, False
-            )
-            if not isinstance(should_issue_refresh_token, bool):
-                raise SynapseError(400, "`refresh_token` should be true or false.")
-        else:
-            should_issue_refresh_token = False
+        # Check to see if the client requested a refresh token.
+        client_requested_refresh_token = login_submission.get(
+            LoginRestServlet.REFRESH_TOKEN_PARAM, False
+        )
+        if not isinstance(client_requested_refresh_token, bool):
+            raise SynapseError(400, "`refresh_token` should be true or false.")
+
+        should_issue_refresh_token = (
+            self._refresh_tokens_enabled and client_requested_refresh_token
+        )
 
         try:
             if login_submission["type"] in (

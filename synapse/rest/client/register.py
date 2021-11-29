@@ -445,14 +445,15 @@ class RegisterRestServlet(RestServlet):
                 f"Do not understand membership kind: {kind}",
             )
 
-        if self._refresh_tokens_enabled:
-            # Check if this registration should also issue a refresh token, as
-            # per MSC2918
-            should_issue_refresh_token = body.get("refresh_token", False)
-            if not isinstance(should_issue_refresh_token, bool):
-                raise SynapseError(400, "`refresh_token` should be true or false.")
-        else:
-            should_issue_refresh_token = False
+        # Check if the clients wishes for this registration to issue a refresh
+        # token.
+        client_requested_refresh_tokens = body.get("refresh_token", False)
+        if not isinstance(client_requested_refresh_tokens, bool):
+            raise SynapseError(400, "`refresh_token` should be true or false.")
+
+        should_issue_refresh_token = (
+            self._refresh_tokens_enabled and client_requested_refresh_tokens
+        )
 
         # Pull out the provided username and do basic sanity checks early since
         # the auth layer will store these in sessions.
