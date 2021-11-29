@@ -515,7 +515,9 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             and a count of total destinations.
         """
 
-        def get_destinations_paginate_txn(txn):
+        def get_destinations_paginate_txn(
+                txn: LoggingTransaction
+        ) -> Tuple[List[JsonDict], int]:
             order_by_column = DestinationSortOrder(order_by).value
 
             if direction == "b":

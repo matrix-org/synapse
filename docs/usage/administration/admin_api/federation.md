@@ -2,7 +2,7 @@
 
 This API allows a server administrator to manage Synapse's federation with other homeservers.
 
-**Note**: This API is new, experimental and "subject to change".
+Note: This API is new, experimental and "subject to change".
 
 ## List of destinations
 

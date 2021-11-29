@@ -57,14 +57,14 @@ class FederationDestinationRestServlet(RestServlet):
 
         if start < 0:
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "Query parameter from must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
 
         if limit < 0:
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "Query parameter limit must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
