@@ -144,6 +144,17 @@ class RegistrationConfig(Config):
             )
         self.nonrefreshable_access_token_lifetime = nonrefreshable_access_token_lifetime
 
+        if (
+            self.session_lifetime is not None
+            and self.nonrefreshable_access_token_lifetime is not None
+        ):
+            if self.session_lifetime < self.nonrefreshable_access_token_lifetime:
+                raise ConfigError(
+                    "Both `session_lifetime` and `nonrefreshable_access_token_lifetime` "
+                    "configuration options have been set, but `nonrefreshable_access_token_lifetime` "
+                    " exceeds `session_lifetime`!"
+                )
+
         refresh_token_lifetime = config.get("refresh_token_lifetime")
         if refresh_token_lifetime is not None:
             refresh_token_lifetime = self.parse_duration(refresh_token_lifetime)
