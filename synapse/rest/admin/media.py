@@ -212,7 +212,7 @@ class ListMediaInRoom(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         is_admin = await self.auth.is_server_admin(requester.user)
         if not is_admin:
-            raise AuthError(HTTPStatus.UNAUTHORIZED, "You are not a server admin")
+            raise AuthError(HTTPStatus.FORBIDDEN, "You are not a server admin")
 
         local_mxcs, remote_mxcs = await self.store.get_media_mxcs_in_room(room_id)
 
