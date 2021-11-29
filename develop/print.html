@@ -13825,25 +13825,67 @@ level).</li>
 <code>(3,2)</code> and both of Alice's joins <code>(4,2)</code> &amp; <code>(4,3)</code>.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="media-repository"><a class="header" href="#media-repository">Media Repository</a></h1>
 <p><em>Synapse implementation-specific details for the media repository</em></p>
-<p>The media repository is where attachments and avatar photos are stored.
-It stores attachment content and thumbnails for media uploaded by local users.
-It caches attachment content and thumbnails for media uploaded by remote users.</p>
-<h2 id="storage"><a class="header" href="#storage">Storage</a></h2>
-<p>Each item of media is assigned a <code>media_id</code> when it is uploaded.
-The <code>media_id</code> is a randomly chosen, URL safe 24 character string.</p>
-<p>Metadata such as the MIME type, upload time and length are stored in the
-sqlite3 database indexed by <code>media_id</code>.</p>
-<p>Content is stored on the filesystem under a <code>&quot;local_content&quot;</code> directory.</p>
-<p>Thumbnails are stored under a <code>&quot;local_thumbnails&quot;</code> directory.</p>
-<p>The item with <code>media_id</code> <code>&quot;aabbccccccccdddddddddddd&quot;</code> is stored under
-<code>&quot;local_content/aa/bb/ccccccccdddddddddddd&quot;</code>. Its thumbnail with width
-<code>128</code> and height <code>96</code> and type <code>&quot;image/jpeg&quot;</code> is stored under
-<code>&quot;local_thumbnails/aa/bb/ccccccccdddddddddddd/128-96-image-jpeg&quot;</code></p>
-<p>Remote content is cached under <code>&quot;remote_content&quot;</code> directory. Each item of
-remote content is assigned a local <code>&quot;filesystem_id&quot;</code> to ensure that the
-directory structure <code>&quot;remote_content/server_name/aa/bb/ccccccccdddddddddddd&quot;</code>
-is appropriate. Thumbnails for remote content are stored under
-<code>&quot;remote_thumbnail/server_name/...&quot;</code></p>
+<p>The media repository</p>
+<ul>
+<li>stores avatars, attachments and their thumbnails for media uploaded by local
+users.</li>
+<li>caches avatars, attachments and their thumbnails for media uploaded by remote
+users.</li>
+<li>caches resources and thumbnails used for
+<a href="development/url_previews.html">URL previews</a>.</li>
+</ul>
+<p>All media in Matrix can be identified by a unique
+<a href="https://spec.matrix.org/latest/client-server-api/#matrix-content-mxc-uris">MXC URI</a>,
+consisting of a server name and media ID:</p>
+<pre><code>mxc://&lt;server-name&gt;/&lt;media-id&gt;
+</code></pre>
+<h2 id="local-media"><a class="header" href="#local-media">Local Media</a></h2>
+<p>Synapse generates 24 character media IDs for content uploaded by local users.
+These media IDs consist of upper and lowercase letters and are case-sensitive.
+Other homeserver implementations may generate media IDs differently.</p>
+<p>Local media is recorded in the <code>local_media_repository</code> table, which includes
+metadata such as MIME types, upload times and file sizes.
+Note that this table is shared by the URL cache, which has a different media ID
+scheme.</p>
+<h3 id="paths"><a class="header" href="#paths">Paths</a></h3>
+<p>A file with media ID <code>aabbcccccccccccccccccccc</code> and its <code>128x96</code> <code>image/jpeg</code>
+thumbnail, created by scaling, would be stored at:</p>
+<pre><code>local_content/aa/bb/cccccccccccccccccccc
+local_thumbnails/aa/bb/cccccccccccccccccccc/128-96-image-jpeg-scale
+</code></pre>
+<h2 id="remote-media"><a class="header" href="#remote-media">Remote Media</a></h2>
+<p>When media from a remote homeserver is requested from Synapse, it is assigned
+a local <code>filesystem_id</code>, with the same format as locally-generated media IDs,
+as described above.</p>
+<p>A record of remote media is stored in the <code>remote_media_cache</code> table, which
+can be used to map remote MXC URIs (server names and media IDs) to local
+<code>filesystem_id</code>s.</p>
+<h3 id="paths-1"><a class="header" href="#paths-1">Paths</a></h3>
+<p>A file from <code>matrix.org</code> with <code>filesystem_id</code> <code>aabbcccccccccccccccccccc</code> and its
+<code>128x96</code> <code>image/jpeg</code> thumbnail, created by scaling, would be stored at:</p>
+<pre><code>remote_content/matrix.org/aa/bb/cccccccccccccccccccc
+remote_thumbnail/matrix.org/aa/bb/cccccccccccccccccccc/128-96-image-jpeg-scale
+</code></pre>
+<p>Older thumbnails may omit the thumbnailing method:</p>
+<pre><code>remote_thumbnail/matrix.org/aa/bb/cccccccccccccccccccc/128-96-image-jpeg
+</code></pre>
+<p>Note that <code>remote_thumbnail/</code> does not have an <code>s</code>.</p>
+<h2 id="url-previews-2"><a class="header" href="#url-previews-2">URL Previews</a></h2>
+<p>See <a href="development/url_previews.html">URL Previews</a> for documentation on the URL preview
+process.</p>
+<p>When generating previews for URLs, Synapse may download and cache various
+resources, including images. These resources are assigned temporary media IDs
+of the form <code>yyyy-mm-dd_aaaaaaaaaaaaaaaa</code>, where <code>yyyy-mm-dd</code> is the current
+date and <code>aaaaaaaaaaaaaaaa</code> is a random sequence of 16 case-sensitive letters.</p>
+<p>The metadata for these cached resources is stored in the
+<code>local_media_repository</code> and <code>local_media_repository_url_cache</code> tables.</p>
+<p>Resources for URL previews are deleted after a few days.</p>
+<h3 id="paths-2"><a class="header" href="#paths-2">Paths</a></h3>
+<p>The file with media ID <code>yyyy-mm-dd_aaaaaaaaaaaaaaaa</code> and its <code>128x96</code>
+<code>image/jpeg</code> thumbnail, created by scaling, would be stored at:</p>
+<pre><code>url_cache/yyyy-mm-dd/aaaaaaaaaaaaaaaa
+url_cache_thumbnails/yyyy-mm-dd/aaaaaaaaaaaaaaaa/128-96-image-jpeg-scale
+</code></pre>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="room-and-user-statistics"><a class="header" href="#room-and-user-statistics">Room and User Statistics</a></h1>
 <p>Synapse maintains room and user statistics in various tables. These can be used
 for administrative purposes but are also used when generating the public room
