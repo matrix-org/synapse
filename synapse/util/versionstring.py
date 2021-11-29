@@ -44,36 +44,36 @@ def get_version_string(module: ModuleType) -> str:
     version_string = module.__version__  # type: ignore[attr-defined]
 
     try:
-        null = open(os.devnull, "w")
-        cwd = os.path.dirname(os.path.abspath(module.__file__))
+        with open(os.devnull, "w") as null:
+            cwd = os.path.dirname(os.path.abspath(module.__file__))
+    
+            def _run_git_command(prefix: str, *params: str) -> str:
+                try:
+                    result = (
+                        subprocess.check_output(["git", *params], stderr=null, cwd=cwd)
+                        .strip()
+                        .decode("ascii")
+                    )
+                    return prefix + result
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    return ""
 
-        def _run_git_command(prefix: str, *params: str) -> str:
-            try:
-                result = (
-                    subprocess.check_output(["git", *params], stderr=null, cwd=cwd)
-                    .strip()
-                    .decode("ascii")
-                )
-                return prefix + result
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                return ""
+            git_branch = _run_git_command("b=", "rev-parse", "--abbrev-ref", "HEAD")
+            git_tag = _run_git_command("t=", "describe", "--exact-match")
+            git_commit = _run_git_command("", "rev-parse", "--short", "HEAD")
 
-        git_branch = _run_git_command("b=", "rev-parse", "--abbrev-ref", "HEAD")
-        git_tag = _run_git_command("t=", "describe", "--exact-match")
-        git_commit = _run_git_command("", "rev-parse", "--short", "HEAD")
-
-        dirty_string = "-this_is_a_dirty_checkout"
-        is_dirty = _run_git_command("", "describe", "--dirty=" + dirty_string).endswith(
-            dirty_string
-        )
-        git_dirty = "dirty" if is_dirty else ""
-
-        if git_branch or git_tag or git_commit or git_dirty:
-            git_version = ",".join(
-                s for s in (git_branch, git_tag, git_commit, git_dirty) if s
+            dirty_string = "-this_is_a_dirty_checkout"
+            is_dirty = _run_git_command("", "describe", "--dirty=" + dirty_string).endswith(
+                dirty_string
             )
+            git_dirty = "dirty" if is_dirty else ""
 
-            version_string = f"{version_string} ({git_version})"
+            if git_branch or git_tag or git_commit or git_dirty:
+                git_version = ",".join(
+                    s for s in (git_branch, git_tag, git_commit, git_dirty) if s
+                )
+
+                version_string = f"{version_string} ({git_version})"
     except Exception as e:
         logger.info("Failed to check for git repository: %s", e)
 
