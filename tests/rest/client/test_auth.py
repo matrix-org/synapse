@@ -690,7 +690,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             "nonrefreshable_access_token_lifetime": "10m",
         }
     )
-    def test_differnt_expiry_for_refreshable_and_nonrefreshable_access_tokens(self):
+    def test_different_expiry_for_refreshable_and_nonrefreshable_access_tokens(self):
         """
         Tests that the expiry times for refreshable and non-refreshable access
         tokens can be different.
