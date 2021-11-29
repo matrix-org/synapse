@@ -419,7 +419,7 @@ class RegisterRestServlet(RestServlet):
         self.password_policy_handler = hs.get_password_policy_handler()
         self.clock = hs.get_clock()
         self._registration_enabled = self.hs.config.registration.enable_registration
-        self._msc2918_enabled = (
+        self._refresh_tokens_enabled = (
             hs.config.registration.refreshable_access_token_lifetime is not None
         )
 
@@ -445,7 +445,7 @@ class RegisterRestServlet(RestServlet):
                 f"Do not understand membership kind: {kind}",
             )
 
-        if self._msc2918_enabled:
+        if self._refresh_tokens_enabled:
             # Check if this registration should also issue a refresh token, as
             # per MSC2918
             should_issue_refresh_token = body.get("refresh_token", False)

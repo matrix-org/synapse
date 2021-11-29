@@ -90,7 +90,7 @@ class LoginRestServlet(RestServlet):
         self.saml2_enabled = hs.config.saml2.saml2_enabled
         self.cas_enabled = hs.config.cas.cas_enabled
         self.oidc_enabled = hs.config.oidc.oidc_enabled
-        self._msc2918_enabled = (
+        self._refresh_tokens_enabled = (
             hs.config.registration.refreshable_access_token_lifetime is not None
         )
 
@@ -163,7 +163,7 @@ class LoginRestServlet(RestServlet):
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, LoginResponse]:
         login_submission = parse_json_object_from_request(request)
 
-        if self._msc2918_enabled:
+        if self._refresh_tokens_enabled:
             # Check if this login should also issue a refresh token, as per MSC2918
             should_issue_refresh_token = login_submission.get(
                 LoginRestServlet.REFRESH_TOKEN_PARAM, False
