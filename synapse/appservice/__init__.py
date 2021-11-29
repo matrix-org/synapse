@@ -144,26 +144,6 @@ class ApplicationService:
             return regex_obj["exclusive"]
         return False
 
-    async def _matches_user(
-        self, event: Optional[EventBase], store: Optional["DataStore"] = None
-    ) -> bool:
-        if not event:
-            return False
-
-        if self.is_user_in_namespace(event.sender):
-            return True
-        # also check m.room.member state key
-        if event.type == EventTypes.Member and self.is_user_in_namespace(
-            event.state_key
-        ):
-            return True
-
-        if not store:
-            return False
-
-        does_match = await self.matches_user_in_member_list(event.room_id, store)
-        return does_match
-
     @cached(num_args=1, cache_context=True)
     async def matches_user_in_member_list(
         self,
@@ -171,14 +151,15 @@ class ApplicationService:
         store: "DataStore",
         cache_context: _CacheContext,
     ) -> bool:
-        """Check if this service is interested a room based upon it's membership
+        """Check if this appservice is interested a room based upon whether any members
+        fall into the appservice's user namespace.
 
         Args:
             room_id: The room to check.
             store: The datastore to query.
 
         Returns:
-            True if this service would like to know about this room.
+            True if this appservice would like to know about this room.
         """
         member_list = await store.get_users_in_room(
             room_id, on_invalidate=cache_context.invalidate
@@ -190,27 +171,33 @@ class ApplicationService:
                 return True
         return False
 
-    def _matches_room_id(self, event: EventBase) -> bool:
-        if hasattr(event, "room_id"):
-            return self.is_room_id_in_namespace(event.room_id)
-        return False
+    async def _is_interested_in_room(self, room_id: str, store: "DataStore") -> bool:
+        # Check if we have interest in this room ID
+        if self.is_room_id_in_namespace(room_id):
+            return True
 
-    async def _matches_aliases(
-        self, event: EventBase, store: Optional["DataStore"] = None
-    ) -> bool:
-        if not store or not event:
-            return False
-
-        alias_list = await store.get_aliases_for_room(event.room_id)
+        # or any of the aliases this room has
+        alias_list = await store.get_aliases_for_room(room_id)
         for alias in alias_list:
             if self.is_room_alias_in_namespace(alias):
                 return True
+
+        # And finally, perform an expensive check on whether the appservice
+        # is interested in any users in the room based on their user ID
+        # and the appservice's user namespace.
+        if await self.matches_user_in_member_list(room_id, store):
+            return True
+
         return False
 
     async def is_interested_in_event(
         self, event: EventBase, store: Optional["DataStore"] = None
     ) -> bool:
         """Check if this service is interested in this event.
+
+        Interest in an event is determined by whether this appservice is interested in
+        either the room the event was sent in, the sender of the event or - if the
+        event is of type "m.room.member", the user referenced by the event's state key.
 
         Args:
             event: The event to check.
@@ -220,16 +207,24 @@ class ApplicationService:
             True if this service would like to know about this event.
         """
         # Do cheap checks first
-        if self._matches_room_id(event):
+
+        # Check if we're interested in this user by namespace
+        if self.is_user_in_namespace(event.sender):
             return True
 
-        # This will check the namespaces first before
-        # checking the store, so should be run before _matches_aliases
-        if await self._matches_user(event, store):
+        # or, if this is a membership event, the user it references by namespace
+        if event.type == EventTypes.Member and self.is_user_in_namespace(
+            event.state_key
+        ):
             return True
 
-        # This will check the store, so should be run last
-        if await self._matches_aliases(event, store):
+        # TODO: The store is only optional here to aid testing this function. We should
+        #  instead convert the tests to use HomeServerTestCase in order to get a working
+        #  database instance.
+        if (
+            store is not None
+            and await self._is_interested_in_room(event.room_id, store)
+        ):
             return True
 
         return False
