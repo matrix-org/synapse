@@ -42,9 +42,7 @@ class VersionTestCase(unittest.HomeserverTestCase):
     def test_version_string(self):
         channel = self.make_request("GET", self.url, shorthand=False)
 
-        self.assertEqual(
-            HTTPStatus.OK, int(channel.result["code"]), msg=channel.result["body"]
-        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(
             {"server_version", "python_version"}, set(channel.json_body.keys())
         )
@@ -73,9 +71,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
             content={"localpart": "test"},
         )
 
-        self.assertEqual(
-            HTTPStatus.OK, int(channel.result["code"]), msg=channel.result["body"]
-        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         group_id = channel.json_body["group_id"]
 
@@ -87,17 +83,13 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "PUT", url.encode("ascii"), access_token=self.admin_user_tok, content={}
         )
-        self.assertEqual(
-            HTTPStatus.OK, int(channel.result["code"]), msg=channel.result["body"]
-        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         url = "/groups/%s/self/accept_invite" % (group_id,)
         channel = self.make_request(
             "PUT", url.encode("ascii"), access_token=self.other_user_token, content={}
         )
-        self.assertEqual(
-            HTTPStatus.OK, int(channel.result["code"]), msg=channel.result["body"]
-        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # Check other user knows they're in the group
         self.assertIn(group_id, self._get_groups_user_is_in(self.admin_user_tok))
@@ -112,9 +104,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
             content={"localpart": "test"},
         )
 
-        self.assertEqual(
-            HTTPStatus.OK, int(channel.result["code"]), msg=channel.result["body"]
-        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # Check group returns HTTPStatus.NOT_FOUND
         self._check_group(group_id, expect_code=HTTPStatus.NOT_FOUND)
@@ -133,17 +123,13 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
             "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
 
-        self.assertEqual(
-            expect_code, int(channel.result["code"]), msg=channel.result["body"]
-        )
+        self.assertEqual(expect_code, channel.code, msg=channel.json_body)
 
     def _get_groups_user_is_in(self, access_token):
         """Returns the list of groups the user is in (given their access token)"""
         channel = self.make_request("GET", b"/joined_groups", access_token=access_token)
 
-        self.assertEqual(
-            HTTPStatus.OK, int(channel.result["code"]), msg=channel.result["body"]
-        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         return channel.json_body["groups"]
 
@@ -246,7 +232,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         # Expect a forbidden error
         self.assertEqual(
             HTTPStatus.FORBIDDEN,
-            int(channel.result["code"]),
+            channel.code,
             msg="Expected forbidden on quarantining media as a non-admin",
         )
 
@@ -261,7 +247,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         # Expect a forbidden error
         self.assertEqual(
             HTTPStatus.FORBIDDEN,
-            int(channel.result["code"]),
+            channel.code,
             msg="Expected forbidden on quarantining media as a non-admin",
         )
 
@@ -292,7 +278,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         )
 
         # Should be successful
-        self.assertEqual(HTTPStatus.OK, int(channel.code), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, int(channel.code), msg=channel.json_body)
 
         # Quarantine the media
         url = "/_synapse/admin/v1/media/quarantine/%s/%s" % (
@@ -305,7 +291,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             access_token=admin_user_tok,
         )
         self.pump(1.0)
-        self.assertEqual(HTTPStatus.OK, int(channel.code), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, int(channel.code), msg=channel.json_body)
 
         # Attempt to access the media
         self._ensure_quarantined(admin_user_tok, server_name_and_media_id)
@@ -361,9 +347,9 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             access_token=admin_user_tok,
         )
         self.pump(1.0)
-        self.assertEqual(HTTPStatus.OK, int(channel.code), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, int(channel.code), msg=channel.json_body)
         self.assertEqual(
-            json.loads(channel.result["body"].decode("utf-8")),
+            json.loads(channel.json_body.decode("utf-8")),
             {"num_quarantined": 2},
             "Expected 2 quarantined items",
         )
@@ -409,11 +395,9 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             access_token=admin_user_tok,
         )
         self.pump(1.0)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(
-            HTTPStatus.OK, int(channel.result["code"]), msg=channel.result["body"]
-        )
-        self.assertEqual(
-            json.loads(channel.result["body"].decode("utf-8")),
+            json.loads(channel.json_body.decode("utf-8")),
             {"num_quarantined": 2},
             "Expected 2 quarantined items",
         )
@@ -447,7 +431,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v1/media/protect/%s" % (urllib.parse.quote(media_id_2),)
         channel = self.make_request("POST", url, access_token=admin_user_tok)
         self.pump(1.0)
-        self.assertEqual(HTTPStatus.OK, int(channel.code), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, int(channel.code), msg=channel.json_body)
 
         # Quarantine all media by this user
         url = "/_synapse/admin/v1/user/%s/media/quarantine" % urllib.parse.quote(
@@ -459,11 +443,9 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             access_token=admin_user_tok,
         )
         self.pump(1.0)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(
-            HTTPStatus.OK, int(channel.result["code"]), msg=channel.result["body"]
-        )
-        self.assertEqual(
-            json.loads(channel.result["body"].decode("utf-8")),
+            json.loads(channel.json_body.decode("utf-8")),
             {"num_quarantined": 1},
             "Expected 1 quarantined item",
         )

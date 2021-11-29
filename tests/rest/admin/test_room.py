@@ -305,9 +305,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         )
 
         # The room is now blocked.
-        self.assertEqual(
-            HTTPStatus.OK, int(channel.result["code"]), msg=channel.result["body"]
-        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self._is_blocked(room_id)
 
     def test_shutdown_room_consent(self):

@@ -58,8 +58,8 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.UNAUTHORIZED,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
@@ -80,8 +80,8 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.FORBIDDEN,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
@@ -230,8 +230,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.UNAUTHORIZED,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
@@ -250,8 +250,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.FORBIDDEN,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
@@ -282,8 +282,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.BAD_REQUEST,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
         self.assertEqual(
@@ -302,8 +302,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.BAD_REQUEST,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
@@ -319,8 +319,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.BAD_REQUEST,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
@@ -337,8 +337,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.BAD_REQUEST,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
@@ -354,8 +354,8 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.BAD_REQUEST,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
         self.assertEqual(
@@ -665,8 +665,8 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.UNAUTHORIZED,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
@@ -686,8 +686,8 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.FORBIDDEN,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
@@ -793,8 +793,8 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.UNAUTHORIZED,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
@@ -814,8 +814,8 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.FORBIDDEN,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
@@ -883,8 +883,8 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.UNAUTHORIZED,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
@@ -903,8 +903,8 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.FORBIDDEN,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
@@ -920,8 +920,8 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.BAD_REQUEST,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
@@ -937,8 +937,8 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.BAD_REQUEST,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(

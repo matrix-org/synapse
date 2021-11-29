@@ -56,8 +56,8 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.UNAUTHORIZED,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
@@ -74,8 +74,8 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.FORBIDDEN,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
@@ -310,8 +310,8 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.UNAUTHORIZED,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
@@ -329,8 +329,8 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.FORBIDDEN,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
@@ -436,8 +436,8 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.UNAUTHORIZED,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
@@ -455,8 +455,8 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.FORBIDDEN,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 

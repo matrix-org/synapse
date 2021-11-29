@@ -50,9 +50,7 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
         url = "%s?username=%s" % (self.url, "allowed")
         channel = self.make_request("GET", url, None, self.admin_user_tok)
 
-        self.assertEqual(
-            HTTPStatus.OK, int(channel.result["code"]), msg=channel.result["body"]
-        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertTrue(channel.json_body["available"])
 
     def test_username_unavailable(self):
@@ -65,8 +63,8 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(
             HTTPStatus.BAD_REQUEST,
-            int(channel.result["code"]),
-            msg=channel.result["body"],
+            channel.code,
+            msg=channel.json_body,
         )
         self.assertEqual(channel.json_body["errcode"], "M_USER_IN_USE")
         self.assertEqual(channel.json_body["error"], "User ID already taken.")
