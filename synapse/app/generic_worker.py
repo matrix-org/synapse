@@ -462,7 +462,7 @@ def start(config_options: List[str]) -> None:
             sys.stderr.write(
                 "\nThe worker_to_update_user_directory config variable must point to this worker's name"
                 "\nto give this worker exclusive access to run it. (It is currently pointed at "
-                f"{config.server.worker_to_update_user_directory:!r})"
+                f"{config.server.worker_to_update_user_directory!r})"
                 "\nPlease add or edit "
                 f'``worker_to_update_user_directory: "{config.worker.worker_name}"`` in the main config\n'
             )
