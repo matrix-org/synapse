@@ -7861,14 +7861,14 @@ configuration file takes priority.</p>
 <p>Modules <strong>must</strong> register their web resources in their <code>__init__</code> method.</p>
 <h2 id="registering-a-callback"><a class="header" href="#registering-a-callback">Registering a callback</a></h2>
 <p>Modules can use Synapse's module API to register callbacks. Callbacks are functions that
-Synapse will call when performing specific actions. Callbacks must be asynchronous, and
-are split in categories. A single module may implement callbacks from multiple categories,
-and is under no obligation to implement all callbacks from the categories it registers
-callbacks for.</p>
+Synapse will call when performing specific actions. Callbacks must be asynchronous (unless
+specified otherwise), and are split in categories. A single module may implement callbacks
+from multiple categories, and is under no obligation to implement all callbacks from the
+categories it registers callbacks for.</p>
 <p>Modules can register callbacks using one of the module API's <code>register_[...]_callbacks</code>
 methods. The callback functions are passed to these methods as keyword arguments, with
-the callback name as the argument name and the function as its value. This is demonstrated
-in the example below. A <code>register_[...]_callbacks</code> method exists for each category.</p>
+the callback name as the argument name and the function as its value. A
+<code>register_[...]_callbacks</code> method exists for each category.</p>
 <p>Callbacks for each category can be found on their respective page of the
 <a href="https://matrix-org.github.io/synapse">Synapse documentation website</a>.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="spam-checker-callbacks"><a class="header" href="#spam-checker-callbacks">Spam checker callbacks</a></h1>
