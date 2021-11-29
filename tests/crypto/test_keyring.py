@@ -645,6 +645,9 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         self.assertEqual(k.verify_key.alg, "ed25519")
         self.assertEqual(k.verify_key.version, "ver2")
 
+        # finally, ensured that only one request was sent
+        self.assertEqual(self.http_client.post_json.call_count, 1)
+
     def test_get_perspectives_own_key(self):
         """Check that we can get the perspectives server's own keys
 
