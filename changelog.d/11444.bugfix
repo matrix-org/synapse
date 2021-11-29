@@ -1,0 +1,1 @@
+Fix a bug introduced in 1.47.1 where the media repository would fail to work if the media store path contained any symbolic links.
