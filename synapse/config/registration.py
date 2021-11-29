@@ -125,6 +125,22 @@ class RegistrationConfig(Config):
             )
         self.refreshable_access_token_lifetime = refreshable_access_token_lifetime
 
+        # The `nonrefreshable_access_token_lifetime` applies for tokens that can NOT be
+        # refreshed using a refresh token.
+        # If it is None, then these tokens last for the entire length of the session,
+        # which is infinite by default.
+        # The intention behind this configuration option is to help with requiring
+        # all clients to use refresh tokens, if the homeserver administrator requires.
+        nonrefreshable_access_token_lifetime = config.get(
+            "nonrefreshable_access_token_lifetime",
+            None,
+        )
+        if nonrefreshable_access_token_lifetime is not None:
+            nonrefreshable_access_token_lifetime = self.parse_duration(
+                nonrefreshable_access_token_lifetime
+            )
+        self.nonrefreshable_access_token_lifetime = nonrefreshable_access_token_lifetime
+
         refresh_token_lifetime = config.get("refresh_token_lifetime")
         if refresh_token_lifetime is not None:
             refresh_token_lifetime = self.parse_duration(refresh_token_lifetime)
