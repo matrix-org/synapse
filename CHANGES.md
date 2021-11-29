@@ -1,3 +1,20 @@
+UNRELEASED
+==========
+
+We've decided to move the existing, somewhat stagnant pages from the GitHub wiki 
+onto the [documentation website](https://matrix-org.github.io/synapse/latest/).
+This was done for two reasons. The first was to ensure that changes are checked by 
+multiple authors before being committed (everyone makes mistakes!) and the second
+was visibility of the documentation. Not everyone knows that Synapse has some very
+useful information hidden away in its GitHub wiki pages. Bringing them to the 
+documentation website should help with visibility, as well as keep all Synapse documentation
+in one, easily-searchable location.
+
+Note that contributions to the documentation website happen through [GitHub pull 
+requests](https://github.com/matrix-org/synapse/pulls). Please visit #synapse-dev:matrix.org
+if you need help with the process!
+
+
 Synapse 1.47.0 (2021-11-17)
 ===========================
 
