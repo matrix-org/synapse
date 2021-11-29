@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import inspect
+import os
 from typing import Iterable
 
 from synapse.rest.media.v1.filepath import MediaFilePaths
@@ -486,3 +487,41 @@ class MediaFilePathsTestCase(unittest.TestCase):
                         f"{value!r} unexpectedly passed validation: "
                         f"{method} returned {path_or_list!r}"
                     )
+
+    def test_symlink(self):
+        """Test that a symlink does not cause the jail check to fail."""
+        media_store_path = self.mktemp()
+
+        # symlink the media store directory
+        os.symlink("/mnt/synapse/media_store", media_store_path)
+
+        # Test that relative and absolute paths don't trip the check
+        # NB: `media_store_path` is a relative path
+        filepaths = MediaFilePaths(media_store_path)
+        filepaths.url_cache_filepath_rel("2020-01-02_GerZNDnDZVjsOtar")
+        filepaths.url_cache_filepath_dirs_to_delete("2020-01-02_GerZNDnDZVjsOtar")
+
+        filepaths = MediaFilePaths(os.path.abspath(media_store_path))
+        filepaths.url_cache_filepath_rel("2020-01-02_GerZNDnDZVjsOtar")
+        filepaths.url_cache_filepath_dirs_to_delete("2020-01-02_GerZNDnDZVjsOtar")
+
+    def test_symlink_subdirectory(self):
+        """Test that a symlinked subdirectory does not cause the jail check to fail."""
+        media_store_path = self.mktemp()
+        os.mkdir(media_store_path)
+
+        # symlink `url_cache/`
+        os.symlink(
+            "/mnt/synapse/media_store_url_cache",
+            os.path.join(media_store_path, "url_cache"),
+        )
+
+        # Test that relative and absolute paths don't trip the check
+        # NB: `media_store_path` is a relative path
+        filepaths = MediaFilePaths(media_store_path)
+        filepaths.url_cache_filepath_rel("2020-01-02_GerZNDnDZVjsOtar")
+        filepaths.url_cache_filepath_dirs_to_delete("2020-01-02_GerZNDnDZVjsOtar")
+
+        filepaths = MediaFilePaths(os.path.abspath(media_store_path))
+        filepaths.url_cache_filepath_rel("2020-01-02_GerZNDnDZVjsOtar")
+        filepaths.url_cache_filepath_dirs_to_delete("2020-01-02_GerZNDnDZVjsOtar")
