@@ -116,6 +116,9 @@ class RegistrationHandler:
             self.pusher_pool = hs.get_pusherpool()
 
         self.session_lifetime = hs.config.registration.session_lifetime
+        self.nonrefreshable_access_token_lifetime = (
+            hs.config.registration.nonrefreshable_access_token_lifetime
+        )
         self.refreshable_access_token_lifetime = (
             hs.config.registration.refreshable_access_token_lifetime
         )
@@ -803,6 +806,17 @@ class RegistrationHandler:
                 )
             access_token_expiry = now_ms + self.session_lifetime
 
+        if self.nonrefreshable_access_token_lifetime is not None:
+            if access_token_expiry is not None:
+                # Don't allow the non-refreshable access token to outlive the
+                # session.
+                access_token_expiry = min(
+                    now_ms + self.nonrefreshable_access_token_lifetime,
+                    access_token_expiry,
+                )
+            else:
+                access_token_expiry = now_ms + self.nonrefreshable_access_token_lifetime
+
         refresh_token = None
         refresh_token_id = None
 
@@ -814,7 +828,6 @@ class RegistrationHandler:
             access_token = self.macaroon_gen.generate_guest_access_token(user_id)
         else:
             if should_issue_refresh_token:
-
                 # Set the expiry time of the refreshable access token
                 access_token_expiry = now_ms + self.refreshable_access_token_lifetime
 
