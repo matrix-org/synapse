@@ -52,7 +52,11 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         """Try to send a server notice without authentication."""
         channel = self.make_request("POST", self.url)
 
-        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(
+            HTTPStatus.UNAUTHORIZED,
+            int(channel.result["code"]),
+            msg=channel.result["body"],
+        )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_requester_is_no_admin(self):
@@ -63,12 +67,16 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_token,
         )
 
-        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(
+            HTTPStatus.FORBIDDEN,
+            int(channel.result["code"]),
+            msg=channel.result["body"],
+        )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     @override_config({"server_notices": {"system_mxid_localpart": "notices"}})
     def test_user_does_not_exist(self):
-        """Tests that a lookup for a user that does not exist returns a 404"""
+        """Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND"""
         channel = self.make_request(
             "POST",
             self.url,
@@ -76,13 +84,13 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             content={"user_id": "@unknown_person:test", "content": ""},
         )
 
-        self.assertEqual(404, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     @override_config({"server_notices": {"system_mxid_localpart": "notices"}})
     def test_user_is_not_local(self):
         """
-        Tests that a lookup for a user that is not a local returns a 400
+        Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST
         """
         channel = self.make_request(
             "POST",
@@ -94,7 +102,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(
             "Server notices can only be sent to local users", channel.json_body["error"]
         )
@@ -110,7 +118,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_JSON, channel.json_body["errcode"])
 
         # no content
@@ -121,7 +129,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             content={"user_id": self.other_user},
         )
 
-        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
 
         # no body
@@ -132,7 +140,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             content={"user_id": self.other_user, "content": ""},
         )
 
-        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
         self.assertEqual("'body' not in content", channel.json_body["error"])
 
@@ -144,7 +152,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             content={"user_id": self.other_user, "content": {"body": ""}},
         )
 
-        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
         self.assertEqual("'msgtype' not in content", channel.json_body["error"])
 
@@ -160,7 +168,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        self.assertEqual(400, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
         self.assertEqual(
             "Server notices are not enabled on this server", channel.json_body["error"]
@@ -185,7 +193,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
                 "content": {"msgtype": "m.text", "body": "test msg one"},
             },
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # user has one invite
         invited_rooms = self._check_invite_and_join_status(self.other_user, 1, 0)
@@ -216,7 +224,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
                 "content": {"msgtype": "m.text", "body": "test msg two"},
             },
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # user has no new invites or memberships
         self._check_invite_and_join_status(self.other_user, 0, 1)
@@ -250,7 +258,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
                 "content": {"msgtype": "m.text", "body": "test msg one"},
             },
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # user has one invite
         invited_rooms = self._check_invite_and_join_status(self.other_user, 1, 0)
@@ -293,7 +301,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
                 "content": {"msgtype": "m.text", "body": "test msg two"},
             },
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # user has one invite
         invited_rooms = self._check_invite_and_join_status(self.other_user, 1, 0)
@@ -333,7 +341,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
                 "content": {"msgtype": "m.text", "body": "test msg one"},
             },
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # user has one invite
         invited_rooms = self._check_invite_and_join_status(self.other_user, 1, 0)
@@ -382,7 +390,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
                 "content": {"msgtype": "m.text", "body": "test msg two"},
             },
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # user has one invite
         invited_rooms = self._check_invite_and_join_status(self.other_user, 1, 0)
@@ -440,7 +448,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET", "/_matrix/client/r0/sync", access_token=token
         )
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, HTTPStatus.OK)
 
         # Get the messages
         room = channel.json_body["rooms"]["join"][room_id]
