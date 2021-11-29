@@ -150,12 +150,6 @@ class UserIpAndAgent:
     last_seen: int
 
 
-# This is sad: I'd like to express that the arguments to this Callable are
-# themselves callable. "Callback protocols" let you do this, but I couldn't find
-# a way to do so that mypy agreed was type safe.
-RegisterCallbacks = Callable[..., None]
-
-
 class ModuleApi:
     """A proxy object that gets passed to various plugin modules so they
     can register new users etc if necessary.
