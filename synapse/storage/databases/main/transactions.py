@@ -516,7 +516,7 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         """
 
         def get_destinations_paginate_txn(
-                txn: LoggingTransaction
+            txn: LoggingTransaction,
         ) -> Tuple[List[JsonDict], int]:
             order_by_column = DestinationSortOrder(order_by).value
 
