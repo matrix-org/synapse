@@ -794,13 +794,14 @@ class RegistrationHandler:
         class and RegisterDeviceReplicationServlet.
         """
         assert not self.hs.config.worker.worker_app
+        now_ms = self.clock.time_msec()
         access_token_expiry = None
         if self.session_lifetime is not None:
             if is_guest:
                 raise Exception(
                     "session_lifetime is not currently implemented for guest access"
                 )
-            access_token_expiry = self.clock.time_msec() + self.session_lifetime
+            access_token_expiry = now_ms + self.session_lifetime
 
         refresh_token = None
         refresh_token_id = None
@@ -813,7 +814,6 @@ class RegistrationHandler:
             access_token = self.macaroon_gen.generate_guest_access_token(user_id)
         else:
             if should_issue_refresh_token:
-                now_ms = self.clock.time_msec()
 
                 # Set the expiry time of the refreshable access token
                 access_token_expiry = now_ms + self.refreshable_access_token_lifetime
