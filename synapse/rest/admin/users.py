@@ -531,7 +531,7 @@ class UserRegisterServlet(RestServlet):
         want_mac = want_mac_builder.hexdigest()
 
         if not hmac.compare_digest(want_mac.encode("ascii"), got_mac.encode("ascii")):
-            raise SynapseError(HTTPStatus.UNAUTHORIZED, "HMAC incorrect")
+            raise SynapseError(HTTPStatus.FORBIDDEN, "HMAC incorrect")
 
         # Reuse the parts of RegisterRestServlet to reduce code duplication
         from synapse.rest.client.register import RegisterRestServlet
@@ -738,7 +738,7 @@ class SearchUsersRestServlet(RestServlet):
 
         # To allow all users to get the users list
         # if not is_admin and target_user != auth_user:
-        #     raise AuthError(HTTPStatus.UNAUTHORIZED, "You are not a server admin")
+        #     raise AuthError(HTTPStatus.FORBIDDEN, "You are not a server admin")
 
         if not self.hs.is_mine(target_user):
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only users a local user")
