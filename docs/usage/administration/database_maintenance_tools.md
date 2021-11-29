@@ -2,7 +2,7 @@ This blog post by Victor Berger explains how to use many of the tools listed on 
 
 # List of useful tools and scripts for maintenance Synapse database:
 
-## [Purge Remote Media API](https://github.com/matrix-org/synapse/blob/master/docs/admin_api/purge_remote_media.rst)
+## [Purge Remote Media API](../../admin_api/media_admin_api.md#purge-remote-media-api)
 The purge remote media API allows server admins to purge old cached remote media.
 
 #### Purge local media 
@@ -18,7 +18,7 @@ This will delete media that hasn't been accessed in 365 days.
 
 **Warning, check noatime flag**: You also have to double-check that the filesystem where synapse's media store don't have [noatime flag](https://unix.stackexchange.com/questions/219015/how-to-disable-access-time-settings-in-debian-linux/219017#219017). Check it with `mount`, `noatime` is something that is usually enabled by default to reduce read-write operations in the filesystem for a feature is not so demanded.
 
-## [Purge History API](https://github.com/matrix-org/synapse/blob/master/docs/admin_api/purge_history_api.rst)
+## [Purge History API](../../admin_api/purge_history_api.md)
 The purge history API allows server admins to purge historic events from their database, reclaiming disk space.
 
 ## [synapse_janitor.sql](https://github.com/xwiki-labs/synapse_scripts)

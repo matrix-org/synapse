@@ -2,7 +2,7 @@
 
 How do I become a server admin?
 ---
-If your server already has an admin account you should use the user admin API to promote other accounts to become admins. See https://github.com/matrix-org/synapse/blob/develop/docs/admin_api/user_admin_api.rst#change-whether-a-user-is-a-server-administrator-or-not.
+If your server already has an admin account you should use the user admin API to promote other accounts to become admins. See [User Admin API](../../admin_api/user_admin_api.md#Change-whether-a-user-is-a-server-administrator-or-not)
 
 If you don't have any admin accounts yet you won't be able to use the admin API so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account, use the admin APIs to make further changes.
 
@@ -78,7 +78,7 @@ If you want to paste that output into a github issue or matrix room, please reme
 
 What do all those fields in the 'Processed' line mean?
 ---
-See https://matrix-org.github.io/synapse/latest/usage/administration/request_log.html.
+See [Request log format](request_log.md).
 
 
 What are the biggest rooms on my server?
