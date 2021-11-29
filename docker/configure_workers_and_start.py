@@ -51,7 +51,7 @@ WORKERS_CONFIG = {
             "^/_matrix/client/(api/v1|r0|v3|unstable)/user_directory/search$"
         ],
         "shared_extra_conf": {"worker_to_update_user_directory": "user_dir"},
-        "worker_extra_conf": 'worker_name: "user_dir"',
+        "worker_extra_conf": "",
     },
     "media_repository": {
         "app": "synapse.app.media_repository",
