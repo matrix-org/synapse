@@ -135,7 +135,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
         self._register_bg_update()
 
         self.store.db_pool.updates.start_doing_background_updates()
-        self.reactor.pump([1.0, 1.0])
+        self.reactor.pump([1.0, 1.0, 1.0])
 
         channel = self.make_request(
             "GET",

@@ -82,10 +82,19 @@ from synapse.http.server import (
 )
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
-from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.logging.context import (
+    defer_to_thread,
+    make_deferred_yieldable,
+    run_in_background,
+)
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
+from synapse.storage.background_updates import (
+    DEFAULT_BATCH_SIZE_CALLBACK,
+    MIN_BATCH_SIZE_CALLBACK,
+    ON_UPDATE_CALLBACK,
+)
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
@@ -310,6 +319,24 @@ class ModuleApi:
             on_logged_out=on_logged_out,
             auth_checkers=auth_checkers,
         )
+
+    def register_background_update_controller_callbacks(
+        self,
+        on_update: ON_UPDATE_CALLBACK,
+        default_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
+        min_batch_size: Optional[MIN_BATCH_SIZE_CALLBACK] = None,
+    ) -> None:
+        """Registers background update controller callbacks.
+
+        Added in Synapse v1.49.0.
+        """
+
+        for db in self._hs.get_datastores().databases:
+            db.updates.register_update_controller_callbacks(
+                on_update=on_update,
+                default_batch_size=default_batch_size,
+                min_batch_size=min_batch_size,
+            )
 
     def register_web_resource(self, path: str, resource: Resource) -> None:
         """Registers a web resource to be served at the given path.
@@ -995,6 +1022,11 @@ class ModuleApi:
                 f,
             )
 
+    async def sleep(self, seconds: float) -> None:
+        """Sleeps for the given number of seconds."""
+
+        await self._clock.sleep(seconds)
+
     async def send_mail(
         self,
         recipient: str,
@@ -1148,6 +1180,26 @@ class ModuleApi:
         state_events = await self._store.get_events(state_ids.values())
 
         return {key: state_events[event_id] for key, event_id in state_ids.items()}
+
+    async def defer_to_thread(
+        self,
+        f: Callable[..., T],
+        *args: Any,
+        **kwargs: Any,
+    ) -> T:
+        """Runs the given function in a separate thread from Synapse's thread pool.
+
+        Added in Synapse v1.49.0.
+
+        Args:
+            f: The function to run.
+            args: The function's arguments.
+            kwargs: The function's keyword arguments.
+
+        Returns:
+            The return value of the function once ran in a thread.
+        """
+        return await defer_to_thread(self._hs.get_reactor(), f, *args, **kwargs)
 
 
 class PublicRoomListManager:
