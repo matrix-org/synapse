@@ -764,7 +764,7 @@ class StateResolutionStore:
     store: "DataStore"
 
     def get_events(
-        self, event_ids: Iterable[str], allow_rejected: bool = False
+        self, event_ids: Collection[str], allow_rejected: bool = False
     ) -> Awaitable[Dict[str, EventBase]]:
         """Get events from the database
 

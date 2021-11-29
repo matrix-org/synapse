@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.36 which could cause problems fetching event-signing keys from trusted key servers.

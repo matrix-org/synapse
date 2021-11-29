@@ -613,8 +613,11 @@ class FederationServer(FederationBase):
         state = await self.store.get_events(state_ids)
 
         time_now = self._clock.time_msec()
+        event_json = event.get_pdu_json()
         return {
-            "org.matrix.msc3083.v2.event": event.get_pdu_json(),
+            # TODO Remove the unstable prefix when servers have updated.
+            "org.matrix.msc3083.v2.event": event_json,
+            "event": event_json,
             "state": [p.get_pdu_json(time_now) for p in state.values()],
             "auth_chain": [p.get_pdu_json(time_now) for p in auth_chain],
         }
