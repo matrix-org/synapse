@@ -296,13 +296,6 @@ async def filter_events_for_server(
             visibility = history.content.get(
                 "history_visibility", HistoryVisibility.SHARED
             )
-            logger.debug(
-                "filter_events_for_server: check_event_is_visible(event=%s, state=%s) for server_name=%s visibility=%s",
-                event.event_id,
-                state,
-                server_name,
-                visibility,
-            )
             if visibility in [HistoryVisibility.INVITED, HistoryVisibility.JOINED]:
                 # We now loop through all state events looking for
                 # membership states for the requesting server to determine
@@ -320,15 +313,6 @@ async def filter_events_for_server(
                         continue
 
                     memtype = ev.membership
-                    logger.debug(
-                        "filter_events_for_server: check_event_is_visible(event=%s) for server_name=%s checking membership: visibility=%s domain=%s memtype=%s state_event_id=%s",
-                        event.event_id,
-                        server_name,
-                        visibility,
-                        domain,
-                        memtype,
-                        ev.event_id,
-                    )
                     if memtype == Membership.JOIN:
                         return True
                     elif memtype == Membership.INVITE:
@@ -445,11 +429,6 @@ async def filter_events_for_server(
     for e in events:
         erased = is_sender_erased(e, erased_senders)
         visible = check_event_is_visible(e, event_to_state[e.event_id])
-        logger.debug(
-            "filter_events_for_server: check_event_is_visible(event=%s) -> visible=%s",
-            e.event_id,
-            visible,
-        )
         if visible and not erased:
             to_return.append(e)
         elif redact:
