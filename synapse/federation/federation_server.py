@@ -210,8 +210,8 @@ class FederationServer(FederationBase):
         Args:
             origin: The server we received the event from
             room_id: Room to fetch the event from
-            timestamp: The point in time we should navigate from in the given
-                direction to find the closest event.
+            timestamp: The point in time (inclusive) we should navigate from in
+                the given direction to find the closest event.
             direction: ["f"|"b"] to indicate whether we should navigate forward
                 or backward from the given timestamp to find the closest event.
 
