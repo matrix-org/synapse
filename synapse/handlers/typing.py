@@ -90,7 +90,7 @@ class FollowerTypingHandler:
         self.wheel_timer = WheelTimer(bucket_size=5000)
 
     @wrap_as_background_process("typing._handle_timeouts")
-    def _handle_timeouts(self) -> None:
+    async def _handle_timeouts(self) -> None:
         logger.debug("Checking for typing timeouts")
 
         now = self.clock.time_msec()

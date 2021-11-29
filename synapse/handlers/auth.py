@@ -18,6 +18,7 @@ import time
 import unicodedata
 import urllib.parse
 from binascii import crc32
+from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -756,53 +757,109 @@ class AuthHandler:
     async def refresh_token(
         self,
         refresh_token: str,
-        valid_until_ms: Optional[int],
-    ) -> Tuple[str, str]:
+        access_token_valid_until_ms: Optional[int],
+        refresh_token_valid_until_ms: Optional[int],
+    ) -> Tuple[str, str, Optional[int]]:
         """
         Consumes a refresh token and generate both a new access token and a new refresh token from it.
 
         The consumed refresh token is considered invalid after the first use of the new access token or the new refresh token.
 
+        The lifetime of both the access token and refresh token will be capped so that they
+        do not exceed the session's ultimate expiry time, if applicable.
+
         Args:
             refresh_token: The token to consume.
-            valid_until_ms: The expiration timestamp of the new access token.
-
+            access_token_valid_until_ms: The expiration timestamp of the new access token.
+                None if the access token does not expire.
+            refresh_token_valid_until_ms: The expiration timestamp of the new refresh token.
+                None if the refresh token does not expire.
         Returns:
-            A tuple containing the new access token and refresh token
+            A tuple containing:
+              - the new access token
+              - the new refresh token
+              - the actual expiry time of the access token, which may be earlier than
+                `access_token_valid_until_ms`.
         """
 
         # Verify the token signature first before looking up the token
         if not self._verify_refresh_token(refresh_token):
-            raise SynapseError(401, "invalid refresh token", Codes.UNKNOWN_TOKEN)
+            raise SynapseError(
+                HTTPStatus.UNAUTHORIZED, "invalid refresh token", Codes.UNKNOWN_TOKEN
+            )
 
         existing_token = await self.store.lookup_refresh_token(refresh_token)
         if existing_token is None:
-            raise SynapseError(401, "refresh token does not exist", Codes.UNKNOWN_TOKEN)
+            raise SynapseError(
+                HTTPStatus.UNAUTHORIZED,
+                "refresh token does not exist",
+                Codes.UNKNOWN_TOKEN,
+            )
 
         if (
             existing_token.has_next_access_token_been_used
             or existing_token.has_next_refresh_token_been_refreshed
         ):
             raise SynapseError(
-                403, "refresh token isn't valid anymore", Codes.FORBIDDEN
+                HTTPStatus.FORBIDDEN,
+                "refresh token isn't valid anymore",
+                Codes.FORBIDDEN,
             )
+
+        now_ms = self._clock.time_msec()
+
+        if existing_token.expiry_ts is not None and existing_token.expiry_ts < now_ms:
+
+            raise SynapseError(
+                HTTPStatus.FORBIDDEN,
+                "The supplied refresh token has expired",
+                Codes.FORBIDDEN,
+            )
+
+        if existing_token.ultimate_session_expiry_ts is not None:
+            # This session has a bounded lifetime, even across refreshes.
+
+            if access_token_valid_until_ms is not None:
+                access_token_valid_until_ms = min(
+                    access_token_valid_until_ms,
+                    existing_token.ultimate_session_expiry_ts,
+                )
+            else:
+                access_token_valid_until_ms = existing_token.ultimate_session_expiry_ts
+
+            if refresh_token_valid_until_ms is not None:
+                refresh_token_valid_until_ms = min(
+                    refresh_token_valid_until_ms,
+                    existing_token.ultimate_session_expiry_ts,
+                )
+            else:
+                refresh_token_valid_until_ms = existing_token.ultimate_session_expiry_ts
+            if existing_token.ultimate_session_expiry_ts < now_ms:
+                raise SynapseError(
+                    HTTPStatus.FORBIDDEN,
+                    "The session has expired and can no longer be refreshed",
+                    Codes.FORBIDDEN,
+                )
 
         (
             new_refresh_token,
             new_refresh_token_id,
-        ) = await self.get_refresh_token_for_user_id(
-            user_id=existing_token.user_id, device_id=existing_token.device_id
-        )
-        access_token = await self.get_access_token_for_user_id(
+        ) = await self.create_refresh_token_for_user_id(
             user_id=existing_token.user_id,
             device_id=existing_token.device_id,
-            valid_until_ms=valid_until_ms,
+            expiry_ts=refresh_token_valid_until_ms,
+            ultimate_session_expiry_ts=existing_token.ultimate_session_expiry_ts,
+        )
+        access_token = await self.create_access_token_for_user_id(
+            user_id=existing_token.user_id,
+            device_id=existing_token.device_id,
+            valid_until_ms=access_token_valid_until_ms,
             refresh_token_id=new_refresh_token_id,
         )
         await self.store.replace_refresh_token(
             existing_token.token_id, new_refresh_token_id
         )
-        return access_token, new_refresh_token
+        return access_token, new_refresh_token, access_token_valid_until_ms
 
     def _verify_refresh_token(self, token: str) -> bool:
         """
@@ -832,10 +889,12 @@ class AuthHandler:
 
         return True
 
-    async def get_refresh_token_for_user_id(
+    async def create_refresh_token_for_user_id(
         self,
         user_id: str,
         device_id: str,
+        expiry_ts: Optional[int],
+        ultimate_session_expiry_ts: Optional[int],
     ) -> Tuple[str, int]:
         """
         Creates a new refresh token for the user with the given user ID.
@@ -843,6 +902,13 @@ class AuthHandler:
         Args:
             user_id: canonical user ID
             device_id: the device ID to associate with the token.
+            expiry_ts (milliseconds since the epoch): Time after which the
+                refresh token cannot be used.
+                If None, the refresh token never expires until it has been used.
+            ultimate_session_expiry_ts (milliseconds since the epoch):
+                Time at which the session will end and can not be extended any
+                further.
+                If None, the session can be refreshed indefinitely.
 
         Returns:
             The newly created refresh token and its ID in the database
@@ -852,10 +918,12 @@ class AuthHandler:
             user_id=user_id,
             token=refresh_token,
             device_id=device_id,
+            expiry_ts=expiry_ts,
+            ultimate_session_expiry_ts=ultimate_session_expiry_ts,
         )
         return refresh_token, refresh_token_id
 
-    async def get_access_token_for_user_id(
+    async def create_access_token_for_user_id(
         self,
         user_id: str,
         device_id: Optional[str],

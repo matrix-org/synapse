@@ -1,0 +1,1 @@
+Fix a bug introduced in v1.13.0 where creating and publishing a room could cause errors if `room_list_publication_rules` is configured.
