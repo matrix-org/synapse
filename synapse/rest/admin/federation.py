@@ -75,13 +75,7 @@ class FederationDestinationRestServlet(RestServlet):
             request,
             "order_by",
             default=DestinationSortOrder.DESTINATION.value,
-            allowed_values=(
-                DestinationSortOrder.DESTINATION.value,
-                DestinationSortOrder.RETRY_LAST_TS.value,
-                DestinationSortOrder.RETTRY_INTERVAL.value,
-                DestinationSortOrder.FAILURE_TS.value,
-                DestinationSortOrder.LAST_SUCCESSFUL_STREAM_ORDERING.value,
-            ),
+            allowed_values=[dest.value for dest in DestinationSortOrder],
         )
 
         direction = parse_string(request, "dir", default="f", allowed_values=("f", "b"))

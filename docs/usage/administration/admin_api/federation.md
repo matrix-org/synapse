@@ -1,6 +1,6 @@
 # Federation API
 
-This API allows a server administrator to manage the federation.
+This API allows a server administrator to manage Synapse's federation with other homeservers.
 
 **Note**: This API is new, experimental and "subject to change".
 
@@ -69,7 +69,7 @@ The following fields are returned in the JSON response body:
   Destinations objects contain the following fields:
   - `destination` - string - Name of the remote server to federate.
   - `retry_last_ts` - integer - The last time Synapse tried and failed to reach the
-    remote server, in ms
+    remote server, in ms.
   - `retry_interval` - integer - How long since the last time Synapse tried to reach
     the remote server before trying again, in ms.
   - `failure_ts` - integer - The first time Synapse tried and failed to reach the
