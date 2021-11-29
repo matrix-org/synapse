@@ -73,12 +73,7 @@ def get_version_string(module: ModuleType) -> str:
                 s for s in (git_branch, git_tag, git_commit, git_dirty) if s
             )
 
-            version_string = "%s (%s)" % (
-                # If the __version__ attribute doesn't exist, we'll have failed
-                # loudly above.
-                module.__version__,  # type: ignore[attr-defined]
-                git_version,
-            )
+            version_string = f"{version_string} ({git_version})"
     except Exception as e:
         logger.info("Failed to check for git repository: %s", e)
 
