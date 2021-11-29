@@ -172,7 +172,7 @@ class ApplicationService:
         return False
 
     @cached(num_args=1, cache_context=True)
-    async def _is_interested_in_room(
+    async def is_interested_in_room(
         self,
         room_id: str,
         store: "DataStore",
@@ -245,7 +245,7 @@ class ApplicationService:
         # TODO: The store is only optional here to aid testing this function. We should
         #  instead convert the tests to use HomeServerTestCase in order to get a working
         #  database instance.
-        if store is not None and await self._is_interested_in_room(
+        if store is not None and await self.is_interested_in_room(
             event.room_id, store, on_invalidate=cache_context.invalidate
         ):
             return True
