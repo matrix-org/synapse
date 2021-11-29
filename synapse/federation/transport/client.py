@@ -1331,15 +1331,26 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
             prefix + "auth_chain.item",
             use_float=True,
         )
-        self._coro_event = ijson.kvitems_coro(
+        # TODO Remove the unstable prefix when servers have updated.
+        #
+        # By re-using the same event dictionary this will cause the parsing of
+        # org.matrix.msc3083.v2.event and event to stomp over each other.
+        # Generally this should be fine.
+        self._coro_unstable_event = ijson.kvitems_coro(
             _event_parser(self._response.event_dict),
             prefix + "org.matrix.msc3083.v2.event",
+            use_float=True,
+        )
+        self._coro_event = ijson.kvitems_coro(
+            _event_parser(self._response.event_dict),
+            prefix + "event",
             use_float=True,
         )
 
     def write(self, data: bytes) -> int:
         self._coro_state.send(data)
         self._coro_auth.send(data)
+        self._coro_unstable_event.send(data)
         self._coro_event.send(data)
 
         return len(data)

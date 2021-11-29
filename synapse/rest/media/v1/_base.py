@@ -29,7 +29,7 @@ from synapse.api.errors import Codes, SynapseError, cs_error
 from synapse.http.server import finish_request, respond_with_json
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
-from synapse.util.stringutils import is_ascii
+from synapse.util.stringutils import is_ascii, parse_and_validate_server_name
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,19 @@ TEXT_CONTENT_TYPES = [
 
 
 def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
+    """Parses the server name, media ID and optional file name from the request URI
+
+    Also performs some rough validation on the server name.
+
+    Args:
+        request: The `Request`.
+
+    Returns:
+        A tuple containing the parsed server name, media ID and optional file name.
+
+    Raises:
+        SynapseError(404): if parsing or validation fail for any reason
+    """
     try:
         # The type on postpath seems incorrect in Twisted 21.2.0.
         postpath: List[bytes] = request.postpath  # type: ignore
@@ -61,6 +74,9 @@ def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
         server_name_bytes, media_id_bytes = postpath[:2]
         server_name = server_name_bytes.decode("utf-8")
         media_id = media_id_bytes.decode("utf8")
+
+        # Validate the server name, raising if invalid
+        parse_and_validate_server_name(server_name)
 
         file_name = None
         if len(postpath) > 2:

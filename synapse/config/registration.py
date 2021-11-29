@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional
 
 from synapse.api.constants import RoomCreationPreset
 from synapse.config._base import Config, ConfigError
@@ -112,26 +113,25 @@ class RegistrationConfig(Config):
             session_lifetime = self.parse_duration(session_lifetime)
         self.session_lifetime = session_lifetime
 
-        # The `access_token_lifetime` applies for tokens that can be renewed
-        # using a refresh token, as per MSC2918. If it is `None`, the refresh
-        # token mechanism is disabled.
-        #
-        # Since it is incompatible with the `session_lifetime` mechanism, it is set to
-        # `None` by default if a `session_lifetime` is set.
-        access_token_lifetime = config.get(
-            "access_token_lifetime", "5m" if session_lifetime is None else None
+        # The `refreshable_access_token_lifetime` applies for tokens that can be renewed
+        # using a refresh token, as per MSC2918.
+        # If it is `None`, the refresh token mechanism is disabled.
+        refreshable_access_token_lifetime = config.get(
+            "refreshable_access_token_lifetime",
+            "5m",
         )
-        if access_token_lifetime is not None:
-            access_token_lifetime = self.parse_duration(access_token_lifetime)
-        self.access_token_lifetime = access_token_lifetime
-
-        if session_lifetime is not None and access_token_lifetime is not None:
-            raise ConfigError(
-                "The refresh token mechanism is incompatible with the "
-                "`session_lifetime` option. Consider disabling the "
-                "`session_lifetime` option or disabling the refresh token "
-                "mechanism by removing the `access_token_lifetime` option."
+        if refreshable_access_token_lifetime is not None:
+            refreshable_access_token_lifetime = self.parse_duration(
+                refreshable_access_token_lifetime
             )
+        self.refreshable_access_token_lifetime: Optional[
+            int
+        ] = refreshable_access_token_lifetime
+
+        refresh_token_lifetime = config.get("refresh_token_lifetime")
+        if refresh_token_lifetime is not None:
+            refresh_token_lifetime = self.parse_duration(refresh_token_lifetime)
+        self.refresh_token_lifetime: Optional[int] = refresh_token_lifetime
 
         # The fallback template used for authenticating using a registration token
         self.registration_token_template = self.read_template("registration_token.html")

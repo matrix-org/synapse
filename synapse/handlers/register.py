@@ -116,7 +116,10 @@ class RegistrationHandler:
             self.pusher_pool = hs.get_pusherpool()
 
         self.session_lifetime = hs.config.registration.session_lifetime
-        self.access_token_lifetime = hs.config.registration.access_token_lifetime
+        self.refreshable_access_token_lifetime = (
+            hs.config.registration.refreshable_access_token_lifetime
+        )
+        self.refresh_token_lifetime = hs.config.registration.refresh_token_lifetime
 
         init_counters_for_auth_provider("")
 
@@ -791,13 +794,13 @@ class RegistrationHandler:
         class and RegisterDeviceReplicationServlet.
         """
         assert not self.hs.config.worker.worker_app
-        valid_until_ms = None
+        access_token_expiry = None
         if self.session_lifetime is not None:
             if is_guest:
                 raise Exception(
                     "session_lifetime is not currently implemented for guest access"
                 )
-            valid_until_ms = self.clock.time_msec() + self.session_lifetime
+            access_token_expiry = self.clock.time_msec() + self.session_lifetime
 
         refresh_token = None
         refresh_token_id = None
@@ -806,23 +809,57 @@ class RegistrationHandler:
             user_id, device_id, initial_display_name
         )
         if is_guest:
-            assert valid_until_ms is None
+            assert access_token_expiry is None
             access_token = self.macaroon_gen.generate_guest_access_token(user_id)
         else:
             if should_issue_refresh_token:
+                # A refreshable access token lifetime must be configured
+                # since we're told to issue a refresh token (the caller checks
+                # that this value is set before setting this flag).
+                assert self.refreshable_access_token_lifetime is not None
+
+                now_ms = self.clock.time_msec()
+
+                # Set the expiry time of the refreshable access token
+                access_token_expiry = now_ms + self.refreshable_access_token_lifetime
+
+                # Set the refresh token expiry time (if configured)
+                refresh_token_expiry = None
+                if self.refresh_token_lifetime is not None:
+                    refresh_token_expiry = now_ms + self.refresh_token_lifetime
+
+                # Set an ultimate session expiry time (if configured)
+                ultimate_session_expiry_ts = None
+                if self.session_lifetime is not None:
+                    ultimate_session_expiry_ts = now_ms + self.session_lifetime
+
+                    # Also ensure that the issued tokens don't outlive the
+                    # session.
+                    # (It would be weird to configure a homeserver with a shorter
+                    # session lifetime than token lifetime, but may as well handle
+                    # it.)
+                    access_token_expiry = min(
+                        access_token_expiry, ultimate_session_expiry_ts
+                    )
+                    if refresh_token_expiry is not None:
+                        refresh_token_expiry = min(
+                            refresh_token_expiry, ultimate_session_expiry_ts
+                        )
+
                 (
                     refresh_token,
                     refresh_token_id,
                 ) = await self._auth_handler.create_refresh_token_for_user_id(
                     user_id,
                     device_id=registered_device_id,
+                    expiry_ts=refresh_token_expiry,
+                    ultimate_session_expiry_ts=ultimate_session_expiry_ts,
                 )
-                valid_until_ms = self.clock.time_msec() + self.access_token_lifetime
 
             access_token = await self._auth_handler.create_access_token_for_user_id(
                 user_id,
                 device_id=registered_device_id,
-                valid_until_ms=valid_until_ms,
+                valid_until_ms=access_token_expiry,
                 is_appservice_ghost=is_appservice_ghost,
                 refresh_token_id=refresh_token_id,
             )
@@ -830,7 +867,7 @@ class RegistrationHandler:
         return {
             "device_id": registered_device_id,
             "access_token": access_token,
-            "valid_until_ms": valid_until_ms,
+            "valid_until_ms": access_token_expiry,
             "refresh_token": refresh_token,
         }
 

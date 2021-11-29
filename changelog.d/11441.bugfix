@@ -1,0 +1,1 @@
+Fix a bug introduced in 1.47.0 where `send_join` could fail due to an outdated `ijson` version.

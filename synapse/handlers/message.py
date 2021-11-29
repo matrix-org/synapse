@@ -252,7 +252,7 @@ class MessageHandler:
             now,
             # We don't bother bundling aggregations in when asked for state
             # events, as clients won't use them.
-            bundle_aggregations=False,
+            bundle_relations=False,
         )
         return events
 
