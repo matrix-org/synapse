@@ -1,1 +1,1 @@
-Add a test case to sanity check that we parse `/send_join` responses correctly.
+Fix a bug introduced in 1.47.0 where `send_join` could fail due to an outdated `ijson` version.
