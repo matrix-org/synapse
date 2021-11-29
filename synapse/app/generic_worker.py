@@ -458,20 +458,14 @@ def start(config_options: List[str]) -> None:
         config.appservice.notify_appservices = False
 
     if config.worker.worker_app == "synapse.app.user_dir":
-        if config.server.update_user_directory:
+        if config.worker.worker_name != config.server.worker_to_update_user_directory:
             sys.stderr.write(
-                "\nThe update_user_directory must be disabled in the main synapse process"
-                "\nbefore they can be run in a separate worker."
-                "\nPlease add ``update_user_directory: false`` to the main config"
-                "\n"
+                "\nThe worker_to_update_user_directory config variable must point to this worker's name"
+                "\nbefore this worker is able to run it."
+                "\nPlease add or edit "
+                f"``worker_to_update_user_directory: \"{config.worker.worker_name}\"`` in the main config\n"
             )
             sys.exit(1)
-
-        # Force the pushers to start since they will be disabled in the main config
-        config.server.update_user_directory = True
-    else:
-        # For other worker types we force this to off.
-        config.server.update_user_directory = False
 
     synapse.events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
     synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage

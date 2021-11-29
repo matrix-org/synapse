@@ -204,6 +204,14 @@ presence:
 #
 #enable_search: false
 
+# User Directory Updates
+#
+# If specified, a worker with that name will be the only one able to update
+# the user directory. Important for querying shared rooms. If the worker is
+# specified, but not running, the user directory may become outdated.
+# Defaults to null, meaning the main process will handle this.
+#worker_to_update_user_directory: null
+
 # Prevent outgoing requests from being sent to the following blacklisted IP address
 # CIDR ranges. If this option is not specified then it defaults to private IP
 # address ranges (see the example below).

@@ -42,18 +42,10 @@ class UserSharedRoomsServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
-        self.user_directory_active = hs.config.server.update_user_directory
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-
-        if not self.user_directory_active:
-            raise SynapseError(
-                code=400,
-                msg="The user directory is disabled on this server. Cannot determine shared rooms.",
-                errcode=Codes.FORBIDDEN,
-            )
 
         UserID.from_string(user_id)
 

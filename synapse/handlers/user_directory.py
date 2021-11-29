@@ -60,7 +60,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
-        self.update_user_directory = hs.config.server.update_user_directory
+        self.update_user_directory = hs.should_update_user_directory()
         self.search_all_users = hs.config.userdirectory.user_directory_search_all_users
         self.spam_checker = hs.get_spam_checker()
         # The current position in the current_state_delta stream

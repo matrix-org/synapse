@@ -834,6 +834,13 @@ class HomeServer(metaclass=abc.ABCMeta):
         "Should this server be sending federation traffic directly?"
         return self.config.worker.send_federation
 
+    def should_update_user_directory(self) -> bool:
+        "Should this process be updating the user directory?"
+        if self.config.worker.worker_app is None:  # we're the main process
+            return self.config.server.worker_to_update_user_directory is None
+        else:
+            return self.config.server.worker_to_update_user_directory == self.config.worker.worker_name
+
     @cache_in_self
     def get_request_ratelimiter(self) -> RequestRatelimiter:
         return RequestRatelimiter(

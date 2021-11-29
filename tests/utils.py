@@ -169,7 +169,7 @@ def default_config(name, parse=False):
         "default_room_version": DEFAULT_ROOM_VERSION,
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
-        "update_user_directory": False,
+        "worker_to_update_user_directory": "dingleberry",
         "caches": {"global_factor": 1},
         "listeners": [{"port": 0, "type": "http"}],
     }
