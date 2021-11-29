@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 from http import HTTPStatus
 
 import synapse.rest.admin
@@ -393,7 +392,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             "rooms/%s/report/%s" % (room_id, event_id),
-            json.dumps({"score": -100, "reason": "this makes me sad"}),
+            {"score": -100, "reason": "this makes me sad"},
             access_token=user_tok,
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
@@ -406,7 +405,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             "rooms/%s/report/%s" % (room_id, event_id),
-            json.dumps({}),
+            {},
             access_token=user_tok,
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
@@ -585,7 +584,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             "rooms/%s/report/%s" % (room_id, event_id),
-            json.dumps({"score": -100, "reason": "this makes me sad"}),
+            {"score": -100, "reason": "this makes me sad"},
             access_token=user_tok,
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)

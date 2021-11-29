@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import os
 from http import HTTPStatus
 
@@ -480,7 +479,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "PUT",
             "/profile/%s/avatar_url" % (self.admin_user,),
-            content=json.dumps({"avatar_url": "mxc://%s" % (server_and_media_id,)}),
+            content={"avatar_url": "mxc://%s" % (server_and_media_id,)},
             access_token=self.admin_user_tok,
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
@@ -525,7 +524,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "PUT",
             "/rooms/%s/state/m.room.avatar" % (room_id,),
-            content=json.dumps({"url": "mxc://%s" % (server_and_media_id,)}),
+            content={"url": "mxc://%s" % (server_and_media_id,)},
             access_token=self.admin_user_tok,
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)

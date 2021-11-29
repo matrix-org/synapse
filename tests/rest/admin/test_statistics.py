@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 from http import HTTPStatus
 from typing import Any, Dict, List, Optional
 
@@ -62,7 +61,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET",
             self.url,
-            json.dumps({}),
+            {},
             access_token=self.other_user_tok,
         )
 
