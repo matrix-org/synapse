@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional
 
 from synapse.api.constants import RoomCreationPreset
 from synapse.config._base import Config, ConfigError
@@ -123,12 +124,14 @@ class RegistrationConfig(Config):
             refreshable_access_token_lifetime = self.parse_duration(
                 refreshable_access_token_lifetime
             )
-        self.refreshable_access_token_lifetime = refreshable_access_token_lifetime
+        self.refreshable_access_token_lifetime: Optional[
+            int
+        ] = refreshable_access_token_lifetime
 
         refresh_token_lifetime = config.get("refresh_token_lifetime")
         if refresh_token_lifetime is not None:
             refresh_token_lifetime = self.parse_duration(refresh_token_lifetime)
-        self.refresh_token_lifetime = refresh_token_lifetime
+        self.refresh_token_lifetime: Optional[int] = refresh_token_lifetime
 
         # The fallback template used for authenticating using a registration token
         self.registration_token_template = self.read_template("registration_token.html")
