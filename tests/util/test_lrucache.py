@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+from typing import List
 from unittest.mock import Mock
 
 from synapse.util.caches.lrucache import LruCache, setup_expire_lru_cache_entries
@@ -260,6 +261,17 @@ class LruCacheSizedTestCase(unittest.HomeserverTestCase):
         self.assertEquals(cache["key3"], [3])
         self.assertEquals(cache["key4"], [4])
         self.assertEquals(cache["key5"], [5, 6])
+
+    def test_zero_size_drop_from_cache(self) -> None:
+        """Test that `drop_from_cache` works correctly with 0-sized entries"""
+        cache: LruCache[str, List[int]] = LruCache(5, size_callback=lambda x: 0)
+        cache["key1"] = []
+
+        self.assertEqual(len(cache), 0)
+        cache.cache["key1"].drop_from_cache()
+        self.assertIsNone(
+            cache.pop("key1"), "Cache entry should have been evicted but wasn't"
+        )
 
 
 class TimeEvictionTestCase(unittest.HomeserverTestCase):
