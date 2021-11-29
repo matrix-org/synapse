@@ -22,6 +22,8 @@ class HomeserverAppStartTestCase(ConfigFileTestCase):
     def test_wrong_start_caught(self):
         # Generate a config with a worker_app
         self.generate_config()
+        # Add a blank line as otherwise the next addition ends up on a line with a comment
+        self.add_lines_to_config(["  "])
         self.add_lines_to_config(["worker_app: test_worker_app"])
 
         # Ensure that starting master process with worker config raises an exception
