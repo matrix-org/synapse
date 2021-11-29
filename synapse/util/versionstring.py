@@ -47,56 +47,26 @@ def get_version_string(module: ModuleType) -> str:
         null = open(os.devnull, "w")
         cwd = os.path.dirname(os.path.abspath(module.__file__))
 
-        try:
-            git_branch = (
-                subprocess.check_output(
-                    ["git", "rev-parse", "--abbrev-ref", "HEAD"], stderr=null, cwd=cwd
+        def _run_git_command(prefix: str, *params: str) -> str:
+            try:
+                result = (
+                    subprocess.check_output(["git", *params], stderr=null, cwd=cwd)
+                    .strip()
+                    .decode("ascii")
                 )
-                .strip()
-                .decode("ascii")
-            )
-            git_branch = "b=" + git_branch
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            # FileNotFoundError can arise when git is not installed
-            git_branch = ""
+                return prefix + result
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                return ""
 
-        try:
-            git_tag = (
-                subprocess.check_output(
-                    ["git", "describe", "--exact-match"], stderr=null, cwd=cwd
-                )
-                .strip()
-                .decode("ascii")
-            )
-            git_tag = "t=" + git_tag
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            git_tag = ""
+        git_branch = _run_git_command("b=", "rev-parse", "--abbrev-ref", "HEAD")
+        git_tag = _run_git_command("t=", "describe", "--exact-match")
+        git_commit = _run_git_command("", "rev-parse", "--short", "HEAD")
 
-        try:
-            git_commit = (
-                subprocess.check_output(
-                    ["git", "rev-parse", "--short", "HEAD"], stderr=null, cwd=cwd
-                )
-                .strip()
-                .decode("ascii")
-            )
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            git_commit = ""
-
-        try:
-            dirty_string = "-this_is_a_dirty_checkout"
-            is_dirty = (
-                subprocess.check_output(
-                    ["git", "describe", "--dirty=" + dirty_string], stderr=null, cwd=cwd
-                )
-                .strip()
-                .decode("ascii")
-                .endswith(dirty_string)
-            )
-
-            git_dirty = "dirty" if is_dirty else ""
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            git_dirty = ""
+        dirty_string = "-this_is_a_dirty_checkout"
+        is_dirty = _run_git_command("", "describe", "--dirty=" + dirty_string).endswith(
+            dirty_string
+        )
+        git_dirty = "dirty" if is_dirty else ""
 
         if git_branch or git_tag or git_commit or git_dirty:
             git_version = ",".join(
