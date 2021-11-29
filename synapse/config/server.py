@@ -323,7 +323,9 @@ class ServerConfig(Config):
 
         # Which worker is responsible for updating the user directory,
         # None means the main process handles this.
-        self.worker_to_update_user_directory = config.get("worker_to_update_user_directory", None)
+        self.worker_to_update_user_directory = config.get(
+            "worker_to_update_user_directory", None
+        )
 
         # whether to enable the media repository endpoints. This should be set
         # to false if the media repository is running as a separate endpoint;

@@ -463,7 +463,7 @@ def start(config_options: List[str]) -> None:
                 "\nThe worker_to_update_user_directory config variable must point to this worker's name"
                 "\nbefore this worker is able to run it."
                 "\nPlease add or edit "
-                f"``worker_to_update_user_directory: \"{config.worker.worker_name}\"`` in the main config\n"
+                f'``worker_to_update_user_directory: "{config.worker.worker_name}"`` in the main config\n'
             )
             sys.exit(1)
 

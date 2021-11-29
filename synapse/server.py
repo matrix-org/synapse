@@ -839,7 +839,10 @@ class HomeServer(metaclass=abc.ABCMeta):
         if self.config.worker.worker_app is None:  # we're the main process
             return self.config.server.worker_to_update_user_directory is None
         else:
-            return self.config.server.worker_to_update_user_directory == self.config.worker.worker_name
+            return (
+                self.config.server.worker_to_update_user_directory
+                == self.config.worker.worker_name
+            )
 
     @cache_in_self
     def get_request_ratelimiter(self) -> RequestRatelimiter:
