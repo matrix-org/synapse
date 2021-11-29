@@ -615,7 +615,7 @@ class FederationServer(FederationBase):
         time_now = self._clock.time_msec()
         event_json = event.get_pdu_json()
         return {
-            # TODO Remove the unstable prefix when servers hae updated.
+            # TODO Remove the unstable prefix when servers have updated.
             "org.matrix.msc3083.v2.event": event_json,
             "event": event_json,
             "state": [p.get_pdu_json(time_now) for p in state.values()],
