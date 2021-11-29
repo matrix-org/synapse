@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from http import HTTPStatus
+
 import synapse.rest.admin
 from synapse.api.errors import Codes, SynapseError
 from synapse.rest.client import login

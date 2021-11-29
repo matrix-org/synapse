@@ -205,9 +205,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             data,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(
-            HTTPStatus.BAD_REQUEST, channel2.code, msg=channel2.json_body
-        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel2.code, msg=channel2.json_body)
         self.assertEqual(channel2.json_body["errcode"], Codes.INVALID_PARAM)
 
     def test_create_unable_to_generate_token(self):
