@@ -1,4 +1,5 @@
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,10 +30,11 @@ def get_version_string(module: ModuleType) -> str:
     If called on a module not in a git checkout will return `__version__`.
 
     Args:
-        module (module)
+        module: The module to check the version of. Must declare a __version__
+            attribute.
 
     Returns:
-        str
+        The module version (as a string).
     """
 
     cached_version = version_cache.get(module)
@@ -46,7 +48,7 @@ def get_version_string(module: ModuleType) -> str:
     try:
         with open(os.devnull, "w") as null:
             cwd = os.path.dirname(os.path.abspath(module.__file__))
-    
+
             def _run_git_command(prefix: str, *params: str) -> str:
                 try:
                     result = (
