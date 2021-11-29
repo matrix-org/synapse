@@ -263,7 +263,7 @@ class LruCacheSizedTestCase(unittest.HomeserverTestCase):
         self.assertEquals(cache["key5"], [5, 6])
 
     def test_zero_size_drop_from_cache(self) -> None:
-        """Test that `drop_from_cache` works correctly with 0-sized entries"""
+        """Test that `drop_from_cache` works correctly with 0-sized entries."""
         cache: LruCache[str, List[int]] = LruCache(5, size_callback=lambda x: 0)
         cache["key1"] = []
 
