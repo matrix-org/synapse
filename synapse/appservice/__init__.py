@@ -171,7 +171,28 @@ class ApplicationService:
                 return True
         return False
 
-    async def _is_interested_in_room(self, room_id: str, store: "DataStore") -> bool:
+    @cached(num_args=1, cache_context=True)
+    async def _is_interested_in_room(
+        self,
+        room_id: str,
+        store: "DataStore",
+        cache_context: _CacheContext,
+    ) -> bool:
+        """
+        Returns whether the application service is interested in a given room ID.
+
+        The appservice is considered to be interested in the room if either: the ID or one
+        of the aliases of the room is in the appservice's room ID or alias namespace
+        respectively, or if one of the members of the room fall into the appservice's user
+        namespace.
+
+        Args:
+            room_id: The ID of the room to check.
+            store: The homeserver's datastore class.
+
+        Returns:
+            True if the application service is interested in the room, False if not.
+        """
         # Check if we have interest in this room ID
         if self.is_room_id_in_namespace(room_id):
             return True
@@ -185,13 +206,16 @@ class ApplicationService:
         # And finally, perform an expensive check on whether the appservice
         # is interested in any users in the room based on their user ID
         # and the appservice's user namespace.
-        if await self.matches_user_in_member_list(room_id, store):
-            return True
+        return await self.matches_user_in_member_list(
+            room_id, store, on_invalidate=cache_context.invalidate
+        )
 
-        return False
-
+    @cached(num_args=1, cache_context=True)
     async def is_interested_in_event(
-        self, event: EventBase, store: Optional["DataStore"] = None
+        self,
+        event: EventBase,
+        cache_context: _CacheContext,
+        store: Optional["DataStore"] = None,
     ) -> bool:
         """Check if this service is interested in this event.
 
@@ -221,17 +245,16 @@ class ApplicationService:
         # TODO: The store is only optional here to aid testing this function. We should
         #  instead convert the tests to use HomeServerTestCase in order to get a working
         #  database instance.
-        if (
-            store is not None
-            and await self._is_interested_in_room(event.room_id, store)
+        if store is not None and await self._is_interested_in_room(
+            event.room_id, store, on_invalidate=cache_context.invalidate
         ):
             return True
 
         return False
 
-    @cached(num_args=1)
+    @cached(num_args=1, cache_context=True)
     async def is_interested_in_presence(
-        self, user_id: UserID, store: "DataStore"
+        self, user_id: UserID, store: "DataStore", cache_context: _CacheContext
     ) -> bool:
         """Check if this service is interested a user's presence
 
@@ -249,7 +272,9 @@ class ApplicationService:
 
         # Then find out if the appservice is interested in any of those rooms
         for room_id in room_ids:
-            if await self.matches_user_in_member_list(room_id, store):
+            if await self.matches_user_in_member_list(
+                room_id, store, on_invalidate=cache_context.invalidate
+            ):
                 return True
         return False
 
