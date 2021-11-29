@@ -46,15 +46,16 @@ class ConfigLoadingFileTestCase(ConfigFileTestCase):
                 "was: %r" % (config.key.macaroon_secret_key,)
             )
 
-        config = HomeServerConfig.load_or_generate_config("", ["-c", self.config_file])
+        config2 = HomeServerConfig.load_or_generate_config("", ["-c", self.config_file])
+        assert config2 is not None
         self.assertTrue(
-            hasattr(config.key, "macaroon_secret_key"),
+            hasattr(config2.key, "macaroon_secret_key"),
             "Want config to have attr macaroon_secret_key",
         )
-        if len(config.key.macaroon_secret_key) < 5:
+        if len(config2.key.macaroon_secret_key) < 5:
             self.fail(
                 "Want macaroon secret key to be string of at least length 5,"
-                "was: %r" % (config.key.macaroon_secret_key,)
+                "was: %r" % (config2.key.macaroon_secret_key,)
             )
 
     def test_load_succeeds_if_macaroon_secret_key_missing(self):
@@ -62,6 +63,9 @@ class ConfigLoadingFileTestCase(ConfigFileTestCase):
         config1 = HomeServerConfig.load_config("", ["-c", self.config_file])
         config2 = HomeServerConfig.load_config("", ["-c", self.config_file])
         config3 = HomeServerConfig.load_or_generate_config("", ["-c", self.config_file])
+        assert config1 is not None
+        assert config2 is not None
+        assert config3 is not None
         self.assertEqual(
             config1.key.macaroon_secret_key, config2.key.macaroon_secret_key
         )
@@ -78,14 +82,16 @@ class ConfigLoadingFileTestCase(ConfigFileTestCase):
         config = HomeServerConfig.load_config("", ["-c", self.config_file])
         self.assertFalse(config.registration.enable_registration)
 
-        config = HomeServerConfig.load_or_generate_config("", ["-c", self.config_file])
-        self.assertFalse(config.registration.enable_registration)
+        config2 = HomeServerConfig.load_or_generate_config("", ["-c", self.config_file])
+        assert config2 is not None
+        self.assertFalse(config2.registration.enable_registration)
 
         # Check that either config value is clobbered by the command line.
-        config = HomeServerConfig.load_or_generate_config(
+        config3 = HomeServerConfig.load_or_generate_config(
             "", ["-c", self.config_file, "--enable-registration"]
         )
-        self.assertTrue(config.registration.enable_registration)
+        assert config3 is not None
+        self.assertTrue(config3.registration.enable_registration)
 
     def test_stats_enabled(self):
         self.generate_config_and_remove_lines_containing("enable_metrics")

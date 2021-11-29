@@ -106,6 +106,15 @@ class RefreshTokenLookupResult:
     has_next_access_token_been_used: bool
     """True if the next access token was already used at least once."""
 
+    expiry_ts: Optional[int]
+    """The time at which the refresh token expires and can not be used.
+    If None, the refresh token doesn't expire."""
+
+    ultimate_session_expiry_ts: Optional[int]
+    """The time at which the session comes to an end and can no longer be
+    refreshed.
+    If None, the session can be refreshed indefinitely."""
+
 
 class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     def __init__(
@@ -1198,8 +1207,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         expiration_ts = now_ms + self._account_validity_period
 
         if use_delta:
+            assert self._account_validity_startup_job_max_delta is not None
             expiration_ts = random.randrange(
-                expiration_ts - self._account_validity_startup_job_max_delta,
+                int(expiration_ts - self._account_validity_startup_job_max_delta),
                 expiration_ts,
             )
 
@@ -1625,8 +1635,10 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                     rt.user_id,
                     rt.device_id,
                     rt.next_token_id,
-                    (nrt.next_token_id IS NOT NULL) has_next_refresh_token_been_refreshed,
-                    at.used has_next_access_token_been_used
+                    (nrt.next_token_id IS NOT NULL) AS has_next_refresh_token_been_refreshed,
+                    at.used AS has_next_access_token_been_used,
+                    rt.expiry_ts,
+                    rt.ultimate_session_expiry_ts
                 FROM refresh_tokens rt
                 LEFT JOIN refresh_tokens nrt ON rt.next_token_id = nrt.id
                 LEFT JOIN access_tokens at ON at.refresh_token_id = nrt.id
@@ -1647,6 +1659,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 has_next_refresh_token_been_refreshed=row[4],
                 # This column is nullable, ensure it's a boolean
                 has_next_access_token_been_used=(row[5] or False),
+                expiry_ts=row[6],
+                ultimate_session_expiry_ts=row[7],
             )
 
         return await self.db_pool.runInteraction(
@@ -1728,11 +1742,11 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         )
 
         self.db_pool.updates.register_background_update_handler(
-            "user_threepids_grandfather", self._bg_user_threepids_grandfather
+            "users_set_deactivated_flag", self._background_update_set_deactivated_flag
         )
 
-        self.db_pool.updates.register_background_update_handler(
-            "users_set_deactivated_flag", self._background_update_set_deactivated_flag
+        self.db_pool.updates.register_noop_background_update(
+            "user_threepids_grandfather"
         )
 
         self.db_pool.updates.register_background_index_update(
@@ -1804,35 +1818,6 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             )
 
         return nb_processed
-
-    async def _bg_user_threepids_grandfather(self, progress, batch_size):
-        """We now track which identity servers a user binds their 3PID to, so
-        we need to handle the case of existing bindings where we didn't track
-        this.
-
-        We do this by grandfathering in existing user threepids assuming that
-        they used one of the server configured trusted identity servers.
-        """
-        id_servers = set(self.config.registration.trusted_third_party_id_servers)
-
-        def _bg_user_threepids_grandfather_txn(txn):
-            sql = """
-                INSERT INTO user_threepid_id_server
-                    (user_id, medium, address, id_server)
-                SELECT user_id, medium, address, ?
-                FROM user_threepids
-            """
-
-            txn.execute_batch(sql, [(id_server,) for id_server in id_servers])
-
-        if id_servers:
-            await self.db_pool.runInteraction(
-                "_bg_user_threepids_grandfather", _bg_user_threepids_grandfather_txn
-            )
-
-        await self.db_pool.updates._end_background_update("user_threepids_grandfather")
-
-        return 1
 
     async def set_user_deactivated_status(
         self, user_id: str, deactivated: bool
@@ -1943,6 +1928,8 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         user_id: str,
         token: str,
         device_id: Optional[str],
+        expiry_ts: Optional[int],
+        ultimate_session_expiry_ts: Optional[int],
     ) -> int:
         """Adds a refresh token for the given user.
 
@@ -1950,6 +1937,13 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             user_id: The user ID.
             token: The new access token to add.
             device_id: ID of the device to associate with the refresh token.
+            expiry_ts (milliseconds since the epoch): Time after which the
+                refresh token cannot be used.
+                If None, the refresh token never expires until it has been used.
+            ultimate_session_expiry_ts (milliseconds since the epoch):
+                Time at which the session will end and can not be extended any
+                further.
+                If None, the session can be refreshed indefinitely.
         Raises:
             StoreError if there was a problem adding this.
         Returns:
@@ -1965,6 +1959,8 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 "device_id": device_id,
                 "token": token,
                 "next_token_id": None,
+                "expiry_ts": expiry_ts,
+                "ultimate_session_expiry_ts": ultimate_session_expiry_ts,
             },
             desc="add_refresh_token_to_user",
         )

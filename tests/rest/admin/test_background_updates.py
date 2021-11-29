@@ -20,6 +20,7 @@ import synapse.rest.admin
 from synapse.api.errors import Codes
 from synapse.rest.client import login
 from synapse.server import HomeServer
+from synapse.storage.background_updates import BackgroundUpdater
 
 from tests import unittest
 
@@ -134,7 +135,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
         self._register_bg_update()
 
         self.store.db_pool.updates.start_doing_background_updates()
-        self.reactor.pump([1.0, 1.0])
+        self.reactor.pump([1.0, 1.0, 1.0])
 
         channel = self.make_request(
             "GET",
@@ -150,9 +151,11 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
                 "current_updates": {
                     "master": {
                         "name": "test_update",
-                        "average_items_per_ms": 0.1,
+                        "average_items_per_ms": 0.001,
                         "total_duration_ms": 1000.0,
-                        "total_item_count": 100,
+                        "total_item_count": (
+                            BackgroundUpdater.MINIMUM_BACKGROUND_BATCH_SIZE
+                        ),
                     }
                 },
                 "enabled": True,
@@ -203,9 +206,11 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
                 "current_updates": {
                     "master": {
                         "name": "test_update",
-                        "average_items_per_ms": 0.1,
+                        "average_items_per_ms": 0.001,
                         "total_duration_ms": 1000.0,
-                        "total_item_count": 100,
+                        "total_item_count": (
+                            BackgroundUpdater.MINIMUM_BACKGROUND_BATCH_SIZE
+                        ),
                     }
                 },
                 "enabled": False,
@@ -230,9 +235,11 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
                 "current_updates": {
                     "master": {
                         "name": "test_update",
-                        "average_items_per_ms": 0.1,
+                        "average_items_per_ms": 0.001,
                         "total_duration_ms": 1000.0,
-                        "total_item_count": 100,
+                        "total_item_count": (
+                            BackgroundUpdater.MINIMUM_BACKGROUND_BATCH_SIZE
+                        ),
                     }
                 },
                 "enabled": False,
@@ -267,9 +274,11 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
                 "current_updates": {
                     "master": {
                         "name": "test_update",
-                        "average_items_per_ms": 0.1,
+                        "average_items_per_ms": 0.001,
                         "total_duration_ms": 2000.0,
-                        "total_item_count": 200,
+                        "total_item_count": (
+                            2 * BackgroundUpdater.MINIMUM_BACKGROUND_BATCH_SIZE
+                        ),
                     }
                 },
                 "enabled": True,

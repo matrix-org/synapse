@@ -2039,6 +2039,12 @@ sso:
     #
     #algorithm: "provided-by-your-issuer"
 
+    # Name of the claim containing a unique identifier for the user.
+    #
+    # Optional, defaults to `sub`.
+    #
+    #subject_claim: "sub"
+
     # The issuer to validate the "iss" claim against.
     #
     # Optional, if provided the "iss" claim will be required and

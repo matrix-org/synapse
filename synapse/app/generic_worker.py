@@ -113,6 +113,7 @@ from synapse.storage.databases.main.monthly_active_users import (
 )
 from synapse.storage.databases.main.presence import PresenceStore
 from synapse.storage.databases.main.room import RoomWorkerStore
+from synapse.storage.databases.main.room_batch import RoomBatchStore
 from synapse.storage.databases.main.search import SearchStore
 from synapse.storage.databases.main.session import SessionStore
 from synapse.storage.databases.main.stats import StatsStore
@@ -240,6 +241,7 @@ class GenericWorkerSlavedStore(
     SlavedEventStore,
     SlavedKeyStore,
     RoomWorkerStore,
+    RoomBatchStore,
     DirectoryStore,
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,

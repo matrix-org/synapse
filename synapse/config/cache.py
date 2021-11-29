@@ -15,7 +15,7 @@
 import os
 import re
 import threading
-from typing import Callable, Dict
+from typing import Callable, Dict, Optional
 
 from synapse.python_dependencies import DependencyException, check_requirements
 
@@ -217,7 +217,7 @@ class CacheConfig(Config):
 
         expiry_time = cache_config.get("expiry_time")
         if expiry_time:
-            self.expiry_time_msec = self.parse_duration(expiry_time)
+            self.expiry_time_msec: Optional[int] = self.parse_duration(expiry_time)
         else:
             self.expiry_time_msec = None
 
