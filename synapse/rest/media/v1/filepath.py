@@ -80,11 +80,8 @@ def _wrap_with_jail_check(relative: bool) -> Callable[[GetPathMethod], GetPathMe
                 # directory, since the media store directory may itself be a relative
                 # path.
                 if relative:
-                    normalized_path = os.path.normpath(
-                        os.path.join(self.base_path, path)
-                    )
-                else:
-                    normalized_path = os.path.normpath(path)
+                    path = os.path.join(self.base_path, path)
+                normalized_path = os.path.normpath(path)
 
                 # Check that the path lies within the media store directory.
                 # `os.path.commonpath` does not take `../`s into account and
