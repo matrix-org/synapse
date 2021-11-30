@@ -1234,7 +1234,7 @@ class TimestampLookupHandler:
         room_id: str,
         timestamp: int,
         direction: str,
-    ) -> str:
+    ) -> Tuple[str, int]:
         """Find the closest event to the given timestamp in the given direction.
         If we can't find an event locally or the event we have locally is next to a gap,
         it will ask other federated homeservers for an event.
@@ -1248,7 +1248,8 @@ class TimestampLookupHandler:
                 or backward from the given timestamp to find the closest event.
 
         Returns:
-            `event_id` closest to the given timestamp in the given direction
+            A tuple containing the `event_id` closest to the given timestamp in
+            the given direction and the `origin_server_ts`.
 
         Raises:
             SynapseError if unable to find any event locally in the given direction
@@ -1329,7 +1330,7 @@ class TimestampLookupHandler:
                         and abs(origin_server_ts - timestamp)
                         < abs(local_event.origin_server_ts - timestamp)
                     ):
-                        return remote_event_id
+                        return remote_event_id, origin_server_ts
                 except Exception as ex:
                     logger.debug(
                         "Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
@@ -1346,7 +1347,7 @@ class TimestampLookupHandler:
                 errcode=Codes.NOT_FOUND,
             )
 
-        return local_event_id
+        return local_event_id, local_event.origin_server_ts
 
 
 class RoomEventSource(EventSource[RoomStreamToken, EventBase]):

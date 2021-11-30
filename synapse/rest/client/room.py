@@ -1113,12 +1113,16 @@ class TimestampLookupRestServlet(RestServlet):
         timestamp = parse_integer(request, "ts", required=True)
         direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])
 
-        event_id = await self.timestamp_lookup_handler.get_event_for_timestamp(
+        (
+            event_id,
+            origin_server_ts,
+        ) = await self.timestamp_lookup_handler.get_event_for_timestamp(
             requester, room_id, timestamp, direction
         )
 
         return 200, {
             "event_id": event_id,
+            "origin_server_ts": origin_server_ts,
         }
 
 
