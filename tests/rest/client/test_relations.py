@@ -653,6 +653,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             },
         )
 
+    @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
     def test_ignore_invalid_room(self):
         """Test that we ignore invalid relations over federation."""
         # Create another room and send a message in it.
@@ -664,7 +665,8 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         with patch(
             "synapse.handlers.message.EventCreationHandler._validate_event_relation"
         ):
-            # Generate a reaction and reference relations from a different room.
+            # Generate a reaction, reference, and thread relations from a
+            # different room.
             self.get_success(
                 inject_event(
                     self.hs,
@@ -692,6 +694,23 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                         "msgtype": "m.text",
                         "m.relates_to": {
                             "rel_type": RelationTypes.REFERENCE,
+                            "event_id": parent_id,
+                        },
+                    },
+                )
+            )
+
+            self.get_success(
+                inject_event(
+                    self.hs,
+                    room_id=self.room,
+                    type="m.room.message",
+                    sender=self.user_id,
+                    content={
+                        "body": "foo",
+                        "msgtype": "m.text",
+                        "m.relates_to": {
+                            "rel_type": RelationTypes.THREAD,
                             "event_id": parent_id,
                         },
                     },
