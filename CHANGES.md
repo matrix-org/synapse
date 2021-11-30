@@ -53,7 +53,7 @@ Improved Documentation
 Deprecations and Removals
 -------------------------
 
-- Remove deprecated `trust_identity_server_for_password_resets` configuration flag. ([\#11395](https://github.com/matrix-org/synapse/issues/11395))
+- Remove deprecated `trust_identity_server_for_password_resets` configuration flag. ([\#11333](https://github.com/matrix-org/synapse/issues/11333), [\#11395](https://github.com/matrix-org/synapse/issues/11395))
 
 
 Internal Changes
@@ -73,7 +73,6 @@ Internal Changes
 - Add type hints to `synapse.util`. ([\#11321](https://github.com/matrix-org/synapse/issues/11321), [\#11328](https://github.com/matrix-org/synapse/issues/11328))
 - Improve type annotations in Synapse's test suite. ([\#11323](https://github.com/matrix-org/synapse/issues/11323), [\#11330](https://github.com/matrix-org/synapse/issues/11330))
 - Test that room alias deletion works as intended. ([\#11327](https://github.com/matrix-org/synapse/issues/11327))
-- Remove deprecated `trust_identity_server_for_password_resets` configuration flag. ([\#11333](https://github.com/matrix-org/synapse/issues/11333))
 - Add type annotations for some methods and properties in the module API. ([\#11341](https://github.com/matrix-org/synapse/issues/11341))
 - Fix running `scripts-dev/complement.sh`, which was broken in v1.47.0rc1. ([\#11368](https://github.com/matrix-org/synapse/issues/11368))
 - Rename internal functions for token generation to better reflect what they do. ([\#11369](https://github.com/matrix-org/synapse/issues/11369), [\#11370](https://github.com/matrix-org/synapse/issues/11370))
