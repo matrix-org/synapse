@@ -32,7 +32,6 @@ from typing import (
 
 import attr
 import ijson
-from typing_extensions import TypedDict
 
 from synapse.api.constants import Membership
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
@@ -54,13 +53,6 @@ logger = logging.getLogger(__name__)
 # is parsed in a streaming manner, which helps alleviate the issue of memory
 # usage a bit.
 MAX_RESPONSE_SIZE_SEND_JOIN = 500 * 1024 * 1024
-
-
-class TimestampToEventResponse(TypedDict):
-    """Typed response dictionary for the federation /timestamp_to_event endpoint"""
-
-    event_id: str
-    origin_server_ts: int
 
 
 class TransportLayerClient:
@@ -160,7 +152,7 @@ class TransportLayerClient:
     @log_function
     async def timestamp_to_event(
         self, destination: str, room_id: str, timestamp: int, direction: str
-    ) -> TimestampToEventResponse:
+    ) -> Union[JsonDict, List]:
         """
         Calls a remote federating server at `destination` asking for their
         closest event to the given timestamp in the given direction.
@@ -174,8 +166,7 @@ class TransportLayerClient:
                 or backward from the given timestamp to find the closest event.
 
         Returns:
-            Results in a dict received from the remote homeserver.
-            Expected response will include the `event_id` key for the closest event.
+            Response dict received from the remote homeserver.
 
         Raises:
             Various exceptions when the request fails
@@ -191,11 +182,8 @@ class TransportLayerClient:
         remote_response = await self.client.get_json(
             destination, path=path, args=args, try_trailing_slash_on_400=True
         )
-        assert isinstance(remote_response, dict)
-        assert remote_response.get("event_id", None) is not None
-        assert remote_response.get("origin_server_ts", None) is not None
 
-        return cast(TimestampToEventResponse, remote_response)
+        return remote_response
 
     @log_function
     async def send_transaction(

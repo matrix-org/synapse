@@ -1226,7 +1226,7 @@ class TimestampLookupHandler:
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.state_handler = hs.get_state_handler()
-        self.transport_layer = hs.get_federation_transport_client()
+        self.federation_client = hs.get_federation_client()
 
     async def get_event_for_timestamp(
         self,
@@ -1309,7 +1309,7 @@ class TimestampLookupHandler:
             # Loop through each homeserver candidate until we get a succesful response
             for domain in likely_domains:
                 try:
-                    remote_response = await self.transport_layer.timestamp_to_event(
+                    remote_response = await self.federation_client.timestamp_to_event(
                         domain, room_id, timestamp, direction
                     )
                     logger.debug(
@@ -1323,8 +1323,8 @@ class TimestampLookupHandler:
                     # this event and run this whole
                     # `get_event_for_timestamp` function again to make sure
                     # they didn't give us an event from their gappy history.
-                    remote_event_id = remote_response["event_id"]
-                    origin_server_ts = remote_response["origin_server_ts"]
+                    remote_event_id = remote_response.event_id
+                    origin_server_ts = remote_response.origin_server_ts
 
                     # Only return the remote event if it's closer than the local event
                     if not local_event or (
