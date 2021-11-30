@@ -270,7 +270,7 @@ class _Node(Generic[KT, VT]):
         removed from all lists.
         """
         cache = self._cache()
-        if cache is None or not cache.pop(self.key, None):
+        if cache is None or cache.pop(self.key, None) is None:
             # `cache.pop` should call `drop_from_lists()`, unless this Node had
             # already been removed from the cache.
             self.drop_from_lists()
