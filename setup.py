@@ -155,7 +155,7 @@ setup(
     entry_points={
         "console_scripts": [
             "synapse_homeserver = synapse.app.homeserver:main",
-            "synapse_worker = synapse.app.generic_worker:main"
+            "synapse_worker = synapse.app.generic_worker:main",
         ]
     },
     classifiers=[

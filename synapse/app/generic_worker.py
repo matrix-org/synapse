@@ -505,7 +505,7 @@ def start(config_options: List[str]) -> None:
     _base.start_worker_reactor("synapse-generic-worker", config)
 
 
-def main():
+def main() -> None:
     with LoggingContext("main"):
         start(sys.argv[1:])
 
