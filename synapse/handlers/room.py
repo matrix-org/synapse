@@ -1265,7 +1265,7 @@ class TimestampLookupHandler:
         )
 
         # Check for gaps in the history where events could be hiding in between
-        # the timestamp given and the event we were able to find localy
+        # the timestamp given and the event we were able to find locally
         is_event_next_to_backward_gap = False
         is_event_next_to_forward_gap = False
         if local_event_id:
