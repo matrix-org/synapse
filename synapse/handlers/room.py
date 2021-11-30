@@ -775,8 +775,11 @@ class RoomCreationHandler:
             raise SynapseError(403, "Room visibility value not allowed.")
 
         if is_public:
+            room_aliases = []
+            if room_alias:
+                room_aliases.append(room_alias.to_string())
             if not self.config.roomdirectory.is_publishing_room_allowed(
-                user_id, room_id, room_alias
+                user_id, room_id, room_aliases
             ):
                 # Let's just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages

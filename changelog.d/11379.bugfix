@@ -1,0 +1,1 @@
+Fix an issue introduced in v1.47.0 which prevented servers re-joining rooms they had previously left, if their signing keys were replaced.

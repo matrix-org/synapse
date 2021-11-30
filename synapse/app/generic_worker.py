@@ -26,7 +26,8 @@ from synapse.api.urls import (
     CLIENT_API_PREFIX,
     FEDERATION_PREFIX,
     LEGACY_MEDIA_PREFIX,
-    MEDIA_PREFIX,
+    MEDIA_R0_PREFIX,
+    MEDIA_V3_PREFIX,
     SERVER_KEY_V2_PREFIX,
 )
 from synapse.app import _base
@@ -112,6 +113,7 @@ from synapse.storage.databases.main.monthly_active_users import (
 )
 from synapse.storage.databases.main.presence import PresenceStore
 from synapse.storage.databases.main.room import RoomWorkerStore
+from synapse.storage.databases.main.room_batch import RoomBatchStore
 from synapse.storage.databases.main.search import SearchStore
 from synapse.storage.databases.main.session import SessionStore
 from synapse.storage.databases.main.stats import StatsStore
@@ -239,6 +241,7 @@ class GenericWorkerSlavedStore(
     SlavedEventStore,
     SlavedKeyStore,
     RoomWorkerStore,
+    RoomBatchStore,
     DirectoryStore,
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
@@ -338,7 +341,8 @@ class GenericWorkerServer(HomeServer):
 
                         resources.update(
                             {
-                                MEDIA_PREFIX: media_repo,
+                                MEDIA_R0_PREFIX: media_repo,
+                                MEDIA_V3_PREFIX: media_repo,
                                 LEGACY_MEDIA_PREFIX: media_repo,
                                 "/_synapse/admin": admin_resource,
                             }

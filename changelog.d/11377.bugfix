@@ -1,0 +1,1 @@
+Fix a bug introduced in v1.45.0 where the `read_templates` method of the module API would error.

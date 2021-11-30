@@ -2226,6 +2226,234 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
         )
 
 
+class BlockRoomTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self._store = hs.get_datastore()
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.other_user_tok = self.login("user", "pass")
+
+        self.room_id = self.helper.create_room_as(
+            self.other_user, tok=self.other_user_tok
+        )
+        self.url = "/_synapse/admin/v1/rooms/%s/block"
+
+    @parameterized.expand([("PUT",), ("GET",)])
+    def test_requester_is_no_admin(self, method: str):
+        """If the user is not a server admin, an error 403 is returned."""
+
+        channel = self.make_request(
+            method,
+            self.url % self.room_id,
+            content={},
+            access_token=self.other_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    @parameterized.expand([("PUT",), ("GET",)])
+    def test_room_is_not_valid(self, method: str):
+        """Check that invalid room names, return an error 400."""
+
+        channel = self.make_request(
+            method,
+            self.url % "invalidroom",
+            content={},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(
+            "invalidroom is not a legal room ID",
+            channel.json_body["error"],
+        )
+
+    def test_block_is_not_valid(self):
+        """If parameter `block` is not valid, return an error."""
+
+        # `block` is not valid
+        channel = self.make_request(
+            "PUT",
+            self.url % self.room_id,
+            content={"block": "NotBool"},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
+
+        # `block` is not set
+        channel = self.make_request(
+            "PUT",
+            self.url % self.room_id,
+            content={},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
+
+        # no content is send
+        channel = self.make_request(
+            "PUT",
+            self.url % self.room_id,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.NOT_JSON, channel.json_body["errcode"])
+
+    def test_block_room(self):
+        """Test that block a room is successful."""
+
+        def _request_and_test_block_room(room_id: str) -> None:
+            self._is_blocked(room_id, expect=False)
+            channel = self.make_request(
+                "PUT",
+                self.url % room_id,
+                content={"block": True},
+                access_token=self.admin_user_tok,
+            )
+            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+            self.assertTrue(channel.json_body["block"])
+            self._is_blocked(room_id, expect=True)
+
+        # known internal room
+        _request_and_test_block_room(self.room_id)
+
+        # unknown internal room
+        _request_and_test_block_room("!unknown:test")
+
+        # unknown remote room
+        _request_and_test_block_room("!unknown:remote")
+
+    def test_block_room_twice(self):
+        """Test that block a room that is already blocked is successful."""
+
+        self._is_blocked(self.room_id, expect=False)
+        for _ in range(2):
+            channel = self.make_request(
+                "PUT",
+                self.url % self.room_id,
+                content={"block": True},
+                access_token=self.admin_user_tok,
+            )
+            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+            self.assertTrue(channel.json_body["block"])
+            self._is_blocked(self.room_id, expect=True)
+
+    def test_unblock_room(self):
+        """Test that unblock a room is successful."""
+
+        def _request_and_test_unblock_room(room_id: str) -> None:
+            self._block_room(room_id)
+
+            channel = self.make_request(
+                "PUT",
+                self.url % room_id,
+                content={"block": False},
+                access_token=self.admin_user_tok,
+            )
+            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+            self.assertFalse(channel.json_body["block"])
+            self._is_blocked(room_id, expect=False)
+
+        # known internal room
+        _request_and_test_unblock_room(self.room_id)
+
+        # unknown internal room
+        _request_and_test_unblock_room("!unknown:test")
+
+        # unknown remote room
+        _request_and_test_unblock_room("!unknown:remote")
+
+    def test_unblock_room_twice(self):
+        """Test that unblock a room that is not blocked is successful."""
+
+        self._block_room(self.room_id)
+        for _ in range(2):
+            channel = self.make_request(
+                "PUT",
+                self.url % self.room_id,
+                content={"block": False},
+                access_token=self.admin_user_tok,
+            )
+            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+            self.assertFalse(channel.json_body["block"])
+            self._is_blocked(self.room_id, expect=False)
+
+    def test_get_blocked_room(self):
+        """Test get status of a blocked room"""
+
+        def _request_blocked_room(room_id: str) -> None:
+            self._block_room(room_id)
+
+            channel = self.make_request(
+                "GET",
+                self.url % room_id,
+                access_token=self.admin_user_tok,
+            )
+            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+            self.assertTrue(channel.json_body["block"])
+            self.assertEqual(self.other_user, channel.json_body["user_id"])
+
+        # known internal room
+        _request_blocked_room(self.room_id)
+
+        # unknown internal room
+        _request_blocked_room("!unknown:test")
+
+        # unknown remote room
+        _request_blocked_room("!unknown:remote")
+
+    def test_get_unblocked_room(self):
+        """Test get status of a unblocked room"""
+
+        def _request_unblocked_room(room_id: str) -> None:
+            self._is_blocked(room_id, expect=False)
+
+            channel = self.make_request(
+                "GET",
+                self.url % room_id,
+                access_token=self.admin_user_tok,
+            )
+            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+            self.assertFalse(channel.json_body["block"])
+            self.assertNotIn("user_id", channel.json_body)
+
+        # known internal room
+        _request_unblocked_room(self.room_id)
+
+        # unknown internal room
+        _request_unblocked_room("!unknown:test")
+
+        # unknown remote room
+        _request_unblocked_room("!unknown:remote")
+
+    def _is_blocked(self, room_id: str, expect: bool = True) -> None:
+        """Assert that the room is blocked or not"""
+        d = self._store.is_room_blocked(room_id)
+        if expect:
+            self.assertTrue(self.get_success(d))
+        else:
+            self.assertIsNone(self.get_success(d))
+
+    def _block_room(self, room_id: str) -> None:
+        """Block a room in database"""
+        self.get_success(self._store.block_room(room_id, self.other_user))
+        self._is_blocked(room_id, expect=True)
+
+
 PURGE_TABLES = [
     "current_state_events",
     "event_backward_extremities",

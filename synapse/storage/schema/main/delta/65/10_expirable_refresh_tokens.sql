@@ -13,6 +13,16 @@
  * limitations under the License.
  */
 
--- Check old events for thread relations.
-INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (6502, 'event_thread_relation', '{}');
+
+ALTER TABLE refresh_tokens
+  -- We add an expiry_ts column (in milliseconds since the Epoch) to refresh tokens.
+  -- They may not be used after they have expired.
+  -- If null, then the refresh token's lifetime is unlimited.
+  ADD COLUMN expiry_ts BIGINT DEFAULT NULL;
+
+ALTER TABLE refresh_tokens
+  -- We also add an ultimate session expiry time (in milliseconds since the Epoch).
+  -- No matter how much the access and refresh tokens are refreshed, they cannot
+  -- be extended past this time.
+  -- If null, then the session length is unlimited.
+  ADD COLUMN ultimate_session_expiry_ts BIGINT DEFAULT NULL;

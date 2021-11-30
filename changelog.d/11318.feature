@@ -1,0 +1,1 @@
+Add support for the `/_matrix/client/v3` APIs from Matrix v1.1.

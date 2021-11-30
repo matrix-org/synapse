@@ -448,7 +448,7 @@ class RoomStateRestServlet(RestServlet):
             now,
             # We don't bother bundling aggregations in when asked for state
             # events, as clients won't use them.
-            bundle_aggregations=False,
+            bundle_relations=False,
         )
         ret = {"state": room_state}
 
@@ -778,7 +778,70 @@ class RoomEventContextServlet(RestServlet):
             results["state"],
             time_now,
             # No need to bundle aggregations for state events
-            bundle_aggregations=False,
+            bundle_relations=False,
         )
 
         return 200, results
+
+
+class BlockRoomRestServlet(RestServlet):
+    """
+    Manage blocking of rooms.
+    On PUT: Add or remove a room from blocking list.
+    On GET: Get blocking status of room and user who has blocked this room.
+    """
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/block$")
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastore()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self._auth, request)
+
+        if not RoomID.is_valid(room_id):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "%s is not a legal room ID" % (room_id,)
+            )
+
+        blocked_by = await self._store.room_is_blocked_by(room_id)
+        # Test `not None` if `user_id` is an empty string
+        # if someone add manually an entry in database
+        if blocked_by is not None:
+            response = {"block": True, "user_id": blocked_by}
+        else:
+            response = {"block": False}
+
+        return HTTPStatus.OK, response
+
+    async def on_PUT(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self._auth.get_user_by_req(request)
+        await assert_user_is_admin(self._auth, requester.user)
+
+        content = parse_json_object_from_request(request)
+
+        if not RoomID.is_valid(room_id):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "%s is not a legal room ID" % (room_id,)
+            )
+
+        assert_params_in_dict(content, ["block"])
+        block = content.get("block")
+        if not isinstance(block, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'block' must be a boolean.",
+                Codes.BAD_JSON,
+            )
+
+        if block:
+            await self._store.block_room(room_id, requester.user.to_string())
+        else:
+            await self._store.unblock_room(room_id)
+
+        return HTTPStatus.OK, {"block": block}

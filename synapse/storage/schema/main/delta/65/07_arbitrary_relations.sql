@@ -13,10 +13,6 @@
  * limitations under the License.
  */
 
-
--- Remove messages from the device_inbox table which were orphaned
--- when a device was deleted using Synapse earlier than 1.47.0.
--- This runs as background task, but may take a bit to finish.
-
+-- Check old events for thread relations.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (6505, 'remove_deleted_devices_from_device_inbox', '{}');
+  (6507, 'event_arbitrary_relations', '{}');

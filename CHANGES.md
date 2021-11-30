@@ -1,3 +1,42 @@
+Synapse 1.47.1 (2021-11-23)
+===========================
+
+This release fixes a security issue in the media store, affecting all prior releases of Synapse. Server administrators are encouraged to update Synapse as soon as possible. We are not aware of these vulnerabilities being exploited in the wild.
+
+Server administrators who are unable to update Synapse may use the workarounds described in the linked GitHub Security Advisory below.
+
+Security advisory
+-----------------
+
+The following issue is fixed in 1.47.1.
+
+- **[GHSA-3hfw-x7gx-437c](https://github.com/matrix-org/synapse/security/advisories/GHSA-3hfw-x7gx-437c) / [CVE-2021-41281](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-41281): Path traversal when downloading remote media.**
+
+  Synapse instances with the media repository enabled can be tricked into downloading a file from a remote server into an arbitrary directory, potentially outside the media store directory.
+
+  The last two directories and file name of the path are chosen randomly by Synapse and cannot be controlled by an attacker, which limits the impact.
+
+  Homeservers with the media repository disabled are unaffected. Homeservers configured with a federation whitelist are also unaffected.
+
+  Fixed by [91f2bd090](https://github.com/matrix-org/synapse/commit/91f2bd090).
+
+
+Synapse 1.47.0 (2021-11-17)
+===========================
+
+No significant changes since 1.47.0rc3.
+
+
+Synapse 1.47.0rc3 (2021-11-16)
+==============================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in 1.47.0rc1 which caused worker processes to not halt startup in the presence of outstanding database migrations. ([\#11346](https://github.com/matrix-org/synapse/issues/11346))
+- Fix a bug introduced in 1.47.0rc1 which prevented the 'remove deleted devices from `device_inbox` column' background process from running when updating from a recent Synapse version. ([\#11303](https://github.com/matrix-org/synapse/issues/11303), [\#11353](https://github.com/matrix-org/synapse/issues/11353))
+
+
 Synapse 1.47.0rc2 (2021-11-10)
 ==============================
 

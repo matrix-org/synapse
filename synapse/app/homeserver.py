@@ -29,7 +29,8 @@ from synapse import events
 from synapse.api.urls import (
     FEDERATION_PREFIX,
     LEGACY_MEDIA_PREFIX,
-    MEDIA_PREFIX,
+    MEDIA_R0_PREFIX,
+    MEDIA_V3_PREFIX,
     SERVER_KEY_V2_PREFIX,
     STATIC_PREFIX,
     WEB_CLIENT_PREFIX,
@@ -193,6 +194,8 @@ class SynapseHomeServer(HomeServer):
                 {
                     "/_matrix/client/api/v1": client_resource,
                     "/_matrix/client/r0": client_resource,
+                    "/_matrix/client/v1": client_resource,
+                    "/_matrix/client/v3": client_resource,
                     "/_matrix/client/unstable": client_resource,
                     "/_matrix/client/v2_alpha": client_resource,
                     "/_matrix/client/versions": client_resource,
@@ -244,7 +247,11 @@ class SynapseHomeServer(HomeServer):
             if self.config.server.enable_media_repo:
                 media_repo = self.get_media_repository_resource()
                 resources.update(
-                    {MEDIA_PREFIX: media_repo, LEGACY_MEDIA_PREFIX: media_repo}
+                    {
+                        MEDIA_R0_PREFIX: media_repo,
+                        MEDIA_V3_PREFIX: media_repo,
+                        LEGACY_MEDIA_PREFIX: media_repo,
+                    }
                 )
             elif name == "media":
                 raise ConfigError(
