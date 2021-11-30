@@ -1,1 +1,1 @@
-Remove not needed `json.dumps` from `tests.rest.admin`.
+Remove unnecessary `json.dumps` from `tests.rest.admin`.
