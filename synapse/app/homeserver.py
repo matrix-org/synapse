@@ -359,7 +359,7 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
 
     if config.worker.worker_app:
         raise ConfigError(
-            "You have specified worker app/s in the config but are attempting to start a non-worker "
+            "You have specified `worker_app` in the config but are attempting to start a non-worker "
             "instance. Please use `python -m synapse.app.generic_worker` instead."
         )
         sys.exit(1)
