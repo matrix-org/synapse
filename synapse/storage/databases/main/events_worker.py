@@ -1640,14 +1640,15 @@ class EventsWorkerStore(SQLBaseStore):
         """
 
         def is_event_next_to_backward_gap_txn(txn) -> bool:
-            # If the event in question has its prev_events listed as a backward
-            # extremity, it's next to a gap.
+            # If the event in question has any of its prev_events listed as a
+            # backward extremity, it's next to a gap.
             #
             # We can't just check the backward edges in `event_edges` because
-            # when we persist event, we will also record the prev_events as
-            # edges to the event in question regardless of if we have those
+            # when we persist events, we will also record the prev_events as
+            # edges to the event in question regardless of whether we have those
             # prev_events yet. We need to check whether those prev_events are
-            # backward extremity also known as gaps that need to be backfilled.
+            # backward extremities, also known as gaps, that need to be
+            # backfilled.
             backward_extremity_query = """
                 SELECT 1 FROM event_backward_extremities
                 WHERE
@@ -1656,13 +1657,14 @@ class EventsWorkerStore(SQLBaseStore):
                 LIMIT 1
             """
 
-            # If the event in question has its prev_events listed as a backward
-            # extremity, it's next to a backwards gap.
-            for prev_event_id in event.prev_event_ids():
+            # If the event in question is a backward extremity or has any of its
+            # prev_events listed as a backward extremity, it's next to a
+            # backward gap.
+            for prev_event_id in [event.event_id] + event.prev_event_ids():
                 txn.execute(backward_extremity_query, (event.room_id, prev_event_id))
                 backward_extremities = txn.fetchall()
 
-                # We consider any backward extremity as a backwards gap
+                # We consider any backward extremity as a backward gap
                 if len(backward_extremities):
                     return True
 
