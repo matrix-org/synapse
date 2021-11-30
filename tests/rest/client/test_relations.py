@@ -665,8 +665,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         with patch(
             "synapse.handlers.message.EventCreationHandler._validate_event_relation"
         ):
-            # Generate a reaction, reference, and thread relations from a
-            # different room.
+            # Generate a various relations from a different room.
             self.get_success(
                 inject_event(
                     self.hs,
@@ -711,6 +710,27 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                         "msgtype": "m.text",
                         "m.relates_to": {
                             "rel_type": RelationTypes.THREAD,
+                            "event_id": parent_id,
+                        },
+                    },
+                )
+            )
+
+            self.get_success(
+                inject_event(
+                    self.hs,
+                    room_id=self.room,
+                    type="m.room.message",
+                    sender=self.user_id,
+                    content={
+                        "body": "foo",
+                        "msgtype": "m.text",
+                        "new_content": {
+                            "body": "new content",
+                            "msgtype": "m.text",
+                        },
+                        "m.relates_to": {
+                            "rel_type": RelationTypes.REPLACE,
                             "event_id": parent_id,
                         },
                     },
