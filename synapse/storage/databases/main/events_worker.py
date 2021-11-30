@@ -1645,12 +1645,26 @@ class EventsWorkerStore(SQLBaseStore):
             # next to a gap.
             backward_extremity_query = """
                 SELECT 1 FROM event_backward_extremities
-                LEFT JOIN rejections USING (event_id)
                 WHERE
                     room_id = ?
                     AND event_id = ?
-                    /* Make sure event is not rejected */
-                    AND rejections.event_id IS NULL
+                LIMIT 1
+            """
+
+            # If the event in question is a forward extremity, we will just
+            # consider any potential forward gap as not a gap since it's one of
+            # the latest events in the room.
+            #
+            # We can't combine this query with the `forward_edge_query` below
+            # because if the event in question has no forward edges(isn't
+            # referenced by any other event's prev_events) but is in
+            # `event_forward_extremities`, we don't want to return 0 rows and
+            # say it's next to a gap.
+            forward_extremity_query = """
+                SELECT 1 FROM event_forward_extremities
+                WHERE
+                    room_id = ?
+                    AND event_id = ?
                 LIMIT 1
             """
 
@@ -1658,24 +1672,18 @@ class EventsWorkerStore(SQLBaseStore):
             # by another event. If we don't see any edges, we're next to a
             # forward gap.
             #
-            # We can't just check `event_forward_extremities` directly because that
-            # doesn't include potential backfilled and outlier events.
-            #
-            # We consider any event that is an `event_forward_extremities` as
-            # the latest in the room and not next to a gap.
+            # We can't just only check `event_forward_extremities` directly
+            # because that doesn't include backfilled and outlier events.
             forward_edge_query = """
                 SELECT 1 FROM event_edges
-                LEFT JOIN rejections ON event_edges.prev_event_id == rejections.event_id
-                LEFT JOIN event_forward_extremities ON event_edges.prev_event_id == event_forward_extremities.event_id
+                /* Check to make sure the event referencing our event in question is not rejected */
+                LEFT JOIN rejections ON event_edges.event_id == rejections.event_id
                 WHERE
                     event_edges.room_id = ?
                     AND event_edges.prev_event_id = ?
-                    /* If the event in question is a forward extremity, we will
-                     * just consider the forward gap as not a gap since it's one
-                     *  of the latest events in the room.
+                    /* It's not a valid edge if the event referencing our event in
+                     * question is rejected.
                      */
-                    AND event_forward_extremities.event_id IS NOT NULL
-                    /* Make sure event is not rejected */
                     AND rejections.event_id IS NULL
                 LIMIT 1
             """
@@ -1683,12 +1691,30 @@ class EventsWorkerStore(SQLBaseStore):
             txn.execute(backward_extremity_query, (room_id, event_id))
             backward_extremities = txn.fetchall()
 
+            # We consider any backward extremity as a backwards gap
             if len(backward_extremities):
                 return True
+
+            txn.execute(forward_extremity_query, (room_id, event_id))
+            forward_extremities = txn.fetchall()
+
+            # We consider any forward extremity as the latest in the room and
+            # not a gap.
+            #
+            # To expand, even though there is technically a gap at the front of
+            # the room where the forward extremities are, we consider those the
+            # latest messages in the room so asking other homeservers for more
+            # is useless. The new latest messages will just be federated as
+            # usual.
+            if len(forward_extremities):
+                return False
 
             txn.execute(forward_edge_query, (room_id, event_id))
             forward_edges = txn.fetchall()
 
+            # If there are no forward edges to the event in question (another
+            # event hasn't referenced this event in their prev_events), then we
+            # assume there is a gap in the history.
             if not len(forward_edges):
                 return True
 
