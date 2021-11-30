@@ -32,6 +32,7 @@ from typing import (
 )
 
 from typing_extensions import TypedDict
+from prometheus_client import Histogram
 
 from synapse.api.constants import (
     EventContentFields,
