@@ -65,9 +65,9 @@ def get_version_string(module: ModuleType) -> str:
             git_commit = _run_git_command("", "rev-parse", "--short", "HEAD")
 
             dirty_string = "-this_is_a_dirty_checkout"
-            is_dirty = _run_git_command("", "describe", "--dirty=" + dirty_string).endswith(
-                dirty_string
-            )
+            is_dirty = _run_git_command(
+                "", "describe", "--dirty=" + dirty_string
+            ).endswith(dirty_string)
             git_dirty = "dirty" if is_dirty else ""
 
             if git_branch or git_tag or git_commit or git_dirty:
