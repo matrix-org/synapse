@@ -350,8 +350,12 @@ class ApplicationServicesHandler:
                         if users_whose_device_lists_changed:
                             # TODO: Have a way of including things in an outgoing appservice
                             #   transaction that's not "events" or "ephemeral"
+                            payload = [{
+                                "changed": users_whose_device_lists_changed,
+                                "left": [],
+                            }]
                             self.scheduler.submit_ephemeral_events_for_as(
-                                service, users_whose_device_lists_changed
+                                service, payload
                             )
 
                         # Persist the latest handled stream token for this appservice
