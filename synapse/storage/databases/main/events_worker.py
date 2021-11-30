@@ -1627,8 +1627,8 @@ class EventsWorkerStore(SQLBaseStore):
             _cleanup_old_transaction_ids_txn,
         )
 
-    async def is_event_id_next_to_gap(self, room_id: str, event_id: str) -> bool:
-        """Check if the given `event_id` is next to a gap of missing events.
+    async def is_event_next_to_gap(self, event: EventBase) -> bool:
+        """Check if the given event is next to a gap of missing events.
         Looks at gaps going forwards and backwards. The gap in front of the
         latest events is not considered a gap.
 
@@ -1640,9 +1640,15 @@ class EventsWorkerStore(SQLBaseStore):
             Boolean indicating whether it's an extremity
         """
 
-        def is_event_id_next_to_gap_txn(txn) -> bool:
-            # If the event in question is listed as a backward extremity, it's
-            # next to a gap.
+        def is_event_next_to_gap_txn(txn) -> bool:
+            # If the event in question has its prev_events listed as a backward
+            # extremity, it's next to a gap.
+            #
+            # We can't just check the backward edges in `event_edges` because
+            # when we persist event, we will also record the prev_events as
+            # edges to the event in question regardless of if we have those
+            # prev_events yet. We need to check whether those prev_events are
+            # backward extremity also known as gaps that need to be backfilled.
             backward_extremity_query = """
                 SELECT 1 FROM event_backward_extremities
                 WHERE
@@ -1688,44 +1694,49 @@ class EventsWorkerStore(SQLBaseStore):
                 LIMIT 1
             """
 
-            txn.execute(backward_extremity_query, (room_id, event_id))
-            backward_extremities = txn.fetchall()
+            # If the event in question has its prev_events listed as a backward
+            # extremity, it's next to a backwards gap.
+            #
+            # We need to check this before the forward edges below as the event
+            # in question could be a forward extremity while still having a
+            # backwards gap.
+            for prev_event_id in event.prev_event_ids():
+                txn.execute(backward_extremity_query, (event.room_id, prev_event_id))
+                backward_extremities = txn.fetchall()
 
-            # We consider any backward extremity as a backwards gap
-            if len(backward_extremities):
-                return True
-
-            txn.execute(forward_extremity_query, (room_id, event_id))
-            forward_extremities = txn.fetchall()
+                # We consider any backward extremity as a backwards gap
+                if len(backward_extremities):
+                    return True
 
             # We consider any forward extremity as the latest in the room and
-            # not a gap.
+            # not a forward gap.
             #
             # To expand, even though there is technically a gap at the front of
             # the room where the forward extremities are, we consider those the
             # latest messages in the room so asking other homeservers for more
             # is useless. The new latest messages will just be federated as
             # usual.
+            txn.execute(forward_extremity_query, (event.room_id, event.event_id))
+            forward_extremities = txn.fetchall()
             if len(forward_extremities):
                 return False
 
-            txn.execute(forward_edge_query, (room_id, event_id))
-            forward_edges = txn.fetchall()
-
             # If there are no forward edges to the event in question (another
             # event hasn't referenced this event in their prev_events), then we
-            # assume there is a gap in the history.
+            # assume there is a forward gap in the history.
+            txn.execute(forward_edge_query, (event.room_id, event.event_id))
+            forward_edges = txn.fetchall()
             if not len(forward_edges):
                 return True
 
             return False
 
         return await self.db_pool.runInteraction(
-            "is_event_id_next_to_gap_txn",
-            is_event_id_next_to_gap_txn,
+            "is_event_next_to_gap_txn",
+            is_event_next_to_gap_txn,
         )
 
-    async def get_event_for_timestamp(
+    async def get_event_id_for_timestamp(
         self, room_id: str, timestamp: int, direction: str
     ) -> Optional[str]:
         """Find the closest event to the given timestamp in the given direction.
@@ -1754,7 +1765,7 @@ class EventsWorkerStore(SQLBaseStore):
             LIMIT 1;
         """
 
-        def get_event_for_timestamp_txn(txn) -> str:
+        def get_event_id_for_timestamp_txn(txn) -> str:
             if direction == "b":
                 # Find closest event *before* a given timestamp. We use descending
                 # (which gives values largest to smallest) because we want the
@@ -1782,6 +1793,6 @@ class EventsWorkerStore(SQLBaseStore):
             raise ValueError("Unknown direction: %s" % (direction,))
 
         return await self.db_pool.runInteraction(
-            "get_event_for_timestamp_txn",
-            get_event_for_timestamp_txn,
+            "get_event_id_for_timestamp_txn",
+            get_event_id_for_timestamp_txn,
         )

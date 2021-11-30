@@ -1254,10 +1254,9 @@ class TimestampLookupHandler:
             SynapseError if unable to find any event locally in the given direction
         """
 
-        local_event_id = await self.store.get_event_for_timestamp(
+        local_event_id = await self.store.get_event_id_for_timestamp(
             room_id, timestamp, direction
         )
-
         logger.debug(
             "get_event_for_timestamp: locally, we found event_id=%s closest to timestamp=%s",
             local_event_id,
@@ -1267,11 +1266,12 @@ class TimestampLookupHandler:
         # If we found a gap, we should probably ask another homeserver first
         # about more history in between
         if local_event_id:
-            is_event_id_next_to_gap = await self.store.is_event_id_next_to_gap(
-                room_id, local_event_id
+            local_event = await self.store.get_event(
+                local_event_id, allow_none=False, allow_rejected=False
             )
+            is_event_next_to_gap = await self.store.is_event_next_to_gap(local_event)
 
-        if not local_event_id or is_event_id_next_to_gap:
+        if not local_event_id or is_event_next_to_gap:
             logger.debug(
                 "get_event_for_timestamp: locally, we found event_id=%s closest to timestamp=%s which is next to a gap in event history so we're asking other homeservers first",
                 local_event_id,

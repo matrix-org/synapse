@@ -224,16 +224,12 @@ class FederationServer(FederationBase):
             await self.check_server_matches_acl(origin_host, room_id)
 
             # We only try to fetch data from the local database
-            event_id = await self.store.get_event_for_timestamp(
+            event_id = await self.store.get_event_id_for_timestamp(
                 room_id, timestamp, direction
             )
             if event_id:
-                event = await self.store.get_event(
-                    event_id, allow_none=False, allow_rejected=False
-                )
-
                 return 200, {
-                    "event_id": event.event_id,
+                    "event_id": event_id,
                 }
 
         raise SynapseError(
