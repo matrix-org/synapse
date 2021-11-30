@@ -1,1 +1,0 @@
-Fix typo in the word `available` and fix HTTP method (should be `GET`) for the `username_available` admin API. Contributed by Stanislav Motylkov.
