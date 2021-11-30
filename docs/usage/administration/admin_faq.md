@@ -5,28 +5,31 @@ How do I become a server admin?
 If your server already has an admin account you should use the user admin API to promote other accounts to become admins. See [User Admin API](../../admin_api/user_admin_api.md#Change-whether-a-user-is-a-server-administrator-or-not)
 
 If you don't have any admin accounts yet you won't be able to use the admin API so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account, use the admin APIs to make further changes.
-
+```sql
     UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
-
+```
 What servers are my server talking to?
 ---
 Run this sql query on your db:
-
+```sql
     SELECT * FROM destinations;
+```
 
 What servers are currently participating in this room?
 ---
 Run this sql query on your db:
-
+```sql
     SELECT DISTINCT split_part(state_key, ':', 2)
         FROM current_state_events AS c
         INNER JOIN room_memberships AS m USING (room_id, event_id)
         WHERE room_id = '!cURbafjkfsMDVwdRDQ:matrix.org' AND membership = 'join';
+```
 
 What users are registered on my server?
 ---
-
+```sql
     SELECT NAME from users;
+```
 
 Manually resetting passwords:
 ---
@@ -50,13 +53,13 @@ There are two exceptions when it might be sensible to delete your database and s
 I've stuffed up access to my room, how can I delete it to free up the alias?
 ---
 Using the following curl command:
-
+```
     curl -H 'Authorization: Bearer <access-token>' -X DELETE https://matrix.org/_matrix/client/r0/directory/room/<room-alias>
-
-\<access-token\> - can be obtained in riot by looking in the riot settings, down the bottom is:
+```
+`<access-token>` - can be obtained in riot by looking in the riot settings, down the bottom is:
 Access Token:\<click to reveal\> 
 
-\<room-alias\> - the room alias, eg. #my_room:matrix.org this possibly needs to be URL encoded also, for example  %23my_room%3Amatrix.org
+`<room-alias>` - the room alias, eg. #my_room:matrix.org this possibly needs to be URL encoded also, for example  %23my_room%3Amatrix.org
 
 How can I find the lines corresponding to a given HTTP request in my homeserver log?
 ---
@@ -94,3 +97,6 @@ GROUP BY s.canonical_alias, g.room_id
 ORDER BY num_rows desc 
 LIMIT 10;
 ```
+
+You can also use the [List Room API](../../admin_api/rooms.md#list-room-api)
+and `order_by` `state_events`.
