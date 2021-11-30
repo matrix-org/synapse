@@ -35,6 +35,7 @@ from synapse.metrics.background_process_metrics import (
 from synapse.storage.databases.main.directory import RoomAliasMapping
 from synapse.types import JsonDict, RoomAlias, RoomStreamToken, UserID
 from synapse.util.async_helpers import Linearizer
+from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -343,12 +344,14 @@ class ApplicationServicesHandler:
                         )
 
                     elif stream_key == "device_list_key":
-                        events = await self._handle_device_list_updates(
-                            service, new_token, users
+                        users_whose_device_lists_changed = await self._get_device_list_changes(
+                            service, new_token
                         )
-                        if events:
+                        if users_whose_device_lists_changed:
+                            # TODO: Have a way of including things in an outgoing appservice
+                            #   transaction that's not "events" or "ephemeral"
                             self.scheduler.submit_ephemeral_events_for_as(
-                                service, events
+                                service, users_whose_device_lists_changed
                             )
 
                         # Persist the latest handled stream token for this appservice
@@ -561,38 +564,85 @@ class ApplicationServicesHandler:
 
         return message_payload
 
-    async def _get_device_list_updates(
+    async def _get_device_list_changes(
         self,
-        service: ApplicationService,
-        new_token: int,
-        users: Collection[Union[UserID, str]],
-    ) -> List[JsonDict]:
+        appservice: ApplicationService,
+        new_key: int,
+    ) -> List[str]:
         """
-
+        Retrieve a list of users who have changed their device lists.
 
         Args:
-            service:
-            new_token:
-            users:
+            appservice: The application service to retrieve device list changes for.
+            new_key: The stream key of the device list change that triggered this method call.
 
         Returns:
-
+            A list of users whose device lists have changed and need to be resynced by the
+            appservice.
         """
-        users_appservice_is_interested_in = [
-            user for user in users if service.is_user_in_namespace(user)
-        ]
-
-        if not users_appservice_is_interested_in:
-            # This appservice was not interested in any of these users.
-            return []
-
         # Fetch the last successfully processed device list update stream ID
         # for this appservice.
         from_key = await self.store.get_type_stream_id_for_appservice(
-            service, "device_list"
+            appservice, "device_list"
         )
 
-        # Fetch device lists updates for each user.
+        # Fetch the users who have modified their device list since then.
+        users_with_changed_device_lists = await self.store.get_users_whose_devices_changed(
+            from_key, filter_user_ids=None, to_key=new_key
+        )
+
+        # Filter out any users the application service is not interested in
+        #
+        # For each user who changed their device list, we want to check whether this
+        # appservice would be interested in the change
+        filtered_users_with_changed_device_lists = [
+            user_id
+            for user_id in users_with_changed_device_lists
+            if self._is_appservice_interested_in_device_lists_of_user(appservice, user_id)
+        ]
+
+        return filtered_users_with_changed_device_lists
+
+    async def _is_appservice_interested_in_device_lists_of_user(
+        self,
+        appservice: ApplicationService,
+        user_id: str,
+    ) -> bool:
+        """
+        Returns whether a given application service is interested in the device lists of a
+        given user.
+
+        The application service is interested in the user's device lists if any of the
+        following are true:
+            * The user is in the appservice's user namespace.
+            * At least one member of one room that the user is a part of is in the
+              appservice's user namespace.
+            * The appservice is explicitly (via room ID or alias) interested in at
+              least one room that the user is in.
+
+        Args:
+            appservice: The application service to gauge interest of.
+            user_id: The ID of the user whose device list interest is in question.
+
+        Returns:
+            True if the application service is interested in the user's device lists, False
+            otherwise.
+        """
+        if appservice.is_user_in_namespace(user_id):
+            return True
+
+        # FIXME: This is quite an expensive check. This method is called per device
+        #  list change.
+        room_ids = await self.store.get_rooms_for_user(user_id)
+        for room_id in room_ids:
+            # This method covers checking room members for appservice interest as well as
+            # room ID and alias checks.
+            if await appservice.is_interested_in_room(
+                room_id, self.store
+            ):
+                return True
+
+        return False
 
     async def query_user_exists(self, user_id: str) -> bool:
         """Check if any application service knows this user_id exists.

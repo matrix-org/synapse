@@ -555,34 +555,47 @@ class DeviceWorkerStore(SQLBaseStore):
         }
 
     async def get_users_whose_devices_changed(
-        self, from_key: int, user_ids: Iterable[str]
+        self, from_key: int, filter_user_ids: Optional[Iterable[str]] = None, to_key: Optional[int] = None
     ) -> Set[str]:
         """Get set of users whose devices have changed since `from_key` that
         are in the given list of user_ids.
 
         Args:
-            from_key: The device lists stream token
-            user_ids: The user IDs to query for devices.
+            from_key: The minimum device lists stream token to query device list changes for,
+                exclusive.
+            filter_user_ids: If provided, only check if these users have changed their
+                device lists.
+            to_key: The maximum device lists stream token to query device list changes for,
+                inclusive.
 
         Returns:
-            The set of user_ids whose devices have changed since `from_key`
+            The set of user_ids whose devices have changed since `from_key` (exclusive)
+                until `to_key` (inclusive).
         """
 
-        # Get set of users who *may* have changed. Users not in the returned
-        # list have definitely not changed.
-        to_check = self._device_list_stream_cache.get_entities_changed(
-            user_ids, from_key
-        )
+        if filter_user_ids is not None:
+            # Get set of users who *may* have changed. Users not in the returned
+            # list have definitely not changed.
+            to_check = self._device_list_stream_cache.get_entities_changed(
+                filter_user_ids, from_key
+            )
 
-        if not to_check:
-            return set()
+            if not to_check:
+                return set()
 
         def _get_users_whose_devices_changed_txn(txn):
             changes = set()
 
-            sql = """
+            sql_args = (from_key,)
+            if to_key:
+                stream_id_where_clause = "stream_id > ? AND stream_id <= ?"
+                sql_args += (to_key,)
+            else:
+                stream_id_where_clause = "stream_id > ?"
+
+            sql = f"""
                 SELECT DISTINCT FROM device_lists_stream
-                WHERE stream_id > ?
+                WHERE {stream_id_where_clause}
                 AND
             """
 
@@ -590,53 +603,9 @@ class DeviceWorkerStore(SQLBaseStore):
                 clause, args = make_in_list_sql_clause(
                     txn.database_engine, "user_id", chunk
                 )
-                txn.execute(sql + clause, (from_key,) + tuple(args))
-                changes.update(user_id for user_id, in txn)
+                sql_args += args
 
-            return changes
-
-        return await self.db_pool.runInteraction(
-            "get_users_whose_devices_changed", _get_users_whose_devices_changed_txn
-        )
-
-    async def get_all_device_list_changes_for_users(
-        self, user_ids: Iterable[str], from_key: int
-    ) -> List[JsonDict]:
-        """
-        Get a list of device updates for a collection of users between the
-        given stream ID and now.
-
-        Args:
-            user_ids: The user IDs to fetch device list updates for.
-            from_key: The minimum device list stream ID to fetch updates from, inclusive.
-
-        Returns:
-            The device list changes, ordered by ascending stream ID.
-            # TODO: Should return max_stream_id?
-        """
-        # Get set of users who *may* have changed. Users not in the returned
-        # list have definitely not changed.
-        to_check = self._device_list_stream_cache.get_entities_changed(
-            user_ids, from_key
-        )
-
-        if not to_check:
-            return []
-
-        def _get_all_device_list_changes_for_users_txn(txn):
-            changes = set()
-
-            sql = """
-                SELECT DISTINCT user_id FROM device_lists_stream
-                WHERE stream_id > ?
-                AND
-            """
-
-            for chunk in batch_iter(to_check, 100):
-                clause, args = make_in_list_sql_clause(
-                    txn.database_engine, "user_id", chunk
-                )
-                txn.execute(sql + clause, (from_key,) + tuple(args))
+                txn.execute(sql + clause, sql_args)
                 changes.update(user_id for user_id, in txn)
 
             return changes
