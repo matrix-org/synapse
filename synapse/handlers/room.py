@@ -1265,13 +1265,31 @@ class TimestampLookupHandler:
 
         # If we found a gap, we should probably ask another homeserver first
         # about more history in between
+        is_event_next_to_backward_gap = False
+        is_event_next_to_forward_gap = False
         if local_event_id:
             local_event = await self.store.get_event(
                 local_event_id, allow_none=False, allow_rejected=False
             )
-            is_event_next_to_gap = await self.store.is_event_next_to_gap(local_event)
 
-        if not local_event_id or is_event_next_to_gap:
+            if direction == "f":
+                # We only need to check for a backward gap if we're looking forwards
+                # to ensure there is nothing in between.
+                is_event_next_to_backward_gap = (
+                    await self.store.is_event_next_to_backward_gap(local_event)
+                )
+            elif direction == "b":
+                # We only need to check for a forward gap if we're looking backwards
+                # to ensure there is nothing in between
+                is_event_next_to_forward_gap = (
+                    await self.store.is_event_next_to_forward_gap(local_event)
+                )
+
+        if (
+            not local_event_id
+            or is_event_next_to_backward_gap
+            or is_event_next_to_forward_gap
+        ):
             logger.debug(
                 "get_event_for_timestamp: locally, we found event_id=%s closest to timestamp=%s which is next to a gap in event history so we're asking other homeservers first",
                 local_event_id,

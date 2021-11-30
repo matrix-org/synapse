@@ -1627,10 +1627,9 @@ class EventsWorkerStore(SQLBaseStore):
             _cleanup_old_transaction_ids_txn,
         )
 
-    async def is_event_next_to_gap(self, event: EventBase) -> bool:
-        """Check if the given event is next to a gap of missing events.
-        Looks at gaps going forwards and backwards. The gap in front of the
-        latest events is not considered a gap.
+    async def is_event_next_to_backward_gap(self, event: EventBase) -> bool:
+        """Check if the given event is next to a backward gap of missing events.
+        <latest messages> A(False)--->B(False)--->C(True)--->  <gap, unknown events> <oldest messages>
 
         Args:
             room_id: room where the event lives
@@ -1640,7 +1639,7 @@ class EventsWorkerStore(SQLBaseStore):
             Boolean indicating whether it's an extremity
         """
 
-        def is_event_next_to_gap_txn(txn) -> bool:
+        def is_event_next_to_backward_gap_txn(txn) -> bool:
             # If the event in question has its prev_events listed as a backward
             # extremity, it's next to a gap.
             #
@@ -1657,6 +1656,38 @@ class EventsWorkerStore(SQLBaseStore):
                 LIMIT 1
             """
 
+            # If the event in question has its prev_events listed as a backward
+            # extremity, it's next to a backwards gap.
+            for prev_event_id in event.prev_event_ids():
+                txn.execute(backward_extremity_query, (event.room_id, prev_event_id))
+                backward_extremities = txn.fetchall()
+
+                # We consider any backward extremity as a backwards gap
+                if len(backward_extremities):
+                    return True
+
+            return False
+
+        return await self.db_pool.runInteraction(
+            "is_event_next_to_backward_gap_txn",
+            is_event_next_to_backward_gap_txn,
+        )
+
+    async def is_event_next_to_forward_gap(self, event: EventBase) -> bool:
+        """Check if the given event is next to a forward gap of missing events.
+        The gap in front of the latest events is not considered a gap.
+        <latest messages> A(False)--->B(False)--->C(False)--->  <gap, unknown events> <oldest messages>
+        <latest messages> A(False)--->B(False)--->  <gap, unknown events>  --->D(True)--->E(False) <oldest messages>
+
+        Args:
+            room_id: room where the event lives
+            event_id: event to check
+
+        Returns:
+            Boolean indicating whether it's an extremity
+        """
+
+        def is_event_next_to_gap_txn(txn) -> bool:
             # If the event in question is a forward extremity, we will just
             # consider any potential forward gap as not a gap since it's one of
             # the latest events in the room.
@@ -1693,21 +1724,6 @@ class EventsWorkerStore(SQLBaseStore):
                     AND rejections.event_id IS NULL
                 LIMIT 1
             """
-
-            # If the event in question has its prev_events listed as a backward
-            # extremity, it's next to a backwards gap.
-            #
-            # We need to check this before the forward edges below as the event
-            # in question could be a forward extremity while still having a
-            # backwards gap.
-            for prev_event_id in event.prev_event_ids():
-                txn.execute(backward_extremity_query, (event.room_id, prev_event_id))
-                backward_extremities = txn.fetchall()
-
-                # We consider any backward extremity as a backwards gap
-                if len(backward_extremities):
-                    return True
-
             # We consider any forward extremity as the latest in the room and
             # not a forward gap.
             #
