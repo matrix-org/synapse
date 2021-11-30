@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import urllib.parse
 from http import HTTPStatus
 from typing import List, Optional
@@ -118,12 +117,11 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         Tests that the user ID must be from local server but it does not have to exist.
         """
-        body = json.dumps({"new_room_user_id": "@unknown:test"})
 
         channel = self.make_request(
             "DELETE",
             self.url,
-            content=body,
+            content={"new_room_user_id": "@unknown:test"},
             access_token=self.admin_user_tok,
         )
 
@@ -137,12 +135,11 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         Check that only local users can create new room to move members.
         """
-        body = json.dumps({"new_room_user_id": "@not:exist.bla"})
 
         channel = self.make_request(
             "DELETE",
             self.url,
-            content=body,
+            content={"new_room_user_id": "@not:exist.bla"},
             access_token=self.admin_user_tok,
         )
 
@@ -156,12 +153,11 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         If parameter `block` is not boolean, return an error
         """
-        body = json.dumps({"block": "NotBool"})
 
         channel = self.make_request(
             "DELETE",
             self.url,
-            content=body,
+            content={"block": "NotBool"},
             access_token=self.admin_user_tok,
         )
 
@@ -172,12 +168,11 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         If parameter `purge` is not boolean, return an error
         """
-        body = json.dumps({"purge": "NotBool"})
 
         channel = self.make_request(
             "DELETE",
             self.url,
-            content=body,
+            content={"purge": "NotBool"},
             access_token=self.admin_user_tok,
         )
 
@@ -198,12 +193,10 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         # Assert one user in room
         self._is_member(room_id=self.room_id, user_id=self.other_user)
 
-        body = json.dumps({"block": True, "purge": True})
-
         channel = self.make_request(
             "DELETE",
             self.url.encode("ascii"),
-            content=body,
+            content={"block": True, "purge": True},
             access_token=self.admin_user_tok,
         )
 
@@ -231,12 +224,10 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         # Assert one user in room
         self._is_member(room_id=self.room_id, user_id=self.other_user)
 
-        body = json.dumps({"block": False, "purge": True})
-
         channel = self.make_request(
             "DELETE",
             self.url.encode("ascii"),
-            content=body,
+            content={"block": False, "purge": True},
             access_token=self.admin_user_tok,
         )
 
@@ -265,12 +256,10 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         # Assert one user in room
         self._is_member(room_id=self.room_id, user_id=self.other_user)
 
-        body = json.dumps({"block": True, "purge": False})
-
         channel = self.make_request(
             "DELETE",
             self.url.encode("ascii"),
-            content=body,
+            content={"block": True, "purge": False},
             access_token=self.admin_user_tok,
         )
 
@@ -342,7 +331,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "DELETE",
             self.url,
-            json.dumps({"new_room_user_id": self.admin_user}),
+            {"new_room_user_id": self.admin_user},
             access_token=self.admin_user_tok,
         )
 
@@ -372,7 +361,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "PUT",
             url.encode("ascii"),
-            json.dumps({"history_visibility": "world_readable"}),
+            {"history_visibility": "world_readable"},
             access_token=self.other_user_tok,
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
@@ -388,7 +377,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "DELETE",
             self.url,
-            json.dumps({"new_room_user_id": self.admin_user}),
+            {"new_room_user_id": self.admin_user},
             access_token=self.admin_user_tok,
         )
 
@@ -1782,12 +1771,11 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         """
         If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
         """
-        body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
             "POST",
             self.url,
-            content=body,
+            content={"user_id": self.second_user_id},
             access_token=self.second_tok,
         )
 
@@ -1798,12 +1786,11 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         """
         If a parameter is missing, return an error
         """
-        body = json.dumps({"unknown_parameter": "@unknown:test"})
 
         channel = self.make_request(
             "POST",
             self.url,
-            content=body,
+            content={"unknown_parameter": "@unknown:test"},
             access_token=self.admin_user_tok,
         )
 
@@ -1814,12 +1801,11 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         """
         Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND
         """
-        body = json.dumps({"user_id": "@unknown:test"})
 
         channel = self.make_request(
             "POST",
             self.url,
-            content=body,
+            content={"user_id": "@unknown:test"},
             access_token=self.admin_user_tok,
         )
 
@@ -1830,12 +1816,11 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         """
         Check that only local user can join rooms.
         """
-        body = json.dumps({"user_id": "@not:exist.bla"})
 
         channel = self.make_request(
             "POST",
             self.url,
-            content=body,
+            content={"user_id": "@not:exist.bla"},
             access_token=self.admin_user_tok,
         )
 
@@ -1849,13 +1834,12 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         """
         Check that unknown rooms/server return error HTTPStatus.NOT_FOUND.
         """
-        body = json.dumps({"user_id": self.second_user_id})
         url = "/_synapse/admin/v1/join/!unknown:test"
 
         channel = self.make_request(
             "POST",
             url,
-            content=body,
+            content={"user_id": self.second_user_id},
             access_token=self.admin_user_tok,
         )
 
@@ -1866,13 +1850,12 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         """
         Check that invalid room names, return an error HTTPStatus.BAD_REQUEST.
         """
-        body = json.dumps({"user_id": self.second_user_id})
         url = "/_synapse/admin/v1/join/invalidroom"
 
         channel = self.make_request(
             "POST",
             url,
-            content=body,
+            content={"user_id": self.second_user_id},
             access_token=self.admin_user_tok,
         )
 
@@ -1886,12 +1869,11 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         """
         Test joining a local user to a public room with "JoinRules.PUBLIC"
         """
-        body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
             "POST",
             self.url,
-            content=body,
+            content={"user_id": self.second_user_id},
             access_token=self.admin_user_tok,
         )
 
@@ -1917,12 +1899,11 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             self.creator, tok=self.creator_tok, is_public=False
         )
         url = f"/_synapse/admin/v1/join/{private_room_id}"
-        body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
             "POST",
             url,
-            content=body,
+            content={"user_id": self.second_user_id},
             access_token=self.admin_user_tok,
         )
 
@@ -1960,12 +1941,11 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         # Join user to room.
 
         url = f"/_synapse/admin/v1/join/{private_room_id}"
-        body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
             "POST",
             url,
-            content=body,
+            content={"user_id": self.second_user_id},
             access_token=self.admin_user_tok,
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
@@ -1990,12 +1970,11 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             self.admin_user, tok=self.admin_user_tok, is_public=False
         )
         url = f"/_synapse/admin/v1/join/{private_room_id}"
-        body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
             "POST",
             url,
-            content=body,
+            content={"user_id": self.second_user_id},
             access_token=self.admin_user_tok,
         )
 
