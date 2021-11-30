@@ -105,7 +105,7 @@ class DeferredCache(Generic[KT, VT]):
             cache_name=name,
             cache_type=cache_type,
             size_callback=(
-                (lambda d: len(d) or 1)  # type: ignore[arg-type]
+                (lambda d: len(cast(Sized, d)) or 1)
                 # Argument 1 to "len" has incompatible type "VT"; expected "Sized"
                 # We trust that `VT` is `Sized` when `iterable` is `True`
                 if iterable
