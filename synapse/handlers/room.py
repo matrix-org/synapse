@@ -1321,7 +1321,15 @@ class TimestampLookupHandler:
                     # `get_event_for_timestamp` function again to make sure
                     # they didn't give us an event from their gappy history.
                     remote_event_id = remote_response["event_id"]
-                    return remote_event_id
+                    origin_server_ts = remote_response["origin_server_ts"]
+
+                    # Only return the remote event if it's closer than the local event
+                    if not local_event or (
+                        local_event
+                        and abs(origin_server_ts - timestamp)
+                        < abs(local_event.origin_server_ts - timestamp)
+                    ):
+                        return remote_event_id
                 except Exception as ex:
                     logger.debug(
                         "Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",

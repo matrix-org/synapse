@@ -60,6 +60,7 @@ class TimestampToEventResponse(TypedDict):
     """Typed response dictionary for the federation /timestamp_to_event endpoint"""
 
     event_id: str
+    origin_server_ts: int
 
 
 class TransportLayerClient:

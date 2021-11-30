@@ -228,8 +228,13 @@ class FederationServer(FederationBase):
                 room_id, timestamp, direction
             )
             if event_id:
+                event = await self.store.get_event(
+                    event_id, allow_none=False, allow_rejected=False
+                )
+
                 return 200, {
                     "event_id": event_id,
+                    "origin_server_ts": event.origin_server_ts,
                 }
 
         raise SynapseError(
