@@ -35,7 +35,7 @@ The following issue is fixed in 1.47.1.
 
   Homeservers with the media repository disabled are unaffected. Homeservers configured with a federation whitelist are also unaffected.
 
-  Fixed by [91f2bd090](https://github.com/matrix-org/synapse/commit/91f2bd0
+  Fixed by [91f2bd090](https://github.com/matrix-org/synapse/commit/91f2bd090).
 
 
 Synapse 1.47.0 (2021-11-17)
