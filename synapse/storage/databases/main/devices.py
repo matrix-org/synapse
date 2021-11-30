@@ -573,39 +573,46 @@ class DeviceWorkerStore(SQLBaseStore):
                 until `to_key` (inclusive).
         """
 
+        user_ids_to_check = []
         if filter_user_ids is not None:
             # Get set of users who *may* have changed. Users not in the returned
             # list have definitely not changed.
-            to_check = self._device_list_stream_cache.get_entities_changed(
+            user_ids_to_check = self._device_list_stream_cache.get_entities_changed(
                 filter_user_ids, from_key
             )
 
-            if not to_check:
+            if not user_ids_to_check:
                 return set()
 
         def _get_users_whose_devices_changed_txn(txn):
             changes = set()
 
-            sql_args = (from_key,)
+            sql_args = [from_key]
             if to_key:
                 stream_id_where_clause = "stream_id > ? AND stream_id <= ?"
-                sql_args += (to_key,)
+                sql_args += [to_key]
             else:
                 stream_id_where_clause = "stream_id > ?"
 
             sql = f"""
-                SELECT DISTINCT FROM device_lists_stream
+                SELECT DISTINCT user_id FROM device_lists_stream
                 WHERE {stream_id_where_clause}
-                AND
             """
 
-            for chunk in batch_iter(to_check, 100):
-                clause, args = make_in_list_sql_clause(
-                    txn.database_engine, "user_id", chunk
-                )
-                sql_args += args
+            # TODO: This is starting to get a bit messy
+            if filter_user_ids:
+                sql += " AND "
 
-                txn.execute(sql + clause, sql_args)
+                for chunk in batch_iter(user_ids_to_check, 100):
+                    clause, args = make_in_list_sql_clause(
+                        txn.database_engine, "user_id", chunk
+                    )
+                    sql_args += args
+
+                    txn.execute(sql + clause, sql_args)
+                    changes.update(user_id for user_id, in txn)
+            else:
+                txn.execute(sql, sql_args)
                 changes.update(user_id for user_id, in txn)
 
             return changes
