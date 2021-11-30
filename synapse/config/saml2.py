@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Any, List
+from typing import Any, List, Set
 
 from synapse.config.sso import SsoAttributeRequirement
 from synapse.python_dependencies import DependencyException, check_requirements
@@ -45,7 +45,7 @@ def _dict_merge(merge_dict: dict, into_dict: dict) -> None:
 
     Args:
         merge_dict: dict to merge
-        into_dict: target dict
+        into_dict: target dict to be modified
     """
     for k, v in merge_dict.items():
         if k not in into_dict:
@@ -184,7 +184,7 @@ class SAML2Config(Config):
         )
 
     def _default_saml_config_dict(
-        self, required_attributes: set, optional_attributes: set
+        self, required_attributes: Set[str], optional_attributes: Set[str]
     ) -> JsonDict:
         """Generate a configuration dictionary with required and optional attributes that
         will be needed to process new user registration
