@@ -84,26 +84,26 @@ class TokenLookupResult:
         return self.user_id
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(auto_attribs=True, frozen=True, slots=True)
 class RefreshTokenLookupResult:
     """Result of looking up a refresh token."""
 
-    user_id = attr.ib(type=str)
+    user_id: str
     """The user this token belongs to."""
 
-    device_id = attr.ib(type=str)
+    device_id: str
     """The device associated with this refresh token."""
 
-    token_id = attr.ib(type=int)
+    token_id: int
     """The ID of this refresh token."""
 
-    next_token_id = attr.ib(type=Optional[int])
+    next_token_id: Optional[int]
     """The ID of the refresh token which replaced this one."""
 
-    has_next_refresh_token_been_refreshed = attr.ib(type=bool)
+    has_next_refresh_token_been_refreshed: bool
     """True if the next refresh token was used for another refresh."""
 
-    has_next_access_token_been_used = attr.ib(type=bool)
+    has_next_access_token_been_used: bool
     """True if the next access token was already used at least once."""
 
 
@@ -476,7 +476,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             shadow_banned: true iff the user is to be shadow-banned, false otherwise.
         """
 
-        def set_shadow_banned_txn(txn):
+        def set_shadow_banned_txn(txn: LoggingTransaction) -> None:
             user_id = user.to_string()
             self.db_pool.simple_update_one_txn(
                 txn,
@@ -1198,8 +1198,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         expiration_ts = now_ms + self._account_validity_period
 
         if use_delta:
+            assert self._account_validity_startup_job_max_delta is not None
             expiration_ts = random.randrange(
-                expiration_ts - self._account_validity_startup_job_max_delta,
+                int(expiration_ts - self._account_validity_startup_job_max_delta),
                 expiration_ts,
             )
 
@@ -1728,11 +1729,11 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         )
 
         self.db_pool.updates.register_background_update_handler(
-            "user_threepids_grandfather", self._bg_user_threepids_grandfather
+            "users_set_deactivated_flag", self._background_update_set_deactivated_flag
         )
 
-        self.db_pool.updates.register_background_update_handler(
-            "users_set_deactivated_flag", self._background_update_set_deactivated_flag
+        self.db_pool.updates.register_noop_background_update(
+            "user_threepids_grandfather"
         )
 
         self.db_pool.updates.register_background_index_update(
@@ -1804,35 +1805,6 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             )
 
         return nb_processed
-
-    async def _bg_user_threepids_grandfather(self, progress, batch_size):
-        """We now track which identity servers a user binds their 3PID to, so
-        we need to handle the case of existing bindings where we didn't track
-        this.
-
-        We do this by grandfathering in existing user threepids assuming that
-        they used one of the server configured trusted identity servers.
-        """
-        id_servers = set(self.config.registration.trusted_third_party_id_servers)
-
-        def _bg_user_threepids_grandfather_txn(txn):
-            sql = """
-                INSERT INTO user_threepid_id_server
-                    (user_id, medium, address, id_server)
-                SELECT user_id, medium, address, ?
-                FROM user_threepids
-            """
-
-            txn.execute_batch(sql, [(id_server,) for id_server in id_servers])
-
-        if id_servers:
-            await self.db_pool.runInteraction(
-                "_bg_user_threepids_grandfather", _bg_user_threepids_grandfather_txn
-            )
-
-        await self.db_pool.updates._end_background_update("user_threepids_grandfather")
-
-        return 1
 
     async def set_user_deactivated_status(
         self, user_id: str, deactivated: bool

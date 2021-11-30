@@ -474,3 +474,51 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
                 % server_and_media_id_2
             ),
         )
+
+
+class PurgeHistoryTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.other_user_tok = self.login("user", "pass")
+
+        self.room_id = self.helper.create_room_as(
+            self.other_user, tok=self.other_user_tok
+        )
+        self.url = f"/_synapse/admin/v1/purge_history/{self.room_id}"
+        self.url_status = "/_synapse/admin/v1/purge_history_status/"
+
+    def test_purge_history(self):
+        """
+        Simple test of purge history API.
+        Test only that is is possible to call, get status 200 and purge_id.
+        """
+
+        channel = self.make_request(
+            "POST",
+            self.url,
+            content={"delete_local_events": True, "purge_up_to_ts": 0},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertIn("purge_id", channel.json_body)
+        purge_id = channel.json_body["purge_id"]
+
+        # get status
+        channel = self.make_request(
+            "GET",
+            self.url_status + purge_id,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual("complete", channel.json_body["status"])

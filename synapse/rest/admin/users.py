@@ -899,7 +899,7 @@ class UserTokenRestServlet(RestServlet):
         if auth_user.to_string() == user_id:
             raise SynapseError(400, "Cannot use admin API to login as self")
 
-        token = await self.auth_handler.get_access_token_for_user_id(
+        token = await self.auth_handler.create_access_token_for_user_id(
             user_id=auth_user.to_string(),
             device_id=None,
             valid_until_ms=valid_until_ms,
@@ -910,7 +910,7 @@ class UserTokenRestServlet(RestServlet):
 
 
 class ShadowBanRestServlet(RestServlet):
-    """An admin API for shadow-banning a user.
+    """An admin API for controlling whether a user is shadow-banned.
 
     A shadow-banned users receives successful responses to their client-server
     API requests, but the events are not propagated into rooms.
@@ -918,9 +918,17 @@ class ShadowBanRestServlet(RestServlet):
     Shadow-banning a user should be used as a tool of last resort and may lead
     to confusing or broken behaviour for the client.
 
-    Example:
+    Example of shadow-banning a user:
 
         POST /_synapse/admin/v1/users/@test:example.com/shadow_ban
+        {}
+
+        200 OK
+        {}
+
+    Example of removing a user from being shadow-banned:
+
+        DELETE /_synapse/admin/v1/users/@test:example.com/shadow_ban
         {}
 
         200 OK
@@ -943,6 +951,18 @@ class ShadowBanRestServlet(RestServlet):
             raise SynapseError(400, "Only local users can be shadow-banned")
 
         await self.store.set_shadow_banned(UserID.from_string(user_id), True)
+
+        return 200, {}
+
+    async def on_DELETE(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
+
+        if not self.hs.is_mine_id(user_id):
+            raise SynapseError(400, "Only local users can be shadow-banned")
+
+        await self.store.set_shadow_banned(UserID.from_string(user_id), False)
 
         return 200, {}
 

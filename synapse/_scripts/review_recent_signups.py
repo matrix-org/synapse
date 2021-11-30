@@ -92,7 +92,7 @@ def get_recent_users(txn: LoggingTransaction, since_ms: int) -> List[UserInfo]:
     return user_infos
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-c",
@@ -142,7 +142,8 @@ def main():
     engine = create_engine(database_config.config)
 
     with make_conn(database_config, engine, "review_recent_signups") as db_conn:
-        user_infos = get_recent_users(db_conn.cursor(), since_ms)
+        # This generates a type of Cursor, not LoggingTransaction.
+        user_infos = get_recent_users(db_conn.cursor(), since_ms)  # type: ignore[arg-type]
 
     for user_info in user_infos:
         if exclude_users_with_email and user_info.emails:

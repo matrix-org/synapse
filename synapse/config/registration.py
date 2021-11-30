@@ -39,9 +39,7 @@ class RegistrationConfig(Config):
         self.registration_shared_secret = config.get("registration_shared_secret")
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
-        self.trusted_third_party_id_servers = config.get(
-            "trusted_third_party_id_servers", ["matrix.org", "vector.im"]
-        )
+
         account_threepid_delegates = config.get("account_threepid_delegates") or {}
         self.account_threepid_delegate_email = account_threepid_delegates.get("email")
         self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
@@ -114,25 +112,32 @@ class RegistrationConfig(Config):
             session_lifetime = self.parse_duration(session_lifetime)
         self.session_lifetime = session_lifetime
 
-        # The `access_token_lifetime` applies for tokens that can be renewed
+        # The `refreshable_access_token_lifetime` applies for tokens that can be renewed
         # using a refresh token, as per MSC2918. If it is `None`, the refresh
         # token mechanism is disabled.
         #
         # Since it is incompatible with the `session_lifetime` mechanism, it is set to
         # `None` by default if a `session_lifetime` is set.
-        access_token_lifetime = config.get(
-            "access_token_lifetime", "5m" if session_lifetime is None else None
+        refreshable_access_token_lifetime = config.get(
+            "refreshable_access_token_lifetime",
+            "5m" if session_lifetime is None else None,
         )
-        if access_token_lifetime is not None:
-            access_token_lifetime = self.parse_duration(access_token_lifetime)
-        self.access_token_lifetime = access_token_lifetime
+        if refreshable_access_token_lifetime is not None:
+            refreshable_access_token_lifetime = self.parse_duration(
+                refreshable_access_token_lifetime
+            )
+        self.refreshable_access_token_lifetime = refreshable_access_token_lifetime
 
-        if session_lifetime is not None and access_token_lifetime is not None:
+        if (
+            session_lifetime is not None
+            and refreshable_access_token_lifetime is not None
+        ):
             raise ConfigError(
                 "The refresh token mechanism is incompatible with the "
                 "`session_lifetime` option. Consider disabling the "
                 "`session_lifetime` option or disabling the refresh token "
-                "mechanism by removing the `access_token_lifetime` option."
+                "mechanism by removing the `refreshable_access_token_lifetime` "
+                "option."
             )
 
         # The fallback template used for authenticating using a registration token

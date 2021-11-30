@@ -252,7 +252,7 @@ class MessageHandler:
             now,
             # We don't bother bundling aggregations in when asked for state
             # events, as clients won't use them.
-            bundle_aggregations=False,
+            bundle_relations=False,
         )
         return events
 
@@ -1001,13 +1001,52 @@ class EventCreationHandler:
             )
 
         self.validator.validate_new(event, self.config)
+        await self._validate_event_relation(event)
+        logger.debug("Created event %s", event.event_id)
+
+        return event, context
+
+    async def _validate_event_relation(self, event: EventBase) -> None:
+        """
+        Ensure the relation data on a new event is not bogus.
+
+        Args:
+            event: The event being created.
+
+        Raises:
+            SynapseError if the event is invalid.
+        """
+
+        relation = event.content.get("m.relates_to")
+        if not relation:
+            return
+
+        relation_type = relation.get("rel_type")
+        if not relation_type:
+            return
+
+        # Ensure the parent is real.
+        relates_to = relation.get("event_id")
+        if not relates_to:
+            return
+
+        parent_event = await self.store.get_event(relates_to, allow_none=True)
+        if parent_event:
+            # And in the same room.
+            if parent_event.room_id != event.room_id:
+                raise SynapseError(400, "Relations must be in the same room")
+
+        else:
+            # There must be some reason that the client knows the event exists,
+            # see if there are existing relations. If so, assume everything is fine.
+            if not await self.store.event_is_target_of_relation(relates_to):
+                # Otherwise, the client can't know about the parent event!
+                raise SynapseError(400, "Can't send relation to unknown event")
 
         # If this event is an annotation then we check that that the sender
         # can't annotate the same way twice (e.g. stops users from liking an
         # event multiple times).
-        relation = event.content.get("m.relates_to", {})
-        if relation.get("rel_type") == RelationTypes.ANNOTATION:
-            relates_to = relation["event_id"]
+        if relation_type == RelationTypes.ANNOTATION:
             aggregation_key = relation["key"]
 
             already_exists = await self.store.has_user_annotated_event(
@@ -1016,9 +1055,12 @@ class EventCreationHandler:
             if already_exists:
                 raise SynapseError(400, "Can't send same reaction twice")
 
-        logger.debug("Created event %s", event.event_id)
-
-        return event, context
+        # Don't attempt to start a thread if the parent event is a relation.
+        elif relation_type == RelationTypes.THREAD:
+            if await self.store.event_includes_relation(relates_to):
+                raise SynapseError(
+                    400, "Cannot start threads from an event with a relation"
+                )
 
     @measure_func("handle_new_client_event")
     async def handle_new_client_event(

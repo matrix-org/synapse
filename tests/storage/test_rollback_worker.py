@@ -33,7 +33,7 @@ def fake_listdir(filepath: str) -> List[str]:
         A list of files and folders in the directory.
     """
     if filepath.endswith("full_schemas"):
-        return [SCHEMA_VERSION]
+        return [str(SCHEMA_VERSION)]
 
     return ["99_add_unicorn_to_database.sql"]
 

@@ -162,6 +162,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         local_user = "@boris:" + self.hs.hostname
         device_id = "xyz"
         fallback_key = {"alg1:k1": "key1"}
+        fallback_key2 = {"alg1:k2": "key2"}
         otk = {"alg1:k2": "key2"}
 
         # we shouldn't have any unused fallback keys yet
@@ -213,6 +214,35 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key}}},
         )
 
+        # re-uploading the same fallback key should still result in no unused fallback
+        # keys
+        self.get_success(
+            self.handler.upload_keys_for_user(
+                local_user,
+                device_id,
+                {"org.matrix.msc2732.fallback_keys": fallback_key},
+            )
+        )
+
+        res = self.get_success(
+            self.store.get_e2e_unused_fallback_key_types(local_user, device_id)
+        )
+        self.assertEqual(res, [])
+
+        # uploading a new fallback key should result in an unused fallback key
+        self.get_success(
+            self.handler.upload_keys_for_user(
+                local_user,
+                device_id,
+                {"org.matrix.msc2732.fallback_keys": fallback_key2},
+            )
+        )
+
+        res = self.get_success(
+            self.store.get_e2e_unused_fallback_key_types(local_user, device_id)
+        )
+        self.assertEqual(res, ["alg1"])
+
         # if the user uploads a one-time key, the next claim should fetch the
         # one-time key, and then go back to the fallback
         self.get_success(
@@ -238,7 +268,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(
             res,
-            {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key}}},
+            {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key2}}},
         )
 
     def test_replace_master_key(self):

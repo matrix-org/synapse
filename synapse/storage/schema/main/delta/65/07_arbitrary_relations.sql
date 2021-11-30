@@ -15,4 +15,4 @@
 
 -- Check old events for thread relations.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (6502, 'event_thread_relation', '{}');
+  (6507, 'event_arbitrary_relations', '{}');

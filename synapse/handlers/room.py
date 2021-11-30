@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Contains functions for performing events on rooms."""
-
+"""Contains functions for performing actions on rooms."""
 import itertools
 import logging
 import math
@@ -32,7 +31,7 @@ from typing import (
     Tuple,
 )
 
-from prometheus_client import Histogram
+from typing_extensions import TypedDict
 
 from synapse.api.constants import (
     EventContentFields,
@@ -787,8 +786,11 @@ class RoomCreationHandler:
             raise SynapseError(403, "Room visibility value not allowed.")
 
         if is_public:
+            room_aliases = []
+            if room_alias:
+                room_aliases.append(room_alias.to_string())
             if not self.config.roomdirectory.is_publishing_room_allowed(
-                user_id, room_id, room_alias
+                user_id, room_id, room_aliases
             ):
                 # Let's just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages
@@ -1174,8 +1176,10 @@ class RoomContextHandler:
         )
 
         if event_filter:
-            results["events_before"] = event_filter.filter(results["events_before"])
-            results["events_after"] = event_filter.filter(results["events_after"])
+            results["events_before"] = await event_filter.filter(
+                results["events_before"]
+            )
+            results["events_after"] = await event_filter.filter(results["events_after"])
 
         results["events_before"] = await filter_evts(results["events_before"])
         results["events_after"] = await filter_evts(results["events_after"])
@@ -1211,7 +1215,7 @@ class RoomContextHandler:
 
         state_events = list(state[last_event_id].values())
         if event_filter:
-            state_events = event_filter.filter(state_events)
+            state_events = await event_filter.filter(state_events)
 
         results["state"] = await filter_evts(state_events)
 
@@ -1291,8 +1295,25 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
         return self.store.get_room_events_max_id(room_id)
 
 
-class RoomShutdownHandler:
+class ShutdownRoomResponse(TypedDict):
+    """
+    Attributes:
+        kicked_users: An array of users (`user_id`) that were kicked.
+        failed_to_kick_users:
+            An array of users (`user_id`) that that were not kicked.
+        local_aliases:
+            An array of strings representing the local aliases that were
+            migrated from the old room to the new.
+        new_room_id: A string representing the room ID of the new room.
+    """
 
+    kicked_users: List[str]
+    failed_to_kick_users: List[str]
+    local_aliases: List[str]
+    new_room_id: Optional[str]
+
+
+class RoomShutdownHandler:
     DEFAULT_MESSAGE = (
         "Sharing illegal content on this server is not permitted and rooms in"
         " violation will be blocked."
@@ -1305,7 +1326,6 @@ class RoomShutdownHandler:
         self._room_creation_handler = hs.get_room_creation_handler()
         self._replication = hs.get_replication_data_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.state = hs.get_state_handler()
         self.store = hs.get_datastore()
 
     async def shutdown_room(
@@ -1316,7 +1336,7 @@ class RoomShutdownHandler:
         new_room_name: Optional[str] = None,
         message: Optional[str] = None,
         block: bool = False,
-    ) -> dict:
+    ) -> ShutdownRoomResponse:
         """
         Shuts down a room. Moves all local users and room aliases automatically
         to a new room if `new_room_user_id` is set. Otherwise local users only
@@ -1350,8 +1370,13 @@ class RoomShutdownHandler:
                 Defaults to `Sharing illegal content on this server is not
                 permitted and rooms in violation will be blocked.`
             block:
-                If set to `true`, this room will be added to a blocking list,
-                preventing future attempts to join the room. Defaults to `false`.
+                If set to `True`, users will be prevented from joining the old
+                room. This option can also be used to pre-emptively block a room,
+                even if it's unknown to this homeserver. In this case, the room
+                will be blocked, and no further action will be taken. If `False`,
+                attempting to delete an unknown room is invalid.
+
+                Defaults to `False`.
 
         Returns: a dict containing the following keys:
             kicked_users: An array of users (`user_id`) that were kicked.
@@ -1360,7 +1385,9 @@ class RoomShutdownHandler:
             local_aliases:
                 An array of strings representing the local aliases that were
                 migrated from the old room to the new.
-            new_room_id: A string representing the room ID of the new room.
+            new_room_id:
+                A string representing the room ID of the new room, or None if
+                no such room was created.
         """
 
         if not new_room_name:
@@ -1371,13 +1398,27 @@ class RoomShutdownHandler:
         if not RoomID.is_valid(room_id):
             raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
 
-        if not await self.store.get_room(room_id):
-            raise NotFoundError("Unknown room id %s" % (room_id,))
-
-        # This will work even if the room is already blocked, but that is
-        # desirable in case the first attempt at blocking the room failed below.
+        # Action the block first (even if the room doesn't exist yet)
         if block:
+            # This will work even if the room is already blocked, but that is
+            # desirable in case the first attempt at blocking the room failed below.
             await self.store.block_room(room_id, requester_user_id)
+
+        if not await self.store.get_room(room_id):
+            if block:
+                # We allow you to block an unknown room.
+                return {
+                    "kicked_users": [],
+                    "failed_to_kick_users": [],
+                    "local_aliases": [],
+                    "new_room_id": None,
+                }
+            else:
+                # But if you don't want to preventatively block another room,
+                # this function can't do anything useful.
+                raise NotFoundError(
+                    "Cannot shut down room: unknown room id %s" % (room_id,)
+                )
 
         if new_room_user_id is not None:
             if not self.hs.is_mine_id(new_room_user_id):

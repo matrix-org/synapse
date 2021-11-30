@@ -28,6 +28,7 @@ from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
 from synapse.rest.admin.background_updates import (
     BackgroundUpdateEnabledRestServlet,
     BackgroundUpdateRestServlet,
+    BackgroundUpdateStartJobRestServlet,
 )
 from synapse.rest.admin.devices import (
     DeleteDevicesRestServlet,
@@ -46,6 +47,9 @@ from synapse.rest.admin.registration_tokens import (
     RegistrationTokenRestServlet,
 )
 from synapse.rest.admin.rooms import (
+    BlockRoomRestServlet,
+    DeleteRoomStatusByDeleteIdRestServlet,
+    DeleteRoomStatusByRoomIdRestServlet,
     ForwardExtremitiesRestServlet,
     JoinRoomAliasServlet,
     ListRoomRestServlet,
@@ -53,6 +57,7 @@ from synapse.rest.admin.rooms import (
     RoomEventContextServlet,
     RoomMembersRestServlet,
     RoomRestServlet,
+    RoomRestV2Servlet,
     RoomStateRestServlet,
 )
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
@@ -220,10 +225,14 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     Register all the admin servlets.
     """
     register_servlets_for_client_rest_resource(hs, http_server)
+    BlockRoomRestServlet(hs).register(http_server)
     ListRoomRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
     RoomRestServlet(hs).register(http_server)
+    RoomRestV2Servlet(hs).register(http_server)
     RoomMembersRestServlet(hs).register(http_server)
+    DeleteRoomStatusByDeleteIdRestServlet(hs).register(http_server)
+    DeleteRoomStatusByRoomIdRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
     UserAdminServlet(hs).register(http_server)
@@ -253,6 +262,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
         SendServerNoticeServlet(hs).register(http_server)
         BackgroundUpdateEnabledRestServlet(hs).register(http_server)
         BackgroundUpdateRestServlet(hs).register(http_server)
+        BackgroundUpdateStartJobRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(

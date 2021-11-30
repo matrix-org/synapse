@@ -14,6 +14,8 @@
 from typing import Any, Iterable, List, Optional, Tuple
 from unittest import mock
 
+from twisted.internet.defer import ensureDeferred
+
 from synapse.api.constants import (
     EventContentFields,
     EventTypes,
@@ -315,6 +317,59 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             self.handler.get_room_hierarchy(user2, "#not-a-space:" + self.hs.hostname),
             AuthError,
         )
+
+    def test_room_hierarchy_cache(self) -> None:
+        """In-flight room hierarchy requests are deduplicated."""
+        # Run two `get_room_hierarchy` calls up until they block.
+        deferred1 = ensureDeferred(
+            self.handler.get_room_hierarchy(self.user, self.space)
+        )
+        deferred2 = ensureDeferred(
+            self.handler.get_room_hierarchy(self.user, self.space)
+        )
+
+        # Complete the two calls.
+        result1 = self.get_success(deferred1)
+        result2 = self.get_success(deferred2)
+
+        # Both `get_room_hierarchy` calls should return the same result.
+        expected = [(self.space, [self.room]), (self.room, ())]
+        self._assert_hierarchy(result1, expected)
+        self._assert_hierarchy(result2, expected)
+        self.assertIs(result1, result2)
+
+        # A subsequent `get_room_hierarchy` call should not reuse the result.
+        result3 = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space)
+        )
+        self._assert_hierarchy(result3, expected)
+        self.assertIsNot(result1, result3)
+
+    def test_room_hierarchy_cache_sharing(self) -> None:
+        """Room hierarchy responses for different users are not shared."""
+        user2 = self.register_user("user2", "pass")
+
+        # Make the room within the space invite-only.
+        self.helper.send_state(
+            self.room,
+            event_type=EventTypes.JoinRules,
+            body={"join_rule": JoinRules.INVITE},
+            tok=self.token,
+        )
+
+        # Run two `get_room_hierarchy` calls for different users up until they block.
+        deferred1 = ensureDeferred(
+            self.handler.get_room_hierarchy(self.user, self.space)
+        )
+        deferred2 = ensureDeferred(self.handler.get_room_hierarchy(user2, self.space))
+
+        # Complete the two calls.
+        result1 = self.get_success(deferred1)
+        result2 = self.get_success(deferred2)
+
+        # The `get_room_hierarchy` calls should return different results.
+        self._assert_hierarchy(result1, [(self.space, [self.room]), (self.room, ())])
+        self._assert_hierarchy(result2, [(self.space, [self.room])])
 
     def _create_room_with_join_rule(
         self, join_rule: str, room_version: Optional[str] = None, **extra_content
