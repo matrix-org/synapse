@@ -24,7 +24,7 @@ import signal
 import subprocess
 import sys
 import time
-from typing import Iterable
+from typing import Iterable, Optional
 
 import yaml
 
@@ -109,15 +109,14 @@ def start(pidfile: str, app: str, config_files: Iterable[str], daemonize: bool) 
         return False
 
 
-def stop(pidfile: str, app: str) -> bool:
+def stop(pidfile: str, app: str) -> Optional[int]:
     """Attempts to kill a synapse worker from the pidfile.
     Args:
         pidfile: path to file containing worker's pid
         app: name of the worker's appservice
 
     Returns:
-        True if the process stopped successfully
-        False if process was already stopped or an error occured
+        process id, or None if the process was not running
     """
 
     if os.path.exists(pidfile):
@@ -125,7 +124,7 @@ def stop(pidfile: str, app: str) -> bool:
         try:
             os.kill(pid, signal.SIGTERM)
             write("stopped %s" % (app,), colour=GREEN)
-            return True
+            return pid
         except OSError as err:
             if err.errno == errno.ESRCH:
                 write("%s not running" % (app,), colour=YELLOW)
@@ -133,14 +132,13 @@ def stop(pidfile: str, app: str) -> bool:
                 abort("Cannot stop %s: Operation not permitted" % (app,))
             else:
                 abort("Cannot stop %s: Unknown error" % (app,))
-            return False
     else:
         write(
             "No running worker of %s found (from %s)\nThe process might be managed by another controller (e.g. systemd)"
             % (app, pidfile),
             colour=YELLOW,
         )
-    return False
+    return None
 
 
 Worker = collections.namedtuple(
@@ -288,32 +286,23 @@ def main():
     action = options.action
 
     if action == "stop" or action == "restart":
-        has_stopped = True
+        running_pids = []
         for worker in workers:
-            if not stop(worker.pidfile, worker.app):
-                # A worker could not be stopped.
-                has_stopped = False
+            pid = stop(worker.pidfile, worker.app)
+            if pid is not None:
+                running_pids.append(pid)
 
         if start_stop_synapse:
-            if not stop(pidfile, MAIN_PROCESS):
-                has_stopped = False
-        if not has_stopped and action == "stop":
-            sys.exit(1)
+            pid = stop(pidfile, MAIN_PROCESS)
+            if pid is not None:
+                running_pids.append(pid)
 
-    # Wait for synapse to actually shutdown before starting it again
-    if action == "restart":
-        running_pids = []
-        if start_stop_synapse and os.path.exists(pidfile):
-            running_pids.append(int(open(pidfile).read()))
-        for worker in workers:
-            if os.path.exists(worker.pidfile):
-                running_pids.append(int(open(worker.pidfile).read()))
         if len(running_pids) > 0:
-            write("Waiting for process to exit before restarting...")
+            write("Waiting for processes to exit...")
             for running_pid in running_pids:
                 while pid_running(running_pid):
                     time.sleep(0.2)
-            write("All processes exited; now restarting...")
+            write("All processes exited")
 
     if action == "start" or action == "restart":
         error = False
