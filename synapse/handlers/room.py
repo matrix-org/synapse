@@ -1296,17 +1296,14 @@ class TimestampLookupHandler:
                         domain,
                         remote_response,
                     )
-                    if not remote_response:
-                        continue
 
-                    remote_event_id = remote_response.get("event_id", None)
-                    if remote_event_id:
-                        # TODO: Do we want to persist this as an extremity?
-                        # TODO: I think ideally, we would try to backfill from
-                        # this event and run this whole
-                        # `get_event_for_timestamp` function again to make sure
-                        # they didn't give us an event from their gappy history.
-                        return remote_event_id
+                    # TODO: Do we want to persist this as an extremity?
+                    # TODO: I think ideally, we would try to backfill from
+                    # this event and run this whole
+                    # `get_event_for_timestamp` function again to make sure
+                    # they didn't give us an event from their gappy history.
+                    remote_event_id = remote_response["event_id"]
+                    return remote_event_id
                 except Exception as ex:
                     logger.debug(
                         "Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
