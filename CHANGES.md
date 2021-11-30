@@ -1,7 +1,7 @@
 Synapse 1.48.0 (2021-11-30)
 ===========================
 
-No significant changes.
+No significant changes since 1.48.0rc1.
 
 
 Synapse 1.48.0rc1 (2021-11-25)
