@@ -1694,8 +1694,12 @@ class EventsWorkerStore(SQLBaseStore):
             # consider any potential forward gap as not a gap since it's one of
             # the latest events in the room.
             #
+            # `event_forward_extremities` does not include backfilled or outlier
+            # events so we can't rely on it to find forward gaps. We can only
+            # use it to determine whether a message is the latest in the room.
+            #
             # We can't combine this query with the `forward_edge_query` below
-            # because if the event in question has no forward edges(isn't
+            # because if the event in question has no forward edges (isn't
             # referenced by any other event's prev_events) but is in
             # `event_forward_extremities`, we don't want to return 0 rows and
             # say it's next to a gap.
@@ -1710,9 +1714,6 @@ class EventsWorkerStore(SQLBaseStore):
             # Check to see whether the event in question is already referenced
             # by another event. If we don't see any edges, we're next to a
             # forward gap.
-            #
-            # We can't just only check `event_forward_extremities` directly
-            # because that doesn't include backfilled and outlier events.
             forward_edge_query = """
                 SELECT 1 FROM event_edges
                 /* Check to make sure the event referencing our event in question is not rejected */
@@ -1726,6 +1727,7 @@ class EventsWorkerStore(SQLBaseStore):
                     AND rejections.event_id IS NULL
                 LIMIT 1
             """
+
             # We consider any forward extremity as the latest in the room and
             # not a forward gap.
             #
