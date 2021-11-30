@@ -1328,8 +1328,7 @@ class TimestampLookupHandler:
 
                     # Only return the remote event if it's closer than the local event
                     if not local_event or (
-                        local_event
-                        and abs(origin_server_ts - timestamp)
+                        abs(origin_server_ts - timestamp)
                         < abs(local_event.origin_server_ts - timestamp)
                     ):
                         return remote_event_id, origin_server_ts
