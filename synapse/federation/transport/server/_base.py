@@ -15,11 +15,11 @@
 import functools
 import logging
 import re
-from typing import Optional, Tuple
+from typing import Any, Awaitable, Callable, Optional, Tuple, cast
 
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.urls import FEDERATION_V1_PREFIX
-from synapse.http.server import HttpServer
+from synapse.http.server import HttpServer, ServletCallback
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging import opentracing
@@ -239,23 +239,27 @@ class BaseFederationServlet:
         self.ratelimiter = ratelimiter
         self.server_name = server_name
 
-    def _wrap(self, func):
+    def _wrap(
+        self, func: Callable[..., Awaitable[Tuple[int, JsonDict]]]
+    ) -> ServletCallback:
         authenticator = self.authenticator
         ratelimiter = self.ratelimiter
 
         @functools.wraps(func)
-        async def new_func(request, *args, **kwargs):
+        async def new_func(
+            request: SynapseRequest, *args: Any, **kwargs: str
+        ) -> Optional[Tuple[int, Any]]:
             """A callback which can be passed to HttpServer.RegisterPaths
 
             Args:
-                request (twisted.web.http.Request):
+                request:
                 *args: unused?
-                **kwargs (dict[unicode, unicode]): the dict mapping keys to path
-                    components as specified in the path match regexp.
+                **kwargs: the dict mapping keys to path components as specified
+                    in the path match regexp.
 
             Returns:
-                Tuple[int, object]|None: (response code, response object) as returned by
-                    the callback method. None if the request has already been handled.
+                (response code, response object) as returned by the callback method.
+                None if the request has already been handled.
             """
             content = None
             if request.method in [b"PUT", b"POST"]:
@@ -309,7 +313,7 @@ class BaseFederationServlet:
                                 "client disconnected before we started processing "
                                 "request"
                             )
-                            return -1, None
+                            return None
                         response = await func(
                             origin, content, request.args, *args, **kwargs
                         )
@@ -320,7 +324,7 @@ class BaseFederationServlet:
 
             return response
 
-        return new_func
+        return cast(ServletCallback, new_func)
 
     def register(self, server: HttpServer) -> None:
         pattern = re.compile("^" + self.PREFIX + self.PATH + "$")
