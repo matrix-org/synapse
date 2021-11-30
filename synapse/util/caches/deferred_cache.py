@@ -22,6 +22,7 @@ from typing import (
     Iterable,
     MutableMapping,
     Optional,
+    Sized,
     TypeVar,
     Union,
     cast,
