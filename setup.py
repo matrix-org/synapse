@@ -153,9 +153,9 @@ setup(
     long_description_content_type="text/x-rst",
     python_requires="~=3.6",
     entry_points={
-        'console_scripts': [
-            'homeserver = synapse.app.homeserver:main',
-            'worker = synapse.app.generic_worker:main'
+        "console_scripts": [
+            "synapse_homeserver = synapse.app.homeserver:main",
+            "synapse_worker = synapse.app.generic_worker:main"
         ]
     },
     classifiers=[
