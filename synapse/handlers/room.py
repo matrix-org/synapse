@@ -1264,8 +1264,8 @@ class TimestampLookupHandler:
             timestamp,
         )
 
-        # If we found a gap, we should probably ask another homeserver first
-        # about more history in between
+        # Check for gaps in the history where events could be hiding in between
+        # the timestamp given and the event we were able to find localy
         is_event_next_to_backward_gap = False
         is_event_next_to_forward_gap = False
         if local_event_id:
@@ -1286,6 +1286,8 @@ class TimestampLookupHandler:
                     await self.store.is_event_next_to_forward_gap(local_event)
                 )
 
+        # If we found a gap, we should probably ask another homeserver first
+        # about more history in between
         if (
             not local_event_id
             or is_event_next_to_backward_gap
