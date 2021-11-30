@@ -24,7 +24,7 @@ import signal
 import subprocess
 import sys
 import time
-from typing import Iterable
+from typing import Iterable, Optional
 
 import yaml
 
@@ -109,14 +109,14 @@ def start(pidfile: str, app: str, config_files: Iterable[str], daemonize: bool) 
         return False
 
 
-def stop(pidfile: str, app: str) -> int:
+def stop(pidfile: str, app: str) -> Optional[int]:
     """Attempts to kill a synapse worker from the pidfile.
     Args:
         pidfile: path to file containing worker's pid
         app: name of the worker's appservice
 
     Returns:
-        process id, or 0 if the process was not running
+        process id, or None if the process was not running
     """
 
     if os.path.exists(pidfile):
@@ -138,7 +138,7 @@ def stop(pidfile: str, app: str) -> int:
             % (app, pidfile),
             colour=YELLOW,
         )
-    return 0
+    return None
 
 
 Worker = collections.namedtuple(
@@ -289,12 +289,12 @@ def main():
         running_pids = []
         for worker in workers:
             pid = stop(worker.pidfile, worker.app)
-            if pid:
+            if pid is not None:
                 running_pids.append(pid)
 
         if start_stop_synapse:
             pid = stop(pidfile, MAIN_PROCESS)
-            if pid:
+            if pid is not None:
                 running_pids.append(pid)
 
         if len(running_pids) > 0:
