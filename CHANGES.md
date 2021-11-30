@@ -1,15 +1,14 @@
 Synapse 1.48.0 (2021-11-30)
 ===========================
 
-No significant changes since 1.48.0rc1.
-
-
-Synapse 1.48.0rc1 (2021-11-25)
-==============================
-
 This release removes support for the long-deprecated `trust_identity_server_for_password_resets` configuration flag.
 
 This release also fixes some performance issues with some background database updates introduced in Synapse 1.47.0.
+
+No significant changes since 1.48.0rc1.
+
+Synapse 1.48.0rc1 (2021-11-25)
+==============================
 
 Features
 --------
