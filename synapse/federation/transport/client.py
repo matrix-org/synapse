@@ -192,7 +192,8 @@ class TransportLayerClient:
             destination, path=path, args=args, try_trailing_slash_on_400=True
         )
         assert isinstance(remote_response, dict)
-        assert remote_response.get("event_id", None)
+        assert remote_response.get("event_id", None) is not None
+        assert remote_response.get("origin_server_ts", None) is not None
 
         return cast(TimestampToEventResponse, remote_response)
 
