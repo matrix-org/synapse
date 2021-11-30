@@ -1,1 +1,0 @@
-Require all files in synapse/ and tests/ to pass mypy unless specifically excluded.
