@@ -86,8 +86,6 @@ def _wrap_with_jail_check(relative: bool) -> Callable[[GetPathMethod], GetPathMe
                 else:
                     normalized_path = os.path.normpath(path)
 
-                normalized_base_path = os.path.normpath(self.base_path)
-
                 # Check that the path lies within the media store directory.
                 # `os.path.commonpath` does not take `../`s into account and
                 # considers `a/b/c` and `a/b/c/../d` to have a common path of
@@ -105,8 +103,8 @@ def _wrap_with_jail_check(relative: bool) -> Callable[[GetPathMethod], GetPathMe
                 # eg. if `url_store/` is symlinked to elsewhere, its canonical path
                 # won't match that of the main media store directory.
                 if (
-                    os.path.commonpath([normalized_path, normalized_base_path])
-                    != normalized_base_path
+                    os.path.commonpath([normalized_path, self.normalized_base_path])
+                    != self.normalized_base_path
                 ):
                     # The path resolves to outside the media store directory.
                     raise ValueError(f"Invalid media store path: {path!r}")
@@ -159,6 +157,7 @@ class MediaFilePaths:
 
     def __init__(self, primary_base_path: str):
         self.base_path = primary_base_path
+        self.normalized_base_path = os.path.normpath(self.base_path)
 
         # Refuse to initialize if paths cannot be validated correctly for the current
         # platform.
