@@ -318,6 +318,7 @@ class RelationAggregationPaginationServlet(RestServlet):
 
             pagination_chunk = await self.store.get_aggregation_groups_for_event(
                 event_id=parent_id,
+                room_id=room_id,
                 event_type=event_type,
                 limit=limit,
                 from_token=from_token,

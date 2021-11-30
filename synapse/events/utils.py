@@ -459,7 +459,9 @@ class EventClientSerializer:
         # The bundled aggregations to include.
         aggregations = {}
 
-        annotations = await self.store.get_aggregation_groups_for_event(event_id)
+        annotations = await self.store.get_aggregation_groups_for_event(
+            event_id, room_id
+        )
         if annotations.chunk:
             aggregations[RelationTypes.ANNOTATION] = annotations.to_dict()
 
