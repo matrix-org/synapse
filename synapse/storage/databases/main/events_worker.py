@@ -1627,7 +1627,7 @@ class EventsWorkerStore(SQLBaseStore):
             _cleanup_old_transaction_ids_txn,
         )
 
-    async def is_event_next_to_gap(self, room_id: str, event_id: str) -> bool:
+    async def is_event_id_next_to_gap(self, room_id: str, event_id: str) -> bool:
         """Check if the given `event_id` is next to a gap of missing events.
         Looks at gaps going forwards and backwards. The gap in front of the
         latest events is not considered a gap.
@@ -1640,7 +1640,7 @@ class EventsWorkerStore(SQLBaseStore):
             Boolean indicating whether it's an extremity
         """
 
-        def is_event_next_to_gap_txn(txn) -> bool:
+        def is_event_id_next_to_gap_txn(txn) -> bool:
             # If the event in question is listed as a backward extremity, it's
             # next to a gap.
             backward_extremity_query = """
@@ -1721,8 +1721,8 @@ class EventsWorkerStore(SQLBaseStore):
             return False
 
         return await self.db_pool.runInteraction(
-            "is_event_next_to_gap_txn",
-            is_event_next_to_gap_txn,
+            "is_event_id_next_to_gap_txn",
+            is_event_id_next_to_gap_txn,
         )
 
     async def get_event_for_timestamp(
