@@ -22,10 +22,12 @@ from ._base import Config, ConfigError
 
 @attr.s
 class MetricsFlags:
-    known_servers = attr.ib(default=False, validator=attr.validators.instance_of(bool))
+    known_servers: bool = attr.ib(
+        default=False, validator=attr.validators.instance_of(bool)
+    )
 
     @classmethod
-    def all_off(cls):
+    def all_off(cls) -> "MetricsFlags":
         """
         Instantiate the flags with all options set to off.
         """

@@ -132,7 +132,7 @@ class TlsConfig(Config):
         self.tls_certificate: Optional[crypto.X509] = None
         self.tls_private_key: Optional[crypto.PKey] = None
 
-    def read_certificate_from_disk(self):
+    def read_certificate_from_disk(self) -> None:
         """
         Read the certificates and private key from disk.
         """
