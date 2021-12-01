@@ -27,7 +27,6 @@ from typing import (
     Optional,
     Tuple,
     Union,
-    cast,
 )
 
 import attr
