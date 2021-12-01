@@ -523,7 +523,7 @@ The synapse config will look like this:
         email_template: "{{ user.email }}"
 ```
 
-## Django OAuth Toolkit
+### Django OAuth Toolkit
 
 [django-oauth-toolkit](https://github.com/jazzband/django-oauth-toolkit) is a
 Django application providing out of the box all the endpoints, data and logic
