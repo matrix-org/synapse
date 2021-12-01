@@ -1653,20 +1653,25 @@ class EventsWorkerStore(SQLBaseStore):
                 SELECT 1 FROM event_backward_extremities
                 WHERE
                     room_id = ?
-                    AND event_id = ?
+                    AND %s
                 LIMIT 1
             """
 
             # If the event in question is a backward extremity or has any of its
             # prev_events listed as a backward extremity, it's next to a
             # backward gap.
-            for prev_event_id in [event.event_id] + event.prev_event_ids():
-                txn.execute(backward_extremity_query, (event.room_id, prev_event_id))
-                backward_extremities = txn.fetchall()
+            clause, args = make_in_list_sql_clause(
+                self.database_engine,
+                "event_id",
+                [event.event_id] + event.prev_event_ids(),
+            )
 
-                # We consider any backward extremity as a backward gap
-                if len(backward_extremities):
-                    return True
+            txn.execute(backward_extremity_query % (clause,), [event.room_id] + args)
+            backward_extremities = txn.fetchall()
+
+            # We consider any backward extremity as a backward gap
+            if len(backward_extremities):
+                return True
 
             return False
 
