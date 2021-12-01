@@ -769,6 +769,9 @@ performance:</p>
 </ul>
 <p>Note that the appropriate values for those fields depend on the amount
 of free memory the database host has available.</p>
+<p>Additionally, admins of large deployments might want to consider using huge pages
+to help manage memory, especially when using large values of <code>shared_buffers</code>. You
+can read more about that <a href="https://www.postgresql.org/docs/10/kernel-resources.html#LINUX-HUGE-PAGES">here</a>.</p>
 <h2 id="porting-from-sqlite"><a class="header" href="#porting-from-sqlite">Porting from SQLite</a></h2>
 <h3 id="overview"><a class="header" href="#overview">Overview</a></h3>
 <p>The script <code>synapse_port_db</code> allows porting an existing synapse server
