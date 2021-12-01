@@ -2,7 +2,7 @@ UNRELEASED
 ==========
 
 We've decided to move the existing, somewhat stagnant pages from the GitHub wiki 
-onto the [documentation website](https://matrix-org.github.io/synapse/latest/).
+to the [documentation website](https://matrix-org.github.io/synapse/latest/).
 This was done for two reasons. The first was to ensure that changes are checked by 
 multiple authors before being committed (everyone makes mistakes!) and the second
 was visibility of the documentation. Not everyone knows that Synapse has some very
