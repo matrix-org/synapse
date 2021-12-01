@@ -100,7 +100,7 @@ Internal Changes
 - Rename unstable `access_token_lifetime` configuration option to `refreshable_access_token_lifetime` to make it clear it only concerns refreshable access tokens. ([\#11388](https://github.com/matrix-org/synapse/issues/11388))
 - Do not run the broken MSC2716 tests when running `scripts-dev/complement.sh`. ([\#11389](https://github.com/matrix-org/synapse/issues/11389))
 - Remove dead code from supporting ACME. ([\#11393](https://github.com/matrix-org/synapse/issues/11393))
-- Refactor including the bundled relations when serializing an event. ([\#11408](https://github.com/matrix-org/synapse/issues/11408)
+- Refactor including the bundled relations when serializing an event. ([\#11408](https://github.com/matrix-org/synapse/issues/11408))
 
 Synapse 1.47.1 (2021-11-23)
 ===========================
@@ -122,7 +122,7 @@ The following issue is fixed in 1.47.1.
 
   Homeservers with the media repository disabled are unaffected. Homeservers configured with a federation whitelist are also unaffected.
 
-  Fixed by [91f2bd090](https://github.com/matrix-org/synapse/commit/91f2bd0
+  Fixed by [91f2bd090](https://github.com/matrix-org/synapse/commit/91f2bd090).
 
 
 Synapse 1.47.0 (2021-11-17)
