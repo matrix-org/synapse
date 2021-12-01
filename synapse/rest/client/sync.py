@@ -391,6 +391,8 @@ class SyncRestServlet(RestServlet):
             invite = await self._event_serializer.serialize_event(
                 room.invite,
                 time_now,
+                # No need to bundle aggregations for state events.
+                bundle_aggregations=False,
                 token_id=token_id,
                 event_format=event_formatter,
                 include_stripped_room_state=True,
@@ -427,6 +429,8 @@ class SyncRestServlet(RestServlet):
             knock = await self._event_serializer.serialize_event(
                 room.knock,
                 time_now,
+                # No need to bundle aggregations for state events.
+                bundle_aggregations=False,
                 token_id=token_id,
                 event_format=event_formatter,
                 include_stripped_room_state=True,

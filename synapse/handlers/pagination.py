@@ -554,7 +554,11 @@ class PaginationHandler:
 
         if state:
             chunk["state"] = await self._event_serializer.serialize_events(
-                state, time_now, as_client_event=as_client_event
+                state,
+                time_now,
+                as_client_event=as_client_event,
+                # No need to bundle aggregations for state events.
+                bundle_aggregations=False,
             )
 
         return chunk

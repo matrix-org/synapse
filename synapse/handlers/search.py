@@ -457,8 +457,9 @@ class SearchHandler:
         if state_results:
             s = {}
             for room_id, state_events in state_results.items():
+                # No need to bundle aggregations for state events.
                 s[room_id] = await self._event_serializer.serialize_events(
-                    state_events, time_now
+                    state_events, time_now, bundle_aggregations=False
                 )
 
             rooms_cat_res["state"] = s
