@@ -46,6 +46,7 @@ from synapse.api.constants import (
 from synapse.api.errors import (
     AuthError,
     Codes,
+    HttpResponseException,
     LimitExceededError,
     NotFoundError,
     StoreError,
@@ -56,6 +57,7 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
 from synapse.events.utils import copy_power_levels_contents
+from synapse.federation.federation_client import InvalidResponseError
 from synapse.handlers.federation import get_domains_from_state
 from synapse.rest.admin._base import assert_user_is_admin
 from synapse.storage.state import StateFilter
@@ -1332,8 +1334,19 @@ class TimestampLookupHandler:
                         < abs(local_event.origin_server_ts - timestamp)
                     ):
                         return remote_event_id, origin_server_ts
-                except Exception as ex:
+                except (HttpResponseException, InvalidResponseError) as ex:
+                    # Let's not put a high priority on some other homeserver
+                    # failing to respond or giving a random response
                     logger.debug(
+                        "Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
+                        domain,
+                        type(ex).__name__,
+                        ex,
+                        ex.args,
+                    )
+                except Exception as ex:
+                    # But we do want to see some exceptions in our code
+                    logger.warning(
                         "Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
                         domain,
                         type(ex).__name__,
