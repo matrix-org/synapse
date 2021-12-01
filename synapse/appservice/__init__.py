@@ -72,6 +72,7 @@ class ApplicationService:
         rate_limited: bool = True,
         ip_range_whitelist: Optional[IPSet] = None,
         supports_ephemeral: bool = False,
+        msc3202_transaction_extensions: bool = False,
     ):
         self.token = token
         self.url = (
@@ -84,6 +85,7 @@ class ApplicationService:
         self.id = id
         self.ip_range_whitelist = ip_range_whitelist
         self.supports_ephemeral = supports_ephemeral
+        self.msc3202_transaction_extensions = msc3202_transaction_extensions
 
         if "|" in self.id:
             raise Exception("application service ID cannot contain '|' character")
