@@ -331,9 +331,7 @@ class ApplicationServiceTransactionWorkerStore(
 
         events = await self.get_events_as_list(event_ids)
 
-        return AppServiceTransaction(
-            service=service, id=entry["txn_id"], events=events, ephemeral=[]
-        )
+        return AppServiceTransaction(service=service, id=entry["txn_id"], events=events)
 
     def _get_last_txn(self, txn, service_id: Optional[str]) -> int:
         txn.execute(

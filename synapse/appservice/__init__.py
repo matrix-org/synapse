@@ -328,14 +328,14 @@ class AppServiceTransaction:
         service: ApplicationService,
         id: int,
         events: List[EventBase],
-        ephemeral: List[JsonDict],
-        to_device_messages: List[JsonDict],
+        ephemeral: Optional[List[JsonDict]] = None,
+        to_device_messages: Optional[List[JsonDict]] = None,
     ):
         self.service = service
         self.id = id
         self.events = events
-        self.ephemeral = ephemeral
-        self.to_device_messages = to_device_messages
+        self.ephemeral = ephemeral or []
+        self.to_device_messages = to_device_messages or []
 
     async def send(self, as_api: "ApplicationServiceApi") -> bool:
         """Sends this transaction using the provided AS API interface.
