@@ -83,28 +83,29 @@ def _wrap_with_jail_check(relative: bool) -> Callable[[GetPathMethod], GetPathMe
                     path = os.path.join(self.base_path, path)
                 normalized_path = os.path.normpath(path)
 
-                # Check that the path lies within the media store directory.
-                # `os.path.commonpath` does not take `../`s into account and
-                # considers `a/b/c` and `a/b/c/../d` to have a common path of
-                # `a/b/c`, so we have to normalize the paths first.
-                #
-                # The normalization process has two issues:
-                #  * `a/b/c/../c` will normalize to `a/b/c`, but the former refers to a
-                #    different path if `a/b/c` is a symlink. `abspath` has the same
-                #    issue.
-                #  * A `base_path` of `.` will fail the check below.
-                #    This configuration is exceedingly unlikely.
-                #
-                # As an alternative, `os.path.realpath` may be used. However it proves
-                # problematic if there are symlinks inside the media store.
-                # eg. if `url_store/` is symlinked to elsewhere, its canonical path
-                # won't match that of the main media store directory.
+                # Now that `normpath` has eliminated `../`s and `./`s from the path,
+                # `os.path.commonpath` can be used to check whether it lies within the
+                # media store directory.
                 if (
                     os.path.commonpath([normalized_path, self.normalized_base_path])
                     != self.normalized_base_path
                 ):
-                    # The path resolves to outside the media store directory.
+                    # The path resolves to outside the media store directory,
+                    # or `self.base_path` is `.`, which is an unlikely configuration.
                     raise ValueError(f"Invalid media store path: {path!r}")
+
+                # Note that `os.path.normpath`/`abspath` has a subtle caveat:
+                # `a/b/c/../c` will normalize to `a/b/c`, but the former refers to a
+                # different path if `a/b/c` is a symlink. That is, the check above is
+                # not perfect and may allow a certain restricted subset of untrustworthy
+                # paths through. Since the check above is secondary to the main
+                # `_validate_path_component` checks, it's less important for it to be
+                # perfect.
+                #
+                # As an alternative, `os.path.realpath` will resolve symlinks, but
+                # proves problematic if there are symlinks inside the media store.
+                # eg. if `url_store/` is symlinked to elsewhere, its canonical path
+                # won't match that of the main media store directory.
 
             return path_or_paths
 
