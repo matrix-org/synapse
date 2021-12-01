@@ -185,10 +185,18 @@ class _ServiceQueuer:
                 if not events and not ephemeral and not to_device_messages_to_send:
                     return
 
+                # Don't pass kwargs unless necessary. This makes unit testing calls of
+                # txn_ctrl.send much more elegant.
+                additional_send_kwargs = {}
+                if ephemeral:
+                    additional_send_kwargs["ephemeral"] = ephemeral
+                if to_device_messages_to_send:
+                    additional_send_kwargs[
+                        "to_device_messages"
+                    ] = to_device_messages_to_send
+
                 try:
-                    await self.txn_ctrl.send(
-                        service, events, ephemeral, to_device_messages_to_send
-                    )
+                    await self.txn_ctrl.send(service, events, **additional_send_kwargs)
                 except Exception:
                     logger.exception("AS request failed")
         finally:

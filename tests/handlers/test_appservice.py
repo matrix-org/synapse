@@ -26,7 +26,7 @@ from synapse.types import RoomStreamToken
 from synapse.util.stringutils import random_string
 
 from tests import unittest
-from tests.test_utils import make_awaitable
+from tests.test_utils import make_awaitable, simple_async_mock
 from tests.utils import MockClock
 
 
@@ -68,8 +68,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         ]
         self.handler.notify_interested_services(RoomStreamToken(None, 1))
 
-        self.mock_scheduler.submit_event_for_as.assert_called_once_with(
-            interested_service, event
+        self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(
+            interested_service, events=[event]
         )
 
     def test_query_user_exists_unknown_user(self):
@@ -279,8 +279,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.handler.notify_interested_services_ephemeral(
             "receipt_key", 580, ["@fakerecipient:example.com"]
         )
-        self.mock_scheduler.submit_ephemeral_events_for_as.assert_called_once_with(
-            interested_service, [event]
+        self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(
+            interested_service, ephemeral=[event]
         )
         self.mock_store.set_appservice_stream_type_pos.assert_called_once_with(
             interested_service,
@@ -310,8 +310,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             "receipt_key", 580, ["@fakerecipient:example.com"]
         )
         # This method will be called, but with an empty list of events
-        self.mock_scheduler.submit_ephemeral_events_for_as.assert_called_once_with(
-            interested_service, []
+        self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(
+            interested_service, ephemeral=[]
         )
 
     def _mkservice(self, is_interested, protocols=None):
@@ -345,11 +345,10 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        # Mock the ApplicationServiceScheduler queuer so that we can track any
-        # outgoing ephemeral events
-        self.mock_service_queuer = Mock()
-        self.mock_service_queuer.enqueue_ephemeral = Mock()
-        hs.get_application_service_handler().scheduler.queuer = self.mock_service_queuer
+        # Mock the ApplicationServiceScheduler's _TransactionController's send method so that
+        # we can track any outgoing ephemeral events
+        self.send_mock = simple_async_mock()
+        hs.get_application_service_handler().scheduler.txn_ctrl.send = self.send_mock
 
         # Mock out application services, and allow defining our own in tests
         self._services: List[ApplicationService] = []
@@ -423,19 +422,22 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         # Only the local_user -> exclusive_as_user to-device message should have been forwarded to the AS.
         #
         # The uninterested application service should not have been notified at all.
-        self.mock_service_queuer.enqueue_ephemeral.assert_called_once()
-        service, events = self.mock_service_queuer.enqueue_ephemeral.call_args[0]
+        self.send_mock.assert_called_once()
+        service, _events = self.send_mock.call_args[0]
+        to_device_messages = self.send_mock.call_args[1]["to_device_messages"]
 
         # Assert that this was the same to-device message that local_user sent
         self.assertEqual(service, interested_appservice)
-        self.assertEqual(events[0]["type"], "m.room_key_request")
-        self.assertEqual(events[0]["sender"], self.local_user)
+        self.assertEqual(to_device_messages[0]["type"], "m.room_key_request")
+        self.assertEqual(to_device_messages[0]["sender"], self.local_user)
 
         # Additional fields 'to_user_id' and 'to_device_id' specifically for
         # to-device messages via the AS API
-        self.assertEqual(events[0]["to_user_id"], self.exclusive_as_user)
-        self.assertEqual(events[0]["to_device_id"], self.exclusive_as_user_device_id)
-        self.assertEqual(events[0]["content"], message_content)
+        self.assertEqual(to_device_messages[0]["to_user_id"], self.exclusive_as_user)
+        self.assertEqual(
+            to_device_messages[0]["to_device_id"], self.exclusive_as_user_device_id
+        )
+        self.assertEqual(to_device_messages[0]["content"], message_content)
 
     @unittest.override_config(
         {"experimental_features": {"msc2409_to_device_messages_enabled": True}}
@@ -525,22 +527,23 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(chan.code, 200, chan.result)
 
-        self.mock_service_queuer.enqueue_ephemeral.assert_called()
+        self.send_mock.assert_called()
 
         # Count the total number of to-device messages that were sent out per-service.
         # Ensure that we only sent to-device messages to interested services, and that
         # each interested service received the full count of to-device messages.
         service_id_to_message_count: Dict[str, int] = {}
 
-        for call in self.mock_service_queuer.enqueue_ephemeral.call_args_list:
-            service, events = call[0]
+        for call in self.send_mock.call_args_list:
+            service, _events = call[0]
+            to_device_messages = call[1]["to_device_messages"]
 
             # Check that this was made to an interested service
             self.assertIn(service, interested_appservices)
 
             # Add to the count of messages for this application service
             service_id_to_message_count.setdefault(service.id, 0)
-            service_id_to_message_count[service.id] += len(events)
+            service_id_to_message_count[service.id] += len(to_device_messages)
 
         # Assert that each interested service received the full count of messages
         for count in service_id_to_message_count.values():
