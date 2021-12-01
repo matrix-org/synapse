@@ -15,7 +15,7 @@ import inspect
 import os
 from typing import Iterable
 
-from synapse.rest.media.v1.filepath import MediaFilePaths
+from synapse.rest.media.v1.filepath import MediaFilePaths, _wrap_with_jail_check
 
 from tests import unittest
 
@@ -488,7 +488,75 @@ class MediaFilePathsTestCase(unittest.TestCase):
                         f"{method} returned {path_or_list!r}"
                     )
 
-    def test_symlink(self):
+
+class MediaFilePathsJailTestCase(unittest.TestCase):
+    def _check_relative_path(self, filepaths: MediaFilePaths, path: str) -> None:
+        """Passes a relative path through the jail check.
+
+        Args:
+            filepaths: The `MediaFilePaths` instance.
+            path: A path relative to the media store directory.
+
+        Raises:
+            ValueError: If the jail check fails.
+        """
+
+        @_wrap_with_jail_check(relative=True)
+        def _make_relative_path(self: MediaFilePaths, path: str) -> str:
+            return path
+
+        _make_relative_path(filepaths, path)
+
+    def _check_absolute_path(self, filepaths: MediaFilePaths, path: str) -> None:
+        """Passes an absolute path through the jail check.
+
+        Args:
+            filepaths: The `MediaFilePaths` instance.
+            path: A path relative to the media store directory.
+
+        Raises:
+            ValueError: If the jail check fails.
+        """
+
+        @_wrap_with_jail_check(relative=False)
+        def _make_absolute_path(self: MediaFilePaths, path: str) -> str:
+            return os.path.join(self.base_path, path)
+
+        _make_absolute_path(filepaths, path)
+
+    def test_traversal_inside(self) -> None:
+        """Test the jail check for paths that stay within the media directory."""
+        # Despite the `../`s, these paths still lie within the media directory and it's
+        # expected for the jail check to allow them through.
+        # These paths ought to trip the other checks in place and should never be
+        # returned.
+        filepaths = MediaFilePaths("/media_store")
+        path = "url_cache/2020-01-02/../../GerZNDnDZVjsOtar"
+        self._check_relative_path(filepaths, path)
+        self._check_absolute_path(filepaths, path)
+
+    def test_traversal_outside(self) -> None:
+        """Test that the jail check fails for paths that escape the media directory."""
+        filepaths = MediaFilePaths("/media_store")
+        path = "url_cache/2020-01-02/../../../GerZNDnDZVjsOtar"
+        with self.assertRaises(ValueError):
+            self._check_relative_path(filepaths, path)
+        with self.assertRaises(ValueError):
+            self._check_absolute_path(filepaths, path)
+
+    def test_traversal_reentry(self) -> None:
+        """Test the jail check for paths that exit and re-enter the media directory."""
+        # These paths lie outside the media directory if it is a symlink, and inside
+        # otherwise. Ideally the check should fail, but this proves difficult.
+        # This test documents the behaviour for this edge case.
+        # These paths ought to trip the other checks in place and should never be
+        # returned.
+        filepaths = MediaFilePaths("/media_store")
+        path = "url_cache/2020-01-02/../../../media_store/GerZNDnDZVjsOtar"
+        self._check_relative_path(filepaths, path)
+        self._check_absolute_path(filepaths, path)
+
+    def test_symlink(self) -> None:
         """Test that a symlink does not cause the jail check to fail."""
         media_store_path = self.mktemp()
 
@@ -498,14 +566,14 @@ class MediaFilePathsTestCase(unittest.TestCase):
         # Test that relative and absolute paths don't trip the check
         # NB: `media_store_path` is a relative path
         filepaths = MediaFilePaths(media_store_path)
-        filepaths.url_cache_filepath_rel("2020-01-02_GerZNDnDZVjsOtar")
-        filepaths.url_cache_filepath_dirs_to_delete("2020-01-02_GerZNDnDZVjsOtar")
+        self._check_relative_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")
+        self._check_absolute_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")
 
         filepaths = MediaFilePaths(os.path.abspath(media_store_path))
-        filepaths.url_cache_filepath_rel("2020-01-02_GerZNDnDZVjsOtar")
-        filepaths.url_cache_filepath_dirs_to_delete("2020-01-02_GerZNDnDZVjsOtar")
+        self._check_relative_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")
+        self._check_absolute_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")
 
-    def test_symlink_subdirectory(self):
+    def test_symlink_subdirectory(self) -> None:
         """Test that a symlinked subdirectory does not cause the jail check to fail."""
         media_store_path = self.mktemp()
         os.mkdir(media_store_path)
@@ -519,9 +587,9 @@ class MediaFilePathsTestCase(unittest.TestCase):
         # Test that relative and absolute paths don't trip the check
         # NB: `media_store_path` is a relative path
         filepaths = MediaFilePaths(media_store_path)
-        filepaths.url_cache_filepath_rel("2020-01-02_GerZNDnDZVjsOtar")
-        filepaths.url_cache_filepath_dirs_to_delete("2020-01-02_GerZNDnDZVjsOtar")
+        self._check_relative_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")
+        self._check_absolute_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")
 
         filepaths = MediaFilePaths(os.path.abspath(media_store_path))
-        filepaths.url_cache_filepath_rel("2020-01-02_GerZNDnDZVjsOtar")
-        filepaths.url_cache_filepath_dirs_to_delete("2020-01-02_GerZNDnDZVjsOtar")
+        self._check_relative_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")
+        self._check_absolute_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")
