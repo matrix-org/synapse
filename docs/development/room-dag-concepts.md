@@ -47,14 +47,6 @@ When we persist a non-outlier event, we clear it as a backward extremity and set
 all of its `prev_events` as the new backward extremities if they aren't already
 persisted in the `events` table.
 
-If an event is marked as a backward extremity by being a `prev_event` of some
-other event, then persisted as an `outlier`, it can be a backward extremity while
-still being in the `events` table. 
-
-If an event is first persited as an `outlier`, then comes across the backward
-extremity update by being a `prev_event` of some other event, it won't become a
-backward extremity.
-
 
 ## Outliers
 
