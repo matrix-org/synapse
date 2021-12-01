@@ -454,7 +454,7 @@ class RoomStateRestServlet(RestServlet):
             now,
             # We don't bother bundling aggregations in when asked for state
             # events, as clients won't use them.
-            bundle_relations=False,
+            bundle_aggregations=False,
         )
         ret = {"state": room_state}
 
@@ -792,7 +792,7 @@ class RoomEventContextServlet(RestServlet):
             results["state"],
             time_now,
             # No need to bundle aggregations for state events
-            bundle_relations=False,
+            bundle_aggregations=False,
         )
 
         return HTTPStatus.OK, results
