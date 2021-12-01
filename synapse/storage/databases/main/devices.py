@@ -139,6 +139,24 @@ class DeviceWorkerStore(SQLBaseStore):
 
         return {d["device_id"]: d for d in devices}
 
+    async def get_devices_by_oidc_sid(
+        self, auth_provider_id: str, oidc_sid: str
+    ) -> List[Dict[str, Any]]:
+        """Retrieve the list of devices associated with an OIDC session ID (sid).
+
+        Args:
+            auth_provider_id: The SSO IdP ID as defined in the server config
+            oidc_sid: OIDC session ID, sid claim in logout tokens and ID tokens
+        Returns:
+            A list of dicts containing the devices informations
+        """
+        return await self.db_pool.simple_select_list(
+            table="devices",
+            keyvalues={"auth_provider_id": auth_provider_id, "oidc_sid": oidc_sid},
+            retcols=("user_id", "device_id", "display_name"),
+            desc="get_devices_by_oidc_sid",
+        )
+
     @trace
     async def get_device_updates_by_remote(
         self, destination: str, from_stream_id: int, limit: int
@@ -1070,7 +1088,12 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         )
 
     async def store_device(
-        self, user_id: str, device_id: str, initial_device_display_name: Optional[str]
+        self,
+        user_id: str,
+        device_id: str,
+        initial_device_display_name: Optional[str],
+        auth_provider_id: Optional[str] = None,
+        oidc_sid: Optional[str] = None,
     ) -> bool:
         """Ensure the given device is known; add it to the store if not
 
@@ -1079,6 +1102,8 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             device_id: id of device
             initial_device_display_name: initial displayname of the device.
                 Ignored if device exists.
+            auth_provider_id: The SSO IdP the user used, if any.
+            oidc_sid: The session ID (sid) got from a OIDC login.
 
         Returns:
             Whether the device was inserted or an existing device existed with that ID.
@@ -1099,6 +1124,8 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 },
                 values={},
                 insertion_values={
+                    "auth_provider_id": auth_provider_id,
+                    "oidc_sid": oidc_sid,
                     "display_name": initial_device_display_name,
                     "hidden": False,
                 },

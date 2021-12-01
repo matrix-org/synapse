@@ -303,6 +303,7 @@ class LoginRestServlet(RestServlet):
         ratelimit: bool = True,
         auth_provider_id: Optional[str] = None,
         should_issue_refresh_token: bool = False,
+        oidc_sid: Optional[str] = None,
     ) -> LoginResponse:
         """Called when we've successfully authed the user and now need to
         actually login them in (e.g. create devices). This gets called on
@@ -322,6 +323,7 @@ class LoginRestServlet(RestServlet):
                 prometheus metrics).
             should_issue_refresh_token: True if this login should issue
                 a refresh token alongside the access token.
+            oidc_sid: The session ID (sid) got from a OIDC login.
 
         Returns:
             result: Dictionary of account information after successful login.
@@ -354,6 +356,7 @@ class LoginRestServlet(RestServlet):
             initial_display_name,
             auth_provider_id=auth_provider_id,
             should_issue_refresh_token=should_issue_refresh_token,
+            oidc_sid=oidc_sid,
         )
 
         result = LoginResponse(
@@ -399,6 +402,7 @@ class LoginRestServlet(RestServlet):
             self.auth_handler._sso_login_callback,
             auth_provider_id=res.auth_provider_id,
             should_issue_refresh_token=should_issue_refresh_token,
+            oidc_sid=res.oidc_sid,
         )
 
     async def _do_jwt_login(

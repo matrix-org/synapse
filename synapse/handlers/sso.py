@@ -365,6 +365,7 @@ class SsoHandler:
         sso_to_matrix_id_mapper: Callable[[int], Awaitable[UserAttributes]],
         grandfather_existing_users: Callable[[], Awaitable[Optional[str]]],
         extra_login_attributes: Optional[JsonDict] = None,
+        oidc_sid: Optional[str] = None,
     ) -> None:
         """
         Given an SSO ID, retrieve the user ID for it and possibly register the user.
@@ -414,6 +415,8 @@ class SsoHandler:
 
             extra_login_attributes: An optional dictionary of extra
                 attributes to be provided to the client in the login response.
+
+            oidc_sid: An optional session ID from the OIDC login
 
         Raises:
             MappingException if there was a problem mapping the response to a user.
@@ -490,6 +493,7 @@ class SsoHandler:
             client_redirect_url,
             extra_login_attributes,
             new_user=new_user,
+            oidc_sid=oidc_sid,
         )
 
     async def _call_attribute_mapper(

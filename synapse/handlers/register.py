@@ -742,6 +742,7 @@ class RegistrationHandler:
         is_appservice_ghost: bool = False,
         auth_provider_id: Optional[str] = None,
         should_issue_refresh_token: bool = False,
+        oidc_sid: Optional[str] = None,
     ) -> Tuple[str, str, Optional[int], Optional[str]]:
         """Register a device for a user and generate an access token.
 
@@ -755,6 +756,7 @@ class RegistrationHandler:
             auth_provider_id: The SSO IdP the user used, if any (just used for the
                 prometheus metrics).
             should_issue_refresh_token: Whether it should also issue a refresh token
+            oidc_sid: The session ID (sid) got from a OIDC login.
         Returns:
             Tuple of device ID, access token, access token expiration time and refresh token
         """
@@ -765,6 +767,8 @@ class RegistrationHandler:
             is_guest=is_guest,
             is_appservice_ghost=is_appservice_ghost,
             should_issue_refresh_token=should_issue_refresh_token,
+            auth_provider_id=auth_provider_id,
+            oidc_sid=oidc_sid,
         )
 
         login_counter.labels(
@@ -787,6 +791,8 @@ class RegistrationHandler:
         is_guest: bool = False,
         is_appservice_ghost: bool = False,
         should_issue_refresh_token: bool = False,
+        auth_provider_id: Optional[str] = None,
+        oidc_sid: Optional[str] = None,
     ) -> LoginDict:
         """Helper for register_device
 
@@ -806,7 +812,11 @@ class RegistrationHandler:
         refresh_token_id = None
 
         registered_device_id = await self.device_handler.check_device_registered(
-            user_id, device_id, initial_display_name
+            user_id,
+            device_id,
+            initial_display_name,
+            auth_provider_id=auth_provider_id,
+            oidc_sid=oidc_sid,
         )
         if is_guest:
             assert access_token_expiry is None
