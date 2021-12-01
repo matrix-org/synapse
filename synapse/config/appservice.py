@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,14 +14,14 @@
 # limitations under the License.
 
 import logging
-from typing import Dict
+from typing import Dict, List
 from urllib import parse as urlparse
 
 import yaml
 from netaddr import IPSet
 
 from synapse.appservice import ApplicationService
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID
 
 from ._base import Config, ConfigError
 
@@ -30,12 +31,12 @@ logger = logging.getLogger(__name__)
 class AppServiceConfig(Config):
     section = "appservice"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config, **kwargs) -> None:
         self.app_service_config_files = config.get("app_service_config_files", [])
         self.notify_appservices = config.get("notify_appservices", True)
         self.track_appservice_user_ips = config.get("track_appservice_user_ips", False)
 
-    def generate_config_section(cls, **kwargs):
+    def generate_config_section(cls, **kwargs) -> str:
         return """\
         # A list of application service config files to use
         #
@@ -50,7 +51,9 @@ class AppServiceConfig(Config):
         """
 
 
-def load_appservices(hostname, config_files):
+def load_appservices(
+    hostname: str, config_files: List[str]
+) -> List[ApplicationService]:
     """Returns a list of Application Services from the config files."""
     if not isinstance(config_files, list):
         logger.warning("Expected %s to be a list of AS config files.", config_files)
@@ -93,7 +96,9 @@ def load_appservices(hostname, config_files):
     return appservices
 
 
-def _load_appservice(hostname, as_info, config_filename):
+def _load_appservice(
+    hostname: str, as_info: JsonDict, config_filename: str
+) -> ApplicationService:
     required_string_fields = ["id", "as_token", "hs_token", "sender_localpart"]
     for field in required_string_fields:
         if not isinstance(as_info.get(field), str):
@@ -115,9 +120,9 @@ def _load_appservice(hostname, as_info, config_filename):
     user_id = user.to_string()
 
     # Rate limiting for users of this AS is on by default (excludes sender)
-    rate_limited = True
-    if isinstance(as_info.get("rate_limited"), bool):
-        rate_limited = as_info.get("rate_limited")
+    rate_limited = as_info.get("rate_limited")
+    if not isinstance(rate_limited, bool):
+        rate_limited = True
 
     # namespace checks
     if not isinstance(as_info.get("namespaces"), dict):

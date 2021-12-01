@@ -15,11 +15,12 @@
 import logging
 import os
 from collections import namedtuple
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from urllib.request import getproxies_environment  # type: ignore
 
 from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST, generate_ip_set
 from synapse.python_dependencies import DependencyException, check_requirements
+from synapse.types import JsonDict
 from synapse.util.module_loader import load_module
 
 from ._base import Config, ConfigError
@@ -57,7 +58,9 @@ MediaStorageProviderConfig = namedtuple(
 )
 
 
-def parse_thumbnail_requirements(thumbnail_sizes):
+def parse_thumbnail_requirements(
+    thumbnail_sizes: List[JsonDict],
+) -> Dict[str, Tuple[ThumbnailRequirement, ...]]:
     """Takes a list of dictionaries with "width", "height", and "method" keys
     and creates a map from image media types to the thumbnail size, thumbnailing
     method, and thumbnail media type to precalculate
@@ -69,7 +72,7 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         Dictionary mapping from media type string to list of
         ThumbnailRequirement tuples.
     """
-    requirements: Dict[str, List] = {}
+    requirements: Dict[str, List[ThumbnailRequirement]] = {}
     for size in thumbnail_sizes:
         width = size["width"]
         height = size["height"]

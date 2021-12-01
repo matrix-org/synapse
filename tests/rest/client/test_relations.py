@@ -526,6 +526,74 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             },
         )
 
+    def test_aggregation_get_event_for_annotation(self):
+        """Test that annotations do not get bundled relations included
+        when directly requested.
+        """
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
+        self.assertEquals(200, channel.code, channel.json_body)
+        annotation_id = channel.json_body["event_id"]
+
+        # Annotate the annotation.
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "a", parent_id=annotation_id
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/event/{annotation_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertIsNone(channel.json_body["unsigned"].get("m.relations"))
+
+    def test_aggregation_get_event_for_thread(self):
+        """Test that threads get bundled relations included when directly requested."""
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        self.assertEquals(200, channel.code, channel.json_body)
+        thread_id = channel.json_body["event_id"]
+
+        # Annotate the annotation.
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "a", parent_id=thread_id
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/event/{thread_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEquals(
+            channel.json_body["unsigned"].get("m.relations"),
+            {
+                RelationTypes.ANNOTATION: {
+                    "chunk": [{"count": 1, "key": "a", "type": "m.reaction"}]
+                },
+            },
+        )
+
+        # It should also be included when the entire thread is requested.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(len(channel.json_body["chunk"]), 1)
+
+        thread_message = channel.json_body["chunk"][0]
+        self.assertEquals(
+            thread_message["unsigned"].get("m.relations"),
+            {
+                RelationTypes.ANNOTATION: {
+                    "chunk": [{"count": 1, "key": "a", "type": "m.reaction"}]
+                },
+            },
+        )
+
     def test_edit(self):
         """Test that a simple edit works."""
 
@@ -661,6 +729,56 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         # We expect that the edit relation appears in the unsigned relations
         # section.
+        relations_dict = channel.json_body["unsigned"].get("m.relations")
+        self.assertIn(RelationTypes.REPLACE, relations_dict)
+
+        m_replace_dict = relations_dict[RelationTypes.REPLACE]
+        for key in ["event_id", "sender", "origin_server_ts"]:
+            self.assertIn(key, m_replace_dict)
+
+        self.assert_dict(
+            {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
+        )
+
+    def test_edit_edit(self):
+        """Test that an edit cannot be edited."""
+        new_body = {"msgtype": "m.text", "body": "Initial edit"}
+        channel = self._send_relation(
+            RelationTypes.REPLACE,
+            "m.room.message",
+            content={
+                "msgtype": "m.text",
+                "body": "Wibble",
+                "m.new_content": new_body,
+            },
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        edit_event_id = channel.json_body["event_id"]
+
+        # Edit the edit event.
+        channel = self._send_relation(
+            RelationTypes.REPLACE,
+            "m.room.message",
+            content={
+                "msgtype": "m.text",
+                "body": "foo",
+                "m.new_content": {"msgtype": "m.text", "body": "Ignored edit"},
+            },
+            parent_id=edit_event_id,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        # Request the original event.
+        channel = self.make_request(
+            "GET",
+            "/rooms/%s/event/%s" % (self.room, self.parent_id),
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        # The edit to the edit should be ignored.
+        self.assertEquals(channel.json_body["content"], new_body)
+
+        # The relations information should not include the edit to the edit.
         relations_dict = channel.json_body["unsigned"].get("m.relations")
         self.assertIn(RelationTypes.REPLACE, relations_dict)
 

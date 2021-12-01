@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import argparse
 from typing import Optional
 
 from synapse.api.constants import RoomCreationPreset
@@ -362,7 +364,7 @@ class RegistrationConfig(Config):
         )
 
     @staticmethod
-    def add_arguments(parser):
+    def add_arguments(parser: argparse.ArgumentParser) -> None:
         reg_group = parser.add_argument_group("registration")
         reg_group.add_argument(
             "--enable-registration",
@@ -371,6 +373,6 @@ class RegistrationConfig(Config):
             help="Enable registration for new users.",
         )
 
-    def read_arguments(self, args):
+    def read_arguments(self, args: argparse.Namespace) -> None:
         if args.enable_registration is not None:
             self.enable_registration = strtobool(str(args.enable_registration))

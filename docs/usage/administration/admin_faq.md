@@ -5,6 +5,7 @@ How do I become a server admin?
 If your server already has an admin account you should use the user admin API to promote other accounts to become admins. See [User Admin API](../../admin_api/user_admin_api.md#Change-whether-a-user-is-a-server-administrator-or-not)
 
 If you don't have any admin accounts yet you won't be able to use the admin API so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account, use the admin APIs to make further changes.
+
 ```sql
     UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 ```

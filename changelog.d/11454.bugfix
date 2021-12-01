@@ -1,0 +1,1 @@
+Fix an `LruCache` corruption bug, introduced in 1.38.0, that would cause certain requests to fail until the next Synapse restart.
