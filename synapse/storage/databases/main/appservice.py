@@ -341,12 +341,16 @@ class ApplicationServiceTransactionWorkerStore(
 
         events = await self.get_events_as_list(event_ids)
 
+        # TODO: should we recalculate one-time key counts and unused fallback
+        #       key counts here?
         return AppServiceTransaction(
             service=service,
             id=entry["txn_id"],
             events=events,
             ephemeral=[],
             to_device_messages=[],
+            one_time_key_counts={},
+            unused_fallback_keys={},
         )
 
     def _get_last_txn(self, txn, service_id: Optional[str]) -> int:
