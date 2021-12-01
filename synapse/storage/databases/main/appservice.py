@@ -20,6 +20,8 @@ from synapse.appservice import (
     ApplicationService,
     ApplicationServiceState,
     AppServiceTransaction,
+    TransactionOneTimeKeyCounts,
+    TransactionUnusedFallbackKeys,
 )
 from synapse.config.appservice import load_appservices
 from synapse.events import EventBase
@@ -195,6 +197,8 @@ class ApplicationServiceTransactionWorkerStore(
         events: List[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
+        one_time_key_counts: TransactionOneTimeKeyCounts,
+        unused_fallback_keys: TransactionUnusedFallbackKeys,
     ) -> AppServiceTransaction:
         """Atomically creates a new transaction for this application service
         with the given list of events. Ephemeral events are NOT persisted to the
@@ -205,6 +209,10 @@ class ApplicationServiceTransactionWorkerStore(
             events: A list of persistent events to put in the transaction.
             ephemeral: A list of ephemeral events to put in the transaction.
             to_device_messages: A list of to-device messages to put in the transaction.
+            one_time_key_counts: Counts of remaining one-time keys for relevant
+                appservice devices in the transaction.
+            unused_fallback_keys: Lists of unused fallback keys for relevant
+                appservice devices in the transaction.
 
         Returns:
             A new transaction.
@@ -240,6 +248,8 @@ class ApplicationServiceTransactionWorkerStore(
                 events=events,
                 ephemeral=ephemeral,
                 to_device_messages=to_device_messages,
+                one_time_key_counts=one_time_key_counts,
+                unused_fallback_keys=unused_fallback_keys,
             )
 
         return await self.db_pool.runInteraction(

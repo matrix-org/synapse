@@ -14,7 +14,7 @@
 import logging
 import re
 from enum import Enum
-from typing import TYPE_CHECKING, Iterable, List, Match, Optional
+from typing import TYPE_CHECKING, Dict, Iterable, List, Match, Optional
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
@@ -341,12 +341,16 @@ class AppServiceTransaction:
         events: List[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
+        one_time_key_counts: TransactionOneTimeKeyCounts,
+        unused_fallback_keys: TransactionUnusedFallbackKeys,
     ):
         self.service = service
         self.id = id
         self.events = events
         self.ephemeral = ephemeral
         self.to_device_messages = to_device_messages
+        self.one_time_key_counts = one_time_key_counts
+        self.unused_fallback_keys = unused_fallback_keys
 
     async def send(self, as_api: "ApplicationServiceApi") -> bool:
         """Sends this transaction using the provided AS API interface.
@@ -361,6 +365,8 @@ class AppServiceTransaction:
             events=self.events,
             ephemeral=self.ephemeral,
             to_device_messages=self.to_device_messages,
+            one_time_key_counts=self.one_time_key_counts,
+            unused_fallback_keys=self.unused_fallback_keys,
             txn_id=self.id,
         )
 
