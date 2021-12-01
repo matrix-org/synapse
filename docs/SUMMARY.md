@@ -44,6 +44,7 @@
         - [Presence router callbacks](modules/presence_router_callbacks.md)
         - [Account validity callbacks](modules/account_validity_callbacks.md)
         - [Password auth provider callbacks](modules/password_auth_provider_callbacks.md)
+        - [Background update controller callbacks](modules/background_update_controller_callbacks.md)
         - [Porting a legacy module to the new interface](modules/porting_legacy_module.md)
     - [Workers](workers.md)
       - [Using `synctl` with Workers](synctl_workers.md)
