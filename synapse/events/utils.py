@@ -505,7 +505,9 @@ class EventClientSerializer:
 
         # If any bundled aggregations were found, include them.
         if aggregations:
-            serialized_event["unsigned"].setdefault("m.relations", {}).update(aggregations)
+            serialized_event["unsigned"].setdefault("m.relations", {}).update(
+                aggregations
+            )
 
     async def serialize_events(
         self, events: Iterable[Union[JsonDict, EventBase]], time_now: int, **kwargs: Any
