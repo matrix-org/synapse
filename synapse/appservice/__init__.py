@@ -27,6 +27,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Type for the `device_one_time_key_counts` field in an appservice transaction
+#   user ID -> {device ID -> {algorithm -> count}}
+TransactionOneTimeKeyCounts = Dict[str, Dict[str, Dict[str, int]]]
+
+# Type for the `device_unused_fallback_keys` field in an appservice transaction
+#   user ID -> {device ID -> [algorithm]}
+TransactionUnusedFallbackKeys = Dict[str, Dict[str, List[str]]]
+
 
 class ApplicationServiceState(Enum):
     DOWN = "down"
