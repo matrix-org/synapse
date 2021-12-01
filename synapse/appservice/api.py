@@ -249,6 +249,16 @@ class ApplicationServiceApi(SimpleHttpClient):
                 }
             )
 
+        if service.msc3202_transaction_extensions:
+            if one_time_key_counts:
+                body[
+                    "org.matrix.msc3202.device_one_time_key_counts"
+                ] = one_time_key_counts
+            if unused_fallback_keys:
+                body[
+                    "org.matrix.msc3202.device_unused_fallback_keys"
+                ] = unused_fallback_keys
+
         try:
             await self.put_json(
                 uri=uri,
