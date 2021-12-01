@@ -415,7 +415,12 @@ class SyncHandler:
         since_token: Optional[StreamToken] = None,
         full_state: bool = False,
     ) -> SyncResult:
-        """Get the sync for client needed to match what the server has now."""
+        """Get the sync for client needed to match what the server has now.
+
+        This is a wrapper around generate_sync_result which starts an open tracing span
+        to track the sync. Delve to generate_sync_result for the next level of your
+        indoctrination.
+        """
         with start_active_span("current_sync_for_user"):
             log_kv({"since_token": since_token})
             sync_result = await self.generate_sync_result(
