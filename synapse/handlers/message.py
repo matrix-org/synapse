@@ -960,7 +960,7 @@ class EventCreationHandler:
             # We allow events with no `prev_events` but it better have some `auth_events`
             assert (
                 builder.type == EventTypes.Create
-                or len(prev_event_ids) > 0
+                or prev_event_ids
                 # Allow an event to have empty list of prev_event_ids
                 # only if it has auth_event_ids.
                 or auth_event_ids
@@ -968,7 +968,7 @@ class EventCreationHandler:
         else:
             # we now ought to have some prev_events (unless it's a create event).
             assert (
-                builder.type == EventTypes.Create or len(prev_event_ids) > 0
+                builder.type == EventTypes.Create or prev_event_ids
             ), "Attempting to create a non-m.room.create event with no prev_events"
 
         event = await builder.build(
