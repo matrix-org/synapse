@@ -250,8 +250,7 @@ class MessageHandler:
         events = await self._event_serializer.serialize_events(
             room_state.values(),
             now,
-            # We don't bother bundling aggregations in when asked for state
-            # events, as clients won't use them.
+            # No need to bundle aggregations for state events.
             bundle_aggregations=False,
         )
         return events

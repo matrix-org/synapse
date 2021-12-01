@@ -224,9 +224,8 @@ class RelationPaginationServlet(RestServlet):
         )
 
         now = self.clock.time_msec()
-        # We set bundle_aggregations to False when retrieving the original
-        # event because we want the content before relations were applied to
-        # it.
+        # Do not bundle aggregations when retrieving the original event because
+        # we want the content before relations are applied to it.
         original_event = await self._event_serializer.serialize_event(
             event, now, bundle_aggregations=False
         )

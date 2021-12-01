@@ -452,8 +452,7 @@ class RoomStateRestServlet(RestServlet):
         room_state = await self._event_serializer.serialize_events(
             events.values(),
             now,
-            # We don't bother bundling aggregations in when asked for state
-            # events, as clients won't use them.
+            # No need to bundle aggregations for state events.
             bundle_aggregations=False,
         )
         ret = {"state": room_state}
@@ -791,7 +790,7 @@ class RoomEventContextServlet(RestServlet):
         results["state"] = await self._event_serializer.serialize_events(
             results["state"],
             time_now,
-            # No need to bundle aggregations for state events
+            # No need to bundle aggregations for state events.
             bundle_aggregations=False,
         )
 

@@ -718,7 +718,7 @@ class RoomEventContextServlet(RestServlet):
         results["state"] = await self._event_serializer.serialize_events(
             results["state"],
             time_now,
-            # No need to bundle aggregations for state events
+            # No need to bundle aggregations for state events.
             bundle_aggregations=False,
         )
 
