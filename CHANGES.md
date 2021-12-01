@@ -11,7 +11,7 @@ documentation website should help with visibility, as well as keep all Synapse d
 in one, easily-searchable location.
 
 Note that contributions to the documentation website happen through [GitHub pull 
-requests](https://github.com/matrix-org/synapse/pulls). Please visit #synapse-dev:matrix.org
+requests](https://github.com/matrix-org/synapse/pulls). Please visit [#synapse-dev:matrix.org](https://matrix.to/#/#synapse-dev:matrix.org)
 if you need help with the process!
 
 Synapse 1.48.0 (2021-11-30)
