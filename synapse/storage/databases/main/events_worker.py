@@ -1775,7 +1775,7 @@ class EventsWorkerStore(SQLBaseStore):
             Boolean indicating whether it's an extremity
         """
 
-        def is_event_next_to_backward_gap_txn(txn) -> bool:
+        def is_event_next_to_backward_gap_txn(txn: LoggingTransaction) -> bool:
             # If the event in question has any of its prev_events listed as a
             # backward extremity, it's next to a gap.
             #
@@ -1799,7 +1799,7 @@ class EventsWorkerStore(SQLBaseStore):
             clause, args = make_in_list_sql_clause(
                 self.database_engine,
                 "event_id",
-                [event.event_id] + event.prev_event_ids(),
+                [event.event_id] + list(event.prev_event_ids()),
             )
 
             txn.execute(backward_extremity_query % (clause,), [event.room_id] + args)
@@ -1830,7 +1830,7 @@ class EventsWorkerStore(SQLBaseStore):
             Boolean indicating whether it's an extremity
         """
 
-        def is_event_next_to_gap_txn(txn) -> bool:
+        def is_event_next_to_gap_txn(txn: LoggingTransaction) -> bool:
             # If the event in question is a forward extremity, we will just
             # consider any potential forward gap as not a gap since it's one of
             # the latest events in the room.
@@ -1926,7 +1926,7 @@ class EventsWorkerStore(SQLBaseStore):
             LIMIT 1;
         """
 
-        def get_event_id_for_timestamp_txn(txn) -> str:
+        def get_event_id_for_timestamp_txn(txn: LoggingTransaction) -> Optional[str]:
             if direction == "b":
                 # Find closest event *before* a given timestamp. We use descending
                 # (which gives values largest to smallest) because we want the

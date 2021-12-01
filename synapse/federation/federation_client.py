@@ -1569,7 +1569,7 @@ class TimestampToEventResponse:
     data: JsonDict
 
     @classmethod
-    def from_json_dict(cls, d: JsonDict) -> "FederationSpaceSummaryEventResult":
+    def from_json_dict(cls, d: JsonDict) -> "TimestampToEventResponse":
         """Parsed response from the federation /timestamp_to_event endpoint
 
         Args:
