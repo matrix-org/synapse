@@ -1497,15 +1497,20 @@ class SyncHandler:
         """Generates the rooms portion of the sync response. Populates the
         `sync_result_builder` with the result.
 
+        In the response that reaches the client, rooms are divided into four categories:
+        `invite`, `join`, `knock`, `leave`. These aren't the same as the four sets of
+        room ids returned by this function.
+
         Args:
             sync_result_builder
             account_data_by_room: Dictionary of per room account data
 
         Returns:
             Returns a 4-tuple of
-            `(newly_joined_rooms, newly_joined_or_invited_users,
+            `(newly_joined_rooms, newly_joined_or_invited_or_knocked_users,
             newly_left_rooms, newly_left_users)`
         """
+        # Start by fetching all ephemeral events in rooms we've joined (if required).
         user_id = sync_result_builder.sync_config.user.to_string()
         block_all_room_ephemeral = (
             sync_result_builder.since_token is None
