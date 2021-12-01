@@ -502,6 +502,7 @@ class EventCreationHandler:
         require_consent: bool = True,
         outlier: bool = False,
         historical: bool = False,
+        allow_no_prev_events: bool = False,
         depth: Optional[int] = None,
     ) -> Tuple[EventBase, EventContext]:
         """
@@ -613,6 +614,7 @@ class EventCreationHandler:
             prev_event_ids=prev_event_ids,
             auth_event_ids=auth_event_ids,
             depth=depth,
+            allow_no_prev_events=allow_no_prev_events,
         )
 
         # In an ideal world we wouldn't need the second part of this condition. However,
@@ -888,6 +890,7 @@ class EventCreationHandler:
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
         depth: Optional[int] = None,
+        allow_no_prev_events: bool = False,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
 
@@ -953,8 +956,7 @@ class EventCreationHandler:
         # Do a quick sanity check here, rather than waiting until we've created the
         # event and then try to auth it (which fails with a somewhat confusing "No
         # create event in auth events")
-        room_version_obj = await self.store.get_room_version(builder.room_id)
-        if room_version_obj.msc2716_empty_prev_events:
+        if allow_no_prev_events:
             # We allow events with no `prev_events` but it better have some `auth_events`
             assert (
                 builder.type == EventTypes.Create
