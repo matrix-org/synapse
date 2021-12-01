@@ -516,13 +516,13 @@ class SyncRestServlet(RestServlet):
             The room, encoded in our response format
         """
 
-        def serialize(events: Iterable[EventBase]) -> Awaitable[List[JsonDict]]:
+        def serialize(
+            events: Iterable[EventBase], bundle_aggregations: bool
+        ) -> Awaitable[List[JsonDict]]:
             return self._event_serializer.serialize_events(
                 events,
                 time_now=time_now,
-                # We don't bundle "live" events, as otherwise clients
-                # will end up double counting annotations.
-                bundle_aggregations=False,
+                bundle_aggregations=bundle_aggregations,
                 token_id=token_id,
                 event_format=event_formatter,
                 only_event_fields=only_fields,
@@ -544,8 +544,13 @@ class SyncRestServlet(RestServlet):
                     event.room_id,
                 )
 
-        serialized_state = await serialize(state_events)
-        serialized_timeline = await serialize(timeline_events)
+        # No need to bundle aggregations for state events.
+        serialized_state = await serialize(state_events, bundle_aggregations=False)
+        # Only bundle aggregations if the room is limited, as clients could be
+        # missing events.
+        serialized_timeline = await serialize(
+            timeline_events, bundle_aggregations=not room.timeline.limited
+        )
 
         account_data = room.account_data
 
