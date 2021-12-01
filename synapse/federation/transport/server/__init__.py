@@ -299,7 +299,7 @@ def register_servlets(
     authenticator: Authenticator,
     ratelimiter: FederationRateLimiter,
     servlet_groups: Optional[Iterable[str]] = None,
-):
+) -> None:
     """Initialize and register servlet classes.
 
     Will by default register all servlets. For custom behaviour, pass in
