@@ -1,0 +1,1 @@
+Fix using MSC2716 batch sending in combination with event persistence workers. Contributed by @tulir at Beeper.

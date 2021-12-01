@@ -1194,12 +1194,12 @@ class RoomSpaceSummaryRestServlet(RestServlet):
 
 
 class RoomHierarchyRestServlet(RestServlet):
-    PATTERNS = (
+    PATTERNS = [
         re.compile(
-            "^/_matrix/client/unstable/org.matrix.msc2946"
+            "^/_matrix/client/(v1|unstable/org.matrix.msc2946)"
             "/rooms/(?P<room_id>[^/]*)/hierarchy$"
         ),
-    )
+    ]
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1224,7 +1224,7 @@ class RoomHierarchyRestServlet(RestServlet):
             )
 
         return 200, await self._room_summary_handler.get_room_hierarchy(
-            requester.user.to_string(),
+            requester,
             room_id,
             suggested_only=parse_boolean(request, "suggested_only", default=False),
             max_depth=max_depth,

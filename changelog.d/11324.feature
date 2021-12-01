@@ -1,1 +1,0 @@
-Add dedicated admin API for blocking a room.
