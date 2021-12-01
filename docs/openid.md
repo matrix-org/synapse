@@ -83,7 +83,7 @@ oidc_providers:
 
 ### Dex
 
-[Dex][dex-idp] is a simple, open-source, certified OpenID Connect Provider.
+[Dex][dex-idp] is a simple, open-source OpenID Connect Provider.
 Although it is designed to help building a full-blown provider with an
 external database, it can be configured with static passwords in a config file.
 
