@@ -154,9 +154,9 @@ class FederationEventHandler:
             "actions": actions_by_user[event.state_key],
             "event_id": event.event_id,
         }
-        pusherConfigs = await self._store.get_pushers_by_user_id(event.state_key)
-        for pusherConfig in pusherConfigs:
-            p = HttpPusher(self._hs, pusherConfig)
+        pusher_configs = await self._store.get_pushers_by_user_id(event.state_key)
+        for pusher_config in pusher_configs:
+            p = HttpPusher(self._hs, pusher_config)
             await p.process_push_action(action_for_pusher)
 
     async def on_receive_pdu(self, origin: str, pdu: EventBase) -> None:
