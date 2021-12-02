@@ -22,18 +22,18 @@ from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent
 from synapse.visibility import filter_events_for_server
 
-import tests.unittest
-from tests.utils import create_room, setup_test_homeserver
+from tests import unittest
+from tests.utils import create_room
 
 logger = logging.getLogger(__name__)
 
 TEST_ROOM_ID = "!TEST:ROOM"
 
 
-class FilterEventsForServerTestCase(tests.unittest.TestCase):
+class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver(self.addCleanup)
+        super(FilterEventsForServerTestCase, self).setUp()
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
         self.storage = self.hs.get_storage()
