@@ -74,11 +74,11 @@ The following fields are returned in the JSON response body:
   Destinations objects contain the following fields:
   - `destination` - string - Name of the remote server to federate.
   - `retry_last_ts` - integer - The last time Synapse tried and failed to reach the
-    remote server, in ms. This is `0` if no error has occurred.
+    remote server, in ms. This is `0` if no further retrying occuring.
   - `retry_interval` - integer - How long since the last time Synapse tried to reach
-    the remote server before trying again, in ms.
+    the remote server before trying again, in ms. This is `0` if no further retrying occuring.
   - `failure_ts` - integer - The first time Synapse tried and failed to reach the
-    remote server, in ms. This is `0` if no error has occurred.
+    remote server, in ms. This is `null` if no error has occurred.
   - `last_successful_stream_ordering` - integer - The stream ordering of the most
     recent successfully-sent [PDU](Understanding-Synapse-Performance-Issues-Through-Grafana-Graphs.md#federation)
     to this destination or `null` if this information has not been tracked yet.
