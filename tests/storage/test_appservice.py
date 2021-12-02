@@ -14,7 +14,7 @@
 import json
 import os
 import tempfile
-from typing import Any, Generator, List, cast
+from typing import Any, Generator, List, Optional, cast
 from unittest.mock import Mock
 
 import yaml
@@ -152,13 +152,15 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             outfile.write(yaml.dump(as_yaml))
             self.as_yaml_files.append(as_token)
 
-    def _set_state(self, id, state, txn=None):
+    def _set_state(
+        self, id: str, state: ApplicationServiceState, txn: Optional[int] = None
+    ):
         return self.db_pool.runOperation(
             self.engine.convert_param_style(
                 "INSERT INTO application_services_state(as_id, state, last_txn) "
                 "VALUES(?,?,?)"
             ),
-            (id, state, txn),
+            (id, state.value, txn),
         )
 
     def _insert_txn(self, as_id, txn_id, events):
@@ -176,7 +178,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
                 "INSERT INTO application_services_state(as_id, last_txn, state) "
                 "VALUES(?,?,?)"
             ),
-            (as_id, txn_id, ApplicationServiceState.UP),
+            (as_id, txn_id, ApplicationServiceState.UP.value),
         )
 
     @defer.inlineCallbacks
@@ -228,7 +230,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             self.engine.convert_param_style(
                 "SELECT as_id FROM application_services_state WHERE state=?"
             ),
-            (ApplicationServiceState.DOWN,),
+            (ApplicationServiceState.DOWN.value,),
         )
         self.assertEquals(service.id, rows[0][0])
 
@@ -250,7 +252,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             self.engine.convert_param_style(
                 "SELECT as_id FROM application_services_state WHERE state=?"
             ),
-            (ApplicationServiceState.UP,),
+            (ApplicationServiceState.UP.value,),
         )
         self.assertEquals(service.id, rows[0][0])
 
@@ -373,7 +375,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         )
         self.assertEquals(1, len(res))
         self.assertEquals(txn_id, res[0][0])
-        self.assertEquals(ApplicationServiceState.UP, res[0][1])
+        self.assertEquals(ApplicationServiceState.UP.value, res[0][1])
 
         res = yield self.db_pool.runQuery(
             self.engine.convert_param_style(
@@ -454,7 +456,9 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
     ) -> None:
         self.service = Mock(id="foo")
         self.store = self.hs.get_datastore()
-        self.get_success(self.store.set_appservice_state(self.service, "up"))
+        self.get_success(
+            self.store.set_appservice_state(self.service, ApplicationServiceState.UP)
+        )
 
     def test_get_type_stream_id_for_appservice_no_value(self) -> None:
         value = self.get_success(
