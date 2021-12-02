@@ -549,7 +549,7 @@ class SyncRestServlet(RestServlet):
         # Only bundle aggregations if the room is limited, as clients could be
         # missing events.
         serialized_timeline = await serialize(
-            timeline_events, bundle_aggregations=not room.timeline.limited
+            timeline_events, bundle_aggregations=room.timeline.limited
         )
 
         account_data = room.account_data
