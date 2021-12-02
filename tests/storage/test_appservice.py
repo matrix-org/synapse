@@ -58,7 +58,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
             database, make_conn(database._database_config, database.engine, "test"), hs
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         # TODO: suboptimal that we need to create files for tests!
         for f in self.as_yaml_files:
             try:
@@ -66,7 +66,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
             except Exception:
                 pass
 
-    def _add_appservice(self, as_token, id, url, hs_token, sender):
+    def _add_appservice(self, as_token, id, url, hs_token, sender) -> None:
         as_yaml = {
             "url": url,
             "as_token": as_token,
@@ -80,11 +80,11 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
             outfile.write(yaml.dump(as_yaml))
             self.as_yaml_files.append(as_token)
 
-    def test_retrieve_unknown_service_token(self):
+    def test_retrieve_unknown_service_token(self) -> None:
         service = self.store.get_app_service_by_token("invalid_token")
         self.assertEquals(service, None)
 
-    def test_retrieval_of_service(self):
+    def test_retrieval_of_service(self) -> None:
         stored_service = self.store.get_app_service_by_token(self.as_token)
         self.assertEquals(stored_service.token, self.as_token)
         self.assertEquals(stored_service.id, self.as_id)
@@ -93,7 +93,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
         self.assertEquals(stored_service.namespaces[ApplicationService.NS_ROOMS], [])
         self.assertEquals(stored_service.namespaces[ApplicationService.NS_USERS], [])
 
-    def test_retrieval_of_all_services(self):
+    def test_retrieval_of_all_services(self) -> None:
         services = self.store.get_app_services()
         self.assertEquals(len(services), 3)
 
@@ -131,7 +131,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             database, make_conn(db_config, self.engine, "test"), hs
         )
 
-    def _add_service(self, url, as_token, id):
+    def _add_service(self, url, as_token, id) -> None:
         as_yaml = {
             "url": url,
             "as_token": as_token,
@@ -173,20 +173,26 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_get_appservice_state_none(self):
+    def test_get_appservice_state_none(
+        self,
+    ) -> Generator["Deferred[object]", object, None]:
         service = Mock(id="999")
         state = yield defer.ensureDeferred(self.store.get_appservice_state(service))
         self.assertEquals(None, state)
 
     @defer.inlineCallbacks
-    def test_get_appservice_state_up(self):
+    def test_get_appservice_state_up(
+        self,
+    ) -> Generator["Deferred[object]", object, None]:
         yield self._set_state(self.as_list[0]["id"], ApplicationServiceState.UP)
         service = Mock(id=self.as_list[0]["id"])
         state = yield defer.ensureDeferred(self.store.get_appservice_state(service))
         self.assertEquals(ApplicationServiceState.UP, state)
 
     @defer.inlineCallbacks
-    def test_get_appservice_state_down(self):
+    def test_get_appservice_state_down(
+        self,
+    ) -> Generator["Deferred[object]", object, None]:
         yield self._set_state(self.as_list[0]["id"], ApplicationServiceState.UP)
         yield self._set_state(self.as_list[1]["id"], ApplicationServiceState.DOWN)
         yield self._set_state(self.as_list[2]["id"], ApplicationServiceState.DOWN)
@@ -195,14 +201,18 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.assertEquals(ApplicationServiceState.DOWN, state)
 
     @defer.inlineCallbacks
-    def test_get_appservices_by_state_none(self):
+    def test_get_appservices_by_state_none(
+        self,
+    ) -> Generator["Deferred[object]", Any, None]:
         services = yield defer.ensureDeferred(
             self.store.get_appservices_by_state(ApplicationServiceState.DOWN)
         )
         self.assertEquals(0, len(services))
 
     @defer.inlineCallbacks
-    def test_set_appservices_state_down(self):
+    def test_set_appservices_state_down(
+        self,
+    ) -> Generator["Deferred[object]", Any, None]:
         service = Mock(id=self.as_list[1]["id"])
         yield defer.ensureDeferred(
             self.store.set_appservice_state(service, ApplicationServiceState.DOWN)
@@ -216,7 +226,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.assertEquals(service.id, rows[0][0])
 
     @defer.inlineCallbacks
-    def test_set_appservices_state_multiple_up(self):
+    def test_set_appservices_state_multiple_up(
+        self,
+    ) -> Generator["Deferred[object]", Any, None]:
         service = Mock(id=self.as_list[1]["id"])
         yield defer.ensureDeferred(
             self.store.set_appservice_state(service, ApplicationServiceState.UP)
@@ -236,7 +248,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.assertEquals(service.id, rows[0][0])
 
     @defer.inlineCallbacks
-    def test_create_appservice_txn_first(self):
+    def test_create_appservice_txn_first(
+        self,
+    ) -> Generator["Deferred[object]", Any, None]:
         service = Mock(id=self.as_list[0]["id"])
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         txn = yield defer.ensureDeferred(
@@ -247,7 +261,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.assertEquals(txn.service, service)
 
     @defer.inlineCallbacks
-    def test_create_appservice_txn_older_last_txn(self):
+    def test_create_appservice_txn_older_last_txn(
+        self,
+    ) -> Generator["Deferred[object]", Any, None]:
         service = Mock(id=self.as_list[0]["id"])
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         yield self._set_last_txn(service.id, 9643)  # AS is falling behind
@@ -261,7 +277,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.assertEquals(txn.service, service)
 
     @defer.inlineCallbacks
-    def test_create_appservice_txn_up_to_date_last_txn(self):
+    def test_create_appservice_txn_up_to_date_last_txn(
+        self,
+    ) -> Generator["Deferred[object]", Any, None]:
         service = Mock(id=self.as_list[0]["id"])
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         yield self._set_last_txn(service.id, 9643)
@@ -273,7 +291,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.assertEquals(txn.service, service)
 
     @defer.inlineCallbacks
-    def test_create_appservice_txn_up_fuzzing(self):
+    def test_create_appservice_txn_up_fuzzing(
+        self,
+    ) -> Generator["Deferred[object]", Any, None]:
         service = Mock(id=self.as_list[0]["id"])
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         yield self._set_last_txn(service.id, 9643)
@@ -296,7 +316,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.assertEquals(txn.service, service)
 
     @defer.inlineCallbacks
-    def test_complete_appservice_txn_first_txn(self):
+    def test_complete_appservice_txn_first_txn(
+        self,
+    ) -> Generator["Deferred[object]", Any, None]:
         service = Mock(id=self.as_list[0]["id"])
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         txn_id = 1
@@ -324,7 +346,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.assertEquals(0, len(res))
 
     @defer.inlineCallbacks
-    def test_complete_appservice_txn_existing_in_state_table(self):
+    def test_complete_appservice_txn_existing_in_state_table(
+        self,
+    ) -> Generator["Deferred[object]", Any, None]:
         service = Mock(id=self.as_list[0]["id"])
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         txn_id = 5
@@ -353,14 +377,16 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.assertEquals(0, len(res))
 
     @defer.inlineCallbacks
-    def test_get_oldest_unsent_txn_none(self):
+    def test_get_oldest_unsent_txn_none(
+        self,
+    ) -> Generator["Deferred[object]", Any, None]:
         service = Mock(id=self.as_list[0]["id"])
 
         txn = yield defer.ensureDeferred(self.store.get_oldest_unsent_txn(service))
         self.assertEquals(None, txn)
 
     @defer.inlineCallbacks
-    def test_get_oldest_unsent_txn(self):
+    def test_get_oldest_unsent_txn(self) -> Generator["Deferred[object]", Any, None]:
         service = Mock(id=self.as_list[0]["id"])
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         other_events = [Mock(event_id="e5"), Mock(event_id="e6")]
@@ -379,7 +405,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.assertEquals(events, txn.events)
 
     @defer.inlineCallbacks
-    def test_get_appservices_by_state_single(self):
+    def test_get_appservices_by_state_single(
+        self,
+    ) -> Generator["Deferred[object]", Any, None]:
         yield self._set_state(self.as_list[0]["id"], ApplicationServiceState.DOWN)
         yield self._set_state(self.as_list[1]["id"], ApplicationServiceState.UP)
 
@@ -390,7 +418,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.assertEquals(self.as_list[0]["id"], services[0].id)
 
     @defer.inlineCallbacks
-    def test_get_appservices_by_state_multiple(self):
+    def test_get_appservices_by_state_multiple(
+        self,
+    ) -> Generator["Deferred[object]", Any, None]:
         yield self._set_state(self.as_list[0]["id"], ApplicationServiceState.DOWN)
         yield self._set_state(self.as_list[1]["id"], ApplicationServiceState.UP)
         yield self._set_state(self.as_list[2]["id"], ApplicationServiceState.DOWN)
@@ -407,7 +437,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
 
 
 class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor, clock) -> "HomeServer":
         hs = self.setup_test_homeserver()
         return hs
 
@@ -416,7 +446,7 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
         self.store = self.hs.get_datastore()
         self.get_success(self.store.set_appservice_state(self.service, "up"))
 
-    def test_get_type_stream_id_for_appservice_no_value(self):
+    def test_get_type_stream_id_for_appservice_no_value(self) -> None:
         value = self.get_success(
             self.store.get_type_stream_id_for_appservice(self.service, "read_receipt")
         )
@@ -427,13 +457,13 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
         )
         self.assertEquals(value, 0)
 
-    def test_get_type_stream_id_for_appservice_invalid_type(self):
+    def test_get_type_stream_id_for_appservice_invalid_type(self) -> None:
         self.get_failure(
             self.store.get_type_stream_id_for_appservice(self.service, "foobar"),
             ValueError,
         )
 
-    def test_set_type_stream_id_for_appservice(self):
+    def test_set_type_stream_id_for_appservice(self) -> None:
         read_receipt_value = 1024
         self.get_success(
             self.store.set_type_stream_id_for_appservice(
@@ -455,7 +485,7 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
         )
         self.assertEqual(result, read_receipt_value)
 
-    def test_set_type_stream_id_for_appservice_invalid_type(self):
+    def test_set_type_stream_id_for_appservice_invalid_type(self) -> None:
         self.get_failure(
             self.store.set_type_stream_id_for_appservice(self.service, "foobar", 1024),
             ValueError,
@@ -464,12 +494,12 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
 
 # required for ApplicationServiceTransactionStoreTestCase tests
 class TestTransactionStore(ApplicationServiceTransactionStore, ApplicationServiceStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs) -> None:
         super().__init__(database, db_conn, hs)
 
 
 class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
-    def _write_config(self, suffix, **kwargs):
+    def _write_config(self, suffix, **kwargs) -> str:
         vals = {
             "id": "id" + suffix,
             "url": "url" + suffix,
@@ -486,7 +516,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         return path
 
     @defer.inlineCallbacks
-    def test_unique_works(self):
+    def test_unique_works(self) -> Generator["Deferred[object]", Any, None]:
         f1 = self._write_config(suffix="1")
         f2 = self._write_config(suffix="2")
 
@@ -503,7 +533,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
-    def test_duplicate_ids(self):
+    def test_duplicate_ids(self) -> Generator["Deferred[object]", Any, None]:
         f1 = self._write_config(id="id", suffix="1")
         f2 = self._write_config(id="id", suffix="2")
 
@@ -528,7 +558,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         self.assertIn("id", str(e))
 
     @defer.inlineCallbacks
-    def test_duplicate_as_tokens(self):
+    def test_duplicate_as_tokens(self) -> Generator["Deferred[object]", Any, None]:
         f1 = self._write_config(as_token="as_token", suffix="1")
         f2 = self._write_config(as_token="as_token", suffix="2")
 
