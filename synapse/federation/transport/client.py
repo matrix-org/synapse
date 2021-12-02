@@ -21,6 +21,7 @@ from typing import (
     Callable,
     Collection,
     Dict,
+    Generator,
     Iterable,
     List,
     Mapping,
@@ -235,11 +236,16 @@ class TransportLayerClient:
 
     @log_function
     async def make_query(
-        self, destination, query_type, args, retry_on_dns_fail, ignore_backoff=False
-    ):
+        self,
+        destination: str,
+        query_type: str,
+        args: dict,
+        retry_on_dns_fail: bool,
+        ignore_backoff: bool = False,
+    ) -> JsonDict:
         path = _create_v1_path("/query/%s", query_type)
 
-        content = await self.client.get_json(
+        return await self.client.get_json(
             destination=destination,
             path=path,
             args=args,
@@ -247,8 +253,6 @@ class TransportLayerClient:
             timeout=10000,
             ignore_backoff=ignore_backoff,
         )
-
-        return content
 
     @log_function
     async def make_membership_event(
@@ -1317,7 +1321,7 @@ class SendJoinResponse:
 
 
 @ijson.coroutine
-def _event_parser(event_dict: JsonDict):
+def _event_parser(event_dict: JsonDict) -> Generator[None, Tuple[str, Any], None]:
     """Helper function for use with `ijson.kvitems_coro` to parse key-value pairs
     to add them to a given dictionary.
     """
@@ -1328,7 +1332,9 @@ def _event_parser(event_dict: JsonDict):
 
 
 @ijson.coroutine
-def _event_list_parser(room_version: RoomVersion, events: List[EventBase]):
+def _event_list_parser(
+    room_version: RoomVersion, events: List[EventBase]
+) -> Generator[None, JsonDict, None]:
     """Helper function for use with `ijson.items_coro` to parse an array of
     events and add them to the given list.
     """
