@@ -1661,7 +1661,22 @@ class SyncHandler:
     async def _get_rooms_changed(
         self, sync_result_builder: "SyncResultBuilder", ignored_users: FrozenSet[str]
     ) -> _RoomChanges:
-        """Gets the the changes that have happened since the last sync.
+        """Determine the changes in rooms to report to the user.
+
+        Ideally, we want to report all events whose stream ordering `s` lies in the
+        range `since_token < s <= now_token`, where the two tokens are read from the
+        sync_result_builder.
+
+        If there are too many events in that range to report, things get complicated.
+        In this situation we return a truncated list of the most recent events, and
+        indicate in the response that there is a "gap" of omitted events. Additionally:
+
+        - we include a "state_delta", to describethe changes in state over the gap,
+        - we include all membership events applying to the user making the request,
+          even those in the gap.
+
+        See the spec for the rationale:
+            https://spec.matrix.org/v1.1/client-server-api/#syncing
 
         The sync_result_builder is not modified by this function.
         """
@@ -1672,10 +1687,14 @@ class SyncHandler:
 
         assert since_token
 
-        # The spec notes:
+        # The spec
+        #     https://spec.matrix.org/v1.1/client-server-api/#get_matrixclientv3sync
+        # notes that membership events need special consideration:
+        #
         # > When a sync is limited, the server MUST return membership events for events
         # > in the gap (between since and the start of the returned timeline), regardless
         # > as to whether or not they are redundant.
+        #
         # We fetch such events here, but we only seem to use them for categorising rooms
         # as newly joined, newly left, invited or knocked.
         # TODO: we've already called this function and ran this query in
