@@ -7,29 +7,29 @@ If your server already has an admin account you should use the user admin API to
 If you don't have any admin accounts yet you won't be able to use the admin API so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account, use the admin APIs to make further changes.
 
 ```sql
-    UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
+UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 ```
 What servers are my server talking to?
 ---
 Run this sql query on your db:
 ```sql
-    SELECT * FROM destinations;
+SELECT * FROM destinations;
 ```
 
 What servers are currently participating in this room?
 ---
 Run this sql query on your db:
 ```sql
-    SELECT DISTINCT split_part(state_key, ':', 2)
-        FROM current_state_events AS c
-        INNER JOIN room_memberships AS m USING (room_id, event_id)
-        WHERE room_id = '!cURbafjkfsMDVwdRDQ:matrix.org' AND membership = 'join';
+SELECT DISTINCT split_part(state_key, ':', 2)
+    FROM current_state_events AS c
+    INNER JOIN room_memberships AS m USING (room_id, event_id)
+    WHERE room_id = '!cURbafjkfsMDVwdRDQ:matrix.org' AND membership = 'join';
 ```
 
 What users are registered on my server?
 ---
 ```sql
-    SELECT NAME from users;
+SELECT NAME from users;
 ```
 
 Manually resetting passwords:
@@ -55,7 +55,7 @@ I've stuffed up access to my room, how can I delete it to free up the alias?
 ---
 Using the following curl command:
 ```
-    curl -H 'Authorization: Bearer <access-token>' -X DELETE https://matrix.org/_matrix/client/r0/directory/room/<room-alias>
+curl -H 'Authorization: Bearer <access-token>' -X DELETE https://matrix.org/_matrix/client/r0/directory/room/<room-alias>
 ```
 `<access-token>` - can be obtained in riot by looking in the riot settings, down the bottom is:
 Access Token:\<click to reveal\> 
