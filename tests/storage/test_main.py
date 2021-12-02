@@ -18,15 +18,13 @@ from twisted.internet import defer
 from synapse.types import UserID
 
 from tests import unittest
-from tests.utils import setup_test_homeserver
 
 
-class DataStoreTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        hs = yield setup_test_homeserver(self.addCleanup)
+class DataStoreTestCase(unittest.HomeserverTestCase):
+    def setUp(self) -> None:
+        super(DataStoreTestCase, self).setUp()
 
-        self.store = hs.get_datastore()
+        self.store = self.hs.get_datastore()
 
         self.user = UserID.from_string("@abcde:test")
         self.displayname = "Frank"
