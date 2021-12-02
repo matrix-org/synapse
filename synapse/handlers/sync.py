@@ -1915,7 +1915,8 @@ class SyncHandler:
         sync_config = sync_result_builder.sync_config
 
         room_list = await self.store.get_rooms_for_local_user_where_membership_is(
-            user_id=user_id, membership_list=Membership.LIST,
+            user_id=user_id,
+            membership_list=Membership.LIST,
         )
 
         room_entries = []
