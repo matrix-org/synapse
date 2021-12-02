@@ -13,42 +13,35 @@
 # limitations under the License.
 
 
-from twisted.internet import defer
-
 from synapse.types import UserID
 
 from tests import unittest
-from tests.utils import setup_test_homeserver
 
 
-class DataStoreTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        hs = yield setup_test_homeserver(self.addCleanup)
+class DataStoreTestCase(unittest.HomeserverTestCase):
+    def setUp(self) -> None:
+        super(DataStoreTestCase, self).setUp()
 
-        self.store = hs.get_datastore()
+        self.store = self.hs.get_datastore()
 
         self.user = UserID.from_string("@abcde:test")
         self.displayname = "Frank"
 
-    @defer.inlineCallbacks
-    def test_get_users_paginate(self):
-        yield defer.ensureDeferred(
-            self.store.register_user(self.user.to_string(), "pass")
-        )
-        yield defer.ensureDeferred(self.store.create_profile(self.user.localpart))
-        yield defer.ensureDeferred(
+    def test_get_users_paginate(self) -> None:
+        self.get_success(self.store.register_user(self.user.to_string(), "pass"))
+        self.get_success(self.store.create_profile(self.user.localpart))
+        self.get_success(
             self.store.set_profile_displayname(self.user.localpart, self.displayname)
         )
 
-        users, total = yield defer.ensureDeferred(
+        users, total = self.get_success(
             self.store.get_users_paginate(0, 10, name="bc", guests=False)
         )
 
         self.assertEquals(1, total)
         self.assertEquals(self.displayname, users.pop()["displayname"])
 
-        users, total = yield defer.ensureDeferred(
+        users, total = self.get_success(
             self.store.get_users_paginate(0, 10, name="BC", guests=False)
         )
 
