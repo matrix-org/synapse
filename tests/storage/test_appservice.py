@@ -36,7 +36,7 @@ from tests.utils import setup_test_homeserver
 class ApplicationServiceStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.as_yaml_files = []
+        self.as_yaml_files: List[str] = []
         hs = yield setup_test_homeserver(
             self.addCleanup, federation_sender=Mock(), federation_client=Mock()
         )
@@ -86,6 +86,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
 
     def test_retrieval_of_service(self) -> None:
         stored_service = self.store.get_app_service_by_token(self.as_token)
+        assert stored_service is not None
         self.assertEquals(stored_service.token, self.as_token)
         self.assertEquals(stored_service.id, self.as_id)
         self.assertEquals(stored_service.url, self.as_url)
@@ -101,7 +102,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
 class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.as_yaml_files = []
+        self.as_yaml_files: List[str] = []
 
         hs = yield setup_test_homeserver(
             self.addCleanup, federation_sender=Mock(), federation_client=Mock()
@@ -117,7 +118,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             {"token": "gamma_tok", "url": "https://gamma.com", "id": "id_gamma"},
         ]
         for s in self.as_list:
-            yield self._add_service(s["url"], s["token"], s["id"])
+            self._add_service(s["url"], s["token"], s["id"])
 
         self.as_yaml_files = []
 
