@@ -52,7 +52,6 @@ def pid_running(pid):
     try:
         with open(f"/proc/{pid}/status") as status_file:
             if "zombie" in status_file.read():
-                subprocess.run(["ps", "auxf"])
                 return False
     except Exception:
         # This isn't Linux or `/proc/` is unavailable.
