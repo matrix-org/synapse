@@ -36,6 +36,10 @@ class SQLBaseStore(metaclass=ABCMeta):
     per data store (and not one per physical database).
     """
 
+    # if set to False, we will query the `state_events` and `rejections` tables when
+    # fetching event data. When True, we rely on it all being in the `events` table.
+    STATE_KEY_IN_EVENTS = False
+
     def __init__(
         self,
         database: DatabasePool,

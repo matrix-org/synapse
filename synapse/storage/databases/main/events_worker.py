@@ -1482,20 +1482,35 @@ class EventsWorkerStore(SQLBaseStore):
         def get_all_new_forward_event_rows(
             txn: LoggingTransaction,
         ) -> List[Tuple[int, str, str, str, str, str, str, str, str]]:
-            sql = (
-                "SELECT e.stream_ordering, e.event_id, e.room_id, e.type,"
-                " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL"
-                " FROM events AS e"
-                " LEFT JOIN redactions USING (event_id)"
-                " LEFT JOIN state_events AS se USING (event_id)"
-                " LEFT JOIN event_relations USING (event_id)"
-                " LEFT JOIN room_memberships USING (event_id)"
-                " LEFT JOIN rejections USING (event_id)"
-                " WHERE ? < stream_ordering AND stream_ordering <= ?"
-                " AND instance_name = ?"
-                " ORDER BY stream_ordering ASC"
-                " LIMIT ?"
-            )
+            if self.STATE_KEY_IN_EVENTS:
+                sql = (
+                    "SELECT e.stream_ordering, e.event_id, e.room_id, e.type,"
+                    " e.state_key, redacts, relates_to_id, membership, e.rejection_reason IS NOT NULL"
+                    " FROM events AS e"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " LEFT JOIN room_memberships USING (event_id)"
+                    " WHERE ? < stream_ordering AND stream_ordering <= ?"
+                    " AND instance_name = ?"
+                    " ORDER BY stream_ordering ASC"
+                    " LIMIT ?"
+                )
+            else:
+                sql = (
+                    "SELECT e.stream_ordering, e.event_id, e.room_id, e.type,"
+                    " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL"
+                    " FROM events AS e"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN state_events AS se USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " LEFT JOIN room_memberships USING (event_id)"
+                    " LEFT JOIN rejections USING (event_id)"
+                    " WHERE ? < stream_ordering AND stream_ordering <= ?"
+                    " AND instance_name = ?"
+                    " ORDER BY stream_ordering ASC"
+                    " LIMIT ?"
+                )
+
             txn.execute(sql, (last_id, current_id, instance_name, limit))
             return cast(
                 List[Tuple[int, str, str, str, str, str, str, str, str]], txn.fetchall()
@@ -1523,21 +1538,36 @@ class EventsWorkerStore(SQLBaseStore):
         def get_ex_outlier_stream_rows_txn(
             txn: LoggingTransaction,
         ) -> List[Tuple[int, str, str, str, str, str, str, str, str]]:
-            sql = (
-                "SELECT event_stream_ordering, e.event_id, e.room_id, e.type,"
-                " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL"
-                " FROM events AS e"
-                " INNER JOIN ex_outlier_stream AS out USING (event_id)"
-                " LEFT JOIN redactions USING (event_id)"
-                " LEFT JOIN state_events AS se USING (event_id)"
-                " LEFT JOIN event_relations USING (event_id)"
-                " LEFT JOIN room_memberships USING (event_id)"
-                " LEFT JOIN rejections USING (event_id)"
-                " WHERE ? < event_stream_ordering"
-                " AND event_stream_ordering <= ?"
-                " AND out.instance_name = ?"
-                " ORDER BY event_stream_ordering ASC"
-            )
+            if self.STATE_KEY_IN_EVENTS:
+                sql = (
+                    "SELECT event_stream_ordering, e.event_id, e.room_id, e.type,"
+                    " e.state_key, redacts, relates_to_id, membership, e.rejection_reason IS NOT NULL"
+                    " FROM events AS e"
+                    " INNER JOIN ex_outlier_stream AS out USING (event_id)"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " LEFT JOIN room_memberships USING (event_id)"
+                    " WHERE ? < event_stream_ordering"
+                    " AND event_stream_ordering <= ?"
+                    " AND out.instance_name = ?"
+                    " ORDER BY event_stream_ordering ASC"
+                )
+            else:
+                sql = (
+                    "SELECT event_stream_ordering, e.event_id, e.room_id, e.type,"
+                    " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL"
+                    " FROM events AS e"
+                    " INNER JOIN ex_outlier_stream AS out USING (event_id)"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN state_events AS se USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " LEFT JOIN room_memberships USING (event_id)"
+                    " LEFT JOIN rejections USING (event_id)"
+                    " WHERE ? < event_stream_ordering"
+                    " AND event_stream_ordering <= ?"
+                    " AND out.instance_name = ?"
+                    " ORDER BY event_stream_ordering ASC"
+                )
 
             txn.execute(sql, (last_id, current_id, instance_name))
             return cast(
@@ -1581,18 +1611,32 @@ class EventsWorkerStore(SQLBaseStore):
         def get_all_new_backfill_event_rows(
             txn: LoggingTransaction,
         ) -> Tuple[List[Tuple[int, Tuple[str, str, str, str, str, str]]], int, bool]:
-            sql = (
-                "SELECT -e.stream_ordering, e.event_id, e.room_id, e.type,"
-                " se.state_key, redacts, relates_to_id"
-                " FROM events AS e"
-                " LEFT JOIN redactions USING (event_id)"
-                " LEFT JOIN state_events AS se USING (event_id)"
-                " LEFT JOIN event_relations USING (event_id)"
-                " WHERE ? > stream_ordering AND stream_ordering >= ?"
-                "  AND instance_name = ?"
-                " ORDER BY stream_ordering ASC"
-                " LIMIT ?"
-            )
+            if self.STATE_KEY_IN_EVENTS:
+                sql = (
+                    "SELECT -e.stream_ordering, e.event_id, e.room_id, e.type,"
+                    " e.state_key, redacts, relates_to_id"
+                    " FROM events AS e"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " WHERE ? > stream_ordering AND stream_ordering >= ?"
+                    "  AND instance_name = ?"
+                    " ORDER BY stream_ordering ASC"
+                    " LIMIT ?"
+                )
+            else:
+                sql = (
+                    "SELECT -e.stream_ordering, e.event_id, e.room_id, e.type,"
+                    " se.state_key, redacts, relates_to_id"
+                    " FROM events AS e"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN state_events AS se USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " WHERE ? > stream_ordering AND stream_ordering >= ?"
+                    "  AND instance_name = ?"
+                    " ORDER BY stream_ordering ASC"
+                    " LIMIT ?"
+                )
+
             txn.execute(sql, (-last_id, -current_id, instance_name, limit))
             new_event_updates: List[
                 Tuple[int, Tuple[str, str, str, str, str, str]]
@@ -1611,19 +1655,34 @@ class EventsWorkerStore(SQLBaseStore):
             else:
                 upper_bound = current_id
 
-            sql = (
-                "SELECT -event_stream_ordering, e.event_id, e.room_id, e.type,"
-                " se.state_key, redacts, relates_to_id"
-                " FROM events AS e"
-                " INNER JOIN ex_outlier_stream AS out USING (event_id)"
-                " LEFT JOIN redactions USING (event_id)"
-                " LEFT JOIN state_events AS se USING (event_id)"
-                " LEFT JOIN event_relations USING (event_id)"
-                " WHERE ? > event_stream_ordering"
-                " AND event_stream_ordering >= ?"
-                " AND out.instance_name = ?"
-                " ORDER BY event_stream_ordering DESC"
-            )
+            if self.STATE_KEY_IN_EVENTS:
+                sql = (
+                    "SELECT -event_stream_ordering, e.event_id, e.room_id, e.type,"
+                    " e.state_key, redacts, relates_to_id"
+                    " FROM events AS e"
+                    " INNER JOIN ex_outlier_stream AS out USING (event_id)"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " WHERE ? > event_stream_ordering"
+                    " AND event_stream_ordering >= ?"
+                    " AND out.instance_name = ?"
+                    " ORDER BY event_stream_ordering DESC"
+                )
+            else:
+                sql = (
+                    "SELECT -event_stream_ordering, e.event_id, e.room_id, e.type,"
+                    " se.state_key, redacts, relates_to_id"
+                    " FROM events AS e"
+                    " INNER JOIN ex_outlier_stream AS out USING (event_id)"
+                    " LEFT JOIN redactions USING (event_id)"
+                    " LEFT JOIN state_events AS se USING (event_id)"
+                    " LEFT JOIN event_relations USING (event_id)"
+                    " WHERE ? > event_stream_ordering"
+                    " AND event_stream_ordering >= ?"
+                    " AND out.instance_name = ?"
+                    " ORDER BY event_stream_ordering DESC"
+                )
+
             txn.execute(sql, (-last_id, -upper_bound, instance_name))
             # Type safety: iterating over `txn` yields `Tuple`, i.e.
             # `Tuple[Any, ...]` of arbitrary length. Mypy detects assigning a

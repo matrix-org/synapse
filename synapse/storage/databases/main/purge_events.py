@@ -122,7 +122,11 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
 
         logger.info("[purge] looking for events to delete")
 
-        should_delete_expr = "state_events.state_key IS NULL"
+        should_delete_expr = (
+            "e.state_key IS NULL"
+            if self.STATE_KEY_IN_EVENTS
+            else "state_events.state_key IS NULL"
+        )
         should_delete_params: Tuple[Any, ...] = ()
         if not delete_local_events:
             should_delete_expr += " AND event_id NOT LIKE ?"
@@ -134,12 +138,23 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
 
         # Note that we insert events that are outliers and aren't going to be
         # deleted, as nothing will happen to them.
+        if self.STATE_KEY_IN_EVENTS:
+            sqlf = """
+            INSERT INTO events_to_purge
+                SELECT event_id, %s
+                FROM events AS e
+                WHERE (NOT outlier OR (%s)) AND e.room_id = ? AND topological_ordering < ?
+            """
+        else:
+            sqlf = """
+            INSERT INTO events_to_purge
+                SELECT event_id, %s
+                FROM events AS e LEFT JOIN state_events USING (event_id)
+                WHERE (NOT outlier OR (%s)) AND e.room_id = ? AND topological_ordering < ?
+            """
+
         txn.execute(
-            "INSERT INTO events_to_purge"
-            " SELECT event_id, %s"
-            " FROM events AS e LEFT JOIN state_events USING (event_id)"
-            " WHERE (NOT outlier OR (%s)) AND e.room_id = ? AND topological_ordering < ?"
-            % (should_delete_expr, should_delete_expr),
+            sqlf % (should_delete_expr, should_delete_expr),
             should_delete_params,
         )
 

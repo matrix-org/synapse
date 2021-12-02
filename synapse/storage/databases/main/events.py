@@ -257,17 +257,30 @@ class PersistEventsStore:
         def _get_events_which_are_prevs_txn(
             txn: LoggingTransaction, batch: Collection[str]
         ) -> None:
-            sql = """
-            SELECT prev_event_id, internal_metadata
-            FROM event_edges
-                INNER JOIN events USING (event_id)
-                LEFT JOIN rejections USING (event_id)
-                LEFT JOIN event_json USING (event_id)
-            WHERE
-                NOT events.outlier
-                AND rejections.event_id IS NULL
-                AND
-            """
+            if self.store.STATE_KEY_IN_EVENTS:
+                sql = """
+                SELECT prev_event_id, internal_metadata
+                FROM event_edges
+                    INNER JOIN events USING (event_id)
+                    LEFT JOIN event_json USING (event_id)
+                WHERE
+                    NOT events.outlier
+                    AND events.rejection_reason IS NULL
+                    AND
+                """
+
+            else:
+                sql = """
+                SELECT prev_event_id, internal_metadata
+                FROM event_edges
+                    INNER JOIN events USING (event_id)
+                    LEFT JOIN rejections USING (event_id)
+                    LEFT JOIN event_json USING (event_id)
+                WHERE
+                    NOT events.outlier
+                    AND rejections.event_id IS NULL
+                    AND
+                """
 
             clause, args = make_in_list_sql_clause(
                 self.database_engine, "prev_event_id", batch
@@ -311,7 +324,19 @@ class PersistEventsStore:
         ) -> None:
             to_recursively_check = batch
 
-            while to_recursively_check:
+            if self.store.STATE_KEY_IN_EVENTS:
+                sql = """
+                SELECT
+                    event_id, prev_event_id, internal_metadata,
+                    events.rejection_reason IS NOT NULL
+                FROM event_edges
+                    INNER JOIN events USING (event_id)
+                    LEFT JOIN event_json USING (event_id)
+                WHERE
+                    NOT events.outlier
+                    AND
+                """
+            else:
                 sql = """
                 SELECT
                     event_id, prev_event_id, internal_metadata,
@@ -325,6 +350,7 @@ class PersistEventsStore:
                     AND
                 """
 
+            while to_recursively_check:
                 clause, args = make_in_list_sql_clause(
                     self.database_engine, "event_id", to_recursively_check
                 )
@@ -530,6 +556,7 @@ class PersistEventsStore:
         event_to_room_id = {e.event_id: e.room_id for e in state_events.values()}
 
         self._add_chain_cover_index(
+            self.store.STATE_KEY_IN_EVENTS,
             txn,
             self.db_pool,
             self.store.event_chain_id_gen,
@@ -541,6 +568,7 @@ class PersistEventsStore:
     @classmethod
     def _add_chain_cover_index(
         cls,
+        state_key_in_events: bool,
         txn: LoggingTransaction,
         db_pool: DatabasePool,
         event_chain_id_gen: SequenceGenerator,
@@ -551,6 +579,8 @@ class PersistEventsStore:
         """Calculate the chain cover index for the given events.
 
         Args:
+            state_key_in_events: whether to use the `state_key` column in the `events`
+                table in preference to the `state_events` table
             event_to_room_id: Event ID to the room ID of the event
             event_to_types: Event ID to type and state_key of the event
             event_to_auth_chain: Event ID to list of auth event IDs of the
@@ -610,7 +640,15 @@ class PersistEventsStore:
 
         # We loop here in case we find an out of band membership and need to
         # fetch their auth event info.
-        while missing_auth_chains:
+        if state_key_in_events:
+            sql = """
+                SELECT event_id, events.type, events.state_key, chain_id, sequence_number
+                FROM events
+                LEFT JOIN event_auth_chains USING (event_id)
+                WHERE
+                    events.state_key IS NOT NULL AND
+            """
+        else:
             sql = """
                 SELECT event_id, events.type, se.state_key, chain_id, sequence_number
                 FROM events
@@ -618,6 +656,8 @@ class PersistEventsStore:
                 LEFT JOIN event_auth_chains USING (event_id)
                 WHERE
             """
+
+        while missing_auth_chains:
             clause, args = make_in_list_sql_clause(
                 txn.database_engine,
                 "event_id",
@@ -1641,22 +1681,31 @@ class PersistEventsStore:
     ) -> None:
         to_prefill = []
 
-        rows = []
-
         ev_map = {e.event_id: e for e, _ in events_and_contexts}
         if not ev_map:
             return
 
-        sql = (
-            "SELECT "
-            " e.event_id as event_id, "
-            " r.redacts as redacts,"
-            " rej.event_id as rejects "
-            " FROM events as e"
-            " LEFT JOIN rejections as rej USING (event_id)"
-            " LEFT JOIN redactions as r ON e.event_id = r.redacts"
-            " WHERE "
-        )
+        if self.store.STATE_KEY_IN_EVENTS:
+            sql = (
+                "SELECT "
+                " e.event_id as event_id, "
+                " r.redacts as redacts,"
+                " e.rejection_reason as rejects "
+                " FROM events as e"
+                " LEFT JOIN redactions as r ON e.event_id = r.redacts"
+                " WHERE "
+            )
+        else:
+            sql = (
+                "SELECT "
+                " e.event_id as event_id, "
+                " r.redacts as redacts,"
+                " rej.event_id as rejects "
+                " FROM events as e"
+                " LEFT JOIN rejections as rej USING (event_id)"
+                " LEFT JOIN redactions as r ON e.event_id = r.redacts"
+                " WHERE "
+            )
 
         clause, args = make_in_list_sql_clause(
             self.database_engine, "e.event_id", list(ev_map)

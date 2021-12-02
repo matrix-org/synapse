@@ -448,6 +448,10 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             # First, we get `batch_size` events from the table, pulling out
             # their successor events, if any, and the successor events'
             # rejection status.
+
+            # this should happen before the bg update which drops 'rejections'
+            assert not self.STATE_KEY_IN_EVENTS
+
             txn.execute(
                 """SELECT prev_event_id, event_id, internal_metadata,
                     rejections.event_id IS NOT NULL, events.outlier
@@ -973,6 +977,9 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             extra_clause = "AND events.room_id = ?"
             tuple_args.append(last_room_id)
 
+        # this should happen before the bg update which drops 'state_events'
+        assert not self.STATE_KEY_IN_EVENTS
+
         sql = """
             SELECT
                 event_id, state_events.type, state_events.state_key,
@@ -1041,9 +1048,10 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
         # Calculate and persist the chain cover index for this set of events.
         #
-        # Annoyingly we need to gut wrench into the persit event store so that
+        # Annoyingly we need to gut wrench into the persist event store so that
         # we can reuse the function to calculate the chain cover for rooms.
         PersistEventsStore._add_chain_cover_index(
+            False,
             txn,
             self.db_pool,
             self.event_chain_id_gen,  # type: ignore[attr-defined]
