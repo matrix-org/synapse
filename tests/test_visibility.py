@@ -15,9 +15,6 @@ import logging
 from typing import Optional
 from unittest.mock import Mock
 
-from twisted.internet import defer
-from twisted.internet.defer import succeed
-
 from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent
 from synapse.visibility import filter_events_for_server
@@ -31,16 +28,14 @@ TEST_ROOM_ID = "!TEST:ROOM"
 
 
 class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
-    @defer.inlineCallbacks
     def setUp(self):
         super(FilterEventsForServerTestCase, self).setUp()
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
         self.storage = self.hs.get_storage()
 
-        yield defer.ensureDeferred(create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM"))
+        self.get_success(create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM"))
 
-    @defer.inlineCallbacks
     def test_filtering(self):
         #
         # The events to be filtered consist of 10 membership events (it doesn't
@@ -51,18 +46,20 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         #
 
         # before we do that, we persist some other events to act as state.
-        yield self.inject_visibility("@admin:hs", "joined")
+        self.get_success(self.inject_visibility("@admin:hs", "joined"))
         for i in range(0, 10):
-            yield self.inject_room_member("@resident%i:hs" % i)
+            self.get_success(self.inject_room_member("@resident%i:hs" % i))
 
         events_to_filter = []
 
         for i in range(0, 10):
             user = "@user%i:%s" % (i, "test_server" if i == 5 else "other_server")
-            evt = yield self.inject_room_member(user, extra_content={"a": "b"})
+            evt = self.get_success(
+                self.inject_room_member(user, extra_content={"a": "b"})
+            )
             events_to_filter.append(evt)
 
-        filtered = yield defer.ensureDeferred(
+        filtered = self.get_success(
             filter_events_for_server(self.storage, "test_server", events_to_filter)
         )
 
@@ -75,34 +72,31 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
             self.assertEqual(events_to_filter[i].event_id, filtered[i].event_id)
             self.assertEqual(filtered[i].content["a"], "b")
 
-    @defer.inlineCallbacks
     def test_erased_user(self):
         # 4 message events, from erased and unerased users, with a membership
         # change in the middle of them.
         events_to_filter = []
 
-        evt = yield self.inject_message("@unerased:local_hs")
+        evt = self.get_success(self.inject_message("@unerased:local_hs"))
         events_to_filter.append(evt)
 
-        evt = yield self.inject_message("@erased:local_hs")
+        evt = self.get_success(self.inject_message("@erased:local_hs"))
         events_to_filter.append(evt)
 
-        evt = yield self.inject_room_member("@joiner:remote_hs")
+        evt = self.get_success(self.inject_room_member("@joiner:remote_hs"))
         events_to_filter.append(evt)
 
-        evt = yield self.inject_message("@unerased:local_hs")
+        evt = self.get_success(self.inject_message("@unerased:local_hs"))
         events_to_filter.append(evt)
 
-        evt = yield self.inject_message("@erased:local_hs")
+        evt = self.get_success(self.inject_message("@erased:local_hs"))
         events_to_filter.append(evt)
 
         # the erasey user gets erased
-        yield defer.ensureDeferred(
-            self.hs.get_datastore().mark_user_erased("@erased:local_hs")
-        )
+        self.get_success(self.hs.get_datastore().mark_user_erased("@erased:local_hs"))
 
         # ... and the filtering happens.
-        filtered = yield defer.ensureDeferred(
+        filtered = self.get_success(
             filter_events_for_server(self.storage, "test_server", events_to_filter)
         )
 
@@ -123,7 +117,6 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         for i in (1, 4):
             self.assertNotIn("body", filtered[i].content)
 
-    @defer.inlineCallbacks
     def inject_visibility(self, user_id, visibility):
         content = {"history_visibility": visibility}
         builder = self.event_builder_factory.for_room_version(
@@ -137,15 +130,12 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        event, context = yield defer.ensureDeferred(
+        event, context = self.get_success(
             self.event_creation_handler.create_new_client_event(builder)
         )
-        yield defer.ensureDeferred(
-            self.storage.persistence.persist_event(event, context)
-        )
+        self.get_success(self.storage.persistence.persist_event(event, context))
         return event
 
-    @defer.inlineCallbacks
     def inject_room_member(
         self, user_id, membership="join", extra_content: Optional[dict] = None
     ):
@@ -162,16 +152,13 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        event, context = yield defer.ensureDeferred(
+        event, context = self.get_success(
             self.event_creation_handler.create_new_client_event(builder)
         )
 
-        yield defer.ensureDeferred(
-            self.storage.persistence.persist_event(event, context)
-        )
+        self.get_success(self.storage.persistence.persist_event(event, context))
         return event
 
-    @defer.inlineCallbacks
     def inject_message(self, user_id, content=None):
         if content is None:
             content = {"body": "testytest", "msgtype": "m.text"}
@@ -185,16 +172,13 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        event, context = yield defer.ensureDeferred(
+        event, context = self.get_success(
             self.event_creation_handler.create_new_client_event(builder)
         )
 
-        yield defer.ensureDeferred(
-            self.storage.persistence.persist_event(event, context)
-        )
+        self.get_success(self.storage.persistence.persist_event(event, context))
         return event
 
-    @defer.inlineCallbacks
     def test_large_room(self):
         # see what happens when we have a large room with hundreds of thousands
         # of membership events
@@ -273,7 +257,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         storage.main = test_store
         storage.state = test_store
 
-        filtered = yield defer.ensureDeferred(
+        filtered = self.get_success(
             filter_events_for_server(test_store, "test_server", events_to_filter)
         )
         logger.info("Filtering took %f seconds", time.time() - start)
@@ -339,10 +323,10 @@ class _TestStore:
                 hve = self.state_ids_for_events[event_id][k]
                 res[event_id] = {k: hve}
 
-        return succeed(res)
+        return res
 
     def get_events(self, events):
-        return succeed({event_id: self.events[event_id] for event_id in events})
+        return {event_id: self.events[event_id] for event_id in events}
 
     def are_users_erased(self, users):
-        return succeed({u: False for u in users})
+        return {u: False for u in users}
