@@ -415,10 +415,10 @@ class SyncHandler:
         since_token: Optional[StreamToken] = None,
         full_state: bool = False,
     ) -> SyncResult:
-        """Get the sync for client needed to match what the server has now.
+        """Generates the response body of a sync result, represented as a SyncResult.
 
-        This is a wrapper around generate_sync_result which starts an open tracing span
-        to track the sync. Delve to generate_sync_result for the next level of your
+        This is a wrapper around `generate_sync_result` which starts an open tracing
+        span to track the sync. See `generate_sync_result` for the next part of your
         indoctrination.
         """
         with start_active_span("current_sync_for_user"):
