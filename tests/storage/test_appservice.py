@@ -252,7 +252,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self,
     ) -> Generator["Deferred[object]", Any, None]:
         service = Mock(id=self.as_list[0]["id"])
-        events = [Mock(event_id="e1"), Mock(event_id="e2")]
+        events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
         txn = yield defer.ensureDeferred(
             self.store.create_appservice_txn(service, events, [])
         )
@@ -265,7 +265,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self,
     ) -> Generator["Deferred[object]", Any, None]:
         service = Mock(id=self.as_list[0]["id"])
-        events = [Mock(event_id="e1"), Mock(event_id="e2")]
+        events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
         yield self._set_last_txn(service.id, 9643)  # AS is falling behind
         yield self._insert_txn(service.id, 9644, events)
         yield self._insert_txn(service.id, 9645, events)
@@ -281,7 +281,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self,
     ) -> Generator["Deferred[object]", Any, None]:
         service = Mock(id=self.as_list[0]["id"])
-        events = [Mock(event_id="e1"), Mock(event_id="e2")]
+        events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
         yield self._set_last_txn(service.id, 9643)
         txn = yield defer.ensureDeferred(
             self.store.create_appservice_txn(service, events, [])
@@ -295,7 +295,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self,
     ) -> Generator["Deferred[object]", Any, None]:
         service = Mock(id=self.as_list[0]["id"])
-        events = [Mock(event_id="e1"), Mock(event_id="e2")]
+        events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
         yield self._set_last_txn(service.id, 9643)
 
         # dump in rows with higher IDs to make sure the queries aren't wrong.
@@ -392,7 +392,8 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         other_events = [Mock(event_id="e5"), Mock(event_id="e6")]
 
         # we aren't testing store._base stuff here, so mock this out
-        self.store.get_events_as_list = Mock(return_value=make_awaitable(events))
+        # (ignore needed because Mypy won't allow us to assign to a method otherwise)
+        self.store.get_events_as_list = Mock(return_value=make_awaitable(events))  # type: ignore[assignment]
 
         yield self._insert_txn(self.as_list[1]["id"], 9, other_events)
         yield self._insert_txn(service.id, 10, events)
