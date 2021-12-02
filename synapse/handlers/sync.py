@@ -1508,7 +1508,7 @@ class SyncHandler:
         Returns:
             Returns a 4-tuple whose entries are:
             - newly_joined_rooms
-            - newly_joined_or_invited_or_knocked_users,
+            - newly_joined_or_invited_or_knocked_users
             - newly_left_rooms
             - newly_left_users
         """
@@ -1671,7 +1671,7 @@ class SyncHandler:
         In this situation we return a truncated list of the most recent events, and
         indicate in the response that there is a "gap" of omitted events. Additionally:
 
-        - we include a "state_delta", to describethe changes in state over the gap,
+        - we include a "state_delta", to describe the changes in state over the gap,
         - we include all membership events applying to the user making the request,
           even those in the gap.
 
