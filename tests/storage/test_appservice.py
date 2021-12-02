@@ -447,10 +447,6 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
 
 
 class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
-    def make_homeserver(self, reactor, clock) -> "HomeServer":
-        hs = self.setup_test_homeserver()
-        return hs
-
     def prepare(
         self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
     ) -> None:
