@@ -41,11 +41,24 @@ NORMAL = "\x1b[m"
 def pid_running(pid):
     try:
         os.kill(pid, 0)
-        return True
     except OSError as err:
         if err.errno == errno.EPERM:
-            return True
-        return False
+            pass  # process exists
+        else:
+            return False
+
+    # When running in a container, orphan processes may not get reaped and their
+    # PIDs may remain valid. Try to work around the issue.
+    try:
+        with open(f"/proc/{pid}/status") as status_file:
+            if "zombie" in status_file.read():
+                return False
+    except Exception:
+        # This isn't Linux or `/proc/` is unavailable.
+        # Assume that the process is still running.
+        pass
+
+    return True
 
 
 def write(message, colour=NORMAL, stream=sys.stdout):
