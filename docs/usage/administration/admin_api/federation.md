@@ -6,7 +6,12 @@ Note: This API is new, experimental and "subject to change".
 
 ## List of destinations
 
-This API gets the current destination retry timing info for a remote server.
+This API gets the current destination retry timing info for all remote servers.
+
+The list contains all the servers with which the server federates,
+regardless of whether an error occurred or not.
+If an error occurs, it may take up to 20 minutes for the error to be displayed here,
+as a complete retry must have failed.
 
 The API is:
 
@@ -69,11 +74,11 @@ The following fields are returned in the JSON response body:
   Destinations objects contain the following fields:
   - `destination` - string - Name of the remote server to federate.
   - `retry_last_ts` - integer - The last time Synapse tried and failed to reach the
-    remote server, in ms.
+    remote server, in ms. This is `0` if no error has occurred.
   - `retry_interval` - integer - How long since the last time Synapse tried to reach
     the remote server before trying again, in ms.
   - `failure_ts` - integer - The first time Synapse tried and failed to reach the
-    remote server, in ms.
+    remote server, in ms. This is `0` if no error has occurred.
   - `last_successful_stream_ordering` - integer - The stream ordering of the most
     recent successfully-sent [PDU](Understanding-Synapse-Performance-Issues-Through-Grafana-Graphs.md#federation)
     to this destination or `null` if this information has not been tracked yet.
