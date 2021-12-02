@@ -14,19 +14,25 @@
 import json
 import os
 import tempfile
+from typing import Any, Generator, List, cast
 from unittest.mock import Mock
 
 import yaml
 
 from twisted.internet import defer
+from twisted.internet.defer import Deferred
+from twisted.internet.testing import MemoryReactor
 
 from synapse.appservice import ApplicationService, ApplicationServiceState
 from synapse.config._base import ConfigError
+from synapse.events import EventBase
+from synapse.server import HomeServer
 from synapse.storage.database import DatabasePool, make_conn
 from synapse.storage.databases.main.appservice import (
     ApplicationServiceStore,
     ApplicationServiceTransactionStore,
 )
+from synapse.util import Clock
 
 from tests import unittest
 from tests.test_utils import make_awaitable
@@ -443,7 +449,9 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
         hs = self.setup_test_homeserver()
         return hs
 
-    def prepare(self, hs, reactor, clock):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         self.service = Mock(id="foo")
         self.store = self.hs.get_datastore()
         self.get_success(self.store.set_appservice_state(self.service, "up"))
