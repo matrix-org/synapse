@@ -183,10 +183,11 @@ class LoginTokenAttributes:
 
     user_id = attr.ib(type=str)
 
-    # the SSO Identity Provider that the user authenticated with, to get this token
     auth_provider_id = attr.ib(type=str)
+    """The SSO Identity Provider that the user authenticated with, to get this token."""
 
     oidc_sid = attr.ib(type=Optional[str])
+    """The OIDC session ID (sid) obtained from the ID token."""
 
 
 class AuthHandler:
