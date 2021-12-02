@@ -239,9 +239,7 @@ class BaseFederationServlet:
         self.ratelimiter = ratelimiter
         self.server_name = server_name
 
-    def _wrap(
-        self, func: Callable[..., Awaitable[Tuple[int, JsonDict]]]
-    ) -> ServletCallback:
+    def _wrap(self, func: Callable[..., Awaitable[Tuple[int, Any]]]) -> ServletCallback:
         authenticator = self.authenticator
         ratelimiter = self.ratelimiter
 
