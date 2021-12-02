@@ -149,6 +149,42 @@ class TransportLayerClient:
         )
 
     @log_function
+    async def timestamp_to_event(
+        self, destination: str, room_id: str, timestamp: int, direction: str
+    ) -> Union[JsonDict, List]:
+        """
+        Calls a remote federating server at `destination` asking for their
+        closest event to the given timestamp in the given direction.
+
+        Args:
+            destination: Domain name of the remote homeserver
+            room_id: Room to fetch the event from
+            timestamp: The point in time (inclusive) we should navigate from in
+                the given direction to find the closest event.
+            direction: ["f"|"b"] to indicate whether we should navigate forward
+                or backward from the given timestamp to find the closest event.
+
+        Returns:
+            Response dict received from the remote homeserver.
+
+        Raises:
+            Various exceptions when the request fails
+        """
+        path = _create_path(
+            FEDERATION_UNSTABLE_PREFIX,
+            "/org.matrix.msc3030/timestamp_to_event/%s",
+            room_id,
+        )
+
+        args = {"ts": [str(timestamp)], "dir": [direction]}
+
+        remote_response = await self.client.get_json(
+            destination, path=path, args=args, try_trailing_slash_on_400=True
+        )
+
+        return remote_response
+
+    @log_function
     async def send_transaction(
         self,
         transaction: Transaction,
