@@ -128,7 +128,7 @@ class FederationClient(FederationBase):
             reset_expiry_on_get=False,
         )
 
-    def _clear_tried_cache(self):
+    def _clear_tried_cache(self) -> None:
         """Clear pdu_destination_tried cache"""
         now = self._clock.time_msec()
 
@@ -800,7 +800,7 @@ class FederationClient(FederationBase):
                 no servers successfully handle the request.
         """
 
-        async def send_request(destination) -> SendJoinResult:
+        async def send_request(destination: str) -> SendJoinResult:
             response = await self._do_send_join(room_version, destination, pdu)
 
             # If an event was returned (and expected to be returned):
@@ -1516,6 +1516,83 @@ class FederationClient(FederationBase):
         # Cache the result to avoid fetching data over federation every time.
         self._get_room_hierarchy_cache[(room_id, suggested_only)] = result
         return result
+
+    async def timestamp_to_event(
+        self, destination: str, room_id: str, timestamp: int, direction: str
+    ) -> "TimestampToEventResponse":
+        """
+        Calls a remote federating server at `destination` asking for their
+        closest event to the given timestamp in the given direction. Also
+        validates the response to always return the expected keys or raises an
+        error.
+
+        Args:
+            destination: Domain name of the remote homeserver
+            room_id: Room to fetch the event from
+            timestamp: The point in time (inclusive) we should navigate from in
+                the given direction to find the closest event.
+            direction: ["f"|"b"] to indicate whether we should navigate forward
+                or backward from the given timestamp to find the closest event.
+
+        Returns:
+            A parsed TimestampToEventResponse including the closest event_id
+            and origin_server_ts
+
+        Raises:
+            Various exceptions when the request fails
+            InvalidResponseError when the response does not have the correct
+            keys or wrong types
+        """
+        remote_response = await self.transport_layer.timestamp_to_event(
+            destination, room_id, timestamp, direction
+        )
+
+        if not isinstance(remote_response, dict):
+            raise InvalidResponseError(
+                "Response must be a JSON dictionary but received %r" % remote_response
+            )
+
+        try:
+            return TimestampToEventResponse.from_json_dict(remote_response)
+        except ValueError as e:
+            raise InvalidResponseError(str(e))
+
+
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class TimestampToEventResponse:
+    """Typed response dictionary for the federation /timestamp_to_event endpoint"""
+
+    event_id: str
+    origin_server_ts: int
+
+    # the raw data, including the above keys
+    data: JsonDict
+
+    @classmethod
+    def from_json_dict(cls, d: JsonDict) -> "TimestampToEventResponse":
+        """Parsed response from the federation /timestamp_to_event endpoint
+
+        Args:
+            d: JSON object response to be parsed
+
+        Raises:
+            ValueError if d does not the correct keys or they are the wrong types
+        """
+
+        event_id = d.get("event_id")
+        if not isinstance(event_id, str):
+            raise ValueError(
+                "Invalid response: 'event_id' must be a str but received %r" % event_id
+            )
+
+        origin_server_ts = d.get("origin_server_ts")
+        if not isinstance(origin_server_ts, int):
+            raise ValueError(
+                "Invalid response: 'origin_server_ts' must be a int but received %r"
+                % origin_server_ts
+            )
+
+        return cls(event_id, origin_server_ts, d)
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)
