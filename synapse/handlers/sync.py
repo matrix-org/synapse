@@ -1506,9 +1506,11 @@ class SyncHandler:
             account_data_by_room: Dictionary of per room account data
 
         Returns:
-            Returns a 4-tuple of
-            `(newly_joined_rooms, newly_joined_or_invited_or_knocked_users,
-            newly_left_rooms, newly_left_users)`
+            Returns a 4-tuple whose entries are:
+            - newly_joined_rooms
+            - newly_joined_or_invited_or_knocked_users,
+            - newly_left_rooms
+            - newly_left_users
         """
         # Start by fetching all ephemeral events in rooms we've joined (if required).
         user_id = sync_result_builder.sync_config.user.to_string()
