@@ -287,12 +287,12 @@ class _TestStore:
 
     def __init__(self) -> None:
         # data for get_events: a map from event_id to event
-        self.events = {}
+        self.events: Dict[str, EventBase] = {}
 
         # data for get_state_ids_for_events mock: a map from event_id to
-        # a map from (type_state_key) -> event_id for the state at that
+        # a map from (type, state_key) -> event_id for the state at that
         # event
-        self.state_ids_for_events = {}
+        self.state_ids_for_events: Dict[str, Dict[Tuple[str, Optional[str]], str]] = {}
 
     def add_event(self, event) -> None:
         self.events[event.event_id] = event
