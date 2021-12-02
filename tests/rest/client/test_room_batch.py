@@ -1,24 +1,18 @@
 import logging
+from typing import List, Tuple
+from unittest.mock import Mock, patch
 
+from twisted.test.proto_helpers import MemoryReactor
+
+from synapse.api.constants import EventContentFields, EventTypes
+from synapse.appservice import ApplicationService
 from synapse.rest import admin
 from synapse.rest.client import login, register, room, room_batch
-from synapse.api.constants import (
-    EventContentFields,
-    EventTypes,
-)
-from synapse.appservice import ApplicationService
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
 
-from twisted.test.proto_helpers import MemoryReactor
-
-from typing import (
-    List,
-    Tuple,
-)
 from tests import unittest
-from unittest.mock import Mock, patch
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +73,7 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
             hostname="test",
             id="1234",
             namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
-            # Note: this user does not match the regex above, so that tests
-            # can distinguish the sender from the AS user.
+            # Note: this user does not have to match the regex above
             sender="@as_main:test",
         )
 
@@ -102,7 +95,7 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
             "as_user_potato", self.appservice.token
         )
 
-    def _create_test_room(self) -> Tuple[str, str, str]:
+    def _create_test_room(self) -> Tuple[str, str, str, str]:
         room_id = self.helper.create_room_as(
             self.appservice.sender, tok=self.appservice.token
         )
