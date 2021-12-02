@@ -416,9 +416,13 @@ class EventClientSerializer:
 
         # If MSC1849 is enabled then we need to look if there are any relations
         # we need to bundle in with the event.
-        # Do not bundle aggregations if the event has been redacted
-        if not event.internal_metadata.is_redacted() and (
-            self._msc1849_enabled and bundle_aggregations
+        # Do not bundle aggregations if the event has been redacted or if the event
+        # is a state event.
+        if (
+            self._msc1849_enabled
+            and bundle_aggregations
+            and not event.is_state()
+            and not event.internal_metadata.is_redacted()
         ):
             await self._injected_bundled_aggregations(event, time_now, serialized_event)
 

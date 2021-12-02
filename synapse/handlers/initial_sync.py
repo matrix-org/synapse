@@ -167,8 +167,6 @@ class InitialSyncHandler:
                 d["invite"] = await self._event_serializer.serialize_event(
                     invite_event,
                     time_now,
-                    # No need to bundle aggregations for state events.
-                    bundle_aggregations=False,
                     as_client_event=as_client_event,
                 )
 
