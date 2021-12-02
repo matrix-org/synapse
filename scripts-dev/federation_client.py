@@ -24,14 +24,14 @@ Some tips on doing the join dance with this:
     room_id=...
     user_id=...
 
-   # make_join
-   federation_client.py "/_matrix/federation/v1/make_join/$room_id/$user_id?ver=5" > make_join.json
+    # make_join
+    federation_client.py "/_matrix/federation/v1/make_join/$room_id/$user_id?ver=5" > make_join.json
 
-   # sign
-   jq -M .event make_join.json | sign_json --sign-event-room-version=$(jq -r .room_version make_join.json) -o signed-join.json
+    # sign
+    jq -M .event make_join.json | sign_json --sign-event-room-version=$(jq -r .room_version make_join.json) -o signed-join.json
 
-   # send_join
-   federation_client.py -X PUT "/_matrix/federation/v2/send_join/$room_id/x" --body $(<signed-join.json) > send_join.json
+    # send_join
+    federation_client.py -X PUT "/_matrix/federation/v2/send_join/$room_id/x" --body $(<signed-join.json) > send_join.json
 """
 
 import argparse
