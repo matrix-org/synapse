@@ -21,7 +21,7 @@ import yaml
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
-from twisted.internet.testing import MemoryReactor
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.appservice import ApplicationService, ApplicationServiceState
 from synapse.config._base import ConfigError
