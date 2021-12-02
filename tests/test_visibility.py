@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Optional
+from typing import Dict, List, Optional, Tuple, cast
 from unittest.mock import Mock
 
 from synapse.api.room_versions import RoomVersions
-from synapse.events import FrozenEvent
+from synapse.events import EventBase, FrozenEvent
+from synapse.storage import Storage
+from synapse.types import JsonDict
 from synapse.visibility import filter_events_for_server
 
 from tests import unittest
@@ -117,7 +119,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         for i in (1, 4):
             self.assertNotIn("body", filtered[i].content)
 
-    def _inject_visibility(self, user_id, visibility) -> EventBase:
+    def _inject_visibility(self, user_id: str, visibility: str) -> EventBase:
         content = {"history_visibility": visibility}
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
@@ -137,8 +139,11 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         return event
 
     def _inject_room_member(
-        self, user_id, membership="join", extra_content: Optional[dict] = None
-    ):
+        self,
+        user_id: str,
+        membership: str = "join",
+        extra_content: Optional[JsonDict] = None,
+    ) -> EventBase:
         content = {"membership": membership}
         content.update(extra_content or {})
         builder = self.event_builder_factory.for_room_version(
@@ -159,7 +164,9 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         self.get_success(self.storage.persistence.persist_event(event, context))
         return event
 
-    def _inject_message(self, user_id, content=None) -> EventBase:
+    def _inject_message(
+        self, user_id: str, content: Optional[JsonDict] = None
+    ) -> EventBase:
         if content is None:
             content = {"body": "testytest", "msgtype": "m.text"}
         builder = self.event_builder_factory.for_room_version(
@@ -297,12 +304,14 @@ class _TestStore:
     def add_event(self, event) -> None:
         self.events[event.event_id] = event
 
-    def set_state_ids_for_event(self, event, state) -> None:
+    def set_state_ids_for_event(
+        self, event: EventBase, state: Dict[Tuple[str, Optional[str]], str]
+    ) -> None:
         self.state_ids_for_events[event.event_id] = state
 
     def get_state_ids_for_events(
-        self, events, types
-    ) -> Dict[str, Dict[Tuple[str, str], str]]:
+        self, events: List[str], types: List[Tuple[str, Optional[str]]]
+    ) -> Dict[str, Dict[Tuple[str, Optional[str]], str]]:
         res = {}
         include_memberships = False
         for (type, state_key) in types:
@@ -327,8 +336,8 @@ class _TestStore:
 
         return res
 
-    def get_events(self, events) -> Dict[str, EventBase]:
+    def get_events(self, events: List[str]) -> Dict[str, EventBase]:
         return {event_id: self.events[event_id] for event_id in events}
 
-    def are_users_erased(self, users) -> Dict[str, bool]:
+    def are_users_erased(self, users: List[str]) -> Dict[str, bool]:
         return {u: False for u in users}
