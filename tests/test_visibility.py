@@ -186,6 +186,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         self.get_success(self.storage.persistence.persist_event(event, context))
         return event
 
+    # FIXME This test is broken!
     def test_large_room(self) -> None:
         # see what happens when we have a large room with hundreds of thousands
         # of membership events
@@ -213,7 +214,8 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
                 "state_key": "",
                 "room_id": TEST_ROOM_ID,
                 "content": {"history_visibility": "joined"},
-            }
+            },
+            room_version=RoomVersions.V1,
         )
         room_state.append(history_visibility_evt)
         test_store.add_event(history_visibility_evt)
@@ -228,12 +230,13 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
                     "sender": user,
                     "room_id": TEST_ROOM_ID,
                     "content": {"membership": "join", "extra": "zzz,"},
-                }
+                },
+                room_version=RoomVersions.V1,
             )
             room_state.append(evt)
             test_store.add_event(evt)
 
-        events_to_filter = []
+        events_to_filter: List[EventBase] = []
         for i in range(0, 10):
             user = "@user%i:%s" % (i, "test_server" if i == 5 else "other_server")
             evt = FrozenEvent(
@@ -244,7 +247,8 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
                     "sender": user,
                     "room_id": TEST_ROOM_ID,
                     "content": {"membership": "join", "extra": "zzz"},
-                }
+                },
+                room_version=RoomVersions.V1,
             )
             events_to_filter.append(evt)
             room_state.append(evt)
@@ -265,7 +269,9 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         storage.state = test_store
 
         filtered = self.get_success(
-            filter_events_for_server(test_store, "test_server", events_to_filter)
+            filter_events_for_server(
+                cast(Storage, test_store), "test_server", events_to_filter
+            )
         )
         logger.info("Filtering took %f seconds", time.time() - start)
 
@@ -283,7 +289,8 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
             self.assertEqual(events_to_filter[i].event_id, filtered[i].event_id)
             self.assertEqual(filtered[i].content["extra"], "zzz")
 
-    test_large_room.skip = "Disabled by default because it's slow"
+    # (Mypy is not happy about a function having a field, but we ignore it because it's fine here.)
+    test_large_room.skip = "Disabled by default because it's slow"  # type: ignore[attr-defined]
 
 
 class _TestStore:
