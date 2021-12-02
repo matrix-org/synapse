@@ -14,13 +14,12 @@
 import json
 import os
 import tempfile
-from typing import Any, Generator, List, Optional, cast
+from typing import List, Optional, cast
 from unittest.mock import Mock
 
 import yaml
 
 from twisted.internet import defer
-from twisted.internet.defer import Deferred
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.appservice import ApplicationService, ApplicationServiceState
@@ -39,16 +38,14 @@ from tests.test_utils import make_awaitable
 from tests.utils import setup_test_homeserver
 
 
-class ApplicationServiceStoreTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
+class ApplicationServiceStoreTestCase(unittest.HomeserverTestCase):
     def setUp(self):
-        self.as_yaml_files: List[str] = []
-        hs = yield setup_test_homeserver(
-            self.addCleanup, federation_sender=Mock(), federation_client=Mock()
-        )
+        super(ApplicationServiceStoreTestCase, self).setUp()
 
-        hs.config.appservice.app_service_config_files = self.as_yaml_files
-        hs.config.caches.event_cache_size = 1
+        self.as_yaml_files: List[str] = []
+
+        self.hs.config.appservice.app_service_config_files = self.as_yaml_files
+        self.hs.config.caches.event_cache_size = 1
 
         self.as_token = "token1"
         self.as_url = "some_url"
@@ -59,9 +56,11 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
         self._add_appservice("token2", "as2", "some_url", "some_hs_token", "bob")
         self._add_appservice("token3", "as3", "some_url", "some_hs_token", "bob")
         # must be done after inserts
-        database = hs.get_datastores().databases[0]
+        database = self.hs.get_datastores().databases[0]
         self.store = ApplicationServiceStore(
-            database, make_conn(database._database_config, database.engine, "test"), hs
+            database,
+            make_conn(database._database_config, database.engine, "test"),
+            self.hs,
         )
 
     def tearDown(self) -> None:
@@ -71,6 +70,8 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
                 os.remove(f)
             except Exception:
                 pass
+
+        super(ApplicationServiceStoreTestCase, self).tearDown()
 
     def _add_appservice(self, as_token, id, url, hs_token, sender) -> None:
         as_yaml = {
@@ -105,17 +106,13 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
         self.assertEquals(len(services), 3)
 
 
-class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
+class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
+    def setUp(self) -> None:
+        super(ApplicationServiceTransactionStoreTestCase, self).setUp()
         self.as_yaml_files: List[str] = []
 
-        hs = yield setup_test_homeserver(
-            self.addCleanup, federation_sender=Mock(), federation_client=Mock()
-        )
-
-        hs.config.appservice.app_service_config_files = self.as_yaml_files
-        hs.config.caches.event_cache_size = 1
+        self.hs.config.appservice.app_service_config_files = self.as_yaml_files
+        self.hs.config.caches.event_cache_size = 1
 
         self.as_list = [
             {"token": "token1", "url": "https://matrix-as.org", "id": "id_1"},
@@ -129,13 +126,13 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.as_yaml_files = []
 
         # We assume there is only one database in these tests
-        database = hs.get_datastores().databases[0]
+        database = self.hs.get_datastores().databases[0]
         self.db_pool = database._db_pool
         self.engine = database.engine
 
-        db_config = hs.config.database.get_single_database()
+        db_config = self.hs.config.database.get_single_database()
         self.store = TestTransactionStore(
-            database, make_conn(db_config, self.engine, "test"), hs
+            database, make_conn(db_config, self.engine, "test"), self.hs
         )
 
     def _add_service(self, url, as_token, id) -> None:
@@ -508,7 +505,7 @@ class TestTransactionStore(ApplicationServiceTransactionStore, ApplicationServic
         super().__init__(database, db_conn, hs)
 
 
-class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
+class ApplicationServiceStoreConfigTestCase(unittest.HomeserverTestCase):
     def _write_config(self, suffix, **kwargs) -> str:
         vals = {
             "id": "id" + suffix,
@@ -530,16 +527,14 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f1 = self._write_config(suffix="1")
         f2 = self._write_config(suffix="2")
 
-        hs = yield setup_test_homeserver(
-            self.addCleanup, federation_sender=Mock(), federation_client=Mock()
-        )
+        self.hs.config.appservice.app_service_config_files = [f1, f2]
+        self.hs.config.caches.event_cache_size = 1
 
-        hs.config.appservice.app_service_config_files = [f1, f2]
-        hs.config.caches.event_cache_size = 1
-
-        database = hs.get_datastores().databases[0]
+        database = self.hs.get_datastores().databases[0]
         ApplicationServiceStore(
-            database, make_conn(database._database_config, database.engine, "test"), hs
+            database,
+            make_conn(database._database_config, database.engine, "test"),
+            self.hs,
         )
 
     @defer.inlineCallbacks
@@ -547,19 +542,15 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f1 = self._write_config(id="id", suffix="1")
         f2 = self._write_config(id="id", suffix="2")
 
-        hs = yield setup_test_homeserver(
-            self.addCleanup, federation_sender=Mock(), federation_client=Mock()
-        )
-
-        hs.config.appservice.app_service_config_files = [f1, f2]
-        hs.config.caches.event_cache_size = 1
+        self.hs.config.appservice.app_service_config_files = [f1, f2]
+        self.hs.config.caches.event_cache_size = 1
 
         with self.assertRaises(ConfigError) as cm:
-            database = hs.get_datastores().databases[0]
+            database = self.hs.get_datastores().databases[0]
             ApplicationServiceStore(
                 database,
                 make_conn(database._database_config, database.engine, "test"),
-                hs,
+                self.hs,
             )
 
         e = cm.exception
@@ -572,19 +563,15 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f1 = self._write_config(as_token="as_token", suffix="1")
         f2 = self._write_config(as_token="as_token", suffix="2")
 
-        hs = yield setup_test_homeserver(
-            self.addCleanup, federation_sender=Mock(), federation_client=Mock()
-        )
-
-        hs.config.appservice.app_service_config_files = [f1, f2]
-        hs.config.caches.event_cache_size = 1
+        self.hs.config.appservice.app_service_config_files = [f1, f2]
+        self.hs.config.caches.event_cache_size = 1
 
         with self.assertRaises(ConfigError) as cm:
-            database = hs.get_datastores().databases[0]
+            database = self.hs.get_datastores().databases[0]
             ApplicationServiceStore(
                 database,
                 make_conn(database._database_config, database.engine, "test"),
-                hs,
+                self.hs,
             )
 
         e = cm.exception
