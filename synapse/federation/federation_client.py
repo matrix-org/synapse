@@ -1549,7 +1549,7 @@ class FederationClient(FederationBase):
 
         if not isinstance(remote_response, dict):
             raise InvalidResponseError(
-                "Response must be a JSON dictionary but received %s" % remote_response
+                "Response must be a JSON dictionary but received %r" % remote_response
             )
 
         try:
@@ -1582,13 +1582,13 @@ class TimestampToEventResponse:
         event_id = d.get("event_id")
         if not isinstance(event_id, str):
             raise ValueError(
-                "Invalid response: 'event_id' must be a str but received %s" % event_id
+                "Invalid response: 'event_id' must be a str but received %r" % event_id
             )
 
         origin_server_ts = d.get("origin_server_ts")
         if not isinstance(origin_server_ts, int):
             raise ValueError(
-                "Invalid response: 'origin_server_ts' must be a int but received %s"
+                "Invalid response: 'origin_server_ts' must be a int but received %r"
                 % origin_server_ts
             )
 
