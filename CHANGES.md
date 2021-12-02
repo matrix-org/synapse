@@ -102,6 +102,7 @@ Internal Changes
 - Remove dead code from supporting ACME. ([\#11393](https://github.com/matrix-org/synapse/issues/11393))
 - Refactor including the bundled relations when serializing an event. ([\#11408](https://github.com/matrix-org/synapse/issues/11408))
 
+
 Synapse 1.47.1 (2021-11-23)
 ===========================
 
