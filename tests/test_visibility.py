@@ -18,6 +18,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase
 from synapse.types import JsonDict
 from synapse.visibility import filter_events_for_server
+
 from tests import unittest
 from tests.utils import create_room
 
