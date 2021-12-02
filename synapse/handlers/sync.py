@@ -1924,6 +1924,10 @@ class SyncHandler:
     ) -> _RoomChanges:
         """Returns entries for all rooms for the user.
 
+        Like `_get_rooms_changed`, but assumes the `since_token` is `None`.
+
+        This function does not modify the sync_result_builder.
+
         Args:
             sync_result_builder
             ignored_users: Set of users ignored by user.
