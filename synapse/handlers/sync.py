@@ -344,7 +344,7 @@ class SyncHandler:
         - deciding if we should dispatch an instant or delayed response
         - marking the sync as being lazily loaded, if appropriate
 
-        Computing the body of the response beings in the next method,
+        Computing the body of the response begins in the next method,
         `current_sync_for_user`.
         """
         if since_token is None:

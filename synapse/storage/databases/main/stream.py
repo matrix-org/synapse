@@ -565,7 +565,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
     async def get_membership_changes_for_user(
         self, user_id: str, from_key: RoomStreamToken, to_key: RoomStreamToken
     ) -> List[EventBase]:
-        """Fetch membership membership events for a given user.
+        """Fetch membership events for a given user.
 
         All such events whose stream ordering lies in the range (from_key, to_key]
         are returned. Events are ordered by ascending stream order.
