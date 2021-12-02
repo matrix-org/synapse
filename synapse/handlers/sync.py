@@ -1708,11 +1708,11 @@ class SyncHandler:
         for event in membership_change_events:
             mem_change_events_by_room_id.setdefault(event.room_id, []).append(event)
 
-        newly_joined_rooms: List[str]
-        newly_left_rooms: List[str]
-        room_entries: List[RoomSyncResultBuilder]
-        invited: List[InvitedSyncResult]
-        knocked: List[KnockedSyncResult]
+        newly_joined_rooms: List[str] = []
+        newly_left_rooms: List[str] = []
+        room_entries: List[RoomSyncResultBuilder] = []
+        invited: List[InvitedSyncResult] = []
+        knocked: List[KnockedSyncResult] = []
         for room_id, events in mem_change_events_by_room_id.items():
             # The body of this loop will add this room to at least one of the five lists
             # above. Things get messy if you've e.g. joined, left, joined then left the
