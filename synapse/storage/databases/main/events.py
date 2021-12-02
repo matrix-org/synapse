@@ -575,9 +575,9 @@ class PersistEventsStore:
         # fetch their auth event info.
         while missing_auth_chains:
             sql = """
-                SELECT event_id, events.type, state_key, chain_id, sequence_number
+                SELECT event_id, events.type, se.state_key, chain_id, sequence_number
                 FROM events
-                INNER JOIN state_events USING (event_id)
+                INNER JOIN state_events se USING (event_id)
                 LEFT JOIN event_auth_chains USING (event_id)
                 WHERE
             """
