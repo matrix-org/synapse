@@ -28,7 +28,7 @@ TEST_ROOM_ID = "!TEST:ROOM"
 
 
 class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super(FilterEventsForServerTestCase, self).setUp()
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
@@ -36,7 +36,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
 
         self.get_success(create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM"))
 
-    def test_filtering(self):
+    def test_filtering(self) -> None:
         #
         # The events to be filtered consist of 10 membership events (it doesn't
         # really matter if they are joins or leaves, so let's make them joins).
@@ -46,16 +46,16 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         #
 
         # before we do that, we persist some other events to act as state.
-        self.get_success(self.inject_visibility("@admin:hs", "joined"))
+        self.get_success(self._inject_visibility("@admin:hs", "joined"))
         for i in range(0, 10):
-            self.get_success(self.inject_room_member("@resident%i:hs" % i))
+            self.get_success(self._inject_room_member("@resident%i:hs" % i))
 
         events_to_filter = []
 
         for i in range(0, 10):
             user = "@user%i:%s" % (i, "test_server" if i == 5 else "other_server")
             evt = self.get_success(
-                self.inject_room_member(user, extra_content={"a": "b"})
+                self._inject_room_member(user, extra_content={"a": "b"})
             )
             events_to_filter.append(evt)
 
@@ -72,24 +72,24 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
             self.assertEqual(events_to_filter[i].event_id, filtered[i].event_id)
             self.assertEqual(filtered[i].content["a"], "b")
 
-    def test_erased_user(self):
+    def test_erased_user(self) -> None:
         # 4 message events, from erased and unerased users, with a membership
         # change in the middle of them.
         events_to_filter = []
 
-        evt = self.get_success(self.inject_message("@unerased:local_hs"))
+        evt = self.get_success(self._inject_message("@unerased:local_hs"))
         events_to_filter.append(evt)
 
-        evt = self.get_success(self.inject_message("@erased:local_hs"))
+        evt = self.get_success(self._inject_message("@erased:local_hs"))
         events_to_filter.append(evt)
 
-        evt = self.get_success(self.inject_room_member("@joiner:remote_hs"))
+        evt = self.get_success(self._inject_room_member("@joiner:remote_hs"))
         events_to_filter.append(evt)
 
-        evt = self.get_success(self.inject_message("@unerased:local_hs"))
+        evt = self.get_success(self._inject_message("@unerased:local_hs"))
         events_to_filter.append(evt)
 
-        evt = self.get_success(self.inject_message("@erased:local_hs"))
+        evt = self.get_success(self._inject_message("@erased:local_hs"))
         events_to_filter.append(evt)
 
         # the erasey user gets erased
@@ -117,7 +117,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         for i in (1, 4):
             self.assertNotIn("body", filtered[i].content)
 
-    def inject_visibility(self, user_id, visibility):
+    def _inject_visibility(self, user_id, visibility) -> EventBase:
         content = {"history_visibility": visibility}
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
@@ -136,7 +136,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         self.get_success(self.storage.persistence.persist_event(event, context))
         return event
 
-    def inject_room_member(
+    def _inject_room_member(
         self, user_id, membership="join", extra_content: Optional[dict] = None
     ):
         content = {"membership": membership}
@@ -159,7 +159,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         self.get_success(self.storage.persistence.persist_event(event, context))
         return event
 
-    def inject_message(self, user_id, content=None):
+    def _inject_message(self, user_id, content=None) -> EventBase:
         if content is None:
             content = {"body": "testytest", "msgtype": "m.text"}
         builder = self.event_builder_factory.for_room_version(
@@ -179,7 +179,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         self.get_success(self.storage.persistence.persist_event(event, context))
         return event
 
-    def test_large_room(self):
+    def test_large_room(self) -> None:
         # see what happens when we have a large room with hundreds of thousands
         # of membership events
 
@@ -285,7 +285,7 @@ class _TestStore:
 
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # data for get_events: a map from event_id to event
         self.events = {}
 
@@ -294,13 +294,15 @@ class _TestStore:
         # event
         self.state_ids_for_events = {}
 
-    def add_event(self, event):
+    def add_event(self, event) -> None:
         self.events[event.event_id] = event
 
-    def set_state_ids_for_event(self, event, state):
+    def set_state_ids_for_event(self, event, state) -> None:
         self.state_ids_for_events[event.event_id] = state
 
-    def get_state_ids_for_events(self, events, types):
+    def get_state_ids_for_events(
+        self, events, types
+    ) -> Dict[str, Dict[Tuple[str, str], str]]:
         res = {}
         include_memberships = False
         for (type, state_key) in types:
@@ -325,8 +327,8 @@ class _TestStore:
 
         return res
 
-    def get_events(self, events):
+    def get_events(self, events) -> Dict[str, EventBase]:
         return {event_id: self.events[event_id] for event_id in events}
 
-    def are_users_erased(self, users):
+    def are_users_erased(self, users) -> Dict[str, bool]:
         return {u: False for u in users}
