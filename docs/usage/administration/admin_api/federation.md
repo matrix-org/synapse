@@ -79,3 +79,30 @@ The following fields are returned in the JSON response body:
     to this destination or `null` if this information has not been tracked yet.
 - `next_token`: string representing a positive integer - Indication for pagination. See above.
 - `total` - integer - Total number of destinations.
+
+# Destination Details API
+
+This API gets the retry timing info for a specific remote server.
+
+The API is:
+
+```
+GET /_synapse/admin/v1/federation/destinations/<destination>
+```
+
+A response body like the following is returned:
+
+```json
+{
+   "destination": "matrix.org",
+   "retry_last_ts": 1557332397936,
+   "retry_interval": 3000000,
+   "failure_ts": 1557329397936,
+   "last_successful_stream_ordering": null
+}
+```
+
+**Response**
+
+The response fields are the same like in the `destinations` array in
+[List of destinations](#list-of-destinations) response.

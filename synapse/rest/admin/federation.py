@@ -15,7 +15,7 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class FederationDestinationRestServlet(RestServlet):
+class ListDestinationsRestServlet(RestServlet):
     """Get request to list all destinations.
     This needs user to have administrator access in Synapse.
 
@@ -86,5 +86,50 @@ class FederationDestinationRestServlet(RestServlet):
         response = {"destinations": destinations, "total": total}
         if (start + limit) < total:
             response["next_token"] = str(start + len(destinations))
+
+        return HTTPStatus.OK, response
+
+
+class DestinationsRestServlet(RestServlet):
+    """Get details of a destination.
+    This needs user to have administrator access in Synapse.
+
+    GET /_synapse/admin/v1/federation/destinations/<destination>
+
+    returns:
+        200 OK with details of a destination if success otherwise an error.
+    """
+
+    PATTERNS = admin_patterns("/federation/destinations/(?P<destination>[^/]+)$")
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastore()
+
+    async def on_GET(
+        self, request: SynapseRequest, destination: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self._auth, request)
+
+        destination_retry_timings = await self._store.get_destination_retry_timings(
+            destination
+        )
+
+        if not destination_retry_timings:
+            raise NotFoundError("Unknown destination")
+
+        last_successful_stream_ordering = (
+            await self._store.get_destination_last_successful_stream_ordering(
+                destination
+            )
+        )
+
+        response = {
+            "destination": destination,
+            "failure_ts": destination_retry_timings.failure_ts,
+            "retry_last_ts": destination_retry_timings.retry_last_ts,
+            "retry_interval": destination_retry_timings.retry_interval,
+            "last_successful_stream_ordering": last_successful_stream_ordering,
+        }
 
         return HTTPStatus.OK, response
