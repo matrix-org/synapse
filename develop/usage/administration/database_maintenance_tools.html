@@ -186,26 +186,14 @@
 <h1 id="list-of-useful-tools-and-scripts-for-maintenance-synapse-database"><a class="header" href="#list-of-useful-tools-and-scripts-for-maintenance-synapse-database">List of useful tools and scripts for maintenance Synapse database:</a></h1>
 <h2 id="a-hrefadmin_apimedia_admin_apihtmlpurge-remote-media-apipurge-remote-media-apia"><a class="header" href="#a-hrefadmin_apimedia_admin_apihtmlpurge-remote-media-apipurge-remote-media-apia"><a href="../../admin_api/media_admin_api.html#purge-remote-media-api">Purge Remote Media API</a></a></h2>
 <p>The purge remote media API allows server admins to purge old cached remote media.</p>
-<h4 id="purge-local-media"><a class="header" href="#purge-local-media">Purge local media</a></h4>
-<p>There is no purge API for local media because you may be the only one with a copy. If you are sure you want to delete local media you could use something like the following to delete media that hasn't been accessed in a while.</p>
-<pre><code>find /path/to/synapse/media_store/local_content -atime +365 -delete
-find /path/to/synapse/media_store/local_thumbnails -atime +365 -delete
-</code></pre>
-<p>This will delete media that hasn't been accessed in 365 days.</p>
-<p><strong>Warning, check noatime flag</strong>: You also have to double-check that the filesystem where synapse's media store don't have <a href="https://unix.stackexchange.com/questions/219015/how-to-disable-access-time-settings-in-debian-linux/219017#219017">noatime flag</a>. Check it with <code>mount</code>, <code>noatime</code> is something that is usually enabled by default to reduce read-write operations in the filesystem for a feature is not so demanded.</p>
+<h2 id="a-hrefadmin_apimedia_admin_apihtmldelete-local-mediapurge-local-media-apia"><a class="header" href="#a-hrefadmin_apimedia_admin_apihtmldelete-local-mediapurge-local-media-apia"><a href="../../admin_api/media_admin_api.html#delete-local-media">Purge Local Media API</a></a></h2>
+<p>This API deletes the <em>local</em> media from the disk of your own server.</p>
 <h2 id="a-hrefadmin_apipurge_history_apihtmlpurge-history-apia"><a class="header" href="#a-hrefadmin_apipurge_history_apihtmlpurge-history-apia"><a href="../../admin_api/purge_history_api.html">Purge History API</a></a></h2>
 <p>The purge history API allows server admins to purge historic events from their database, reclaiming disk space.</p>
-<h2 id="a-hrefhttpsgithubcomxwiki-labssynapse_scriptssynapse_janitorsqla"><a class="header" href="#a-hrefhttpsgithubcomxwiki-labssynapse_scriptssynapse_janitorsqla"><a href="https://github.com/xwiki-labs/synapse_scripts">synapse_janitor.sql</a></a></h2>
-<ul>
-<li>this project is <a href="https://github.com/xwiki-labs/synapse_scripts#unmaintained-and-dangerous">unmantained and dangerous</a></li>
-<li>USE WITH CAUTION. It may cause database corruption (see https://github.com/matrix-org/synapse/issues/7305 for example).</li>
-<li><a href="https://github.com/xwiki-labs/synapse_scripts/pull/12#issuecomment-617275345">&quot;Our team hasn't used any of these scripts for some time (possibly years) (...) if anyone wants to volunteer to maintain this repo I'd be happy to transfer ownership.</a> </li>
-</ul>
-<p>Cleans a synapse Postgres database of deleted messages and abandoned rooms.</p>
 <h2 id="a-hrefhttpsgithubcommatrix-orgrust-synapse-compress-statesynapse-compress-statea"><a class="header" href="#a-hrefhttpsgithubcommatrix-orgrust-synapse-compress-statesynapse-compress-statea"><a href="https://github.com/matrix-org/rust-synapse-compress-state">synapse-compress-state</a></a></h2>
 <p>Tool for compressing (deduplicating) <code>state_groups_state</code> table.</p>
-<h2 id="a-hrefhttpsgithubcommatrix-orgsynapsewikisql-for-analyzing-synapse-postgresql-database-statssql-for-analyzing-synapse-postgresql-database-statsa"><a class="header" href="#a-hrefhttpsgithubcommatrix-orgsynapsewikisql-for-analyzing-synapse-postgresql-database-statssql-for-analyzing-synapse-postgresql-database-statsa"><a href="https://github.com/matrix-org/synapse/wiki/SQL-for-analyzing-Synapse-PostgreSQL-database-stats">SQL for analyzing Synapse PostgreSQL database stats</a></a></h2>
-<p>Some easy SQL that reports useful stat about Matrix Synapse database.</p>
+<h2 id="a-hrefuseful_sql_for_adminshtmlsql-for-analyzing-synapse-postgresql-database-statsa"><a class="header" href="#a-hrefuseful_sql_for_adminshtmlsql-for-analyzing-synapse-postgresql-database-statsa"><a href="useful_sql_for_admins.html">SQL for analyzing Synapse PostgreSQL database stats</a></a></h2>
+<p>Some easy SQL that reports useful stats about your Synapse database.</p>
 
                     </main>
 

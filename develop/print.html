@@ -12199,7 +12199,13 @@ renamed.</p>
 <tr><td>python_twisted_reactor_tick_time</td><td>reactor_tick_time</td></tr>
 </tbody></table>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h2 id="understanding-synapse-through-grafana-graphs"><a class="header" href="#understanding-synapse-through-grafana-graphs">Understanding Synapse through Grafana graphs</a></h2>
-<p>It is possible monitor much of the internal state of Synapse using <a href="https://prometheus.io">Prometheus</a> metrics and <a href="https://grafana.com/">Grafana</a>. A guide for configuring Synapse to provide metrics is available <a href="usage/administration/../../metrics-howto.html">here</a> and information on setting up Grafana is <a href="https://github.com/matrix-org/synapse/tree/master/contrib/grafana">here</a>. In this setup, Prometheus will periodically scrape the information Synapse provides and store a record of it over time. Grafana is then used as an interface to query and present this information through a series of pretty graphs.</p>
+<p>It is possible to monitor much of the internal state of Synapse using <a href="https://prometheus.io">Prometheus</a> 
+metrics and <a href="https://grafana.com/">Grafana</a>. 
+A guide for configuring Synapse to provide metrics is available <a href="usage/administration/../../metrics-howto.html">here</a> 
+and information on setting up Grafana is <a href="https://github.com/matrix-org/synapse/tree/master/contrib/grafana">here</a>.
+In this setup, Prometheus will periodically scrape the information Synapse provides and
+store a record of it over time. Grafana is then used as an interface to query and
+present this information through a series of pretty graphs.</p>
 <p>Once you have grafana set up, and assuming you're using <a href="https://github.com/matrix-org/synapse/blob/master/contrib/grafana/synapse.json">our grafana dashboard template</a>, look for the following graphs when debugging a slow/overloaded Synapse:</p>
 <h2 id="message-event-send-time"><a class="header" href="#message-event-send-time">Message Event Send Time</a></h2>
 <p><img src="https://user-images.githubusercontent.com/1342360/82239409-a1c8e900-9930-11ea-8081-e4614e0c63f4.png" alt="image" /></p>
@@ -12230,13 +12236,18 @@ renamed.</p>
 <p>we should probably consider raising the size of that cache by raising its cache factor (a multiplier value for the size of an individual cache). Information on doing so is available <a href="https://github.com/matrix-org/synapse/blob/ee421e524478c1ad8d43741c27379499c2f6135c/docs/sample_config.yaml#L608-L642">here</a> (note that the configuration of individual cache factors through the configuration file is available in Synapse v1.14.0+, whereas doing so through environment variables has been supported for a very long time). Note that this will increase Synapse's overall memory usage.</p>
 <h2 id="forward-extremities"><a class="header" href="#forward-extremities">Forward Extremities</a></h2>
 <p><img src="https://user-images.githubusercontent.com/1342360/82241440-13566680-9934-11ea-8b88-ba468db937ed.png" alt="image" /></p>
-<p>Forward extremities are the leaf events at the end of a DAG in a room, aka events that have no children. The more exist in a room, the more <a href="https://matrix.org/docs/spec/server_server/r0.1.3#room-state-resolution">state resolution</a> that Synapse needs to perform (hint: it's an expensive operation). While Synapse has code to prevent too many of these existing at one time in a room, bugs can sometimes make them crop up again.</p>
+<p>Forward extremities are the leaf events at the end of a DAG in a room, aka events that have no children. The more that exist in a room, the more <a href="https://spec.matrix.org/v1.1/server-server-api/#room-state-resolution">state resolution</a> that Synapse needs to perform (hint: it's an expensive operation). While Synapse has code to prevent too many of these existing at one time in a room, bugs can sometimes make them crop up again.</p>
 <p>If a room has &gt;10 forward extremities, it's worth checking which room is the culprit and potentially removing them using the SQL queries mentioned in <a href="https://github.com/matrix-org/synapse/issues/1760">#1760</a>.</p>
 <h2 id="garbage-collection"><a class="header" href="#garbage-collection">Garbage Collection</a></h2>
 <p><img src="https://user-images.githubusercontent.com/1342360/82241911-da6ac180-9934-11ea-9a0d-a311fe22acd0.png" alt="image" /></p>
-<p>Large spikes in garbage collection times (bigger than shown here, I'm talking in the multiple seconds range), can cause lots of problems in Synapse performance. It's more an indicator of problems, and a symptom of other problems though, so check other graphs for what might be causing it.</p>
+<p>Large spikes in garbage collection times (bigger than shown here, I'm talking in the 
+multiple seconds range), can cause lots of problems in Synapse performance. It's more an 
+indicator of problems, and a symptom of other problems though, so check other graphs for what might be causing it.</p>
 <h2 id="final-thoughts"><a class="header" href="#final-thoughts">Final Thoughts</a></h2>
-<p>If you're still having performance problems with your Synapse instance and you've tried everything you can, it may just be a lack of system resources. Consider adding more CPU and RAM, and make use of <a href="usage/administration/../../workers.html">worker mode</a> to make use of multiple CPU cores / multiple machines for your homeserver.</p>
+<p>If you're still having performance problems with your Synapse instance and you've 
+tried everything you can, it may just be a lack of system resources. Consider adding
+more CPU and RAM, and make use of <a href="usage/administration/../../workers.html">worker mode</a> 
+to make use of multiple CPU cores / multiple machines for your homeserver.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h2 id="some-useful-sql-queries-for-synapse-admins"><a class="header" href="#some-useful-sql-queries-for-synapse-admins">Some useful SQL queries for Synapse Admins</a></h2>
 <h2 id="size-of-full-matrix-db"><a class="header" href="#size-of-full-matrix-db">Size of full matrix db</a></h2>
 <p><code>SELECT pg_size_pretty( pg_database_size( 'matrix' ) );</code></p>
@@ -12375,26 +12386,14 @@ WHERE room_id IN (WHERE room_id IN (
 <h1 id="list-of-useful-tools-and-scripts-for-maintenance-synapse-database"><a class="header" href="#list-of-useful-tools-and-scripts-for-maintenance-synapse-database">List of useful tools and scripts for maintenance Synapse database:</a></h1>
 <h2 id="a-hrefusageadministrationadmin_apimedia_admin_apihtmlpurge-remote-media-apipurge-remote-media-apia"><a class="header" href="#a-hrefusageadministrationadmin_apimedia_admin_apihtmlpurge-remote-media-apipurge-remote-media-apia"><a href="usage/administration/../../admin_api/media_admin_api.html#purge-remote-media-api">Purge Remote Media API</a></a></h2>
 <p>The purge remote media API allows server admins to purge old cached remote media.</p>
-<h4 id="purge-local-media"><a class="header" href="#purge-local-media">Purge local media</a></h4>
-<p>There is no purge API for local media because you may be the only one with a copy. If you are sure you want to delete local media you could use something like the following to delete media that hasn't been accessed in a while.</p>
-<pre><code>find /path/to/synapse/media_store/local_content -atime +365 -delete
-find /path/to/synapse/media_store/local_thumbnails -atime +365 -delete
-</code></pre>
-<p>This will delete media that hasn't been accessed in 365 days.</p>
-<p><strong>Warning, check noatime flag</strong>: You also have to double-check that the filesystem where synapse's media store don't have <a href="https://unix.stackexchange.com/questions/219015/how-to-disable-access-time-settings-in-debian-linux/219017#219017">noatime flag</a>. Check it with <code>mount</code>, <code>noatime</code> is something that is usually enabled by default to reduce read-write operations in the filesystem for a feature is not so demanded.</p>
+<h2 id="a-hrefusageadministrationadmin_apimedia_admin_apihtmldelete-local-mediapurge-local-media-apia"><a class="header" href="#a-hrefusageadministrationadmin_apimedia_admin_apihtmldelete-local-mediapurge-local-media-apia"><a href="usage/administration/../../admin_api/media_admin_api.html#delete-local-media">Purge Local Media API</a></a></h2>
+<p>This API deletes the <em>local</em> media from the disk of your own server.</p>
 <h2 id="a-hrefusageadministrationadmin_apipurge_history_apihtmlpurge-history-apia"><a class="header" href="#a-hrefusageadministrationadmin_apipurge_history_apihtmlpurge-history-apia"><a href="usage/administration/../../admin_api/purge_history_api.html">Purge History API</a></a></h2>
 <p>The purge history API allows server admins to purge historic events from their database, reclaiming disk space.</p>
-<h2 id="a-hrefhttpsgithubcomxwiki-labssynapse_scriptssynapse_janitorsqla"><a class="header" href="#a-hrefhttpsgithubcomxwiki-labssynapse_scriptssynapse_janitorsqla"><a href="https://github.com/xwiki-labs/synapse_scripts">synapse_janitor.sql</a></a></h2>
-<ul>
-<li>this project is <a href="https://github.com/xwiki-labs/synapse_scripts#unmaintained-and-dangerous">unmantained and dangerous</a></li>
-<li>USE WITH CAUTION. It may cause database corruption (see https://github.com/matrix-org/synapse/issues/7305 for example).</li>
-<li><a href="https://github.com/xwiki-labs/synapse_scripts/pull/12#issuecomment-617275345">&quot;Our team hasn't used any of these scripts for some time (possibly years) (...) if anyone wants to volunteer to maintain this repo I'd be happy to transfer ownership.</a> </li>
-</ul>
-<p>Cleans a synapse Postgres database of deleted messages and abandoned rooms.</p>
 <h2 id="a-hrefhttpsgithubcommatrix-orgrust-synapse-compress-statesynapse-compress-statea"><a class="header" href="#a-hrefhttpsgithubcommatrix-orgrust-synapse-compress-statesynapse-compress-statea"><a href="https://github.com/matrix-org/rust-synapse-compress-state">synapse-compress-state</a></a></h2>
 <p>Tool for compressing (deduplicating) <code>state_groups_state</code> table.</p>
-<h2 id="a-hrefhttpsgithubcommatrix-orgsynapsewikisql-for-analyzing-synapse-postgresql-database-statssql-for-analyzing-synapse-postgresql-database-statsa"><a class="header" href="#a-hrefhttpsgithubcommatrix-orgsynapsewikisql-for-analyzing-synapse-postgresql-database-statssql-for-analyzing-synapse-postgresql-database-statsa"><a href="https://github.com/matrix-org/synapse/wiki/SQL-for-analyzing-Synapse-PostgreSQL-database-stats">SQL for analyzing Synapse PostgreSQL database stats</a></a></h2>
-<p>Some easy SQL that reports useful stat about Matrix Synapse database.</p>
+<h2 id="a-hrefusageadministrationuseful_sql_for_adminshtmlsql-for-analyzing-synapse-postgresql-database-statsa"><a class="header" href="#a-hrefusageadministrationuseful_sql_for_adminshtmlsql-for-analyzing-synapse-postgresql-database-statsa"><a href="usage/administration/useful_sql_for_admins.html">SQL for analyzing Synapse PostgreSQL database stats</a></a></h2>
+<p>Some easy SQL that reports useful stats about your Synapse database.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="how-do-state-groups-work"><a class="header" href="#how-do-state-groups-work">How do State Groups work?</a></h1>
 <p>As a general rule, I encourage people who want to understand the deepest darkest secrets of the database schema to drop by #synapse-dev:matrix.org and ask questions.</p>
 <p>However, one question that comes up frequently is that of how &quot;state groups&quot; work, and why the <code>state_groups_state</code> table gets so big, so here's an attempt to answer that question.</p>
@@ -12447,21 +12446,21 @@ small processing times.</p>
 <h2 id="how-do-i-become-a-server-admin"><a class="header" href="#how-do-i-become-a-server-admin">How do I become a server admin?</a></h2>
 <p>If your server already has an admin account you should use the user admin API to promote other accounts to become admins. See <a href="usage/administration/../../admin_api/user_admin_api.html#Change-whether-a-user-is-a-server-administrator-or-not">User Admin API</a></p>
 <p>If you don't have any admin accounts yet you won't be able to use the admin API so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account, use the admin APIs to make further changes.</p>
-<pre><code>UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
+<pre><code class="language-sql">UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 </code></pre>
 <h2 id="what-servers-are-my-server-talking-to"><a class="header" href="#what-servers-are-my-server-talking-to">What servers are my server talking to?</a></h2>
 <p>Run this sql query on your db:</p>
-<pre><code>SELECT * FROM destinations;
+<pre><code class="language-sql">SELECT * FROM destinations;
 </code></pre>
 <h2 id="what-servers-are-currently-participating-in-this-room"><a class="header" href="#what-servers-are-currently-participating-in-this-room">What servers are currently participating in this room?</a></h2>
 <p>Run this sql query on your db:</p>
-<pre><code>SELECT DISTINCT split_part(state_key, ':', 2)
+<pre><code class="language-sql">SELECT DISTINCT split_part(state_key, ':', 2)
     FROM current_state_events AS c
     INNER JOIN room_memberships AS m USING (room_id, event_id)
     WHERE room_id = '!cURbafjkfsMDVwdRDQ:matrix.org' AND membership = 'join';
 </code></pre>
 <h2 id="what-users-are-registered-on-my-server"><a class="header" href="#what-users-are-registered-on-my-server">What users are registered on my server?</a></h2>
-<pre><code>SELECT NAME from users;
+<pre><code class="language-sql">SELECT NAME from users;
 </code></pre>
 <h2 id="manually-resetting-passwords"><a class="header" href="#manually-resetting-passwords">Manually resetting passwords:</a></h2>
 <p>See https://github.com/matrix-org/synapse/blob/master/README.rst#password-reset</p>
@@ -12480,9 +12479,9 @@ small processing times.</p>
 <p>Using the following curl command:</p>
 <pre><code>curl -H 'Authorization: Bearer &lt;access-token&gt;' -X DELETE https://matrix.org/_matrix/client/r0/directory/room/&lt;room-alias&gt;
 </code></pre>
-<p>&lt;access-token&gt; - can be obtained in riot by looking in the riot settings, down the bottom is:
+<p><code>&lt;access-token&gt;</code> - can be obtained in riot by looking in the riot settings, down the bottom is:
 Access Token:&lt;click to reveal&gt; </p>
-<p>&lt;room-alias&gt; - the room alias, eg. #my_room:matrix.org this possibly needs to be URL encoded also, for example  %23my_room%3Amatrix.org</p>
+<p><code>&lt;room-alias&gt;</code> - the room alias, eg. #my_room:matrix.org this possibly needs to be URL encoded also, for example  %23my_room%3Amatrix.org</p>
 <h2 id="how-can-i-find-the-lines-corresponding-to-a-given-http-request-in-my-homeserver-log"><a class="header" href="#how-can-i-find-the-lines-corresponding-to-a-given-http-request-in-my-homeserver-log">How can I find the lines corresponding to a given HTTP request in my homeserver log?</a></h2>
 <p>Synapse tags each log line according to the HTTP request it is processing. When it finishes processing each request, it logs a line containing the words <code>Processed request: </code>. For example:</p>
 <pre><code>2019-02-14 22:35:08,196 - synapse.access.http.8008 - 302 - INFO - GET-37 - ::1 - 8008 - {@richvdh:localhost} Processed request: 0.173sec/0.001sec (0.002sec, 0.000sec) (0.027sec/0.026sec/2) 687B 200 &quot;GET /_matrix/client/r0/sync HTTP/1.1&quot; &quot;Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36&quot; [0 dbevts]&quot;
@@ -12503,6 +12502,8 @@ GROUP BY s.canonical_alias, g.room_id
 ORDER BY num_rows desc 
 LIMIT 10;
 </code></pre>
+<p>You can also use the <a href="usage/administration/../../admin_api/rooms.html#list-room-api">List Room API</a>
+and <code>order_by</code> <code>state_events</code>.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="contributing"><a class="header" href="#contributing">Contributing</a></h1>
 <p>This document aims to get you started with contributing to Synapse!</p>
 <h1 id="1-who-can-contribute-to-synapse"><a class="header" href="#1-who-can-contribute-to-synapse">1. Who can contribute to Synapse?</a></h1>

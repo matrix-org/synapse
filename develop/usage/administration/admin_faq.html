@@ -186,21 +186,21 @@
 <h2 id="how-do-i-become-a-server-admin"><a class="header" href="#how-do-i-become-a-server-admin">How do I become a server admin?</a></h2>
 <p>If your server already has an admin account you should use the user admin API to promote other accounts to become admins. See <a href="../../admin_api/user_admin_api.html#Change-whether-a-user-is-a-server-administrator-or-not">User Admin API</a></p>
 <p>If you don't have any admin accounts yet you won't be able to use the admin API so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account, use the admin APIs to make further changes.</p>
-<pre><code>UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
+<pre><code class="language-sql">UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 </code></pre>
 <h2 id="what-servers-are-my-server-talking-to"><a class="header" href="#what-servers-are-my-server-talking-to">What servers are my server talking to?</a></h2>
 <p>Run this sql query on your db:</p>
-<pre><code>SELECT * FROM destinations;
+<pre><code class="language-sql">SELECT * FROM destinations;
 </code></pre>
 <h2 id="what-servers-are-currently-participating-in-this-room"><a class="header" href="#what-servers-are-currently-participating-in-this-room">What servers are currently participating in this room?</a></h2>
 <p>Run this sql query on your db:</p>
-<pre><code>SELECT DISTINCT split_part(state_key, ':', 2)
+<pre><code class="language-sql">SELECT DISTINCT split_part(state_key, ':', 2)
     FROM current_state_events AS c
     INNER JOIN room_memberships AS m USING (room_id, event_id)
     WHERE room_id = '!cURbafjkfsMDVwdRDQ:matrix.org' AND membership = 'join';
 </code></pre>
 <h2 id="what-users-are-registered-on-my-server"><a class="header" href="#what-users-are-registered-on-my-server">What users are registered on my server?</a></h2>
-<pre><code>SELECT NAME from users;
+<pre><code class="language-sql">SELECT NAME from users;
 </code></pre>
 <h2 id="manually-resetting-passwords"><a class="header" href="#manually-resetting-passwords">Manually resetting passwords:</a></h2>
 <p>See https://github.com/matrix-org/synapse/blob/master/README.rst#password-reset</p>
@@ -219,9 +219,9 @@
 <p>Using the following curl command:</p>
 <pre><code>curl -H 'Authorization: Bearer &lt;access-token&gt;' -X DELETE https://matrix.org/_matrix/client/r0/directory/room/&lt;room-alias&gt;
 </code></pre>
-<p>&lt;access-token&gt; - can be obtained in riot by looking in the riot settings, down the bottom is:
+<p><code>&lt;access-token&gt;</code> - can be obtained in riot by looking in the riot settings, down the bottom is:
 Access Token:&lt;click to reveal&gt; </p>
-<p>&lt;room-alias&gt; - the room alias, eg. #my_room:matrix.org this possibly needs to be URL encoded also, for example  %23my_room%3Amatrix.org</p>
+<p><code>&lt;room-alias&gt;</code> - the room alias, eg. #my_room:matrix.org this possibly needs to be URL encoded also, for example  %23my_room%3Amatrix.org</p>
 <h2 id="how-can-i-find-the-lines-corresponding-to-a-given-http-request-in-my-homeserver-log"><a class="header" href="#how-can-i-find-the-lines-corresponding-to-a-given-http-request-in-my-homeserver-log">How can I find the lines corresponding to a given HTTP request in my homeserver log?</a></h2>
 <p>Synapse tags each log line according to the HTTP request it is processing. When it finishes processing each request, it logs a line containing the words <code>Processed request: </code>. For example:</p>
 <pre><code>2019-02-14 22:35:08,196 - synapse.access.http.8008 - 302 - INFO - GET-37 - ::1 - 8008 - {@richvdh:localhost} Processed request: 0.173sec/0.001sec (0.002sec, 0.000sec) (0.027sec/0.026sec/2) 687B 200 &quot;GET /_matrix/client/r0/sync HTTP/1.1&quot; &quot;Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36&quot; [0 dbevts]&quot;
@@ -242,6 +242,8 @@ GROUP BY s.canonical_alias, g.room_id
 ORDER BY num_rows desc 
 LIMIT 10;
 </code></pre>
+<p>You can also use the <a href="../../admin_api/rooms.html#list-room-api">List Room API</a>
+and <code>order_by</code> <code>state_events</code>.</p>
 
                     </main>
 
