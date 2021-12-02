@@ -35,7 +35,6 @@ from synapse.util import Clock
 
 from tests import unittest
 from tests.test_utils import make_awaitable
-from tests.utils import setup_test_homeserver
 
 
 class ApplicationServiceStoreTestCase(unittest.HomeserverTestCase):
@@ -178,221 +177,223 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
             (as_id, txn_id, ApplicationServiceState.UP.value),
         )
 
-    @defer.inlineCallbacks
     def test_get_appservice_state_none(
         self,
-    ) -> Generator["Deferred[object]", object, None]:
+    ) -> None:
         service = Mock(id="999")
-        state = yield defer.ensureDeferred(self.store.get_appservice_state(service))
+        state = self.get_success(self.store.get_appservice_state(service))
         self.assertEquals(None, state)
 
-    @defer.inlineCallbacks
     def test_get_appservice_state_up(
         self,
-    ) -> Generator["Deferred[object]", object, None]:
-        yield self._set_state(self.as_list[0]["id"], ApplicationServiceState.UP)
+    ) -> None:
+        self.get_success(
+            self._set_state(self.as_list[0]["id"], ApplicationServiceState.UP)
+        )
         service = Mock(id=self.as_list[0]["id"])
-        state = yield defer.ensureDeferred(self.store.get_appservice_state(service))
+        state = self.get_success(
+            defer.ensureDeferred(self.store.get_appservice_state(service))
+        )
         self.assertEquals(ApplicationServiceState.UP, state)
 
-    @defer.inlineCallbacks
     def test_get_appservice_state_down(
         self,
-    ) -> Generator["Deferred[object]", object, None]:
-        yield self._set_state(self.as_list[0]["id"], ApplicationServiceState.UP)
-        yield self._set_state(self.as_list[1]["id"], ApplicationServiceState.DOWN)
-        yield self._set_state(self.as_list[2]["id"], ApplicationServiceState.DOWN)
+    ) -> None:
+        self.get_success(
+            self._set_state(self.as_list[0]["id"], ApplicationServiceState.UP)
+        )
+        self.get_success(
+            self._set_state(self.as_list[1]["id"], ApplicationServiceState.DOWN)
+        )
+        self.get_success(
+            self._set_state(self.as_list[2]["id"], ApplicationServiceState.DOWN)
+        )
         service = Mock(id=self.as_list[1]["id"])
-        state = yield defer.ensureDeferred(self.store.get_appservice_state(service))
+        state = self.get_success(self.store.get_appservice_state(service))
         self.assertEquals(ApplicationServiceState.DOWN, state)
 
-    @defer.inlineCallbacks
     def test_get_appservices_by_state_none(
         self,
-    ) -> Generator["Deferred[object]", Any, None]:
-        services = yield defer.ensureDeferred(
+    ) -> None:
+        services = self.get_success(
             self.store.get_appservices_by_state(ApplicationServiceState.DOWN)
         )
         self.assertEquals(0, len(services))
 
-    @defer.inlineCallbacks
     def test_set_appservices_state_down(
         self,
-    ) -> Generator["Deferred[object]", Any, None]:
+    ) -> None:
         service = Mock(id=self.as_list[1]["id"])
-        yield defer.ensureDeferred(
+        self.get_success(
             self.store.set_appservice_state(service, ApplicationServiceState.DOWN)
         )
-        rows = yield self.db_pool.runQuery(
-            self.engine.convert_param_style(
-                "SELECT as_id FROM application_services_state WHERE state=?"
-            ),
-            (ApplicationServiceState.DOWN.value,),
+        rows = self.get_success(
+            self.db_pool.runQuery(
+                self.engine.convert_param_style(
+                    "SELECT as_id FROM application_services_state WHERE state=?"
+                ),
+                (ApplicationServiceState.DOWN.value,),
+            )
         )
         self.assertEquals(service.id, rows[0][0])
 
-    @defer.inlineCallbacks
     def test_set_appservices_state_multiple_up(
         self,
-    ) -> Generator["Deferred[object]", Any, None]:
+    ) -> None:
         service = Mock(id=self.as_list[1]["id"])
-        yield defer.ensureDeferred(
+        self.get_success(
             self.store.set_appservice_state(service, ApplicationServiceState.UP)
         )
-        yield defer.ensureDeferred(
+        self.get_success(
             self.store.set_appservice_state(service, ApplicationServiceState.DOWN)
         )
-        yield defer.ensureDeferred(
+        self.get_success(
             self.store.set_appservice_state(service, ApplicationServiceState.UP)
         )
-        rows = yield self.db_pool.runQuery(
-            self.engine.convert_param_style(
-                "SELECT as_id FROM application_services_state WHERE state=?"
-            ),
-            (ApplicationServiceState.UP.value,),
+        rows = self.get_success(
+            self.db_pool.runQuery(
+                self.engine.convert_param_style(
+                    "SELECT as_id FROM application_services_state WHERE state=?"
+                ),
+                (ApplicationServiceState.UP.value,),
+            )
         )
         self.assertEquals(service.id, rows[0][0])
 
-    @defer.inlineCallbacks
     def test_create_appservice_txn_first(
         self,
-    ) -> Generator["Deferred[object]", Any, None]:
+    ) -> None:
         service = Mock(id=self.as_list[0]["id"])
         events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
-        txn = yield defer.ensureDeferred(
-            self.store.create_appservice_txn(service, events, [])
+        txn = self.get_success(
+            defer.ensureDeferred(self.store.create_appservice_txn(service, events, []))
         )
         self.assertEquals(txn.id, 1)
         self.assertEquals(txn.events, events)
         self.assertEquals(txn.service, service)
 
-    @defer.inlineCallbacks
     def test_create_appservice_txn_older_last_txn(
         self,
-    ) -> Generator["Deferred[object]", Any, None]:
+    ) -> None:
         service = Mock(id=self.as_list[0]["id"])
         events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
-        yield self._set_last_txn(service.id, 9643)  # AS is falling behind
-        yield self._insert_txn(service.id, 9644, events)
-        yield self._insert_txn(service.id, 9645, events)
-        txn = yield defer.ensureDeferred(
-            self.store.create_appservice_txn(service, events, [])
-        )
+        self.get_success(self._set_last_txn(service.id, 9643))  # AS is falling behind
+        self.get_success(self._insert_txn(service.id, 9644, events))
+        self.get_success(self._insert_txn(service.id, 9645, events))
+        txn = self.get_success(self.store.create_appservice_txn(service, events, []))
         self.assertEquals(txn.id, 9646)
         self.assertEquals(txn.events, events)
         self.assertEquals(txn.service, service)
 
-    @defer.inlineCallbacks
     def test_create_appservice_txn_up_to_date_last_txn(
         self,
-    ) -> Generator["Deferred[object]", Any, None]:
+    ) -> None:
         service = Mock(id=self.as_list[0]["id"])
         events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
-        yield self._set_last_txn(service.id, 9643)
-        txn = yield defer.ensureDeferred(
-            self.store.create_appservice_txn(service, events, [])
-        )
+        self.get_success(self._set_last_txn(service.id, 9643))
+        txn = self.get_success(self.store.create_appservice_txn(service, events, []))
         self.assertEquals(txn.id, 9644)
         self.assertEquals(txn.events, events)
         self.assertEquals(txn.service, service)
 
-    @defer.inlineCallbacks
     def test_create_appservice_txn_up_fuzzing(
         self,
-    ) -> Generator["Deferred[object]", Any, None]:
+    ) -> None:
         service = Mock(id=self.as_list[0]["id"])
         events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
-        yield self._set_last_txn(service.id, 9643)
+        self.get_success(self._set_last_txn(service.id, 9643))
 
         # dump in rows with higher IDs to make sure the queries aren't wrong.
-        yield self._set_last_txn(self.as_list[1]["id"], 119643)
-        yield self._set_last_txn(self.as_list[2]["id"], 9)
-        yield self._set_last_txn(self.as_list[3]["id"], 9643)
-        yield self._insert_txn(self.as_list[1]["id"], 119644, events)
-        yield self._insert_txn(self.as_list[1]["id"], 119645, events)
-        yield self._insert_txn(self.as_list[1]["id"], 119646, events)
-        yield self._insert_txn(self.as_list[2]["id"], 10, events)
-        yield self._insert_txn(self.as_list[3]["id"], 9643, events)
+        self.get_success(self._set_last_txn(self.as_list[1]["id"], 119643))
+        self.get_success(self._set_last_txn(self.as_list[2]["id"], 9))
+        self.get_success(self._set_last_txn(self.as_list[3]["id"], 9643))
+        self.get_success(self._insert_txn(self.as_list[1]["id"], 119644, events))
+        self.get_success(self._insert_txn(self.as_list[1]["id"], 119645, events))
+        self.get_success(self._insert_txn(self.as_list[1]["id"], 119646, events))
+        self.get_success(self._insert_txn(self.as_list[2]["id"], 10, events))
+        self.get_success(self._insert_txn(self.as_list[3]["id"], 9643, events))
 
-        txn = yield defer.ensureDeferred(
-            self.store.create_appservice_txn(service, events, [])
-        )
+        txn = self.get_success(self.store.create_appservice_txn(service, events, []))
         self.assertEquals(txn.id, 9644)
         self.assertEquals(txn.events, events)
         self.assertEquals(txn.service, service)
 
-    @defer.inlineCallbacks
     def test_complete_appservice_txn_first_txn(
         self,
-    ) -> Generator["Deferred[object]", Any, None]:
+    ) -> None:
         service = Mock(id=self.as_list[0]["id"])
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         txn_id = 1
 
-        yield self._insert_txn(service.id, txn_id, events)
-        yield defer.ensureDeferred(
+        self.get_success(self._insert_txn(service.id, txn_id, events))
+        self.get_success(
             self.store.complete_appservice_txn(txn_id=txn_id, service=service)
         )
 
-        res = yield self.db_pool.runQuery(
-            self.engine.convert_param_style(
-                "SELECT last_txn FROM application_services_state WHERE as_id=?"
-            ),
-            (service.id,),
+        res = self.get_success(
+            self.db_pool.runQuery(
+                self.engine.convert_param_style(
+                    "SELECT last_txn FROM application_services_state WHERE as_id=?"
+                ),
+                (service.id,),
+            )
         )
         self.assertEquals(1, len(res))
         self.assertEquals(txn_id, res[0][0])
 
-        res = yield self.db_pool.runQuery(
-            self.engine.convert_param_style(
-                "SELECT * FROM application_services_txns WHERE txn_id=?"
-            ),
-            (txn_id,),
+        res = self.get_success(
+            self.db_pool.runQuery(
+                self.engine.convert_param_style(
+                    "SELECT * FROM application_services_txns WHERE txn_id=?"
+                ),
+                (txn_id,),
+            )
         )
         self.assertEquals(0, len(res))
 
-    @defer.inlineCallbacks
     def test_complete_appservice_txn_existing_in_state_table(
         self,
-    ) -> Generator["Deferred[object]", Any, None]:
+    ) -> None:
         service = Mock(id=self.as_list[0]["id"])
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         txn_id = 5
-        yield self._set_last_txn(service.id, 4)
-        yield self._insert_txn(service.id, txn_id, events)
-        yield defer.ensureDeferred(
+        self.get_success(self._set_last_txn(service.id, 4))
+        self.get_success(self._insert_txn(service.id, txn_id, events))
+        self.get_success(
             self.store.complete_appservice_txn(txn_id=txn_id, service=service)
         )
 
-        res = yield self.db_pool.runQuery(
-            self.engine.convert_param_style(
-                "SELECT last_txn, state FROM application_services_state WHERE as_id=?"
-            ),
-            (service.id,),
+        res = self.get_success(
+            self.db_pool.runQuery(
+                self.engine.convert_param_style(
+                    "SELECT last_txn, state FROM application_services_state WHERE as_id=?"
+                ),
+                (service.id,),
+            )
         )
         self.assertEquals(1, len(res))
         self.assertEquals(txn_id, res[0][0])
         self.assertEquals(ApplicationServiceState.UP.value, res[0][1])
 
-        res = yield self.db_pool.runQuery(
-            self.engine.convert_param_style(
-                "SELECT * FROM application_services_txns WHERE txn_id=?"
-            ),
-            (txn_id,),
+        res = self.get_success(
+            self.db_pool.runQuery(
+                self.engine.convert_param_style(
+                    "SELECT * FROM application_services_txns WHERE txn_id=?"
+                ),
+                (txn_id,),
+            )
         )
         self.assertEquals(0, len(res))
 
-    @defer.inlineCallbacks
     def test_get_oldest_unsent_txn_none(
         self,
-    ) -> Generator["Deferred[object]", Any, None]:
+    ) -> None:
         service = Mock(id=self.as_list[0]["id"])
 
-        txn = yield defer.ensureDeferred(self.store.get_oldest_unsent_txn(service))
+        txn = self.get_success(self.store.get_oldest_unsent_txn(service))
         self.assertEquals(None, txn)
 
-    @defer.inlineCallbacks
-    def test_get_oldest_unsent_txn(self) -> Generator["Deferred[object]", Any, None]:
+    def test_get_oldest_unsent_txn(self) -> None:
         service = Mock(id=self.as_list[0]["id"])
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         other_events = [Mock(event_id="e5"), Mock(event_id="e6")]
@@ -401,39 +402,49 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         # (ignore needed because Mypy won't allow us to assign to a method otherwise)
         self.store.get_events_as_list = Mock(return_value=make_awaitable(events))  # type: ignore[assignment]
 
-        yield self._insert_txn(self.as_list[1]["id"], 9, other_events)
-        yield self._insert_txn(service.id, 10, events)
-        yield self._insert_txn(service.id, 11, other_events)
-        yield self._insert_txn(service.id, 12, other_events)
+        self.get_success(self._insert_txn(self.as_list[1]["id"], 9, other_events))
+        self.get_success(self._insert_txn(service.id, 10, events))
+        self.get_success(self._insert_txn(service.id, 11, other_events))
+        self.get_success(self._insert_txn(service.id, 12, other_events))
 
-        txn = yield defer.ensureDeferred(self.store.get_oldest_unsent_txn(service))
+        txn = self.get_success(self.store.get_oldest_unsent_txn(service))
         self.assertEquals(service, txn.service)
         self.assertEquals(10, txn.id)
         self.assertEquals(events, txn.events)
 
-    @defer.inlineCallbacks
     def test_get_appservices_by_state_single(
         self,
-    ) -> Generator["Deferred[object]", Any, None]:
-        yield self._set_state(self.as_list[0]["id"], ApplicationServiceState.DOWN)
-        yield self._set_state(self.as_list[1]["id"], ApplicationServiceState.UP)
+    ) -> None:
+        self.get_success(
+            self._set_state(self.as_list[0]["id"], ApplicationServiceState.DOWN)
+        )
+        self.get_success(
+            self._set_state(self.as_list[1]["id"], ApplicationServiceState.UP)
+        )
 
-        services = yield defer.ensureDeferred(
+        services = self.get_success(
             self.store.get_appservices_by_state(ApplicationServiceState.DOWN)
         )
         self.assertEquals(1, len(services))
         self.assertEquals(self.as_list[0]["id"], services[0].id)
 
-    @defer.inlineCallbacks
     def test_get_appservices_by_state_multiple(
         self,
-    ) -> Generator["Deferred[object]", Any, None]:
-        yield self._set_state(self.as_list[0]["id"], ApplicationServiceState.DOWN)
-        yield self._set_state(self.as_list[1]["id"], ApplicationServiceState.UP)
-        yield self._set_state(self.as_list[2]["id"], ApplicationServiceState.DOWN)
-        yield self._set_state(self.as_list[3]["id"], ApplicationServiceState.UP)
+    ) -> None:
+        self.get_success(
+            self._set_state(self.as_list[0]["id"], ApplicationServiceState.DOWN)
+        )
+        self.get_success(
+            self._set_state(self.as_list[1]["id"], ApplicationServiceState.UP)
+        )
+        self.get_success(
+            self._set_state(self.as_list[2]["id"], ApplicationServiceState.DOWN)
+        )
+        self.get_success(
+            self._set_state(self.as_list[3]["id"], ApplicationServiceState.UP)
+        )
 
-        services = yield defer.ensureDeferred(
+        services = self.get_success(
             self.store.get_appservices_by_state(ApplicationServiceState.DOWN)
         )
         self.assertEquals(2, len(services))
@@ -522,8 +533,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.HomeserverTestCase):
             f.write(yaml.dump(vals))
         return path
 
-    @defer.inlineCallbacks
-    def test_unique_works(self) -> Generator["Deferred[object]", Any, None]:
+    def test_unique_works(self) -> None:
         f1 = self._write_config(suffix="1")
         f2 = self._write_config(suffix="2")
 
@@ -537,8 +547,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.HomeserverTestCase):
             self.hs,
         )
 
-    @defer.inlineCallbacks
-    def test_duplicate_ids(self) -> Generator["Deferred[object]", Any, None]:
+    def test_duplicate_ids(self) -> None:
         f1 = self._write_config(id="id", suffix="1")
         f2 = self._write_config(id="id", suffix="2")
 
@@ -558,8 +567,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.HomeserverTestCase):
         self.assertIn(f2, str(e))
         self.assertIn("id", str(e))
 
-    @defer.inlineCallbacks
-    def test_duplicate_as_tokens(self) -> Generator["Deferred[object]", Any, None]:
+    def test_duplicate_as_tokens(self) -> None:
         f1 = self._write_config(as_token="as_token", suffix="1")
         f2 = self._write_config(as_token="as_token", suffix="2")
 
