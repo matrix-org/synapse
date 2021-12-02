@@ -1670,13 +1670,21 @@ class SyncHandler:
 
         assert since_token
 
-        # Get a list of membership change events that have happened.
-        rooms_changed = await self.store.get_membership_changes_for_user(
+        # The spec notes:
+        # > When a sync is limited, the server MUST return membership events for events
+        # > in the gap (between since and the start of the returned timeline), regardless
+        # > as to whether or not they are redundant.
+        # We fetch such events here, but we only seem to use them for categorising rooms
+        # as newly joined, newly left, invited or knocked.
+        # TODO: we've already called this function and ran this query in
+        #       _have_rooms_changed. We could keep the results in memory to avoid a
+        #       second query, at the cost of more complicated source code.
+        membership_change_events = await self.store.get_membership_changes_for_user(
             user_id, since_token.room_key, now_token.room_key
         )
 
         mem_change_events_by_room_id: Dict[str, List[EventBase]] = {}
-        for event in rooms_changed:
+        for event in membership_change_events:
             mem_change_events_by_room_id.setdefault(event.room_id, []).append(event)
 
         newly_joined_rooms = []
@@ -1685,6 +1693,9 @@ class SyncHandler:
         invited = []
         knocked = []
         for room_id, events in mem_change_events_by_room_id.items():
+            # The body of this loop will add this room to at least one of the five lists
+            # above. Things get messy if you've e.g. joined, left, joined then left the
+            # room all in the same sync period.
             logger.debug(
                 "Membership changes in %s: [%s]",
                 room_id,
@@ -1829,7 +1840,9 @@ class SyncHandler:
 
         timeline_limit = sync_config.filter_collection.timeline_limit()
 
-        # Get all events for rooms we're currently joined to.
+        # Get all events since the `from_key` in rooms we're currently joined to.
+        # If there are too many, we get the most recent events only. This leaves
+        # a "gap" in the timeline, as described by the spec for /sync.
         room_to_events = await self.store.get_room_events_stream_for_rooms(
             room_ids=sync_result_builder.joined_room_ids,
             from_key=since_token.room_key,
