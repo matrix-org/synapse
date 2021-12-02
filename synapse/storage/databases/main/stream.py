@@ -567,8 +567,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
     ) -> List[EventBase]:
         """Fetch membership events for a given user.
 
-        All such events whose stream ordering lies in the range (from_key, to_key]
-        are returned. Events are ordered by ascending stream order.
+        All such events whose stream ordering `s` lies in the range
+        `from_key < s <= to_key` are returned. Events are ordered by ascending stream
+        order.
         """
         # Start by ruling out cases where a DB query is not necessary.
         if from_key == to_key:
