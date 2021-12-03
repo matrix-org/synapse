@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from http import HTTPStatus
 from typing import Optional, Union
 
 from twisted.internet.defer import succeed
@@ -513,12 +514,26 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         self.user_pass = "pass"
         self.user = self.register_user("test", self.user_pass)
 
+    def use_refresh_token(self, refresh_token: str) -> FakeChannel:
+        """
+        Helper that makes a request to use a refresh token.
+        """
+        return self.make_request(
+            "POST",
+            "/_matrix/client/unstable/org.matrix.msc2918.refresh_token/refresh",
+            {"refresh_token": refresh_token},
+        )
+
     def test_login_issue_refresh_token(self):
         """
         A login response should include a refresh_token only if asked.
         """
         # Test login
-        body = {"type": "m.login.password", "user": "test", "password": self.user_pass}
+        body = {
+            "type": "m.login.password",
+            "user": "test",
+            "password": self.user_pass,
+        }
 
         login_without_refresh = self.make_request(
             "POST", "/_matrix/client/r0/login", body
@@ -528,8 +543,8 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
 
         login_with_refresh = self.make_request(
             "POST",
-            "/_matrix/client/r0/login?org.matrix.msc2918.refresh_token=true",
-            body,
+            "/_matrix/client/r0/login",
+            {"org.matrix.msc2918.refresh_token": True, **body},
         )
         self.assertEqual(login_with_refresh.code, 200, login_with_refresh.result)
         self.assertIn("refresh_token", login_with_refresh.json_body)
@@ -555,11 +570,12 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
 
         register_with_refresh = self.make_request(
             "POST",
-            "/_matrix/client/r0/register?org.matrix.msc2918.refresh_token=true",
+            "/_matrix/client/r0/register",
             {
                 "username": "test3",
                 "password": self.user_pass,
                 "auth": {"type": LoginType.DUMMY},
+                "org.matrix.msc2918.refresh_token": True,
             },
         )
         self.assertEqual(register_with_refresh.code, 200, register_with_refresh.result)
@@ -570,10 +586,15 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         """
         A refresh token can be used to issue a new access token.
         """
-        body = {"type": "m.login.password", "user": "test", "password": self.user_pass}
+        body = {
+            "type": "m.login.password",
+            "user": "test",
+            "password": self.user_pass,
+            "org.matrix.msc2918.refresh_token": True,
+        }
         login_response = self.make_request(
             "POST",
-            "/_matrix/client/r0/login?org.matrix.msc2918.refresh_token=true",
+            "/_matrix/client/r0/login",
             body,
         )
         self.assertEqual(login_response.code, 200, login_response.result)
@@ -599,14 +620,19 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         )
 
     @override_config({"refreshable_access_token_lifetime": "1m"})
-    def test_refresh_token_expiration(self):
+    def test_refreshable_access_token_expiration(self):
         """
         The access token should have some time as specified in the config.
         """
-        body = {"type": "m.login.password", "user": "test", "password": self.user_pass}
+        body = {
+            "type": "m.login.password",
+            "user": "test",
+            "password": self.user_pass,
+            "org.matrix.msc2918.refresh_token": True,
+        }
         login_response = self.make_request(
             "POST",
-            "/_matrix/client/r0/login?org.matrix.msc2918.refresh_token=true",
+            "/_matrix/client/r0/login",
             body,
         )
         self.assertEqual(login_response.code, 200, login_response.result)
@@ -623,6 +649,128 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         self.assertApproximates(
             refresh_response.json_body["expires_in_ms"], 60 * 1000, 100
         )
+        access_token = refresh_response.json_body["access_token"]
+
+        # Advance 59 seconds in the future (just shy of 1 minute, the time of expiry)
+        self.reactor.advance(59.0)
+        # Check that our token is valid
+        self.assertEqual(
+            self.make_request(
+                "GET", "/_matrix/client/v3/account/whoami", access_token=access_token
+            ).code,
+            HTTPStatus.OK,
+        )
+
+        # Advance 2 more seconds (just past the time of expiry)
+        self.reactor.advance(2.0)
+        # Check that our token is invalid
+        self.assertEqual(
+            self.make_request(
+                "GET", "/_matrix/client/v3/account/whoami", access_token=access_token
+            ).code,
+            HTTPStatus.UNAUTHORIZED,
+        )
+
+    @override_config(
+        {"refreshable_access_token_lifetime": "1m", "refresh_token_lifetime": "2m"}
+    )
+    def test_refresh_token_expiry(self):
+        """
+        The refresh token can be configured to have a limited lifetime.
+        When that lifetime has ended, the refresh token can no longer be used to
+        refresh the session.
+        """
+
+        body = {
+            "type": "m.login.password",
+            "user": "test",
+            "password": self.user_pass,
+            "org.matrix.msc2918.refresh_token": True,
+        }
+        login_response = self.make_request(
+            "POST",
+            "/_matrix/client/r0/login",
+            body,
+        )
+        self.assertEqual(login_response.code, HTTPStatus.OK, login_response.result)
+        refresh_token1 = login_response.json_body["refresh_token"]
+
+        # Advance 119 seconds in the future (just shy of 2 minutes)
+        self.reactor.advance(119.0)
+
+        # Refresh our session. The refresh token should still JUST be valid right now.
+        # By doing so, we get a new access token and a new refresh token.
+        refresh_response = self.use_refresh_token(refresh_token1)
+        self.assertEqual(refresh_response.code, HTTPStatus.OK, refresh_response.result)
+        self.assertIn(
+            "refresh_token",
+            refresh_response.json_body,
+            "No new refresh token returned after refresh.",
+        )
+        refresh_token2 = refresh_response.json_body["refresh_token"]
+
+        # Advance 121 seconds in the future (just a bit more than 2 minutes)
+        self.reactor.advance(121.0)
+
+        # Try to refresh our session, but instead notice that the refresh token is
+        # not valid (it just expired).
+        refresh_response = self.use_refresh_token(refresh_token2)
+        self.assertEqual(
+            refresh_response.code, HTTPStatus.FORBIDDEN, refresh_response.result
+        )
+
+    @override_config(
+        {
+            "refreshable_access_token_lifetime": "2m",
+            "refresh_token_lifetime": "2m",
+            "session_lifetime": "3m",
+        }
+    )
+    def test_ultimate_session_expiry(self):
+        """
+        The session can be configured to have an ultimate, limited lifetime.
+        """
+
+        body = {
+            "type": "m.login.password",
+            "user": "test",
+            "password": self.user_pass,
+            "org.matrix.msc2918.refresh_token": True,
+        }
+        login_response = self.make_request(
+            "POST",
+            "/_matrix/client/r0/login",
+            body,
+        )
+        self.assertEqual(login_response.code, 200, login_response.result)
+        refresh_token = login_response.json_body["refresh_token"]
+
+        # Advance shy of 2 minutes into the future
+        self.reactor.advance(119.0)
+
+        # Refresh our session. The refresh token should still be valid right now.
+        refresh_response = self.use_refresh_token(refresh_token)
+        self.assertEqual(refresh_response.code, 200, refresh_response.result)
+        self.assertIn(
+            "refresh_token",
+            refresh_response.json_body,
+            "No new refresh token returned after refresh.",
+        )
+        # Notice that our access token lifetime has been diminished to match the
+        # session lifetime.
+        # 3 minutes - 119 seconds = 61 seconds.
+        self.assertEqual(refresh_response.json_body["expires_in_ms"], 61_000)
+        refresh_token = refresh_response.json_body["refresh_token"]
+
+        # Advance 61 seconds into the future. Our session should have expired
+        # now, because we've had our 3 minutes.
+        self.reactor.advance(61.0)
+
+        # Try to issue a new, refreshed, access token.
+        # This should fail because the refresh token's lifetime has also been
+        # diminished as our session expired.
+        refresh_response = self.use_refresh_token(refresh_token)
+        self.assertEqual(refresh_response.code, 403, refresh_response.result)
 
     def test_refresh_token_invalidation(self):
         """Refresh tokens are invalidated after first use of the next token.
@@ -640,10 +788,15 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
                    |-> fourth_refresh (fails)
         """
 
-        body = {"type": "m.login.password", "user": "test", "password": self.user_pass}
+        body = {
+            "type": "m.login.password",
+            "user": "test",
+            "password": self.user_pass,
+            "org.matrix.msc2918.refresh_token": True,
+        }
         login_response = self.make_request(
             "POST",
-            "/_matrix/client/r0/login?org.matrix.msc2918.refresh_token=true",
+            "/_matrix/client/r0/login",
             body,
         )
         self.assertEqual(login_response.code, 200, login_response.result)

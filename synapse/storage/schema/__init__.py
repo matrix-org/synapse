@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCHEMA_VERSION = 66  # remember to update the list below when updating
+SCHEMA_VERSION = 67  # remember to update the list below when updating
 """Represents the expectations made by the codebase about the database schema
 
 This should be incremented whenever the codebase changes its requirements on the
@@ -48,9 +48,12 @@ Changes in SCHEMA_VERSION = 65:
     - Remove unused tables `user_stats_historical` and `room_stats_historical`.
 
 Changes in SCHEMA_VERSION = 66:
-    - Add column `userinfo_fields` to table `open_id_tokens`. The new column is used
-      to persist the additional open id token fields requested by the user according to
-      MSC3356.
+    - Queries on state_key columns are now disambiguated (ie, the codebase can handle
+      the `events` table having a `state_key` column).
+
+Changes in SCHEMA_VERSION = 67:
+    - MSC3356: Add column `userinfo_fields` to table `open_id_tokens`. The new column is 
+      used to persist the additional open id token fields requested by the user.
 """
 
 

@@ -46,7 +46,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
     )
     def test_requester_is_no_admin(self, method: str, url: str):
         """
-        If the user is not a server admin, an error 403 is returned.
+        If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
         """
 
         self.register_user("user", "pass", admin=False)
@@ -135,7 +135,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
         self._register_bg_update()
 
         self.store.db_pool.updates.start_doing_background_updates()
-        self.reactor.pump([1.0, 1.0])
+        self.reactor.pump([1.0, 1.0, 1.0])
 
         channel = self.make_request(
             "GET",
