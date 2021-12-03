@@ -327,10 +327,8 @@ class ApplicationServicesHandler:
                         to_device_messages = await self._get_to_device_messages(
                             service, new_token, users
                         )
-                        # REVIEW: In a subsequent commit, we'll move this to a to-device-specific
-                        #  key in the AS transaction.
                         self.scheduler.enqueue_for_appservice(
-                            service, ephemeral=to_device_messages
+                            service, to_device_messages=to_device_messages
                         )
 
                         # Persist the latest handled stream token for this appservice
