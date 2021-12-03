@@ -22,6 +22,8 @@ be too much of an inconvenience.
 
 **Refresh tokens** are a mechanism to avoid some of this inconvenience whilst
 still getting most of the benefits of short access token lifetimes.
+Refresh tokens are also a concept present in OAuth 2 — further reading is available
+[here](https://datatracker.ietf.org/doc/html/rfc6749#section-1.5).
 
 When refresh tokens are in use, both an access token and a refresh token will be
 issued to users on login. The access token will expire after a predetermined amount
