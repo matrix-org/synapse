@@ -252,6 +252,6 @@ class ReadReceiptEventFields:
 
 
 class OpenIdUserInfoField:
-    DISPLAY_NAME = "display_name"
-    AVATAR_URL = "avatar_url"
-    ROOM_POWERLEVELS = "room_powerlevels"
+    DISPLAY_NAME = "org.matrix.msc3356.display_name"
+    AVATAR_URL = "org.matrix.msc3356.avatar_url"
+    ROOM_POWERLEVELS = "org.matrix.msc3356.room_powerlevels"

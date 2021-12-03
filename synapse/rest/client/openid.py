@@ -88,8 +88,8 @@ class IdTokenServlet(RestServlet):
         json = parse_json_object_from_request(request, allow_empty_body=True)
 
         userinfo_fields = None
-        if "userinfo_fields" in json:
-            userinfo_fields = json["userinfo_fields"]
+        if "org.matrix.msc3356.userinfo_fields" in json:
+            userinfo_fields = json["org.matrix.msc3356.userinfo_fields"]
             for field in userinfo_fields:
                 if field not in self.USERINFO_FIELDS:
                     raise SynapseError(
