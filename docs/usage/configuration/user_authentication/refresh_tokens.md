@@ -35,7 +35,8 @@ The homeserver will then generate a new access token and refresh token for the u
 and return them. The old refresh token is invalidated and can not be used again*.
 
 Finally, refresh tokens also make it possible for sessions to be logged out if they
-are inactive for too long; see the configuration guide below.
+are inactive for too long, before the session naturally ends; see the configuration
+guide below.
 
 
 *To prevent issues if clients lose connection half-way through refreshing a token,
