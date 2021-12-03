@@ -135,7 +135,9 @@ class ApplicationServicesHandler:
 
                         # Fork off pushes to these services
                         for service in services:
-                            self.scheduler.submit_event_for_as(service, event)
+                            self.scheduler.enqueue_for_appservice(
+                                service, events=[event]
+                            )
 
                         now = self.clock.time_msec()
                         ts = await self.store.get_received_ts(event.event_id)
@@ -292,7 +294,7 @@ class ApplicationServicesHandler:
                     # and, if they apply to this application service, send it off.
                     events = await self._handle_typing(service, new_token)
                     if events:
-                        self.scheduler.submit_ephemeral_events_for_as(service, events)
+                        self.scheduler.enqueue_for_appservice(service, ephemeral=events)
                     continue
 
                 # Since we read/update the stream position for this AS/stream
@@ -303,7 +305,7 @@ class ApplicationServicesHandler:
                 ):
                     if stream_key == "receipt_key":
                         events = await self._handle_receipts(service, new_token)
-                        self.scheduler.submit_ephemeral_events_for_as(service, events)
+                        self.scheduler.enqueue_for_appservice(service, ephemeral=events)
 
                         # Persist the latest handled stream token for this appservice
                         await self.store.set_appservice_stream_type_pos(
@@ -312,7 +314,7 @@ class ApplicationServicesHandler:
 
                     elif stream_key == "presence_key":
                         events = await self._handle_presence(service, users, new_token)
-                        self.scheduler.submit_ephemeral_events_for_as(service, events)
+                        self.scheduler.enqueue_for_appservice(service, ephemeral=events)
 
                         # Persist the latest handled stream token for this appservice
                         await self.store.set_appservice_stream_type_pos(
@@ -325,8 +327,10 @@ class ApplicationServicesHandler:
                         to_device_messages = await self._get_to_device_messages(
                             service, new_token, users
                         )
-                        self.scheduler.submit_ephemeral_events_for_as(
-                            service, to_device_messages
+                        # REVIEW: In a subsequent commit, we'll move this to a to-device-specific
+                        #  key in the AS transaction.
+                        self.scheduler.enqueue_for_appservice(
+                            service, ephemeral=to_device_messages
                         )
 
                         # Persist the latest handled stream token for this appservice
