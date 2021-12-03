@@ -306,6 +306,7 @@ def format_event_for_client_v2_without_room_id(d: JsonDict) -> JsonDict:
 def serialize_event(
     e: Union[JsonDict, EventBase],
     time_now_ms: int,
+    *,
     as_client_event: bool = True,
     event_format: Callable[[JsonDict], JsonDict] = format_event_for_client_v1,
     token_id: Optional[str] = None,
@@ -393,6 +394,7 @@ class EventClientSerializer:
         self,
         event: Union[JsonDict, EventBase],
         time_now: int,
+        *,
         bundle_aggregations: bool = True,
         **kwargs: Any,
     ) -> JsonDict:
