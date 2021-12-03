@@ -52,7 +52,7 @@ Changes in SCHEMA_VERSION = 66:
       the `events` table having a `state_key` column).
 
 Changes in SCHEMA_VERSION = 67:
-    - MSC3356: Add column `userinfo_fields` to table `open_id_tokens`. The new column is 
+    - MSC3356: Add column `userinfo_fields` to table `open_id_tokens`. The new column is
       used to persist the additional open id token fields requested by the user.
 """
 
