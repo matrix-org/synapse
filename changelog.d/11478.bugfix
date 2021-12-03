@@ -1,1 +1,1 @@
-Include bundled relations during a limited `/sync` request, per [MSC2675](https://github.com/matrix-org/matrix-doc/pull/2675).
+Include bundled relation aggregations during a limited `/sync` request, per [MSC2675](https://github.com/matrix-org/matrix-doc/pull/2675).

@@ -414,8 +414,8 @@ class EventClientSerializer:
 
         serialized_event = serialize_event(event, time_now, **kwargs)
 
-        # If MSC1849 is enabled then we need to look if there are any relations
-        # we need to bundle in with the event.
+        # If MSC1849 is enabled then we need to look if there are any relation
+        # aggregations we need to bundle in with the event.
         # Do not bundle aggregations if the event has been redacted or if the event
         # is a state event.
         if (
