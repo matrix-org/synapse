@@ -273,9 +273,9 @@ class OpenIdUserInfo(BaseFederationServlet):
                 {"errcode": "M_MISSING_TOKEN", "error": "Access Token required"},
             )
 
-        user_id, userinfo_fields = await self.handler.on_openid_userinfo(token)
+        token_info = await self.handler.on_openid_userinfo(token)
 
-        if user_id is None:
+        if token_info is None:
             return (
                 401,
                 {
@@ -284,7 +284,8 @@ class OpenIdUserInfo(BaseFederationServlet):
                 },
             )
 
-        userinfo = {"sub": user_id}
+        user_id, userinfo_fields = token_info
+        userinfo: JsonDict = {"sub": user_id}
 
         if userinfo_fields:
             if OpenIdUserInfoField.DISPLAY_NAME in userinfo_fields:
@@ -304,7 +305,7 @@ class OpenIdUserInfo(BaseFederationServlet):
 
         return 200, userinfo
 
-    async def _get_powerlevels(self, user_id):
+    async def _get_powerlevels(self, user_id: str) -> Dict[str, int]:
         room_list = (
             await self.hs.get_datastore().get_rooms_for_local_user_where_membership_is(
                 user_id=user_id, membership_list=[Membership.JOIN]

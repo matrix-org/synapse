@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
+from typing import List, Optional, Tuple
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import LoggingTransaction
@@ -41,8 +41,10 @@ class OpenIdStore(SQLBaseStore):
 
     async def get_user_id_and_userinfo_fields_for_open_id_token(
         self, token: str, ts_now_ms: int
-    ) -> Optional[str]:
-        def get_user_id_for_token_txn(txn: LoggingTransaction) -> Optional[str]:
+    ) -> Optional[Tuple[str, Optional[List[str]]]]:
+        def get_user_id_for_token_txn(
+            txn: LoggingTransaction,
+        ) -> Optional[Tuple[str, Optional[List[str]]]]:
             sql = (
                 "SELECT user_id, userinfo_fields FROM open_id_tokens"
                 " WHERE token = ? AND ? <= ts_valid_until_ms"
