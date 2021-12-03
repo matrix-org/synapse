@@ -148,15 +148,15 @@ class DeviceWorkerStore(SQLBaseStore):
             auth_provider_id: The SSO IdP ID as defined in the server config
             auth_provider_session_id: The session ID within the IdP
         Returns:
-            A list of dicts containing the devices informations
+            A list of dicts containing the device_id and the user_id of each device
         """
         return await self.db_pool.simple_select_list(
-            table="devices",
+            table="device_auth_providers",
             keyvalues={
                 "auth_provider_id": auth_provider_id,
                 "auth_provider_session_id": auth_provider_session_id,
             },
-            retcols=("user_id", "device_id", "display_name"),
+            retcols=("user_id", "device_id"),
             desc="get_devices_by_auth_provider_session_id",
         )
 
@@ -1127,8 +1127,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 },
                 values={},
                 insertion_values={
-                    "auth_provider_id": auth_provider_id,
-                    "auth_provider_session_id": auth_provider_session_id,
                     "display_name": initial_device_display_name,
                     "hidden": False,
                 },
@@ -1144,6 +1142,18 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 )
                 if hidden:
                     raise StoreError(400, "The device ID is in use", Codes.FORBIDDEN)
+
+            if auth_provider_id and auth_provider_session_id:
+                await self.db_pool.simple_insert(
+                    "device_auth_providers",
+                    values={
+                        "user_id": user_id,
+                        "device_id": device_id,
+                        "auth_provider_id": auth_provider_id,
+                        "auth_provider_session_id": auth_provider_session_id,
+                    },
+                    desc="store_device_auth_provider",
+                )
 
             self.device_id_exists_cache.set(key, True)
             return inserted
@@ -1193,6 +1203,14 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             self.db_pool.simple_delete_many_txn(
                 txn,
                 table="device_inbox",
+                column="device_id",
+                values=device_ids,
+                keyvalues={"user_id": user_id},
+            )
+
+            self.db_pool.simple_delete_many_txn(
+                txn,
+                table="device_auth_providers",
                 column="device_id",
                 values=device_ids,
                 keyvalues={"user_id": user_id},

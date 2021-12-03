@@ -13,10 +13,15 @@
  * limitations under the License.
  */
 
--- Track the auth provider used by this login as well as the session ID
-ALTER TABLE devices
-  ADD COLUMN auth_provider_id TEXT;
-ALTER TABLE devices
-  ADD COLUMN auth_provider_session_id TEXT;
+-- Track the auth provider used by each login as well as the session ID
+CREATE TABLE device_auth_providers (
+  user_id TEXT NOT NULL,
+  device_id TEXT NOT NULL,
+  auth_provider_id TEXT NOT NULL,
+  auth_provider_session_id TEXT NOT NULL
+);
 
-CREATE INDEX devices_auth_provider_session_id ON devices (auth_provider_id, auth_provider_session_id);
+CREATE INDEX device_auth_providers_devices
+  ON device_auth_providers (user_id, device_id);
+CREATE INDEX device_auth_providers_sessions
+  ON device_auth_providers (auth_provider_id, auth_provider_session_id);
