@@ -128,6 +128,17 @@ class RegistrationConfig(Config):
             int
         ] = refreshable_access_token_lifetime
 
+        if (
+            self.session_lifetime is not None
+            and "refreshable_access_token_lifetime" in config
+        ):
+            if self.session_lifetime < self.refreshable_access_token_lifetime:
+                raise ConfigError(
+                    "Both `session_lifetime` and `refreshable_access_token_lifetime` "
+                    "configuration options have been set, but `refreshable_access_token_lifetime` "
+                    " exceeds `session_lifetime`!"
+                )
+
         # The `nonrefreshable_access_token_lifetime` applies for tokens that can NOT be
         # refreshed using a refresh token.
         # If it is None, then these tokens last for the entire length of the session,
@@ -159,6 +170,17 @@ class RegistrationConfig(Config):
         if refresh_token_lifetime is not None:
             refresh_token_lifetime = self.parse_duration(refresh_token_lifetime)
         self.refresh_token_lifetime: Optional[int] = refresh_token_lifetime
+
+        if (
+            self.session_lifetime is not None
+            and self.refresh_token_lifetime is not None
+        ):
+            if self.session_lifetime < self.refresh_token_lifetime:
+                raise ConfigError(
+                    "Both `session_lifetime` and `refresh_token_lifetime` "
+                    "configuration options have been set, but `refresh_token_lifetime` "
+                    " exceeds `session_lifetime`!"
+                )
 
         # The fallback template used for authenticating using a registration token
         self.registration_token_template = self.read_template("registration_token.html")
