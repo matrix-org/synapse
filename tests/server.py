@@ -57,7 +57,6 @@ from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict
 from synapse.util import Clock
 
-from tests.utils import setup_test_homeserver as _sth
 
 logger = logging.getLogger(__name__)
 
@@ -450,14 +449,11 @@ class ThreadPool:
         return d
 
 
-def setup_test_homeserver(cleanup_func, *args, **kwargs):
+def make_test_homeserver_synchronous(server: HomeServer) -> None:
     """
-    Set up a synchronous test server, driven by the reactor used by
-    the homeserver.
+    Make the given test homeserver's database interactions synchronous.
     """
-    server = _sth(cleanup_func, *args, **kwargs)
 
-    # Make the thread pool synchronous.
     clock = server.get_clock()
 
     for database in server.get_datastores().databases:
@@ -485,14 +481,13 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
 
         pool.runWithConnection = runWithConnection
         pool.runInteraction = runInteraction
+        # Replace the thread pool with a threadless 'thread' pool
         pool.threadpool = ThreadPool(clock._reactor)
         pool.running = True
 
     # We've just changed the Databases to run DB transactions on the same
     # thread, so we need to disable the dedicated thread behaviour.
     server.get_datastores().main.USE_DEDICATED_DB_THREADS_FOR_EVENT_FETCHING = False
-
-    return server
 
 
 def get_clock() -> Tuple[ThreadedMemoryReactorClock, Clock]:
