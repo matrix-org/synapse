@@ -19,8 +19,8 @@ from synapse.rest.client import login, room
 from synapse.types import UserID, create_requester
 
 from tests import unittest
-from tests.server import TestHomeServer
 from tests.test_utils import event_injection
+from tests.utils import TestHomeServer
 
 
 class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
