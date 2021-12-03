@@ -41,7 +41,8 @@ The forward extremities of a room are used as the `prev_events` when the next ev
 ## Backward extremity
 
 The current marker of where we have backfilled up to and will generally be the
-oldest-in-time events we know of in the DAG.
+oldest-in-time events we know of in the DAG. This gives a starting point when
+backfilling history.
 
 When we persist a non-outlier event, we clear it as a backward extremity and set
 all of its `prev_events` as the new backward extremities if they aren't already
