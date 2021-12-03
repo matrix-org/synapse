@@ -15,8 +15,9 @@
 
 from typing import List
 
+from matrix_common.regex import glob_to_regex
+
 from synapse.types import JsonDict
-from synapse.util import glob_to_regex
 
 from ._base import Config, ConfigError
 
