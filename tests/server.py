@@ -850,4 +850,7 @@ def setup_test_homeserver(
 
     hs.get_auth_handler().validate_hash = validate_hash
 
+    # Make the threadpool and database transactions synchronous for testing.
+    make_test_homeserver_synchronous(hs)
+
     return hs
