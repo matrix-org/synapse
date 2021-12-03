@@ -172,6 +172,9 @@ class RegistrationConfig(Config):
         # Note that this only applies to clients which advertise support for
         # refresh tokens.
         #
+        # Note also that this is calculated at login time and refresh time:
+        # changes are not applied to existing sessions until they are refreshed.
+        #
         # By default, this is 5 minutes.
         #
         #refreshable_access_token_lifetime: 5m
@@ -180,6 +183,9 @@ class RegistrationConfig(Config):
         # exchanged for another one first).
         # This option can be used to automatically log-out inactive sessions.
         # Please see the manual for more information.
+        #
+        # Note also that this is calculated at login time and refresh time:
+        # changes are not applied to existing sessions until they are refreshed.
         #
         # By default, this is infinite.
         #
@@ -190,6 +196,9 @@ class RegistrationConfig(Config):
         # Please note that not all clients support refresh tokens, so setting
         # this to a short value may be inconvenient for some users who will
         # then be logged out frequently.
+        #
+        # Note also that this is calculated at login time: changes are not applied
+        # retrospectively to existing sessions for users that have already logged in.
         #
         # By default, this is infinite.
         #
