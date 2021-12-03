@@ -15,10 +15,9 @@
 import logging
 from typing import TYPE_CHECKING
 
-from twisted.web.server import Request
-
 from synapse.http.server import DirectServeJsonResource, set_cors_headers
 from synapse.http.servlet import parse_boolean
+from synapse.http.site import SynapseRequest
 
 from ._base import parse_media_id, respond_404
 
@@ -37,7 +36,7 @@ class DownloadResource(DirectServeJsonResource):
         self.media_repo = media_repo
         self.server_name = hs.hostname
 
-    async def _async_render_GET(self, request: Request) -> None:
+    async def _async_render_GET(self, request: SynapseRequest) -> None:
         set_cors_headers(request)
         request.setHeader(
             b"Content-Security-Policy",

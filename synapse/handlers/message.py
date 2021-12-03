@@ -16,6 +16,7 @@
 # limitations under the License.
 import logging
 import random
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
@@ -39,13 +40,16 @@ from synapse.api.errors import (
     NotFoundError,
     ShadowBanError,
     SynapseError,
+    UnsupportedRoomVersionError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.api.urls import ConsentURIBuilder
+from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
+from synapse.handlers.directory import DirectoryHandler
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
@@ -57,8 +61,6 @@ from synapse.util.async_helpers import Linearizer, unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_events_for_client
-
-from ._base import BaseHandler
 
 if TYPE_CHECKING:
     from synapse.events.third_party_rules import ThirdPartyEventRules
@@ -78,13 +80,13 @@ class MessageHandler:
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
-        self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
+        self._ephemeral_events_enabled = hs.config.server.enable_ephemeral_messages
 
         # The scheduled call to self._expire_event. None if no call is currently
         # scheduled.
         self._scheduled_expiry: Optional[IDelayedCall] = None
 
-        if not hs.config.worker_app:
+        if not hs.config.worker.worker_app:
             run_as_background_process(
                 "_schedule_next_expiry", self._schedule_next_expiry
             )
@@ -250,7 +252,7 @@ class MessageHandler:
             now,
             # We don't bother bundling aggregations in when asked for state
             # events, as clients won't use them.
-            bundle_aggregations=False,
+            bundle_relations=False,
         )
         return events
 
@@ -298,7 +300,7 @@ class MessageHandler:
             for user_id, profile in users_with_profile.items()
         }
 
-    def maybe_schedule_expiry(self, event: EventBase):
+    def maybe_schedule_expiry(self, event: EventBase) -> None:
         """Schedule the expiry of an event if there's not already one scheduled,
         or if the one running is for an event that will expire after the provided
         timestamp.
@@ -318,7 +320,7 @@ class MessageHandler:
         # a task scheduled for a timestamp that's sooner than the provided one.
         self._schedule_expiry_for_event(event.event_id, expiry_ts)
 
-    async def _schedule_next_expiry(self):
+    async def _schedule_next_expiry(self) -> None:
         """Retrieve the ID and the expiry timestamp of the next event to be expired,
         and schedule an expiry task for it.
 
@@ -331,7 +333,7 @@ class MessageHandler:
             event_id, expiry_ts = res
             self._schedule_expiry_for_event(event_id, expiry_ts)
 
-    def _schedule_expiry_for_event(self, event_id: str, expiry_ts: int):
+    def _schedule_expiry_for_event(self, event_id: str, expiry_ts: int) -> None:
         """Schedule an expiry task for the provided event if there's not already one
         scheduled at a timestamp that's sooner than the provided one.
 
@@ -367,7 +369,7 @@ class MessageHandler:
             event_id,
         )
 
-    async def _expire_event(self, event_id: str):
+    async def _expire_event(self, event_id: str) -> None:
         """Retrieve and expire an event that needs to be expired from the database.
 
         If the event doesn't exist in the database, log it and delete the expiry date
@@ -412,7 +414,9 @@ class EventCreationHandler:
         self.server_name = hs.hostname
         self.notifier = hs.get_notifier()
         self.config = hs.config
-        self.require_membership_for_aliases = hs.config.require_membership_for_aliases
+        self.require_membership_for_aliases = (
+            hs.config.server.require_membership_for_aliases
+        )
         self._events_shard_config = self.config.worker.events_shard_config
         self._instance_name = hs.get_instance_name()
 
@@ -422,13 +426,12 @@ class EventCreationHandler:
             Membership.JOIN,
             Membership.KNOCK,
         }
-        if self.hs.config.include_profile_data_on_invite:
+        if self.hs.config.server.include_profile_data_on_invite:
             self.membership_types_to_include_profile_data_in.add(Membership.INVITE)
 
         self.send_event = ReplicationSendEventRestServlet.make_client(hs)
 
-        # This is only used to get at ratelimit function
-        self.base_handler = BaseHandler(hs)
+        self.request_ratelimiter = hs.get_request_ratelimiter()
 
         # We arbitrarily limit concurrent event creation for a room to 5.
         # This is to stop us from diverging history *too* much.
@@ -442,7 +445,7 @@ class EventCreationHandler:
         )
 
         self._block_events_without_consent_error = (
-            self.config.block_events_without_consent_error
+            self.config.consent.block_events_without_consent_error
         )
 
         # we need to construct a ConsentURIBuilder here, as it checks that the necessary
@@ -458,11 +461,11 @@ class EventCreationHandler:
         #
         self._rooms_to_exclude_from_dummy_event_insertion: Dict[str, int] = {}
         # The number of forward extremeities before a dummy event is sent.
-        self._dummy_events_threshold = hs.config.dummy_events_threshold
+        self._dummy_events_threshold = hs.config.server.dummy_events_threshold
 
         if (
-            self.config.run_background_tasks
-            and self.config.cleanup_extremities_with_dummy_events
+            self.config.worker.run_background_tasks
+            and self.config.server.cleanup_extremities_with_dummy_events
         ):
             self.clock.looping_call(
                 lambda: run_as_background_process(
@@ -474,7 +477,7 @@ class EventCreationHandler:
 
         self._message_handler = hs.get_message_handler()
 
-        self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
+        self._ephemeral_events_enabled = hs.config.server.enable_ephemeral_messages
 
         self._external_cache = hs.get_external_cache()
 
@@ -548,16 +551,22 @@ class EventCreationHandler:
         await self.auth.check_auth_blocking(requester=requester)
 
         if event_dict["type"] == EventTypes.Create and event_dict["state_key"] == "":
-            room_version = event_dict["content"]["room_version"]
+            room_version_id = event_dict["content"]["room_version"]
+            room_version_obj = KNOWN_ROOM_VERSIONS.get(room_version_id)
+            if not room_version_obj:
+                # this can happen if support is withdrawn for a room version
+                raise UnsupportedRoomVersionError(room_version_id)
         else:
             try:
-                room_version = await self.store.get_room_version_id(
+                room_version_obj = await self.store.get_room_version(
                     event_dict["room_id"]
                 )
             except NotFoundError:
                 raise AuthError(403, "Unknown room")
 
-        builder = self.event_builder_factory.new(room_version, event_dict)
+        builder = self.event_builder_factory.for_room_version(
+            room_version_obj, event_dict
+        )
 
         self.validator.validate_builder(builder)
 
@@ -597,29 +606,6 @@ class EventCreationHandler:
         builder.internal_metadata.outlier = outlier
 
         builder.internal_metadata.historical = historical
-
-        # Strip down the auth_event_ids to only what we need to auth the event.
-        # For example, we don't need extra m.room.member that don't match event.sender
-        if auth_event_ids is not None:
-            # If auth events are provided, prev events must be also.
-            assert prev_event_ids is not None
-
-            temp_event = await builder.build(
-                prev_event_ids=prev_event_ids,
-                auth_event_ids=auth_event_ids,
-                depth=depth,
-            )
-            auth_events = await self.store.get_events_as_list(auth_event_ids)
-            # Create a StateMap[str]
-            auth_event_state_map = {
-                (e.type, e.state_key): e.event_id for e in auth_events
-            }
-            # Actually strip down and use the necessary auth events
-            auth_event_ids = self._event_auth_handler.compute_auth_events(
-                event=temp_event,
-                current_state_ids=auth_event_state_map,
-                for_verification=False,
-            )
 
         event, context = await self.create_new_client_event(
             builder=builder,
@@ -665,7 +651,7 @@ class EventCreationHandler:
 
         self.validator.validate_new(event, self.config)
 
-        return (event, context)
+        return event, context
 
     async def _is_exempt_from_privacy_policy(
         self, builder: EventBuilder, requester: Requester
@@ -691,10 +677,10 @@ class EventCreationHandler:
         return False
 
     async def _is_server_notices_room(self, room_id: str) -> bool:
-        if self.config.server_notices_mxid is None:
+        if self.config.servernotices.server_notices_mxid is None:
             return False
         user_ids = await self.store.get_users_in_room(room_id)
-        return self.config.server_notices_mxid in user_ids
+        return self.config.servernotices.server_notices_mxid in user_ids
 
     async def assert_accepted_privacy_policy(self, requester: Requester) -> None:
         """Check if a user has accepted the privacy policy
@@ -730,8 +716,8 @@ class EventCreationHandler:
 
         # exempt the system notices user
         if (
-            self.config.server_notices_mxid is not None
-            and user_id == self.config.server_notices_mxid
+            self.config.servernotices.server_notices_mxid is not None
+            and user_id == self.config.servernotices.server_notices_mxid
         ):
             return
 
@@ -743,7 +729,7 @@ class EventCreationHandler:
         if u["appservice_id"] is not None:
             # users registered by an appservice are exempt
             return
-        if u["consent_version"] == self.config.user_consent_version:
+        if u["consent_version"] == self.config.consent.user_consent_version:
             return
 
         consent_uri = self._consent_uri_builder.build_user_consent_uri(user.localpart)
@@ -927,6 +913,33 @@ class EventCreationHandler:
             Tuple of created event, context
         """
 
+        # Strip down the auth_event_ids to only what we need to auth the event.
+        # For example, we don't need extra m.room.member that don't match event.sender
+        full_state_ids_at_event = None
+        if auth_event_ids is not None:
+            # If auth events are provided, prev events must be also.
+            assert prev_event_ids is not None
+
+            # Copy the full auth state before it stripped down
+            full_state_ids_at_event = auth_event_ids.copy()
+
+            temp_event = await builder.build(
+                prev_event_ids=prev_event_ids,
+                auth_event_ids=auth_event_ids,
+                depth=depth,
+            )
+            auth_events = await self.store.get_events_as_list(auth_event_ids)
+            # Create a StateMap[str]
+            auth_event_state_map = {
+                (e.type, e.state_key): e.event_id for e in auth_events
+            }
+            # Actually strip down and use the necessary auth events
+            auth_event_ids = self._event_auth_handler.compute_auth_events(
+                event=temp_event,
+                current_state_ids=auth_event_state_map,
+                for_verification=False,
+            )
+
         if prev_event_ids is not None:
             assert (
                 len(prev_event_ids) <= 10
@@ -951,18 +964,20 @@ class EventCreationHandler:
             depth=depth,
         )
 
-        old_state = None
-
         # Pass on the outlier property from the builder to the event
         # after it is created
         if builder.internal_metadata.outlier:
-            event.internal_metadata.outlier = builder.internal_metadata.outlier
-
-            # Calculate the state for outliers that pass in their own `auth_event_ids`
-            if auth_event_ids:
-                old_state = await self.store.get_events_as_list(auth_event_ids)
-
-        context = await self.state.compute_event_context(event, old_state=old_state)
+            event.internal_metadata.outlier = True
+            context = EventContext.for_outlier()
+        elif (
+            event.type == EventTypes.MSC2716_INSERTION
+            and full_state_ids_at_event
+            and builder.internal_metadata.is_historical()
+        ):
+            old_state = await self.store.get_events_as_list(full_state_ids_at_event)
+            context = await self.state.compute_event_context(event, old_state=old_state)
+        else:
+            context = await self.state.compute_event_context(event)
 
         if requester:
             context.app_service = requester.app_service
@@ -986,13 +1001,52 @@ class EventCreationHandler:
             )
 
         self.validator.validate_new(event, self.config)
+        await self._validate_event_relation(event)
+        logger.debug("Created event %s", event.event_id)
+
+        return event, context
+
+    async def _validate_event_relation(self, event: EventBase) -> None:
+        """
+        Ensure the relation data on a new event is not bogus.
+
+        Args:
+            event: The event being created.
+
+        Raises:
+            SynapseError if the event is invalid.
+        """
+
+        relation = event.content.get("m.relates_to")
+        if not relation:
+            return
+
+        relation_type = relation.get("rel_type")
+        if not relation_type:
+            return
+
+        # Ensure the parent is real.
+        relates_to = relation.get("event_id")
+        if not relates_to:
+            return
+
+        parent_event = await self.store.get_event(relates_to, allow_none=True)
+        if parent_event:
+            # And in the same room.
+            if parent_event.room_id != event.room_id:
+                raise SynapseError(400, "Relations must be in the same room")
+
+        else:
+            # There must be some reason that the client knows the event exists,
+            # see if there are existing relations. If so, assume everything is fine.
+            if not await self.store.event_is_target_of_relation(relates_to):
+                # Otherwise, the client can't know about the parent event!
+                raise SynapseError(400, "Can't send relation to unknown event")
 
         # If this event is an annotation then we check that that the sender
         # can't annotate the same way twice (e.g. stops users from liking an
         # event multiple times).
-        relation = event.content.get("m.relates_to", {})
-        if relation.get("rel_type") == RelationTypes.ANNOTATION:
-            relates_to = relation["event_id"]
+        if relation_type == RelationTypes.ANNOTATION:
             aggregation_key = relation["key"]
 
             already_exists = await self.store.has_user_annotated_event(
@@ -1001,9 +1055,12 @@ class EventCreationHandler:
             if already_exists:
                 raise SynapseError(400, "Can't send same reaction twice")
 
-        logger.debug("Created event %s", event.event_id)
-
-        return (event, context)
+        # Don't attempt to start a thread if the parent event is a relation.
+        elif relation_type == RelationTypes.THREAD:
+            if await self.store.event_includes_relation(relates_to):
+                raise SynapseError(
+                    400, "Cannot start threads from an event with a relation"
+                )
 
     @measure_func("handle_new_client_event")
     async def handle_new_client_event(
@@ -1068,9 +1125,17 @@ class EventCreationHandler:
             EventTypes.Create,
             "",
         ):
-            room_version = event.content.get("room_version", RoomVersions.V1.identifier)
+            room_version_id = event.content.get(
+                "room_version", RoomVersions.V1.identifier
+            )
+            room_version_obj = KNOWN_ROOM_VERSIONS.get(room_version_id)
+            if not room_version_obj:
+                raise UnsupportedRoomVersionError(
+                    "Attempt to create a room with unsupported room version %s"
+                    % (room_version_id,)
+                )
         else:
-            room_version = await self.store.get_room_version_id(event.room_id)
+            room_version_obj = await self.store.get_room_version(event.room_id)
 
         if event.internal_metadata.is_out_of_band_membership():
             # the only sort of out-of-band-membership events we expect to see here are
@@ -1079,8 +1144,9 @@ class EventCreationHandler:
             assert event.content["membership"] == Membership.LEAVE
         else:
             try:
-                await self._event_auth_handler.check_from_context(
-                    room_version, event, context
+                validate_event_for_room_version(room_version_obj, event)
+                await self._event_auth_handler.check_auth_rules_from_context(
+                    room_version_obj, event, context
                 )
             except AuthError as err:
                 logger.warning("Denying new event %r because %s", event, err)
@@ -1229,7 +1295,10 @@ class EventCreationHandler:
             self._external_cache_joined_hosts_updates[state_entry.state_group] = None
 
     async def _validate_canonical_alias(
-        self, directory_handler, room_alias_str: str, expected_room_id: str
+        self,
+        directory_handler: DirectoryHandler,
+        room_alias_str: str,
+        expected_room_id: str,
     ) -> None:
         """
         Ensure that the given room alias points to the expected room ID.
@@ -1291,6 +1360,8 @@ class EventCreationHandler:
             # user is actually admin or not).
             is_admin_redaction = False
             if event.type == EventTypes.Redaction:
+                assert event.redacts is not None
+
                 original_event = await self.store.get_event(
                     event.redacts,
                     redact_behaviour=EventRedactBehaviour.AS_IS,
@@ -1303,7 +1374,7 @@ class EventCreationHandler:
                     original_event and event.sender != original_event.sender
                 )
 
-            await self.base_handler.ratelimit(
+            await self.request_ratelimiter.ratelimit(
                 requester, is_admin_redaction=is_admin_redaction
             )
 
@@ -1386,6 +1457,8 @@ class EventCreationHandler:
                 )
 
         if event.type == EventTypes.Redaction:
+            assert event.redacts is not None
+
             original_event = await self.store.get_event(
                 event.redacts,
                 redact_behaviour=EventRedactBehaviour.AS_IS,
@@ -1421,7 +1494,7 @@ class EventCreationHandler:
                 # structural protocol level).
                 is_msc2716_event = (
                     original_event.type == EventTypes.MSC2716_INSERTION
-                    or original_event.type == EventTypes.MSC2716_CHUNK
+                    or original_event.type == EventTypes.MSC2716_BATCH
                     or original_event.type == EventTypes.MSC2716_MARKER
                 )
                 if not room_version_obj.msc2716_historical and is_msc2716_event:
@@ -1457,6 +1530,41 @@ class EventCreationHandler:
             if prev_state_ids:
                 raise AuthError(403, "Changing the room create event is forbidden")
 
+        if event.type == EventTypes.MSC2716_INSERTION:
+            room_version = await self.store.get_room_version_id(event.room_id)
+            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+
+            create_event = await self.store.get_create_event_for_room(event.room_id)
+            room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+
+            # Only check an insertion event if the room version
+            # supports it or the event is from the room creator.
+            if room_version_obj.msc2716_historical or (
+                self.config.experimental.msc2716_enabled
+                and event.sender == room_creator
+            ):
+                next_batch_id = event.content.get(
+                    EventContentFields.MSC2716_NEXT_BATCH_ID
+                )
+                conflicting_insertion_event_id = None
+                if next_batch_id:
+                    conflicting_insertion_event_id = (
+                        await self.store.get_insertion_event_id_by_batch_id(
+                            event.room_id, next_batch_id
+                        )
+                    )
+                if conflicting_insertion_event_id is not None:
+                    # The current insertion event that we're processing is invalid
+                    # because an insertion event already exists in the room with the
+                    # same next_batch_id. We can't allow multiple because the batch
+                    # pointing will get weird, e.g. we can't determine which insertion
+                    # event the batch event is pointing to.
+                    raise SynapseError(
+                        HTTPStatus.BAD_REQUEST,
+                        "Another insertion event already exists with the same next_batch_id",
+                        errcode=Codes.INVALID_PARAM,
+                    )
+
         # Mark any `m.historical` messages as backfilled so they don't appear
         # in `/sync` and have the proper decrementing `stream_ordering` as we import
         backfilled = False
@@ -1477,13 +1585,16 @@ class EventCreationHandler:
             # If there's an expiry timestamp on the event, schedule its expiry.
             self._message_handler.maybe_schedule_expiry(event)
 
-        def _notify():
+        async def _notify() -> None:
             try:
-                self.notifier.on_new_room_event(
+                await self.notifier.on_new_room_event(
                     event, event_pos, max_stream_token, extra_users=extra_users
                 )
             except Exception:
-                logger.exception("Error notifying about new room event")
+                logger.exception(
+                    "Error notifying about new room event %s",
+                    event.event_id,
+                )
 
         run_in_background(_notify)
 
@@ -1523,7 +1634,7 @@ class EventCreationHandler:
         except Exception:
             logger.exception("Error bumping presence active time")
 
-    async def _send_dummy_events_to_fill_extremities(self):
+    async def _send_dummy_events_to_fill_extremities(self) -> None:
         """Background task to send dummy events into rooms that have a large
         number of extremities
         """
@@ -1600,7 +1711,7 @@ class EventCreationHandler:
                 )
         return False
 
-    def _expire_rooms_to_exclude_from_dummy_event_insertion(self):
+    def _expire_rooms_to_exclude_from_dummy_event_insertion(self) -> None:
         expire_before = self.clock.time_msec() - _DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY
         to_expire = set()
         for room_id, time in self._rooms_to_exclude_from_dummy_event_insertion.items():

@@ -46,7 +46,7 @@ class StatsHandler:
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
 
-        self.stats_enabled = hs.config.stats_enabled
+        self.stats_enabled = hs.config.stats.stats_enabled
 
         # The current position in the current_state_delta stream
         self.pos: Optional[int] = None
@@ -54,7 +54,7 @@ class StatsHandler:
         # Guard to ensure we only process deltas one at a time
         self._is_processing = False
 
-        if self.stats_enabled and hs.config.run_background_tasks:
+        if self.stats_enabled and hs.config.worker.run_background_tasks:
             self.notifier.add_replication_callback(self.notify_new_event)
 
             # We kick this off so that we don't have to wait for a change before
@@ -68,7 +68,7 @@ class StatsHandler:
 
         self._is_processing = True
 
-        async def process():
+        async def process() -> None:
             try:
                 await self._unsafe_process()
             finally:

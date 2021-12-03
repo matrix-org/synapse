@@ -1,1 +1,0 @@
-Add config option to use non-default manhole password and keys.

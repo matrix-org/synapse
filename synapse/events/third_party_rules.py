@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Optional, Tuple
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import ModuleFailedException, SynapseError
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.types import Requester, StateMap
@@ -36,16 +36,17 @@ CHECK_THREEPID_CAN_BE_INVITED_CALLBACK = Callable[
 CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK = Callable[
     [str, StateMap[EventBase], str], Awaitable[bool]
 ]
+ON_NEW_EVENT_CALLBACK = Callable[[EventBase, StateMap[EventBase]], Awaitable]
 
 
-def load_legacy_third_party_event_rules(hs: "HomeServer"):
+def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
     """Wrapper that loads a third party event rules module configured using the old
     configuration, and registers the hooks they implement.
     """
-    if hs.config.third_party_event_rules is None:
+    if hs.config.thirdpartyrules.third_party_event_rules is None:
         return
 
-    module, config = hs.config.third_party_event_rules
+    module, config = hs.config.thirdpartyrules.third_party_event_rules
 
     api = hs.get_module_api()
     third_party_rules = module(config=config, module_api=api)
@@ -77,9 +78,9 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
                 event: EventBase,
                 state_events: StateMap[EventBase],
             ) -> Tuple[bool, Optional[dict]]:
-                # We've already made sure f is not None above, but mypy doesn't do well
-                # across function boundaries so we need to tell it f is definitely not
-                # None.
+                # Assertion required because mypy can't prove we won't change
+                # `f` back to `None`. See
+                # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
                 assert f is not None
 
                 res = await f(event, state_events)
@@ -98,9 +99,9 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
             async def wrap_on_create_room(
                 requester: Requester, config: dict, is_requester_admin: bool
             ) -> None:
-                # We've already made sure f is not None above, but mypy doesn't do well
-                # across function boundaries so we need to tell it f is definitely not
-                # None.
+                # Assertion required because mypy can't prove we won't change
+                # `f` back to `None`. See
+                # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
                 assert f is not None
 
                 res = await f(requester, config, is_requester_admin)
@@ -112,9 +113,10 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
 
             return wrap_on_create_room
 
-        def run(*args, **kwargs):
-            # mypy doesn't do well across function boundaries so we need to tell it
-            # f is definitely not None.
+        def run(*args: Any, **kwargs: Any) -> Awaitable:
+            # Assertion required because mypy can't prove we won't change  `f`
+            # back to `None`. See
+            # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
             assert f is not None
 
             return maybe_awaitable(f(*args, **kwargs))
@@ -151,6 +153,7 @@ class ThirdPartyEventRules:
         self._check_visibility_can_be_modified_callbacks: List[
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = []
+        self._on_new_event_callbacks: List[ON_NEW_EVENT_CALLBACK] = []
 
     def register_third_party_rules_callbacks(
         self,
@@ -162,7 +165,8 @@ class ThirdPartyEventRules:
         check_visibility_can_be_modified: Optional[
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = None,
-    ):
+        on_new_event: Optional[ON_NEW_EVENT_CALLBACK] = None,
+    ) -> None:
         """Register callbacks from modules for each hook."""
         if check_event_allowed is not None:
             self._check_event_allowed_callbacks.append(check_event_allowed)
@@ -179,6 +183,9 @@ class ThirdPartyEventRules:
             self._check_visibility_can_be_modified_callbacks.append(
                 check_visibility_can_be_modified,
             )
+
+        if on_new_event is not None:
+            self._on_new_event_callbacks.append(on_new_event)
 
     async def check_event_allowed(
         self, event: EventBase, context: EventContext
@@ -217,9 +224,19 @@ class ThirdPartyEventRules:
         for callback in self._check_event_allowed_callbacks:
             try:
                 res, replacement_data = await callback(event, state_events)
-            except Exception as e:
-                logger.warning("Failed to run module API callback %s: %s", callback, e)
-                continue
+            except SynapseError as e:
+                # FIXME: Being able to throw SynapseErrors is relied upon by
+                # some modules. PR #10386 accidentally broke this ability.
+                # That said, we aren't keen on exposing this implementation detail
+                # to modules and we should one day have a proper way to do what
+                # is wanted.
+                # This module callback needs a rework so that hacks such as
+                # this one are not necessary.
+                raise e
+            except Exception:
+                raise ModuleFailedException(
+                    "Failed to run `check_event_allowed` module API callback"
+                )
 
             # Return if the event shouldn't be allowed or if the module came up with a
             # replacement dict for the event.
@@ -310,6 +327,31 @@ class ThirdPartyEventRules:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
 
         return True
+
+    async def on_new_event(self, event_id: str) -> None:
+        """Let modules act on events after they've been sent (e.g. auto-accepting
+        invites, etc.)
+
+        Args:
+            event_id: The ID of the event.
+
+        Raises:
+            ModuleFailureError if a callback raised any exception.
+        """
+        # Bail out early without hitting the store if we don't have any callbacks
+        if len(self._on_new_event_callbacks) == 0:
+            return
+
+        event = await self.store.get_event(event_id)
+        state_events = await self._get_state_map_for_room(event.room_id)
+
+        for callback in self._on_new_event_callbacks:
+            try:
+                await callback(event, state_events)
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
 
     async def _get_state_map_for_room(self, room_id: str) -> StateMap[EventBase]:
         """Given a room ID, return the state events of that room.

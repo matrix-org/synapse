@@ -22,7 +22,7 @@ class SQLTransactionLimitTestCase(unittest.HomeserverTestCase):
         return self.setup_test_homeserver(db_txn_limit=1000)
 
     def test_config(self):
-        db_config = self.hs.config.get_single_database()
+        db_config = self.hs.config.database.get_single_database()
         self.assertEqual(db_config.config["txn_limit"], 1000)
 
     def test_select(self):

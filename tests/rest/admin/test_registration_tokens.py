@@ -95,8 +95,10 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
 
     def test_create_specifying_fields(self):
         """Create a token specifying the value of all fields."""
+        # As many of the allowed characters as possible with length <= 64
+        token = "adefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._~-"
         data = {
-            "token": "abcd",
+            "token": token,
             "uses_allowed": 1,
             "expiry_time": self.clock.time_msec() + 1000000,
         }
@@ -109,7 +111,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(channel.json_body["token"], "abcd")
+        self.assertEqual(channel.json_body["token"], token)
         self.assertEqual(channel.json_body["uses_allowed"], 1)
         self.assertEqual(channel.json_body["expiry_time"], data["expiry_time"])
         self.assertEqual(channel.json_body["pending"], 0)
@@ -193,7 +195,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         """Check right error is raised when server can't generate unique token."""
         # Create all possible single character tokens
         tokens = []
-        for c in string.ascii_letters + string.digits + "-_":
+        for c in string.ascii_letters + string.digits + "._~-":
             tokens.append(
                 {
                     "token": c,

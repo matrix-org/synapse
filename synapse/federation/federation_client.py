@@ -37,7 +37,7 @@ from typing import (
 import attr
 from prometheus_client import Counter
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
@@ -227,7 +227,7 @@ class FederationClient(FederationBase):
         )
 
     async def backfill(
-        self, dest: str, room_id: str, limit: int, extremities: Iterable[str]
+        self, dest: str, room_id: str, limit: int, extremities: Collection[str]
     ) -> Optional[List[EventBase]]:
         """Requests some more historic PDUs for the given room from the
         given destination server.
@@ -237,6 +237,8 @@ class FederationClient(FederationBase):
             room_id: The room_id to backfill.
             limit: The maximum number of events to return.
             extremities: our current backwards extremities, to backfill from
+                Must be a Collection that is falsy when empty.
+                (Iterable is not enough here!)
         """
         logger.debug("backfill extrem=%s", extremities)
 
@@ -250,11 +252,22 @@ class FederationClient(FederationBase):
 
         logger.debug("backfill transaction_data=%r", transaction_data)
 
+        if not isinstance(transaction_data, dict):
+            # TODO we probably want an exception type specific to federation
+            # client validation.
+            raise TypeError("Backfill transaction_data is not a dict.")
+
+        transaction_data_pdus = transaction_data.get("pdus")
+        if not isinstance(transaction_data_pdus, list):
+            # TODO we probably want an exception type specific to federation
+            # client validation.
+            raise TypeError("transaction_data.pdus is not a list.")
+
         room_version = await self.store.get_room_version(room_id)
 
         pdus = [
             event_from_pdu_json(p, room_version, outlier=False)
-            for p in transaction_data["pdus"]
+            for p in transaction_data_pdus
         ]
 
         # Check signatures and hash of pdus, removing any from the list that fail checks
@@ -263,6 +276,58 @@ class FederationClient(FederationBase):
         )
 
         return pdus
+
+    async def get_pdu_from_destination_raw(
+        self,
+        destination: str,
+        event_id: str,
+        room_version: RoomVersion,
+        outlier: bool = False,
+        timeout: Optional[int] = None,
+    ) -> Optional[EventBase]:
+        """Requests the PDU with given origin and ID from the remote home
+        server. Does not have any caching or rate limiting!
+
+        Args:
+            destination: Which homeserver to query
+            event_id: event to fetch
+            room_version: version of the room
+            outlier: Indicates whether the PDU is an `outlier`, i.e. if
+                it's from an arbitrary point in the context as opposed to part
+                of the current block of PDUs. Defaults to `False`
+            timeout: How long to try (in ms) each destination for before
+                moving to the next destination. None indicates no timeout.
+
+        Returns:
+            The requested PDU, or None if we were unable to find it.
+
+        Raises:
+            SynapseError, NotRetryingDestination, FederationDeniedError
+        """
+        transaction_data = await self.transport_layer.get_event(
+            destination, event_id, timeout=timeout
+        )
+
+        logger.debug(
+            "retrieved event id %s from %s: %r",
+            event_id,
+            destination,
+            transaction_data,
+        )
+
+        pdu_list: List[EventBase] = [
+            event_from_pdu_json(p, room_version, outlier=outlier)
+            for p in transaction_data["pdus"]
+        ]
+
+        if pdu_list and pdu_list[0]:
+            pdu = pdu_list[0]
+
+            # Check signatures are correct.
+            signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
+            return signed_pdu
+
+        return None
 
     async def get_pdu(
         self,
@@ -308,29 +373,13 @@ class FederationClient(FederationBase):
                 continue
 
             try:
-                transaction_data = await self.transport_layer.get_event(
-                    destination, event_id, timeout=timeout
+                signed_pdu = await self.get_pdu_from_destination_raw(
+                    destination=destination,
+                    event_id=event_id,
+                    room_version=room_version,
+                    outlier=outlier,
+                    timeout=timeout,
                 )
-
-                logger.debug(
-                    "retrieved event id %s from %s: %r",
-                    event_id,
-                    destination,
-                    transaction_data,
-                )
-
-                pdu_list: List[EventBase] = [
-                    event_from_pdu_json(p, room_version, outlier=outlier)
-                    for p in transaction_data["pdus"]
-                ]
-
-                if pdu_list and pdu_list[0]:
-                    pdu = pdu_list[0]
-
-                    # Check signatures are correct.
-                    signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
-
-                    break
 
                 pdu_attempts[destination] = now
 
@@ -500,8 +549,6 @@ class FederationClient(FederationBase):
         signed_auth = await self._check_sigs_and_hash_and_fetch(
             destination, auth_chain, outlier=True, room_version=room_version
         )
-
-        signed_auth.sort(key=lambda e: e.depth)
 
         return signed_auth
 
@@ -877,9 +924,9 @@ class FederationClient(FederationBase):
             # If the join is being authorised via allow rules, we need to send
             # the /send_join back to the same server that was originally used
             # with /make_join.
-            if "join_authorised_via_users_server" in pdu.content:
+            if EventContentFields.AUTHORISING_USER in pdu.content:
                 destinations = [
-                    get_domain_from_id(pdu.content["join_authorised_via_users_server"])
+                    get_domain_from_id(pdu.content[EventContentFields.AUTHORISING_USER])
                 ]
 
         return await self._try_destination_list(

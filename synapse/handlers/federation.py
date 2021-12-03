@@ -15,7 +15,6 @@
 
 """Contains handlers for federation events."""
 
-import itertools
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
@@ -27,7 +26,7 @@ from unpaddedbase64 import decode_base64
 from twisted.internet import defer
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, RejectedReason
+from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     CodeMessageException,
@@ -38,13 +37,13 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVersions
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.crypto.event_signing import compute_event_signature
+from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.federation.federation_client import InvalidResponseError
-from synapse.handlers._base import BaseHandler
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
     make_deferred_yieldable,
@@ -69,15 +68,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class FederationHandler(BaseHandler):
+class FederationHandler:
     """Handles general incoming federation requests
 
     Incoming events are *not* handled here, for which see FederationEventHandler.
     """
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
         self.hs = hs
 
         self.store = hs.get_datastore()
@@ -90,8 +87,9 @@ class FederationHandler(BaseHandler):
         self.is_mine_id = hs.is_mine_id
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.event_builder_factory = hs.get_event_builder_factory()
         self._event_auth_handler = hs.get_event_auth_handler()
-        self._server_notices_mxid = hs.config.server_notices_mxid
+        self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self.config = hs.config
         self.http_client = hs.get_proxied_blacklisted_http_client()
         self._replication = hs.get_replication_data_handler()
@@ -101,7 +99,7 @@ class FederationHandler(BaseHandler):
             hs
         )
 
-        if hs.config.worker_app:
+        if hs.config.worker.worker_app:
             self._maybe_store_room_on_outlier_membership = (
                 ReplicationStoreRoomOnOutlierMembershipRestServlet.make_client(hs)
             )
@@ -231,18 +229,10 @@ class FederationHandler(BaseHandler):
             )
             return False
 
-        logger.debug(
-            "room_id: %s, backfill: current_depth: %s, max_depth: %s, extrems: %s",
-            room_id,
-            current_depth,
-            max_depth,
-            sorted_extremeties_tuple,
-        )
-
         # We ignore extremities that have a greater depth than our current depth
         # as:
         #    1. we don't really care about getting events that have happened
-        #       before our current position; and
+        #       after our current position; and
         #    2. we have likely previously tried and failed to backfill from that
         #       extremity, so to avoid getting "stuck" requesting the same
         #       backfill repeatedly we drop those extremities.
@@ -250,9 +240,19 @@ class FederationHandler(BaseHandler):
             t for t in sorted_extremeties_tuple if int(t[1]) <= current_depth
         ]
 
+        logger.debug(
+            "room_id: %s, backfill: current_depth: %s, limit: %s, max_depth: %s, extrems: %s filtered_sorted_extremeties_tuple: %s",
+            room_id,
+            current_depth,
+            limit,
+            max_depth,
+            sorted_extremeties_tuple,
+            filtered_sorted_extremeties_tuple,
+        )
+
         # However, we need to check that the filtered extremities are non-empty.
         # If they are empty then either we can a) bail or b) still attempt to
-        # backill. We opt to try backfilling anyway just in case we do get
+        # backfill. We opt to try backfilling anyway just in case we do get
         # relevant events.
         if filtered_sorted_extremeties_tuple:
             sorted_extremeties_tuple = filtered_sorted_extremeties_tuple
@@ -382,7 +382,7 @@ class FederationHandler(BaseHandler):
             for key, state_dict in states.items()
         }
 
-        for e_id, _ in sorted_extremeties_tuple:
+        for e_id in event_ids:
             likely_extremeties_domains = get_domains_from_state(states[e_id])
 
             success = await try_backfill(
@@ -510,7 +510,7 @@ class FederationHandler(BaseHandler):
                 auth_events=auth_chain,
             )
 
-            max_stream_id = await self._persist_auth_tree(
+            max_stream_id = await self._federation_event_handler.process_remote_join(
                 origin, room_id, auth_chain, state, event, room_version_obj
             )
 
@@ -593,6 +593,13 @@ class FederationHandler(BaseHandler):
             target_hosts, room_id, knockee, Membership.KNOCK, content, params=params
         )
 
+        # Mark the knock as an outlier as we don't yet have the state at this point in
+        # the DAG.
+        event.internal_metadata.outlier = True
+
+        # ... but tell /sync to send it to clients anyway.
+        event.internal_metadata.out_of_band_membership = True
+
         # Record the room ID and its version so that we have a record of the room
         await self._maybe_store_room_on_outlier_membership(
             room_id=event.room_id, room_version=event_format_version
@@ -617,7 +624,7 @@ class FederationHandler(BaseHandler):
         # in the invitee's sync stream. It is stripped out for all other local users.
         event.unsigned["knock_room_state"] = stripped_room_state["knock_state_events"]
 
-        context = await self.state_handler.compute_event_context(event)
+        context = EventContext.for_outlier()
         stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -705,14 +712,14 @@ class FederationHandler(BaseHandler):
 
                 if include_auth_user_id:
                     event_content[
-                        "join_authorised_via_users_server"
+                        EventContentFields.AUTHORISING_USER
                     ] = await self._event_auth_handler.get_user_which_could_invite(
                         room_id,
                         state_ids,
                     )
 
-        builder = self.event_builder_factory.new(
-            room_version.identifier,
+        builder = self.event_builder_factory.for_room_version(
+            room_version,
             {
                 "type": EventTypes.Member,
                 "content": event_content,
@@ -735,10 +742,9 @@ class FederationHandler(BaseHandler):
 
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
-        await self._event_auth_handler.check_from_context(
-            room_version.identifier, event, context, do_sig_check=False
+        await self._event_auth_handler.check_auth_rules_from_context(
+            room_version, event, context
         )
-
         return event
 
     async def on_invite_request(
@@ -755,7 +761,7 @@ class FederationHandler(BaseHandler):
         if is_blocked:
             raise SynapseError(403, "This room has been blocked on this server")
 
-        if self.hs.config.block_non_admin_invites:
+        if self.hs.config.server.block_non_admin_invites:
             raise SynapseError(403, "This server does not accept room invites")
 
         if not await self.spam_checker.user_may_invite(
@@ -807,7 +813,7 @@ class FederationHandler(BaseHandler):
             )
         )
 
-        context = await self.state_handler.compute_event_context(event)
+        context = EventContext.for_outlier()
         await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -836,7 +842,7 @@ class FederationHandler(BaseHandler):
 
         await self.federation_client.send_leave(host_list, event)
 
-        context = await self.state_handler.compute_event_context(event)
+        context = EventContext.for_outlier()
         stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -890,9 +896,9 @@ class FederationHandler(BaseHandler):
             )
             raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
 
-        room_version = await self.store.get_room_version_id(room_id)
-        builder = self.event_builder_factory.new(
-            room_version,
+        room_version_obj = await self.store.get_room_version(room_id)
+        builder = self.event_builder_factory.for_room_version(
+            room_version_obj,
             {
                 "type": EventTypes.Member,
                 "content": {"membership": Membership.LEAVE},
@@ -909,8 +915,8 @@ class FederationHandler(BaseHandler):
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_leave_request`
-            await self._event_auth_handler.check_from_context(
-                room_version, event, context, do_sig_check=False
+            await self._event_auth_handler.check_auth_rules_from_context(
+                room_version_obj, event, context
             )
         except AuthError as e:
             logger.warning("Failed to create new leave %r because %s", event, e)
@@ -942,10 +948,10 @@ class FederationHandler(BaseHandler):
             )
             raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
 
-        room_version = await self.store.get_room_version_id(room_id)
+        room_version_obj = await self.store.get_room_version(room_id)
 
-        builder = self.event_builder_factory.new(
-            room_version,
+        builder = self.event_builder_factory.for_room_version(
+            room_version_obj,
             {
                 "type": EventTypes.Member,
                 "content": {"membership": Membership.KNOCK},
@@ -971,8 +977,8 @@ class FederationHandler(BaseHandler):
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_knock_request`
-            await self._event_auth_handler.check_from_context(
-                room_version, event, context, do_sig_check=False
+            await self._event_auth_handler.check_auth_rules_from_context(
+                room_version_obj, event, context
             )
         except AuthError as e:
             logger.warning("Failed to create new knock %r because %s", event, e)
@@ -1080,119 +1086,6 @@ class FederationHandler(BaseHandler):
         else:
             return None
 
-    async def _persist_auth_tree(
-        self,
-        origin: str,
-        room_id: str,
-        auth_events: List[EventBase],
-        state: List[EventBase],
-        event: EventBase,
-        room_version: RoomVersion,
-    ) -> int:
-        """Checks the auth chain is valid (and passes auth checks) for the
-        state and event. Then persists the auth chain and state atomically.
-        Persists the event separately. Notifies about the persisted events
-        where appropriate.
-
-        Will attempt to fetch missing auth events.
-
-        Args:
-            origin: Where the events came from
-            room_id,
-            auth_events
-            state
-            event
-            room_version: The room version we expect this room to have, and
-                will raise if it doesn't match the version in the create event.
-        """
-        events_to_context = {}
-        for e in itertools.chain(auth_events, state):
-            e.internal_metadata.outlier = True
-            ctx = await self.state_handler.compute_event_context(e)
-            events_to_context[e.event_id] = ctx
-
-        event_map = {
-            e.event_id: e for e in itertools.chain(auth_events, state, [event])
-        }
-
-        create_event = None
-        for e in auth_events:
-            if (e.type, e.state_key) == (EventTypes.Create, ""):
-                create_event = e
-                break
-
-        if create_event is None:
-            # If the state doesn't have a create event then the room is
-            # invalid, and it would fail auth checks anyway.
-            raise SynapseError(400, "No create event in state")
-
-        room_version_id = create_event.content.get(
-            "room_version", RoomVersions.V1.identifier
-        )
-
-        if room_version.identifier != room_version_id:
-            raise SynapseError(400, "Room version mismatch")
-
-        missing_auth_events = set()
-        for e in itertools.chain(auth_events, state, [event]):
-            for e_id in e.auth_event_ids():
-                if e_id not in event_map:
-                    missing_auth_events.add(e_id)
-
-        for e_id in missing_auth_events:
-            m_ev = await self.federation_client.get_pdu(
-                [origin],
-                e_id,
-                room_version=room_version,
-                outlier=True,
-                timeout=10000,
-            )
-            if m_ev and m_ev.event_id == e_id:
-                event_map[e_id] = m_ev
-            else:
-                logger.info("Failed to find auth event %r", e_id)
-
-        for e in itertools.chain(auth_events, state, [event]):
-            auth_for_e = {
-                (event_map[e_id].type, event_map[e_id].state_key): event_map[e_id]
-                for e_id in e.auth_event_ids()
-                if e_id in event_map
-            }
-            if create_event:
-                auth_for_e[(EventTypes.Create, "")] = create_event
-
-            try:
-                event_auth.check(room_version, e, auth_events=auth_for_e)
-            except SynapseError as err:
-                # we may get SynapseErrors here as well as AuthErrors. For
-                # instance, there are a couple of (ancient) events in some
-                # rooms whose senders do not have the correct sigil; these
-                # cause SynapseErrors in auth.check. We don't want to give up
-                # the attempt to federate altogether in such cases.
-
-                logger.warning("Rejecting %s because %s", e.event_id, err.msg)
-
-                if e == event:
-                    raise
-                events_to_context[e.event_id].rejected = RejectedReason.AUTH_ERROR
-
-        if auth_events or state:
-            await self._federation_event_handler.persist_events_and_notify(
-                room_id,
-                [
-                    (e, events_to_context[e.event_id])
-                    for e in itertools.chain(auth_events, state)
-                ],
-            )
-
-        new_event_context = await self.state_handler.compute_event_context(
-            event, old_state=state
-        )
-
-        return await self._federation_event_handler.persist_events_and_notify(
-            room_id, [(event, new_event_context)]
-        )
-
     async def on_get_missing_events(
         self,
         origin: str,
@@ -1221,136 +1114,6 @@ class FederationHandler(BaseHandler):
 
         return missing_events
 
-    async def construct_auth_difference(
-        self, local_auth: Iterable[EventBase], remote_auth: Iterable[EventBase]
-    ) -> Dict:
-        """Given a local and remote auth chain, find the differences. This
-        assumes that we have already processed all events in remote_auth
-
-        Params:
-            local_auth
-            remote_auth
-
-        Returns:
-            dict
-        """
-
-        logger.debug("construct_auth_difference Start!")
-
-        # TODO: Make sure we are OK with local_auth or remote_auth having more
-        # auth events in them than strictly necessary.
-
-        def sort_fun(ev):
-            return ev.depth, ev.event_id
-
-        logger.debug("construct_auth_difference after sort_fun!")
-
-        # We find the differences by starting at the "bottom" of each list
-        # and iterating up on both lists. The lists are ordered by depth and
-        # then event_id, we iterate up both lists until we find the event ids
-        # don't match. Then we look at depth/event_id to see which side is
-        # missing that event, and iterate only up that list. Repeat.
-
-        remote_list = list(remote_auth)
-        remote_list.sort(key=sort_fun)
-
-        local_list = list(local_auth)
-        local_list.sort(key=sort_fun)
-
-        local_iter = iter(local_list)
-        remote_iter = iter(remote_list)
-
-        logger.debug("construct_auth_difference before get_next!")
-
-        def get_next(it, opt=None):
-            try:
-                return next(it)
-            except Exception:
-                return opt
-
-        current_local = get_next(local_iter)
-        current_remote = get_next(remote_iter)
-
-        logger.debug("construct_auth_difference before while")
-
-        missing_remotes = []
-        missing_locals = []
-        while current_local or current_remote:
-            if current_remote is None:
-                missing_locals.append(current_local)
-                current_local = get_next(local_iter)
-                continue
-
-            if current_local is None:
-                missing_remotes.append(current_remote)
-                current_remote = get_next(remote_iter)
-                continue
-
-            if current_local.event_id == current_remote.event_id:
-                current_local = get_next(local_iter)
-                current_remote = get_next(remote_iter)
-                continue
-
-            if current_local.depth < current_remote.depth:
-                missing_locals.append(current_local)
-                current_local = get_next(local_iter)
-                continue
-
-            if current_local.depth > current_remote.depth:
-                missing_remotes.append(current_remote)
-                current_remote = get_next(remote_iter)
-                continue
-
-            # They have the same depth, so we fall back to the event_id order
-            if current_local.event_id < current_remote.event_id:
-                missing_locals.append(current_local)
-                current_local = get_next(local_iter)
-
-            if current_local.event_id > current_remote.event_id:
-                missing_remotes.append(current_remote)
-                current_remote = get_next(remote_iter)
-                continue
-
-        logger.debug("construct_auth_difference after while")
-
-        # missing locals should be sent to the server
-        # We should find why we are missing remotes, as they will have been
-        # rejected.
-
-        # Remove events from missing_remotes if they are referencing a missing
-        # remote. We only care about the "root" rejected ones.
-        missing_remote_ids = [e.event_id for e in missing_remotes]
-        base_remote_rejected = list(missing_remotes)
-        for e in missing_remotes:
-            for e_id in e.auth_event_ids():
-                if e_id in missing_remote_ids:
-                    try:
-                        base_remote_rejected.remove(e)
-                    except ValueError:
-                        pass
-
-        reason_map = {}
-
-        for e in base_remote_rejected:
-            reason = await self.store.get_rejection_reason(e.event_id)
-            if reason is None:
-                # TODO: e is not in the current state, so we should
-                # construct some proof of that.
-                continue
-
-            reason_map[e.event_id] = reason
-
-        logger.debug("construct_auth_difference returning")
-
-        return {
-            "auth_chain": local_auth,
-            "rejects": {
-                e.event_id: {"reason": reason_map[e.event_id], "proof": None}
-                for e in base_remote_rejected
-            },
-            "missing": [e.event_id for e in missing_locals],
-        }
-
     @log_function
     async def exchange_third_party_invite(
         self, sender_user_id: str, target_user_id: str, room_id: str, signed: JsonDict
@@ -1369,8 +1132,10 @@ class FederationHandler(BaseHandler):
         }
 
         if await self._event_auth_handler.check_host_in_room(room_id, self.hs.hostname):
-            room_version = await self.store.get_room_version_id(room_id)
-            builder = self.event_builder_factory.new(room_version, event_dict)
+            room_version_obj = await self.store.get_room_version(room_id)
+            builder = self.event_builder_factory.for_room_version(
+                room_version_obj, event_dict
+            )
 
             EventValidator().validate_builder(builder)
             event, context = await self.event_creation_handler.create_new_client_event(
@@ -1378,7 +1143,7 @@ class FederationHandler(BaseHandler):
             )
 
             event, context = await self.add_display_name_to_third_party_invite(
-                room_version, event_dict, event, context
+                room_version_obj, event_dict, event, context
             )
 
             EventValidator().validate_new(event, self.config)
@@ -1388,8 +1153,9 @@ class FederationHandler(BaseHandler):
             event.internal_metadata.send_on_behalf_of = self.hs.hostname
 
             try:
-                await self._event_auth_handler.check_from_context(
-                    room_version, event, context
+                validate_event_for_room_version(room_version_obj, event)
+                await self._event_auth_handler.check_auth_rules_from_context(
+                    room_version_obj, event, context
                 )
             except AuthError as e:
                 logger.warning("Denying new third party invite %r because %s", event, e)
@@ -1423,22 +1189,25 @@ class FederationHandler(BaseHandler):
 
         """
         assert_params_in_dict(event_dict, ["room_id"])
-        room_version = await self.store.get_room_version_id(event_dict["room_id"])
+        room_version_obj = await self.store.get_room_version(event_dict["room_id"])
 
         # NB: event_dict has a particular specced format we might need to fudge
         # if we change event formats too much.
-        builder = self.event_builder_factory.new(room_version, event_dict)
+        builder = self.event_builder_factory.for_room_version(
+            room_version_obj, event_dict
+        )
 
         event, context = await self.event_creation_handler.create_new_client_event(
             builder=builder
         )
         event, context = await self.add_display_name_to_third_party_invite(
-            room_version, event_dict, event, context
+            room_version_obj, event_dict, event, context
         )
 
         try:
-            await self._event_auth_handler.check_from_context(
-                room_version, event, context
+            validate_event_for_room_version(room_version_obj, event)
+            await self._event_auth_handler.check_auth_rules_from_context(
+                room_version_obj, event, context
             )
         except AuthError as e:
             logger.warning("Denying third party invite %r because %s", event, e)
@@ -1455,7 +1224,7 @@ class FederationHandler(BaseHandler):
 
     async def add_display_name_to_third_party_invite(
         self,
-        room_version: str,
+        room_version_obj: RoomVersion,
         event_dict: JsonDict,
         event: EventBase,
         context: EventContext,
@@ -1487,13 +1256,15 @@ class FederationHandler(BaseHandler):
             # auth checks. If we need the invite and don't have it then the
             # auth check code will explode appropriately.
 
-        builder = self.event_builder_factory.new(room_version, event_dict)
+        builder = self.event_builder_factory.for_room_version(
+            room_version_obj, event_dict
+        )
         EventValidator().validate_builder(builder)
         event, context = await self.event_creation_handler.create_new_client_event(
             builder=builder
         )
         EventValidator().validate_new(event, self.config)
-        return (event, context)
+        return event, context
 
     async def _check_signature(self, event: EventBase, context: EventContext) -> None:
         """
@@ -1614,7 +1385,7 @@ class FederationHandler(BaseHandler):
         Args:
             room_id
         """
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             await self._clean_room_for_join_client(room_id)
         else:
             await self.store.clean_room_for_join(room_id)

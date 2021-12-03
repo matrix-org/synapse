@@ -61,7 +61,8 @@ class LoginRestServlet(RestServlet):
     TOKEN_TYPE = "m.login.token"
     JWT_TYPE = "org.matrix.login.jwt"
     JWT_TYPE_DEPRECATED = "m.login.jwt"
-    APPSERVICE_TYPE = "uk.half-shot.msc2778.login.application_service"
+    APPSERVICE_TYPE = "m.login.application_service"
+    APPSERVICE_TYPE_UNSTABLE = "uk.half-shot.msc2778.login.application_service"
     REFRESH_TOKEN_PARAM = "org.matrix.msc2918.refresh_token"
 
     def __init__(self, hs: "HomeServer"):
@@ -69,17 +70,20 @@ class LoginRestServlet(RestServlet):
         self.hs = hs
 
         # JWT configuration variables.
-        self.jwt_enabled = hs.config.jwt_enabled
-        self.jwt_secret = hs.config.jwt_secret
-        self.jwt_algorithm = hs.config.jwt_algorithm
-        self.jwt_issuer = hs.config.jwt_issuer
-        self.jwt_audiences = hs.config.jwt_audiences
+        self.jwt_enabled = hs.config.jwt.jwt_enabled
+        self.jwt_secret = hs.config.jwt.jwt_secret
+        self.jwt_subject_claim = hs.config.jwt.jwt_subject_claim
+        self.jwt_algorithm = hs.config.jwt.jwt_algorithm
+        self.jwt_issuer = hs.config.jwt.jwt_issuer
+        self.jwt_audiences = hs.config.jwt.jwt_audiences
 
         # SSO configuration.
-        self.saml2_enabled = hs.config.saml2_enabled
-        self.cas_enabled = hs.config.cas_enabled
-        self.oidc_enabled = hs.config.oidc_enabled
-        self._msc2918_enabled = hs.config.access_token_lifetime is not None
+        self.saml2_enabled = hs.config.saml2.saml2_enabled
+        self.cas_enabled = hs.config.cas.cas_enabled
+        self.oidc_enabled = hs.config.oidc.oidc_enabled
+        self._msc2918_enabled = (
+            hs.config.registration.refreshable_access_token_lifetime is not None
+        )
 
         self.auth = hs.get_auth()
 
@@ -93,14 +97,14 @@ class LoginRestServlet(RestServlet):
         self._address_ratelimiter = Ratelimiter(
             store=hs.get_datastore(),
             clock=hs.get_clock(),
-            rate_hz=self.hs.config.rc_login_address.per_second,
-            burst_count=self.hs.config.rc_login_address.burst_count,
+            rate_hz=self.hs.config.ratelimiting.rc_login_address.per_second,
+            burst_count=self.hs.config.ratelimiting.rc_login_address.burst_count,
         )
         self._account_ratelimiter = Ratelimiter(
             store=hs.get_datastore(),
             clock=hs.get_clock(),
-            rate_hz=self.hs.config.rc_login_account.per_second,
-            burst_count=self.hs.config.rc_login_account.burst_count,
+            rate_hz=self.hs.config.ratelimiting.rc_login_account.per_second,
+            burst_count=self.hs.config.ratelimiting.rc_login_account.burst_count,
         )
 
         # ensure the CAS/SAML/OIDC handlers are loaded on this worker instance.
@@ -143,6 +147,7 @@ class LoginRestServlet(RestServlet):
         flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())
 
         flows.append({"type": LoginRestServlet.APPSERVICE_TYPE})
+        flows.append({"type": LoginRestServlet.APPSERVICE_TYPE_UNSTABLE})
 
         return 200, {"flows": flows}
 
@@ -159,7 +164,10 @@ class LoginRestServlet(RestServlet):
             should_issue_refresh_token = False
 
         try:
-            if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
+            if login_submission["type"] in (
+                LoginRestServlet.APPSERVICE_TYPE,
+                LoginRestServlet.APPSERVICE_TYPE_UNSTABLE,
+            ):
                 appservice = self.auth.get_appservice_by_req(request)
 
                 if appservice.is_rate_limited():
@@ -408,7 +416,7 @@ class LoginRestServlet(RestServlet):
                 errcode=Codes.FORBIDDEN,
             )
 
-        user = payload.get("sub", None)
+        user = payload.get(self.jwt_subject_claim, None)
         if user is None:
             raise LoginError(403, "Invalid JWT", errcode=Codes.FORBIDDEN)
 
@@ -447,7 +455,9 @@ class RefreshTokenServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self._auth_handler = hs.get_auth_handler()
         self._clock = hs.get_clock()
-        self.access_token_lifetime = hs.config.access_token_lifetime
+        self.refreshable_access_token_lifetime = (
+            hs.config.registration.refreshable_access_token_lifetime
+        )
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         refresh_submission = parse_json_object_from_request(request)
@@ -457,7 +467,9 @@ class RefreshTokenServlet(RestServlet):
         if not isinstance(token, str):
             raise SynapseError(400, "Invalid param: refresh_token", Codes.INVALID_PARAM)
 
-        valid_until_ms = self._clock.time_msec() + self.access_token_lifetime
+        valid_until_ms = (
+            self._clock.time_msec() + self.refreshable_access_token_lifetime
+        )
         access_token, refresh_token = await self._auth_handler.refresh_token(
             token, valid_until_ms
         )
@@ -486,7 +498,7 @@ class SsoRedirectServlet(RestServlet):
         # register themselves with the main SSOHandler.
         _load_sso_handlers(hs)
         self._sso_handler = hs.get_sso_handler()
-        self._public_baseurl = hs.config.public_baseurl
+        self._public_baseurl = hs.config.server.public_baseurl
 
     async def on_GET(
         self, request: SynapseRequest, idp_id: Optional[str] = None
@@ -556,10 +568,10 @@ class CasTicketServlet(RestServlet):
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     LoginRestServlet(hs).register(http_server)
-    if hs.config.access_token_lifetime is not None:
+    if hs.config.registration.refreshable_access_token_lifetime is not None:
         RefreshTokenServlet(hs).register(http_server)
     SsoRedirectServlet(hs).register(http_server)
-    if hs.config.cas_enabled:
+    if hs.config.cas.cas_enabled:
         CasTicketServlet(hs).register(http_server)
 
 

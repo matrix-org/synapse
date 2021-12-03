@@ -88,7 +88,7 @@ class AuthConfig(Config):
               #
               #require_lowercase: true
 
-              # Whether a password must contain at least one lowercase letter.
+              # Whether a password must contain at least one uppercase letter.
               # Defaults to 'false'.
               #
               #require_uppercase: true

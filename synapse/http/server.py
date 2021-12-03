@@ -21,8 +21,8 @@ import types
 import urllib
 from http import HTTPStatus
 from inspect import isawaitable
-from io import BytesIO
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -37,7 +37,7 @@ from typing import (
 )
 
 import jinja2
-from canonicaljson import iterencode_canonical_json
+from canonicaljson import encode_canonical_json
 from typing_extensions import Protocol
 from zope.interface import implementer
 
@@ -45,7 +45,7 @@ from twisted.internet import defer, interfaces
 from twisted.python import failure
 from twisted.web import resource
 from twisted.web.server import NOT_DONE_YET, Request
-from twisted.web.static import File, NoRangeStaticProducer
+from twisted.web.static import File
 from twisted.web.util import redirectTo
 
 from synapse.api.errors import (
@@ -56,10 +56,14 @@ from synapse.api.errors import (
     UnrecognizedRequestError,
 )
 from synapse.http.site import SynapseRequest
-from synapse.logging.context import preserve_fn
+from synapse.logging.context import defer_to_thread, preserve_fn, run_in_background
 from synapse.logging.opentracing import trace_servlet
 from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
+from synapse.util.iterutils import chunk_seq
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +98,7 @@ def return_json_error(f: failure.Failure, request: SynapseRequest) -> None:
             "Failed handle request via %r: %r",
             request.request_metrics.name,
             request,
-            exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+            exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
         )
 
     # Only respond with an error response if we haven't already started writing,
@@ -146,7 +150,7 @@ def return_html_error(
             logger.error(
                 "Failed handle request %r",
                 request,
-                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
             )
     else:
         code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -155,7 +159,7 @@ def return_html_error(
         logger.error(
             "Failed handle request %r",
             request,
-            exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+            exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
         )
 
     if isinstance(error_template, str):
@@ -320,7 +324,7 @@ class DirectServeJsonResource(_AsyncResource):
 
     def _send_response(
         self,
-        request: Request,
+        request: SynapseRequest,
         code: int,
         response_object: Any,
     ):
@@ -343,6 +347,11 @@ class DirectServeJsonResource(_AsyncResource):
         return_json_error(f, request)
 
 
+_PathEntry = collections.namedtuple(
+    "_PathEntry", ["pattern", "callback", "servlet_classname"]
+)
+
+
 class JsonResource(DirectServeJsonResource):
     """This implements the HttpServer interface and provides JSON support for
     Resources.
@@ -359,14 +368,10 @@ class JsonResource(DirectServeJsonResource):
 
     isLeaf = True
 
-    _PathEntry = collections.namedtuple(
-        "_PathEntry", ["pattern", "callback", "servlet_classname"]
-    )
-
-    def __init__(self, hs, canonical_json=True, extract_context=False):
+    def __init__(self, hs: "HomeServer", canonical_json=True, extract_context=False):
         super().__init__(canonical_json, extract_context)
         self.clock = hs.get_clock()
-        self.path_regexs = {}
+        self.path_regexs: Dict[bytes, List[_PathEntry]] = {}
         self.hs = hs
 
     def register_paths(self, method, path_patterns, callback, servlet_classname):
@@ -391,7 +396,7 @@ class JsonResource(DirectServeJsonResource):
         for path_pattern in path_patterns:
             logger.debug("Registering for %s %s", method, path_pattern.pattern)
             self.path_regexs.setdefault(method, []).append(
-                self._PathEntry(path_pattern, callback, servlet_classname)
+                _PathEntry(path_pattern, callback, servlet_classname)
             )
 
     def _get_handler_for_request(
@@ -561,9 +566,20 @@ class _ByteProducer:
         self._iterator = iterator
         self._paused = False
 
-        # Register the producer and start producing data.
-        self._request.registerProducer(self, True)
-        self.resumeProducing()
+        try:
+            self._request.registerProducer(self, True)
+        except AttributeError as e:
+            # Calling self._request.registerProducer might raise an AttributeError since
+            # the underlying Twisted code calls self._request.channel.registerProducer,
+            # however self._request.channel will be None if the connection was lost.
+            logger.info("Connection disconnected before response was written: %r", e)
+
+            # We drop our references to data we'll not use.
+            self._request = None
+            self._iterator = iter(())
+        else:
+            # Start producing if `registerProducer` was successful
+            self.resumeProducing()
 
     def _send_data(self, data: List[bytes]) -> None:
         """
@@ -620,16 +636,15 @@ class _ByteProducer:
         self._request = None
 
 
-def _encode_json_bytes(json_object: Any) -> Iterator[bytes]:
+def _encode_json_bytes(json_object: Any) -> bytes:
     """
     Encode an object into JSON. Returns an iterator of bytes.
     """
-    for chunk in json_encoder.iterencode(json_object):
-        yield chunk.encode("utf-8")
+    return json_encoder.encode(json_object).encode("utf-8")
 
 
 def respond_with_json(
-    request: Request,
+    request: SynapseRequest,
     code: int,
     json_object: Any,
     send_cors: bool = False,
@@ -659,7 +674,7 @@ def respond_with_json(
         return None
 
     if canonical_json:
-        encoder = iterencode_canonical_json
+        encoder = encode_canonical_json
     else:
         encoder = _encode_json_bytes
 
@@ -670,7 +685,9 @@ def respond_with_json(
     if send_cors:
         set_cors_headers(request)
 
-    _ByteProducer(request, encoder(json_object))
+    run_in_background(
+        _async_write_json_to_request_in_thread, request, encoder, json_object
+    )
     return NOT_DONE_YET
 
 
@@ -706,13 +723,54 @@ def respond_with_json_bytes(
     if send_cors:
         set_cors_headers(request)
 
-    # note that this is zero-copy (the bytesio shares a copy-on-write buffer with
-    # the original `bytes`).
-    bytes_io = BytesIO(json_bytes)
-
-    producer = NoRangeStaticProducer(request, bytes_io)
-    producer.start()
+    _write_bytes_to_request(request, json_bytes)
     return NOT_DONE_YET
+
+
+async def _async_write_json_to_request_in_thread(
+    request: SynapseRequest,
+    json_encoder: Callable[[Any], bytes],
+    json_object: Any,
+):
+    """Encodes the given JSON object on a thread and then writes it to the
+    request.
+
+    This is done so that encoding large JSON objects doesn't block the reactor
+    thread.
+
+    Note: We don't use JsonEncoder.iterencode here as that falls back to the
+    Python implementation (rather than the C backend), which is *much* more
+    expensive.
+    """
+
+    json_str = await defer_to_thread(request.reactor, json_encoder, json_object)
+
+    _write_bytes_to_request(request, json_str)
+
+
+def _write_bytes_to_request(request: Request, bytes_to_write: bytes) -> None:
+    """Writes the bytes to the request using an appropriate producer.
+
+    Note: This should be used instead of `Request.write` to correctly handle
+    large response bodies.
+    """
+
+    # The problem with dumping all of the response into the `Request` object at
+    # once (via `Request.write`) is that doing so starts the timeout for the
+    # next request to be received: so if it takes longer than 60s to stream back
+    # the response to the client, the client never gets it.
+    #
+    # The correct solution is to use a Producer; then the timeout is only
+    # started once all of the content is sent over the TCP connection.
+
+    # To make sure we don't write all of the bytes at once we split it up into
+    # chunks.
+    chunk_size = 4096
+    bytes_generator = chunk_seq(bytes_to_write, chunk_size)
+
+    # We use a `_ByteProducer` here rather than `NoRangeStaticProducer` as the
+    # unit tests can't cope with being given a pull producer.
+    _ByteProducer(request, bytes_generator)
 
 
 def set_cors_headers(request: Request):

@@ -14,7 +14,7 @@
 
 import logging
 from collections import namedtuple
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional, Tuple
 
 import msgpack
 from unpaddedbase64 import decode_base64, encode_base64
@@ -33,10 +33,8 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.types import JsonDict, ThirdPartyInstanceID
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.caches.response_cache import ResponseCache
-
-from ._base import BaseHandler
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -49,10 +47,11 @@ REMOTE_ROOM_LIST_POLL_INTERVAL = 60 * 1000
 EMPTY_THIRD_PARTY_ID = ThirdPartyInstanceID(None, None)
 
 
-class RoomListHandler(BaseHandler):
+class RoomListHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-        self.enable_room_list_search = hs.config.enable_room_list_search
+        self.store = hs.get_datastore()
+        self.hs = hs
+        self.enable_room_list_search = hs.config.roomdirectory.enable_room_list_search
         self.response_cache: ResponseCache[
             Tuple[Optional[int], Optional[str], Optional[ThirdPartyInstanceID]]
         ] = ResponseCache(hs.get_clock(), "room_list")
@@ -169,7 +168,7 @@ class RoomListHandler(BaseHandler):
             ignore_non_federatable=from_federation,
         )
 
-        def build_room_entry(room):
+        def build_room_entry(room: JsonDict) -> JsonDict:
             entry = {
                 "room_id": room["room_id"],
                 "name": room["name"],
@@ -249,10 +248,10 @@ class RoomListHandler(BaseHandler):
         self,
         room_id: str,
         num_joined_users: int,
-        cache_context,
+        cache_context: _CacheContext,
         with_alias: bool = True,
         allow_private: bool = False,
-    ) -> Optional[dict]:
+    ) -> Optional[JsonDict]:
         """Returns the entry for a room
 
         Args:
@@ -507,7 +506,7 @@ class RoomListNextBatch(
             )
         )
 
-    def copy_and_replace(self, **kwds) -> "RoomListNextBatch":
+    def copy_and_replace(self, **kwds: Any) -> "RoomListNextBatch":
         return self._replace(**kwds)
 
 

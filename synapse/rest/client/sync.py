@@ -29,7 +29,7 @@ from typing import (
 
 from synapse.api.constants import Membership, PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError
-from synapse.api.filtering import DEFAULT_FILTER_COLLECTION, FilterCollection
+from synapse.api.filtering import FilterCollection
 from synapse.api.presence import UserPresenceState
 from synapse.events import EventBase
 from synapse.events.utils import (
@@ -150,17 +150,17 @@ class SyncRestServlet(RestServlet):
         request_key = (user, timeout, since, filter_id, full_state, device_id)
 
         if filter_id is None:
-            filter_collection = DEFAULT_FILTER_COLLECTION
+            filter_collection = self.filtering.DEFAULT_FILTER_COLLECTION
         elif filter_id.startswith("{"):
             try:
                 filter_object = json_decoder.decode(filter_id)
                 set_timeline_upper_limit(
-                    filter_object, self.hs.config.filter_timeline_limit
+                    filter_object, self.hs.config.server.filter_timeline_limit
                 )
             except Exception:
                 raise SynapseError(400, "Invalid filter JSON")
             self.filtering.check_valid_filter(filter_object)
-            filter_collection = FilterCollection(filter_object)
+            filter_collection = FilterCollection(self.hs, filter_object)
         else:
             try:
                 filter_collection = await self.filtering.get_user_filter(
@@ -522,7 +522,7 @@ class SyncRestServlet(RestServlet):
                 time_now=time_now,
                 # We don't bundle "live" events, as otherwise clients
                 # will end up double counting annotations.
-                bundle_aggregations=False,
+                bundle_relations=False,
                 token_id=token_id,
                 event_format=event_formatter,
                 only_event_fields=only_fields,

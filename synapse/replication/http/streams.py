@@ -13,10 +13,14 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING
 
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import parse_integer
 from synapse.replication.http._base import ReplicationEndpoint
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +50,7 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
     PATH_ARGS = ("stream_name",)
     METHOD = "GET"
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self._instance_name = hs.get_instance_name()
@@ -74,5 +78,5 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
         )
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server):
     ReplicationGetStreamUpdates(hs).register(http_server)

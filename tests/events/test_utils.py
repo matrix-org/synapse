@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.api.constants import EventContentFields
 from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.events.utils import (
@@ -352,7 +353,7 @@ class PruneEventTestCase(unittest.TestCase):
                 "event_id": "$test:domain",
                 "content": {
                     "membership": "join",
-                    "join_authorised_via_users_server": "@user:domain",
+                    EventContentFields.AUTHORISING_USER: "@user:domain",
                     "other_key": "stripped",
                 },
             },
@@ -372,7 +373,7 @@ class PruneEventTestCase(unittest.TestCase):
                 "type": "m.room.member",
                 "content": {
                     "membership": "join",
-                    "join_authorised_via_users_server": "@user:domain",
+                    EventContentFields.AUTHORISING_USER: "@user:domain",
                     "other_key": "stripped",
                 },
             },
@@ -380,7 +381,7 @@ class PruneEventTestCase(unittest.TestCase):
                 "type": "m.room.member",
                 "content": {
                     "membership": "join",
-                    "join_authorised_via_users_server": "@user:domain",
+                    EventContentFields.AUTHORISING_USER: "@user:domain",
                 },
                 "signatures": {},
                 "unsigned": {},

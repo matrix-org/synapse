@@ -42,15 +42,15 @@ class VersionsRestServlet(RestServlet):
         # Calculate these once since they shouldn't change after start-up.
         self.e2ee_forced_public = (
             RoomCreationPreset.PUBLIC_CHAT
-            in self.config.encryption_enabled_by_default_for_room_presets
+            in self.config.room.encryption_enabled_by_default_for_room_presets
         )
         self.e2ee_forced_private = (
             RoomCreationPreset.PRIVATE_CHAT
-            in self.config.encryption_enabled_by_default_for_room_presets
+            in self.config.room.encryption_enabled_by_default_for_room_presets
         )
         self.e2ee_forced_trusted_private = (
             RoomCreationPreset.TRUSTED_PRIVATE_CHAT
-            in self.config.encryption_enabled_by_default_for_room_presets
+            in self.config.room.encryption_enabled_by_default_for_room_presets
         )
 
     def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
@@ -72,6 +72,7 @@ class VersionsRestServlet(RestServlet):
                     "r0.4.0",
                     "r0.5.0",
                     "r0.6.0",
+                    "r0.6.1",
                 ],
                 # as per MSC1497:
                 "unstable_features": {

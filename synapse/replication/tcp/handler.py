@@ -138,7 +138,7 @@ class ReplicationCommandHandler:
             if isinstance(stream, TypingStream):
                 # Only add TypingStream as a source on the instance in charge of
                 # typing.
-                if hs.config.worker.writers.typing == hs.get_instance_name():
+                if hs.get_instance_name() in hs.config.worker.writers.typing:
                     self._streams_to_replicate.append(stream)
 
                 continue
@@ -168,10 +168,13 @@ class ReplicationCommandHandler:
                 continue
 
             # Only add any other streams if we're on master.
-            if hs.config.worker_app is not None:
+            if hs.config.worker.worker_app is not None:
                 continue
 
-            if stream.NAME == FederationStream.NAME and hs.config.send_federation:
+            if (
+                stream.NAME == FederationStream.NAME
+                and hs.config.worker.send_federation
+            ):
                 # We only support federation stream if federation sending
                 # has been disabled on the master.
                 continue
@@ -222,10 +225,10 @@ class ReplicationCommandHandler:
             },
         )
 
-        self._is_master = hs.config.worker_app is None
+        self._is_master = hs.config.worker.worker_app is None
 
         self._federation_sender = None
-        if self._is_master and not hs.config.send_federation:
+        if self._is_master and not hs.config.worker.send_federation:
             self._federation_sender = hs.get_federation_sender()
 
         self._server_notices_sender = None
@@ -291,7 +294,7 @@ class ReplicationCommandHandler:
             # This shouldn't be possible
             raise Exception("Unrecognised command %s in stream queue", cmd.NAME)
 
-    def start_replication(self, hs):
+    def start_replication(self, hs: "HomeServer"):
         """Helper method to start a replication connection to the remote server
         using TCP.
         """
@@ -315,16 +318,24 @@ class ReplicationCommandHandler:
                 hs, outbound_redis_connection
             )
             hs.get_reactor().connectTCP(
-                hs.config.redis.redis_host.encode(),
+                hs.config.redis.redis_host,  # type: ignore[arg-type]
                 hs.config.redis.redis_port,
                 self._factory,
+                timeout=30,
+                bindAddress=None,
             )
         else:
             client_name = hs.get_instance_name()
             self._factory = DirectTcpReplicationClientFactory(hs, client_name, self)
-            host = hs.config.worker_replication_host
-            port = hs.config.worker_replication_port
-            hs.get_reactor().connectTCP(host.encode(), port, self._factory)
+            host = hs.config.worker.worker_replication_host
+            port = hs.config.worker.worker_replication_port
+            hs.get_reactor().connectTCP(
+                host,  # type: ignore[arg-type]
+                port,
+                self._factory,
+                timeout=30,
+                bindAddress=None,
+            )
 
     def get_streams(self) -> Dict[str, Stream]:
         """Get a map from stream name to all streams."""

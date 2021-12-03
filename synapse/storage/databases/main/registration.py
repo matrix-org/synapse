@@ -23,10 +23,14 @@ import attr
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidationError
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.databases.main.stats import StatsStore
-from synapse.storage.types import Connection, Cursor
+from synapse.storage.types import Cursor
 from synapse.storage.util.id_generators import IdGenerator
 from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import UserID, UserInfo
@@ -38,6 +42,13 @@ if TYPE_CHECKING:
 THIRTY_MINUTES_IN_MS = 30 * 60 * 1000
 
 logger = logging.getLogger(__name__)
+
+
+class ExternalIDReuseException(Exception):
+    """Exception if writing an external id for a user fails,
+    because this external id is given to an other user."""
+
+    pass
 
 
 @attr.s(frozen=True, slots=True)
@@ -73,26 +84,26 @@ class TokenLookupResult:
         return self.user_id
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(auto_attribs=True, frozen=True, slots=True)
 class RefreshTokenLookupResult:
     """Result of looking up a refresh token."""
 
-    user_id = attr.ib(type=str)
+    user_id: str
     """The user this token belongs to."""
 
-    device_id = attr.ib(type=str)
+    device_id: str
     """The device associated with this refresh token."""
 
-    token_id = attr.ib(type=int)
+    token_id: int
     """The ID of this refresh token."""
 
-    next_token_id = attr.ib(type=Optional[int])
+    next_token_id: Optional[int]
     """The ID of the refresh token which replaced this one."""
 
-    has_next_refresh_token_been_refreshed = attr.ib(type=bool)
+    has_next_refresh_token_been_refreshed: bool
     """True if the next refresh token was used for another refresh."""
 
-    has_next_access_token_been_used = attr.ib(type=bool)
+    has_next_access_token_been_used: bool
     """True if the next access token was already used at least once."""
 
 
@@ -132,14 +143,14 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 hs.config.account_validity.account_validity_startup_job_max_delta
             )
 
-            if hs.config.run_background_tasks:
+            if hs.config.worker.run_background_tasks:
                 self._clock.call_later(
                     0.0,
                     self._set_expiration_date_when_missing,
                 )
 
         # Create a background job for culling expired 3PID validity tokens
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             self._clock.looping_call(
                 self.cull_expired_threepid_validation_tokens, THIRTY_MINUTES_IN_MS
             )
@@ -207,7 +218,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             return False
 
         now = self._clock.time_msec()
-        trial_duration_ms = self.config.mau_trial_days * 24 * 60 * 60 * 1000
+        trial_duration_ms = self.config.server.mau_trial_days * 24 * 60 * 60 * 1000
         is_trial = (now - info["creation_ts"] * 1000) < trial_duration_ms
         return is_trial
 
@@ -388,7 +399,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             "get_users_expiring_soon",
             select_users_txn,
             self._clock.time_msec(),
-            self.config.account_validity_renew_at,
+            self.config.account_validity.account_validity_renew_at,
         )
 
     async def set_renewal_mail_status(self, user_id: str, email_sent: bool) -> None:
@@ -465,7 +476,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             shadow_banned: true iff the user is to be shadow-banned, false otherwise.
         """
 
-        def set_shadow_banned_txn(txn):
+        def set_shadow_banned_txn(txn: LoggingTransaction) -> None:
             user_id = user.to_string()
             self.db_pool.simple_update_one_txn(
                 txn,
@@ -487,6 +498,24 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
         await self.db_pool.runInteraction("set_shadow_banned", set_shadow_banned_txn)
+
+    async def set_user_type(self, user: UserID, user_type: Optional[UserTypes]) -> None:
+        """Sets the user type.
+
+        Args:
+            user: user ID of the user.
+            user_type: type of the user or None for a user without a type.
+        """
+
+        def set_user_type_txn(txn):
+            self.db_pool.simple_update_one_txn(
+                txn, "users", {"name": user.to_string()}, {"user_type": user_type}
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_user_by_id, (user.to_string(),)
+            )
+
+        await self.db_pool.runInteraction("set_user_type", set_user_type_txn)
 
     def _query_for_auth(self, txn, token: str) -> Optional[TokenLookupResult]:
         sql = """
@@ -588,24 +617,44 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             auth_provider: identifier for the remote auth provider
             external_id: id on that system
             user_id: complete mxid that it is mapped to
+        Raises:
+            ExternalIDReuseException if the new external_id could not be mapped.
         """
-        await self.db_pool.simple_insert(
+
+        try:
+            await self.db_pool.runInteraction(
+                "record_user_external_id",
+                self._record_user_external_id_txn,
+                auth_provider,
+                external_id,
+                user_id,
+            )
+        except self.database_engine.module.IntegrityError:
+            raise ExternalIDReuseException()
+
+    def _record_user_external_id_txn(
+        self,
+        txn: LoggingTransaction,
+        auth_provider: str,
+        external_id: str,
+        user_id: str,
+    ) -> None:
+
+        self.db_pool.simple_insert_txn(
+            txn,
             table="user_external_ids",
             values={
                 "auth_provider": auth_provider,
                 "external_id": external_id,
                 "user_id": user_id,
             },
-            desc="record_user_external_id",
         )
 
     async def remove_user_external_id(
         self, auth_provider: str, external_id: str, user_id: str
     ) -> None:
         """Remove a mapping from an external user id to a mxid
-
         If the mapping is not found, this method does nothing.
-
         Args:
             auth_provider: identifier for the remote auth provider
             external_id: id on that system
@@ -620,6 +669,60 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             },
             desc="remove_user_external_id",
         )
+
+    async def replace_user_external_id(
+        self,
+        record_external_ids: List[Tuple[str, str]],
+        user_id: str,
+    ) -> None:
+        """Replace mappings from external user ids to a mxid in a single transaction.
+        All mappings are deleted and the new ones are created.
+
+        Args:
+            record_external_ids:
+                List with tuple of auth_provider and external_id to record
+            user_id: complete mxid that it is mapped to
+        Raises:
+            ExternalIDReuseException if the new external_id could not be mapped.
+        """
+
+        def _remove_user_external_ids_txn(
+            txn: LoggingTransaction,
+            user_id: str,
+        ) -> None:
+            """Remove all mappings from external user ids to a mxid
+            If these mappings are not found, this method does nothing.
+
+            Args:
+                user_id: complete mxid that it is mapped to
+            """
+
+            self.db_pool.simple_delete_txn(
+                txn,
+                table="user_external_ids",
+                keyvalues={"user_id": user_id},
+            )
+
+        def _replace_user_external_id_txn(
+            txn: LoggingTransaction,
+        ):
+            _remove_user_external_ids_txn(txn, user_id)
+
+            for auth_provider, external_id in record_external_ids:
+                self._record_user_external_id_txn(
+                    txn,
+                    auth_provider,
+                    external_id,
+                    user_id,
+                )
+
+        try:
+            await self.db_pool.runInteraction(
+                "replace_user_external_id",
+                _replace_user_external_id_txn,
+            )
+        except self.database_engine.module.IntegrityError:
+            raise ExternalIDReuseException()
 
     async def get_user_by_external_id(
         self, auth_provider: str, external_id: str
@@ -1091,11 +1194,13 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 delta equal to 10% of the validity period.
         """
         now_ms = self._clock.time_msec()
+        assert self._account_validity_period is not None
         expiration_ts = now_ms + self._account_validity_period
 
         if use_delta:
+            assert self._account_validity_startup_job_max_delta is not None
             expiration_ts = random.randrange(
-                expiration_ts - self._account_validity_startup_job_max_delta,
+                int(expiration_ts - self._account_validity_startup_job_max_delta),
                 expiration_ts,
             )
 
@@ -1624,11 +1729,11 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         )
 
         self.db_pool.updates.register_background_update_handler(
-            "user_threepids_grandfather", self._bg_user_threepids_grandfather
+            "users_set_deactivated_flag", self._background_update_set_deactivated_flag
         )
 
-        self.db_pool.updates.register_background_update_handler(
-            "users_set_deactivated_flag", self._background_update_set_deactivated_flag
+        self.db_pool.updates.register_noop_background_update(
+            "user_threepids_grandfather"
         )
 
         self.db_pool.updates.register_background_index_update(
@@ -1701,35 +1806,6 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
 
         return nb_processed
 
-    async def _bg_user_threepids_grandfather(self, progress, batch_size):
-        """We now track which identity servers a user binds their 3PID to, so
-        we need to handle the case of existing bindings where we didn't track
-        this.
-
-        We do this by grandfathering in existing user threepids assuming that
-        they used one of the server configured trusted identity servers.
-        """
-        id_servers = set(self.config.trusted_third_party_id_servers)
-
-        def _bg_user_threepids_grandfather_txn(txn):
-            sql = """
-                INSERT INTO user_threepid_id_server
-                    (user_id, medium, address, id_server)
-                SELECT user_id, medium, address, ?
-                FROM user_threepids
-            """
-
-            txn.execute_batch(sql, [(id_server,) for id_server in id_servers])
-
-        if id_servers:
-            await self.db_pool.runInteraction(
-                "_bg_user_threepids_grandfather", _bg_user_threepids_grandfather_txn
-            )
-
-        await self.db_pool.updates._end_background_update("user_threepids_grandfather")
-
-        return 1
-
     async def set_user_deactivated_status(
         self, user_id: str, deactivated: bool
     ) -> None:
@@ -1774,10 +1850,17 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
 
 
 class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
-    def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
-        self._ignore_unknown_session_error = hs.config.request_token_inhibit_3pid_errors
+        self._ignore_unknown_session_error = (
+            hs.config.server.request_token_inhibit_3pid_errors
+        )
 
         self._access_tokens_id_gen = IdGenerator(db_conn, "access_tokens", "id")
         self._refresh_tokens_id_gen = IdGenerator(db_conn, "refresh_tokens", "id")
@@ -2014,7 +2097,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 (user_id_obj.localpart, create_profile_with_displayname),
             )
 
-        if self.hs.config.stats_enabled:
+        if self.hs.config.stats.stats_enabled:
             # we create a new completed user statistics row
 
             # we don't strictly need current_token since this user really can't
@@ -2229,7 +2312,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                     # accident.
                     row = {"client_secret": None, "validated_at": None}
                 else:
-                    raise ThreepidValidationError(400, "Unknown session_id")
+                    raise ThreepidValidationError("Unknown session_id")
 
             retrieved_client_secret = row["client_secret"]
             validated_at = row["validated_at"]
@@ -2244,14 +2327,14 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
 
             if not row:
                 raise ThreepidValidationError(
-                    400, "Validation token not found or has expired"
+                    "Validation token not found or has expired"
                 )
             expires = row["expires"]
             next_link = row["next_link"]
 
             if retrieved_client_secret != client_secret:
                 raise ThreepidValidationError(
-                    400, "This client_secret does not match the provided session_id"
+                    "This client_secret does not match the provided session_id"
                 )
 
             # If the session is already validated, no need to revalidate
@@ -2260,7 +2343,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
 
             if expires <= current_ts:
                 raise ThreepidValidationError(
-                    400, "This token has expired. Please request a new one"
+                    "This token has expired. Please request a new one"
                 )
 
             # Looks good. Validate the session

@@ -37,14 +37,14 @@ class VoipRestServlet(RestServlet):
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(
-            request, self.hs.config.turn_allow_guests
+            request, self.hs.config.voip.turn_allow_guests
         )
 
-        turnUris = self.hs.config.turn_uris
-        turnSecret = self.hs.config.turn_shared_secret
-        turnUsername = self.hs.config.turn_username
-        turnPassword = self.hs.config.turn_password
-        userLifetime = self.hs.config.turn_user_lifetime
+        turnUris = self.hs.config.voip.turn_uris
+        turnSecret = self.hs.config.voip.turn_shared_secret
+        turnUsername = self.hs.config.voip.turn_username
+        turnPassword = self.hs.config.voip.turn_password
+        userLifetime = self.hs.config.voip.turn_user_lifetime
 
         if turnUris and turnSecret and userLifetime:
             expiry = (self.hs.get_clock().time_msec() + userLifetime) / 1000
@@ -70,7 +70,7 @@ class VoipRestServlet(RestServlet):
             {
                 "username": username,
                 "password": password,
-                "ttl": userLifetime / 1000,
+                "ttl": userLifetime // 1000,
                 "uris": turnUris,
             },
         )

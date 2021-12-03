@@ -25,6 +25,11 @@ from synapse.http.server import HttpServer, JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
+from synapse.rest.admin.background_updates import (
+    BackgroundUpdateEnabledRestServlet,
+    BackgroundUpdateRestServlet,
+    BackgroundUpdateStartJobRestServlet,
+)
 from synapse.rest.admin.devices import (
     DeleteDevicesRestServlet,
     DeviceRestServlet,
@@ -42,7 +47,9 @@ from synapse.rest.admin.registration_tokens import (
     RegistrationTokenRestServlet,
 )
 from synapse.rest.admin.rooms import (
-    DeleteRoomRestServlet,
+    BlockRoomRestServlet,
+    DeleteRoomStatusByDeleteIdRestServlet,
+    DeleteRoomStatusByRoomIdRestServlet,
     ForwardExtremitiesRestServlet,
     JoinRoomAliasServlet,
     ListRoomRestServlet,
@@ -50,6 +57,7 @@ from synapse.rest.admin.rooms import (
     RoomEventContextServlet,
     RoomMembersRestServlet,
     RoomRestServlet,
+    RoomRestV2Servlet,
     RoomStateRestServlet,
 )
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
@@ -217,11 +225,14 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     Register all the admin servlets.
     """
     register_servlets_for_client_rest_resource(hs, http_server)
+    BlockRoomRestServlet(hs).register(http_server)
     ListRoomRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
     RoomRestServlet(hs).register(http_server)
+    RoomRestV2Servlet(hs).register(http_server)
     RoomMembersRestServlet(hs).register(http_server)
-    DeleteRoomRestServlet(hs).register(http_server)
+    DeleteRoomStatusByDeleteIdRestServlet(hs).register(http_server)
+    DeleteRoomStatusByRoomIdRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
     UserAdminServlet(hs).register(http_server)
@@ -247,8 +258,11 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     RegistrationTokenRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
-    if hs.config.worker_app is None:
+    if hs.config.worker.worker_app is None:
         SendServerNoticeServlet(hs).register(http_server)
+        BackgroundUpdateEnabledRestServlet(hs).register(http_server)
+        BackgroundUpdateRestServlet(hs).register(http_server)
+        BackgroundUpdateStartJobRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(
@@ -267,7 +281,7 @@ def register_servlets_for_client_rest_resource(
 
     # Load the media repo ones if we're using them. Otherwise load the servlets which
     # don't need a media repo (typically readonly admin APIs).
-    if hs.config.can_load_media_repo:
+    if hs.config.media.can_load_media_repo:
         register_servlets_for_media_repo(hs, http_server)
     else:
         ListMediaInRoom(hs).register(http_server)

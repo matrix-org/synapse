@@ -23,11 +23,16 @@ from synapse.federation.federation_base import event_from_pdu_json
 from synapse.logging.context import LoggingContext, run_in_background
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.types import create_requester
 from synapse.util.stringutils import random_string
 
 from tests import unittest
 
 logger = logging.getLogger(__name__)
+
+
+def generate_fake_event_id() -> str:
+    return "$fake_" + random_string(43)
 
 
 class FederationTestCase(unittest.HomeserverTestCase):
@@ -198,6 +203,65 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(sg, sg2)
 
+    def test_backfill_with_many_backward_extremities(self):
+        """
+        Check that we can backfill with many backward extremities.
+        The goal is to make sure that when we only use a portion
+        of backwards extremities(the magic number is more than 5),
+        no errors are thrown.
+
+        Regression test, see #11027
+        """
+        # create the room
+        user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test")
+        requester = create_requester(user_id)
+
+        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+
+        ev1 = self.helper.send(room_id, "first message", tok=tok)
+
+        # Create "many" backward extremities. The magic number we're trying to
+        # create more than is 5 which corresponds to the number of backward
+        # extremities we slice off in `_maybe_backfill_inner`
+        for _ in range(0, 8):
+            event_handler = self.hs.get_event_creation_handler()
+            event, context = self.get_success(
+                event_handler.create_event(
+                    requester,
+                    {
+                        "type": "m.room.message",
+                        "content": {
+                            "msgtype": "m.text",
+                            "body": "message connected to fake event",
+                        },
+                        "room_id": room_id,
+                        "sender": user_id,
+                    },
+                    prev_event_ids=[
+                        ev1["event_id"],
+                        # We're creating an backward extremity each time thanks
+                        # to this fake event
+                        generate_fake_event_id(),
+                    ],
+                )
+            )
+            self.get_success(
+                event_handler.handle_new_client_event(requester, event, context)
+            )
+
+        current_depth = 1
+        limit = 100
+        with LoggingContext("receive_pdu"):
+            # Make sure backfill still works
+            d = run_in_background(
+                self.hs.get_federation_handler().maybe_backfill,
+                room_id,
+                current_depth,
+                limit,
+            )
+        self.get_success(d)
+
     def test_backfill_floating_outlier_membership_auth(self):
         """
         As the local homeserver, check that we can properly process a federated
@@ -308,7 +372,12 @@ class FederationTestCase(unittest.HomeserverTestCase):
         async def get_event_auth(
             destination: str, room_id: str, event_id: str
         ) -> List[EventBase]:
-            return auth_events
+            return [
+                event_from_pdu_json(
+                    ae.get_pdu_json(), room_version=room_version, outlier=True
+                )
+                for ae in auth_events
+            ]
 
         self.handler.federation_client.get_event_auth = get_event_auth
 

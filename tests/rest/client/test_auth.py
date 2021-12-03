@@ -598,7 +598,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             refresh_response.json_body["refresh_token"],
         )
 
-    @override_config({"access_token_lifetime": "1m"})
+    @override_config({"refreshable_access_token_lifetime": "1m"})
     def test_refresh_token_expiration(self):
         """
         The access token should have some time as specified in the config.

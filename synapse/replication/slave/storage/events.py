@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import TYPE_CHECKING
 
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
@@ -29,6 +30,9 @@ from synapse.storage.databases.main.user_erasure_store import UserErasureWorkerS
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from ._base import BaseSlavedStore
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +58,7 @@ class SlavedEventStore(
     RelationsWorkerStore,
     BaseSlavedStore,
 ):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
 
         events_max = self._stream_id_gen.get_current_token()

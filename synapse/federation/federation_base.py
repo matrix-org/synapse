@@ -14,8 +14,9 @@
 # limitations under the License.
 import logging
 from collections import namedtuple
+from typing import TYPE_CHECKING
 
-from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
+from synapse.api.constants import MAX_DEPTH, EventContentFields, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import EventFormatVersions, RoomVersion
 from synapse.crypto.event_signing import check_event_content_hash
@@ -25,11 +26,15 @@ from synapse.events.utils import prune_event, validate_canonicaljson
 from synapse.http.servlet import assert_params_in_dict
 from synapse.types import JsonDict, get_domain_from_id
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
+
 logger = logging.getLogger(__name__)
 
 
 class FederationBase:
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
 
         self.server_name = hs.hostname
@@ -184,10 +189,10 @@ async def _check_sigs_on_pdu(
         room_version.msc3083_join_rules
         and pdu.type == EventTypes.Member
         and pdu.membership == Membership.JOIN
-        and "join_authorised_via_users_server" in pdu.content
+        and EventContentFields.AUTHORISING_USER in pdu.content
     ):
         authorising_server = get_domain_from_id(
-            pdu.content["join_authorised_via_users_server"]
+            pdu.content[EventContentFields.AUTHORISING_USER]
         )
         try:
             await keyring.verify_event_for_server(

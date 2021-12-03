@@ -50,7 +50,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         PUT to the status endpoint with use_presence enabled will call
         set_state on the presence handler.
         """
-        self.hs.config.use_presence = True
+        self.hs.config.server.use_presence = True
 
         body = {"presence": "here", "status_msg": "beep boop"}
         channel = self.make_request(

@@ -131,17 +131,9 @@ def prepare_database(
                     "config==None in prepare_database, but database is not empty"
                 )
 
-            # if it's a worker app, refuse to upgrade the database, to avoid multiple
-            # workers doing it at once.
-            if (
-                config.worker_app is not None
-                and version_info.current_version != SCHEMA_VERSION
-            ):
-                raise UpgradeDatabaseException(
-                    OUTDATED_SCHEMA_ON_WORKER_ERROR
-                    % (SCHEMA_VERSION, version_info.current_version)
-                )
-
+            # This should be run on all processes, master or worker. The master will
+            # apply the deltas, while workers will check if any outstanding deltas
+            # exist and raise an PrepareDatabaseException if they do.
             _upgrade_existing_database(
                 cur,
                 version_info,
@@ -149,12 +141,13 @@ def prepare_database(
                 config,
                 databases=databases,
             )
+
         else:
             logger.info("%r: Initialising new database", databases)
 
             # if it's a worker app, refuse to upgrade the database, to avoid multiple
             # workers doing it at once.
-            if config and config.worker_app is not None:
+            if config and config.worker.worker_app is not None:
                 raise UpgradeDatabaseException(EMPTY_DATABASE_ON_WORKER_ERROR)
 
             _setup_new_database(cur, database_engine, databases=databases)
@@ -355,7 +348,19 @@ def _upgrade_existing_database(
     else:
         assert config
 
-    is_worker = config and config.worker_app is not None
+    is_worker = config and config.worker.worker_app is not None
+
+    # If the schema version needs to be updated, and we are on a worker, we immediately
+    # know to bail out as workers cannot update the database schema. Only one process
+    # must update the database at the time, therefore we delegate this task to the master.
+    if is_worker and current_schema_state.current_version < SCHEMA_VERSION:
+        # If the DB is on an older version than we expect then we refuse
+        # to start the worker (as the main process needs to run first to
+        # update the schema).
+        raise UpgradeDatabaseException(
+            OUTDATED_SCHEMA_ON_WORKER_ERROR
+            % (SCHEMA_VERSION, current_schema_state.current_version)
+        )
 
     if (
         current_schema_state.compat_version is not None
@@ -366,7 +371,7 @@ def _upgrade_existing_database(
             + "new for the server to understand"
         )
 
-    # some of the deltas assume that config.server_name is set correctly, so now
+    # some of the deltas assume that server_name is set correctly, so now
     # is a good time to run the sanity check.
     if not is_empty and "main" in databases:
         from synapse.storage.databases.main import check_database_before_upgrade
@@ -487,6 +492,10 @@ def _upgrade_existing_database(
                 spec = importlib.util.spec_from_file_location(
                     module_name, absolute_path
                 )
+                if spec is None:
+                    raise RuntimeError(
+                        f"Could not build a module spec for {module_name} at {absolute_path}"
+                    )
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)  # type: ignore
 
@@ -545,7 +554,9 @@ def _apply_module_schemas(
         database_engine:
         config: application config
     """
-    for (mod, _config) in config.password_providers:
+    # This is the old way for password_auth_provider modules to make changes
+    # to the database. This should instead be done using the module API
+    for (mod, _config) in config.authproviders.password_providers:
         if not hasattr(mod, "get_db_schema_files"):
             continue
         modname = ".".join((mod.__module__, mod.__name__))

@@ -16,10 +16,10 @@
 import logging
 import os
 import sys
-from typing import Iterator
+from typing import Dict, Iterable, Iterator, List
 
-from twisted.internet import reactor
-from twisted.web.resource import EncodingResourceWrapper, IResource
+from twisted.internet.tcp import Port
+from twisted.web.resource import EncodingResourceWrapper, Resource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
 
@@ -29,7 +29,8 @@ from synapse import events
 from synapse.api.urls import (
     FEDERATION_PREFIX,
     LEGACY_MEDIA_PREFIX,
-    MEDIA_PREFIX,
+    MEDIA_R0_PREFIX,
+    MEDIA_V3_PREFIX,
     SERVER_KEY_V2_PREFIX,
     STATIC_PREFIX,
     WEB_CLIENT_PREFIX,
@@ -66,7 +67,7 @@ from synapse.rest.admin import AdminRestResource
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
-from synapse.rest.well_known import WellKnownResource
+from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.util.httpresourcetree import create_resource_tree
@@ -76,23 +77,27 @@ from synapse.util.versionstring import get_version_string
 logger = logging.getLogger("synapse.app.homeserver")
 
 
-def gz_wrap(r):
+def gz_wrap(r: Resource) -> Resource:
     return EncodingResourceWrapper(r, [GzipEncoderFactory()])
 
 
 class SynapseHomeServer(HomeServer):
-    DATASTORE_CLASS = DataStore
+    DATASTORE_CLASS = DataStore  # type: ignore
 
-    def _listener_http(self, config: HomeServerConfig, listener_config: ListenerConfig):
+    def _listener_http(
+        self, config: HomeServerConfig, listener_config: ListenerConfig
+    ) -> Iterable[Port]:
         port = listener_config.port
         bind_addresses = listener_config.bind_addresses
         tls = listener_config.tls
+        # Must exist since this is an HTTP listener.
+        assert listener_config.http_options is not None
         site_tag = listener_config.http_options.tag
         if site_tag is None:
             site_tag = str(port)
 
         # We always include a health resource.
-        resources = {"/health": HealthResource()}
+        resources: Dict[str, Resource] = {"/health": HealthResource()}
 
         for res in listener_config.http_options.resources:
             for name in res.names:
@@ -111,7 +116,7 @@ class SynapseHomeServer(HomeServer):
                 ("listeners", site_tag, "additional_resources", "<%s>" % (path,)),
             )
             handler = handler_cls(config, module_api)
-            if IResource.providedBy(handler):
+            if isinstance(handler, Resource):
                 resource = handler
             elif hasattr(handler, "handle_request"):
                 resource = AdditionalResource(self, handler.handle_request)
@@ -128,7 +133,7 @@ class SynapseHomeServer(HomeServer):
 
         # try to find something useful to redirect '/' to
         if WEB_CLIENT_PREFIX in resources:
-            root_resource = RootOptionsRedirectResource(WEB_CLIENT_PREFIX)
+            root_resource: Resource = RootOptionsRedirectResource(WEB_CLIENT_PREFIX)
         elif STATIC_PREFIX in resources:
             root_resource = RootOptionsRedirectResource(STATIC_PREFIX)
         else:
@@ -145,6 +150,8 @@ class SynapseHomeServer(HomeServer):
         )
 
         if tls:
+            # refresh_certificate should have been called before this.
+            assert self.tls_server_context_factory is not None
             ports = listen_ssl(
                 bind_addresses,
                 port,
@@ -165,20 +172,21 @@ class SynapseHomeServer(HomeServer):
 
         return ports
 
-    def _configure_named_resource(self, name, compress=False):
+    def _configure_named_resource(
+        self, name: str, compress: bool = False
+    ) -> Dict[str, Resource]:
         """Build a resource map for a named resource
 
         Args:
-            name (str): named resource: one of "client", "federation", etc
-            compress (bool): whether to enable gzip compression for this
-                resource
+            name: named resource: one of "client", "federation", etc
+            compress: whether to enable gzip compression for this resource
 
         Returns:
-            dict[str, Resource]: map from path to HTTP resource
+            map from path to HTTP resource
         """
-        resources = {}
+        resources: Dict[str, Resource] = {}
         if name == "client":
-            client_resource = ClientRestResource(self)
+            client_resource: Resource = ClientRestResource(self)
             if compress:
                 client_resource = gz_wrap(client_resource)
 
@@ -186,16 +194,17 @@ class SynapseHomeServer(HomeServer):
                 {
                     "/_matrix/client/api/v1": client_resource,
                     "/_matrix/client/r0": client_resource,
+                    "/_matrix/client/v3": client_resource,
                     "/_matrix/client/unstable": client_resource,
                     "/_matrix/client/v2_alpha": client_resource,
                     "/_matrix/client/versions": client_resource,
-                    "/.well-known/matrix/client": WellKnownResource(self),
+                    "/.well-known": well_known_resource(self),
                     "/_synapse/admin": AdminRestResource(self),
                     **build_synapse_client_resource_tree(self),
                 }
             )
 
-            if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            if self.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
                 from synapse.rest.synapse.client.password_reset import (
                     PasswordResetSubmitTokenResource,
                 )
@@ -207,7 +216,7 @@ class SynapseHomeServer(HomeServer):
         if name == "consent":
             from synapse.rest.consent.consent_resource import ConsentResource
 
-            consent_resource = ConsentResource(self)
+            consent_resource: Resource = ConsentResource(self)
             if compress:
                 consent_resource = gz_wrap(consent_resource)
             resources.update({"/_matrix/consent": consent_resource})
@@ -234,10 +243,14 @@ class SynapseHomeServer(HomeServer):
             )
 
         if name in ["media", "federation", "client"]:
-            if self.config.enable_media_repo:
+            if self.config.server.enable_media_repo:
                 media_repo = self.get_media_repository_resource()
                 resources.update(
-                    {MEDIA_PREFIX: media_repo, LEGACY_MEDIA_PREFIX: media_repo}
+                    {
+                        MEDIA_R0_PREFIX: media_repo,
+                        MEDIA_V3_PREFIX: media_repo,
+                        LEGACY_MEDIA_PREFIX: media_repo,
+                    }
                 )
             elif name == "media":
                 raise ConfigError(
@@ -248,7 +261,7 @@ class SynapseHomeServer(HomeServer):
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         if name == "webclient":
-            webclient_loc = self.config.web_client_location
+            webclient_loc = self.config.server.web_client_location
 
             if webclient_loc is None:
                 logger.warning(
@@ -269,7 +282,7 @@ class SynapseHomeServer(HomeServer):
                 # https://twistedmatrix.com/trac/ticket/7678
                 resources[WEB_CLIENT_PREFIX] = File(webclient_loc)
 
-        if name == "metrics" and self.config.enable_metrics:
+        if name == "metrics" and self.config.metrics.enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
 
         if name == "replication":
@@ -277,8 +290,8 @@ class SynapseHomeServer(HomeServer):
 
         return resources
 
-    def start_listening(self):
-        if self.config.redis_enabled:
+    def start_listening(self) -> None:
+        if self.config.redis.redis_enabled:
             # If redis is enabled we connect via the replication command handler
             # in the same way as the workers (since we're effectively a client
             # rather than a server).
@@ -303,9 +316,11 @@ class SynapseHomeServer(HomeServer):
                     ReplicationStreamProtocolFactory(self),
                 )
                 for s in services:
-                    reactor.addSystemEventTrigger("before", "shutdown", s.stopListening)
+                    self.get_reactor().addSystemEventTrigger(
+                        "before", "shutdown", s.stopListening
+                    )
             elif listener.type == "metrics":
-                if not self.config.enable_metrics:
+                if not self.config.metrics.enable_metrics:
                     logger.warning(
                         "Metrics listener configured, but "
                         "enable_metrics is not True!"
@@ -318,14 +333,13 @@ class SynapseHomeServer(HomeServer):
                 logger.warning("Unrecognized listener type: %s", listener.type)
 
 
-def setup(config_options):
+def setup(config_options: List[str]) -> SynapseHomeServer:
     """
     Args:
-        config_options_options: The options passed to Synapse. Usually
-            `sys.argv[1:]`.
+        config_options_options: The options passed to Synapse. Usually `sys.argv[1:]`.
 
     Returns:
-        HomeServer
+        A homeserver instance.
     """
     try:
         config = HomeServerConfig.load_or_generate_config(
@@ -343,14 +357,14 @@ def setup(config_options):
         # generating config files and shouldn't try to continue.
         sys.exit(0)
 
-    events.USE_FROZEN_DICTS = config.use_frozen_dicts
+    events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
     synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
 
     if config.server.gc_seconds:
         synapse.metrics.MIN_TIME_BETWEEN_GCS = config.server.gc_seconds
 
     hs = SynapseHomeServer(
-        config.server_name,
+        config.server.server_name,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
     )
@@ -364,9 +378,9 @@ def setup(config_options):
     except Exception as e:
         handle_startup_exception(e)
 
-    async def start():
+    async def start() -> None:
         # Load the OIDC provider metadatas, if OIDC is enabled.
-        if hs.config.oidc_enabled:
+        if hs.config.oidc.oidc_enabled:
             oidc = hs.get_oidc_handler()
             # Loading the provider metadata also ensures the provider config is valid.
             await oidc.load_metadata()
@@ -404,58 +418,34 @@ def format_config_error(e: ConfigError) -> Iterator[str]:
 
     yield ":\n  %s" % (e.msg,)
 
-    e = e.__cause__
+    parent_e = e.__cause__
     indent = 1
-    while e:
+    while parent_e:
         indent += 1
-        yield ":\n%s%s" % ("  " * indent, str(e))
-        e = e.__cause__
+        yield ":\n%s%s" % ("  " * indent, str(parent_e))
+        parent_e = parent_e.__cause__
 
 
-def run(hs):
-    PROFILE_SYNAPSE = False
-    if PROFILE_SYNAPSE:
-
-        def profile(func):
-            from cProfile import Profile
-            from threading import current_thread
-
-            def profiled(*args, **kargs):
-                profile = Profile()
-                profile.enable()
-                func(*args, **kargs)
-                profile.disable()
-                ident = current_thread().ident
-                profile.dump_stats(
-                    "/tmp/%s.%s.%i.pstat" % (hs.hostname, func.__name__, ident)
-                )
-
-            return profiled
-
-        from twisted.python.threadpool import ThreadPool
-
-        ThreadPool._worker = profile(ThreadPool._worker)
-        reactor.run = profile(reactor.run)
-
+def run(hs: HomeServer) -> None:
     _base.start_reactor(
         "synapse-homeserver",
-        soft_file_limit=hs.config.soft_file_limit,
-        gc_thresholds=hs.config.gc_thresholds,
-        pid_file=hs.config.pid_file,
-        daemonize=hs.config.daemonize,
-        print_pidfile=hs.config.print_pidfile,
+        soft_file_limit=hs.config.server.soft_file_limit,
+        gc_thresholds=hs.config.server.gc_thresholds,
+        pid_file=hs.config.server.pid_file,
+        daemonize=hs.config.server.daemonize,
+        print_pidfile=hs.config.server.print_pidfile,
         logger=logger,
     )
 
 
-def main():
+def main() -> None:
     with LoggingContext("main"):
         # check base requirements
         check_requirements()
         hs = setup(sys.argv[1:])
 
         # redirect stdio to the logs, if configured.
-        if not hs.config.no_redirect_stdio:
+        if not hs.config.logging.no_redirect_stdio:
             redirect_stdio_to_logs()
 
         run(hs)

@@ -326,7 +326,7 @@ class UIAuthWorkerStore(SQLBaseStore):
             txn,
             table="ui_auth_sessions_ips",
             column="session_id",
-            iterable=session_ids,
+            values=session_ids,
             keyvalues={},
         )
 
@@ -377,7 +377,7 @@ class UIAuthWorkerStore(SQLBaseStore):
             txn,
             table="ui_auth_sessions_credentials",
             column="session_id",
-            iterable=session_ids,
+            values=session_ids,
             keyvalues={},
         )
 
@@ -386,7 +386,7 @@ class UIAuthWorkerStore(SQLBaseStore):
             txn,
             table="ui_auth_sessions",
             column="session_id",
-            iterable=session_ids,
+            values=session_ids,
             keyvalues={},
         )
 

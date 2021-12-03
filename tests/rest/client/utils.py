@@ -19,10 +19,21 @@ import json
 import re
 import time
 import urllib.parse
-from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, Tuple, Union
+from typing import (
+    Any,
+    AnyStr,
+    Dict,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Tuple,
+    overload,
+)
 from unittest.mock import patch
 
 import attr
+from typing_extensions import Literal
 
 from twisted.web.resource import Resource
 from twisted.web.server import Site
@@ -45,26 +56,51 @@ class RestHelper:
     site = attr.ib(type=Site)
     auth_user_id = attr.ib()
 
+    @overload
+    def create_room_as(
+        self,
+        room_creator: Optional[str] = ...,
+        is_public: Optional[bool] = ...,
+        room_version: Optional[str] = ...,
+        tok: Optional[str] = ...,
+        expect_code: Literal[200] = ...,
+        extra_content: Optional[Dict] = ...,
+        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = ...,
+    ) -> str:
+        ...
+
+    @overload
+    def create_room_as(
+        self,
+        room_creator: Optional[str] = ...,
+        is_public: Optional[bool] = ...,
+        room_version: Optional[str] = ...,
+        tok: Optional[str] = ...,
+        expect_code: int = ...,
+        extra_content: Optional[Dict] = ...,
+        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = ...,
+    ) -> Optional[str]:
+        ...
+
     def create_room_as(
         self,
         room_creator: Optional[str] = None,
-        is_public: bool = True,
+        is_public: Optional[bool] = None,
         room_version: Optional[str] = None,
         tok: Optional[str] = None,
         expect_code: int = 200,
         extra_content: Optional[Dict] = None,
-        custom_headers: Optional[
-            Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
-        ] = None,
-    ) -> str:
+        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
+    ) -> Optional[str]:
         """
         Create a room.
 
         Args:
             room_creator: The user ID to create the room with.
-            is_public: If True, the `visibility` parameter will be set to the
-                default (public). Otherwise, the `visibility` parameter will be set
-                to "private".
+            is_public: If True, the `visibility` parameter will be set to
+                "public". If False, it will be set to "private". If left
+                unspecified, the server will set it to an appropriate default
+                (which should be "private" as per the CS spec).
             room_version: The room version to create the room as. Defaults to Synapse's
                 default room version.
             tok: The access token to use in the request.
@@ -77,8 +113,8 @@ class RestHelper:
         self.auth_user_id = room_creator
         path = "/_matrix/client/r0/createRoom"
         content = extra_content or {}
-        if not is_public:
-            content["visibility"] = "private"
+        if is_public is not None:
+            content["visibility"] = "public" if is_public else "private"
         if room_version:
             content["room_version"] = room_version
         if tok:
@@ -98,6 +134,8 @@ class RestHelper:
 
         if expect_code == 200:
             return channel.json_body["room_id"]
+        else:
+            return None
 
     def invite(self, room=None, src=None, targ=None, expect_code=200, tok=None):
         self.change_membership(
@@ -119,6 +157,35 @@ class RestHelper:
             expect_code=expect_code,
         )
 
+    def knock(self, room=None, user=None, reason=None, expect_code=200, tok=None):
+        temp_id = self.auth_user_id
+        self.auth_user_id = user
+        path = "/knock/%s" % room
+        if tok:
+            path = path + "?access_token=%s" % tok
+
+        data = {}
+        if reason:
+            data["reason"] = reason
+
+        channel = make_request(
+            self.hs.get_reactor(),
+            self.site,
+            "POST",
+            path,
+            json.dumps(data).encode("utf8"),
+        )
+
+        assert (
+            int(channel.result["code"]) == expect_code
+        ), "Expected: %d, got: %d, resp: %r" % (
+            expect_code,
+            int(channel.result["code"]),
+            channel.result["body"],
+        )
+
+        self.auth_user_id = temp_id
+
     def leave(self, room=None, user=None, expect_code=200, tok=None):
         self.change_membership(
             room=room,
@@ -138,6 +205,7 @@ class RestHelper:
         extra_data: Optional[dict] = None,
         tok: Optional[str] = None,
         expect_code: int = 200,
+        expect_errcode: Optional[str] = None,
     ) -> None:
         """
         Send a membership state event into a room.
@@ -150,6 +218,7 @@ class RestHelper:
             extra_data: Extra information to include in the content of the event
             tok: The user access token to use
             expect_code: The expected HTTP response code
+            expect_errcode: The expected Matrix error code
         """
         temp_id = self.auth_user_id
         self.auth_user_id = src
@@ -177,6 +246,15 @@ class RestHelper:
             channel.result["body"],
         )
 
+        if expect_errcode:
+            assert (
+                str(channel.json_body["errcode"]) == expect_errcode
+            ), "Expected: %r, got: %r, resp: %r" % (
+                expect_errcode,
+                channel.json_body["errcode"],
+                channel.result["body"],
+            )
+
         self.auth_user_id = temp_id
 
     def send(
@@ -186,9 +264,7 @@ class RestHelper:
         txn_id=None,
         tok=None,
         expect_code=200,
-        custom_headers: Optional[
-            Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
-        ] = None,
+        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
     ):
         if body is None:
             body = "body_text_here"
@@ -213,9 +289,7 @@ class RestHelper:
         txn_id=None,
         tok=None,
         expect_code=200,
-        custom_headers: Optional[
-            Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
-        ] = None,
+        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
     ):
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
@@ -372,12 +446,12 @@ class RestHelper:
         path = "/_matrix/media/r0/upload?filename=%s" % (filename,)
         channel = make_request(
             self.hs.get_reactor(),
-            FakeSite(resource),
+            FakeSite(resource, self.hs.get_reactor()),
             "POST",
             path,
             content=image_data,
             access_token=tok,
-            custom_headers=[(b"Content-Length", str(image_length))],
+            custom_headers=[("Content-Length", str(image_length))],
         )
 
         assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
@@ -462,7 +536,7 @@ class RestHelper:
             went.
         """
 
-        cookies = {}
+        cookies: Dict[str, str] = {}
 
         # if we're doing a ui auth, hit the ui auth redirect endpoint
         if ui_auth_session_id:
@@ -584,7 +658,13 @@ class RestHelper:
 
         # hit the redirect url again with the right Host header, which should now issue
         # a cookie and redirect to the SSO provider.
-        location = channel.headers.getRawHeaders("Location")[0]
+        def get_location(channel: FakeChannel) -> str:
+            location_values = channel.headers.getRawHeaders("Location")
+            # Keep mypy happy by asserting that location_values is nonempty
+            assert location_values
+            return location_values[0]
+
+        location = get_location(channel)
         parts = urllib.parse.urlsplit(location)
         channel = make_request(
             self.hs.get_reactor(),
@@ -598,7 +678,7 @@ class RestHelper:
 
         assert channel.code == 302
         channel.extract_cookies(cookies)
-        return channel.headers.getRawHeaders("Location")[0]
+        return get_location(channel)
 
     def initiate_sso_ui_auth(
         self, ui_auth_session_id: str, cookies: MutableMapping[str, str]

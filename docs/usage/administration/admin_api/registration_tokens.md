@@ -1,7 +1,8 @@
 # Registration Tokens
 
 This API allows you to manage tokens which can be used to authenticate
-registration requests, as proposed in [MSC3231](https://github.com/govynnus/matrix-doc/blob/token-registration/proposals/3231-token-authenticated-registration.md).
+registration requests, as proposed in
+[MSC3231](https://github.com/matrix-org/matrix-doc/blob/main/proposals/3231-token-authenticated-registration.md).
 To use it, you will need to enable the `registration_requires_token` config
 option, and authenticate by providing an `access_token` for a server admin:
 see [Admin API](../../usage/administration/admin_api).
@@ -148,7 +149,7 @@ POST /_synapse/admin/v1/registration_tokens/new
 
 The request body must be a JSON object and can contain the following fields:
 - `token`: The registration token. A string of no more than 64 characters that
-  consists only of characters matched by the regex `[A-Za-z0-9-_]`.
+  consists only of characters matched by the regex `[A-Za-z0-9._~-]`.
   Default: randomly generated.
 - `uses_allowed`: The integer number of times the token can be used to complete
   a registration before it becomes invalid.

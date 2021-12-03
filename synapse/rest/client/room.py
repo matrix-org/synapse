@@ -369,7 +369,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             # Option to allow servers to require auth when accessing
             # /publicRooms via CS API. This is especially helpful in private
             # federations.
-            if not self.hs.config.allow_public_rooms_without_auth:
+            if not self.hs.config.server.allow_public_rooms_without_auth:
                 raise
 
             # We allow people to not be authed if they're just looking at our
@@ -388,7 +388,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             limit = None
 
         handler = self.hs.get_room_list_handler()
-        if server and server != self.hs.config.server_name:
+        if server and server != self.hs.config.server.server_name:
             # Ensure the server is valid.
             try:
                 parse_and_validate_server_name(server)
@@ -438,7 +438,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             limit = None
 
         handler = self.hs.get_room_list_handler()
-        if server and server != self.hs.config.server_name:
+        if server and server != self.hs.config.server.server_name:
             # Ensure the server is valid.
             try:
                 parse_and_validate_server_name(server)
@@ -550,6 +550,7 @@ class RoomMessageListRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
+        self._hs = hs
         self.pagination_handler = hs.get_pagination_handler()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
@@ -567,7 +568,9 @@ class RoomMessageListRestServlet(RestServlet):
         filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter: Optional[Filter] = Filter(json_decoder.decode(filter_json))
+            event_filter: Optional[Filter] = Filter(
+                self._hs, json_decoder.decode(filter_json)
+            )
             if (
                 event_filter
                 and event_filter.filter_json.get("event_format", "client")
@@ -672,6 +675,7 @@ class RoomEventContextServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
+        self._hs = hs
         self.clock = hs.get_clock()
         self.room_context_handler = hs.get_room_context_handler()
         self._event_serializer = hs.get_event_client_serializer()
@@ -688,7 +692,9 @@ class RoomEventContextServlet(RestServlet):
         filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter: Optional[Filter] = Filter(json_decoder.decode(filter_json))
+            event_filter: Optional[Filter] = Filter(
+                self._hs, json_decoder.decode(filter_json)
+            )
         else:
             event_filter = None
 
@@ -713,7 +719,7 @@ class RoomEventContextServlet(RestServlet):
             results["state"],
             time_now,
             # No need to bundle aggregations for state events
-            bundle_aggregations=False,
+            bundle_relations=False,
         )
 
         return 200, results
@@ -914,7 +920,7 @@ class RoomTypingRestServlet(RestServlet):
         # If we're not on the typing writer instance we should scream if we get
         # requests.
         self._is_typing_writer = (
-            hs.config.worker.writers.typing == hs.get_instance_name()
+            hs.get_instance_name() in hs.config.worker.writers.typing
         )
 
     async def on_PUT(

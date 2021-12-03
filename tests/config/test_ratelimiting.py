@@ -30,7 +30,7 @@ class RatelimitConfigTestCase(TestCase):
 
         config = HomeServerConfig()
         config.parse_config_dict(config_dict, "", "")
-        config_obj = config.rc_federation
+        config_obj = config.ratelimiting.rc_federation
 
         self.assertEqual(config_obj.window_size, 20000)
         self.assertEqual(config_obj.sleep_limit, 693)

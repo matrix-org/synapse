@@ -42,7 +42,7 @@ class UserSharedRoomsServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
-        self.user_directory_active = hs.config.update_user_directory
+        self.user_directory_active = hs.config.server.update_user_directory
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str

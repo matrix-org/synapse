@@ -17,19 +17,17 @@ from typing import TYPE_CHECKING, Optional
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.types import Requester
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class SetPasswordHandler(BaseHandler):
+class SetPasswordHandler:
     """Handler which deals with changing user account passwords"""
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
 

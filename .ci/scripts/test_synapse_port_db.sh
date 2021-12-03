@@ -7,7 +7,7 @@
 
 
 set -xe
-cd `dirname $0`/../..
+cd "$(dirname "$0")/../.."
 
 echo "--- Install dependencies"
 
@@ -25,7 +25,7 @@ python -m synapse.app.homeserver --generate-keys -c .ci/sqlite-config.yaml
 echo "--- Prepare test database"
 
 # Make sure the SQLite3 database is using the latest schema and has no pending background update.
-scripts-dev/update_database --database-config .ci/sqlite-config.yaml
+scripts/update_synapse_database --database-config .ci/sqlite-config.yaml --run-background-updates
 
 # Create the PostgreSQL database.
 .ci/scripts/postgres_exec.py "CREATE DATABASE synapse"
@@ -46,7 +46,7 @@ echo "--- Prepare empty SQLite database"
 # we do this by deleting the sqlite db, and then doing the same again.
 rm .ci/test_db.db
 
-scripts-dev/update_database --database-config .ci/sqlite-config.yaml
+scripts/update_synapse_database --database-config .ci/sqlite-config.yaml --run-background-updates
 
 # re-create the PostgreSQL database.
 .ci/scripts/postgres_exec.py \

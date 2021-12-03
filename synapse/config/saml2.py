@@ -199,14 +199,11 @@ class SAML2Config(Config):
         """
         import saml2
 
-        public_baseurl = self.public_baseurl
-        if public_baseurl is None:
-            raise ConfigError("saml2_config requires a public_baseurl to be set")
-
         if self.saml2_grandfathered_mxid_source_attribute:
             optional_attributes.add(self.saml2_grandfathered_mxid_source_attribute)
         optional_attributes -= required_attributes
 
+        public_baseurl = self.root.server.public_baseurl
         metadata_url = public_baseurl + "_synapse/client/saml2/metadata.xml"
         response_url = public_baseurl + "_synapse/client/saml2/authn_response"
         return {

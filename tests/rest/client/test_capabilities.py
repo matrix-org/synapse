@@ -55,7 +55,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
             self.assertTrue(room_version in KNOWN_ROOM_VERSIONS, "" + room_version)
 
         self.assertEqual(
-            self.config.default_room_version.identifier,
+            self.config.server.default_room_version.identifier,
             capabilities["m.room_versions"]["default"],
         )
 
@@ -71,7 +71,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
     @override_config({"password_config": {"localdb_enabled": False}})
     def test_get_change_password_capabilities_localdb_disabled(self):
         access_token = self.get_success(
-            self.auth_handler.get_access_token_for_user_id(
+            self.auth_handler.create_access_token_for_user_id(
                 self.user, device_id=None, valid_until_ms=None
             )
         )
@@ -85,7 +85,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
     @override_config({"password_config": {"enabled": False}})
     def test_get_change_password_capabilities_password_disabled(self):
         access_token = self.get_success(
-            self.auth_handler.get_access_token_for_user_id(
+            self.auth_handler.create_access_token_for_user_id(
                 self.user, device_id=None, valid_until_ms=None
             )
         )
@@ -174,7 +174,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
     @override_config({"experimental_features": {"msc3244_enabled": False}})
     def test_get_does_not_include_msc3244_fields_when_disabled(self):
         access_token = self.get_success(
-            self.auth_handler.get_access_token_for_user_id(
+            self.auth_handler.create_access_token_for_user_id(
                 self.user, device_id=None, valid_until_ms=None
             )
         )
@@ -189,7 +189,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
     def test_get_does_include_msc3244_fields_when_enabled(self):
         access_token = self.get_success(
-            self.auth_handler.get_access_token_for_user_id(
+            self.auth_handler.create_access_token_for_user_id(
                 self.user, device_id=None, valid_until_ms=None
             )
         )

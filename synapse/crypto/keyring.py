@@ -1,5 +1,4 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2017, 2018 New Vector Ltd
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +21,7 @@ import attr
 from signedjson.key import (
     decode_verify_key_bytes,
     encode_verify_key_base64,
+    get_verify_key,
     is_signing_algorithm_supported,
 )
 from signedjson.sign import (
@@ -30,6 +30,7 @@ from signedjson.sign import (
     signature_ids,
     verify_signed_json,
 )
+from signedjson.types import VerifyKey
 from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
@@ -87,7 +88,7 @@ class VerifyJsonRequest:
         server_name: str,
         json_object: JsonDict,
         minimum_valid_until_ms: int,
-    ):
+    ) -> "VerifyJsonRequest":
         """Create a VerifyJsonRequest to verify all signatures on a signed JSON
         object for the given server.
         """
@@ -104,7 +105,7 @@ class VerifyJsonRequest:
         server_name: str,
         event: EventBase,
         minimum_valid_until_ms: int,
-    ):
+    ) -> "VerifyJsonRequest":
         """Create a VerifyJsonRequest to verify all signatures on an event
         object for the given server.
         """
@@ -116,16 +117,6 @@ class VerifyJsonRequest:
             lambda: prune_event_dict(event.room_version, event.get_pdu_json()),
             minimum_valid_until_ms,
             key_ids=key_ids,
-        )
-
-    def to_fetch_key_request(self) -> "_FetchKeyRequest":
-        """Create a key fetch request for all keys needed to satisfy the
-        verification request.
-        """
-        return _FetchKeyRequest(
-            server_name=self.server_name,
-            minimum_valid_until_ts=self.minimum_valid_until_ts,
-            key_ids=self.key_ids,
         )
 
 
@@ -178,6 +169,22 @@ class Keyring:
             process_batch_callback=self._inner_fetch_key_requests,
         )
 
+        self._hostname = hs.hostname
+
+        # build a FetchKeyResult for each of our own keys, to shortcircuit the
+        # fetcher.
+        self._local_verify_keys: Dict[str, FetchKeyResult] = {}
+        for key_id, key in hs.config.key.old_signing_keys.items():
+            self._local_verify_keys[key_id] = FetchKeyResult(
+                verify_key=key, valid_until_ts=key.expired_ts
+            )
+
+        vk = get_verify_key(hs.signing_key)
+        self._local_verify_keys[f"{vk.alg}:{vk.version}"] = FetchKeyResult(
+            verify_key=vk,
+            valid_until_ts=2 ** 63,  # fake future timestamp
+        )
+
     async def verify_json_for_server(
         self,
         server_name: str,
@@ -196,6 +203,7 @@ class Keyring:
             validity_time: timestamp at which we require the signing key to
                 be valid. (0 implies we don't care)
         """
+
         request = VerifyJsonRequest.from_json_object(
             server_name,
             json_object,
@@ -262,17 +270,32 @@ class Keyring:
                 Codes.UNAUTHORIZED,
             )
 
-        # Add the keys we need to verify to the queue for retrieval. We queue
-        # up requests for the same server so we don't end up with many in flight
-        # requests for the same keys.
-        key_request = verify_request.to_fetch_key_request()
-        found_keys_by_server = await self._server_queue.add_to_queue(
-            key_request, key=verify_request.server_name
-        )
+        found_keys: Dict[str, FetchKeyResult] = {}
 
-        # Since we batch up requests the returned set of keys may contain keys
-        # from other servers, so we pull out only the ones we care about.s
-        found_keys = found_keys_by_server.get(verify_request.server_name, {})
+        # If we are the originating server, short-circuit the key-fetch for any keys
+        # we already have
+        if verify_request.server_name == self._hostname:
+            for key_id in verify_request.key_ids:
+                if key_id in self._local_verify_keys:
+                    found_keys[key_id] = self._local_verify_keys[key_id]
+
+        key_ids_to_find = set(verify_request.key_ids) - found_keys.keys()
+        if key_ids_to_find:
+            # Add the keys we need to verify to the queue for retrieval. We queue
+            # up requests for the same server so we don't end up with many in flight
+            # requests for the same keys.
+            key_request = _FetchKeyRequest(
+                server_name=verify_request.server_name,
+                minimum_valid_until_ts=verify_request.minimum_valid_until_ts,
+                key_ids=list(key_ids_to_find),
+            )
+            found_keys_by_server = await self._server_queue.add_to_queue(
+                key_request, key=verify_request.server_name
+            )
+
+            # Since we batch up requests the returned set of keys may contain keys
+            # from other servers, so we pull out only the ones we care about.
+            found_keys.update(found_keys_by_server.get(verify_request.server_name, {}))
 
         # Verify each signature we got valid keys for, raising if we can't
         # verify any of them.
@@ -285,40 +308,46 @@ class Keyring:
             if key_result.valid_until_ts < verify_request.minimum_valid_until_ts:
                 continue
 
-            verify_key = key_result.verify_key
-            json_object = verify_request.get_json_object()
-            try:
-                verify_signed_json(
-                    json_object,
-                    verify_request.server_name,
-                    verify_key,
-                )
-                verified = True
-            except SignatureVerifyException as e:
-                logger.debug(
-                    "Error verifying signature for %s:%s:%s with key %s: %s",
-                    verify_request.server_name,
-                    verify_key.alg,
-                    verify_key.version,
-                    encode_verify_key_base64(verify_key),
-                    str(e),
-                )
-                raise SynapseError(
-                    401,
-                    "Invalid signature for server %s with key %s:%s: %s"
-                    % (
-                        verify_request.server_name,
-                        verify_key.alg,
-                        verify_key.version,
-                        str(e),
-                    ),
-                    Codes.UNAUTHORIZED,
-                )
+            await self._process_json(key_result.verify_key, verify_request)
+            verified = True
 
         if not verified:
             raise SynapseError(
                 401,
                 f"Failed to find any key to satisfy: {key_request}",
+                Codes.UNAUTHORIZED,
+            )
+
+    async def _process_json(
+        self, verify_key: VerifyKey, verify_request: VerifyJsonRequest
+    ) -> None:
+        """Processes the `VerifyJsonRequest`. Raises if the signature can't be
+        verified.
+        """
+        try:
+            verify_signed_json(
+                verify_request.get_json_object(),
+                verify_request.server_name,
+                verify_key,
+            )
+        except SignatureVerifyException as e:
+            logger.debug(
+                "Error verifying signature for %s:%s:%s with key %s: %s",
+                verify_request.server_name,
+                verify_key.alg,
+                verify_key.version,
+                encode_verify_key_base64(verify_key),
+                str(e),
+            )
+            raise SynapseError(
+                401,
+                "Invalid signature for server %s with key %s:%s: %s"
+                % (
+                    verify_request.server_name,
+                    verify_key.alg,
+                    verify_key.version,
+                    str(e),
+                ),
                 Codes.UNAUTHORIZED,
             )
 
@@ -449,7 +478,9 @@ class StoreKeyFetcher(KeyFetcher):
 
         self.store = hs.get_datastore()
 
-    async def _fetch_keys(self, keys_to_fetch: List[_FetchKeyRequest]):
+    async def _fetch_keys(
+        self, keys_to_fetch: List[_FetchKeyRequest]
+    ) -> Dict[str, Dict[str, FetchKeyResult]]:
         key_ids_to_fetch = (
             (queue_value.server_name, key_id)
             for queue_value in keys_to_fetch
@@ -572,7 +603,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         super().__init__(hs)
         self.clock = hs.get_clock()
         self.client = hs.get_federation_http_client()
-        self.key_servers = self.config.key_servers
+        self.key_servers = self.config.key.key_servers
 
     async def _fetch_keys(
         self, keys_to_fetch: List[_FetchKeyRequest]

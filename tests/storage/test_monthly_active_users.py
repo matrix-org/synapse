@@ -51,7 +51,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
     @override_config({"max_mau_value": 3, "mau_limit_reserved_threepids": gen_3pids(3)})
     def test_initialise_reserved_users(self):
-        threepids = self.hs.config.mau_limits_reserved_threepids
+        threepids = self.hs.config.server.mau_limits_reserved_threepids
 
         # register three users, of which two have reserved 3pids, and a third
         # which is a support user.
@@ -101,9 +101,9 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         # XXX some of this is redundant. poking things into the config shouldn't
         # work, and in any case it's not obvious what we expect to happen when
         # we advance the reactor.
-        self.hs.config.max_mau_value = 0
+        self.hs.config.server.max_mau_value = 0
         self.reactor.advance(FORTY_DAYS)
-        self.hs.config.max_mau_value = 5
+        self.hs.config.server.max_mau_value = 5
 
         self.get_success(self.store.reap_monthly_active_users())
 
@@ -183,7 +183,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.get_success(d)
 
         count = self.get_success(self.store.get_monthly_active_count())
-        self.assertEqual(count, self.hs.config.max_mau_value)
+        self.assertEqual(count, self.hs.config.server.max_mau_value)
 
         self.reactor.advance(FORTY_DAYS)
 
@@ -199,7 +199,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
     def test_reap_monthly_active_users_reserved_users(self):
         """Tests that reaping correctly handles reaping where reserved users are
         present"""
-        threepids = self.hs.config.mau_limits_reserved_threepids
+        threepids = self.hs.config.server.mau_limits_reserved_threepids
         initial_users = len(threepids)
         reserved_user_number = initial_users - 1
         for i in range(initial_users):
@@ -234,7 +234,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.get_success(d)
 
         count = self.get_success(self.store.get_monthly_active_count())
-        self.assertEqual(count, self.hs.config.max_mau_value)
+        self.assertEqual(count, self.hs.config.server.max_mau_value)
 
     def test_populate_monthly_users_is_guest(self):
         # Test that guest users are not added to mau list
@@ -294,7 +294,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
             {"medium": "email", "address": user2_email},
         ]
 
-        self.hs.config.mau_limits_reserved_threepids = threepids
+        self.hs.config.server.mau_limits_reserved_threepids = threepids
         d = self.store.db_pool.runInteraction(
             "initialise", self.store._initialise_reserved_users, threepids
         )

@@ -81,7 +81,7 @@ class PaginationConfig:
             raise SynapseError(400, "Invalid request.")
 
     def __repr__(self) -> str:
-        return ("PaginationConfig(from_tok=%r, to_tok=%r, direction=%r, limit=%r)") % (
+        return "PaginationConfig(from_tok=%r, to_tok=%r, direction=%r, limit=%r)" % (
             self.from_token,
             self.to_token,
             self.direction,

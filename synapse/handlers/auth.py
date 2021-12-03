@@ -29,6 +29,7 @@ from typing import (
     Mapping,
     Optional,
     Tuple,
+    Type,
     Union,
     cast,
 )
@@ -51,7 +52,6 @@ from synapse.api.errors import (
     UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
-from synapse.handlers._base import BaseHandler
 from synapse.handlers.ui_auth import (
     INTERACTIVE_AUTH_CHECKERS,
     UIAuthSessionDataConstants,
@@ -62,7 +62,6 @@ from synapse.http.server import finish_request, respond_with_html
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.module_api import ModuleApi
 from synapse.storage.roommember import ProfileInfo
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
@@ -73,6 +72,7 @@ from synapse.util.stringutils import base62_encode
 from synapse.util.threepids import canonicalise_email
 
 if TYPE_CHECKING:
+    from synapse.module_api import ModuleApi
     from synapse.rest.client.login import LoginResponse
     from synapse.server import HomeServer
 
@@ -185,84 +185,52 @@ class LoginTokenAttributes:
     auth_provider_id = attr.ib(type=str)
 
 
-class AuthHandler(BaseHandler):
+class AuthHandler:
     SESSION_EXPIRE_MS = 48 * 60 * 60 * 1000
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
         self.checkers: Dict[str, UserInteractiveAuthChecker] = {}
         for auth_checker_class in INTERACTIVE_AUTH_CHECKERS:
             inst = auth_checker_class(hs)
             if inst.is_enabled():
                 self.checkers[inst.AUTH_TYPE] = inst  # type: ignore
 
-        self.bcrypt_rounds = hs.config.bcrypt_rounds
+        self.bcrypt_rounds = hs.config.registration.bcrypt_rounds
 
-        # we can't use hs.get_module_api() here, because to do so will create an
-        # import loop.
-        #
-        # TODO: refactor this class to separate the lower-level stuff that
-        #   ModuleApi can use from the higher-level stuff that uses ModuleApi, as
-        #   better way to break the loop
-        account_handler = ModuleApi(hs, self)
-
-        self.password_providers = [
-            PasswordProvider.load(module, config, account_handler)
-            for module, config in hs.config.password_providers
-        ]
-
-        logger.info("Extra password_providers: %s", self.password_providers)
+        self.password_auth_provider = hs.get_password_auth_provider()
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.macaroon_gen = hs.get_macaroon_generator()
-        self._password_enabled = hs.config.password_enabled
-        self._password_localdb_enabled = hs.config.password_localdb_enabled
-
-        # start out by assuming PASSWORD is enabled; we will remove it later if not.
-        login_types = set()
-        if self._password_localdb_enabled:
-            login_types.add(LoginType.PASSWORD)
-
-        for provider in self.password_providers:
-            login_types.update(provider.get_supported_login_types().keys())
-
-        if not self._password_enabled:
-            login_types.discard(LoginType.PASSWORD)
-
-        # Some clients just pick the first type in the list. In this case, we want
-        # them to use PASSWORD (rather than token or whatever), so we want to make sure
-        # that comes first, where it's present.
-        self._supported_login_types = []
-        if LoginType.PASSWORD in login_types:
-            self._supported_login_types.append(LoginType.PASSWORD)
-            login_types.remove(LoginType.PASSWORD)
-        self._supported_login_types.extend(login_types)
+        self._password_enabled = hs.config.auth.password_enabled
+        self._password_localdb_enabled = hs.config.auth.password_localdb_enabled
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
         self._failed_uia_attempts_ratelimiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+            rate_hz=self.hs.config.ratelimiting.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.ratelimiting.rc_login_failed_attempts.burst_count,
         )
 
         # The number of seconds to keep a UI auth session active.
-        self._ui_auth_session_timeout = hs.config.ui_auth_session_timeout
+        self._ui_auth_session_timeout = hs.config.auth.ui_auth_session_timeout
 
         # Ratelimitier for failed /login attempts
         self._failed_login_attempts_ratelimiter = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
-            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+            rate_hz=self.hs.config.ratelimiting.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.ratelimiting.rc_login_failed_attempts.burst_count,
         )
 
         self._clock = self.hs.get_clock()
 
         # Expire old UI auth sessions after a period of time.
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             self._clock.looping_call(
                 run_as_background_process,
                 5 * 60 * 1000,
@@ -276,23 +244,25 @@ class AuthHandler(BaseHandler):
         # after the SSO completes and before redirecting them back to their client.
         # It notifies the user they are about to give access to their matrix account
         # to the client.
-        self._sso_redirect_confirm_template = hs.config.sso_redirect_confirm_template
+        self._sso_redirect_confirm_template = (
+            hs.config.sso.sso_redirect_confirm_template
+        )
 
         # The following template is shown during user interactive authentication
         # in the fallback auth scenario. It notifies the user that they are
         # authenticating for an operation to occur on their account.
-        self._sso_auth_confirm_template = hs.config.sso_auth_confirm_template
+        self._sso_auth_confirm_template = hs.config.sso.sso_auth_confirm_template
 
         # The following template is shown during the SSO authentication process if
         # the account is deactivated.
         self._sso_account_deactivated_template = (
-            hs.config.sso_account_deactivated_template
+            hs.config.sso.sso_account_deactivated_template
         )
 
-        self._server_name = hs.config.server_name
+        self._server_name = hs.config.server.server_name
 
         # cast to tuple for use with str.startswith
-        self._whitelisted_sso_clients = tuple(hs.config.sso_client_whitelist)
+        self._whitelisted_sso_clients = tuple(hs.config.sso.sso_client_whitelist)
 
         # A mapping of user ID to extra attributes to include in the login
         # response.
@@ -424,11 +394,10 @@ class AuthHandler(BaseHandler):
                     ui_auth_types.add(LoginType.PASSWORD)
 
         # also allow auth from password providers
-        for provider in self.password_providers:
-            for t in provider.get_supported_login_types().keys():
-                if t == LoginType.PASSWORD and not self._password_enabled:
-                    continue
-                ui_auth_types.add(t)
+        for t in self.password_auth_provider.get_supported_login_types().keys():
+            if t == LoginType.PASSWORD and not self._password_enabled:
+                continue
+            ui_auth_types.add(t)
 
         # if sso is enabled, allow the user to log in via SSO iff they have a mapping
         # from sso to mxid.
@@ -439,7 +408,7 @@ class AuthHandler(BaseHandler):
 
         return ui_auth_types
 
-    def get_enabled_auth_types(self):
+    def get_enabled_auth_types(self) -> Iterable[str]:
         """Return the enabled user-interactive authentication types
 
         Returns the UI-Auth types which are supported by the homeserver's current
@@ -702,7 +671,7 @@ class AuthHandler(BaseHandler):
         except StoreError:
             raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
 
-    async def _expire_old_sessions(self):
+    async def _expire_old_sessions(self) -> None:
         """
         Invalidate any user interactive authentication sessions that have expired.
         """
@@ -738,19 +707,19 @@ class AuthHandler(BaseHandler):
         return canonical_id
 
     def _get_params_recaptcha(self) -> dict:
-        return {"public_key": self.hs.config.recaptcha_public_key}
+        return {"public_key": self.hs.config.captcha.recaptcha_public_key}
 
     def _get_params_terms(self) -> dict:
         return {
             "policies": {
                 "privacy_policy": {
-                    "version": self.hs.config.user_consent_version,
+                    "version": self.hs.config.consent.user_consent_version,
                     "en": {
-                        "name": self.hs.config.user_consent_policy_name,
+                        "name": self.hs.config.consent.user_consent_policy_name,
                         "url": "%s_matrix/consent?v=%s"
                         % (
-                            self.hs.config.public_baseurl,
-                            self.hs.config.user_consent_version,
+                            self.hs.config.server.public_baseurl,
+                            self.hs.config.consent.user_consent_version,
                         ),
                     },
                 }
@@ -821,10 +790,10 @@ class AuthHandler(BaseHandler):
         (
             new_refresh_token,
             new_refresh_token_id,
-        ) = await self.get_refresh_token_for_user_id(
+        ) = await self.create_refresh_token_for_user_id(
             user_id=existing_token.user_id, device_id=existing_token.device_id
         )
-        access_token = await self.get_access_token_for_user_id(
+        access_token = await self.create_access_token_for_user_id(
             user_id=existing_token.user_id,
             device_id=existing_token.device_id,
             valid_until_ms=valid_until_ms,
@@ -863,7 +832,7 @@ class AuthHandler(BaseHandler):
 
         return True
 
-    async def get_refresh_token_for_user_id(
+    async def create_refresh_token_for_user_id(
         self,
         user_id: str,
         device_id: str,
@@ -886,7 +855,7 @@ class AuthHandler(BaseHandler):
         )
         return refresh_token, refresh_token_id
 
-    async def get_access_token_for_user_id(
+    async def create_access_token_for_user_id(
         self,
         user_id: str,
         device_id: Optional[str],
@@ -1015,7 +984,7 @@ class AuthHandler(BaseHandler):
     def can_change_password(self) -> bool:
         """Get whether users on this server are allowed to change or set a password.
 
-        Both `config.password_enabled` and `config.password_localdb_enabled` must be true.
+        Both `config.auth.password_enabled` and `config.auth.password_localdb_enabled` must be true.
 
         Note that any account (even SSO accounts) are allowed to add passwords if the above
         is true.
@@ -1035,7 +1004,25 @@ class AuthHandler(BaseHandler):
         Returns:
             login types
         """
-        return self._supported_login_types
+        # Load any login types registered by modules
+        # This is stored in the password_auth_provider so this doesn't trigger
+        # any callbacks
+        types = list(self.password_auth_provider.get_supported_login_types().keys())
+
+        # This list should include PASSWORD if (either _password_localdb_enabled is
+        # true or if one of the modules registered it) AND _password_enabled is true
+        # Also:
+        # Some clients just pick the first type in the list. In this case, we want
+        # them to use PASSWORD (rather than token or whatever), so we want to make sure
+        # that comes first, where it's present.
+        if LoginType.PASSWORD in types:
+            types.remove(LoginType.PASSWORD)
+            if self._password_enabled:
+                types.insert(0, LoginType.PASSWORD)
+        elif self._password_localdb_enabled and self._password_enabled:
+            types.insert(0, LoginType.PASSWORD)
+
+        return types
 
     async def validate_login(
         self,
@@ -1214,15 +1201,20 @@ class AuthHandler(BaseHandler):
 
         known_login_type = False
 
-        for provider in self.password_providers:
-            supported_login_types = provider.get_supported_login_types()
-            if login_type not in supported_login_types:
-                # this password provider doesn't understand this login type
-                continue
-
+        # Check if login_type matches a type registered by one of the modules
+        # We don't need to remove LoginType.PASSWORD from the list if password login is
+        # disabled, since if that were the case then by this point we know that the
+        # login_type is not LoginType.PASSWORD
+        supported_login_types = self.password_auth_provider.get_supported_login_types()
+        # check if the login type being used is supported by a module
+        if login_type in supported_login_types:
+            # Make a note that this login type is supported by the server
             known_login_type = True
+            # Get all the fields expected for this login types
             login_fields = supported_login_types[login_type]
 
+            # go through the login submission and keep track of which required fields are
+            # provided/not provided
             missing_fields = []
             login_dict = {}
             for f in login_fields:
@@ -1230,6 +1222,7 @@ class AuthHandler(BaseHandler):
                     missing_fields.append(f)
                 else:
                     login_dict[f] = login_submission[f]
+            # raise an error if any of the expected fields for that login type weren't provided
             if missing_fields:
                 raise SynapseError(
                     400,
@@ -1237,10 +1230,15 @@ class AuthHandler(BaseHandler):
                     % (login_type, missing_fields),
                 )
 
-            result = await provider.check_auth(username, login_type, login_dict)
+            # call all of the check_auth hooks for that login_type
+            # it will return a result once the first success is found (or None otherwise)
+            result = await self.password_auth_provider.check_auth(
+                username, login_type, login_dict
+            )
             if result:
                 return result
 
+        # if no module managed to authenticate the user, then fallback to built in password based auth
         if login_type == LoginType.PASSWORD and self._password_localdb_enabled:
             known_login_type = True
 
@@ -1279,11 +1277,16 @@ class AuthHandler(BaseHandler):
             completed login/registration, or `None`. If authentication was
             unsuccessful, `user_id` and `callback` are both `None`.
         """
-        for provider in self.password_providers:
-            result = await provider.check_3pid_auth(medium, address, password)
-            if result:
-                return result
+        # call all of the check_3pid_auth callbacks
+        # Result will be from the first callback that returns something other than None
+        # If all the callbacks return None, then result is also set to None
+        result = await self.password_auth_provider.check_3pid_auth(
+            medium, address, password
+        )
+        if result:
+            return result
 
+        # if result is None then return (None, None)
         return None, None
 
     async def _check_local_password(self, user_id: str, password: str) -> Optional[str]:
@@ -1347,12 +1350,12 @@ class AuthHandler(BaseHandler):
         try:
             res = self.macaroon_gen.verify_short_term_login_token(login_token)
         except Exception:
-            raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
+            raise AuthError(403, "Invalid login token", errcode=Codes.FORBIDDEN)
 
         await self.auth.check_auth_blocking(res.user_id)
         return res
 
-    async def delete_access_token(self, access_token: str):
+    async def delete_access_token(self, access_token: str) -> None:
         """Invalidate a single access token
 
         Args:
@@ -1362,13 +1365,12 @@ class AuthHandler(BaseHandler):
         user_info = await self.auth.get_user_by_access_token(access_token)
         await self.store.delete_access_token(access_token)
 
-        # see if any of our auth providers want to know about this
-        for provider in self.password_providers:
-            await provider.on_logged_out(
-                user_id=user_info.user_id,
-                device_id=user_info.device_id,
-                access_token=access_token,
-            )
+        # see if any modules want to know about this
+        await self.password_auth_provider.on_logged_out(
+            user_id=user_info.user_id,
+            device_id=user_info.device_id,
+            access_token=access_token,
+        )
 
         # delete pushers associated with this access token
         if user_info.token_id is not None:
@@ -1381,7 +1383,7 @@ class AuthHandler(BaseHandler):
         user_id: str,
         except_token_id: Optional[int] = None,
         device_id: Optional[str] = None,
-    ):
+    ) -> None:
         """Invalidate access tokens belonging to a user
 
         Args:
@@ -1395,12 +1397,11 @@ class AuthHandler(BaseHandler):
             user_id, except_token_id=except_token_id, device_id=device_id
         )
 
-        # see if any of our auth providers want to know about this
-        for provider in self.password_providers:
-            for token, _, device_id in tokens_and_devices:
-                await provider.on_logged_out(
-                    user_id=user_id, device_id=device_id, access_token=token
-                )
+        # see if any modules want to know about this
+        for token, _, device_id in tokens_and_devices:
+            await self.password_auth_provider.on_logged_out(
+                user_id=user_id, device_id=device_id, access_token=token
+            )
 
         # delete pushers associated with the access tokens
         await self.hs.get_pusherpool().remove_pushers_by_access_token(
@@ -1409,7 +1410,7 @@ class AuthHandler(BaseHandler):
 
     async def add_threepid(
         self, user_id: str, medium: str, address: str, validated_at: int
-    ):
+    ) -> None:
         # check if medium has a valid value
         if medium not in ["email", "msisdn"]:
             raise SynapseError(
@@ -1480,12 +1481,12 @@ class AuthHandler(BaseHandler):
             Hashed password.
         """
 
-        def _do_hash():
+        def _do_hash() -> str:
             # Normalise the Unicode in the password
             pw = unicodedata.normalize("NFKC", password)
 
             return bcrypt.hashpw(
-                pw.encode("utf8") + self.hs.config.password_pepper.encode("utf8"),
+                pw.encode("utf8") + self.hs.config.auth.password_pepper.encode("utf8"),
                 bcrypt.gensalt(self.bcrypt_rounds),
             ).decode("ascii")
 
@@ -1504,12 +1505,12 @@ class AuthHandler(BaseHandler):
             Whether self.hash(password) == stored_hash.
         """
 
-        def _do_validate_hash(checked_hash: bytes):
+        def _do_validate_hash(checked_hash: bytes) -> bool:
             # Normalise the Unicode in the password
             pw = unicodedata.normalize("NFKC", password)
 
             return bcrypt.checkpw(
-                pw.encode("utf8") + self.hs.config.password_pepper.encode("utf8"),
+                pw.encode("utf8") + self.hs.config.auth.password_pepper.encode("utf8"),
                 checked_hash,
             )
 
@@ -1581,7 +1582,7 @@ class AuthHandler(BaseHandler):
         client_redirect_url: str,
         extra_attributes: Optional[JsonDict] = None,
         new_user: bool = False,
-    ):
+    ) -> None:
         """Having figured out a mxid for this user, complete the HTTP request
 
         Args:
@@ -1627,7 +1628,7 @@ class AuthHandler(BaseHandler):
         extra_attributes: Optional[JsonDict] = None,
         new_user: bool = False,
         user_profile_data: Optional[ProfileInfo] = None,
-    ):
+    ) -> None:
         """
         The synchronous portion of complete_sso_login.
 
@@ -1726,7 +1727,7 @@ class AuthHandler(BaseHandler):
             del self._extra_attributes[user_id]
 
     @staticmethod
-    def add_query_param_to_url(url: str, param_name: str, param: Any):
+    def add_query_param_to_url(url: str, param_name: str, param: Any) -> str:
         url_parts = list(urllib.parse.urlparse(url))
         query = urllib.parse.parse_qsl(url_parts[4], keep_blank_values=True)
         query.append((param_name, param))
@@ -1734,9 +1735,9 @@ class AuthHandler(BaseHandler):
         return urllib.parse.urlunparse(url_parts)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class MacaroonGenerator:
-    hs = attr.ib()
+    hs: "HomeServer"
 
     def generate_guest_access_token(self, user_id: str) -> str:
         macaroon = self._generate_base_macaroon(user_id)
@@ -1799,47 +1800,241 @@ class MacaroonGenerator:
 
     def _generate_base_macaroon(self, user_id: str) -> pymacaroons.Macaroon:
         macaroon = pymacaroons.Macaroon(
-            location=self.hs.config.server_name,
+            location=self.hs.config.server.server_name,
             identifier="key",
-            key=self.hs.config.macaroon_secret_key,
+            key=self.hs.config.key.macaroon_secret_key,
         )
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         return macaroon
 
 
-class PasswordProvider:
-    """Wrapper for a password auth provider module
+def load_legacy_password_auth_providers(hs: "HomeServer") -> None:
+    module_api = hs.get_module_api()
+    for module, config in hs.config.authproviders.password_providers:
+        load_single_legacy_password_auth_provider(
+            module=module, config=config, api=module_api
+        )
 
-    This class abstracts out all of the backwards-compatibility hacks for
-    password providers, to provide a consistent interface.
+
+def load_single_legacy_password_auth_provider(
+    module: Type,
+    config: JsonDict,
+    api: "ModuleApi",
+) -> None:
+    try:
+        provider = module(config=config, account_handler=api)
+    except Exception as e:
+        logger.error("Error while initializing %r: %s", module, e)
+        raise
+
+    # All methods that the module provides should be async, but this wasn't enforced
+    # in the old module system, so we wrap them if needed
+    def async_wrapper(f: Optional[Callable]) -> Optional[Callable[..., Awaitable]]:
+        # f might be None if the callback isn't implemented by the module. In this
+        # case we don't want to register a callback at all so we return None.
+        if f is None:
+            return None
+
+        # We need to wrap check_password because its old form would return a boolean
+        # but we now want it to behave just like check_auth() and return the matrix id of
+        # the user if authentication succeeded or None otherwise
+        if f.__name__ == "check_password":
+
+            async def wrapped_check_password(
+                username: str, login_type: str, login_dict: JsonDict
+            ) -> Optional[Tuple[str, Optional[Callable]]]:
+                # We've already made sure f is not None above, but mypy doesn't do well
+                # across function boundaries so we need to tell it f is definitely not
+                # None.
+                assert f is not None
+
+                matrix_user_id = api.get_qualified_user_id(username)
+                password = login_dict["password"]
+
+                is_valid = await f(matrix_user_id, password)
+
+                if is_valid:
+                    return matrix_user_id, None
+
+                return None
+
+            return wrapped_check_password
+
+        # We need to wrap check_auth as in the old form it could return
+        # just a str, but now it must return Optional[Tuple[str, Optional[Callable]]
+        if f.__name__ == "check_auth":
+
+            async def wrapped_check_auth(
+                username: str, login_type: str, login_dict: JsonDict
+            ) -> Optional[Tuple[str, Optional[Callable]]]:
+                # We've already made sure f is not None above, but mypy doesn't do well
+                # across function boundaries so we need to tell it f is definitely not
+                # None.
+                assert f is not None
+
+                result = await f(username, login_type, login_dict)
+
+                if isinstance(result, str):
+                    return result, None
+
+                return result
+
+            return wrapped_check_auth
+
+        # We need to wrap check_3pid_auth as in the old form it could return
+        # just a str, but now it must return Optional[Tuple[str, Optional[Callable]]
+        if f.__name__ == "check_3pid_auth":
+
+            async def wrapped_check_3pid_auth(
+                medium: str, address: str, password: str
+            ) -> Optional[Tuple[str, Optional[Callable]]]:
+                # We've already made sure f is not None above, but mypy doesn't do well
+                # across function boundaries so we need to tell it f is definitely not
+                # None.
+                assert f is not None
+
+                result = await f(medium, address, password)
+
+                if isinstance(result, str):
+                    return result, None
+
+                return result
+
+            return wrapped_check_3pid_auth
+
+        def run(*args: Tuple, **kwargs: Dict) -> Awaitable:
+            # mypy doesn't do well across function boundaries so we need to tell it
+            # f is definitely not None.
+            assert f is not None
+
+            return maybe_awaitable(f(*args, **kwargs))
+
+        return run
+
+    # If the module has these methods implemented, then we pull them out
+    # and register them as hooks.
+    check_3pid_auth_hook: Optional[CHECK_3PID_AUTH_CALLBACK] = async_wrapper(
+        getattr(provider, "check_3pid_auth", None)
+    )
+    on_logged_out_hook: Optional[ON_LOGGED_OUT_CALLBACK] = async_wrapper(
+        getattr(provider, "on_logged_out", None)
+    )
+
+    supported_login_types = {}
+    # call get_supported_login_types and add that to the dict
+    g = getattr(provider, "get_supported_login_types", None)
+    if g is not None:
+        # Note the old module style also called get_supported_login_types at loading time
+        # and it is synchronous
+        supported_login_types.update(g())
+
+    auth_checkers = {}
+    # Legacy modules have a check_auth method which expects to be called with one of
+    # the keys returned by get_supported_login_types. New style modules register a
+    # dictionary of login_type->check_auth_method mappings
+    check_auth = async_wrapper(getattr(provider, "check_auth", None))
+    if check_auth is not None:
+        for login_type, fields in supported_login_types.items():
+            # need tuple(fields) since fields can be any Iterable type (so may not be hashable)
+            auth_checkers[(login_type, tuple(fields))] = check_auth
+
+    # if it has a "check_password" method then it should handle all auth checks
+    # with login type of LoginType.PASSWORD
+    check_password = async_wrapper(getattr(provider, "check_password", None))
+    if check_password is not None:
+        # need to use a tuple here for ("password",) not a list since lists aren't hashable
+        auth_checkers[(LoginType.PASSWORD, ("password",))] = check_password
+
+    api.register_password_auth_provider_callbacks(
+        check_3pid_auth=check_3pid_auth_hook,
+        on_logged_out=on_logged_out_hook,
+        auth_checkers=auth_checkers,
+    )
+
+
+CHECK_3PID_AUTH_CALLBACK = Callable[
+    [str, str, str],
+    Awaitable[
+        Optional[Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]]
+    ],
+]
+ON_LOGGED_OUT_CALLBACK = Callable[[str, Optional[str], str], Awaitable]
+CHECK_AUTH_CALLBACK = Callable[
+    [str, str, JsonDict],
+    Awaitable[
+        Optional[Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]]
+    ],
+]
+
+
+class PasswordAuthProvider:
+    """
+    A class that the AuthHandler calls when authenticating users
+    It allows modules to provide alternative methods for authentication
     """
 
-    @classmethod
-    def load(cls, module, config, module_api: ModuleApi) -> "PasswordProvider":
-        try:
-            pp = module(config=config, account_handler=module_api)
-        except Exception as e:
-            logger.error("Error while initializing %r: %s", module, e)
-            raise
-        return cls(pp, module_api)
+    def __init__(self) -> None:
+        # lists of callbacks
+        self.check_3pid_auth_callbacks: List[CHECK_3PID_AUTH_CALLBACK] = []
+        self.on_logged_out_callbacks: List[ON_LOGGED_OUT_CALLBACK] = []
 
-    def __init__(self, pp, module_api: ModuleApi):
-        self._pp = pp
-        self._module_api = module_api
+        # Mapping from login type to login parameters
+        self._supported_login_types: Dict[str, Iterable[str]] = {}
 
-        self._supported_login_types = {}
+        # Mapping from login type to auth checker callbacks
+        self.auth_checker_callbacks: Dict[str, List[CHECK_AUTH_CALLBACK]] = {}
 
-        # grandfather in check_password support
-        if hasattr(self._pp, "check_password"):
-            self._supported_login_types[LoginType.PASSWORD] = ("password",)
+    def register_password_auth_provider_callbacks(
+        self,
+        check_3pid_auth: Optional[CHECK_3PID_AUTH_CALLBACK] = None,
+        on_logged_out: Optional[ON_LOGGED_OUT_CALLBACK] = None,
+        auth_checkers: Optional[
+            Dict[Tuple[str, Tuple[str, ...]], CHECK_AUTH_CALLBACK]
+        ] = None,
+    ) -> None:
+        # Register check_3pid_auth callback
+        if check_3pid_auth is not None:
+            self.check_3pid_auth_callbacks.append(check_3pid_auth)
 
-        g = getattr(self._pp, "get_supported_login_types", None)
-        if g:
-            self._supported_login_types.update(g())
+        # register on_logged_out callback
+        if on_logged_out is not None:
+            self.on_logged_out_callbacks.append(on_logged_out)
 
-    def __str__(self):
-        return str(self._pp)
+        if auth_checkers is not None:
+            # register a new supported login_type
+            # Iterate through all of the types being registered
+            for (login_type, fields), callback in auth_checkers.items():
+                # Note: fields may be empty here. This would allow a modules auth checker to
+                # be called with just 'login_type' and no password or other secrets
+
+                # Need to check that all the field names are strings or may get nasty errors later
+                for f in fields:
+                    if not isinstance(f, str):
+                        raise RuntimeError(
+                            "A module tried to register support for login type: %s with parameters %s"
+                            " but all parameter names must be strings"
+                            % (login_type, fields)
+                        )
+
+                # 2 modules supporting the same login type must expect the same fields
+                # e.g. 1 can't expect "pass" if the other expects "password"
+                # so throw an exception if that happens
+                if login_type not in self._supported_login_types.get(login_type, []):
+                    self._supported_login_types[login_type] = fields
+                else:
+                    fields_currently_supported = self._supported_login_types.get(
+                        login_type
+                    )
+                    if fields_currently_supported != fields:
+                        raise RuntimeError(
+                            "A module tried to register support for login type: %s with parameters %s"
+                            " but another module had already registered support for that type with parameters %s"
+                            % (login_type, fields, fields_currently_supported)
+                        )
+
+                # Add the new method to the list of auth_checker_callbacks for this login type
+                self.auth_checker_callbacks.setdefault(login_type, []).append(callback)
 
     def get_supported_login_types(self) -> Mapping[str, Iterable[str]]:
         """Get the login types supported by this password provider
@@ -1847,19 +2042,14 @@ class PasswordProvider:
         Returns a map from a login type identifier (such as m.login.password) to an
         iterable giving the fields which must be provided by the user in the submission
         to the /login API.
-
-        This wrapper adds m.login.password to the list if the underlying password
-        provider supports the check_password() api.
         """
+
         return self._supported_login_types
 
     async def check_auth(
         self, username: str, login_type: str, login_dict: JsonDict
-    ) -> Optional[Tuple[str, Optional[Callable]]]:
+    ) -> Optional[Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]]:
         """Check if the user has presented valid login credentials
-
-        This wrapper also calls check_password() if the underlying password provider
-        supports the check_password() api and the login type is m.login.password.
 
         Args:
             username: user id presented by the client. Either an MXID or an unqualified
@@ -1874,63 +2064,130 @@ class PasswordProvider:
             user, and `callback` is an optional callback which will be called with the
             result from the /login call (including access_token, device_id, etc.)
         """
-        # first grandfather in a call to check_password
-        if login_type == LoginType.PASSWORD:
-            g = getattr(self._pp, "check_password", None)
-            if g:
-                qualified_user_id = self._module_api.get_qualified_user_id(username)
-                is_valid = await self._pp.check_password(
-                    qualified_user_id, login_dict["password"]
-                )
-                if is_valid:
-                    return qualified_user_id, None
 
-        g = getattr(self._pp, "check_auth", None)
-        if not g:
-            return None
-        result = await g(username, login_type, login_dict)
+        # Go through all callbacks for the login type until one returns with a value
+        # other than None (i.e. until a callback returns a success)
+        for callback in self.auth_checker_callbacks[login_type]:
+            try:
+                result = await callback(username, login_type, login_dict)
+            except Exception as e:
+                logger.warning("Failed to run module API callback %s: %s", callback, e)
+                continue
 
-        # Check if the return value is a str or a tuple
-        if isinstance(result, str):
-            # If it's a str, set callback function to None
-            return result, None
+            if result is not None:
+                # Check that the callback returned a Tuple[str, Optional[Callable]]
+                # "type: ignore[unreachable]" is used after some isinstance checks because mypy thinks
+                # result is always the right type, but as it is 3rd party code it might not be
 
-        return result
+                if not isinstance(result, tuple) or len(result) != 2:
+                    logger.warning(
+                        "Wrong type returned by module API callback %s: %s, expected"
+                        " Optional[Tuple[str, Optional[Callable]]]",
+                        callback,
+                        result,
+                    )
+                    continue
+
+                # pull out the two parts of the tuple so we can do type checking
+                str_result, callback_result = result
+
+                # the 1st item in the tuple should be a str
+                if not isinstance(str_result, str):
+                    logger.warning(  # type: ignore[unreachable]
+                        "Wrong type returned by module API callback %s: %s, expected"
+                        " Optional[Tuple[str, Optional[Callable]]]",
+                        callback,
+                        result,
+                    )
+                    continue
+
+                # the second should be Optional[Callable]
+                if callback_result is not None:
+                    if not callable(callback_result):
+                        logger.warning(  # type: ignore[unreachable]
+                            "Wrong type returned by module API callback %s: %s, expected"
+                            " Optional[Tuple[str, Optional[Callable]]]",
+                            callback,
+                            result,
+                        )
+                        continue
+
+                # The result is a (str, Optional[callback]) tuple so return the successful result
+                return result
+
+        # If this point has been reached then none of the callbacks successfully authenticated
+        # the user so return None
+        return None
 
     async def check_3pid_auth(
         self, medium: str, address: str, password: str
-    ) -> Optional[Tuple[str, Optional[Callable]]]:
-        g = getattr(self._pp, "check_3pid_auth", None)
-        if not g:
-            return None
-
+    ) -> Optional[Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]]:
         # This function is able to return a deferred that either
         # resolves None, meaning authentication failure, or upon
         # success, to a str (which is the user_id) or a tuple of
         # (user_id, callback_func), where callback_func should be run
         # after we've finished everything else
-        result = await g(medium, address, password)
 
-        # Check if the return value is a str or a tuple
-        if isinstance(result, str):
-            # If it's a str, set callback function to None
-            return result, None
+        for callback in self.check_3pid_auth_callbacks:
+            try:
+                result = await callback(medium, address, password)
+            except Exception as e:
+                logger.warning("Failed to run module API callback %s: %s", callback, e)
+                continue
 
-        return result
+            if result is not None:
+                # Check that the callback returned a Tuple[str, Optional[Callable]]
+                # "type: ignore[unreachable]" is used after some isinstance checks because mypy thinks
+                # result is always the right type, but as it is 3rd party code it might not be
+
+                if not isinstance(result, tuple) or len(result) != 2:
+                    logger.warning(
+                        "Wrong type returned by module API callback %s: %s, expected"
+                        " Optional[Tuple[str, Optional[Callable]]]",
+                        callback,
+                        result,
+                    )
+                    continue
+
+                # pull out the two parts of the tuple so we can do type checking
+                str_result, callback_result = result
+
+                # the 1st item in the tuple should be a str
+                if not isinstance(str_result, str):
+                    logger.warning(  # type: ignore[unreachable]
+                        "Wrong type returned by module API callback %s: %s, expected"
+                        " Optional[Tuple[str, Optional[Callable]]]",
+                        callback,
+                        result,
+                    )
+                    continue
+
+                # the second should be Optional[Callable]
+                if callback_result is not None:
+                    if not callable(callback_result):
+                        logger.warning(  # type: ignore[unreachable]
+                            "Wrong type returned by module API callback %s: %s, expected"
+                            " Optional[Tuple[str, Optional[Callable]]]",
+                            callback,
+                            result,
+                        )
+                        continue
+
+                # The result is a (str, Optional[callback]) tuple so return the successful result
+                return result
+
+        # If this point has been reached then none of the callbacks successfully authenticated
+        # the user so return None
+        return None
 
     async def on_logged_out(
         self, user_id: str, device_id: Optional[str], access_token: str
     ) -> None:
-        g = getattr(self._pp, "on_logged_out", None)
-        if not g:
-            return
 
-        # This might return an awaitable, if it does block the log out
-        # until it completes.
-        await maybe_awaitable(
-            g(
-                user_id=user_id,
-                device_id=device_id,
-                access_token=access_token,
-            )
-        )
+        # call all of the on_logged_out callbacks
+        for callback in self.on_logged_out_callbacks:
+            try:
+                callback(user_id, device_id, access_token)
+            except Exception as e:
+                logger.warning("Failed to run module API callback %s: %s", callback, e)
+                continue

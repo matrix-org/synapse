@@ -1,1 +1,0 @@
-Refactor event size checking code to simplify searching the codebase for the origins of certain error strings that are occasionally emitted.

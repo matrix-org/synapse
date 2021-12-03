@@ -14,6 +14,8 @@
 
 from typing import Dict, Optional
 
+import attr
+
 from ._base import Config
 
 
@@ -29,18 +31,13 @@ class RateLimitConfig:
         self.burst_count = int(config.get("burst_count", defaults["burst_count"]))
 
 
+@attr.s(auto_attribs=True)
 class FederationRateLimitConfig:
-    _items_and_default = {
-        "window_size": 1000,
-        "sleep_limit": 10,
-        "sleep_delay": 500,
-        "reject_limit": 50,
-        "concurrent": 3,
-    }
-
-    def __init__(self, **kwargs):
-        for i in self._items_and_default.keys():
-            setattr(self, i, kwargs.get(i) or self._items_and_default[i])
+    window_size: int = 1000
+    sleep_limit: int = 10
+    sleep_delay: int = 500
+    reject_limit: int = 50
+    concurrent: int = 3
 
 
 class RatelimitConfig(Config):
@@ -69,11 +66,15 @@ class RatelimitConfig(Config):
         else:
             self.rc_federation = FederationRateLimitConfig(
                 **{
-                    "window_size": config.get("federation_rc_window_size"),
-                    "sleep_limit": config.get("federation_rc_sleep_limit"),
-                    "sleep_delay": config.get("federation_rc_sleep_delay"),
-                    "reject_limit": config.get("federation_rc_reject_limit"),
-                    "concurrent": config.get("federation_rc_concurrent"),
+                    k: v
+                    for k, v in {
+                        "window_size": config.get("federation_rc_window_size"),
+                        "sleep_limit": config.get("federation_rc_sleep_limit"),
+                        "sleep_delay": config.get("federation_rc_sleep_delay"),
+                        "reject_limit": config.get("federation_rc_reject_limit"),
+                        "concurrent": config.get("federation_rc_concurrent"),
+                    }.items()
+                    if v is not None
                 }
             )
 

@@ -11,11 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any
 
 from frozendict import frozendict
 
 
-def freeze(o):
+def freeze(o: Any) -> Any:
     if isinstance(o, dict):
         return frozendict({k: freeze(v) for k, v in o.items()})
 
@@ -33,7 +34,7 @@ def freeze(o):
     return o
 
 
-def unfreeze(o):
+def unfreeze(o: Any) -> Any:
     if isinstance(o, (dict, frozendict)):
         return {k: unfreeze(v) for k, v in o.items()}
 

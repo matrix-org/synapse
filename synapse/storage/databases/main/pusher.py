@@ -18,8 +18,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Optional,
 
 from synapse.push import PusherConfig, ThrottleParams
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import DatabasePool
-from synapse.storage.types import Connection
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import JsonDict
 from synapse.util import json_encoder
@@ -32,7 +31,12 @@ logger = logging.getLogger(__name__)
 
 
 class PusherWorkerStore(SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
         self._pushers_id_gen = StreamIdGenerator(
             db_conn, "pushers", "id", extra_tables=[("deleted_pushers", "stream_id")]
@@ -324,7 +328,7 @@ class PusherWorkerStore(SQLBaseStore):
                 txn,
                 table="pushers",
                 column="user_name",
-                iterable=users,
+                values=users,
                 keyvalues={},
             )
 
@@ -373,7 +377,7 @@ class PusherWorkerStore(SQLBaseStore):
                 txn,
                 table="pushers",
                 column="id",
-                iterable=(pusher_id for pusher_id, token in pushers if token is None),
+                values=[pusher_id for pusher_id, token in pushers if token is None],
                 keyvalues={},
             )
 

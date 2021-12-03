@@ -53,6 +53,7 @@ from synapse.util.caches.descriptors import _CacheContext, cached, cachedList
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
+    from synapse.server import HomeServer
     from synapse.state import _StateCacheEntry
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ _CURRENT_STATE_MEMBERSHIP_UPDATE_NAME = "current_state_events_membership"
 
 
 class RoomMemberWorkerStore(EventsWorkerStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
 
         # Used by `_get_joined_hosts` to ensure only one thing mutates the cache
@@ -81,8 +82,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         txn.close()
 
         if (
-            self.hs.config.run_background_tasks
-            and self.hs.config.metrics_flags.known_servers
+            self.hs.config.worker.run_background_tasks
+            and self.hs.config.metrics.metrics_flags.known_servers
         ):
             self._known_servers_count = 1
             self.hs.get_clock().looping_call(
@@ -162,7 +163,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 self._check_safe_current_state_events_membership_updated_txn,
             )
 
-    @cached(max_entries=100000, iterable=True)
+    @cached(max_entries=100000, iterable=True, prune_unread_entries=False)
     async def get_users_in_room(self, room_id: str) -> List[str]:
         return await self.db_pool.runInteraction(
             "get_users_in_room", self.get_users_in_room_txn, room_id
@@ -195,6 +196,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         self, room_id: str
     ) -> Dict[str, ProfileInfo]:
         """Get a mapping from user ID to profile information for all users in a given room.
+
+        The profile information comes directly from this room's `m.room.member`
+        events, and so may be specific to this room rather than part of a user's
+        global profile. To avoid privacy leaks, the profile data should only be
+        revealed to users who are already in this room.
 
         Args:
             room_id: The ID of the room to retrieve the users of.
@@ -434,7 +440,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return results_dict.get("membership"), results_dict.get("event_id")
 
-    @cached(max_entries=500000, iterable=True)
+    @cached(max_entries=500000, iterable=True, prune_unread_entries=False)
     async def get_rooms_for_user_with_stream_ordering(
         self, user_id: str
     ) -> FrozenSet[GetRoomsForUserWithStreamOrdering]:
@@ -539,7 +545,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
         return frozenset(r.room_id for r in rooms)
 
-    @cached(max_entries=500000, cache_context=True, iterable=True)
+    @cached(
+        max_entries=500000,
+        cache_context=True,
+        iterable=True,
+        prune_unread_entries=False,
+    )
     async def get_users_who_share_room_with_user(
         self, user_id: str, cache_context: _CacheContext
     ) -> Set[str]:
@@ -559,7 +570,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     async def get_joined_users_from_context(
         self, event: EventBase, context: EventContext
-    ):
+    ) -> Dict[str, ProfileInfo]:
         state_group = context.state_group
         if not state_group:
             # If state_group is None it means it has yet to be assigned a
@@ -573,7 +584,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             event.room_id, state_group, current_state_ids, event=event, context=context
         )
 
-    async def get_joined_users_from_state(self, room_id, state_entry):
+    async def get_joined_users_from_state(
+        self, room_id, state_entry
+    ) -> Dict[str, ProfileInfo]:
         state_group = state_entry.state_group
         if not state_group:
             # If state_group is None it means it has yet to be assigned a
@@ -596,7 +609,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         cache_context,
         event=None,
         context=None,
-    ):
+    ) -> Dict[str, ProfileInfo]:
         # We don't use `state_group`, it's there so that we can cache based
         # on it. However, it's important that it's never None, since two current_states
         # with a state_group of None are likely to be different.
@@ -972,7 +985,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
 
 class RoomMemberBackgroundUpdateStore(SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
         self.db_pool.updates.register_background_update_handler(
             _MEMBERSHIP_PROFILE_UPDATE_NAME, self._background_add_membership_profile
@@ -1122,7 +1135,7 @@ class RoomMemberBackgroundUpdateStore(SQLBaseStore):
 
 
 class RoomMemberStore(RoomMemberWorkerStore, RoomMemberBackgroundUpdateStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
 
     async def forget(self, user_id: str, room_id: str) -> None:
