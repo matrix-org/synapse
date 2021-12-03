@@ -276,3 +276,110 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
             "ed25519:" + remote_self_signing_key in self_signing_key["keys"].keys(),
         )
         self.assertTrue(remote_self_signing_key in self_signing_key["keys"].values())
+
+
+class StripEventsTestCase(MessageAcceptTests):
+    def setUp(self):
+        super().setUp()
+
+    def strip_unauthorized_unsigned_values(self):
+        most_recent = self.get_success(
+            self.homeserver.get_datastore().get_latest_event_ids_in_room(self.room_id)
+        )[0]
+        federation_event_handler = self.homeserver.get_federation_event_handler()
+        join_event1 = make_event_from_dict(
+            {
+                "room_id": self.room_id,
+                "sender": "@baduser:test.serv",
+                "state_key": "@baduser:test.serv",
+                "event_id": "$join1:test.serv",
+                "depth": 1000,
+                "origin_server_ts": 1,
+                "type": "m.room.member",
+                "origin": "test.servx",
+                "content": {"membership": "join"},
+                "auth_events": [],
+                "prev_state": [(most_recent, {})],
+                "prev_events": [(most_recent, {})],
+                "unsigned": {"malicious garbage": "hackz", "more warez": "more hackz"},
+            }
+        )
+        self.get_success(
+            federation_event_handler.on_receive_pdu("test.serv", join_event1)
+        )
+
+        event = self.get_success(self.store.get_event("$join1:test.serv"))
+        event_dict = event.get_dict()
+        self.assertTrue("hackz" not in event_dict["unsigned"])
+
+    def strip_event_maintains_allowed_fields(self):
+        most_recent = self.get_success(
+            self.homeserver.get_datastore().get_latest_event_ids_in_room(self.room_id)
+        )[0]
+        federation_event_handler = self.homeserver.get_federation_event_handler()
+        join_event2 = make_event_from_dict(
+            {
+                "room_id": self.room_id,
+                "sender": "@baduser:test.serv",
+                "state_key": "@baduser:test.serv",
+                "event_id": "$join2:test.serv",
+                "depth": 1000,
+                "origin_server_ts": 1,
+                "type": "m.room.member",
+                "origin": "test.servx",
+                "content": {"membership": "join"},
+                "auth_events": [],
+                "prev_state": [(most_recent, {})],
+                "prev_events": [(most_recent, {})],
+                "unsigned": {
+                    "malicious garbage": "hackz",
+                    "more warez": "more hackz",
+                    "age": 14,
+                    "invite_room_state": [],
+                },
+            }
+        )
+        self.get_success(
+            federation_event_handler.on_receive_pdu("test.serv", join_event2)
+        )
+
+        event = self.get_success(self.store.get_event("$join2:test.serv"))
+        event_dict = event.get_dict()
+        self.assertTrue("age" in event_dict["unsigned"])
+        self.assertTrue("invite_room_state" in event_dict["unsigned"])
+
+    def strip_event_removes_fields_based_on_event_type(self):
+        most_recent = self.get_success(
+            self.homeserver.get_datastore().get_latest_event_ids_in_room(self.room_id)
+        )[0]
+        federation_event_handler = self.homeserver.get_federation_event_handler()
+        join_event3 = make_event_from_dict(
+            {
+                "room_id": self.room_id,
+                "sender": "@baduser:test.serv",
+                "state_key": "@baduser:test.serv",
+                "event_id": "$join3:test.serv",
+                "depth": 1000,
+                "origin_server_ts": 1,
+                "type": "m.room.power_levels",
+                "origin": "test.servx",
+                "content": {},
+                "auth_events": [],
+                "prev_state": [(most_recent, {})],
+                "prev_events": [(most_recent, {})],
+                "unsigned": {
+                    "malicious garbage": "hackz",
+                    "more warez": "more hackz",
+                    "age": 14,
+                    "invite_room_state": [],
+                },
+            }
+        )
+        self.get_success(
+            federation_event_handler.on_receive_pdu("test.serv", join_event3)
+        )
+
+        event = self.get_success(self.store.get_event("$join3:test.serv"))
+        event_dict = event.get_dict()
+        self.assertTrue("age" in event_dict["unsigned"])
+        self.assertTrue("invite_room_state" not in event_dict["unsigned"])
