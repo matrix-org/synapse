@@ -127,14 +127,14 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
         want_mac.update(b"notthenonce\x00bob\x00abc123\x00admin")
-        want_mac = want_mac.hexdigest()
+        want_mac_str = want_mac.hexdigest()
 
         body = {
             "nonce": nonce,
             "username": "bob",
             "password": "abc123",
             "admin": True,
-            "mac": want_mac,
+            "mac": want_mac_str,
         }
         channel = self.make_request("POST", self.url, body)
 
@@ -153,7 +153,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         want_mac.update(
             nonce.encode("ascii") + b"\x00bob\x00abc123\x00admin\x00support"
         )
-        want_mac = want_mac.hexdigest()
+        want_mac_str = want_mac.hexdigest()
 
         body = {
             "nonce": nonce,
@@ -161,7 +161,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
             "password": "abc123",
             "admin": True,
             "user_type": UserTypes.SUPPORT,
-            "mac": want_mac,
+            "mac": want_mac_str,
         }
         channel = self.make_request("POST", self.url, body)
 
@@ -177,14 +177,14 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
         want_mac.update(nonce.encode("ascii") + b"\x00bob\x00abc123\x00admin")
-        want_mac = want_mac.hexdigest()
+        want_mac_str = want_mac.hexdigest()
 
         body = {
             "nonce": nonce,
             "username": "bob",
             "password": "abc123",
             "admin": True,
-            "mac": want_mac,
+            "mac": want_mac_str,
         }
         channel = self.make_request("POST", self.url, body)
 
@@ -308,13 +308,13 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
         want_mac.update(nonce.encode("ascii") + b"\x00bob1\x00abc123\x00notadmin")
-        want_mac = want_mac.hexdigest()
+        want_mac_str = want_mac.hexdigest()
 
         body = {
             "nonce": nonce,
             "username": "bob1",
             "password": "abc123",
-            "mac": want_mac,
+            "mac": want_mac_str,
         }
 
         channel = self.make_request("POST", self.url, body)
@@ -332,14 +332,14 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
         want_mac.update(nonce.encode("ascii") + b"\x00bob2\x00abc123\x00notadmin")
-        want_mac = want_mac.hexdigest()
+        want_mac_str = want_mac.hexdigest()
 
         body = {
             "nonce": nonce,
             "username": "bob2",
             "displayname": None,
             "password": "abc123",
-            "mac": want_mac,
+            "mac": want_mac_str,
         }
         channel = self.make_request("POST", self.url, body)
 
@@ -356,14 +356,14 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
         want_mac.update(nonce.encode("ascii") + b"\x00bob3\x00abc123\x00notadmin")
-        want_mac = want_mac.hexdigest()
+        want_mac_str = want_mac.hexdigest()
 
         body = {
             "nonce": nonce,
             "username": "bob3",
             "displayname": "",
             "password": "abc123",
-            "mac": want_mac,
+            "mac": want_mac_str,
         }
         channel = self.make_request("POST", self.url, body)
 
@@ -379,14 +379,14 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
         want_mac.update(nonce.encode("ascii") + b"\x00bob4\x00abc123\x00notadmin")
-        want_mac = want_mac.hexdigest()
+        want_mac_str = want_mac.hexdigest()
 
         body = {
             "nonce": nonce,
             "username": "bob4",
             "displayname": "Bob's Name",
             "password": "abc123",
-            "mac": want_mac,
+            "mac": want_mac_str,
         }
         channel = self.make_request("POST", self.url, body)
 
@@ -426,7 +426,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         want_mac.update(
             nonce.encode("ascii") + b"\x00bob\x00abc123\x00admin\x00support"
         )
-        want_mac = want_mac.hexdigest()
+        want_mac_str = want_mac.hexdigest()
 
         body = {
             "nonce": nonce,
@@ -434,7 +434,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
             "password": "abc123",
             "admin": True,
             "user_type": UserTypes.SUPPORT,
-            "mac": want_mac,
+            "mac": want_mac_str,
         }
         channel = self.make_request("POST", self.url, body)
 
@@ -870,7 +870,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self.assertEqual(expected_user_list, returned_order)
         self._check_fields(channel.json_body["users"])
 
-    def _check_fields(self, content: JsonDict):
+    def _check_fields(self, content: List[JsonDict]):
         """Checks that the expected user attributes are present in content
         Args:
             content: List that is checked for content
@@ -3235,7 +3235,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
         return media_id
 
-    def _check_fields(self, content: JsonDict):
+    def _check_fields(self, content: List[JsonDict]):
         """Checks that the expected user attributes are present in content
         Args:
             content: List that is checked for content

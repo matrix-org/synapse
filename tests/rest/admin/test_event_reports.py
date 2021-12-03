@@ -11,12 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from http import HTTPStatus
+from typing import List
+
+from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
 from synapse.rest.client import login, report_event, room
+from synapse.server import HomeServer
+from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -29,7 +34,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         report_event.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
@@ -70,7 +75,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
         self.url = "/_synapse/admin/v1/event_reports"
 
-    def test_no_auth(self):
+    def test_no_auth(self) -> None:
         """
         Try to get an event report without authentication.
         """
@@ -83,7 +88,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
-    def test_requester_is_no_admin(self):
+    def test_requester_is_no_admin(self) -> None:
         """
         If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
         """
@@ -101,7 +106,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_default_success(self):
+    def test_default_success(self) -> None:
         """
         Testing list of reported events
         """
@@ -118,7 +123,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertNotIn("next_token", channel.json_body)
         self._check_fields(channel.json_body["event_reports"])
 
-    def test_limit(self):
+    def test_limit(self) -> None:
         """
         Testing list of reported events with limit
         """
@@ -135,7 +140,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["next_token"], 5)
         self._check_fields(channel.json_body["event_reports"])
 
-    def test_from(self):
+    def test_from(self) -> None:
         """
         Testing list of reported events with a defined starting point (from)
         """
@@ -152,7 +157,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertNotIn("next_token", channel.json_body)
         self._check_fields(channel.json_body["event_reports"])
 
-    def test_limit_and_from(self):
+    def test_limit_and_from(self) -> None:
         """
         Testing list of reported events with a defined starting point and limit
         """
@@ -169,7 +174,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(channel.json_body["event_reports"]), 10)
         self._check_fields(channel.json_body["event_reports"])
 
-    def test_filter_room(self):
+    def test_filter_room(self) -> None:
         """
         Testing list of reported events with a filter of room
         """
@@ -189,7 +194,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         for report in channel.json_body["event_reports"]:
             self.assertEqual(report["room_id"], self.room_id1)
 
-    def test_filter_user(self):
+    def test_filter_user(self) -> None:
         """
         Testing list of reported events with a filter of user
         """
@@ -209,7 +214,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         for report in channel.json_body["event_reports"]:
             self.assertEqual(report["user_id"], self.other_user)
 
-    def test_filter_user_and_room(self):
+    def test_filter_user_and_room(self) -> None:
         """
         Testing list of reported events with a filter of user and room
         """
@@ -230,7 +235,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             self.assertEqual(report["user_id"], self.other_user)
             self.assertEqual(report["room_id"], self.room_id1)
 
-    def test_valid_search_order(self):
+    def test_valid_search_order(self) -> None:
         """
         Testing search order. Order by timestamps.
         """
@@ -271,7 +276,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             )
             report += 1
 
-    def test_invalid_search_order(self):
+    def test_invalid_search_order(self) -> None:
         """
         Testing that a invalid search order returns a HTTPStatus.BAD_REQUEST
         """
@@ -290,7 +295,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual("Unknown direction: bar", channel.json_body["error"])
 
-    def test_limit_is_negative(self):
+    def test_limit_is_negative(self) -> None:
         """
         Testing that a negative limit parameter returns a HTTPStatus.BAD_REQUEST
         """
@@ -308,7 +313,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
-    def test_from_is_negative(self):
+    def test_from_is_negative(self) -> None:
         """
         Testing that a negative from parameter returns a HTTPStatus.BAD_REQUEST
         """
@@ -326,7 +331,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
-    def test_next_token(self):
+    def test_next_token(self) -> None:
         """
         Testing that `next_token` appears at the right place
         """
@@ -384,7 +389,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(channel.json_body["event_reports"]), 1)
         self.assertNotIn("next_token", channel.json_body)
 
-    def _create_event_and_report(self, room_id, user_tok):
+    def _create_event_and_report(self, room_id: str, user_tok: str) -> None:
         """Create and report events"""
         resp = self.helper.send(room_id, tok=user_tok)
         event_id = resp["event_id"]
@@ -397,7 +402,9 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
-    def _create_event_and_report_without_parameters(self, room_id, user_tok):
+    def _create_event_and_report_without_parameters(
+        self, room_id: str, user_tok: str
+    ) -> None:
         """Create and report an event, but omit reason and score"""
         resp = self.helper.send(room_id, tok=user_tok)
         event_id = resp["event_id"]
@@ -410,7 +417,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
-    def _check_fields(self, content):
+    def _check_fields(self, content: List[JsonDict]) -> None:
         """Checks that all attributes are present in an event report"""
         for c in content:
             self.assertIn("id", c)
@@ -433,7 +440,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         report_event.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
@@ -453,7 +460,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         # first created event report gets `id`=2
         self.url = "/_synapse/admin/v1/event_reports/2"
 
-    def test_no_auth(self):
+    def test_no_auth(self) -> None:
         """
         Try to get event report without authentication.
         """
@@ -466,7 +473,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
-    def test_requester_is_no_admin(self):
+    def test_requester_is_no_admin(self) -> None:
         """
         If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
         """
@@ -484,7 +491,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_default_success(self):
+    def test_default_success(self) -> None:
         """
         Testing get a reported event
         """
@@ -498,7 +505,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self._check_fields(channel.json_body)
 
-    def test_invalid_report_id(self):
+    def test_invalid_report_id(self) -> None:
         """
         Testing that an invalid `report_id` returns a HTTPStatus.BAD_REQUEST.
         """
@@ -557,7 +564,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             channel.json_body["error"],
         )
 
-    def test_report_id_not_found(self):
+    def test_report_id_not_found(self) -> None:
         """
         Testing that a not existing `report_id` returns a HTTPStatus.NOT_FOUND.
         """
@@ -576,7 +583,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
         self.assertEqual("Event report not found", channel.json_body["error"])
 
-    def _create_event_and_report(self, room_id, user_tok):
+    def _create_event_and_report(self, room_id: str, user_tok: str) -> None:
         """Create and report events"""
         resp = self.helper.send(room_id, tok=user_tok)
         event_id = resp["event_id"]
@@ -589,7 +596,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
-    def _check_fields(self, content):
+    def _check_fields(self, content: JsonDict) -> None:
         """Checks that all attributes are present in a event report"""
         self.assertIn("id", content)
         self.assertIn("received_ts", content)
