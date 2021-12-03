@@ -71,7 +71,7 @@ this can cause a large load on the database, especially for large environments.
 The following fields are returned in the JSON response body:
 
 - `destinations` - An array of objects, each containing information about a destination.
-  Destinations objects contain the following fields:
+  Destination objects contain the following fields:
   - `destination` - string - Name of the remote server to federate.
   - `retry_last_ts` - integer - The last time Synapse tried and failed to reach the
     remote server, in ms. This is `0` if no further retrying occuring.
@@ -80,8 +80,8 @@ The following fields are returned in the JSON response body:
   - `failure_ts` - integer - The first time Synapse tried and failed to reach the
     remote server, in ms. This is `null` if no error has occurred.
   - `last_successful_stream_ordering` - integer - The stream ordering of the most
-    recent successfully-sent [PDU](Understanding-Synapse-Performance-Issues-Through-Grafana-Graphs.md#federation)
-    to this destination or `null` if this information has not been tracked yet.
+    recent successfully-sent [PDU](understanding_synapse_through_grafana_graphs.md#federation)
+    to this destination, or `null` if this information has not been tracked yet.
 - `next_token`: string representing a positive integer - Indication for pagination. See above.
 - `total` - integer - Total number of destinations.
 
