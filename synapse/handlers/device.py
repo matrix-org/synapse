@@ -315,7 +315,7 @@ class DeviceHandler(DeviceWorkerHandler):
             device_id: device id supplied by client
             initial_device_display_name: device display name from client
             auth_provider_id: The SSO IdP the user used, if any.
-            auth_provider_session_id: The session ID (sid) got from a OIDC login.
+            auth_provider_session_id: The session ID (sid) got from the SSO IdP.
         Returns:
             device id (generated if none was supplied)
         """

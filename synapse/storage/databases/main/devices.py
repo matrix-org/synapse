@@ -142,7 +142,7 @@ class DeviceWorkerStore(SQLBaseStore):
     async def get_devices_by_auth_provider_session_id(
         self, auth_provider_id: str, auth_provider_session_id: str
     ) -> List[Dict[str, Any]]:
-        """Retrieve the list of devices associated with an OIDC session ID (sid).
+        """Retrieve the list of devices associated with a SSO IdP session ID.
 
         Args:
             auth_provider_id: The SSO IdP ID as defined in the server config

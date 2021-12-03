@@ -755,7 +755,7 @@ class RegistrationHandler:
             is_guest: Whether this is a guest account
             auth_provider_id: The SSO IdP the user used, if any.
             should_issue_refresh_token: Whether it should also issue a refresh token
-            auth_provider_session_id: The session ID got during login from the SSO IdP.
+            auth_provider_session_id: The session ID received during login from the SSO IdP.
         Returns:
             Tuple of device ID, access token, access token expiration time and refresh token
         """

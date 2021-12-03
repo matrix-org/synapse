@@ -832,7 +832,7 @@ class OidcProvider:
 
         logger.debug("Successfully obtained OAuth2 token data: %r", token)
 
-        # If there is an id_token, it should be validated, regardless if the
+        # If there is an id_token, it should be validated, regardless of the
         # userinfo endpoint is used or not.
         if token.get("id_token") is not None:
             try:
