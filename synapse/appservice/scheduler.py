@@ -209,6 +209,7 @@ class _TransactionController:
         """
         Create a transaction with the given data and send to the provided
         application service.
+
         Args:
             service: The application service to send the transaction to.
             events: The persistent events to include in the transaction.

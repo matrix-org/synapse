@@ -41,6 +41,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         hs.get_datastore.return_value = self.mock_store
         self.mock_store.get_received_ts.return_value = make_awaitable(0)
         self.mock_store.set_appservice_last_pos.return_value = make_awaitable(None)
+        self.mock_store.set_appservice_stream_type_pos.return_value = make_awaitable(None)
         hs.get_application_service_api.return_value = self.mock_as_api
         hs.get_application_service_scheduler.return_value = self.mock_scheduler
         hs.get_clock.return_value = MockClock()
@@ -68,8 +69,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         ]
         self.handler.notify_interested_services(RoomStreamToken(None, 1))
 
-        self.mock_scheduler.submit_event_for_as.assert_called_once_with(
-            interested_service, event
+        self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(
+            interested_service, events=[event]
         )
 
     def test_query_user_exists_unknown_user(self):
@@ -279,8 +280,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.handler.notify_interested_services_ephemeral(
             "receipt_key", 580, ["@fakerecipient:example.com"]
         )
-        self.mock_scheduler.submit_ephemeral_events_for_as.assert_called_once_with(
-            interested_service, [event]
+        self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(
+            interested_service, ephemeral=[event]
         )
         self.mock_store.set_appservice_stream_type_pos.assert_called_once_with(
             interested_service,
@@ -310,8 +311,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             "receipt_key", 580, ["@fakerecipient:example.com"]
         )
         # This method will be called, but with an empty list of events
-        self.mock_scheduler.submit_ephemeral_events_for_as.assert_called_once_with(
-            interested_service, []
+        self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(
+            interested_service, ephemeral=[]
         )
 
     def _mkservice(self, is_interested, protocols=None):

@@ -14,14 +14,17 @@
 from unittest.mock import Mock
 
 from twisted.internet import defer
+from twisted.internet.testing import MemoryReactor
 
 from synapse.appservice import ApplicationServiceState
 from synapse.appservice.scheduler import (
+    ApplicationServiceScheduler,
     _Recoverer,
-    _ServiceQueuer,
     _TransactionController,
 )
 from synapse.logging.context import make_deferred_yieldable
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 from tests.test_utils import simple_async_mock
@@ -189,17 +192,21 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.callback.assert_called_once_with(self.recoverer)
 
 
-class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
-    def setUp(self):
+class ApplicationServiceSchedulerQueuerTestCase(unittest.HomeserverTestCase):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
+        self.scheduler = ApplicationServiceScheduler(hs)
         self.txn_ctrl = Mock()
         self.txn_ctrl.send = simple_async_mock()
-        self.queuer = _ServiceQueuer(self.txn_ctrl, MockClock())
+
+        # Replace instantiated _TransactionController instances with our Mock
+        self.scheduler.txn_ctrl = self.txn_ctrl
+        self.scheduler.queuer.txn_ctrl = self.txn_ctrl
 
     def test_send_single_event_no_queue(self):
         # Expect the event to be sent immediately.
         service = Mock(id=4)
         event = Mock()
-        self.queuer.enqueue_event(service, event)
+        self.scheduler.enqueue_for_appservice(service, events=[event])
         self.txn_ctrl.send.assert_called_once_with(service, [event], [])
 
     def test_send_single_event_with_queue(self):
@@ -212,10 +219,11 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         event2 = Mock(event_id="second")
         event3 = Mock(event_id="third")
         # Send an event and don't resolve it just yet.
-        self.queuer.enqueue_event(service, event)
+        self.scheduler.enqueue_for_appservice(service, events=[event])
         # Send more events: expect send() to NOT be called multiple times.
-        self.queuer.enqueue_event(service, event2)
-        self.queuer.enqueue_event(service, event3)
+        # (call enqueue_for_appservice multiple times deliberately)
+        self.scheduler.enqueue_for_appservice(service, events=[event2])
+        self.scheduler.enqueue_for_appservice(service, events=[event3])
         self.txn_ctrl.send.assert_called_with(service, [event], [])
         self.assertEquals(1, self.txn_ctrl.send.call_count)
         # Resolve the send event: expect the queued events to be sent
@@ -244,11 +252,11 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         self.txn_ctrl.send = Mock(side_effect=do_send)
 
         # send events for different ASes and make sure they are sent
-        self.queuer.enqueue_event(srv1, srv_1_event)
-        self.queuer.enqueue_event(srv1, srv_1_event2)
+        self.scheduler.enqueue_for_appservice(srv1, events=[srv_1_event])
+        self.scheduler.enqueue_for_appservice(srv1, events=[srv_1_event2])
         self.txn_ctrl.send.assert_called_with(srv1, [srv_1_event], [])
-        self.queuer.enqueue_event(srv2, srv_2_event)
-        self.queuer.enqueue_event(srv2, srv_2_event2)
+        self.scheduler.enqueue_for_appservice(srv2, events=[srv_2_event])
+        self.scheduler.enqueue_for_appservice(srv2, events=[srv_2_event2])
         self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event], [])
 
         # make sure callbacks for a service only send queued events for THAT
@@ -270,7 +278,7 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         service = Mock(id=4, name="service")
         event_list = [Mock(name="event%i" % (i + 1)) for i in range(200)]
         for event in event_list:
-            self.queuer.enqueue_event(service, event)
+            self.scheduler.enqueue_for_appservice(service, [event], [])
 
         # Expect the first event to be sent immediately.
         self.txn_ctrl.send.assert_called_with(service, [event_list[0]], [])
@@ -286,14 +294,14 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         # Expect the event to be sent immediately.
         service = Mock(id=4, name="service")
         event_list = [Mock(name="event")]
-        self.queuer.enqueue_ephemeral(service, event_list)
+        self.scheduler.enqueue_for_appservice(service, ephemeral=event_list)
         self.txn_ctrl.send.assert_called_once_with(service, [], event_list)
 
     def test_send_multiple_ephemeral_no_queue(self):
         # Expect the event to be sent immediately.
         service = Mock(id=4, name="service")
         event_list = [Mock(name="event1"), Mock(name="event2"), Mock(name="event3")]
-        self.queuer.enqueue_ephemeral(service, event_list)
+        self.scheduler.enqueue_for_appservice(service, ephemeral=event_list)
         self.txn_ctrl.send.assert_called_once_with(service, [], event_list)
 
     def test_send_single_ephemeral_with_queue(self):
@@ -307,10 +315,10 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         event_list_3 = [Mock(event_id="event5"), Mock(event_id="event6")]
 
         # Send an event and don't resolve it just yet.
-        self.queuer.enqueue_ephemeral(service, event_list_1)
+        self.scheduler.enqueue_for_appservice(service, ephemeral=event_list_1)
         # Send more events: expect send() to NOT be called multiple times.
-        self.queuer.enqueue_ephemeral(service, event_list_2)
-        self.queuer.enqueue_ephemeral(service, event_list_3)
+        self.scheduler.enqueue_for_appservice(service, ephemeral=event_list_2)
+        self.scheduler.enqueue_for_appservice(service, ephemeral=event_list_3)
         self.txn_ctrl.send.assert_called_with(service, [], event_list_1)
         self.assertEquals(1, self.txn_ctrl.send.call_count)
         # Resolve txn_ctrl.send
@@ -329,7 +337,7 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         first_chunk = [Mock(name="event%i" % (i + 1)) for i in range(100)]
         second_chunk = [Mock(name="event%i" % (i + 101)) for i in range(50)]
         event_list = first_chunk + second_chunk
-        self.queuer.enqueue_ephemeral(service, event_list)
+        self.scheduler.enqueue_for_appservice(service, ephemeral=event_list)
         self.txn_ctrl.send.assert_called_once_with(service, [], first_chunk)
         d.callback(service)
         self.txn_ctrl.send.assert_called_with(service, [], second_chunk)
