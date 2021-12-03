@@ -524,6 +524,19 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             {"refresh_token": refresh_token},
         )
 
+    def is_access_token_valid(self, access_token) -> bool:
+        """
+        Checks whether an access token is valid, returning whether it is or not.
+        """
+        code = self.make_request(
+            "GET", "/_matrix/client/v3/account/whoami", access_token=access_token
+        ).code
+
+        # Either 200 or 401 is what we get back; anything else is a bug.
+        assert code in {HTTPStatus.OK, HTTPStatus.UNAUTHORIZED}
+
+        return code == HTTPStatus.OK
+
     def test_login_issue_refresh_token(self):
         """
         A login response should include a refresh_token only if asked.
@@ -670,6 +683,69 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             ).code,
             HTTPStatus.UNAUTHORIZED,
         )
+
+    @override_config(
+        {
+            "refreshable_access_token_lifetime": "1m",
+            "nonrefreshable_access_token_lifetime": "10m",
+        }
+    )
+    def test_different_expiry_for_refreshable_and_nonrefreshable_access_tokens(self):
+        """
+        Tests that the expiry times for refreshable and non-refreshable access
+        tokens can be different.
+        """
+        body = {
+            "type": "m.login.password",
+            "user": "test",
+            "password": self.user_pass,
+        }
+        login_response1 = self.make_request(
+            "POST",
+            "/_matrix/client/r0/login",
+            {"org.matrix.msc2918.refresh_token": True, **body},
+        )
+        self.assertEqual(login_response1.code, 200, login_response1.result)
+        self.assertApproximates(
+            login_response1.json_body["expires_in_ms"], 60 * 1000, 100
+        )
+        refreshable_access_token = login_response1.json_body["access_token"]
+
+        login_response2 = self.make_request(
+            "POST",
+            "/_matrix/client/r0/login",
+            body,
+        )
+        self.assertEqual(login_response2.code, 200, login_response2.result)
+        nonrefreshable_access_token = login_response2.json_body["access_token"]
+
+        # Advance 59 seconds in the future (just shy of 1 minute, the time of expiry)
+        self.reactor.advance(59.0)
+
+        # Both tokens should still be valid.
+        self.assertTrue(self.is_access_token_valid(refreshable_access_token))
+        self.assertTrue(self.is_access_token_valid(nonrefreshable_access_token))
+
+        # Advance to 61 s (just past 1 minute, the time of expiry)
+        self.reactor.advance(2.0)
+
+        # Only the non-refreshable token is still valid.
+        self.assertFalse(self.is_access_token_valid(refreshable_access_token))
+        self.assertTrue(self.is_access_token_valid(nonrefreshable_access_token))
+
+        # Advance to 599 s (just shy of 10 minutes, the time of expiry)
+        self.reactor.advance(599.0 - 61.0)
+
+        # It's still the case that only the non-refreshable token is still valid.
+        self.assertFalse(self.is_access_token_valid(refreshable_access_token))
+        self.assertTrue(self.is_access_token_valid(nonrefreshable_access_token))
+
+        # Advance to 601 s (just past 10 minutes, the time of expiry)
+        self.reactor.advance(2.0)
+
+        # Now neither token is valid.
+        self.assertFalse(self.is_access_token_valid(refreshable_access_token))
+        self.assertFalse(self.is_access_token_valid(nonrefreshable_access_token))
 
     @override_config(
         {"refreshable_access_token_lifetime": "1m", "refresh_token_lifetime": "2m"}
