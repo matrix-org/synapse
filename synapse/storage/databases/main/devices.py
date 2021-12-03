@@ -139,22 +139,25 @@ class DeviceWorkerStore(SQLBaseStore):
 
         return {d["device_id"]: d for d in devices}
 
-    async def get_devices_by_oidc_sid(
-        self, auth_provider_id: str, oidc_sid: str
+    async def get_devices_by_auth_provider_session_id(
+        self, auth_provider_id: str, auth_provider_session_id: str
     ) -> List[Dict[str, Any]]:
         """Retrieve the list of devices associated with an OIDC session ID (sid).
 
         Args:
             auth_provider_id: The SSO IdP ID as defined in the server config
-            oidc_sid: OIDC session ID, sid claim in logout tokens and ID tokens
+            auth_provider_session_id: The session ID within the IdP
         Returns:
             A list of dicts containing the devices informations
         """
         return await self.db_pool.simple_select_list(
             table="devices",
-            keyvalues={"auth_provider_id": auth_provider_id, "oidc_sid": oidc_sid},
+            keyvalues={
+                "auth_provider_id": auth_provider_id,
+                "auth_provider_session_id": auth_provider_session_id,
+            },
             retcols=("user_id", "device_id", "display_name"),
-            desc="get_devices_by_oidc_sid",
+            desc="get_devices_by_auth_provider_session_id",
         )
 
     @trace
@@ -1093,7 +1096,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         device_id: str,
         initial_device_display_name: Optional[str],
         auth_provider_id: Optional[str] = None,
-        oidc_sid: Optional[str] = None,
+        auth_provider_session_id: Optional[str] = None,
     ) -> bool:
         """Ensure the given device is known; add it to the store if not
 
@@ -1103,7 +1106,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             initial_device_display_name: initial displayname of the device.
                 Ignored if device exists.
             auth_provider_id: The SSO IdP the user used, if any.
-            oidc_sid: The session ID (sid) got from a OIDC login.
+            auth_provider_session_id: The session ID (sid) got from a OIDC login.
 
         Returns:
             Whether the device was inserted or an existing device existed with that ID.
@@ -1125,7 +1128,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 values={},
                 insertion_values={
                     "auth_provider_id": auth_provider_id,
-                    "oidc_sid": oidc_sid,
+                    "auth_provider_session_id": auth_provider_session_id,
                     "display_name": initial_device_display_name,
                     "hidden": False,
                 },

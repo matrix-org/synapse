@@ -47,7 +47,7 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
         is_appservice_ghost,
         should_issue_refresh_token,
         auth_provider_id,
-        oidc_sid,
+        auth_provider_session_id,
     ):
         """
         Args:
@@ -66,7 +66,7 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
             "is_appservice_ghost": is_appservice_ghost,
             "should_issue_refresh_token": should_issue_refresh_token,
             "auth_provider_id": auth_provider_id,
-            "oidc_sid": oidc_sid,
+            "auth_provider_session_id": auth_provider_session_id,
         }
 
     async def _handle_request(self, request, user_id):
@@ -78,7 +78,7 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
         is_appservice_ghost = content["is_appservice_ghost"]
         should_issue_refresh_token = content["should_issue_refresh_token"]
         auth_provider_id = content["auth_provider_id"]
-        oidc_sid = content["oidc_sid"]
+        auth_provider_session_id = content["auth_provider_session_id"]
 
         res = await self.registration_handler.register_device_inner(
             user_id,
@@ -88,7 +88,7 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
             is_appservice_ghost=is_appservice_ghost,
             should_issue_refresh_token=should_issue_refresh_token,
             auth_provider_id=auth_provider_id,
-            oidc_sid=oidc_sid,
+            auth_provider_session_id=auth_provider_session_id,
         )
 
         return 200, res

@@ -72,7 +72,7 @@ class CasHandlerTestCase(HomeserverTestCase):
             "redirect_uri",
             None,
             new_user=True,
-            oidc_sid=None,
+            auth_provider_session_id=None,
         )
 
     def test_map_cas_user_to_existing_user(self):
@@ -101,7 +101,7 @@ class CasHandlerTestCase(HomeserverTestCase):
             "redirect_uri",
             None,
             new_user=False,
-            oidc_sid=None,
+            auth_provider_session_id=None,
         )
 
         # Subsequent calls should map to the same mxid.
@@ -116,7 +116,7 @@ class CasHandlerTestCase(HomeserverTestCase):
             "redirect_uri",
             None,
             new_user=False,
-            oidc_sid=None,
+            auth_provider_session_id=None,
         )
 
     def test_map_cas_user_to_invalid_localpart(self):
@@ -140,7 +140,7 @@ class CasHandlerTestCase(HomeserverTestCase):
             "redirect_uri",
             None,
             new_user=True,
-            oidc_sid=None,
+            auth_provider_session_id=None,
         )
 
     @override_config(
@@ -190,7 +190,7 @@ class CasHandlerTestCase(HomeserverTestCase):
             "redirect_uri",
             None,
             new_user=True,
-            oidc_sid=None,
+            auth_provider_session_id=None,
         )
 
 

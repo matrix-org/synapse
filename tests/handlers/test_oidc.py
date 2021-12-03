@@ -454,7 +454,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             client_redirect_url,
             None,
             new_user=True,
-            oidc_sid=None,
+            auth_provider_session_id=None,
         )
         self.provider._exchange_code.assert_called_once_with(code)
         self.provider._parse_id_token.assert_called_once_with(token, nonce=nonce)
@@ -496,7 +496,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             client_redirect_url,
             None,
             new_user=False,
-            oidc_sid=None,
+            auth_provider_session_id=None,
         )
         self.provider._exchange_code.assert_called_once_with(code)
         self.provider._parse_id_token.assert_not_called()
@@ -786,7 +786,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             client_redirect_url,
             {"phone": "1234567"},
             new_user=True,
-            oidc_sid=None,
+            auth_provider_session_id=None,
         )
 
     @override_config({"oidc_config": DEFAULT_CONFIG})
@@ -801,7 +801,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
         }
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@test_user:test", "oidc", ANY, ANY, None, new_user=True, oidc_sid=None
+            "@test_user:test",
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=True,
+            auth_provider_session_id=None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -812,7 +818,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
         }
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@test_user_2:test", "oidc", ANY, ANY, None, new_user=True, oidc_sid=None
+            "@test_user_2:test",
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=True,
+            auth_provider_session_id=None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -849,14 +861,26 @@ class OidcHandlerTestCase(HomeserverTestCase):
         }
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            user.to_string(), "oidc", ANY, ANY, None, new_user=False, oidc_sid=None
+            user.to_string(),
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=False,
+            auth_provider_session_id=None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
         # Subsequent calls should map to the same mxid.
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            user.to_string(), "oidc", ANY, ANY, None, new_user=False, oidc_sid=None
+            user.to_string(),
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=False,
+            auth_provider_session_id=None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -871,7 +895,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
         }
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            user.to_string(), "oidc", ANY, ANY, None, new_user=False, oidc_sid=None
+            user.to_string(),
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=False,
+            auth_provider_session_id=None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -907,7 +937,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@TEST_USER_2:test", "oidc", ANY, ANY, None, new_user=False, oidc_sid=None
+            "@TEST_USER_2:test",
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=False,
+            auth_provider_session_id=None,
         )
 
     @override_config({"oidc_config": DEFAULT_CONFIG})
@@ -945,7 +981,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         # test_user is already taken, so test_user1 gets registered instead.
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@test_user1:test", "oidc", ANY, ANY, None, new_user=True, oidc_sid=None
+            "@test_user1:test",
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=True,
+            auth_provider_session_id=None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -1029,7 +1071,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         # check that the auth handler got called as expected
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@tester:test", "oidc", ANY, ANY, None, new_user=True, oidc_sid=None
+            "@tester:test",
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=True,
+            auth_provider_session_id=None,
         )
 
     @override_config(
@@ -1054,7 +1102,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         # check that the auth handler got called as expected
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@tester:test", "oidc", ANY, ANY, None, new_user=True, oidc_sid=None
+            "@tester:test",
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=True,
+            auth_provider_session_id=None,
         )
 
     @override_config(

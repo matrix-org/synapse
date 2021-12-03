@@ -302,7 +302,7 @@ class DeviceHandler(DeviceWorkerHandler):
         device_id: Optional[str],
         initial_device_display_name: Optional[str] = None,
         auth_provider_id: Optional[str] = None,
-        oidc_sid: Optional[str] = None,
+        auth_provider_session_id: Optional[str] = None,
     ) -> str:
         """
         If the given device has not been registered, register it with the
@@ -315,7 +315,7 @@ class DeviceHandler(DeviceWorkerHandler):
             device_id: device id supplied by client
             initial_device_display_name: device display name from client
             auth_provider_id: The SSO IdP the user used, if any.
-            oidc_sid: The session ID (sid) got from a OIDC login.
+            auth_provider_session_id: The session ID (sid) got from a OIDC login.
         Returns:
             device id (generated if none was supplied)
         """
@@ -328,7 +328,7 @@ class DeviceHandler(DeviceWorkerHandler):
                 device_id=device_id,
                 initial_device_display_name=initial_device_display_name,
                 auth_provider_id=auth_provider_id,
-                oidc_sid=oidc_sid,
+                auth_provider_session_id=auth_provider_session_id,
             )
             if new_device:
                 await self.notify_device_update(user_id, [device_id])
@@ -344,7 +344,7 @@ class DeviceHandler(DeviceWorkerHandler):
                 device_id=new_device_id,
                 initial_device_display_name=initial_device_display_name,
                 auth_provider_id=auth_provider_id,
-                oidc_sid=oidc_sid,
+                auth_provider_session_id=auth_provider_session_id,
             )
             if new_device:
                 await self.notify_device_update(user_id, [new_device_id])

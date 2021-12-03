@@ -13,10 +13,10 @@
  * limitations under the License.
  */
 
--- Track the OIDC issuer used by this login as well as the session ID
+-- Track the auth provider used by this login as well as the session ID
 ALTER TABLE devices
   ADD COLUMN auth_provider_id TEXT;
 ALTER TABLE devices
-  ADD COLUMN oidc_sid TEXT;
+  ADD COLUMN auth_provider_session_id TEXT;
 
-CREATE INDEX devices_oidc_sid ON devices (auth_provider_id, oidc_sid);
+CREATE INDEX devices_auth_provider_session_id ON devices (auth_provider_id, auth_provider_session_id);
