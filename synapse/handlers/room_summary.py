@@ -812,9 +812,48 @@ class RoomSummaryHandler:
 
                 room_summary["membership"] = membership or "leave"
         else:
-            # TODO federation API, descoped from initial unstable implementation
-            #      as MSC needs more maturing on that side.
-            raise SynapseError(400, "Federation is not currently supported.")
+            # Reuse the hierarchy query over federation
+            if remote_room_hosts is None:
+                raise SynapseError(400, "Missing via to query remote room")
+
+            fed_rooms = await self._summarize_remote_room(
+                _RoomQueueEntry(room_id, remote_room_hosts),
+                suggested_only=True,
+                max_children=1,
+                exclude_rooms=[],
+            )
+
+            for room_entry in fed_rooms:
+                room = room_entry.room
+                fed_room_id = room_entry.room_id
+
+                if fed_room_id == room_id:
+                    # If no user is specified, test against an invalid userid
+                    if requester is None:
+                        requester = ""
+
+                    # The results over federation might include rooms that the we,
+                    # as the requesting server, are allowed to see, but the requesting
+                    # user is not permitted see.
+                    #
+                    # Filter the returned results to only what is accessible to the user.
+                    if await self._is_remote_room_accessible(
+                        requester, fed_room_id, room
+                    ):
+                        # Before returning to the client, remove the allowed_room_ids
+                        # and allowed_spaces keys.
+                        room.pop("allowed_room_ids", None)
+                        room.pop("allowed_spaces", None)
+
+                        # A remote room can't be in the joined state
+                        room["membership"] = "leave"
+
+                        return room
+
+                    else:
+                        break
+
+            raise NotFoundError("Room not found or is not accessible")
 
         return room_summary
 
