@@ -14033,19 +14033,18 @@ representation of the state of the room as others were seeing it at the time.</p
 <h2 id="forward-extremity"><a class="header" href="#forward-extremity">Forward extremity</a></h2>
 <p>Most-recent-in-time events in the DAG which are not referenced by any other events' <code>prev_events</code> yet.</p>
 <p>The forward extremities of a room are used as the <code>prev_events</code> when the next event is sent.</p>
-<h2 id="backwards-extremity"><a class="header" href="#backwards-extremity">Backwards extremity</a></h2>
+<h2 id="backward-extremity"><a class="header" href="#backward-extremity">Backward extremity</a></h2>
 <p>The current marker of where we have backfilled up to and will generally be the
-oldest-in-time events we know of in the DAG.</p>
-<p>This is an event where we haven't fetched all of the <code>prev_events</code> for.</p>
-<p>Once we have fetched all of its <code>prev_events</code>, it's unmarked as a backwards
-extremity (although we may have formed new backwards extremities from the prev
-events during the backfilling process).</p>
+<code>prev_events</code> of the oldest-in-time events we have in the DAG. This gives a starting point when
+backfilling history.</p>
+<p>When we persist a non-outlier event, we clear it as a backward extremity and set
+all of its <code>prev_events</code> as the new backward extremities if they aren't already
+persisted in the <code>events</code> table.</p>
 <h2 id="outliers"><a class="header" href="#outliers">Outliers</a></h2>
 <p>We mark an event as an <code>outlier</code> when we haven't figured out the state for the
 room at that point in the DAG yet.</p>
 <p>We won't <em>necessarily</em> have the <code>prev_events</code> of an <code>outlier</code> in the database,
-but it's entirely possible that we <em>might</em>. The status of whether we have all of
-the <code>prev_events</code> is marked as a <a href="development/room-dag-concepts.html#backwards-extremity">backwards extremity</a>.</p>
+but it's entirely possible that we <em>might</em>.</p>
 <p>For example, when we fetch the event auth chain or state for a given event, we
 mark all of those claimed auth events as outliers because we haven't done the
 state calculation ourself.</p>
