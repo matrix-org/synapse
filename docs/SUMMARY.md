@@ -65,6 +65,7 @@
       - [Statistics](admin_api/statistics.md)
       - [Users](admin_api/user_admin_api.md)
       - [Server Version](admin_api/version_api.md)
+      - [Federation](usage/administration/admin_api/federation.md)
     - [Manhole](manhole.md)
     - [Monitoring](metrics-howto.md)
     - [Understanding Synapse Through Grafana Graphs](usage/administration/understanding_synapse_through_grafana_graphs.md)
