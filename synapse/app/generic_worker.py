@@ -462,7 +462,8 @@ def start(config_options: List[str]) -> None:
 
         if (
             config.worker.worker_name != config.server.worker_to_update_user_directory
-            and config.worker.worker_name is not ANY_USER_DIRECTORY_WORKER
+            and config.server.worker_to_update_user_directory
+            is not ANY_USER_DIRECTORY_WORKER
         ):
             sys.stderr.write(
                 "\nThe worker_to_update_user_directory config variable must point to this worker's name"
