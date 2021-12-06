@@ -1771,6 +1771,7 @@ class SyncHandler:
 
             if not non_joins:
                 continue
+            last_non_join = non_joins[-1]
 
             # Check if we have left the room. This can either be because we were
             # joined before *or* that we since joined and then left.
@@ -1792,18 +1793,18 @@ class SyncHandler:
                         newly_left_rooms.append(room_id)
 
             # Only bother if we're still currently invited
-            should_invite = non_joins[-1].membership == Membership.INVITE
+            should_invite = last_non_join.membership == Membership.INVITE
             if should_invite:
                 if event.sender not in ignored_users:
-                    invite_room_sync = InvitedSyncResult(room_id, invite=non_joins[-1])
+                    invite_room_sync = InvitedSyncResult(room_id, invite=last_non_join)
                     if invite_room_sync:
                         invited.append(invite_room_sync)
 
             # Only bother if our latest membership in the room is knock (and we haven't
             # been accepted/rejected in the meantime).
-            should_knock = non_joins[-1].membership == Membership.KNOCK
+            should_knock = last_non_join.membership == Membership.KNOCK
             if should_knock:
-                knock_room_sync = KnockedSyncResult(room_id, knock=non_joins[-1])
+                knock_room_sync = KnockedSyncResult(room_id, knock=last_non_join)
                 if knock_room_sync:
                     knocked.append(knock_room_sync)
 
