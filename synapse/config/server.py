@@ -35,6 +35,14 @@ from ._util import validate_config
 
 logger = logging.Logger(__name__)
 
+# an object to pass to the "default" parameter, with which we can
+# `is` against to be sure we have an undefined config option.
+UNDEFINED = object()
+
+# an object to pass to self.worker_to_update_user_directory if
+# update_user_directory was defined, is used to compare with 'is'.
+ANY_USER_DIRECTORY_WORKER = object()
+
 # by default, we attempt to listen on both '::' *and* '0.0.0.0' because some OSes
 # (Windows, macOS, other BSD/Linux where net.ipv6.bindv6only is set) will only listen
 # on IPv6 when '::' is set.
@@ -324,8 +332,27 @@ class ServerConfig(Config):
         # Which worker is responsible for updating the user directory,
         # None means the main process handles this.
         self.worker_to_update_user_directory = config.get(
-            "worker_to_update_user_directory", None
+            "worker_to_update_user_directory", UNDEFINED
         )
+
+        update_user_directory = config.get("update_user_directory", UNDEFINED)
+
+        # Resolve backwards compat between update_user_directory (UUD) and
+        # worker_to_update_user_directory (WTUUD):
+        # - if WTUUD is defined, just use it
+        # - if UUD and WTUUD are undefined, assume WTUUD is None
+        # - if UUD is defined (and True), assume WTUUD is None
+        # - if UUD is defined (and False), set sentinel object so that user_dir
+        #    workers will work normally.
+        if self.worker_to_update_user_directory is UNDEFINED:
+            if update_user_directory is UNDEFINED:
+                self.worker_to_update_user_directory = None
+            else:
+                logger.warning(USER_UPDATE_DIRECTORY_DEPRECATION_WARNING)
+                if update_user_directory:
+                    self.worker_to_update_user_directory = None
+                else:
+                    self.worker_to_update_user_directory = ANY_USER_DIRECTORY_WORKER
 
         # whether to enable the media repository endpoints. This should be set
         # to false if the media repository is running as a separate endpoint;
@@ -1357,6 +1384,13 @@ NO_MORE_WEB_CLIENT_WARNING = """
 Synapse no longer includes a web client. To enable a web client, configure
 web_client_location. To remove this warning, remove 'webclient' from the 'listeners'
 configuration.
+"""
+
+USER_UPDATE_DIRECTORY_DEPRECATION_WARNING = """
+Synapse now uses 'worker_to_update_user_directory' over 'update_user_directory',
+you have set 'update_user_directory', and while synapse will work in a backwards
+compatible manner, it is suggested to change this value to use
+'worker_to_update_user_directory' instead.
 """
 
 

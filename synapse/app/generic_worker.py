@@ -458,7 +458,12 @@ def start(config_options: List[str]) -> None:
         config.appservice.notify_appservices = False
 
     if config.worker.worker_app == "synapse.app.user_dir":
-        if config.worker.worker_name != config.server.worker_to_update_user_directory:
+        from synapse.config.server import ANY_USER_DIRECTORY_WORKER
+
+        if (
+            config.worker.worker_name != config.server.worker_to_update_user_directory
+            and config.worker.worker_name is not ANY_USER_DIRECTORY_WORKER
+        ):
             sys.stderr.write(
                 "\nThe worker_to_update_user_directory config variable must point to this worker's name"
                 "\nto give this worker exclusive access to run it. (It is currently pointed at "
