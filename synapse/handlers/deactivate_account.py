@@ -136,10 +136,6 @@ class DeactivateAccountHandler:
         # delete from user directory
         await self.user_directory_handler.handle_local_user_deactivated(user_id)
 
-        # If the user is present in the monthly active users table
-        # remove them
-        await self.store.remove_deactivated_user_from_mau_table(user_id)
-
         # Mark the user as erased, if they asked for that
         if erase_data:
             user = UserID.from_string(user_id)
