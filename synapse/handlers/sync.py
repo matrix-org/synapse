@@ -184,6 +184,20 @@ class GroupsSyncResult:
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
+class MembershipChangesSummary:
+    """
+    A summary of rooms we've joined or left, plus users who we've seen join or leave.
+
+    Used to create the DeviceLists struct below.
+    """
+
+    newly_joined_rooms: Collection[str]
+    newly_joined_or_invited_or_knocked_users: Collection[str]
+    newly_left_rooms: Collection[str]
+    newly_left_users: Collection[str]
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class DeviceLists:
     """
     Attributes:
@@ -1112,11 +1126,9 @@ class SyncHandler:
 
         logger.debug("Fetching room data")
 
-        res = await self._generate_sync_entry_for_rooms(
+        membership_changes_summary = await self._generate_sync_entry_for_rooms(
             sync_result_builder, account_data_by_room
         )
-        newly_joined_rooms, newly_joined_or_invited_or_knocked_users, _, _ = res
-        _, _, newly_left_rooms, newly_left_users = res
 
         block_all_presence_data = (
             since_token is None and sync_config.filter_collection.blocks_all_presence()
@@ -1125,8 +1137,8 @@ class SyncHandler:
             logger.debug("Fetching presence data")
             await self._generate_sync_entry_for_presence(
                 sync_result_builder,
-                newly_joined_rooms,
-                newly_joined_or_invited_or_knocked_users,
+                membership_changes_summary.newly_joined_rooms,
+                membership_changes_summary.newly_joined_or_invited_or_knocked_users,
             )
 
         logger.debug("Fetching to-device data")
@@ -1134,10 +1146,7 @@ class SyncHandler:
 
         device_lists = await self._generate_sync_entry_for_device_list(
             sync_result_builder,
-            newly_joined_rooms=newly_joined_rooms,
-            newly_joined_or_invited_or_knocked_users=newly_joined_or_invited_or_knocked_users,
-            newly_left_rooms=newly_left_rooms,
-            newly_left_users=newly_left_users,
+            membership_changes_summary,
         )
 
         logger.debug("Fetching OTK data")
@@ -1164,7 +1173,7 @@ class SyncHandler:
         # debug for https://github.com/matrix-org/synapse/issues/4422
         for joined_room in sync_result_builder.joined:
             room_id = joined_room.room_id
-            if room_id in newly_joined_rooms:
+            if room_id in membership_changes_summary.newly_joined_rooms:
                 issue4422_logger.debug(
                     "Sync result for newly joined room %s: %r", room_id, joined_room
                 )
@@ -1242,10 +1251,7 @@ class SyncHandler:
     async def _generate_sync_entry_for_device_list(
         self,
         sync_result_builder: "SyncResultBuilder",
-        newly_joined_rooms: Set[str],
-        newly_joined_or_invited_or_knocked_users: Set[str],
-        newly_left_rooms: Set[str],
-        newly_left_users: Set[str],
+        mem_changes: MembershipChangesSummary,
     ) -> DeviceLists:
         """Generate the DeviceLists section of sync
 
@@ -1266,9 +1272,9 @@ class SyncHandler:
         # We're going to mutate these fields, so lets copy them rather than
         # assume they won't get used later.
         newly_joined_or_invited_or_knocked_users = set(
-            newly_joined_or_invited_or_knocked_users
+            mem_changes.newly_joined_or_invited_or_knocked_users
         )
-        newly_left_users = set(newly_left_users)
+        newly_left_users = set(mem_changes.newly_left_users)
 
         if since_token and since_token.device_list_key:
             # We want to figure out what user IDs the client should refetch
@@ -1304,7 +1310,7 @@ class SyncHandler:
             )
 
             # Step 1b, check for newly joined rooms
-            for room_id in newly_joined_rooms:
+            for room_id in mem_changes.newly_joined_rooms:
                 joined_users = await self.store.get_users_in_room(room_id)
                 newly_joined_or_invited_or_knocked_users.update(joined_users)
 
@@ -1320,7 +1326,7 @@ class SyncHandler:
             users_that_have_changed.update(user_signatures_changed)
 
             # Now find users that we no longer track
-            for room_id in newly_left_rooms:
+            for room_id in mem_changes.newly_left_rooms:
                 left_users = await self.store.get_users_in_room(room_id)
                 newly_left_users.update(left_users)
 
@@ -1434,8 +1440,8 @@ class SyncHandler:
     async def _generate_sync_entry_for_presence(
         self,
         sync_result_builder: "SyncResultBuilder",
-        newly_joined_rooms: Set[str],
-        newly_joined_or_invited_users: Set[str],
+        newly_joined_rooms: Collection[str],
+        newly_joined_or_invited_users: Collection[str],
     ) -> None:
         """Generates the presence portion of the sync response. Populates the
         `sync_result_builder` with the result.
@@ -1493,7 +1499,7 @@ class SyncHandler:
         self,
         sync_result_builder: "SyncResultBuilder",
         account_data_by_room: Dict[str, Dict[str, JsonDict]],
-    ) -> Tuple[Set[str], Set[str], Set[str], Set[str]]:
+    ) -> MembershipChangesSummary:
         """Generates the rooms portion of the sync response. Populates the
         `sync_result_builder` with the result.
 
@@ -1547,7 +1553,7 @@ class SyncHandler:
                     )
                     if not tags_by_room:
                         logger.debug("no-oping sync")
-                        return set(), set(), set(), set()
+                        return MembershipChangesSummary(set(), set(), set(), set())
 
         # 3. Work out which rooms need reporting in the sync response.
         ignored_users = await self._get_ignored_users(user_id)
@@ -1598,7 +1604,7 @@ class SyncHandler:
             newly_left_users,
         ) = _calculate_user_changes(sync_result_builder)
 
-        return (
+        return MembershipChangesSummary(
             set(newly_joined_rooms),
             newly_joined_or_invited_or_knocked_users,
             set(newly_left_rooms),
