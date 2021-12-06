@@ -404,7 +404,8 @@ class EventClientSerializer:
             event: The event being serialized.
             time_now: The current time in milliseconds
             bundle_aggregations: Whether to include the bundled aggregations for this
-                event. Only applies to non-state events.
+                event. Only applies to non-state events. (State events never include
+                bundled aggregations.)
             **kwargs: Arguments to pass to `serialize_event`
 
         Returns:
