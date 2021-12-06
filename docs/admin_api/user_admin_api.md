@@ -50,7 +50,8 @@ It returns a JSON body like the following:
             "auth_provider": "<provider2>",
             "external_id": "<user_id_provider_2>"
         }
-    ]
+    ],
+    "user_type": null
 }
 ```
 
@@ -97,7 +98,8 @@ with a body of:
     ],
     "avatar_url": "<avatar_url>",
     "admin": false,
-    "deactivated": false
+    "deactivated": false,
+    "user_type": null
 }
 ```
 
@@ -135,6 +137,9 @@ Body parameters:
   unchanged on existing accounts and set to `false` for new accounts.
   A user cannot be erased by deactivating with this API. For details on
   deactivating users see [Deactivate Account](#deactivate-account).
+- `user_type` - string or null, optional. If provided, the user type will be
+  adjusted. If `null` given, the user type will be cleared. Other 
+  allowed options are: `bot` and `support`.
 
 If the user already exists then optional parameters default to the current value.
 
@@ -341,6 +346,7 @@ The following actions are performed when deactivating an user:
 - Remove all 3PIDs from the homeserver
 - Delete all devices and E2EE keys
 - Delete all access tokens
+- Delete all pushers
 - Delete the password hash
 - Removal from all rooms the user is a member of
 - Remove the user from the user directory
@@ -354,6 +360,15 @@ is set to `true`:
 - Remove the user's avatar URL
 - Mark the user as erased
 
+The following actions are **NOT** performed. The list may be incomplete.
+
+- Remove mappings of SSO IDs
+- [Delete media uploaded](#delete-media-uploaded-by-a-user) by user (included avatar images)
+- Delete sent and received messages
+- Delete E2E cross-signing keys
+- Remove the user's creation (registration) timestamp
+- [Remove rate limit overrides](#override-ratelimiting-for-users)
+- Remove from monthly active users
 
 ## Reset password
 

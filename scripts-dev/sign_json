@@ -52,12 +52,18 @@ Example usage:
     )
 
     parser.add_argument(
+        "-K",
+        "--signing-key",
+        help="The private ed25519 key to sign the request with.",
+    )
+
+    parser.add_argument(
         "-c",
         "--config",
         default="homeserver.yaml",
         help=(
             "Path to synapse config file, from which the server name and/or signing "
-            "key path will be read. Ignored if --server-name and --signing-key-path "
+            "key path will be read. Ignored if --server-name and --signing-key(-path) "
             "are both given."
         ),
     )
@@ -87,11 +93,14 @@ Example usage:
 
     args = parser.parse_args()
 
-    if not args.server_name or not args.signing_key_path:
+    if not args.server_name or not (args.signing_key_path or args.signing_key):
         read_args_from_config(args)
 
-    with open(args.signing_key_path) as f:
-        key = read_signing_keys(f)[0]
+    if args.signing_key:
+        keys = read_signing_keys([args.signing_key])
+    else:
+        with open(args.signing_key_path) as f:
+            keys = read_signing_keys(f)
 
     json_to_sign = args.input_data
     if json_to_sign is None:
@@ -107,7 +116,7 @@ Example usage:
         print("Input json was not an object", file=sys.stderr)
         sys.exit(1)
 
-    sign_json(obj, args.server_name, key)
+    sign_json(obj, args.server_name, keys[0])
     for c in json_encoder.iterencode(obj):
         args.output.write(c)
     args.output.write("\n")
@@ -118,8 +127,17 @@ def read_args_from_config(args: argparse.Namespace) -> None:
         config = yaml.safe_load(fh)
         if not args.server_name:
             args.server_name = config["server_name"]
-        if not args.signing_key_path:
-            args.signing_key_path = config["signing_key_path"]
+        if not args.signing_key_path and not args.signing_key:
+            if "signing_key" in config:
+                args.signing_key = config["signing_key"]
+            elif "signing_key_path" in config:
+                args.signing_key_path = config["signing_key_path"]
+            else:
+                print(
+                    "A signing key must be given on the commandline or in the config file.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
 
 
 if __name__ == "__main__":

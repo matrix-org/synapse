@@ -187,8 +187,8 @@ of this endpoint modifying the media store.
 
 The current third-party rules module interface is deprecated in favour of the new generic
 modules system introduced in Synapse v1.37.0. Authors of third-party rules modules can refer
-to [this documentation](modules.md#porting-an-existing-module-that-uses-the-old-interface)
-to update their modules. Synapse administrators can refer to [this documentation](modules.md#using-modules)
+to [this documentation](modules/porting_legacy_module.md)
+to update their modules. Synapse administrators can refer to [this documentation](modules/index.md)
 to update their configuration once the modules they are using have been updated.
 
 We plan to remove support for the current third-party rules interface in September 2021.
@@ -237,9 +237,9 @@ SQLite databases are unaffected by this change.
 
 The current spam checker interface is deprecated in favour of a new generic modules system.
 Authors of spam checker modules can refer to [this
-documentation](modules.md#porting-an-existing-module-that-uses-the-old-interface)
+documentation](modules/porting_legacy_module.md
 to update their modules. Synapse administrators can refer to [this
-documentation](modules.md#using-modules)
+documentation](modules/index.md)
 to update their configuration once the modules they are using have been updated.
 
 We plan to remove support for the current spam checker interface in August 2021.
@@ -348,24 +348,24 @@ Please ensure your Application Services are up to date.
 ## Requirement for X-Forwarded-Proto header
 
 When using Synapse with a reverse proxy (in particular, when using the
-[x_forwarded]{.title-ref} option on an HTTP listener), Synapse now
-expects to receive an [X-Forwarded-Proto]{.title-ref} header on incoming
+`x_forwarded` option on an HTTP listener), Synapse now
+expects to receive an `X-Forwarded-Proto` header on incoming
 HTTP requests. If it is not set, Synapse will log a warning on each
 received request.
 
 To avoid the warning, administrators using a reverse proxy should ensure
-that the reverse proxy sets [X-Forwarded-Proto]{.title-ref} header to
-[https]{.title-ref} or [http]{.title-ref} to indicate the protocol used
+that the reverse proxy sets `X-Forwarded-Proto` header to
+`https` or `http` to indicate the protocol used
 by the client.
 
-Synapse also requires the [Host]{.title-ref} header to be preserved.
+Synapse also requires the `Host` header to be preserved.
 
 See the [reverse proxy documentation](reverse_proxy.md), where the
 example configurations have been updated to show how to set these
 headers.
 
 (Users of [Caddy](https://caddyserver.com/) are unaffected, since we
-believe it sets [X-Forwarded-Proto]{.title-ref} by default.)
+believe it sets `X-Forwarded-Proto` by default.)
 
 # Upgrading to v1.27.0
 
@@ -529,13 +529,13 @@ mapping provider to specify different algorithms, instead of the
 way](<https://matrix.org/docs/spec/appendices#mapping-from-other-character-sets>).
 
 If your Synapse configuration uses a custom mapping provider
-([oidc_config.user_mapping_provider.module]{.title-ref} is specified and
+(`oidc_config.user_mapping_provider.module` is specified and
 not equal to
-[synapse.handlers.oidc_handler.JinjaOidcMappingProvider]{.title-ref})
-then you *must* ensure that [map_user_attributes]{.title-ref} of the
+`synapse.handlers.oidc_handler.JinjaOidcMappingProvider`)
+then you *must* ensure that `map_user_attributes` of the
 mapping provider performs some normalisation of the
-[localpart]{.title-ref} returned. To match previous behaviour you can
-use the [map_username_to_mxid_localpart]{.title-ref} function provided
+`localpart` returned. To match previous behaviour you can
+use the `map_username_to_mxid_localpart` function provided
 by Synapse. An example is shown below:
 
 ```python
@@ -564,7 +564,7 @@ v1.24.0. The Admin API is now only accessible under:
 
 -   `/_synapse/admin/v1`
 
-The only exception is the [/admin/whois]{.title-ref} endpoint, which is
+The only exception is the `/admin/whois` endpoint, which is
 [also available via the client-server
 API](https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid).
 
@@ -639,7 +639,7 @@ This page will appear to the user after clicking a password reset link
 that has been emailed to them.
 
 To complete password reset, the page must include a way to make a
-[POST]{.title-ref} request to
+`POST` request to
 `/_synapse/client/password_reset/{medium}/submit_token` with the query
 parameters from the original link, presented as a URL-encoded form. See
 the file itself for more details.
@@ -660,18 +660,18 @@ but the parameters are slightly different:
 
 # Upgrading to v1.18.0
 
-## Docker [-py3]{.title-ref} suffix will be removed in future versions
+## Docker `-py3` suffix will be removed in future versions
 
 From 10th August 2020, we will no longer publish Docker images with the
-[-py3]{.title-ref} tag suffix. The images tagged with the
-[-py3]{.title-ref} suffix have been identical to the non-suffixed tags
+`-py3` tag suffix. The images tagged with the
+`-py3` suffix have been identical to the non-suffixed tags
 since release 0.99.0, and the suffix is obsolete.
 
-On 10th August, we will remove the [latest-py3]{.title-ref} tag.
-Existing per-release tags (such as [v1.18.0-py3]{.title-ref}) will not
-be removed, but no new [-py3]{.title-ref} tags will be added.
+On 10th August, we will remove the `latest-py3` tag.
+Existing per-release tags (such as `v1.18.0-py3` will not
+be removed, but no new `-py3` tags will be added.
 
-Scripts relying on the [-py3]{.title-ref} suffix will need to be
+Scripts relying on the `-py3` suffix will need to be
 updated.
 
 ## Redis replication is now recommended in lieu of TCP replication
@@ -705,8 +705,8 @@ This will *not* be a problem for Synapse installations which were:
 If completeness of the room directory is a concern, installations which
 are affected can be repaired as follows:
 
-1.  Run the following sql from a [psql]{.title-ref} or
-    [sqlite3]{.title-ref} console:
+1.  Run the following sql from a `psql` or
+    `sqlite3` console:
 
     ```sql
     INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
@@ -770,8 +770,8 @@ participating in many rooms.
     of any problems.
 
 1.  As an initial check to see if you will be affected, you can try
-    running the following query from the [psql]{.title-ref} or
-    [sqlite3]{.title-ref} console. It is safe to run it while Synapse is
+    running the following query from the `psql` or
+    `sqlite3` console. It is safe to run it while Synapse is
     still running.
 
     ```sql
@@ -1353,9 +1353,9 @@ first need to upgrade the database by running:
 
     python scripts/upgrade_db_to_v0.6.0.py <db> <server_name> <signing_key>
 
-Where [<db>]{.title-ref} is the location of the database,
-[<server_name>]{.title-ref} is the server name as specified in the
-synapse configuration, and [<signing_key>]{.title-ref} is the location
+Where `<db>` is the location of the database,
+`<server_name>` is the server name as specified in the
+synapse configuration, and `<signing_key>` is the location
 of the signing key as specified in the synapse configuration.
 
 This may take some time to complete. Failures of signatures and content

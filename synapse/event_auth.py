@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
@@ -113,7 +113,7 @@ def validate_event_for_room_version(
 
 
 def check_auth_rules_for_event(
-    room_version_obj: RoomVersion, event: EventBase, auth_events: StateMap[EventBase]
+    room_version_obj: RoomVersion, event: EventBase, auth_events: Iterable[EventBase]
 ) -> None:
     """Check that an event complies with the auth rules
 
@@ -137,8 +137,6 @@ def check_auth_rules_for_event(
     Raises:
         AuthError if the checks fail
     """
-    assert isinstance(auth_events, dict)
-
     # We need to ensure that the auth events are actually for the same room, to
     # stop people from using powers they've been granted in other rooms for
     # example.
@@ -147,7 +145,7 @@ def check_auth_rules_for_event(
     # the state res algorithm isn't silly enough to give us events from different rooms.
     # Still, it's easier to do it anyway.
     room_id = event.room_id
-    for auth_event in auth_events.values():
+    for auth_event in auth_events:
         if auth_event.room_id != room_id:
             raise AuthError(
                 403,
@@ -186,8 +184,10 @@ def check_auth_rules_for_event(
         logger.debug("Allowing! %s", event)
         return
 
+    auth_dict = {(e.type, e.state_key): e for e in auth_events}
+
     # 3. If event does not have a m.room.create in its auth_events, reject.
-    creation_event = auth_events.get((EventTypes.Create, ""), None)
+    creation_event = auth_dict.get((EventTypes.Create, ""), None)
     if not creation_event:
         raise AuthError(403, "No create event in auth events")
 
@@ -195,7 +195,7 @@ def check_auth_rules_for_event(
     creating_domain = get_domain_from_id(event.room_id)
     originating_domain = get_domain_from_id(event.sender)
     if creating_domain != originating_domain:
-        if not _can_federate(event, auth_events):
+        if not _can_federate(event, auth_dict):
             raise AuthError(403, "This room has been marked as unfederatable.")
 
     # 4. If type is m.room.aliases
@@ -217,23 +217,20 @@ def check_auth_rules_for_event(
         logger.debug("Allowing! %s", event)
         return
 
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug("Auth events: %s", [a.event_id for a in auth_events.values()])
-
     # 5. If type is m.room.membership
     if event.type == EventTypes.Member:
-        _is_membership_change_allowed(room_version_obj, event, auth_events)
+        _is_membership_change_allowed(room_version_obj, event, auth_dict)
         logger.debug("Allowing! %s", event)
         return
 
-    _check_event_sender_in_room(event, auth_events)
+    _check_event_sender_in_room(event, auth_dict)
 
     # Special case to allow m.room.third_party_invite events wherever
     # a user is allowed to issue invites.  Fixes
     # https://github.com/vector-im/vector-web/issues/1208 hopefully
     if event.type == EventTypes.ThirdPartyInvite:
-        user_level = get_user_power_level(event.user_id, auth_events)
-        invite_level = get_named_level(auth_events, "invite", 0)
+        user_level = get_user_power_level(event.user_id, auth_dict)
+        invite_level = get_named_level(auth_dict, "invite", 0)
 
         if user_level < invite_level:
             raise AuthError(403, "You don't have permission to invite users")
@@ -241,20 +238,20 @@ def check_auth_rules_for_event(
             logger.debug("Allowing! %s", event)
             return
 
-    _can_send_event(event, auth_events)
+    _can_send_event(event, auth_dict)
 
     if event.type == EventTypes.PowerLevels:
-        _check_power_levels(room_version_obj, event, auth_events)
+        _check_power_levels(room_version_obj, event, auth_dict)
 
     if event.type == EventTypes.Redaction:
-        check_redaction(room_version_obj, event, auth_events)
+        check_redaction(room_version_obj, event, auth_dict)
 
     if (
         event.type == EventTypes.MSC2716_INSERTION
         or event.type == EventTypes.MSC2716_BATCH
         or event.type == EventTypes.MSC2716_MARKER
     ):
-        check_historical(room_version_obj, event, auth_events)
+        check_historical(room_version_obj, event, auth_dict)
 
     logger.debug("Allowing! %s", event)
 

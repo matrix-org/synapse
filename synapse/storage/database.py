@@ -19,6 +19,7 @@ from collections import defaultdict
 from sys import intern
 from time import monotonic as monotonic_time
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Collection,
@@ -51,6 +52,9 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.types import Connection, Cursor
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 # python 3 does not have a maximum int value
 MAX_TXN_ID = 2 ** 63 - 1
@@ -392,7 +396,7 @@ class DatabasePool:
 
     def __init__(
         self,
-        hs,
+        hs: "HomeServer",
         database_config: DatabaseConnectionConfig,
         engine: BaseDatabaseEngine,
     ):

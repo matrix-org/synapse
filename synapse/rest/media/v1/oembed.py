@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, List, Optional
 
 import attr
 
-from synapse.http.client import SimpleHttpClient
 from synapse.types import JsonDict
 from synapse.util import json_decoder
 
@@ -48,7 +47,7 @@ class OEmbedProvider:
     requesting/parsing oEmbed content.
     """
 
-    def __init__(self, hs: "HomeServer", client: SimpleHttpClient):
+    def __init__(self, hs: "HomeServer"):
         self._oembed_patterns = {}
         for oembed_endpoint in hs.config.oembed.oembed_patterns:
             api_endpoint = oembed_endpoint.api_endpoint
@@ -69,7 +68,6 @@ class OEmbedProvider:
             # Iterate through each URL pattern and point it to the endpoint.
             for pattern in oembed_endpoint.url_patterns:
                 self._oembed_patterns[pattern] = api_endpoint
-        self._client = client
 
     def get_oembed_url(self, url: str) -> Optional[str]:
         """
@@ -139,10 +137,11 @@ class OEmbedProvider:
             # oEmbed responses *must* be UTF-8 according to the spec.
             oembed = json_decoder.decode(raw_body.decode("utf-8"))
 
-            # Ensure there's a version of 1.0.
-            oembed_version = oembed["version"]
-            if oembed_version != "1.0":
-                raise RuntimeError(f"Invalid version: {oembed_version}")
+            # The version is a required string field, but not always provided,
+            # or sometimes provided as a float. Be lenient.
+            oembed_version = oembed.get("version", "1.0")
+            if oembed_version != "1.0" and oembed_version != 1:
+                raise RuntimeError(f"Invalid oEmbed version: {oembed_version}")
 
             # Ensure the cache age is None or an int.
             cache_age = oembed.get("cache_age")

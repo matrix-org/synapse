@@ -21,6 +21,8 @@ from synapse.logging.context import make_deferred_yieldable
 from synapse.util import json_decoder, json_encoder
 
 if TYPE_CHECKING:
+    from txredisapi import RedisProtocol
+
     from synapse.server import HomeServer
 
 set_counter = Counter(
@@ -59,7 +61,12 @@ class ExternalCache:
     """
 
     def __init__(self, hs: "HomeServer"):
-        self._redis_connection = hs.get_outbound_redis_connection()
+        if hs.config.redis.redis_enabled:
+            self._redis_connection: Optional[
+                "RedisProtocol"
+            ] = hs.get_outbound_redis_connection()
+        else:
+            self._redis_connection = None
 
     def _get_redis_key(self, cache_name: str, key: str) -> str:
         return "cache_v1:%s:%s" % (cache_name, key)

@@ -467,7 +467,7 @@ class FederationServer(FederationBase):
 
     async def on_room_state_request(
         self, origin: str, room_id: str, event_id: Optional[str]
-    ) -> Tuple[int, Dict[str, Any]]:
+    ) -> Tuple[int, JsonDict]:
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
 
@@ -481,7 +481,7 @@ class FederationServer(FederationBase):
         # - but that's non-trivial to get right, and anyway somewhat defeats
         # the point of the linearizer.
         with (await self._server_linearizer.queue((origin, room_id))):
-            resp = dict(
+            resp: JsonDict = dict(
                 await self._state_resp_cache.wrap(
                     (room_id, event_id),
                     self._on_context_state_request_compute,
@@ -1061,11 +1061,12 @@ class FederationServer(FederationBase):
 
                 origin, event = next
 
-            lock = await self.store.try_acquire_lock(
+            new_lock = await self.store.try_acquire_lock(
                 _INBOUND_EVENT_HANDLING_LOCK_NAME, room_id
             )
-            if not lock:
+            if not new_lock:
                 return
+            lock = new_lock
 
     def __str__(self) -> str:
         return "<ReplicationLayer(%s)>" % self.server_name

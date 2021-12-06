@@ -549,7 +549,7 @@ async def _iterative_auth_checks(
             event_auth.check_auth_rules_for_event(
                 room_version,
                 event,
-                auth_events,
+                auth_events.values(),
             )
 
             resolved_state[(event.type, event.state_key)] = event_id

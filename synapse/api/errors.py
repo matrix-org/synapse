@@ -19,7 +19,7 @@
 import logging
 import typing
 from http import HTTPStatus
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from twisted.web import http
 
@@ -144,7 +144,7 @@ class SynapseError(CodeMessageException):
         super().__init__(code, msg)
         self.errcode = errcode
 
-    def error_dict(self):
+    def error_dict(self) -> "JsonDict":
         return cs_error(self.msg, self.errcode)
 
 
@@ -176,7 +176,7 @@ class ProxiedRequestError(SynapseError):
         else:
             self._additional_fields = dict(additional_fields)
 
-    def error_dict(self):
+    def error_dict(self) -> "JsonDict":
         return cs_error(self.msg, self.errcode, **self._additional_fields)
 
 
@@ -197,7 +197,7 @@ class ConsentNotGivenError(SynapseError):
         )
         self._consent_uri = consent_uri
 
-    def error_dict(self):
+    def error_dict(self) -> "JsonDict":
         return cs_error(self.msg, self.errcode, consent_uri=self._consent_uri)
 
 
@@ -263,14 +263,10 @@ class InteractiveAuthIncompleteError(Exception):
 class UnrecognizedRequestError(SynapseError):
     """An error indicating we don't understand the request you're trying to make"""
 
-    def __init__(self, *args, **kwargs):
-        if "errcode" not in kwargs:
-            kwargs["errcode"] = Codes.UNRECOGNIZED
-        if len(args) == 0:
-            message = "Unrecognized request"
-        else:
-            message = args[0]
-        super().__init__(400, message, **kwargs)
+    def __init__(
+        self, msg: str = "Unrecognized request", errcode: str = Codes.UNRECOGNIZED
+    ):
+        super().__init__(400, msg, errcode)
 
 
 class NotFoundError(SynapseError):
@@ -285,10 +281,8 @@ class AuthError(SynapseError):
     other poorly-defined times.
     """
 
-    def __init__(self, *args, **kwargs):
-        if "errcode" not in kwargs:
-            kwargs["errcode"] = Codes.FORBIDDEN
-        super().__init__(*args, **kwargs)
+    def __init__(self, code: int, msg: str, errcode: str = Codes.FORBIDDEN):
+        super().__init__(code, msg, errcode)
 
 
 class InvalidClientCredentialsError(SynapseError):
@@ -322,7 +316,7 @@ class InvalidClientTokenError(InvalidClientCredentialsError):
         super().__init__(msg=msg, errcode="M_UNKNOWN_TOKEN")
         self._soft_logout = soft_logout
 
-    def error_dict(self):
+    def error_dict(self) -> "JsonDict":
         d = super().error_dict()
         d["soft_logout"] = self._soft_logout
         return d
@@ -346,7 +340,7 @@ class ResourceLimitError(SynapseError):
         self.limit_type = limit_type
         super().__init__(code, msg, errcode=errcode)
 
-    def error_dict(self):
+    def error_dict(self) -> "JsonDict":
         return cs_error(
             self.msg,
             self.errcode,
@@ -358,31 +352,16 @@ class ResourceLimitError(SynapseError):
 class EventSizeError(SynapseError):
     """An error raised when an event is too big."""
 
-    def __init__(self, *args, **kwargs):
-        if "errcode" not in kwargs:
-            kwargs["errcode"] = Codes.TOO_LARGE
-        super().__init__(413, *args, **kwargs)
-
-
-class EventStreamError(SynapseError):
-    """An error raised when there a problem with the event stream."""
-
-    def __init__(self, *args, **kwargs):
-        if "errcode" not in kwargs:
-            kwargs["errcode"] = Codes.BAD_PAGINATION
-        super().__init__(*args, **kwargs)
+    def __init__(self, msg: str):
+        super().__init__(413, msg, Codes.TOO_LARGE)
 
 
 class LoginError(SynapseError):
     """An error raised when there was a problem logging in."""
 
-    pass
-
 
 class StoreError(SynapseError):
     """An error raised when there was a problem storing some data."""
-
-    pass
 
 
 class InvalidCaptchaError(SynapseError):
@@ -396,7 +375,7 @@ class InvalidCaptchaError(SynapseError):
         super().__init__(code, msg, errcode)
         self.error_url = error_url
 
-    def error_dict(self):
+    def error_dict(self) -> "JsonDict":
         return cs_error(self.msg, self.errcode, error_url=self.error_url)
 
 
@@ -413,7 +392,7 @@ class LimitExceededError(SynapseError):
         super().__init__(code, msg, errcode)
         self.retry_after_ms = retry_after_ms
 
-    def error_dict(self):
+    def error_dict(self) -> "JsonDict":
         return cs_error(self.msg, self.errcode, retry_after_ms=self.retry_after_ms)
 
 
@@ -444,10 +423,8 @@ class UnsupportedRoomVersionError(SynapseError):
 class ThreepidValidationError(SynapseError):
     """An error raised when there was a problem authorising an event."""
 
-    def __init__(self, *args, **kwargs):
-        if "errcode" not in kwargs:
-            kwargs["errcode"] = Codes.FORBIDDEN
-        super().__init__(*args, **kwargs)
+    def __init__(self, msg: str, errcode: str = Codes.FORBIDDEN):
+        super().__init__(400, msg, errcode)
 
 
 class IncompatibleRoomVersionError(SynapseError):
@@ -467,7 +444,7 @@ class IncompatibleRoomVersionError(SynapseError):
 
         self._room_version = room_version
 
-    def error_dict(self):
+    def error_dict(self) -> "JsonDict":
         return cs_error(self.msg, self.errcode, room_version=self._room_version)
 
 
@@ -495,7 +472,7 @@ class RequestSendFailed(RuntimeError):
     errors (like programming errors).
     """
 
-    def __init__(self, inner_exception, can_retry):
+    def __init__(self, inner_exception: BaseException, can_retry: bool):
         super().__init__(
             "Failed to send request: %s: %s"
             % (type(inner_exception).__name__, inner_exception)
@@ -504,7 +481,7 @@ class RequestSendFailed(RuntimeError):
         self.can_retry = can_retry
 
 
-def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs):
+def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs: Any) -> "JsonDict":
     """Utility method for constructing an error response for client-server
     interactions.
 
@@ -552,7 +529,7 @@ class FederationError(RuntimeError):
         msg = "%s %s: %s" % (level, code, reason)
         super().__init__(msg)
 
-    def get_dict(self):
+    def get_dict(self) -> "JsonDict":
         return {
             "level": self.level,
             "code": self.code,
@@ -581,7 +558,7 @@ class HttpResponseException(CodeMessageException):
         super().__init__(code, msg)
         self.response = response
 
-    def to_synapse_error(self):
+    def to_synapse_error(self) -> SynapseError:
         """Make a SynapseError based on an HTTPResponseException
 
         This is useful when a proxied request has failed, and we need to

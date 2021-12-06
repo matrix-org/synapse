@@ -122,6 +122,8 @@ jobs:
           SYNAPSE_POSTGRES_USER: postgres
           SYNAPSE_POSTGRES_PASSWORD: postgres
       - name: Dump logs
+        # Logs are most useful when the command fails, always include them.
+        if: ${{ always() }}
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
         #       It also ignores find's exit code; this is a best effort affair
@@ -146,6 +148,8 @@ jobs:
         env:
           TRIAL_FLAGS: "--jobs=2"
       - name: Dump logs
+        # Logs are most useful when the command fails, always include them.
+        if: ${{ always() }}
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
         #       It also ignores find's exit code; this is a best effort affair
@@ -176,6 +180,8 @@ jobs:
         env:
           TRIAL_FLAGS: "--jobs=2"
       - name: Dump logs
+        # Logs are most useful when the command fails, always include them.
+        if: ${{ always() }}
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
         #       It also ignores find's exit code; this is a best effort affair
@@ -239,6 +245,35 @@ jobs:
           path: |
             /logs/results.tap
             /logs/**/*.log*
+
+  export-data:
+    if: ${{ !failure() && !cancelled() }} # Allow previous steps to be skipped, but not fail
+    needs: [linting-done, portdb]
+    runs-on: ubuntu-latest
+    env:
+      TOP: ${{ github.workspace }}
+
+    services:
+      postgres:
+        image: postgres
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_PASSWORD: "postgres"
+          POSTGRES_INITDB_ARGS: "--lc-collate C --lc-ctype C --encoding UTF8"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v2
+      - run: sudo apt-get -qq install xmlsec1
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.9"
+      - run: .ci/scripts/test_export_data_command.sh
 
   portdb:
     if: ${{ !failure() && !cancelled() }} # Allow previous steps to be skipped, but not fail

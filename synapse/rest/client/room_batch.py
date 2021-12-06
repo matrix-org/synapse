@@ -32,7 +32,6 @@ from synapse.http.servlet import (
 from synapse.http.site import SynapseRequest
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.types import JsonDict
-from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -160,11 +159,6 @@ class RoomBatchSendEventRestServlet(RestServlet):
         base_insertion_event = None
         if batch_id_from_query:
             batch_id_to_connect_to = batch_id_from_query
-            #  All but the first base insertion event should point at a fake
-            #  event, which causes the HS to ask for the state at the start of
-            #  the batch later.
-            fake_prev_event_id = "$" + random_string(43)
-            prev_event_ids = [fake_prev_event_id]
         # Otherwise, create an insertion event to act as a starting point.
         #
         # We don't always have an insertion event to start hanging more history
@@ -173,8 +167,6 @@ class RoomBatchSendEventRestServlet(RestServlet):
         # an insertion event), in which case we just create a new insertion event
         # that can then get pointed to by a "marker" event later.
         else:
-            prev_event_ids = prev_event_ids_from_query
-
             base_insertion_event_dict = (
                 self.room_batch_handler.create_insertion_event_dict(
                     sender=requester.user.to_string(),
@@ -182,7 +174,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
                     origin_server_ts=last_event_in_batch["origin_server_ts"],
                 )
             )
-            base_insertion_event_dict["prev_events"] = prev_event_ids.copy()
+            base_insertion_event_dict["prev_events"] = prev_event_ids_from_query.copy()
 
             (
                 base_insertion_event,
@@ -202,6 +194,11 @@ class RoomBatchSendEventRestServlet(RestServlet):
             batch_id_to_connect_to = base_insertion_event["content"][
                 EventContentFields.MSC2716_NEXT_BATCH_ID
             ]
+
+        # Also connect the historical event chain to the end of the floating
+        # state chain, which causes the HS to ask for the state at the start of
+        # the batch later.
+        prev_event_ids = [state_event_ids_at_start[-1]]
 
         # Create and persist all of the historical events as well as insertion
         # and batch meta events to make the batch navigable in the DAG.

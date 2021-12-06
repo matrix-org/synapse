@@ -38,6 +38,7 @@ from .ratelimiting import RatelimitConfig
 from .redis import RedisConfig
 from .registration import RegistrationConfig
 from .repository import ContentRepositoryConfig
+from .retention import RetentionConfig
 from .room import RoomConfig
 from .room_directory import RoomDirectoryConfig
 from .saml2 import SAML2Config
@@ -59,6 +60,7 @@ class HomeServerConfig(RootConfig):
     config_classes = [
         ModulesConfig,
         ServerConfig,
+        RetentionConfig,
         TlsConfig,
         FederationConfig,
         CacheConfig,

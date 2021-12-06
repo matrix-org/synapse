@@ -87,7 +87,7 @@ class VerifyJsonRequest:
         server_name: str,
         json_object: JsonDict,
         minimum_valid_until_ms: int,
-    ):
+    ) -> "VerifyJsonRequest":
         """Create a VerifyJsonRequest to verify all signatures on a signed JSON
         object for the given server.
         """
@@ -104,7 +104,7 @@ class VerifyJsonRequest:
         server_name: str,
         event: EventBase,
         minimum_valid_until_ms: int,
-    ):
+    ) -> "VerifyJsonRequest":
         """Create a VerifyJsonRequest to verify all signatures on an event
         object for the given server.
         """
@@ -449,7 +449,9 @@ class StoreKeyFetcher(KeyFetcher):
 
         self.store = hs.get_datastore()
 
-    async def _fetch_keys(self, keys_to_fetch: List[_FetchKeyRequest]):
+    async def _fetch_keys(
+        self, keys_to_fetch: List[_FetchKeyRequest]
+    ) -> Dict[str, Dict[str, FetchKeyResult]]:
         key_ids_to_fetch = (
             (queue_value.server_name, key_id)
             for queue_value in keys_to_fetch

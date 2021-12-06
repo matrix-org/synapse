@@ -145,7 +145,7 @@ class DirectoryHandler:
             if not self.config.roomdirectory.is_alias_creation_allowed(
                 user_id, room_id, room_alias_str
             ):
-                # Lets just return a generic message, as there may be all sorts of
+                # Let's just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages
                 # per alias creation rule?
                 raise SynapseError(403, "Not allowed to create alias")
@@ -461,7 +461,7 @@ class DirectoryHandler:
             if not self.config.roomdirectory.is_publishing_room_allowed(
                 user_id, room_id, room_aliases
             ):
-                # Lets just return a generic message, as there may be all sorts of
+                # Let's just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages
                 # per alias creation rule?
                 raise SynapseError(403, "Not allowed to publish room")

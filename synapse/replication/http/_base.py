@@ -17,7 +17,7 @@ import logging
 import re
 import urllib
 from inspect import signature
-from typing import TYPE_CHECKING, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Tuple
 
 from prometheus_client import Counter, Gauge
 
@@ -156,7 +156,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         pass
 
     @classmethod
-    def make_client(cls, hs):
+    def make_client(cls, hs: "HomeServer"):
         """Create a client that makes requests.
 
         Returns a callable that accepts the same parameters as
@@ -208,7 +208,9 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                     url_args.append(txn_id)
 
                 if cls.METHOD == "POST":
-                    request_func = client.post_json_get_json
+                    request_func: Callable[
+                        ..., Awaitable[Any]
+                    ] = client.post_json_get_json
                 elif cls.METHOD == "PUT":
                     request_func = client.put_json
                 elif cls.METHOD == "GET":

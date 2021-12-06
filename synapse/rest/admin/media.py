@@ -40,7 +40,7 @@ class QuarantineMediaInRoom(RestServlet):
     """
 
     PATTERNS = [
-        *admin_patterns("/room/(?P<room_id>[^/]+)/media/quarantine"),
+        *admin_patterns("/room/(?P<room_id>[^/]+)/media/quarantine$"),
         # This path kept around for legacy reasons
         *admin_patterns("/quarantine_media/(?P<room_id>[^/]+)"),
     ]
@@ -70,7 +70,7 @@ class QuarantineMediaByUser(RestServlet):
     this server.
     """
 
-    PATTERNS = admin_patterns("/user/(?P<user_id>[^/]+)/media/quarantine")
+    PATTERNS = admin_patterns("/user/(?P<user_id>[^/]+)/media/quarantine$")
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
@@ -199,7 +199,7 @@ class UnprotectMediaByID(RestServlet):
 class ListMediaInRoom(RestServlet):
     """Lists all of the media in a given room."""
 
-    PATTERNS = admin_patterns("/room/(?P<room_id>[^/]+)/media")
+    PATTERNS = admin_patterns("/room/(?P<room_id>[^/]+)/media$")
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
@@ -219,7 +219,7 @@ class ListMediaInRoom(RestServlet):
 
 
 class PurgeMediaCacheRestServlet(RestServlet):
-    PATTERNS = admin_patterns("/purge_media_cache")
+    PATTERNS = admin_patterns("/purge_media_cache$")
 
     def __init__(self, hs: "HomeServer"):
         self.media_repository = hs.get_media_repository()
@@ -230,6 +230,20 @@ class PurgeMediaCacheRestServlet(RestServlet):
 
         before_ts = parse_integer(request, "before_ts", required=True)
         logger.info("before_ts: %r", before_ts)
+
+        if before_ts < 0:
+            raise SynapseError(
+                400,
+                "Query parameter before_ts must be a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+        elif before_ts < 30000000000:  # Dec 1970 in milliseconds, Aug 2920 in seconds
+            raise SynapseError(
+                400,
+                "Query parameter before_ts you provided is from the year 1970. "
+                + "Double check that you are providing a timestamp in milliseconds.",
+                errcode=Codes.INVALID_PARAM,
+            )
 
         ret = await self.media_repository.delete_old_remote_media(before_ts)
 
@@ -271,7 +285,7 @@ class DeleteMediaByDateSize(RestServlet):
     timestamp and size.
     """
 
-    PATTERNS = admin_patterns("/media/(?P<server_name>[^/]+)/delete")
+    PATTERNS = admin_patterns("/media/(?P<server_name>[^/]+)/delete$")
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
@@ -291,7 +305,14 @@ class DeleteMediaByDateSize(RestServlet):
         if before_ts < 0:
             raise SynapseError(
                 400,
-                "Query parameter before_ts must be a string representing a positive integer.",
+                "Query parameter before_ts must be a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+        elif before_ts < 30000000000:  # Dec 1970 in milliseconds, Aug 2920 in seconds
+            raise SynapseError(
+                400,
+                "Query parameter before_ts you provided is from the year 1970. "
+                + "Double check that you are providing a timestamp in milliseconds.",
                 errcode=Codes.INVALID_PARAM,
             )
         if size_gt < 0:

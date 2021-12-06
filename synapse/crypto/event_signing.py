@@ -100,7 +100,7 @@ def compute_content_hash(
 
 
 def compute_event_reference_hash(
-    event, hash_algorithm: Hasher = hashlib.sha256
+    event: EventBase, hash_algorithm: Hasher = hashlib.sha256
 ) -> Tuple[str, bytes]:
     """Computes the event reference hash. This is the hash of the redacted
     event.

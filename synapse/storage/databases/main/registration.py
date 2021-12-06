@@ -23,7 +23,11 @@ import attr
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidationError
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.types import Cursor
@@ -38,6 +42,13 @@ if TYPE_CHECKING:
 THIRTY_MINUTES_IN_MS = 30 * 60 * 1000
 
 logger = logging.getLogger(__name__)
+
+
+class ExternalIDReuseException(Exception):
+    """Exception if writing an external id for a user fails,
+    because this external id is given to an other user."""
+
+    pass
 
 
 @attr.s(frozen=True, slots=True)
@@ -568,6 +579,24 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         await self.db_pool.runInteraction("set_shadow_banned", set_shadow_banned_txn)
 
+    async def set_user_type(self, user: UserID, user_type: Optional[UserTypes]) -> None:
+        """Sets the user type.
+
+        Args:
+            user: user ID of the user.
+            user_type: type of the user or None for a user without a type.
+        """
+
+        def set_user_type_txn(txn):
+            self.db_pool.simple_update_one_txn(
+                txn, "users", {"name": user.to_string()}, {"user_type": user_type}
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_user_by_id, (user.to_string(),)
+            )
+
+        await self.db_pool.runInteraction("set_user_type", set_user_type_txn)
+
     def _query_for_auth(self, txn, token: str) -> Optional[TokenLookupResult]:
         sql = """
             SELECT users.name as user_id,
@@ -668,24 +697,44 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             auth_provider: identifier for the remote auth provider
             external_id: id on that system
             user_id: complete mxid that it is mapped to
+        Raises:
+            ExternalIDReuseException if the new external_id could not be mapped.
         """
-        await self.db_pool.simple_insert(
+
+        try:
+            await self.db_pool.runInteraction(
+                "record_user_external_id",
+                self._record_user_external_id_txn,
+                auth_provider,
+                external_id,
+                user_id,
+            )
+        except self.database_engine.module.IntegrityError:
+            raise ExternalIDReuseException()
+
+    def _record_user_external_id_txn(
+        self,
+        txn: LoggingTransaction,
+        auth_provider: str,
+        external_id: str,
+        user_id: str,
+    ) -> None:
+
+        self.db_pool.simple_insert_txn(
+            txn,
             table="user_external_ids",
             values={
                 "auth_provider": auth_provider,
                 "external_id": external_id,
                 "user_id": user_id,
             },
-            desc="record_user_external_id",
         )
 
     async def remove_user_external_id(
         self, auth_provider: str, external_id: str, user_id: str
     ) -> None:
         """Remove a mapping from an external user id to a mxid
-
         If the mapping is not found, this method does nothing.
-
         Args:
             auth_provider: identifier for the remote auth provider
             external_id: id on that system
@@ -700,6 +749,60 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             },
             desc="remove_user_external_id",
         )
+
+    async def replace_user_external_id(
+        self,
+        record_external_ids: List[Tuple[str, str]],
+        user_id: str,
+    ) -> None:
+        """Replace mappings from external user ids to a mxid in a single transaction.
+        All mappings are deleted and the new ones are created.
+
+        Args:
+            record_external_ids:
+                List with tuple of auth_provider and external_id to record
+            user_id: complete mxid that it is mapped to
+        Raises:
+            ExternalIDReuseException if the new external_id could not be mapped.
+        """
+
+        def _remove_user_external_ids_txn(
+            txn: LoggingTransaction,
+            user_id: str,
+        ) -> None:
+            """Remove all mappings from external user ids to a mxid
+            If these mappings are not found, this method does nothing.
+
+            Args:
+                user_id: complete mxid that it is mapped to
+            """
+
+            self.db_pool.simple_delete_txn(
+                txn,
+                table="user_external_ids",
+                keyvalues={"user_id": user_id},
+            )
+
+        def _replace_user_external_id_txn(
+            txn: LoggingTransaction,
+        ):
+            _remove_user_external_ids_txn(txn, user_id)
+
+            for auth_provider, external_id in record_external_ids:
+                self._record_user_external_id_txn(
+                    txn,
+                    auth_provider,
+                    external_id,
+                    user_id,
+                )
+
+        try:
+            await self.db_pool.runInteraction(
+                "replace_user_external_id",
+                _replace_user_external_id_txn,
+            )
+        except self.database_engine.module.IntegrityError:
+            raise ExternalIDReuseException()
 
     async def get_user_by_external_id(
         self, auth_provider: str, external_id: str
@@ -2317,7 +2420,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                     # accident.
                     row = {"client_secret": None, "validated_at": None}
                 else:
-                    raise ThreepidValidationError(400, "Unknown session_id")
+                    raise ThreepidValidationError("Unknown session_id")
 
             retrieved_client_secret = row["client_secret"]
             validated_at = row["validated_at"]
@@ -2332,14 +2435,14 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
 
             if not row:
                 raise ThreepidValidationError(
-                    400, "Validation token not found or has expired"
+                    "Validation token not found or has expired"
                 )
             expires = row["expires"]
             next_link = row["next_link"]
 
             if retrieved_client_secret != client_secret:
                 raise ThreepidValidationError(
-                    400, "This client_secret does not match the provided session_id"
+                    "This client_secret does not match the provided session_id"
                 )
 
             # If the session is already validated, no need to revalidate
@@ -2348,7 +2451,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
 
             if expires <= current_ts:
                 raise ThreepidValidationError(
-                    400, "This token has expired. Please request a new one"
+                    "This token has expired. Please request a new one"
                 )
 
             # Looks good. Validate the session

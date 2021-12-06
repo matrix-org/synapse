@@ -10,6 +10,8 @@ The available third party rules callbacks are:
 
 ### `check_event_allowed`
 
+_First introduced in Synapse v1.39.0_
+
 ```python
 async def check_event_allowed(
     event: "synapse.events.EventBase",
@@ -44,7 +46,14 @@ dictionary, and modify the returned dictionary accordingly.
 Note that replacing the event only works for events sent by local users, not for events
 received over federation.
 
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
 ### `on_create_room`
+
+_First introduced in Synapse v1.39.0_
 
 ```python
 async def on_create_room(
@@ -63,7 +72,15 @@ the request is a server admin.
 Modules can modify the `request_content` (by e.g. adding events to its `initial_state`),
 or deny the room's creation by raising a `module_api.errors.SynapseError`.
 
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns without raising an exception, Synapse falls through to the next one. The
+room creation will be forbidden as soon as one of the callbacks raises an exception. If
+this happens, Synapse will not call any of the subsequent implementations of this
+callback.
+
 ### `check_threepid_can_be_invited`
+
+_First introduced in Synapse v1.39.0_
 
 ```python
 async def check_threepid_can_be_invited(
@@ -76,7 +93,14 @@ async def check_threepid_can_be_invited(
 Called when processing an invite via a third-party identifier (i.e. email or phone number).
 The module must return a boolean indicating whether the invite can go through.
 
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
 ### `check_visibility_can_be_modified`
+
+_First introduced in Synapse v1.39.0_
 
 ```python
 async def check_visibility_can_be_modified(
@@ -89,6 +113,11 @@ async def check_visibility_can_be_modified(
 Called when changing the visibility of a room in the local public room directory. The
 visibility is a string that's either "public" or "private". The module must return a
 boolean indicating whether the change can go through.
+
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
 
 ## Example
 

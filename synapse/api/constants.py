@@ -176,6 +176,7 @@ class RelationTypes:
     ANNOTATION = "m.annotation"
     REPLACE = "m.replace"
     REFERENCE = "m.reference"
+    THREAD = "io.element.thread"
 
 
 class LimitBlockingTypes:

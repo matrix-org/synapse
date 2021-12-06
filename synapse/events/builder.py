@@ -90,13 +90,13 @@ class EventBuilder:
     )
 
     @property
-    def state_key(self):
+    def state_key(self) -> str:
         if self._state_key is not None:
             return self._state_key
 
         raise AttributeError("state_key")
 
-    def is_state(self):
+    def is_state(self) -> bool:
         return self._state_key is not None
 
     async def build(

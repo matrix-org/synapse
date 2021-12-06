@@ -86,19 +86,22 @@ class PaginationHandler:
         self._event_serializer = hs.get_event_client_serializer()
 
         self._retention_default_max_lifetime = (
-            hs.config.server.retention_default_max_lifetime
+            hs.config.retention.retention_default_max_lifetime
         )
 
         self._retention_allowed_lifetime_min = (
-            hs.config.server.retention_allowed_lifetime_min
+            hs.config.retention.retention_allowed_lifetime_min
         )
         self._retention_allowed_lifetime_max = (
-            hs.config.server.retention_allowed_lifetime_max
+            hs.config.retention.retention_allowed_lifetime_max
         )
 
-        if hs.config.worker.run_background_tasks and hs.config.server.retention_enabled:
+        if (
+            hs.config.worker.run_background_tasks
+            and hs.config.retention.retention_enabled
+        ):
             # Run the purge jobs described in the configuration file.
-            for job in hs.config.server.retention_purge_jobs:
+            for job in hs.config.retention.retention_purge_jobs:
                 logger.info("Setting up purge job with config: %s", job)
 
                 self.clock.looping_call(

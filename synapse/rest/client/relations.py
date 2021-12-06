@@ -128,9 +128,10 @@ class RelationSendServlet(RestServlet):
 
         content["m.relates_to"] = {
             "event_id": parent_id,
-            "key": aggregation_key,
             "rel_type": relation_type,
         }
+        if aggregation_key is not None:
+            content["m.relates_to"]["key"] = aggregation_key
 
         event_dict = {
             "type": event_type,
@@ -232,12 +233,12 @@ class RelationPaginationServlet(RestServlet):
         # Similarly, we don't allow relations to be applied to relations, so we
         # return the original relations without any aggregations on top of them
         # here.
-        events = await self._event_serializer.serialize_events(
+        serialized_events = await self._event_serializer.serialize_events(
             events, now, bundle_aggregations=False
         )
 
         return_value = pagination_chunk.to_dict()
-        return_value["chunk"] = events
+        return_value["chunk"] = serialized_events
         return_value["original_event"] = original_event
 
         return 200, return_value
@@ -416,10 +417,10 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
         )
 
         now = self.clock.time_msec()
-        events = await self._event_serializer.serialize_events(events, now)
+        serialized_events = await self._event_serializer.serialize_events(events, now)
 
         return_value = result.to_dict()
-        return_value["chunk"] = events
+        return_value["chunk"] = serialized_events
 
         return 200, return_value
 
