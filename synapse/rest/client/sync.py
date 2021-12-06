@@ -546,8 +546,8 @@ class SyncRestServlet(RestServlet):
 
         # No need to bundle aggregations for state events.
         serialized_state = await serialize(state_events, bundle_aggregations=False)
-        # Only bundle aggregations if the room is limited, as clients could be
-        # missing events.
+        # Don't bother to bundle aggregations if the timeline is unlimited, as
+        # clients will have all the necessary information.
         serialized_timeline = await serialize(
             timeline_events, bundle_aggregations=room.timeline.limited
         )
