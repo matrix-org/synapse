@@ -834,7 +834,7 @@ class RoomSummaryHandler:
 
                     # The results over federation might include rooms that the we,
                     # as the requesting server, are allowed to see, but the requesting
-                    # user is not permitted see.
+                    # user is not permitted to see.
                     #
                     # Filter the returned results to only what is accessible to the user.
                     if await self._is_remote_room_accessible(
