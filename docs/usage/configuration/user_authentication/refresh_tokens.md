@@ -101,31 +101,35 @@ obtained from logging in or from refreshing), so won't apply retroactively.
 If you'd like to force sessions to be logged out upon inactivity, you can enable
 refreshable access token expiry and refresh token expiry.
 
-Assuming that clients keep their access token valid whilst they are active, and
-that you set `refresh_token_lifetime` to some value *R* and
-`refreshable_access_token_lifetime` to some value *A* (which is not bigger than *R*),
-then:
- 1. sessions may become logged out if they are inactive for more than *R - A*.
-    (Explanation: if a client goes offline just before it was about to refresh its
-    access token, then it must come online before the refresh token expires.)
- 2. sessions will always become logged out if they are inactive for more than *R*.
-    (Explanation: if a client refreshes its access token just before going offline,
-    then returns just before the refresh token expires, it will be able to continue
-    its session.)
+This works because a client must refresh at least once within a period of
+`refresh_token_lifetime` in order to maintain valid credentials to access the
+account.
 
-Clients are able to refresh more frequently than strictly necessary in order to
-avoid the case described by point (1) above.
-
-As an example, if refresh tokens are configured to expire after 20 minutes and
-access tokens are configured to expire after 5 minutes, then sessions will definitely
-end if inactive for 20 minutes, but may end if inactive for as few as 15 minutes.
-
+(It's suggested that `refresh_token_lifetime` should be longer than
+`refreshable_access_token_lifetime` and this section assumes that to be the case
+for simplicity.)
 
 Note: this will only affect sessions using refresh tokens. You may wish to
 set a short `nonrefreshable_access_token_lifetime` to prevent this being bypassed
 by clients that do not support refresh tokens.
 
 
-## Diagram
+#### Choosing values that guarantee permitting some inactivity
 
+It may be desirable to permit some short periods of inactivity, for example to
+accommodate brief outages in client connectivity.
 
+The following model aims to provide guidance for choosing `refresh_token_lifetime`
+and `refreshable_access_token_lifetime` to satisfy requirements of the form:
+
+1. inactivity longer than `L` **MUST** cause the session to be logged out; and
+2. inactivity shorter than `S` **MUST NOT** cause the session to be logged out.
+
+This model makes the weakest assumption that all active clients will refresh as
+needed to maintain an active access token, but no sooner.
+*In reality, clients may refresh more often than this model assumes, but the
+above requirements will still hold.*
+
+To satisfy the above model,
+* `refresh_token_lifetime` should be set to `L`; and
+* `refreshable_access_token_lifetime` should be set to `L - S`.
