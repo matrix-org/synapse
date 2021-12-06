@@ -167,6 +167,8 @@ class InitialSyncHandler:
                 d["invite"] = await self._event_serializer.serialize_event(
                     invite_event,
                     time_now,
+                    # Don't bundle aggregations as this is a deprecated API.
+                    bundle_aggregations=False,
                     as_client_event=as_client_event,
                 )
 
@@ -232,7 +234,7 @@ class InitialSyncHandler:
                 d["state"] = await self._event_serializer.serialize_events(
                     current_state.values(),
                     time_now=time_now,
-                    # No need to bundle aggregations for state events.
+                    # Don't bundle aggregations as this is a deprecated API.
                     bundle_aggregations=False,
                     as_client_event=as_client_event,
                 )
@@ -383,7 +385,7 @@ class InitialSyncHandler:
                 "end": await end_token.to_string(self.store),
             },
             "state": (
-                # No need to bundle aggregations for state events.
+                # Don't bundle aggregations as this is a deprecated API.
                 await self._event_serializer.serialize_events(
                     room_state.values(), time_now, bundle_aggregations=False
                 )
@@ -404,7 +406,7 @@ class InitialSyncHandler:
 
         # TODO: These concurrently
         time_now = self.clock.time_msec()
-        # No need to bundle aggregations for state events.
+        # Don't bundle aggregations as this is a deprecated API.
         state = await self._event_serializer.serialize_events(
             current_state.values(), time_now, bundle_aggregations=False
         )

@@ -404,7 +404,7 @@ class EventClientSerializer:
             event: The event being serialized.
             time_now: The current time in milliseconds
             bundle_aggregations: Whether to include the bundled aggregations for this
-                event.
+                event. Only applies to non-state events.
             **kwargs: Arguments to pass to `serialize_event`
 
         Returns:
@@ -416,10 +416,13 @@ class EventClientSerializer:
 
         serialized_event = serialize_event(event, time_now, **kwargs)
 
-        # If MSC1849 is enabled then we need to look if there are any relation
-        # aggregations we need to bundle in with the event.
-        # Do not bundle aggregations if the event has been redacted or if the event
-        # is a state event.
+        # Check if there are any bundled aggregations to include with the event.
+        #
+        # Do not bundle aggregations if any of the following at true:
+        #
+        # * Support is disabled via the configuration or the caller.
+        # * The event is a state event.
+        # * The event has been redacted.
         if (
             self._msc1849_enabled
             and bundle_aggregations
