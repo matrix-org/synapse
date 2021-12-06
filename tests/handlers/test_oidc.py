@@ -503,6 +503,36 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.provider._fetch_userinfo.assert_called_once_with(token)
         self.render_error.assert_not_called()
 
+        # With an ID token, userinfo fetching and sid in the ID token
+        self.provider._user_profile_method = "userinfo_endpoint"
+        token = {
+            "type": "bearer",
+            "access_token": "access_token",
+            "id_token": "id_token",
+        }
+        id_token = {
+            "sid": "abcdefgh",
+        }
+        self.provider._parse_id_token = simple_async_mock(return_value=id_token)
+        self.provider._exchange_code = simple_async_mock(return_value=token)
+        auth_handler.complete_sso_login.reset_mock()
+        self.provider._fetch_userinfo.reset_mock()
+        self.get_success(self.handler.handle_oidc_callback(request))
+
+        auth_handler.complete_sso_login.assert_called_once_with(
+            expected_user_id,
+            "oidc",
+            request,
+            client_redirect_url,
+            None,
+            new_user=False,
+            auth_provider_session_id=id_token["sid"],
+        )
+        self.provider._exchange_code.assert_called_once_with(code)
+        self.provider._parse_id_token.assert_called_once_with(token, nonce=nonce)
+        self.provider._fetch_userinfo.assert_called_once_with(token)
+        self.render_error.assert_not_called()
+
         # Handle userinfo fetching error
         self.provider._fetch_userinfo = simple_async_mock(raises=Exception())
         self.get_success(self.handler.handle_oidc_callback(request))
