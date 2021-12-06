@@ -80,7 +80,7 @@ The following fields are returned in the JSON response body:
     the remote server before trying again, in ms. This is `0` if no further retrying occuring.
   - `failure_ts` - nullable integer - The first time Synapse tried and failed to reach the
     remote server, in ms. This is `null` if communication with the remote server has never failed.
-  - `last_successful_stream_ordering` - integer - The stream ordering of the most
+  - `last_successful_stream_ordering` - nullable integer - The stream ordering of the most
     recent successfully-sent [PDU](understanding_synapse_through_grafana_graphs.md#federation)
     to this destination, or `null` if this information has not been tracked yet.
 - `next_token`: string representing a positive integer - Indication for pagination. See above.
