@@ -106,7 +106,7 @@ class StateGroupStore:
         }
 
     async def get_state_group_delta(self, name):
-        return (None, None)
+        return None, None
 
     def register_events(self, events):
         for e in events:

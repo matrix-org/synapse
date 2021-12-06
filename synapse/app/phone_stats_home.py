@@ -131,10 +131,12 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     log_level = synapse_logger.getEffectiveLevel()
     stats["log_level"] = logging.getLevelName(log_level)
 
-    logger.info("Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats))
+    logger.info(
+        "Reporting stats to %s: %s" % (hs.config.metrics.report_stats_endpoint, stats)
+    )
     try:
         await hs.get_proxied_http_client().put_json(
-            hs.config.report_stats_endpoint, stats
+            hs.config.metrics.report_stats_endpoint, stats
         )
     except Exception as e:
         logger.warning("Error reporting stats: %s", e)
@@ -188,7 +190,7 @@ def start_phone_stats_home(hs):
         clock.looping_call(generate_monthly_active_users, 5 * 60 * 1000)
     # End of monthly active user settings
 
-    if hs.config.report_stats:
+    if hs.config.metrics.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
         clock.looping_call(phone_stats_home, 3 * 60 * 60 * 1000, hs, stats)
 

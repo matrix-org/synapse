@@ -25,6 +25,7 @@ from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
+from synapse.events.snapshot import EventContext
 from synapse.types import StateMap, get_domain_from_id
 from synapse.util.metrics import Measure
 
@@ -45,7 +46,11 @@ class EventAuthHandler:
         self._server_name = hs.hostname
 
     async def check_from_context(
-        self, room_version: str, event, context, do_sig_check=True
+        self,
+        room_version: str,
+        event: EventBase,
+        context: EventContext,
+        do_sig_check: bool = True,
     ) -> None:
         auth_event_ids = event.auth_event_ids()
         auth_events_by_id = await self._store.get_events(auth_event_ids)

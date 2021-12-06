@@ -288,7 +288,7 @@ Quick start
 
 Before setting up a development environment for synapse, make sure you have the
 system dependencies (such as the python header files) installed - see
-`Installing from source <https://matrix-org.github.io/synapse/latest/setup/installation.html#installing-from-source>`_.
+`Platform-specific prerequisites <https://matrix-org.github.io/synapse/latest/setup/installation.html#platform-specific-prerequisites>`_.
 
 To check out a synapse for development, clone the git repo into a working
 directory of your choice::

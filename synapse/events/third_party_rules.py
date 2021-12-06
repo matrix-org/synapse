@@ -42,10 +42,10 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
     """Wrapper that loads a third party event rules module configured using the old
     configuration, and registers the hooks they implement.
     """
-    if hs.config.third_party_event_rules is None:
+    if hs.config.thirdpartyrules.third_party_event_rules is None:
         return
 
-    module, config = hs.config.third_party_event_rules
+    module, config = hs.config.thirdpartyrules.third_party_event_rules
 
     api = hs.get_module_api()
     third_party_rules = module(config=config, module_api=api)

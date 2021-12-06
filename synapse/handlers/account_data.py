@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import random
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING, Collection, List, Optional, Tuple
 
 from synapse.replication.http.account_data import (
     ReplicationAddTagRestServlet,
@@ -21,6 +21,7 @@ from synapse.replication.http.account_data import (
     ReplicationRoomAccountDataRestServlet,
     ReplicationUserAccountDataRestServlet,
 )
+from synapse.streams import EventSource
 from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
@@ -163,7 +164,7 @@ class AccountDataHandler:
             return response["max_stream_id"]
 
 
-class AccountDataEventSource:
+class AccountDataEventSource(EventSource[int, JsonDict]):
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
 
@@ -171,7 +172,13 @@ class AccountDataEventSource:
         return self.store.get_max_account_data_stream_id()
 
     async def get_new_events(
-        self, user: UserID, from_key: int, **kwargs
+        self,
+        user: UserID,
+        from_key: int,
+        limit: Optional[int],
+        room_ids: Collection[str],
+        is_guest: bool,
+        explicit_room_id: Optional[str] = None,
     ) -> Tuple[List[JsonDict], int]:
         user_id = user.to_string()
         last_stream_id = from_key

@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
 from synapse.api.constants import ReadReceiptEventFields
 from synapse.appservice import ApplicationService
 from synapse.handlers._base import BaseHandler
+from synapse.streams import EventSource
 from synapse.types import JsonDict, ReadReceipt, UserID, get_domain_from_id
 
 if TYPE_CHECKING:
@@ -162,7 +163,7 @@ class ReceiptsHandler(BaseHandler):
             await self.federation_sender.send_read_receipt(receipt)
 
 
-class ReceiptEventSource:
+class ReceiptEventSource(EventSource[int, JsonDict]):
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self.config = hs.config
@@ -216,7 +217,13 @@ class ReceiptEventSource:
         return visible_events
 
     async def get_new_events(
-        self, from_key: int, room_ids: List[str], user: UserID, **kwargs
+        self,
+        user: UserID,
+        from_key: int,
+        limit: Optional[int],
+        room_ids: Iterable[str],
+        is_guest: bool,
+        explicit_room_id: Optional[str] = None,
     ) -> Tuple[List[JsonDict], int]:
         from_key = int(from_key)
         to_key = self.get_current_key()
@@ -231,7 +238,7 @@ class ReceiptEventSource:
         if self.config.experimental.msc2285_enabled:
             events = ReceiptEventSource.filter_out_hidden(events, user.to_string())
 
-        return (events, to_key)
+        return events, to_key
 
     async def get_new_events_as(
         self, from_key: int, service: ApplicationService
@@ -263,7 +270,7 @@ class ReceiptEventSource:
 
             events.append(event)
 
-        return (events, to_key)
+        return events, to_key
 
     def get_current_key(self, direction: str = "f") -> int:
         return self.store.get_max_receipt_stream_id()

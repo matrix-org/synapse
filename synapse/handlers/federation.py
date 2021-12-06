@@ -27,7 +27,12 @@ from unpaddedbase64 import decode_base64
 from twisted.internet import defer
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, RejectedReason
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    Membership,
+    RejectedReason,
+)
 from synapse.api.errors import (
     AuthError,
     CodeMessageException,
@@ -91,7 +96,7 @@ class FederationHandler(BaseHandler):
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
-        self._server_notices_mxid = hs.config.server_notices_mxid
+        self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self.config = hs.config
         self.http_client = hs.get_proxied_blacklisted_http_client()
         self._replication = hs.get_replication_data_handler()
@@ -593,6 +598,13 @@ class FederationHandler(BaseHandler):
             target_hosts, room_id, knockee, Membership.KNOCK, content, params=params
         )
 
+        # Mark the knock as an outlier as we don't yet have the state at this point in
+        # the DAG.
+        event.internal_metadata.outlier = True
+
+        # ... but tell /sync to send it to clients anyway.
+        event.internal_metadata.out_of_band_membership = True
+
         # Record the room ID and its version so that we have a record of the room
         await self._maybe_store_room_on_outlier_membership(
             room_id=event.room_id, room_version=event_format_version
@@ -617,7 +629,7 @@ class FederationHandler(BaseHandler):
         # in the invitee's sync stream. It is stripped out for all other local users.
         event.unsigned["knock_room_state"] = stripped_room_state["knock_state_events"]
 
-        context = await self.state_handler.compute_event_context(event)
+        context = EventContext.for_outlier()
         stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -705,7 +717,7 @@ class FederationHandler(BaseHandler):
 
                 if include_auth_user_id:
                     event_content[
-                        "join_authorised_via_users_server"
+                        EventContentFields.AUTHORISING_USER
                     ] = await self._event_auth_handler.get_user_which_could_invite(
                         room_id,
                         state_ids,
@@ -807,7 +819,7 @@ class FederationHandler(BaseHandler):
             )
         )
 
-        context = await self.state_handler.compute_event_context(event)
+        context = EventContext.for_outlier()
         await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -836,7 +848,7 @@ class FederationHandler(BaseHandler):
 
         await self.federation_client.send_leave(host_list, event)
 
-        context = await self.state_handler.compute_event_context(event)
+        context = EventContext.for_outlier()
         stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -1108,8 +1120,7 @@ class FederationHandler(BaseHandler):
         events_to_context = {}
         for e in itertools.chain(auth_events, state):
             e.internal_metadata.outlier = True
-            ctx = await self.state_handler.compute_event_context(e)
-            events_to_context[e.event_id] = ctx
+            events_to_context[e.event_id] = EventContext.for_outlier()
 
         event_map = {
             e.event_id: e for e in itertools.chain(auth_events, state, [event])
@@ -1220,136 +1231,6 @@ class FederationHandler(BaseHandler):
         )
 
         return missing_events
-
-    async def construct_auth_difference(
-        self, local_auth: Iterable[EventBase], remote_auth: Iterable[EventBase]
-    ) -> Dict:
-        """Given a local and remote auth chain, find the differences. This
-        assumes that we have already processed all events in remote_auth
-
-        Params:
-            local_auth
-            remote_auth
-
-        Returns:
-            dict
-        """
-
-        logger.debug("construct_auth_difference Start!")
-
-        # TODO: Make sure we are OK with local_auth or remote_auth having more
-        # auth events in them than strictly necessary.
-
-        def sort_fun(ev):
-            return ev.depth, ev.event_id
-
-        logger.debug("construct_auth_difference after sort_fun!")
-
-        # We find the differences by starting at the "bottom" of each list
-        # and iterating up on both lists. The lists are ordered by depth and
-        # then event_id, we iterate up both lists until we find the event ids
-        # don't match. Then we look at depth/event_id to see which side is
-        # missing that event, and iterate only up that list. Repeat.
-
-        remote_list = list(remote_auth)
-        remote_list.sort(key=sort_fun)
-
-        local_list = list(local_auth)
-        local_list.sort(key=sort_fun)
-
-        local_iter = iter(local_list)
-        remote_iter = iter(remote_list)
-
-        logger.debug("construct_auth_difference before get_next!")
-
-        def get_next(it, opt=None):
-            try:
-                return next(it)
-            except Exception:
-                return opt
-
-        current_local = get_next(local_iter)
-        current_remote = get_next(remote_iter)
-
-        logger.debug("construct_auth_difference before while")
-
-        missing_remotes = []
-        missing_locals = []
-        while current_local or current_remote:
-            if current_remote is None:
-                missing_locals.append(current_local)
-                current_local = get_next(local_iter)
-                continue
-
-            if current_local is None:
-                missing_remotes.append(current_remote)
-                current_remote = get_next(remote_iter)
-                continue
-
-            if current_local.event_id == current_remote.event_id:
-                current_local = get_next(local_iter)
-                current_remote = get_next(remote_iter)
-                continue
-
-            if current_local.depth < current_remote.depth:
-                missing_locals.append(current_local)
-                current_local = get_next(local_iter)
-                continue
-
-            if current_local.depth > current_remote.depth:
-                missing_remotes.append(current_remote)
-                current_remote = get_next(remote_iter)
-                continue
-
-            # They have the same depth, so we fall back to the event_id order
-            if current_local.event_id < current_remote.event_id:
-                missing_locals.append(current_local)
-                current_local = get_next(local_iter)
-
-            if current_local.event_id > current_remote.event_id:
-                missing_remotes.append(current_remote)
-                current_remote = get_next(remote_iter)
-                continue
-
-        logger.debug("construct_auth_difference after while")
-
-        # missing locals should be sent to the server
-        # We should find why we are missing remotes, as they will have been
-        # rejected.
-
-        # Remove events from missing_remotes if they are referencing a missing
-        # remote. We only care about the "root" rejected ones.
-        missing_remote_ids = [e.event_id for e in missing_remotes]
-        base_remote_rejected = list(missing_remotes)
-        for e in missing_remotes:
-            for e_id in e.auth_event_ids():
-                if e_id in missing_remote_ids:
-                    try:
-                        base_remote_rejected.remove(e)
-                    except ValueError:
-                        pass
-
-        reason_map = {}
-
-        for e in base_remote_rejected:
-            reason = await self.store.get_rejection_reason(e.event_id)
-            if reason is None:
-                # TODO: e is not in the current state, so we should
-                # construct some proof of that.
-                continue
-
-            reason_map[e.event_id] = reason
-
-        logger.debug("construct_auth_difference returning")
-
-        return {
-            "auth_chain": local_auth,
-            "rejects": {
-                e.event_id: {"reason": reason_map[e.event_id], "proof": None}
-                for e in base_remote_rejected
-            },
-            "missing": [e.event_id for e in missing_locals],
-        }
 
     @log_function
     async def exchange_third_party_invite(
@@ -1493,7 +1374,7 @@ class FederationHandler(BaseHandler):
             builder=builder
         )
         EventValidator().validate_new(event, self.config)
-        return (event, context)
+        return event, context
 
     async def _check_signature(self, event: EventBase, context: EventContext) -> None:
         """

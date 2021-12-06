@@ -58,7 +58,7 @@ class StateDeltasStore(SQLBaseStore):
             # if the CSDs haven't changed between prev_stream_id and now, we
             # know for certain that they haven't changed between prev_stream_id and
             # max_stream_id.
-            return (max_stream_id, [])
+            return max_stream_id, []
 
         def get_current_state_deltas_txn(txn):
             # First we calculate the max stream id that will give us less than

@@ -63,7 +63,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         """Generates current count of monthly active users broken down by service.
         A service is typically an appservice but also includes native matrix users.
         Since the `monthly_active_users` table is populated from the `user_ips` table
-        `config.track_appservice_user_ips` must be set to `true` for this
+        `config.appservice.track_appservice_user_ips` must be set to `true` for this
         method to return anything other than native matrix users.
 
         Returns:

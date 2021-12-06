@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generator
 
 from twisted.web.server import Request
 
@@ -45,7 +45,7 @@ class NewUserConsentResource(DirectServeHtmlResource):
         self._server_name = hs.hostname
         self._consent_version = hs.config.consent.user_consent_version
 
-        def template_search_dirs():
+        def template_search_dirs() -> Generator[str, None, None]:
             if hs.config.server.custom_template_directory:
                 yield hs.config.server.custom_template_directory
             if hs.config.sso.sso_template_dir:
@@ -88,7 +88,7 @@ class NewUserConsentResource(DirectServeHtmlResource):
         html = template.render(template_params)
         respond_with_html(request, 200, html)
 
-    async def _async_render_POST(self, request: Request):
+    async def _async_render_POST(self, request: Request) -> None:
         try:
             session_id = get_username_mapping_session_cookie_from_request(request)
         except SynapseError as e:

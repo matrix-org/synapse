@@ -14,7 +14,7 @@
 
 # When updating these values, please leave a short summary of the changes below.
 
-SCHEMA_VERSION = 63
+SCHEMA_VERSION = 64
 """Represents the expectations made by the codebase about the database schema
 
 This should be incremented whenever the codebase changes its requirements on the
@@ -27,11 +27,22 @@ for more information on how this works.
 Changes in SCHEMA_VERSION = 61:
     - The `user_stats_historical` and `room_stats_historical` tables are not written and
       are not read (previously, they were written but not read).
+    - MSC2716: Add `insertion_events` and `insertion_event_edges` tables to keep track
+      of insertion events in order to navigate historical chunks of messages.
+    - MSC2716: Add `chunk_events` table to track how the chunk is labeled and
+      determines which insertion event it points to.
+
+Changes in SCHEMA_VERSION = 62:
+    - MSC2716: Add `insertion_event_extremities` table that keeps track of which
+      insertion events need to be backfilled.
 
 Changes in SCHEMA_VERSION = 63:
     - The `public_room_list_stream` table is not written nor read to
       (previously, it was written and read to, but not for any significant purpose).
       https://github.com/matrix-org/synapse/pull/10565
+
+Changes in SCHEMA_VERSION = 64:
+    - MSC2716: Rename related tables and columns from "chunks" to "batches".
 """
 
 

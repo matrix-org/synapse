@@ -154,7 +154,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.json_body["errcode"], "M_FORBIDDEN")
 
     def test_POST_guest_registration(self):
-        self.hs.config.macaroon_secret_key = "test"
+        self.hs.config.key.macaroon_secret_key = "test"
         self.hs.config.allow_guest_access = True
 
         channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")

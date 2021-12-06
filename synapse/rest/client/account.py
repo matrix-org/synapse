@@ -65,17 +65,17 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         self.config = hs.config
         self.identity_handler = hs.get_identity_handler()
 
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(
                 hs=self.hs,
-                app_name=self.config.email_app_name,
-                template_html=self.config.email_password_reset_template_html,
-                template_text=self.config.email_password_reset_template_text,
+                app_name=self.config.email.email_app_name,
+                template_html=self.config.email.email_password_reset_template_html,
+                template_text=self.config.email.email_password_reset_template_text,
             )
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if self.config.local_threepid_handling_disabled_due_to_email_config:
+        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self.config.email.local_threepid_handling_disabled_due_to_email_config:
                 logger.warning(
                     "User password resets have been disabled due to lack of email config"
                 )
@@ -130,7 +130,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             assert self.hs.config.account_threepid_delegate_email
 
             # Have the configured identity server handle the request
@@ -358,17 +358,17 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         self.identity_handler = hs.get_identity_handler()
         self.store = self.hs.get_datastore()
 
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(
                 hs=self.hs,
-                app_name=self.config.email_app_name,
-                template_html=self.config.email_add_threepid_template_html,
-                template_text=self.config.email_add_threepid_template_text,
+                app_name=self.config.email.email_app_name,
+                template_html=self.config.email.email_add_threepid_template_html,
+                template_text=self.config.email.email_add_threepid_template_text,
             )
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if self.config.local_threepid_handling_disabled_due_to_email_config:
+        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self.config.email.local_threepid_handling_disabled_due_to_email_config:
                 logger.warning(
                     "Adding emails have been disabled due to lack of an email config"
                 )
@@ -422,7 +422,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
 
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             assert self.hs.config.account_threepid_delegate_email
 
             # Have the configured identity server handle the request
@@ -543,21 +543,21 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
         self.config = hs.config
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self._failure_email_template = (
-                self.config.email_add_threepid_template_failure_html
+                self.config.email.email_add_threepid_template_failure_html
             )
 
     async def on_GET(self, request: Request) -> None:
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if self.config.local_threepid_handling_disabled_due_to_email_config:
+        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self.config.email.local_threepid_handling_disabled_due_to_email_config:
                 logger.warning(
                     "Adding emails have been disabled due to lack of an email config"
                 )
             raise SynapseError(
                 400, "Adding an email to your account is disabled on this server"
             )
-        elif self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+        elif self.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             raise SynapseError(
                 400,
                 "This homeserver is not validating threepids. Use an identity server "
@@ -584,7 +584,7 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
                 return None
 
             # Otherwise show the success template
-            html = self.config.email_add_threepid_template_success_html_content
+            html = self.config.email.email_add_threepid_template_success_html_content
             status_code = 200
         except ThreepidValidationError as e:
             status_code = e.code

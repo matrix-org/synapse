@@ -88,8 +88,8 @@ def start_worker_reactor(appname, config, run_command=reactor.run):
         appname,
         soft_file_limit=config.soft_file_limit,
         gc_thresholds=config.gc_thresholds,
-        pid_file=config.worker_pid_file,
-        daemonize=config.worker_daemonize,
+        pid_file=config.worker.worker_pid_file,
+        daemonize=config.worker.worker_daemonize,
         print_pidfile=config.print_pidfile,
         logger=logger,
         run_command=run_command,
@@ -424,12 +424,14 @@ def setup_sentry(hs):
         hs (synapse.server.HomeServer)
     """
 
-    if not hs.config.sentry_enabled:
+    if not hs.config.metrics.sentry_enabled:
         return
 
     import sentry_sdk
 
-    sentry_sdk.init(dsn=hs.config.sentry_dsn, release=get_version_string(synapse))
+    sentry_sdk.init(
+        dsn=hs.config.metrics.sentry_dsn, release=get_version_string(synapse)
+    )
 
     # We set some default tags that give some context to this instance
     with sentry_sdk.configure_scope() as scope:

@@ -73,6 +73,7 @@ class DeferredCache(Generic[KT, VT]):
         tree: bool = False,
         iterable: bool = False,
         apply_cache_factor_from_config: bool = True,
+        prune_unread_entries: bool = True,
     ):
         """
         Args:
@@ -105,6 +106,7 @@ class DeferredCache(Generic[KT, VT]):
             size_callback=(lambda d: len(d) or 1) if iterable else None,
             metrics_collection_callback=metrics_cb,
             apply_cache_factor_from_config=apply_cache_factor_from_config,
+            prune_unread_entries=prune_unread_entries,
         )
 
         self.thread: Optional[threading.Thread] = None

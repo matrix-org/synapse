@@ -555,8 +555,11 @@ class ClientIpStore(ClientIpWorkerStore):
         return ret
 
     async def get_user_ip_and_agents(
-        self, user: UserID
+        self, user: UserID, since_ts: int = 0
     ) -> List[Dict[str, Union[str, int]]]:
+        """
+        Fetch IP/User Agent connection since a given timestamp.
+        """
         user_id = user.to_string()
         results = {}
 
@@ -568,18 +571,28 @@ class ClientIpStore(ClientIpWorkerStore):
             ) = key
             if uid == user_id:
                 user_agent, _, last_seen = self._batch_row_update[key]
-                results[(access_token, ip)] = (user_agent, last_seen)
+                if last_seen >= since_ts:
+                    results[(access_token, ip)] = (user_agent, last_seen)
 
-        rows = await self.db_pool.simple_select_list(
-            table="user_ips",
-            keyvalues={"user_id": user_id},
-            retcols=["access_token", "ip", "user_agent", "last_seen"],
-            desc="get_user_ip_and_agents",
+        def get_recent(txn):
+            txn.execute(
+                """
+                SELECT access_token, ip, user_agent, last_seen FROM user_ips
+                WHERE last_seen >= ? AND user_id = ?
+                ORDER BY last_seen
+                DESC
+                """,
+                (since_ts, user_id),
+            )
+            return txn.fetchall()
+
+        rows = await self.db_pool.runInteraction(
+            desc="get_user_ip_and_agents", func=get_recent
         )
 
         results.update(
-            ((row["access_token"], row["ip"]), (row["user_agent"], row["last_seen"]))
-            for row in rows
+            ((access_token, ip), (user_agent, last_seen))
+            for access_token, ip, user_agent, last_seen in rows
         )
         return [
             {

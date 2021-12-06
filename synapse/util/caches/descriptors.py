@@ -258,6 +258,7 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
         tree=False,
         cache_context=False,
         iterable=False,
+        prune_unread_entries: bool = True,
     ):
         super().__init__(orig, num_args=num_args, cache_context=cache_context)
 
@@ -269,6 +270,7 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
         self.max_entries = max_entries
         self.tree = tree
         self.iterable = iterable
+        self.prune_unread_entries = prune_unread_entries
 
     def __get__(self, obj, owner):
         cache: DeferredCache[CacheKey, Any] = DeferredCache(
@@ -276,6 +278,7 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
             max_entries=self.max_entries,
             tree=self.tree,
             iterable=self.iterable,
+            prune_unread_entries=self.prune_unread_entries,
         )
 
         get_cache_key = self.cache_key_builder
@@ -507,6 +510,7 @@ def cached(
     tree: bool = False,
     cache_context: bool = False,
     iterable: bool = False,
+    prune_unread_entries: bool = True,
 ) -> Callable[[F], _CachedFunction[F]]:
     func = lambda orig: DeferredCacheDescriptor(
         orig,
@@ -515,6 +519,7 @@ def cached(
         tree=tree,
         cache_context=cache_context,
         iterable=iterable,
+        prune_unread_entries=prune_unread_entries,
     )
 
     return cast(Callable[[F], _CachedFunction[F]], func)

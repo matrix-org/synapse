@@ -15,9 +15,12 @@
 
 from unittest.mock import Mock
 
+from parameterized import parameterized
+
 import synapse.rest.admin
 from synapse.http.site import XForwardedForRequest
 from synapse.rest.client import login
+from synapse.types import UserID
 
 from tests import unittest
 from tests.server import make_request
@@ -140,6 +143,37 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
                     "device_id": None,
                     "last_seen": 12345878000,
                 }
+            ],
+        )
+
+    @parameterized.expand([(False,), (True,)])
+    def test_get_user_ip_and_agents(self, after_persisting: bool):
+        """Test `get_user_ip_and_agents` for persisted and unpersisted data"""
+        self.reactor.advance(12345678)
+
+        user_id = "@user:id"
+        user = UserID.from_string(user_id)
+
+        # Insert a user IP
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token", "ip", "user_agent", "MY_DEVICE"
+            )
+        )
+
+        if after_persisting:
+            # Trigger the storage loop
+            self.reactor.advance(10)
+
+        self.assertEqual(
+            self.get_success(self.store.get_user_ip_and_agents(user)),
+            [
+                {
+                    "access_token": "access_token",
+                    "ip": "ip",
+                    "user_agent": "user_agent",
+                    "last_seen": 12345678000,
+                },
             ],
         )
 

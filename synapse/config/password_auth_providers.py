@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, List
+from typing import Any, List, Tuple, Type
 
 from synapse.util.module_loader import load_module
 
@@ -25,7 +25,7 @@ class PasswordAuthProviderConfig(Config):
     section = "authproviders"
 
     def read_config(self, config, **kwargs):
-        self.password_providers: List[Any] = []
+        self.password_providers: List[Tuple[Type, Any]] = []
         providers = []
 
         # We want to be backwards compatible with the old `ldap_config`

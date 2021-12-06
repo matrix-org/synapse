@@ -320,11 +320,10 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, displayname_to_set, new_batchnum
         )
 
-        if self.hs.config.user_directory_search_all_users:
-            profile = await self.store.get_profileinfo(target_user.localpart)
-            await self.user_directory_handler.handle_local_profile_change(
-                target_user.to_string(), profile
-            )
+        profile = await self.store.get_profileinfo(target_user.localpart)
+        await self.user_directory_handler.handle_local_profile_change(
+            target_user.to_string(), profile
+        )
 
         # Don't ratelimit when the admin makes the change.
         # FIXME: this is because we call this function on registration to update DINUM's
@@ -406,7 +405,7 @@ class ProfileHandler(BaseHandler):
         requester: Requester,
         new_avatar_url: str,
         by_admin: bool = False,
-    ):
+    ) -> None:
         """Set a new avatar URL for a user.
 
         Args:
@@ -494,11 +493,10 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, avatar_url_to_set, new_batchnum
         )
 
-        if self.hs.config.user_directory_search_all_users:
-            profile = await self.store.get_profileinfo(target_user.localpart)
-            await self.user_directory_handler.handle_local_profile_change(
-                target_user.to_string(), profile
-            )
+        profile = await self.store.get_profileinfo(target_user.localpart)
+        await self.user_directory_handler.handle_local_profile_change(
+            target_user.to_string(), profile
+        )
 
         await self._update_join_states(requester, target_user)
 
@@ -522,7 +520,7 @@ class ProfileHandler(BaseHandler):
     async def on_profile_query(self, args: JsonDict) -> JsonDict:
         """Handles federation profile query requests."""
 
-        if not self.hs.config.allow_profile_lookup_over_federation:
+        if not self.hs.config.federation.allow_profile_lookup_over_federation:
             raise SynapseError(
                 403,
                 "Profile lookup over federation is disabled on this homeserver",
@@ -640,7 +638,7 @@ class ProfileHandler(BaseHandler):
             raise
 
     @wrap_as_background_process("Update remote profile")
-    async def _update_remote_profile_cache(self):
+    async def _update_remote_profile_cache(self) -> None:
         """Called periodically to check profiles of remote users we haven't
         checked in a while.
         """

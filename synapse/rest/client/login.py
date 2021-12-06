@@ -69,16 +69,16 @@ class LoginRestServlet(RestServlet):
         self.hs = hs
 
         # JWT configuration variables.
-        self.jwt_enabled = hs.config.jwt_enabled
-        self.jwt_secret = hs.config.jwt_secret
-        self.jwt_algorithm = hs.config.jwt_algorithm
-        self.jwt_issuer = hs.config.jwt_issuer
-        self.jwt_audiences = hs.config.jwt_audiences
+        self.jwt_enabled = hs.config.jwt.jwt_enabled
+        self.jwt_secret = hs.config.jwt.jwt_secret
+        self.jwt_algorithm = hs.config.jwt.jwt_algorithm
+        self.jwt_issuer = hs.config.jwt.jwt_issuer
+        self.jwt_audiences = hs.config.jwt.jwt_audiences
 
         # SSO configuration.
-        self.saml2_enabled = hs.config.saml2_enabled
-        self.cas_enabled = hs.config.cas_enabled
-        self.oidc_enabled = hs.config.oidc_enabled
+        self.saml2_enabled = hs.config.saml2.saml2_enabled
+        self.cas_enabled = hs.config.cas.cas_enabled
+        self.oidc_enabled = hs.config.oidc.oidc_enabled
         self._msc2918_enabled = hs.config.access_token_lifetime is not None
 
         self.auth = hs.get_auth()
@@ -559,7 +559,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     if hs.config.access_token_lifetime is not None:
         RefreshTokenServlet(hs).register(http_server)
     SsoRedirectServlet(hs).register(http_server)
-    if hs.config.cas_enabled:
+    if hs.config.cas.cas_enabled:
         CasTicketServlet(hs).register(http_server)
 
 

@@ -545,7 +545,7 @@ def _apply_module_schemas(
         database_engine:
         config: application config
     """
-    for (mod, _config) in config.password_providers:
+    for (mod, _config) in config.authproviders.password_providers:
         if not hasattr(mod, "get_db_schema_files"):
             continue
         modname = ".".join((mod.__module__, mod.__name__))

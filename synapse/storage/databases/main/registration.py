@@ -419,7 +419,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             "get_users_expiring_soon",
             select_users_txn,
             self._clock.time_msec(),
-            self.config.account_validity_renew_at,
+            self.config.account_validity.account_validity_renew_at,
         )
 
     async def set_renewal_mail_status(self, user_id: str, email_sent: bool) -> None:
@@ -2095,7 +2095,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 (user_id_obj.localpart, create_profile_with_displayname),
             )
 
-        if self.hs.config.stats_enabled:
+        if self.hs.config.stats.stats_enabled:
             # we create a new completed user statistics row
 
             # we don't strictly need current_token since this user really can't

@@ -276,7 +276,7 @@ def tag(gh_token: Optional[str]):
     if click.confirm("Edit text?", default=False):
         changes = click.edit(changes, require_save=False)
 
-    repo.create_tag(tag_name, message=changes)
+    repo.create_tag(tag_name, message=changes, sign=True)
 
     if not click.confirm("Push tag to GitHub?", default=True):
         print("")

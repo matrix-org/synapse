@@ -1632,7 +1632,7 @@ class DatabasePool:
         txn: LoggingTransaction,
         table: str,
         column: str,
-        iterable: Iterable[Any],
+        iterable: Collection[Any],
         keyvalues: Dict[str, Any],
         retcols: Iterable[str],
     ) -> List[Dict[str, Any]]:
@@ -1891,29 +1891,32 @@ class DatabasePool:
         txn: LoggingTransaction,
         table: str,
         column: str,
-        iterable: Iterable[Any],
+        values: Collection[Any],
         keyvalues: Dict[str, Any],
     ) -> int:
         """Executes a DELETE query on the named table.
 
-        Filters rows by if value of `column` is in `iterable`.
+        Deletes the rows:
+          - whose value of `column` is in `values`; AND
+          - that match extra column-value pairs specified in `keyvalues`.
 
         Args:
             txn: Transaction object
             table: string giving the table name
-            column: column name to test for inclusion against `iterable`
-            iterable: list
-            keyvalues: dict of column names and values to select the rows with
+            column: column name to test for inclusion against `values`
+            values: values of `column` which choose rows to delete
+            keyvalues: dict of extra column names and values to select the rows
+                with. They will be ANDed together with the main predicate.
 
         Returns:
             Number rows deleted
         """
-        if not iterable:
+        if not values:
             return 0
 
         sql = "DELETE FROM %s" % table
 
-        clause, values = make_in_list_sql_clause(txn.database_engine, column, iterable)
+        clause, values = make_in_list_sql_clause(txn.database_engine, column, values)
         clauses = [clause]
 
         for key, value in keyvalues.items():
@@ -2098,7 +2101,7 @@ class DatabasePool:
 
 
 def make_in_list_sql_clause(
-    database_engine: BaseDatabaseEngine, column: str, iterable: Iterable
+    database_engine: BaseDatabaseEngine, column: str, iterable: Collection[Any]
 ) -> Tuple[str, list]:
     """Returns an SQL clause that checks the given column is in the iterable.
 

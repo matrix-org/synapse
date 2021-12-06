@@ -82,7 +82,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         if (
             self.hs.config.worker.run_background_tasks
-            and self.hs.config.metrics_flags.known_servers
+            and self.hs.config.metrics.metrics_flags.known_servers
         ):
             self._known_servers_count = 1
             self.hs.get_clock().looping_call(
@@ -162,7 +162,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 self._check_safe_current_state_events_membership_updated_txn,
             )
 
-    @cached(max_entries=100000, iterable=True)
+    @cached(max_entries=100000, iterable=True, prune_unread_entries=False)
     async def get_users_in_room(self, room_id: str) -> List[str]:
         return await self.db_pool.runInteraction(
             "get_users_in_room", self.get_users_in_room_txn, room_id
@@ -439,7 +439,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return results_dict.get("membership"), results_dict.get("event_id")
 
-    @cached(max_entries=500000, iterable=True)
+    @cached(max_entries=500000, iterable=True, prune_unread_entries=False)
     async def get_rooms_for_user_with_stream_ordering(
         self, user_id: str
     ) -> FrozenSet[GetRoomsForUserWithStreamOrdering]:
@@ -544,7 +544,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
         return frozenset(r.room_id for r in rooms)
 
-    @cached(max_entries=500000, cache_context=True, iterable=True)
+    @cached(
+        max_entries=500000,
+        cache_context=True,
+        iterable=True,
+        prune_unread_entries=False,
+    )
     async def get_users_who_share_room_with_user(
         self, user_id: str, cache_context: _CacheContext
     ) -> Set[str]:

@@ -98,7 +98,8 @@ class RegistrationHandler(BaseHandler):
         self.ratelimiter = hs.get_registration_ratelimiter()
         self.macaroon_gen = hs.get_macaroon_generator()
         self._account_validity_handler = hs.get_account_validity_handler()
-        self._server_notices_mxid = hs.config.server_notices_mxid
+        self._user_consent_version = self.hs.config.consent.user_consent_version
+        self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self._server_name = hs.hostname
 
         self.spam_checker = hs.get_spam_checker()
@@ -128,17 +129,7 @@ class RegistrationHandler(BaseHandler):
         localpart: str,
         guest_access_token: Optional[str] = None,
         assigned_user_id: Optional[str] = None,
-    ):
-        """
-
-        Args:
-            localpart (str|None): The user's localpart
-            guest_access_token (str|None): A guest's access token
-            assigned_user_id (str|None): An existing User ID for this user if pre-calculated
-
-        Returns:
-            Deferred
-        """
+    ) -> None:
         if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
                 400,
@@ -320,11 +311,10 @@ class RegistrationHandler(BaseHandler):
                     user, requester, default_display_name, by_admin=True
                 )
 
-            if self.hs.config.user_directory_search_all_users:
-                profile = await self.store.get_profileinfo(localpart)
-                await self.user_directory_handler.handle_local_profile_change(
-                    user_id, profile
-                )
+            profile = await self.store.get_profileinfo(localpart)
+            await self.user_directory_handler.handle_local_profile_change(
+                user_id, profile
+            )
 
         else:
             # autogen a sequential user ID
@@ -368,7 +358,7 @@ class RegistrationHandler(BaseHandler):
             auth_provider=(auth_provider_id or ""),
         ).inc()
 
-        if not self.hs.config.user_consent_at_registration:
+        if not self.hs.config.consent.user_consent_at_registration:
             if not self.hs.config.auto_join_rooms_for_guests and make_guest:
                 logger.info(
                     "Skipping auto-join for %s because auto-join for guests is disabled",
@@ -928,7 +918,9 @@ class RegistrationHandler(BaseHandler):
             await self._register_msisdn_threepid(user_id, threepid)
 
         if auth_result and LoginType.TERMS in auth_result:
-            await self._on_user_consented(user_id, self.hs.config.user_consent_version)
+            # The terms type should only exist if consent is enabled.
+            assert self._user_consent_version is not None
+            await self._on_user_consented(user_id, self._user_consent_version)
 
     async def _on_user_consented(self, user_id: str, consent_version: str) -> None:
         """A user consented to the terms on registration
@@ -974,8 +966,8 @@ class RegistrationHandler(BaseHandler):
         # getting mail spam where they weren't before if email
         # notifs are set up on a homeserver)
         if (
-            self.hs.config.email_enable_notifs
-            and self.hs.config.email_notif_for_new_users
+            self.hs.config.email.email_enable_notifs
+            and self.hs.config.email.email_notif_for_new_users
             and token
         ):
             # Pull the ID of the access token back out of the db

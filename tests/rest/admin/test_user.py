@@ -1,4 +1,4 @@
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ from synapse.types import JsonDict, UserID
 
 from tests import unittest
 from tests.server import FakeSite, make_request
-from tests.test_utils import make_awaitable
+from tests.test_utils import SMALL_PNG, make_awaitable
 from tests.unittest import override_config
 
 
@@ -2488,7 +2488,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
         self.media_repo = hs.get_media_repository_resource()
-        self.filepaths = MediaFilePaths(hs.config.media_store_path)
+        self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -2850,11 +2850,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         other_user_tok = self.login("user", "pass")
 
         # Resolution: 1×1, MIME type: image/png, Extension: png, Size: 67 B
-        image_data1 = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
+        image_data1 = SMALL_PNG
         # Resolution: 1×1, MIME type: image/gif, Extension: gif, Size: 35 B
         image_data2 = unhexlify(
             b"47494638376101000100800100000000"
@@ -2958,14 +2954,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         """
         media_ids = []
         for _ in range(number_media):
-            # file size is 67 Byte
-            image_data = unhexlify(
-                b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-                b"0000001f15c4890000000a49444154789c63000100000500010d"
-                b"0a2db40000000049454e44ae426082"
-            )
-
-            media_ids.append(self._create_media_and_access(user_token, image_data))
+            media_ids.append(self._create_media_and_access(user_token, SMALL_PNG))
 
         return media_ids
 
@@ -2999,7 +2988,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         # Try to access a media and to create `last_access_ts`
         channel = make_request(
             self.reactor,
-            FakeSite(download_resource),
+            FakeSite(download_resource, self.reactor),
             "GET",
             server_and_media_id,
             shorthand=False,

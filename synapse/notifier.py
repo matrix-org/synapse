@@ -584,7 +584,7 @@ class Notifier:
             events: List[EventBase] = []
             end_token = from_token
 
-            for name, source in self.event_sources.sources.items():
+            for name, source in self.event_sources.sources.get_sources():
                 keyname = "%s_key" % name
                 before_id = getattr(before_token, keyname)
                 after_id = getattr(after_token, keyname)

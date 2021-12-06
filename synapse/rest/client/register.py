@@ -76,17 +76,19 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         self.identity_handler = hs.get_identity_handler()
         self.config = hs.config
 
-        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        if self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(
                 hs=self.hs,
-                app_name=self.config.email_app_name,
-                template_html=self.config.email_registration_template_html,
-                template_text=self.config.email_registration_template_text,
+                app_name=self.config.email.email_app_name,
+                template_html=self.config.email.email_registration_template_html,
+                template_text=self.config.email.email_registration_template_text,
             )
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if self.hs.config.local_threepid_handling_disabled_due_to_email_config:
+        if self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if (
+                self.hs.config.email.local_threepid_handling_disabled_due_to_email_config
+            ):
                 logger.warning(
                     "Email registration has been disabled due to lack of email config"
                 )
@@ -138,7 +140,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             assert self.hs.config.account_threepid_delegate_email
 
             # Have the configured identity server handle the request
@@ -262,9 +264,9 @@ class RegistrationSubmitTokenServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
 
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self._failure_email_template = (
-                self.config.email_registration_template_failure_html
+                self.config.email.email_registration_template_failure_html
             )
 
     async def on_GET(self, request: Request, medium: str) -> None:
@@ -272,8 +274,8 @@ class RegistrationSubmitTokenServlet(RestServlet):
             raise SynapseError(
                 400, "This medium is currently not supported for registration"
             )
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if self.config.local_threepid_handling_disabled_due_to_email_config:
+        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self.config.email.local_threepid_handling_disabled_due_to_email_config:
                 logger.warning(
                     "User registration via email has been disabled due to lack of email config"
                 )
@@ -306,7 +308,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
                     return None
 
             # Otherwise show the success template
-            html = self.config.email_registration_template_success_html_content
+            html = self.config.email.email_registration_template_success_html_content
             status_code = 200
         except ThreepidValidationError as e:
             status_code = e.code
@@ -1018,12 +1020,12 @@ def _calculate_registration_flows(
         flows.append([LoginType.MSISDN, LoginType.EMAIL_IDENTITY])
 
     # Prepend m.login.terms to all flows if we're requiring consent
-    if config.user_consent_at_registration:
+    if config.consent.user_consent_at_registration:
         for flow in flows:
             flow.insert(0, LoginType.TERMS)
 
     # Prepend recaptcha to all flows if we're requiring captcha
-    if config.enable_registration_captcha:
+    if config.captcha.enable_registration_captcha:
         for flow in flows:
             flow.insert(0, LoginType.RECAPTCHA)
 

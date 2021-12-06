@@ -15,7 +15,7 @@
 import logging
 from collections import namedtuple
 
-from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
+from synapse.api.constants import MAX_DEPTH, EventContentFields, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import EventFormatVersions, RoomVersion
 from synapse.crypto.event_signing import check_event_content_hash
@@ -184,10 +184,10 @@ async def _check_sigs_on_pdu(
         room_version.msc3083_join_rules
         and pdu.type == EventTypes.Member
         and pdu.membership == Membership.JOIN
-        and "join_authorised_via_users_server" in pdu.content
+        and EventContentFields.AUTHORISING_USER in pdu.content
     ):
         authorising_server = get_domain_from_id(
-            pdu.content["join_authorised_via_users_server"]
+            pdu.content[EventContentFields.AUTHORISING_USER]
         )
         try:
             await keyring.verify_event_for_server(

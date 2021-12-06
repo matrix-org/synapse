@@ -41,7 +41,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             federation_client=Mock(),
         )
 
-        self.event_source = hs.get_event_sources().sources["typing"]
+        self.event_source = hs.get_event_sources().sources.typing
 
         hs.get_federation_handler = Mock()
 
@@ -76,7 +76,13 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 1)
         events = self.get_success(
-            self.event_source.get_new_events(from_key=0, room_ids=[self.room_id])
+            self.event_source.get_new_events(
+                user=UserID.from_string(self.user_id),
+                from_key=0,
+                limit=None,
+                room_ids=[self.room_id],
+                is_guest=False,
+            )
         )
         self.assertEquals(
             events[0],

@@ -27,8 +27,8 @@ from urllib import parse as urlparse
 
 import attr
 
+from twisted.internet.defer import Deferred
 from twisted.internet.error import DNSLookupError
-from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
@@ -43,7 +43,7 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
 from synapse.rest.media.v1.media_storage import MediaStorage
-from synapse.rest.media.v1.oembed import OEmbedError, OEmbedProvider
+from synapse.rest.media.v1.oembed import OEmbedProvider
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
@@ -72,6 +72,7 @@ OG_TAG_NAME_MAXLEN = 50
 OG_TAG_VALUE_MAXLEN = 1000
 
 ONE_HOUR = 60 * 60 * 1000
+ONE_DAY = 24 * ONE_HOUR
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -124,14 +125,14 @@ class PreviewUrlResource(DirectServeJsonResource):
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.filepaths = media_repo.filepaths
-        self.max_spider_size = hs.config.max_spider_size
+        self.max_spider_size = hs.config.media.max_spider_size
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.client = SimpleHttpClient(
             hs,
             treq_args={"browser_like_redirects": True},
-            ip_whitelist=hs.config.url_preview_ip_range_whitelist,
-            ip_blacklist=hs.config.url_preview_ip_range_blacklist,
+            ip_whitelist=hs.config.media.url_preview_ip_range_whitelist,
+            ip_blacklist=hs.config.media.url_preview_ip_range_blacklist,
             use_proxy=True,
         )
         self.media_repo = media_repo
@@ -149,8 +150,8 @@ class PreviewUrlResource(DirectServeJsonResource):
             or instance_running_jobs == hs.get_instance_name()
         )
 
-        self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
-        self.url_preview_accept_language = hs.config.url_preview_accept_language
+        self.url_preview_url_blacklist = hs.config.media.url_preview_url_blacklist
+        self.url_preview_accept_language = hs.config.media.url_preview_accept_language
 
         # memory cache mapping urls to an ObservableDeferred returning
         # JSON-encoded OG metadata
@@ -166,7 +167,7 @@ class PreviewUrlResource(DirectServeJsonResource):
                 self._start_expire_url_cache_data, 10 * 1000
             )
 
-    async def _async_render_OPTIONS(self, request: Request) -> None:
+    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
         request.setHeader(b"Allow", b"OPTIONS, GET")
         respond_with_json(request, 200, {}, send_cors=True)
 
@@ -254,9 +255,18 @@ class PreviewUrlResource(DirectServeJsonResource):
                 og = og.encode("utf8")
             return og
 
-        media_info = await self._download_url(url, user)
+        # If this URL can be accessed via oEmbed, use that instead.
+        url_to_download = url
+        oembed_url = self._oembed.get_oembed_url(url)
+        if oembed_url:
+            url_to_download = oembed_url
+
+        media_info = await self._download_url(url_to_download, user)
 
         logger.debug("got media_info of '%s'", media_info)
+
+        # The number of milliseconds that the response should be considered valid.
+        expiration_ms = media_info.expires
 
         if _is_media(media_info.media_type):
             file_id = media_info.filesystem_id
@@ -287,34 +297,22 @@ class PreviewUrlResource(DirectServeJsonResource):
             encoding = get_html_media_encoding(body, media_info.media_type)
             og = decode_and_calc_og(body, media_info.uri, encoding)
 
-            # pre-cache the image for posterity
-            # FIXME: it might be cleaner to use the same flow as the main /preview_url
-            # request itself and benefit from the same caching etc.  But for now we
-            # just rely on the caching on the master request to speed things up.
-            if "og:image" in og and og["og:image"]:
-                image_info = await self._download_url(
-                    _rebase_url(og["og:image"], media_info.uri), user
-                )
+            await self._precache_image_url(user, media_info, og)
 
-                if _is_media(image_info.media_type):
-                    # TODO: make sure we don't choke on white-on-transparent images
-                    file_id = image_info.filesystem_id
-                    dims = await self.media_repo._generate_thumbnails(
-                        None, file_id, file_id, image_info.media_type, url_cache=True
-                    )
-                    if dims:
-                        og["og:image:width"] = dims["width"]
-                        og["og:image:height"] = dims["height"]
-                    else:
-                        logger.warning("Couldn't get dims for %s", og["og:image"])
+        elif oembed_url and _is_json(media_info.media_type):
+            # Handle an oEmbed response.
+            with open(media_info.filename, "rb") as file:
+                body = file.read()
 
-                    og[
-                        "og:image"
-                    ] = f"mxc://{self.server_name}/{image_info.filesystem_id}"
-                    og["og:image:type"] = image_info.media_type
-                    og["matrix:image:size"] = image_info.media_length
-                else:
-                    del og["og:image"]
+            oembed_response = self._oembed.parse_oembed_response(url, body)
+            og = oembed_response.open_graph_result
+
+            # Use the cache age from the oEmbed result, instead of the HTTP response.
+            if oembed_response.cache_age is not None:
+                expiration_ms = oembed_response.cache_age
+
+            await self._precache_image_url(user, media_info, og)
+
         else:
             logger.warning("Failed to find any OG data in %s", url)
             og = {}
@@ -335,12 +333,15 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         jsonog = json_encoder.encode(og)
 
+        # Cap the amount of time to consider a response valid.
+        expiration_ms = min(expiration_ms, ONE_DAY)
+
         # store OG in history-aware DB cache
         await self.store.store_url_cache(
             url,
             media_info.response_code,
             media_info.etag,
-            media_info.expires + media_info.created_ts_ms,
+            media_info.created_ts_ms + expiration_ms,
             jsonog,
             media_info.filesystem_id,
             media_info.created_ts_ms,
@@ -357,88 +358,52 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         file_info = FileInfo(server_name=None, file_id=file_id, url_cache=True)
 
-        # If this URL can be accessed via oEmbed, use that instead.
-        url_to_download: Optional[str] = url
-        oembed_url = self._oembed.get_oembed_url(url)
-        if oembed_url:
-            # The result might be a new URL to download, or it might be HTML content.
+        with self.media_storage.store_into_file(file_info) as (f, fname, finish):
             try:
-                oembed_result = await self._oembed.get_oembed_content(oembed_url, url)
-                if oembed_result.url:
-                    url_to_download = oembed_result.url
-                elif oembed_result.html:
-                    url_to_download = None
-            except OEmbedError:
-                # If an error occurs, try doing a normal preview.
-                pass
-
-        if url_to_download:
-            with self.media_storage.store_into_file(file_info) as (f, fname, finish):
-                try:
-                    logger.debug("Trying to get preview for url '%s'", url_to_download)
-                    length, headers, uri, code = await self.client.get_file(
-                        url_to_download,
-                        output_stream=f,
-                        max_size=self.max_spider_size,
-                        headers={"Accept-Language": self.url_preview_accept_language},
-                    )
-                except SynapseError:
-                    # Pass SynapseErrors through directly, so that the servlet
-                    # handler will return a SynapseError to the client instead of
-                    # blank data or a 500.
-                    raise
-                except DNSLookupError:
-                    # DNS lookup returned no results
-                    # Note: This will also be the case if one of the resolved IP
-                    # addresses is blacklisted
-                    raise SynapseError(
-                        502,
-                        "DNS resolution failure during URL preview generation",
-                        Codes.UNKNOWN,
-                    )
-                except Exception as e:
-                    # FIXME: pass through 404s and other error messages nicely
-                    logger.warning("Error downloading %s: %r", url_to_download, e)
-
-                    raise SynapseError(
-                        500,
-                        "Failed to download content: %s"
-                        % (traceback.format_exception_only(sys.exc_info()[0], e),),
-                        Codes.UNKNOWN,
-                    )
-                await finish()
-
-                if b"Content-Type" in headers:
-                    media_type = headers[b"Content-Type"][0].decode("ascii")
-                else:
-                    media_type = "application/octet-stream"
-
-                download_name = get_filename_from_headers(headers)
-
-                # FIXME: we should calculate a proper expiration based on the
-                # Cache-Control and Expire headers.  But for now, assume 1 hour.
-                expires = ONE_HOUR
-                etag = (
-                    headers[b"ETag"][0].decode("ascii") if b"ETag" in headers else None
+                logger.debug("Trying to get preview for url '%s'", url)
+                length, headers, uri, code = await self.client.get_file(
+                    url,
+                    output_stream=f,
+                    max_size=self.max_spider_size,
+                    headers={"Accept-Language": self.url_preview_accept_language},
                 )
-        else:
-            # we can only get here if we did an oembed request and have an oembed_result.html
-            assert oembed_result.html is not None
-            assert oembed_url is not None
+            except SynapseError:
+                # Pass SynapseErrors through directly, so that the servlet
+                # handler will return a SynapseError to the client instead of
+                # blank data or a 500.
+                raise
+            except DNSLookupError:
+                # DNS lookup returned no results
+                # Note: This will also be the case if one of the resolved IP
+                # addresses is blacklisted
+                raise SynapseError(
+                    502,
+                    "DNS resolution failure during URL preview generation",
+                    Codes.UNKNOWN,
+                )
+            except Exception as e:
+                # FIXME: pass through 404s and other error messages nicely
+                logger.warning("Error downloading %s: %r", url, e)
 
-            html_bytes = oembed_result.html.encode("utf-8")
-            with self.media_storage.store_into_file(file_info) as (f, fname, finish):
-                f.write(html_bytes)
-                await finish()
+                raise SynapseError(
+                    500,
+                    "Failed to download content: %s"
+                    % (traceback.format_exception_only(sys.exc_info()[0], e),),
+                    Codes.UNKNOWN,
+                )
+            await finish()
 
-            media_type = "text/html"
-            download_name = oembed_result.title
-            length = len(html_bytes)
-            # If a specific cache age was not given, assume 1 hour.
-            expires = oembed_result.cache_age or ONE_HOUR
-            uri = oembed_url
-            code = 200
-            etag = None
+            if b"Content-Type" in headers:
+                media_type = headers[b"Content-Type"][0].decode("ascii")
+            else:
+                media_type = "application/octet-stream"
+
+            download_name = get_filename_from_headers(headers)
+
+            # FIXME: we should calculate a proper expiration based on the
+            # Cache-Control and Expire headers.  But for now, assume 1 hour.
+            expires = ONE_HOUR
+            etag = headers[b"ETag"][0].decode("ascii") if b"ETag" in headers else None
 
         try:
             time_now_ms = self.clock.time_msec()
@@ -473,14 +438,53 @@ class PreviewUrlResource(DirectServeJsonResource):
             etag=etag,
         )
 
-    def _start_expire_url_cache_data(self):
+    async def _precache_image_url(
+        self, user: str, media_info: MediaInfo, og: JsonDict
+    ) -> None:
+        """
+        Pre-cache the image (if one exists) for posterity
+
+        Args:
+            user: The user requesting the preview.
+            media_info: The media being previewed.
+            og: The Open Graph dictionary. This is modified with image information.
+        """
+        # If there's no image or it is blank, there's nothing to do.
+        if "og:image" not in og or not og["og:image"]:
+            return
+
+        # FIXME: it might be cleaner to use the same flow as the main /preview_url
+        # request itself and benefit from the same caching etc.  But for now we
+        # just rely on the caching on the master request to speed things up.
+        image_info = await self._download_url(
+            _rebase_url(og["og:image"], media_info.uri), user
+        )
+
+        if _is_media(image_info.media_type):
+            # TODO: make sure we don't choke on white-on-transparent images
+            file_id = image_info.filesystem_id
+            dims = await self.media_repo._generate_thumbnails(
+                None, file_id, file_id, image_info.media_type, url_cache=True
+            )
+            if dims:
+                og["og:image:width"] = dims["width"]
+                og["og:image:height"] = dims["height"]
+            else:
+                logger.warning("Couldn't get dims for %s", og["og:image"])
+
+            og["og:image"] = f"mxc://{self.server_name}/{image_info.filesystem_id}"
+            og["og:image:type"] = image_info.media_type
+            og["matrix:image:size"] = image_info.media_length
+        else:
+            del og["og:image"]
+
+    def _start_expire_url_cache_data(self) -> Deferred:
         return run_as_background_process(
             "expire_url_cache_data", self._expire_url_cache_data
         )
 
     async def _expire_url_cache_data(self) -> None:
         """Clean up expired url cache content, media and thumbnails."""
-        # TODO: Delete from backup media store
 
         assert self._worker_run_media_background_jobs
 
@@ -526,7 +530,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         # These may be cached for a bit on the client (i.e., they
         # may have a room open with a preview url thing open).
         # So we wait a couple of days before deleting, just in case.
-        expire_before = now - 2 * 24 * ONE_HOUR
+        expire_before = now - 2 * ONE_DAY
         media_ids = await self.store.get_url_cache_media_before(expire_before)
 
         removed_media = []
@@ -668,7 +672,18 @@ def decode_and_calc_og(
 
 
 def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
-    # suck our tree into lxml and define our OG response.
+    """
+    Calculate metadata for an HTML document.
+
+    This uses lxml to search the HTML document for Open Graph data.
+
+    Args:
+        tree: The parsed HTML document.
+        media_url: The URI used to download the body.
+
+    Returns:
+        The Open Graph response as a dictionary.
+    """
 
     # if we see any image URLs in the OG response, then spider them
     # (although the client could choose to do this by asking for previews of those
@@ -742,35 +757,7 @@ def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
         if meta_description:
             og["og:description"] = meta_description[0]
         else:
-            # grab any text nodes which are inside the <body/> tag...
-            # unless they are within an HTML5 semantic markup tag...
-            # <header/>, <nav/>, <aside/>, <footer/>
-            # ...or if they are within a <script/> or <style/> tag.
-            # This is a very very very coarse approximation to a plain text
-            # render of the page.
-
-            # We don't just use XPATH here as that is slow on some machines.
-
-            from lxml import etree
-
-            TAGS_TO_REMOVE = (
-                "header",
-                "nav",
-                "aside",
-                "footer",
-                "script",
-                "noscript",
-                "style",
-                etree.Comment,
-            )
-
-            # Split all the text nodes into paragraphs (by splitting on new
-            # lines)
-            text_nodes = (
-                re.sub(r"\s+", "\n", el).strip()
-                for el in _iterate_over_text(tree.find("body"), *TAGS_TO_REMOVE)
-            )
-            og["og:description"] = summarize_paragraphs(text_nodes)
+            og["og:description"] = _calc_description(tree)
     elif og["og:description"]:
         # This must be a non-empty string at this point.
         assert isinstance(og["og:description"], str)
@@ -781,8 +768,48 @@ def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
     return og
 
 
+def _calc_description(tree: "etree.Element") -> Optional[str]:
+    """
+    Calculate a text description based on an HTML document.
+
+    Grabs any text nodes which are inside the <body/> tag, unless they are within
+    an HTML5 semantic markup tag (<header/>, <nav/>, <aside/>, <footer/>), or
+    if they are within a <script/> or <style/> tag.
+
+    This is a very very very coarse approximation to a plain text render of the page.
+
+    Args:
+        tree: The parsed HTML document.
+
+    Returns:
+        The plain text description, or None if one cannot be generated.
+    """
+    # We don't just use XPATH here as that is slow on some machines.
+
+    from lxml import etree
+
+    TAGS_TO_REMOVE = (
+        "header",
+        "nav",
+        "aside",
+        "footer",
+        "script",
+        "noscript",
+        "style",
+        etree.Comment,
+    )
+
+    # Split all the text nodes into paragraphs (by splitting on new
+    # lines)
+    text_nodes = (
+        re.sub(r"\s+", "\n", el).strip()
+        for el in _iterate_over_text(tree.find("body"), *TAGS_TO_REMOVE)
+    )
+    return summarize_paragraphs(text_nodes)
+
+
 def _iterate_over_text(
-    tree, *tags_to_ignore: Iterable[Union[str, "etree.Comment"]]
+    tree: "etree.Element", *tags_to_ignore: Iterable[Union[str, "etree.Comment"]]
 ) -> Generator[str, None, None]:
     """Iterate over the tree returning text nodes in a depth first fashion,
     skipping text nodes inside certain tags.
@@ -840,11 +867,25 @@ def _is_html(content_type: str) -> bool:
     )
 
 
+def _is_json(content_type: str) -> bool:
+    return content_type.lower().startswith("application/json")
+
+
 def summarize_paragraphs(
     text_nodes: Iterable[str], min_size: int = 200, max_size: int = 500
 ) -> Optional[str]:
-    # Try to get a summary of between 200 and 500 words, respecting
-    # first paragraph and then word boundaries.
+    """
+    Try to get a summary respecting first paragraph and then word boundaries.
+
+    Args:
+        text_nodes: The paragraphs to summarize.
+        min_size: The minimum number of words to include.
+        max_size: The maximum number of words to include.
+
+    Returns:
+        A summary of the text nodes, or None if that was not possible.
+    """
+
     # TODO: Respect sentences?
 
     description = ""
@@ -867,7 +908,7 @@ def summarize_paragraphs(
         new_desc = ""
 
         # This splits the paragraph into words, but keeping the
-        # (preceeding) whitespace intact so we can easily concat
+        # (preceding) whitespace intact so we can easily concat
         # words back together.
         for match in re.finditer(r"\s*\S+", description):
             word = match.group()

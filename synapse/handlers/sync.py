@@ -364,7 +364,9 @@ class SyncHandler:
             )
         else:
 
-            async def current_sync_callback(before_token, after_token) -> SyncResult:
+            async def current_sync_callback(
+                before_token: StreamToken, after_token: StreamToken
+            ) -> SyncResult:
                 return await self.current_sync_for_user(sync_config, since_token)
 
             result = await self.notifier.wait_for_events(
@@ -441,7 +443,7 @@ class SyncHandler:
 
             room_ids = sync_result_builder.joined_room_ids
 
-            typing_source = self.event_sources.sources["typing"]
+            typing_source = self.event_sources.sources.typing
             typing, typing_key = await typing_source.get_new_events(
                 user=sync_config.user,
                 from_key=typing_key,
@@ -463,7 +465,7 @@ class SyncHandler:
 
             receipt_key = since_token.receipt_key if since_token else 0
 
-            receipt_source = self.event_sources.sources["receipt"]
+            receipt_source = self.event_sources.sources.receipt
             receipts, receipt_key = await receipt_source.get_new_events(
                 user=sync_config.user,
                 from_key=receipt_key,
@@ -1090,7 +1092,7 @@ class SyncHandler:
         block_all_presence_data = (
             since_token is None and sync_config.filter_collection.blocks_all_presence()
         )
-        if self.hs_config.use_presence and not block_all_presence_data:
+        if self.hs_config.server.use_presence and not block_all_presence_data:
             logger.debug("Fetching presence data")
             await self._generate_sync_entry_for_presence(
                 sync_result_builder,
@@ -1413,7 +1415,7 @@ class SyncHandler:
         sync_config = sync_result_builder.sync_config
         user = sync_result_builder.sync_config.user
 
-        presence_source = self.event_sources.sources["presence"]
+        presence_source = self.event_sources.sources.presence
 
         since_token = sync_result_builder.since_token
         presence_key = None
@@ -1532,9 +1534,9 @@ class SyncHandler:
         newly_joined_rooms = room_changes.newly_joined_rooms
         newly_left_rooms = room_changes.newly_left_rooms
 
-        async def handle_room_entries(room_entry: "RoomSyncResultBuilder"):
+        async def handle_room_entries(room_entry: "RoomSyncResultBuilder") -> None:
             logger.debug("Generating room entry for %s", room_entry.room_id)
-            res = await self._generate_room_entry(
+            await self._generate_room_entry(
                 sync_result_builder,
                 ignored_users,
                 room_entry,
@@ -1544,7 +1546,6 @@ class SyncHandler:
                 always_include=sync_result_builder.full_state,
             )
             logger.debug("Generated room entry for %s", room_entry.room_id)
-            return res
 
         await concurrently_execute(handle_room_entries, room_entries, 10)
 
@@ -1925,7 +1926,7 @@ class SyncHandler:
         tags: Optional[Dict[str, Dict[str, Any]]],
         account_data: Dict[str, JsonDict],
         always_include: bool = False,
-    ):
+    ) -> None:
         """Populates the `joined` and `archived` section of `sync_result_builder`
         based on the `room_builder`.
 

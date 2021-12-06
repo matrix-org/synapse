@@ -61,7 +61,11 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         """You can observe the terms form without specifying a user"""
         resource = consent_resource.ConsentResource(self.hs)
         channel = make_request(
-            self.reactor, FakeSite(resource), "GET", "/consent?v=1", shorthand=False
+            self.reactor,
+            FakeSite(resource, self.reactor),
+            "GET",
+            "/consent?v=1",
+            shorthand=False,
         )
         self.assertEqual(channel.code, 200)
 
@@ -83,7 +87,7 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         )
         channel = make_request(
             self.reactor,
-            FakeSite(resource),
+            FakeSite(resource, self.reactor),
             "GET",
             consent_uri,
             access_token=access_token,
@@ -98,7 +102,7 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         # POST to the consent page, saying we've agreed
         channel = make_request(
             self.reactor,
-            FakeSite(resource),
+            FakeSite(resource, self.reactor),
             "POST",
             consent_uri + "&v=" + version,
             access_token=access_token,
@@ -110,7 +114,7 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         # changed
         channel = make_request(
             self.reactor,
-            FakeSite(resource),
+            FakeSite(resource, self.reactor),
             "GET",
             consent_uri,
             access_token=access_token,

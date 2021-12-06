@@ -88,7 +88,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
         self.third_party_event_rules = hs.get_third_party_event_rules()
-        self._server_notices_mxid = self.config.server_notices_mxid
+        self._server_notices_mxid = self.config.servernotices.server_notices_mxid
         self._enable_lookup = hs.config.enable_3pid_lookup
         self.allow_per_room_profiles = self.config.allow_per_room_profiles
 
@@ -225,7 +225,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         room_id: Optional[str],
         n_invites: int,
         update: bool = True,
-    ):
+    ) -> None:
         """Ratelimit more than one invite sent by the given requester in the given room.
 
         Args:
@@ -249,7 +249,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         requester: Optional[Requester],
         room_id: Optional[str],
         invitee_user_id: str,
-    ):
+    ) -> None:
         """Ratelimit invites by room and by target user.
 
         If room ID is missing then we just rate limit by target user.
@@ -386,7 +386,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         return result_event.event_id, result_event.internal_metadata.stream_ordering
 
     async def copy_room_tags_and_direct_to_room(
-        self, old_room_id, new_room_id, user_id
+        self, old_room_id: str, new_room_id: str, user_id: str
     ) -> None:
         """Copies the tags and direct room state from one room to another.
 
@@ -580,6 +580,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 errcode=Codes.BAD_JSON,
             )
 
+        # The event content should *not* include the authorising user as
+        # it won't be properly signed. Strip it out since it might come
+        # back from a client updating a display name / avatar.
+        #
+        # This only applies to restricted rooms, but there should be no reason
+        # for a client to include it. Unconditionally remove it.
+        content.pop(EventContentFields.AUTHORISING_USER, None)
+
         effective_membership_state = action
         if action in ["kick", "unban"]:
             effective_membership_state = "leave"
@@ -675,7 +683,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     " (membership=%s)" % old_membership,
                     errcode=Codes.BAD_STATE,
                 )
-            if old_membership == "ban" and action != "unban":
+            if old_membership == "ban" and action not in ["ban", "unban", "leave"]:
                 raise SynapseError(
                     403,
                     "Cannot %s user who was banned" % (action,),
@@ -970,7 +978,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # be included in the event content in order to efficiently validate
         # the event.
         content[
-            "join_authorised_via_users_server"
+            EventContentFields.AUTHORISING_USER
         ] = await self.event_auth_handler.get_user_which_could_invite(
             room_id,
             current_state_ids,
@@ -1061,7 +1069,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,
-    ):
+    ) -> None:
         """
         Change the membership status of a user in a room.
 

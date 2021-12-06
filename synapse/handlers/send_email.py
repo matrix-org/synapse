@@ -17,7 +17,7 @@ import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from io import BytesIO
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from pkg_resources import parse_version
 
@@ -79,7 +79,7 @@ async def _sendmail(
     msg = BytesIO(msg_bytes)
     d: "Deferred[object]" = Deferred()
 
-    def build_sender_factory(**kwargs) -> ESMTPSenderFactory:
+    def build_sender_factory(**kwargs: Any) -> ESMTPSenderFactory:
         return ESMTPSenderFactory(
             username,
             password,

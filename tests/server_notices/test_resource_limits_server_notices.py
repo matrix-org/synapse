@@ -326,7 +326,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         for event in events:
             if (
                 event["type"] == EventTypes.Message
-                and event["sender"] == self.hs.config.server_notices_mxid
+                and event["sender"] == self.hs.config.servernotices.server_notices_mxid
             ):
                 notice_in_room = True
 

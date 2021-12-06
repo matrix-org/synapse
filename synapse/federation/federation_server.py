@@ -34,7 +34,7 @@ from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
-from synapse.api.constants import EduTypes, EventTypes, Membership
+from synapse.api.constants import EduTypes, EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -765,11 +765,11 @@ class FederationServer(FederationBase):
         if (
             room_version.msc3083_join_rules
             and event.membership == Membership.JOIN
-            and "join_authorised_via_users_server" in event.content
+            and EventContentFields.AUTHORISING_USER in event.content
         ):
             # We can only authorise our own users.
             authorising_server = get_domain_from_id(
-                event.content["join_authorised_via_users_server"]
+                event.content[EventContentFields.AUTHORISING_USER]
             )
             if authorising_server != self.server_name:
                 raise SynapseError(
@@ -1237,7 +1237,7 @@ class FederationHandlerRegistry:
         self._edu_type_to_instance[edu_type] = instance_names
 
     async def on_edu(self, edu_type: str, origin: str, content: dict) -> None:
-        if not self.config.use_presence and edu_type == EduTypes.Presence:
+        if not self.config.server.use_presence and edu_type == EduTypes.Presence:
             return
 
         # Check if we have a handler on this instance

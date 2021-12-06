@@ -824,6 +824,10 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
             if otk_row is None:
                 return None
 
+            self._invalidate_cache_and_stream(
+                txn, self.count_e2e_one_time_keys, (user_id, device_id)
+            )
+
             key_id, key_json = otk_row
             return f"{algorithm}:{key_id}", key_json
 

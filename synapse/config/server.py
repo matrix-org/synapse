@@ -1521,7 +1521,7 @@ def read_gc_thresholds(thresholds):
         return None
     try:
         assert len(thresholds) == 3
-        return (int(thresholds[0]), int(thresholds[1]), int(thresholds[2]))
+        return int(thresholds[0]), int(thresholds[1]), int(thresholds[2])
     except Exception:
         raise ConfigError(
             "Value of `gc_threshold` must be a list of three integers if set"

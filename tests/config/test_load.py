@@ -52,10 +52,10 @@ class ConfigLoadingTestCase(unittest.TestCase):
             hasattr(config, "macaroon_secret_key"),
             "Want config to have attr macaroon_secret_key",
         )
-        if len(config.macaroon_secret_key) < 5:
+        if len(config.key.macaroon_secret_key) < 5:
             self.fail(
                 "Want macaroon secret key to be string of at least length 5,"
-                "was: %r" % (config.macaroon_secret_key,)
+                "was: %r" % (config.key.macaroon_secret_key,)
             )
 
         config = HomeServerConfig.load_or_generate_config("", ["-c", self.file])
@@ -63,10 +63,10 @@ class ConfigLoadingTestCase(unittest.TestCase):
             hasattr(config, "macaroon_secret_key"),
             "Want config to have attr macaroon_secret_key",
         )
-        if len(config.macaroon_secret_key) < 5:
+        if len(config.key.macaroon_secret_key) < 5:
             self.fail(
                 "Want macaroon secret key to be string of at least length 5,"
-                "was: %r" % (config.macaroon_secret_key,)
+                "was: %r" % (config.key.macaroon_secret_key,)
             )
 
     def test_load_succeeds_if_macaroon_secret_key_missing(self):
@@ -101,7 +101,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
 
         # The default Metrics Flags are off by default.
         config = HomeServerConfig.load_config("", ["-c", self.file])
-        self.assertFalse(config.metrics_flags.known_servers)
+        self.assertFalse(config.metrics.metrics_flags.known_servers)
 
     def generate_config(self):
         with redirect_stdout(StringIO()):

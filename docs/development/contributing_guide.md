@@ -170,6 +170,53 @@ To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`:
 SYNAPSE_TEST_LOG_LEVEL=DEBUG trial tests
 ```
 
+### Running tests under PostgreSQL
+
+Invoking `trial` as above will use an in-memory SQLite database. This is great for
+quick development and testing. However, we recommend using a PostgreSQL database
+in production (and indeed, we have some code paths specific to each database).
+This means that we need to run our unit tests against PostgreSQL too. Our CI does
+this automatically for pull requests and release candidates, but it's sometimes
+useful to reproduce this locally.
+
+To do so, [configure Postgres](../postgres.md) and run `trial` with the
+following environment variables matching your configuration:
+
+- `SYNAPSE_POSTGRES` to anything nonempty
+- `SYNAPSE_POSTGRES_HOST`
+- `SYNAPSE_POSTGRES_USER`
+- `SYNAPSE_POSTGRES_PASSWORD`
+
+For example:
+
+```shell
+export SYNAPSE_POSTGRES=1
+export SYNAPSE_POSTGRES_HOST=localhost
+export SYNAPSE_POSTGRES_USER=postgres
+export SYNAPSE_POSTGRES_PASSWORD=mydevenvpassword
+trial
+```
+
+#### Prebuilt container
+
+Since configuring PostgreSQL can be fiddly, we can make use of a pre-made
+Docker container to set up PostgreSQL and run our tests for us. To do so, run
+
+```shell
+scripts-dev/test_postgresql.sh
+```
+
+Any extra arguments to the script will be passed to `tox` and then to `trial`,
+so we can run a specific test in this container with e.g.
+
+```shell
+scripts-dev/test_postgresql.sh tests.replication.test_sharded_event_persister.EventPersisterShardTestCase
+```
+
+The container creates a folder in your Synapse checkout called
+`.tox-pg-container` and uses this as a tox environment. The output of any
+`trial` runs goes into `_trial_temp` in your synapse source directory — the same
+as running `trial` directly on your host machine.
 
 ## Run the integration tests ([Sytest](https://github.com/matrix-org/sytest)).
 

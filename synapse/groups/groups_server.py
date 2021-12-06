@@ -847,16 +847,16 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
             UserID.from_string(requester_user_id)
         )
         if not is_admin:
-            if not self.hs.config.enable_group_creation:
+            if not self.hs.config.groups.enable_group_creation:
                 raise SynapseError(
                     403, "Only a server admin can create groups on this server"
                 )
             localpart = group_id_obj.localpart
-            if not localpart.startswith(self.hs.config.group_creation_prefix):
+            if not localpart.startswith(self.hs.config.groups.group_creation_prefix):
                 raise SynapseError(
                     400,
                     "Can only create groups with prefix %r on this server"
-                    % (self.hs.config.group_creation_prefix,),
+                    % (self.hs.config.groups.group_creation_prefix,),
                 )
 
         profile = content.get("profile", {})

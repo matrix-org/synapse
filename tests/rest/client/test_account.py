@@ -312,7 +312,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         # Load the password reset confirmation page
         channel = make_request(
             self.reactor,
-            FakeSite(self.submit_token_resource),
+            FakeSite(self.submit_token_resource, self.reactor),
             "GET",
             path,
             shorthand=False,
@@ -326,7 +326,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         # Confirm the password reset
         channel = make_request(
             self.reactor,
-            FakeSite(self.submit_token_resource),
+            FakeSite(self.submit_token_resource, self.reactor),
             "POST",
             path,
             content=b"",

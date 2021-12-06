@@ -267,7 +267,7 @@ def register_servlets_for_client_rest_resource(
 
     # Load the media repo ones if we're using them. Otherwise load the servlets which
     # don't need a media repo (typically readonly admin APIs).
-    if hs.config.can_load_media_repo:
+    if hs.config.media.can_load_media_repo:
         register_servlets_for_media_repo(hs, http_server)
     else:
         ListMediaInRoom(hs).register(http_server)

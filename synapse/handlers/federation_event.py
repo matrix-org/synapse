@@ -27,10 +27,7 @@ from typing import (
     Tuple,
 )
 
-import attr
 from prometheus_client import Counter
-
-from twisted.internet import defer
 
 from synapse import event_auth
 from synapse.api.constants import (
@@ -54,11 +51,7 @@ from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_client import InvalidResponseError
-from synapse.logging.context import (
-    make_deferred_yieldable,
-    nested_logging_context,
-    run_in_background,
-)
+from synapse.logging.context import nested_logging_context, run_in_background
 from synapse.logging.utils import log_function
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
@@ -75,7 +68,11 @@ from synapse.types import (
     UserID,
     get_domain_from_id,
 )
-from synapse.util.async_helpers import Linearizer, concurrently_execute
+from synapse.util.async_helpers import (
+    Linearizer,
+    concurrently_execute,
+    yieldable_gather_results,
+)
 from synapse.util.iterutils import batch_iter
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import shortstr
@@ -90,30 +87,6 @@ soft_failed_event_counter = Counter(
     "synapse_federation_soft_failed_events_total",
     "Events received over federation that we marked as soft_failed",
 )
-
-
-@attr.s(slots=True, frozen=True, auto_attribs=True)
-class _NewEventInfo:
-    """Holds information about a received event, ready for passing to _auth_and_persist_events
-
-    Attributes:
-        event: the received event
-
-        claimed_auth_event_map: a map of (type, state_key) => event for the event's
-            claimed auth_events.
-
-            This can include events which have not yet been persisted, in the case that
-            we are backfilling a batch of events.
-
-            Note: May be incomplete: if we were unable to find all of the claimed auth
-            events. Also, treat the contents with caution: the events might also have
-            been rejected, might not yet have been authorized themselves, or they might
-            be in the wrong room.
-
-    """
-
-    event: EventBase
-    claimed_auth_event_map: StateMap[EventBase]
 
 
 class FederationEventHandler:
@@ -1016,7 +989,7 @@ class FederationEventHandler:
         except Exception:
             logger.exception("Failed to resync device for %s", sender)
 
-    async def _handle_marker_event(self, origin: str, marker_event: EventBase):
+    async def _handle_marker_event(self, origin: str, marker_event: EventBase) -> None:
         """Handles backfilling the insertion event when we receive a marker
         event that points to one.
 
@@ -1107,9 +1080,9 @@ class FederationEventHandler:
 
         room_version = await self._store.get_room_version(room_id)
 
-        event_map: Dict[str, EventBase] = {}
+        events: List[EventBase] = []
 
-        async def get_event(event_id: str):
+        async def get_event(event_id: str) -> None:
             with nested_logging_context(event_id):
                 try:
                     event = await self._federation_client.get_pdu(
@@ -1125,8 +1098,7 @@ class FederationEventHandler:
                             event_id,
                         )
                         return
-
-                    event_map[event.event_id] = event
+                    events.append(event)
 
                 except Exception as e:
                     logger.warning(
@@ -1137,11 +1109,29 @@ class FederationEventHandler:
                     )
 
         await concurrently_execute(get_event, event_ids, 5)
-        logger.info("Fetched %i events of %i requested", len(event_map), len(event_ids))
+        logger.info("Fetched %i events of %i requested", len(events), len(event_ids))
+        await self._auth_and_persist_fetched_events(destination, room_id, events)
 
-        # we now need to auth the events in an order which ensures that each event's
-        # auth_events are authed before the event itself.
-        #
+    async def _auth_and_persist_fetched_events(
+        self, origin: str, room_id: str, events: Iterable[EventBase]
+    ) -> None:
+        """Persist the events fetched by _get_events_and_persist or _get_remote_auth_chain_for_event
+
+        The events to be persisted must be outliers.
+
+        We first sort the events to make sure that we process each event's auth_events
+        before the event itself, and then auth and persist them.
+
+        Notifies about the events where appropriate.
+
+        Params:
+            origin: where the events came from
+            room_id: the room that the events are meant to be in (though this has
+               not yet been checked)
+            events: the events that have been fetched
+        """
+        event_map = {event.event_id: event for event in events}
+
         # XXX: it might be possible to kick this process off in parallel with fetching
         # the events.
         while event_map:
@@ -1168,22 +1158,18 @@ class FederationEventHandler:
                 "Persisting %i of %i remaining events", len(roots), len(event_map)
             )
 
-            await self._auth_and_persist_fetched_events(destination, room_id, roots)
+            await self._auth_and_persist_fetched_events_inner(origin, room_id, roots)
 
             for ev in roots:
                 del event_map[ev.event_id]
 
-    async def _auth_and_persist_fetched_events(
+    async def _auth_and_persist_fetched_events_inner(
         self, origin: str, room_id: str, fetched_events: Collection[EventBase]
     ) -> None:
-        """Persist the events fetched by _get_events_and_persist.
+        """Helper for _auth_and_persist_fetched_events
 
-        The events should not depend on one another, e.g. this should be used to persist
-        a bunch of outliers, but not a chunk of individual events that depend
-        on each other for state calculations.
-
-        We also assume that all of the auth events for all of the events have already
-        been persisted.
+        Persists a batch of events where we have (theoretically) already persisted all
+        of their auth events.
 
         Notifies about the events where appropriate.
 
@@ -1191,7 +1177,7 @@ class FederationEventHandler:
             origin: where the events came from
             room_id: the room that the events are meant to be in (though this has
                not yet been checked)
-            event_id: map from event_id -> event for the fetched events
+            fetched_events: the events to persist
         """
         # get all the auth events for all the events in this batch. By now, they should
         # have been persisted.
@@ -1203,47 +1189,36 @@ class FederationEventHandler:
             allow_rejected=True,
         )
 
-        event_infos = []
-        for event in fetched_events:
-            auth = {}
-            for auth_event_id in event.auth_event_ids():
-                ae = persisted_events.get(auth_event_id)
-                if ae:
-                    auth[(ae.type, ae.state_key)] = ae
-                else:
-                    logger.info("Missing auth event %s", auth_event_id)
-
-            event_infos.append(_NewEventInfo(event, auth))
-
-        if not event_infos:
-            return
-
-        async def prep(ev_info: _NewEventInfo):
-            event = ev_info.event
+        async def prep(event: EventBase) -> Optional[Tuple[EventBase, EventContext]]:
             with nested_logging_context(suffix=event.event_id):
-                res = await self._state_handler.compute_event_context(event)
-                res = await self._check_event_auth(
+                auth = {}
+                for auth_event_id in event.auth_event_ids():
+                    ae = persisted_events.get(auth_event_id)
+                    if not ae:
+                        logger.warning(
+                            "Event %s relies on auth_event %s, which could not be found.",
+                            event,
+                            auth_event_id,
+                        )
+                        # the fact we can't find the auth event doesn't mean it doesn't
+                        # exist, which means it is premature to reject `event`. Instead we
+                        # just ignore it for now.
+                        return None
+                    auth[(ae.type, ae.state_key)] = ae
+
+                context = EventContext.for_outlier()
+                context = await self._check_event_auth(
                     origin,
                     event,
-                    res,
-                    claimed_auth_event_map=ev_info.claimed_auth_event_map,
+                    context,
+                    claimed_auth_event_map=auth,
                 )
-            return res
+            return event, context
 
-        contexts = await make_deferred_yieldable(
-            defer.gatherResults(
-                [run_in_background(prep, ev_info) for ev_info in event_infos],
-                consumeErrors=True,
-            )
+        events_to_persist = (
+            x for x in await yieldable_gather_results(prep, fetched_events) if x
         )
-
-        await self.persist_events_and_notify(
-            room_id,
-            [
-                (ev_info.event, context)
-                for ev_info, context in zip(event_infos, contexts)
-            ],
-        )
+        await self.persist_events_and_notify(room_id, tuple(events_to_persist))
 
     async def _check_event_auth(
         self,
@@ -1269,8 +1244,7 @@ class FederationEventHandler:
 
             claimed_auth_event_map:
                 A map of (type, state_key) => event for the event's claimed auth_events.
-                Possibly incomplete, and possibly including events that are not yet
-                persisted, or authed, or in the right room.
+                Possibly including events that were rejected, or are in the wrong room.
 
                 Only populated when populating outliers.
 
@@ -1505,64 +1479,22 @@ class FederationEventHandler:
             # If we don't have all the auth events, we need to get them.
             logger.info("auth_events contains unknown events: %s", missing_auth)
             try:
-                try:
-                    remote_auth_chain = await self._federation_client.get_event_auth(
-                        origin, event.room_id, event.event_id
-                    )
-                except RequestSendFailed as e1:
-                    # The other side isn't around or doesn't implement the
-                    # endpoint, so lets just bail out.
-                    logger.info("Failed to get event auth from remote: %s", e1)
-                    return context, auth_events
-
-                seen_remotes = await self._store.have_seen_events(
-                    event.room_id, [e.event_id for e in remote_auth_chain]
+                await self._get_remote_auth_chain_for_event(
+                    origin, event.room_id, event.event_id
                 )
-
-                for auth_event in remote_auth_chain:
-                    if auth_event.event_id in seen_remotes:
-                        continue
-
-                    if auth_event.event_id == event.event_id:
-                        continue
-
-                    try:
-                        auth_ids = auth_event.auth_event_ids()
-                        auth = {
-                            (e.type, e.state_key): e
-                            for e in remote_auth_chain
-                            if e.event_id in auth_ids or e.type == EventTypes.Create
-                        }
-                        auth_event.internal_metadata.outlier = True
-
-                        logger.debug(
-                            "_check_event_auth %s missing_auth: %s",
-                            event.event_id,
-                            auth_event.event_id,
-                        )
-                        missing_auth_event_context = (
-                            await self._state_handler.compute_event_context(auth_event)
-                        )
-
-                        missing_auth_event_context = await self._check_event_auth(
-                            origin,
-                            auth_event,
-                            missing_auth_event_context,
-                            claimed_auth_event_map=auth,
-                        )
-                        await self.persist_events_and_notify(
-                            event.room_id, [(auth_event, missing_auth_event_context)]
-                        )
-
-                        if auth_event.event_id in event_auth_events:
-                            auth_events[
-                                (auth_event.type, auth_event.state_key)
-                            ] = auth_event
-                    except AuthError:
-                        pass
-
             except Exception:
                 logger.exception("Failed to get auth chain")
+            else:
+                # load any auth events we might have persisted from the database. This
+                # has the side-effect of correctly setting the rejected_reason on them.
+                auth_events.update(
+                    {
+                        (ae.type, ae.state_key): ae
+                        for ae in await self._store.get_events_as_list(
+                            missing_auth, allow_rejected=True
+                        )
+                    }
+                )
 
         if event.internal_metadata.is_outlier():
             # XXX: given that, for an outlier, we'll be working with the
@@ -1636,6 +1568,45 @@ class FederationEventHandler:
 
         return context, auth_events
 
+    async def _get_remote_auth_chain_for_event(
+        self, destination: str, room_id: str, event_id: str
+    ) -> None:
+        """If we are missing some of an event's auth events, attempt to request them
+
+        Args:
+            destination: where to fetch the auth tree from
+            room_id: the room in which we are lacking auth events
+            event_id: the event for which we are lacking auth events
+        """
+        try:
+            remote_event_map = {
+                e.event_id: e
+                for e in await self._federation_client.get_event_auth(
+                    destination, room_id, event_id
+                )
+            }
+        except RequestSendFailed as e1:
+            # The other side isn't around or doesn't implement the
+            # endpoint, so lets just bail out.
+            logger.info("Failed to get event auth from remote: %s", e1)
+            return
+
+        logger.info("/event_auth returned %i events", len(remote_event_map))
+
+        # `event` may be returned, but we should not yet process it.
+        remote_event_map.pop(event_id, None)
+
+        # nor should we reprocess any events we have already seen.
+        seen_remotes = await self._store.have_seen_events(
+            room_id, remote_event_map.keys()
+        )
+        for s in seen_remotes:
+            remote_event_map.pop(s, None)
+
+        await self._auth_and_persist_fetched_events(
+            destination, room_id, remote_event_map.values()
+        )
+
     async def _update_context_for_auth_events(
         self, event: EventBase, context: EventContext, auth_events: StateMap[EventBase]
     ) -> EventContext:
@@ -1692,7 +1663,7 @@ class FederationEventHandler:
 
     async def _run_push_actions_and_persist_event(
         self, event: EventBase, context: EventContext, backfilled: bool = False
-    ):
+    ) -> None:
         """Run the push actions for a received event, and persist it.
 
         Args:

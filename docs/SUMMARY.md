@@ -74,6 +74,7 @@
   - [Testing]()
   - [OpenTracing](opentracing.md)
   - [Database Schemas](development/database_schema.md)
+  - [Experimental features](development/experimental_features.md)
   - [Synapse Architecture]()
     - [Log Contexts](log_contexts.md)
     - [Replication](replication.md)

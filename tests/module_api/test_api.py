@@ -43,6 +43,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.module_api = homeserver.get_module_api()
         self.event_creation_handler = homeserver.get_event_creation_handler()
         self.sync_handler = homeserver.get_sync_handler()
+        self.auth_handler = homeserver.get_auth_handler()
 
     def make_homeserver(self, reactor, clock):
         return self.setup_test_homeserver(
@@ -88,6 +89,77 @@ class ModuleApiTestCase(HomeserverTestCase):
     def test_get_userinfo_by_id__no_user_found(self):
         found_user = self.get_success(self.module_api.get_userinfo_by_id("@alice:test"))
         self.assertIsNone(found_user)
+
+    def test_get_user_ip_and_agents(self):
+        user_id = self.register_user("test_get_user_ip_and_agents_user", "1234")
+
+        # Initially, we should have no ip/agent for our user.
+        info = self.get_success(self.module_api.get_user_ip_and_agents(user_id))
+        self.assertEqual(info, [])
+
+        # Insert a first ip, agent. We should be able to retrieve it.
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token", "ip_1", "user_agent_1", "device_1", None
+            )
+        )
+        info = self.get_success(self.module_api.get_user_ip_and_agents(user_id))
+
+        self.assertEqual(len(info), 1)
+        last_seen_1 = info[0].last_seen
+
+        # Insert a second ip, agent at a later date. We should be able to retrieve it.
+        last_seen_2 = last_seen_1 + 10000
+        print("%s => %s" % (last_seen_1, last_seen_2))
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token", "ip_2", "user_agent_2", "device_2", last_seen_2
+            )
+        )
+        info = self.get_success(self.module_api.get_user_ip_and_agents(user_id))
+
+        self.assertEqual(len(info), 2)
+        ip_1_seen = False
+        ip_2_seen = False
+
+        for i in info:
+            if i.ip == "ip_1":
+                ip_1_seen = True
+                self.assertEqual(i.user_agent, "user_agent_1")
+                self.assertEqual(i.last_seen, last_seen_1)
+            elif i.ip == "ip_2":
+                ip_2_seen = True
+                self.assertEqual(i.user_agent, "user_agent_2")
+                self.assertEqual(i.last_seen, last_seen_2)
+        self.assertTrue(ip_1_seen)
+        self.assertTrue(ip_2_seen)
+
+        # If we fetch from a midpoint between last_seen_1 and last_seen_2,
+        # we should only find the second ip, agent.
+        info = self.get_success(
+            self.module_api.get_user_ip_and_agents(
+                user_id, (last_seen_1 + last_seen_2) / 2
+            )
+        )
+        self.assertEqual(len(info), 1)
+        self.assertEqual(info[0].ip, "ip_2")
+        self.assertEqual(info[0].user_agent, "user_agent_2")
+        self.assertEqual(info[0].last_seen, last_seen_2)
+
+        # If we fetch from a point later than last_seen_2, we shouldn't
+        # find anything.
+        info = self.get_success(
+            self.module_api.get_user_ip_and_agents(user_id, last_seen_2 + 10000)
+        )
+        self.assertEqual(info, [])
+
+    def test_get_user_ip_and_agents__no_user_found(self):
+        info = self.get_success(
+            self.module_api.get_user_ip_and_agents(
+                "@test_get_user_ip_and_agents_user_nonexistent:example.com"
+            )
+        )
+        self.assertEqual(info, [])
 
     def test_sending_events_into_room(self):
         """Tests that a module can send events into a room"""

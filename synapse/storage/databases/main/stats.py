@@ -98,7 +98,7 @@ class StatsStore(StateDeltasStore):
 
         self.server_name = hs.hostname
         self.clock = self.hs.get_clock()
-        self.stats_enabled = hs.config.stats_enabled
+        self.stats_enabled = hs.config.stats.stats_enabled
 
         self.stats_delta_processing_lock = DeferredLock()
 

@@ -344,6 +344,18 @@ class EventBase(metaclass=abc.ABCMeta):
         # this will be a no-op if the event dict is already frozen.
         self._dict = freeze(self._dict)
 
+    def __str__(self):
+        return self.__repr__()
+
+    def __repr__(self):
+        return "<%s event_id=%r, type=%r, state_key=%r, outlier=%s>" % (
+            self.__class__.__name__,
+            self.event_id,
+            self.get("type", None),
+            self.get("state_key", None),
+            self.internal_metadata.is_outlier(),
+        )
+
 
 class FrozenEvent(EventBase):
     format_version = EventFormatVersions.V1  # All events of this type are V1
@@ -391,17 +403,6 @@ class FrozenEvent(EventBase):
     @property
     def event_id(self) -> str:
         return self._event_id
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self):
-        return "<FrozenEvent event_id=%r, type=%r, state_key=%r, outlier=%s>" % (
-            self.get("event_id", None),
-            self.get("type", None),
-            self.get("state_key", None),
-            self.internal_metadata.is_outlier(),
-        )
 
 
 class FrozenEventV2(EventBase):
@@ -477,17 +478,6 @@ class FrozenEventV2(EventBase):
             list[str]: The list of event IDs of this event's auth_events
         """
         return self.auth_events
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self):
-        return "<%s event_id=%r, type=%r, state_key=%r>" % (
-            self.__class__.__name__,
-            self.event_id,
-            self.get("type", None),
-            self.get("state_key", None),
-        )
 
 
 class FrozenEventV3(FrozenEventV2):
