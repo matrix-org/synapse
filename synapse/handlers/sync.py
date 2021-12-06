@@ -1612,6 +1612,12 @@ class SyncHandler:
         )
 
     async def _get_ignored_users(self, user_id: str) -> FrozenSet[str]:
+        """Retrieve the users ignored by the given user from their global account_data.
+
+        Returns an empty set if
+        - there is no global account_data entry for ignored_users
+        - there is such an entry, but it's not a JSON object.
+        """
         ignored_account_data = (
             await self.store.get_global_account_data_by_type_for_user(
                 AccountDataTypes.IGNORED_USER_LIST, user_id=user_id
