@@ -80,7 +80,7 @@ class AccountDetailsResource(DirectServeHtmlResource):
                 yield hs.config.sso.sso_template_dir
             yield hs.config.sso.default_template_dir
 
-        self._jinja_env = build_jinja_env(template_search_dirs(), hs.config)
+        self._jinja_env = build_jinja_env(list(template_search_dirs()), hs.config)
 
     async def _async_render_GET(self, request: Request) -> None:
         try:

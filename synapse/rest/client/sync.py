@@ -14,12 +14,24 @@
 import itertools
 import logging
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from synapse.api.constants import Membership, PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.api.filtering import DEFAULT_FILTER_COLLECTION, FilterCollection
 from synapse.api.presence import UserPresenceState
+from synapse.events import EventBase
 from synapse.events.utils import (
     format_event_for_client_v2_without_room_id,
     format_event_raw,
@@ -504,7 +516,7 @@ class SyncRestServlet(RestServlet):
             The room, encoded in our response format
         """
 
-        def serialize(events):
+        def serialize(events: Iterable[EventBase]) -> Awaitable[List[JsonDict]]:
             return self._event_serializer.serialize_events(
                 events,
                 time_now=time_now,

@@ -27,6 +27,7 @@ from synapse import event_auth
 from synapse.api.constants import (
     EventContentFields,
     EventTypes,
+    GuestAccess,
     Membership,
     RelationTypes,
     UserTypes,
@@ -83,7 +84,7 @@ class MessageHandler:
         # scheduled.
         self._scheduled_expiry: Optional[IDelayedCall] = None
 
-        if not hs.config.worker_app:
+        if not hs.config.worker.worker_app:
             run_as_background_process(
                 "_schedule_next_expiry", self._schedule_next_expiry
             )
@@ -426,7 +427,7 @@ class EventCreationHandler:
 
         self.send_event = ReplicationSendEventRestServlet.make_client(hs)
 
-        # This is only used to get at ratelimit function, and maybe_kick_guest_users
+        # This is only used to get at ratelimit function
         self.base_handler = BaseHandler(hs)
 
         # We arbitrarily limit concurrent event creation for a room to 5.
@@ -460,7 +461,7 @@ class EventCreationHandler:
         self._dummy_events_threshold = hs.config.dummy_events_threshold
 
         if (
-            self.config.run_background_tasks
+            self.config.worker.run_background_tasks
             and self.config.cleanup_extremities_with_dummy_events
         ):
             self.clock.looping_call(
@@ -1306,7 +1307,7 @@ class EventCreationHandler:
                 requester, is_admin_redaction=is_admin_redaction
             )
 
-        await self.base_handler.maybe_kick_guest_users(event, context)
+        await self._maybe_kick_guest_users(event, context)
 
         if event.type == EventTypes.CanonicalAlias:
             # Validate a newly added alias or newly added alt_aliases.
@@ -1393,6 +1394,9 @@ class EventCreationHandler:
                 allow_none=True,
             )
 
+            room_version = await self.store.get_room_version_id(event.room_id)
+            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+
             # we can make some additional checks now if we have the original event.
             if original_event:
                 if original_event.type == EventTypes.Create:
@@ -1404,15 +1408,34 @@ class EventCreationHandler:
                 if original_event.type == EventTypes.ServerACL:
                     raise AuthError(403, "Redacting server ACL events is not permitted")
 
+                # Add a little safety stop-gap to prevent people from trying to
+                # redact MSC2716 related events when they're in a room version
+                # which does not support it yet. We allow people to use MSC2716
+                # events in existing room versions but only from the room
+                # creator since it does not require any changes to the auth
+                # rules and in effect, the redaction algorithm . In the
+                # supported room version, we add the `historical` power level to
+                # auth the MSC2716 related events and adjust the redaction
+                # algorthim to keep the `historical` field around (redacting an
+                # event should only strip fields which don't affect the
+                # structural protocol level).
+                is_msc2716_event = (
+                    original_event.type == EventTypes.MSC2716_INSERTION
+                    or original_event.type == EventTypes.MSC2716_CHUNK
+                    or original_event.type == EventTypes.MSC2716_MARKER
+                )
+                if not room_version_obj.msc2716_historical and is_msc2716_event:
+                    raise AuthError(
+                        403,
+                        "Redacting MSC2716 events is not supported in this room version",
+                    )
+
             prev_state_ids = await context.get_prev_state_ids()
             auth_events_ids = self._event_auth_handler.compute_auth_events(
                 event, prev_state_ids, for_verification=True
             )
             auth_events_map = await self.store.get_events(auth_events_ids)
             auth_events = {(e.type, e.state_key): e for e in auth_events_map.values()}
-
-            room_version = await self.store.get_room_version_id(event.room_id)
-            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
             if event_auth.check_redaction(
                 room_version_obj, event, auth_events=auth_events
@@ -1470,6 +1493,28 @@ class EventCreationHandler:
             run_in_background(self._bump_active_time, requester.user)
 
         return event
+
+    async def _maybe_kick_guest_users(
+        self, event: EventBase, context: EventContext
+    ) -> None:
+        if event.type != EventTypes.GuestAccess:
+            return
+
+        guest_access = event.content.get(EventContentFields.GUEST_ACCESS)
+        if guest_access == GuestAccess.CAN_JOIN:
+            return
+
+        current_state_ids = await context.get_current_state_ids()
+
+        # since this is a client-generated event, it cannot be an outlier and we must
+        # therefore have the state ids.
+        assert current_state_ids is not None
+        current_state_dict = await self.store.get_events(
+            list(current_state_ids.values())
+        )
+        current_state = list(current_state_dict.values())
+        logger.info("maybe_kick_guest_users %r", current_state)
+        await self.hs.get_room_member_handler().kick_guest_users(current_state)
 
     async def _bump_active_time(self, user: UserID) -> None:
         try:

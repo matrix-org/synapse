@@ -384,7 +384,7 @@ class SynapseRequest(Request):
         # authenticated (e.g. and admin is puppetting a user) then we log both.
         requester, authenticated_entity = self.get_authenticated_entity()
         if authenticated_entity:
-            requester = f"{authenticated_entity}.{requester}"
+            requester = f"{authenticated_entity}|{requester}"
 
         self.site.access_logger.log(
             log_level,

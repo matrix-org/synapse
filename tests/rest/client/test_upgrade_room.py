@@ -13,9 +13,11 @@
 # limitations under the License.
 from typing import Optional
 
+from synapse.api.constants import EventContentFields, EventTypes, RoomTypes
 from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.rest import admin
 from synapse.rest.client import login, room, room_upgrade_rest_servlet
+from synapse.server import HomeServer
 
 from tests import unittest
 from tests.server import FakeChannel
@@ -29,9 +31,8 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         room_upgrade_rest_servlet.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor, clock, hs: "HomeServer"):
         self.store = hs.get_datastore()
-        self.handler = hs.get_user_directory_handler()
 
         self.creator = self.register_user("creator", "pass")
         self.creator_token = self.login(self.creator, "pass")
@@ -42,13 +43,18 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_token)
         self.helper.join(self.room_id, self.other, tok=self.other_token)
 
-    def _upgrade_room(self, token: Optional[str] = None) -> FakeChannel:
+    def _upgrade_room(
+        self, token: Optional[str] = None, room_id: Optional[str] = None
+    ) -> FakeChannel:
         # We never want a cached response.
         self.reactor.advance(5 * 60 + 1)
 
+        if room_id is None:
+            room_id = self.room_id
+
         return self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/%s/upgrade" % self.room_id,
+            f"/_matrix/client/r0/rooms/{room_id}/upgrade",
             # This will upgrade a room to the same version, but that's fine.
             content={"new_version": DEFAULT_ROOM_VERSION},
             access_token=token or self.creator_token,
@@ -157,3 +163,56 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
             tok=self.creator_token,
         )
         self.assertNotIn(self.other, power_levels["users"])
+
+    def test_space(self):
+        """Test upgrading a space."""
+
+        # Create a space.
+        space_id = self.helper.create_room_as(
+            self.creator,
+            tok=self.creator_token,
+            extra_content={
+                "creation_content": {EventContentFields.ROOM_TYPE: RoomTypes.SPACE}
+            },
+        )
+
+        # Add the room as a child room.
+        self.helper.send_state(
+            space_id,
+            event_type=EventTypes.SpaceChild,
+            body={"via": [self.hs.hostname]},
+            tok=self.creator_token,
+            state_key=self.room_id,
+        )
+
+        # Also add a room that was removed.
+        old_room_id = "!notaroom:" + self.hs.hostname
+        self.helper.send_state(
+            space_id,
+            event_type=EventTypes.SpaceChild,
+            body={},
+            tok=self.creator_token,
+            state_key=old_room_id,
+        )
+
+        # Upgrade the room!
+        channel = self._upgrade_room(room_id=space_id)
+        self.assertEquals(200, channel.code, channel.result)
+        self.assertIn("replacement_room", channel.json_body)
+
+        new_space_id = channel.json_body["replacement_room"]
+
+        state_ids = self.get_success(self.store.get_current_state_ids(new_space_id))
+
+        # Ensure the new room is still a space.
+        create_event = self.get_success(
+            self.store.get_event(state_ids[(EventTypes.Create, "")])
+        )
+        self.assertEqual(
+            create_event.content.get(EventContentFields.ROOM_TYPE), RoomTypes.SPACE
+        )
+
+        # The child link should have been copied over.
+        self.assertIn((EventTypes.SpaceChild, self.room_id), state_ids)
+        # The child that was removed should not be copied over.
+        self.assertNotIn((EventTypes.SpaceChild, old_room_id), state_ids)

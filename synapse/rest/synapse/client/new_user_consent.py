@@ -52,7 +52,7 @@ class NewUserConsentResource(DirectServeHtmlResource):
                 yield hs.config.sso.sso_template_dir
             yield hs.config.sso.default_template_dir
 
-        self._jinja_env = build_jinja_env(template_search_dirs(), hs.config)
+        self._jinja_env = build_jinja_env(list(template_search_dirs()), hs.config)
 
     async def _async_render_GET(self, request: Request) -> None:
         try:
@@ -63,8 +63,8 @@ class NewUserConsentResource(DirectServeHtmlResource):
             self._sso_handler.render_error(request, "bad_session", e.msg, code=e.code)
             return
 
-        # It should be impossible to get here without having first been through
-        # the pick-a-username step, which ensures chosen_localpart gets set.
+        # It should be impossible to get here without either the user or the mapping provider
+        # having chosen a username, which ensures chosen_localpart gets set.
         if not session.chosen_localpart:
             logger.warning("Session has no user name selected")
             self._sso_handler.render_error(

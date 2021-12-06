@@ -74,7 +74,7 @@ class ListNode(Generic[P]):
             new_node._refs_insert_after(node)
         return new_node
 
-    def remove_from_list(self):
+    def remove_from_list(self) -> None:
         """Remove this node from the list."""
         with self._LOCK:
             self._refs_remove_node_from_list()
@@ -84,7 +84,7 @@ class ListNode(Generic[P]):
         # immediately rather than at the next GC.
         self.cache_entry = None
 
-    def move_after(self, node: "ListNode"):
+    def move_after(self, node: "ListNode") -> None:
         """Move this node from its current location in the list to after the
         given node.
         """
@@ -103,7 +103,7 @@ class ListNode(Generic[P]):
             # Insert self back into the list, after target node
             self._refs_insert_after(node)
 
-    def _refs_remove_node_from_list(self):
+    def _refs_remove_node_from_list(self) -> None:
         """Internal method to *just* remove the node from the list, without
         e.g. clearing out the cache entry.
         """
@@ -122,7 +122,7 @@ class ListNode(Generic[P]):
         self.prev_node = None
         self.next_node = None
 
-    def _refs_insert_after(self, node: "ListNode"):
+    def _refs_insert_after(self, node: "ListNode") -> None:
         """Internal method to insert the node after the given node."""
 
         # This method should only be called when we're not already in the list.

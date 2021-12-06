@@ -19,7 +19,13 @@ from typing import TYPE_CHECKING, Optional, Tuple
 import msgpack
 from unpaddedbase64 import decode_base64, encode_base64
 
-from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    GuestAccess,
+    HistoryVisibility,
+    JoinRules,
+)
 from synapse.api.errors import (
     Codes,
     HttpResponseException,
@@ -307,7 +313,9 @@ class RoomListHandler(BaseHandler):
 
         # Return whether this room is open to federation users or not
         create_event = current_state[EventTypes.Create, ""]
-        result["m.federate"] = create_event.content.get("m.federate", True)
+        result["m.federate"] = create_event.content.get(
+            EventContentFields.FEDERATE, True
+        )
 
         name_event = current_state.get((EventTypes.Name, ""))
         if name_event:
@@ -336,8 +344,8 @@ class RoomListHandler(BaseHandler):
         guest_event = current_state.get((EventTypes.GuestAccess, ""))
         guest = None
         if guest_event:
-            guest = guest_event.content.get("guest_access", None)
-        result["guest_can_join"] = guest == "can_join"
+            guest = guest_event.content.get(EventContentFields.GUEST_ACCESS)
+        result["guest_can_join"] = guest == GuestAccess.CAN_JOIN
 
         avatar_event = current_state.get(("m.room.avatar", ""))
         if avatar_event:

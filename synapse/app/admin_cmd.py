@@ -178,12 +178,12 @@ def start(config_options):
         sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
 
-    if config.worker_app is not None:
-        assert config.worker_app == "synapse.app.admin_cmd"
+    if config.worker.worker_app is not None:
+        assert config.worker.worker_app == "synapse.app.admin_cmd"
 
     # Update the config with some basic overrides so that don't have to specify
     # a full worker config.
-    config.worker_app = "synapse.app.admin_cmd"
+    config.worker.worker_app = "synapse.app.admin_cmd"
 
     if (
         not config.worker_daemonize
@@ -196,7 +196,7 @@ def start(config_options):
 
     # Explicitly disable background processes
     config.update_user_directory = False
-    config.run_background_tasks = False
+    config.worker.run_background_tasks = False
     config.start_pushers = False
     config.pusher_shard_config.instances = []
     config.send_federation = False
@@ -205,7 +205,7 @@ def start(config_options):
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     ss = AdminCmdServer(
-        config.server_name,
+        config.server.server_name,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
     )

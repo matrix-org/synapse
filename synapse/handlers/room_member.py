@@ -23,6 +23,7 @@ from synapse.api.constants import (
     AccountDataTypes,
     EventContentFields,
     EventTypes,
+    GuestAccess,
     Membership,
 )
 from synapse.api.errors import (
@@ -44,6 +45,7 @@ from synapse.types import (
     RoomID,
     StateMap,
     UserID,
+    create_requester,
     get_domain_from_id,
 )
 from synapse.util.async_helpers import Linearizer
@@ -70,6 +72,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.config = hs.config
+        self._server_name = hs.hostname
 
         self.federation_handler = hs.get_federation_handler()
         self.directory_handler = hs.get_directory_handler()
@@ -115,9 +118,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
         )
 
-        # This is only used to get at ratelimit function, and
-        # maybe_kick_guest_users. It's fine there are multiple of these as
-        # it doesn't store state.
+        # This is only used to get at the ratelimit function. It's fine there are
+        # multiple of these as it doesn't store state.
         self.base_handler = BaseHandler(hs)
 
     @abc.abstractmethod
@@ -1126,9 +1128,61 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         return bool(
             guest_access
             and guest_access.content
-            and "guest_access" in guest_access.content
-            and guest_access.content["guest_access"] == "can_join"
+            and guest_access.content.get(EventContentFields.GUEST_ACCESS)
+            == GuestAccess.CAN_JOIN
         )
+
+    async def kick_guest_users(self, current_state: Iterable[EventBase]) -> None:
+        """Kick any local guest users from the room.
+
+        This is called when the room state changes from guests allowed to not-allowed.
+
+        Params:
+            current_state: the current state of the room. We will iterate this to look
+               for guest users to kick.
+        """
+        for member_event in current_state:
+            try:
+                if member_event.type != EventTypes.Member:
+                    continue
+
+                if not self.hs.is_mine_id(member_event.state_key):
+                    continue
+
+                if member_event.content["membership"] not in {
+                    Membership.JOIN,
+                    Membership.INVITE,
+                }:
+                    continue
+
+                if (
+                    "kind" not in member_event.content
+                    or member_event.content["kind"] != "guest"
+                ):
+                    continue
+
+                # We make the user choose to leave, rather than have the
+                # event-sender kick them. This is partially because we don't
+                # need to worry about power levels, and partially because guest
+                # users are a concept which doesn't hugely work over federation,
+                # and having homeservers have their own users leave keeps more
+                # of that decision-making and control local to the guest-having
+                # homeserver.
+                target_user = UserID.from_string(member_event.state_key)
+                requester = create_requester(
+                    target_user, is_guest=True, authenticated_entity=self._server_name
+                )
+                handler = self.hs.get_room_member_handler()
+                await handler.update_membership(
+                    requester,
+                    target_user,
+                    member_event.room_id,
+                    "leave",
+                    ratelimit=False,
+                    require_consent=False,
+                )
+            except Exception as e:
+                logger.exception("Error kicking guest user: %s" % (e,))
 
     async def lookup_room_alias(
         self, room_alias: RoomAlias
@@ -1405,7 +1459,6 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         self.distributor = hs.get_distributor()
         self.distributor.declare("user_left_room")
-        self._server_name = hs.hostname
 
     async def _is_remote_room_too_complex(
         self, room_id: str, remote_room_hosts: List[str]

@@ -131,6 +131,8 @@ class ApplicationServicesHandler:
 
                         now = self.clock.time_msec()
                         ts = await self.store.get_received_ts(event.event_id)
+                        assert ts is not None
+
                         synapse.metrics.event_processing_lag_by_event.labels(
                             "appservice_sender"
                         ).observe((now - ts) / 1000)
@@ -166,6 +168,7 @@ class ApplicationServicesHandler:
                     if events:
                         now = self.clock.time_msec()
                         ts = await self.store.get_received_ts(events[-1].event_id)
+                        assert ts is not None
 
                         synapse.metrics.event_processing_lag.labels(
                             "appservice_sender"

@@ -335,6 +335,24 @@ listeners:
   #  bind_addresses: ['::1', '127.0.0.1']
   #  type: manhole
 
+# Connection settings for the manhole
+#
+manhole_settings:
+  # The username for the manhole. This defaults to 'matrix'.
+  #
+  #username: manhole
+
+  # The password for the manhole. This defaults to 'rabbithole'.
+  #
+  #password: mypassword
+
+  # The private and public SSH key pair used to encrypt the manhole traffic.
+  # If these are left unset, then hardcoded and non-secret keys are used,
+  # which could allow traffic to be intercepted if sent over a public network.
+  #
+  #ssh_priv_key_path: CONFDIR/id_rsa
+  #ssh_pub_key_path: CONFDIR/id_rsa.pub
+
 # Forward extremities can build up in a room due to networking delays between
 # homeservers. Once this happens in a large room, calculation of the state of
 # that room can become quite expensive. To mitigate this, once the number of
@@ -1171,6 +1189,27 @@ media_store_path: "DATADIR/media_store"
 #
 url_preview_accept_language:
 #   - en
+
+
+# oEmbed allows for easier embedding content from a website. It can be
+# used for generating URLs previews of services which support it.
+#
+oembed:
+  # A default list of oEmbed providers is included with Synapse.
+  #
+  # Uncomment the following to disable using these default oEmbed URLs.
+  # Defaults to 'false'.
+  #
+  #disable_default_providers: true
+
+  # Additional files with oEmbed configuration (each should be in the
+  # form of providers.json).
+  #
+  # By default, this list is empty (so only the default providers.json
+  # is used).
+  #
+  #additional_providers:
+  #  - oembed/my_providers.json
 
 
 ## Captcha ##
@@ -2213,7 +2252,7 @@ password_config:
       #
       #require_lowercase: true
 
-      # Whether a password must contain at least one lowercase letter.
+      # Whether a password must contain at least one uppercase letter.
       # Defaults to 'false'.
       #
       #require_uppercase: true

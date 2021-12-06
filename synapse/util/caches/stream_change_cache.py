@@ -195,7 +195,7 @@ class StreamChangeCache:
             for entity in r:
                 del self._entity_to_key[entity]
 
-    def _evict(self):
+    def _evict(self) -> None:
         while len(self._cache) > self._max_size:
             k, r = self._cache.popitem(0)
             self._earliest_known_stream_pos = max(k, self._earliest_known_stream_pos)

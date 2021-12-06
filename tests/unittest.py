@@ -734,9 +734,9 @@ class TestTransportLayerServer(JsonResource):
             FederationRateLimitConfig(
                 window_size=1,
                 sleep_limit=1,
-                sleep_msec=1,
+                sleep_delay=1,
                 reject_limit=1000,
-                concurrent_requests=1000,
+                concurrent=1000,
             ),
         )
 

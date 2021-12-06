@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import email.message
 import os
+from typing import Dict, List, Sequence, Tuple
 
 import attr
 import pkg_resources
@@ -70,9 +71,10 @@ class EmailPusherTests(HomeserverTestCase):
         hs = self.setup_test_homeserver(config=config)
 
         # List[Tuple[Deferred, args, kwargs]]
-        self.email_attempts = []
+        self.email_attempts: List[Tuple[Deferred, Sequence, Dict]] = []
 
         def sendmail(*args, **kwargs):
+            # This mocks out synapse.reactor.send_email._sendmail.
             d = Deferred()
             self.email_attempts.append((d, args, kwargs))
             return d
@@ -255,6 +257,39 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about those messages
         self._check_for_mail()
 
+    def test_room_notifications_include_avatar(self):
+        # Create a room and set its avatar.
+        room = self.helper.create_room_as(self.user_id, tok=self.access_token)
+        self.helper.send_state(
+            room, "m.room.avatar", {"url": "mxc://DUMMY_MEDIA_ID"}, self.access_token
+        )
+
+        # Invite two other uses.
+        for other in self.others:
+            self.helper.invite(
+                room=room, src=self.user_id, tok=self.access_token, targ=other.id
+            )
+            self.helper.join(room=room, user=other.id, tok=other.token)
+
+        # The other users send some messages.
+        # TODO It seems that two messages are required to trigger an email?
+        self.helper.send(room, body="Alpha", tok=self.others[0].token)
+        self.helper.send(room, body="Beta", tok=self.others[1].token)
+
+        # We should get emailed about those messages
+        args, kwargs = self._check_for_mail()
+
+        # That email should contain the room's avatar
+        msg: bytes = args[5]
+        # Multipart: plain text, base 64 encoded; html, base 64 encoded
+        html = (
+            email.message_from_bytes(msg)
+            .get_payload()[1]
+            .get_payload(decode=True)
+            .decode()
+        )
+        self.assertIn("_matrix/media/v1/thumbnail/DUMMY_MEDIA_ID", html)
+
     def test_empty_room(self):
         """All users leaving a room shouldn't cause the pusher to break."""
         # Create a simple room with two users
@@ -388,9 +423,14 @@ class EmailPusherTests(HomeserverTestCase):
         pushers = list(pushers)
         self.assertEqual(len(pushers), 0)
 
-    def _check_for_mail(self):
-        """Check that the user receives an email notification"""
+    def _check_for_mail(self) -> Tuple[Sequence, Dict]:
+        """
+        Assert that synapse sent off exactly one email notification.
 
+        Returns:
+            args and kwargs passed to synapse.reactor.send_email._sendmail for
+            that notification.
+        """
         # Get the stream ordering before it gets sent
         pushers = self.get_success(
             self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
@@ -413,8 +453,9 @@ class EmailPusherTests(HomeserverTestCase):
         # One email was attempted to be sent
         self.assertEqual(len(self.email_attempts), 1)
 
+        deferred, sendmail_args, sendmail_kwargs = self.email_attempts[0]
         # Make the email succeed
-        self.email_attempts[0][0].callback(True)
+        deferred.callback(True)
         self.pump()
 
         # One email was attempted to be sent
@@ -430,3 +471,4 @@ class EmailPusherTests(HomeserverTestCase):
 
         # Reset the attempts.
         self.email_attempts = []
+        return sendmail_args, sendmail_kwargs

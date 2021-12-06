@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import atexit
 import gc
 import logging
 import os
@@ -36,6 +37,7 @@ from synapse.api.constants import MAX_PDU_SIZE
 from synapse.app import check_bind_error
 from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config.homeserver import HomeServerConfig
+from synapse.config.server import ManholeConfig
 from synapse.crypto import context_factory
 from synapse.events.presence_router import load_legacy_presence_router
 from synapse.events.spamcheck import load_legacy_spam_checkers
@@ -80,7 +82,7 @@ def start_worker_reactor(appname, config, run_command=reactor.run):
         run_command (Callable[]): callable that actually runs the reactor
     """
 
-    logger = logging.getLogger(config.worker_app)
+    logger = logging.getLogger(config.worker.worker_app)
 
     start_reactor(
         appname,
@@ -229,7 +231,12 @@ def listen_metrics(bind_addresses, port):
         start_http_server(port, addr=host, registry=RegistryProxy)
 
 
-def listen_manhole(bind_addresses: Iterable[str], port: int, manhole_globals: dict):
+def listen_manhole(
+    bind_addresses: Iterable[str],
+    port: int,
+    manhole_settings: ManholeConfig,
+    manhole_globals: dict,
+):
     # twisted.conch.manhole 21.1.0 uses "int_from_bytes", which produces a confusing
     # warning. It's fixed by https://github.com/twisted/twisted/pull/1522), so
     # suppress the warning for now.
@@ -244,7 +251,7 @@ def listen_manhole(bind_addresses: Iterable[str], port: int, manhole_globals: di
     listen_tcp(
         bind_addresses,
         port,
-        manhole(username="matrix", password="rabbithole", globals=manhole_globals),
+        manhole(settings=manhole_settings, globals=manhole_globals),
     )
 
 
@@ -391,7 +398,7 @@ async def start(hs: "HomeServer"):
 
     # If background tasks are running on the main process, start collecting the
     # phone home stats.
-    if hs.config.run_background_tasks:
+    if hs.config.worker.run_background_tasks:
         start_phone_stats_home(hs)
 
     # We now freeze all allocated objects in the hopes that (almost)
@@ -402,6 +409,12 @@ async def start(hs: "HomeServer"):
     if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
         gc.collect()
         gc.freeze()
+
+    # Speed up shutdowns by freezing all allocated objects. This moves everything
+    # into the permanent generation and excludes them from the final GC.
+    # Unfortunately only works on Python 3.7
+    if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
+        atexit.register(gc.freeze)
 
 
 def setup_sentry(hs):
@@ -420,9 +433,13 @@ def setup_sentry(hs):
 
     # We set some default tags that give some context to this instance
     with sentry_sdk.configure_scope() as scope:
-        scope.set_tag("matrix_server_name", hs.config.server_name)
+        scope.set_tag("matrix_server_name", hs.config.server.server_name)
 
-        app = hs.config.worker_app if hs.config.worker_app else "synapse.app.homeserver"
+        app = (
+            hs.config.worker.worker_app
+            if hs.config.worker.worker_app
+            else "synapse.app.homeserver"
+        )
         name = hs.get_instance_name()
         scope.set_tag("worker_app", app)
         scope.set_tag("worker_name", name)

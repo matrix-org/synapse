@@ -35,6 +35,7 @@ from typing import (
 from typing_extensions import Literal
 
 from twisted.internet import reactor
+from twisted.internet.interfaces import IReactorTime
 
 from synapse.config import cache as cache_config
 from synapse.metrics.background_process_metrics import wrap_as_background_process
@@ -341,7 +342,7 @@ class LruCache(Generic[KT, VT]):
         # Default `clock` to something sensible. Note that we rename it to
         # `real_clock` so that mypy doesn't think its still `Optional`.
         if clock is None:
-            real_clock = Clock(reactor)
+            real_clock = Clock(cast(IReactorTime, reactor))
         else:
             real_clock = clock
 
@@ -384,7 +385,7 @@ class LruCache(Generic[KT, VT]):
 
         lock = threading.Lock()
 
-        def evict():
+        def evict() -> None:
             while cache_len() > self.max_size:
                 # Get the last node in the list (i.e. the oldest node).
                 todelete = list_root.prev_node

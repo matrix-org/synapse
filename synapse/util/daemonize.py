@@ -126,7 +126,7 @@ def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -
     signal.signal(signal.SIGTERM, sigterm)
 
     # Cleanup pid file at exit.
-    def exit():
+    def exit() -> None:
         logger.warning("Stopping daemon.")
         os.remove(pid_file)
         sys.exit(0)

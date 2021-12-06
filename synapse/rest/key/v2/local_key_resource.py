@@ -86,12 +86,12 @@ class LocalKey(Resource):
 
         json_object = {
             "valid_until_ts": self.valid_until_ts,
-            "server_name": self.config.server_name,
+            "server_name": self.config.server.server_name,
             "verify_keys": verify_keys,
             "old_verify_keys": old_verify_keys,
         }
         for key in self.config.signing_key:
-            json_object = sign_json(json_object, self.config.server_name, key)
+            json_object = sign_json(json_object, self.config.server.server_name, key)
         return json_object
 
     def render_GET(self, request):

@@ -83,7 +83,7 @@ class AccountValidityHandler:
             )
 
             # Check the renewal emails to send and send them every 30min.
-            if hs.config.run_background_tasks:
+            if hs.config.worker.run_background_tasks:
                 self.clock.looping_call(self._send_renewal_emails, 30 * 60 * 1000)
 
         # Mark users as inactive when they expired. Check once every hour
@@ -266,7 +266,7 @@ class AccountValidityHandler:
 
         renewal_token = await self._get_renewal_token(user_id)
         url = "%s_matrix/client/unstable/account_validity/renew?token=%s" % (
-            self.hs.config.public_baseurl,
+            self.hs.config.server.public_baseurl,
             renewal_token,
         )
 
@@ -415,6 +415,7 @@ class AccountValidityHandler:
         """
         now = self.clock.time_msec()
         if expiration_ts is None:
+            assert self._account_validity_period is not None
             expiration_ts = now + self._account_validity_period
 
         await self.store.set_account_validity_for_user(

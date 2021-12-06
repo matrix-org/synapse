@@ -75,8 +75,6 @@ class DirectoryWorkerStore(SQLBaseStore):
             desc="get_aliases_for_room",
         )
 
-
-class DirectoryStore(DirectoryWorkerStore):
     async def create_room_alias_association(
         self,
         room_alias: RoomAlias,
@@ -126,6 +124,8 @@ class DirectoryStore(DirectoryWorkerStore):
                 409, "Room alias %s already exists" % room_alias.to_string()
             )
 
+
+class DirectoryStore(DirectoryWorkerStore):
     async def delete_room_alias(self, room_alias: RoomAlias) -> str:
         room_id = await self.db_pool.runInteraction(
             "delete_room_alias", self._delete_room_alias_txn, room_alias

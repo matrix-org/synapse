@@ -57,7 +57,7 @@ class E2eKeysHandler:
 
         federation_registry = hs.get_federation_registry()
 
-        self._is_master = hs.config.worker_app is None
+        self._is_master = hs.config.worker.worker_app is None
         if not self._is_master:
             self._user_device_resync_client = (
                 ReplicationUserDevicesResyncRestServlet.make_client(hs)

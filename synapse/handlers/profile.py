@@ -80,7 +80,7 @@ class ProfileHandler(BaseHandler):
         self.allowed_avatar_mimetypes = hs.config.allowed_avatar_mimetypes
         self.replicate_user_profiles_to = hs.config.replicate_user_profiles_to
 
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             self.clock.looping_call(
                 self._update_remote_profile_cache, self.PROFILE_UPDATE_MS
             )

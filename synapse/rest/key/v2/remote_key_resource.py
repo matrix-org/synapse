@@ -224,7 +224,9 @@ class RemoteKey(DirectServeJsonResource):
             for key_json in json_results:
                 key_json = json_decoder.decode(key_json.decode("utf-8"))
                 for signing_key in self.config.key_server_signing_keys:
-                    key_json = sign_json(key_json, self.config.server_name, signing_key)
+                    key_json = sign_json(
+                        key_json, self.config.server.server_name, signing_key
+                    )
 
                 signed_keys.append(key_json)
 

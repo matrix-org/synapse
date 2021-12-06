@@ -82,7 +82,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         self._rotate_delay = 3
         self._rotate_count = 10000
         self._doing_notif_rotation = False
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             self._rotate_notif_loop = self._clock.looping_call(
                 self._rotate_notifs, 30 * 60 * 1000
             )

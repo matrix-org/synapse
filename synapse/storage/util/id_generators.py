@@ -19,6 +19,7 @@ from contextlib import contextmanager
 from typing import Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import attr
+from sortedcontainers import SortedSet
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.database import DatabasePool, LoggingTransaction
@@ -240,7 +241,7 @@ class MultiWriterIdGenerator:
 
         # Set of local IDs that we're still processing. The current position
         # should be less than the minimum of this set (if not empty).
-        self._unfinished_ids: Set[int] = set()
+        self._unfinished_ids: SortedSet[int] = SortedSet()
 
         # Set of local IDs that we've processed that are larger than the current
         # position, due to there being smaller unpersisted IDs.
@@ -473,7 +474,7 @@ class MultiWriterIdGenerator:
 
                 finished = set()
 
-                min_unfinshed = min(self._unfinished_ids)
+                min_unfinshed = self._unfinished_ids[0]
                 for s in self._finished_ids:
                     if s < min_unfinshed:
                         if new_cur is None or new_cur < s:

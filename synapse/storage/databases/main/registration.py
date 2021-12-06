@@ -132,14 +132,14 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 hs.config.account_validity.account_validity_startup_job_max_delta
             )
 
-            if hs.config.run_background_tasks:
+            if hs.config.worker.run_background_tasks:
                 self._clock.call_later(
                     0.0,
                     self._set_expiration_date_when_missing,
                 )
 
         # Create a background job for culling expired 3PID validity tokens
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             self._clock.looping_call(
                 self.cull_expired_threepid_validation_tokens, THIRTY_MINUTES_IN_MS
             )
@@ -1171,6 +1171,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 delta equal to 10% of the validity period.
         """
         now_ms = self._clock.time_msec()
+        assert self._account_validity_period is not None
         expiration_ts = now_ms + self._account_validity_period
 
         if use_delta:

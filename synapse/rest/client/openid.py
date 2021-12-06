@@ -69,7 +69,7 @@ class IdTokenServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
-        self.server_name = hs.config.server_name
+        self.server_name = hs.config.server.server_name
 
     async def on_POST(
         self, request: SynapseRequest, user_id: str

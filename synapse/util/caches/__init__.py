@@ -64,32 +64,32 @@ class CacheMetric:
     evicted_size = attr.ib(default=0)
     memory_usage = attr.ib(default=None)
 
-    def inc_hits(self):
+    def inc_hits(self) -> None:
         self.hits += 1
 
-    def inc_misses(self):
+    def inc_misses(self) -> None:
         self.misses += 1
 
-    def inc_evictions(self, size=1):
+    def inc_evictions(self, size: int = 1) -> None:
         self.evicted_size += size
 
-    def inc_memory_usage(self, memory: int):
+    def inc_memory_usage(self, memory: int) -> None:
         if self.memory_usage is None:
             self.memory_usage = 0
 
         self.memory_usage += memory
 
-    def dec_memory_usage(self, memory: int):
+    def dec_memory_usage(self, memory: int) -> None:
         self.memory_usage -= memory
 
-    def clear_memory_usage(self):
+    def clear_memory_usage(self) -> None:
         if self.memory_usage is not None:
             self.memory_usage = 0
 
     def describe(self):
         return []
 
-    def collect(self):
+    def collect(self) -> None:
         try:
             if self._cache_type == "response_cache":
                 response_cache_size.labels(self._cache_name).set(len(self._cache))

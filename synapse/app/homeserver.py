@@ -291,7 +291,10 @@ class SynapseHomeServer(HomeServer):
                 )
             elif listener.type == "manhole":
                 _base.listen_manhole(
-                    listener.bind_addresses, listener.port, manhole_globals={"hs": self}
+                    listener.bind_addresses,
+                    listener.port,
+                    manhole_settings=self.config.server.manhole_settings,
+                    manhole_globals={"hs": self},
                 )
             elif listener.type == "replication":
                 services = listen_tcp(
@@ -347,7 +350,7 @@ def setup(config_options):
         synapse.metrics.MIN_TIME_BETWEEN_GCS = config.server.gc_seconds
 
     hs = SynapseHomeServer(
-        config.server_name,
+        config.server.server_name,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
     )

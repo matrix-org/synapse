@@ -355,7 +355,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
 
         self.user_ips_max_age = hs.config.user_ips_max_age
 
-        if hs.config.run_background_tasks and self.user_ips_max_age:
+        if hs.config.worker.run_background_tasks and self.user_ips_max_age:
             self._clock.looping_call(self._prune_old_user_ips, 5 * 1000)
 
     @wrap_as_background_process("prune_old_user_ips")

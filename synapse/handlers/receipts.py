@@ -29,7 +29,7 @@ class ReceiptsHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.server_name = hs.config.server_name
+        self.server_name = hs.config.server.server_name
         self.store = hs.get_datastore()
         self.event_auth_handler = hs.get_event_auth_handler()
 

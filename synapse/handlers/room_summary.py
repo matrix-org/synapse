@@ -28,9 +28,15 @@ from synapse.api.constants import (
     Membership,
     RoomTypes,
 )
-from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    NotFoundError,
+    StoreError,
+    SynapseError,
+    UnsupportedRoomVersionError,
+)
 from synapse.events import EventBase
-from synapse.events.utils import format_event_for_client_v2
 from synapse.types import JsonDict
 from synapse.util.caches.response_cache import ResponseCache
 
@@ -82,7 +88,6 @@ class RoomSummaryHandler:
     _PAGINATION_SESSION_VALIDITY_PERIOD_MS = 5 * 60 * 1000
 
     def __init__(self, hs: "HomeServer"):
-        self._clock = hs.get_clock()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._store = hs.get_datastore()
         self._event_serializer = hs.get_event_client_serializer()
@@ -641,18 +646,18 @@ class RoomSummaryHandler:
         if max_children is None or max_children > MAX_ROOMS_PER_SPACE:
             max_children = MAX_ROOMS_PER_SPACE
 
-        now = self._clock.time_msec()
-        events_result: List[JsonDict] = []
-        for edge_event in itertools.islice(child_events, max_children):
-            events_result.append(
-                await self._event_serializer.serialize_event(
-                    edge_event,
-                    time_now=now,
-                    event_format=format_event_for_client_v2,
-                )
-            )
-
-        return _RoomEntry(room_id, room_entry, events_result)
+        stripped_events: List[JsonDict] = [
+            {
+                "type": e.type,
+                "state_key": e.state_key,
+                "content": e.content,
+                "room_id": e.room_id,
+                "sender": e.sender,
+                "origin_server_ts": e.origin_server_ts,
+            }
+            for e in itertools.islice(child_events, max_children)
+        ]
+        return _RoomEntry(room_id, room_entry, stripped_events)
 
     async def _summarize_remote_room(
         self,
@@ -814,7 +819,12 @@ class RoomSummaryHandler:
             logger.info("room %s is unknown, omitting from summary", room_id)
             return False
 
-        room_version = await self._store.get_room_version(room_id)
+        try:
+            room_version = await self._store.get_room_version(room_id)
+        except UnsupportedRoomVersionError:
+            # If a room with an unsupported room version is encountered, ignore
+            # it to avoid breaking the entire summary response.
+            return False
 
         # Include the room if it has join rules of public or knock.
         join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""))
@@ -1139,17 +1149,17 @@ def _is_suggested_child_event(edge_event: EventBase) -> bool:
 _INVALID_ORDER_CHARS_RE = re.compile(r"[^\x20-\x7E]")
 
 
-def _child_events_comparison_key(child: EventBase) -> Tuple[bool, Optional[str], str]:
+def _child_events_comparison_key(
+    child: EventBase,
+) -> Tuple[bool, Optional[str], int, str]:
     """
     Generate a value for comparing two child events for ordering.
 
-    The rules for ordering are supposed to be:
+    The rules for ordering are:
 
     1. The 'order' key, if it is valid.
-    2. The 'origin_server_ts' of the 'm.room.create' event.
+    2. The 'origin_server_ts' of the 'm.space.child' event.
     3. The 'room_id'.
-
-    But we skip step 2 since we may not have any state from the room.
 
     Args:
         child: The event for generating a comparison key.
@@ -1157,7 +1167,8 @@ def _child_events_comparison_key(child: EventBase) -> Tuple[bool, Optional[str],
     Returns:
         The comparison key as a tuple of:
             False if the ordering is valid.
-            The ordering field.
+            The 'order' field or None if it is not given or invalid.
+            The 'origin_server_ts' field.
             The room ID.
     """
     order = child.content.get("order")
@@ -1168,4 +1179,4 @@ def _child_events_comparison_key(child: EventBase) -> Tuple[bool, Optional[str],
         order = None
 
     # Items without an order come last.
-    return (order is None, order, child.room_id)
+    return (order is None, order, child.origin_server_ts, child.room_id)

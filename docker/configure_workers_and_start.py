@@ -162,7 +162,7 @@ WORKERS_CONFIG = {
         "shared_extra_conf": {},
         "worker_extra_conf": (
             "worker_main_http_uri: http://127.0.0.1:%d"
-            % (MAIN_PROCESS_HTTP_LISTENER_PORT,),
+            % (MAIN_PROCESS_HTTP_LISTENER_PORT,)
         ),
     },
 }

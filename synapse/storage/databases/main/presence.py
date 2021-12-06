@@ -29,7 +29,26 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
-class PresenceStore(SQLBaseStore):
+class PresenceBackgroundUpdateStore(SQLBaseStore):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: Connection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+
+        # Used by `PresenceStore._get_active_presence()`
+        self.db_pool.updates.register_background_index_update(
+            "presence_stream_not_offline_index",
+            index_name="presence_stream_state_not_offline_idx",
+            table="presence_stream",
+            columns=["state"],
+            where_clause="state != 'offline'",
+        )
+
+
+class PresenceStore(PresenceBackgroundUpdateStore):
     def __init__(
         self,
         database: DatabasePool,
@@ -332,6 +351,8 @@ class PresenceStore(SQLBaseStore):
         the appropriate time outs.
         """
 
+        # The `presence_stream_state_not_offline_idx` index should be used for this
+        # query.
         sql = (
             "SELECT user_id, state, last_active_ts, last_federation_update_ts,"
             " last_user_sync_ts, status_msg, currently_active FROM presence_stream"

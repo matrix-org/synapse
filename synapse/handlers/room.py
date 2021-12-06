@@ -25,12 +25,15 @@ from collections import OrderedDict
 from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
 
 from synapse.api.constants import (
+    EventContentFields,
     EventTypes,
+    GuestAccess,
     HistoryVisibility,
     JoinRules,
     Membership,
     RoomCreationPreset,
     RoomEncryptionAlgorithms,
+    RoomTypes,
 )
 from synapse.api.errors import (
     AuthError,
@@ -388,14 +391,14 @@ class RoomCreationHandler(BaseHandler):
         old_room_create_event = await self.store.get_create_event_for_room(old_room_id)
 
         # Check if the create event specified a non-federatable room
-        if not old_room_create_event.content.get("m.federate", True):
+        if not old_room_create_event.content.get(EventContentFields.FEDERATE, True):
             # If so, mark the new room as non-federatable as well
-            creation_content["m.federate"] = False
+            creation_content[EventContentFields.FEDERATE] = False
 
         initial_state = {}
 
         # Replicate relevant room events
-        types_to_copy = (
+        types_to_copy: List[Tuple[str, Optional[str]]] = [
             (EventTypes.JoinRules, ""),
             (EventTypes.Name, ""),
             (EventTypes.Topic, ""),
@@ -406,7 +409,16 @@ class RoomCreationHandler(BaseHandler):
             (EventTypes.ServerACL, ""),
             (EventTypes.RelatedGroups, ""),
             (EventTypes.PowerLevels, ""),
-        )
+        ]
+
+        # If the old room was a space, copy over the room type and the rooms in
+        # the space.
+        if (
+            old_room_create_event.content.get(EventContentFields.ROOM_TYPE)
+            == RoomTypes.SPACE
+        ):
+            creation_content[EventContentFields.ROOM_TYPE] = RoomTypes.SPACE
+            types_to_copy.append((EventTypes.SpaceChild, None))
 
         old_room_state_ids = await self.store.get_filtered_current_state_ids(
             old_room_id, StateFilter.from_types(types_to_copy)
@@ -417,6 +429,11 @@ class RoomCreationHandler(BaseHandler):
         for k, old_event_id in old_room_state_ids.items():
             old_event = old_room_state_events.get(old_event_id)
             if old_event:
+                # If the event is an space child event with empty content, it was
+                # removed from the space and should be ignored.
+                if k[0] == EventTypes.SpaceChild and not old_event.content:
+                    continue
+
                 initial_state[k] = old_event.content
 
         # deep-copy the power-levels event before we start modifying it
@@ -916,7 +933,12 @@ class RoomCreationHandler(BaseHandler):
             )
             return last_stream_id
 
-        config = self._presets_dict[preset_config]
+        try:
+            config = self._presets_dict[preset_config]
+        except KeyError:
+            raise SynapseError(
+                400, f"'{preset_config}' is not a valid preset", errcode=Codes.BAD_JSON
+            )
 
         creation_content.update({"creator": creator_id})
         await send(etype=EventTypes.Create, content=creation_content)
@@ -996,7 +1018,8 @@ class RoomCreationHandler(BaseHandler):
         if config["guest_can_join"]:
             if (EventTypes.GuestAccess, "") not in initial_state:
                 last_sent_stream_id = await send(
-                    etype=EventTypes.GuestAccess, content={"guest_access": "can_join"}
+                    etype=EventTypes.GuestAccess,
+                    content={EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN},
                 )
 
         for (etype, state_key), content in initial_state.items():

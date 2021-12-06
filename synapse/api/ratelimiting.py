@@ -46,7 +46,7 @@ class Ratelimiter:
         #   * How many times an action has occurred since a point in time
         #   * The point in time
         #   * The rate_hz of this particular entry. This can vary per request
-        self.actions: OrderedDict[Hashable, Tuple[float, int, float]] = OrderedDict()
+        self.actions: OrderedDict[Hashable, Tuple[float, float, float]] = OrderedDict()
 
     async def can_do_action(
         self,
@@ -56,7 +56,7 @@ class Ratelimiter:
         burst_count: Optional[int] = None,
         update: bool = True,
         n_actions: int = 1,
-        _time_now_s: Optional[int] = None,
+        _time_now_s: Optional[float] = None,
     ) -> Tuple[bool, float]:
         """Can the entity (e.g. user or IP address) perform the action?
 
@@ -160,7 +160,7 @@ class Ratelimiter:
 
         return allowed, time_allowed
 
-    def _prune_message_counts(self, time_now_s: int):
+    def _prune_message_counts(self, time_now_s: float):
         """Remove message count entries that have not exceeded their defined
         rate_hz limit
 
@@ -188,7 +188,7 @@ class Ratelimiter:
         burst_count: Optional[int] = None,
         update: bool = True,
         n_actions: int = 1,
-        _time_now_s: Optional[int] = None,
+        _time_now_s: Optional[float] = None,
     ):
         """Checks if an action can be performed. If not, raises a LimitExceededError
 

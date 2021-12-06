@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import synapse.metrics
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, Membership
-from synapse.handlers.state_deltas import StateDeltasHandler
+from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo
 from synapse.types import JsonDict
@@ -30,14 +30,26 @@ logger = logging.getLogger(__name__)
 
 
 class UserDirectoryHandler(StateDeltasHandler):
-    """Handles querying of and keeping updated the user_directory.
+    """Handles queries and updates for the user_directory.
 
     N.B.: ASSUMES IT IS THE ONLY THING THAT MODIFIES THE USER DIRECTORY
 
-    The user directory is filled with users who this server can see are joined to a
-    world_readable or publicly joinable room. We keep a database table up to date
-    by streaming changes of the current state and recalculating whether users should
-    be in the directory or not when necessary.
+    When a local user searches the user_directory, we report two kinds of users:
+
+    - users this server can see are joined to a world_readable or publicly
+      joinable room, and
+    - users belonging to a private room shared by that local user.
+
+    The two cases are tracked separately in the `users_in_public_rooms` and
+    `users_who_share_private_rooms` tables. Both kinds of users have their
+    username and avatar tracked in a `user_directory` table.
+
+    This handler has three responsibilities:
+    1. Forwarding requests to `/user_directory/search` to the UserDirectoryStore.
+    2. Providing hooks for the application to call when local users are added,
+       removed, or have their profile changed.
+    3. Listening for room state changes that indicate remote users have
+       joined or left a room, or that their profile has changed.
     """
 
     def __init__(self, hs: "HomeServer"):
@@ -130,7 +142,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 user_id, profile.display_name, profile.avatar_url
             )
 
-    async def handle_user_deactivated(self, user_id: str) -> None:
+    async def handle_local_user_deactivated(self, user_id: str) -> None:
         """Called when a user ID is deactivated"""
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
@@ -196,7 +208,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                     public_value=Membership.JOIN,
                 )
 
-                if change is False:
+                if change is MatchChange.now_false:
                     # Need to check if the server left the room entirely, if so
                     # we might need to remove all the users in that room
                     is_in_room = await self.store.is_host_joined(
@@ -219,14 +231,14 @@ class UserDirectoryHandler(StateDeltasHandler):
 
                 is_support = await self.store.is_support_user(state_key)
                 if not is_support:
-                    if change is None:
+                    if change is MatchChange.no_change:
                         # Handle any profile changes
                         await self._handle_profile_change(
                             state_key, room_id, prev_event_id, event_id
                         )
                         continue
 
-                    if change:  # The user joined
+                    if change is MatchChange.now_true:  # The user joined
                         event = await self.store.get_event(event_id, allow_none=True)
                         # It isn't expected for this event to not exist, but we
                         # don't want the entire background process to break.
@@ -263,14 +275,14 @@ class UserDirectoryHandler(StateDeltasHandler):
         logger.debug("Handling change for %s: %s", typ, room_id)
 
         if typ == EventTypes.RoomHistoryVisibility:
-            change = await self._get_key_change(
+            publicness = await self._get_key_change(
                 prev_event_id,
                 event_id,
                 key_name="history_visibility",
                 public_value=HistoryVisibility.WORLD_READABLE,
             )
         elif typ == EventTypes.JoinRules:
-            change = await self._get_key_change(
+            publicness = await self._get_key_change(
                 prev_event_id,
                 event_id,
                 key_name="join_rule",
@@ -278,9 +290,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             )
         else:
             raise Exception("Invalid event type")
-        # If change is None, no change. True => become world_readable/public,
-        # False => was world_readable/public
-        if change is None:
+        if publicness is MatchChange.no_change:
             logger.debug("No change")
             return
 
@@ -290,13 +300,13 @@ class UserDirectoryHandler(StateDeltasHandler):
             room_id
         )
 
-        logger.debug("Change: %r, is_public: %r", change, is_public)
+        logger.debug("Change: %r, publicness: %r", publicness, is_public)
 
-        if change and not is_public:
+        if publicness is MatchChange.now_true and not is_public:
             # If we became world readable but room isn't currently public then
             # we ignore the change
             return
-        elif not change and is_public:
+        elif publicness is MatchChange.now_false and is_public:
             # If we stopped being world readable but are still public,
             # ignore the change
             return

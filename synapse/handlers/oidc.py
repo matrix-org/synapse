@@ -324,7 +324,7 @@ class OidcProvider:
         self._allow_existing_users = provider.allow_existing_users
 
         self._http_client = hs.get_proxied_http_client()
-        self._server_name: str = hs.config.server_name
+        self._server_name: str = hs.config.server.server_name
 
         # identifier for the external_ids table
         self.idp_id = provider.idp_id
@@ -337,9 +337,6 @@ class OidcProvider:
 
         # optional brand identifier for this auth provider
         self.idp_brand = provider.idp_brand
-
-        # Optional brand identifier for the unstable API (see MSC2858).
-        self.unstable_idp_brand = provider.unstable_idp_brand
 
         self._sso_handler = hs.get_sso_handler()
 

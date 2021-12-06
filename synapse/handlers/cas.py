@@ -82,7 +82,6 @@ class CasHandler:
         # the SsoIdentityProvider protocol type.
         self.idp_icon = None
         self.idp_brand = None
-        self.unstable_idp_brand = None
 
         self._sso_handler = hs.get_sso_handler()
 
