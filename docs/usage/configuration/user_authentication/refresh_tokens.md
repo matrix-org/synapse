@@ -9,8 +9,8 @@ Synapse supports refresh tokens since version 1.49 (some earlier versions had su
 ## Background and motivation
 
 Synapse users' sessions are identified by **access tokens**; access tokens are
-issued to users on login and the access token is then used to identify the user
-and device making subsequent requests.
+issued to users on login. Each session gets a unique access token which identifies
+it; the access token must be kept secret as it grants access to the user's account.
 
 Traditionally, these access tokens were eternally valid (at least until the user
 explicitly chose to log out).
