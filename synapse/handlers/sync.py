@@ -1512,8 +1512,8 @@ class SyncHandler:
             account_data_by_room: Dictionary of per room account data
 
         Returns:
-            Returns a 4-tuple describing rooms we've joined or left, and users who've
-            joined or left rooms we're in. This gets used later in
+            Returns a 4-tuple describing rooms the user has joined or left, and users who've
+            joined or left rooms any rooms the user is in. This gets used later in
             `_generate_sync_entry_for_device_list`.
 
             Its entries are:
