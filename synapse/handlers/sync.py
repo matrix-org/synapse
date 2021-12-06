@@ -1795,7 +1795,7 @@ class SyncHandler:
             # Only bother if we're still currently invited
             should_invite = last_non_join.membership == Membership.INVITE
             if should_invite:
-                if event.sender not in ignored_users:
+                if last_non_join.sender not in ignored_users:
                     invite_room_sync = InvitedSyncResult(room_id, invite=last_non_join)
                     if invite_room_sync:
                         invited.append(invite_room_sync)
