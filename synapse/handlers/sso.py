@@ -416,7 +416,7 @@ class SsoHandler:
             extra_login_attributes: An optional dictionary of extra
                 attributes to be provided to the client in the login response.
 
-            auth_provider_session_id: An optional session ID from the OIDC login
+            auth_provider_session_id: An optional session ID from the IdP.
 
         Raises:
             MappingException if there was a problem mapping the response to a user.
