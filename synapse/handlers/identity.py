@@ -462,7 +462,7 @@ class IdentityHandler:
 
         return session_id
 
-    def rewrite_id_server_url(self, url: str, add_https=False) -> str:
+    def rewrite_id_server_url(self, url: str, add_https: bool = False) -> str:
         """Given an identity server URL, optionally add a protocol scheme
         before rewriting it according to the rewrite_identity_server_urls
         config option
@@ -1109,7 +1109,7 @@ class IdentityHandler:
         id_server_url: str,
         email: str,
         user_id: str,
-    ):
+    ) -> None:
         """Bind an email to a fully qualified user ID using the internal API of an
         instance of Sydent.
 

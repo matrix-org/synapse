@@ -32,7 +32,7 @@ from synapse.rest.client import (
 )
 from synapse.server import HomeServer
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import create_requester
+from synapse.types import JsonDict, create_requester
 from synapse.util import Clock
 
 from tests import unittest
@@ -910,7 +910,7 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
         account.register_servlets,
     ]
 
-    def default_config(self):
+    def default_config(self) -> JsonDict:
         config = super().default_config()
 
         # Set accounts to expire after a week
@@ -920,12 +920,12 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
         }
         return config
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         super(UserInfoTestCase, self).prepare(reactor, clock, hs)
         self.store = hs.get_datastore()
         self.handler = hs.get_user_directory_handler()
 
-    def test_user_info(self):
+    def test_user_info(self) -> None:
         """Test /users/info for local users from the Client-Server API"""
         user_one, user_two, user_three, user_three_token = self.setup_test_users()
 
@@ -954,7 +954,7 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
         self.assertFalse(user_three_info["deactivated"])
         self.assertFalse(user_three_info["expired"])
 
-    def test_user_info_federation(self):
+    def test_user_info_federation(self) -> None:
         """Test that /users/info can be called from the Federation API, and
         and that we can query remote users from the Client-Server API
         """
@@ -983,7 +983,7 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
         self.assertFalse(user_three_info["deactivated"])
         self.assertFalse(user_three_info["expired"])
 
-    def setup_test_users(self):
+    def setup_test_users(self) -> Tuple[str, str, str, str]:
         """Create an admin user and three test users, each with a different state"""
 
         # Create an admin user to expire other users with
@@ -1007,7 +1007,7 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
 
         return user_one, user_two, user_three, user_three_token
 
-    def expire(self, user_id_to_expire, admin_tok):
+    def expire(self, user_id_to_expire: str, admin_tok: str) -> None:
         url = "/_synapse/admin/v1/account_validity/validity"
         request_data = {
             "user_id": user_id_to_expire,
@@ -1017,7 +1017,7 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
         channel = self.make_request("POST", url, request_data, access_token=admin_tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
-    def deactivate(self, user_id, tok):
+    def deactivate(self, user_id: str, tok: str) -> None:
         request_data = {
             "auth": {"type": "m.login.password", "user": user_id, "password": "pass"},
             "erase": False,

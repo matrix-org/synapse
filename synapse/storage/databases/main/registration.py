@@ -16,7 +16,7 @@
 import logging
 import random
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import attr
 
@@ -453,7 +453,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
     async def get_info_for_users(
         self,
-        user_ids: List[str],
+        user_ids: Iterable[str],
     ):
         """Return the user info for a given set of users
 

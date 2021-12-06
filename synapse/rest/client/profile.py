@@ -79,7 +79,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
 
         return 200, {}
 
-    def on_OPTIONS(self, request, user_id):
+    def on_OPTIONS(self, request: SynapseRequest, user_id: str) -> Tuple[int, JsonDict]:
         return 200, {}
 
 
@@ -134,7 +134,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
 
         return 200, {}
 
-    def on_OPTIONS(self, request, user_id):
+    def on_OPTIONS(self, request: SynapseRequest, user_id: str) -> Tuple[int, JsonDict]:
         return 200, {}
 
 

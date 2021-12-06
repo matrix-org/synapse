@@ -903,13 +903,13 @@ class RegisterRestServlet(RestServlet):
         return 200, result
 
 
-def cap(name):
+def cap(name: str) -> str:
     """Capitalise parts of a name containing different words, including those
     separated by hyphens.
     For example, 'John-Doe'
 
     Args:
-        name (str): The name to parse
+        The name to parse
     """
     if not name:
         return name
@@ -923,13 +923,13 @@ def cap(name):
     return capatilized_name
 
 
-def _map_email_to_displayname(address):
+def _map_email_to_displayname(address: str) -> str:
     """Custom mapping from an email address to a user displayname
 
     Args:
-        address (str): The email address to process
+        address: The email address to process
     Returns:
-        str: The new displayname
+        The new displayname
     """
     # Split the part before and after the @ in the email.
     # Replace all . with spaces in the first part

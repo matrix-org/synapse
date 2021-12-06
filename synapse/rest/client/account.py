@@ -17,7 +17,7 @@ import logging
 import random
 import re
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional, Tuple
 from urllib.parse import urlparse
 
 from twisted.web.server import Request
@@ -294,7 +294,7 @@ class PasswordRestServlet(RestServlet):
 
         return 200, {}
 
-    def on_OPTIONS(self, _):
+    def on_OPTIONS(self, _: Any) -> Tuple[int, JsonDict]:
         return 200, {}
 
 
@@ -844,25 +844,27 @@ class ThreepidDeleteRestServlet(RestServlet):
 class ThreepidLookupRestServlet(RestServlet):
     PATTERNS = [re.compile("^/_matrix/client/unstable/account/3pid/lookup$")]
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer") -> None:
         super(ThreepidLookupRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self.identity_handler = hs.get_identity_handler()
 
-    async def on_GET(self, request):
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         """Proxy a /_matrix/identity/api/v1/lookup request to an identity
         server
         """
         await self.auth.get_user_by_req(request)
 
         # Verify query parameters
-        query_params = request.args
+        # Mypy will complain that request.args is of an incompatible type with JsonDict
+        # because Twisted is badly typed, so we just ignore it.
+        query_params: JsonDict = request.args  # type: ignore[assignment]
         assert_params_in_dict(query_params, [b"medium", b"address", b"id_server"])
 
         # Retrieve needed information from query parameters
-        medium = parse_string(request, "medium")
-        address = parse_string(request, "address")
-        id_server = parse_string(request, "id_server")
+        medium = parse_string(request, "medium", required=True)
+        address = parse_string(request, "address", required=True)
+        id_server = parse_string(request, "id_server", required=True)
 
         # Proxy the request to the identity server. lookup_3pid handles checking
         # if the lookup is allowed so we don't need to do it here.
@@ -874,12 +876,12 @@ class ThreepidLookupRestServlet(RestServlet):
 class ThreepidBulkLookupRestServlet(RestServlet):
     PATTERNS = [re.compile("^/_matrix/client/unstable/account/3pid/bulk_lookup$")]
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer") -> None:
         super(ThreepidBulkLookupRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self.identity_handler = hs.get_identity_handler()
 
-    async def on_POST(self, request):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         """Proxy a /_matrix/identity/api/v1/bulk_lookup request to an identity
         server
         """

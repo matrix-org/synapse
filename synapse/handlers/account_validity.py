@@ -87,7 +87,7 @@ class AccountValidityHandler:
         # Mark users as inactive when they expired. Check once every hour
         if self._account_validity_enabled:
 
-            def mark_expired_users_as_inactive():
+            def mark_expired_users_as_inactive() -> Awaitable:
                 # run as a background process to allow async functions to work
                 return run_as_background_process(
                     "_mark_expired_users_as_inactive",
@@ -438,12 +438,9 @@ class AccountValidityHandler:
 
         return expiration_ts
 
-    async def _mark_expired_users_as_inactive(self):
+    async def _mark_expired_users_as_inactive(self) -> None:
         """Iterate over active, expired users. Mark them as inactive in order to hide them
         from the user directory.
-
-        Returns:
-            Deferred
         """
         # Get active, expired users
         active_expired_users = await self.store.get_expired_users()
