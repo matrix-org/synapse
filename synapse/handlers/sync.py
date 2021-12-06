@@ -1512,10 +1512,12 @@ class SyncHandler:
             - newly_left_rooms
             - newly_left_users
         """
+        since_token = sync_result_builder.since_token
+
         # Start by fetching all ephemeral events in rooms we've joined (if required).
         user_id = sync_result_builder.sync_config.user.to_string()
         block_all_room_ephemeral = (
-            sync_result_builder.since_token is None
+            since_token is None
             and sync_result_builder.sync_config.filter_collection.blocks_all_room_ephemeral()
         )
 
@@ -1531,7 +1533,6 @@ class SyncHandler:
 
         # We check up front if anything has changed, if it hasn't then there is
         # no point in going further.
-        since_token = sync_result_builder.since_token
         if not sync_result_builder.full_state:
             if since_token and not ephemeral_by_room and not account_data_by_room:
                 have_changed = await self._have_rooms_changed(sync_result_builder)
