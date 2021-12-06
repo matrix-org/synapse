@@ -62,7 +62,6 @@ logger = logging.getLogger(__name__)
 # Debug logger for https://github.com/matrix-org/synapse/issues/4422
 issue4422_logger = logging.getLogger("synapse.handler.sync.4422_debug")
 
-
 # Counts the number of times we returned a non-empty sync. `type` is one of
 # "initial_sync", "full_state_sync" or "incremental_sync", `lazy_loaded` is
 # "true" or "false" depending on if the request asked for lazy loaded members or
@@ -82,7 +81,6 @@ LAZY_LOADED_MEMBERS_CACHE_MAX_AGE = 30 * 60 * 1000
 # Remember the last 100 members we sent to a client for the purposes of
 # avoiding redundantly sending the same lazy-loaded members to the client
 LAZY_LOADED_MEMBERS_CACHE_MAX_SIZE = 100
-
 
 SyncRequestKey = Tuple[Any, ...]
 
@@ -1684,7 +1682,7 @@ class SyncHandler:
         now_token = sync_result_builder.now_token
         sync_config = sync_result_builder.sync_config
 
-        assert since_token
+        assert since_token is not None
 
         # The spec
         #     https://spec.matrix.org/v1.1/client-server-api/#get_matrixclientv3sync
@@ -1702,6 +1700,77 @@ class SyncHandler:
         membership_change_events = await self.store.get_membership_changes_for_user(
             user_id, since_token.room_key, now_token.room_key
         )
+
+        room_changes = await self._classify_rooms_by_membership_changes(
+            sync_result_builder, membership_change_events, ignored_users
+        )
+
+        timeline_limit = sync_config.filter_collection.timeline_limit()
+
+        # Get all events since the `from_key` in rooms we're currently joined to.
+        # If there are too many, we get the most recent events only. This leaves
+        # a "gap" in the timeline, as described by the spec for /sync.
+        room_to_events = await self.store.get_room_events_stream_for_rooms(
+            room_ids=sync_result_builder.joined_room_ids,
+            from_key=since_token.room_key,
+            to_key=now_token.room_key,
+            limit=timeline_limit + 1,
+        )
+
+        # We loop through all room ids, even if there are no new events, in case
+        # there are non room events that we need to notify about.
+        for room_id in sync_result_builder.joined_room_ids:
+            room_entry = room_to_events.get(room_id, None)
+
+            newly_joined = room_id in room_changes.newly_joined_rooms
+            if room_entry:
+                events, start_key = room_entry
+
+                prev_batch_token = now_token.copy_and_replace("room_key", start_key)
+
+                entry = RoomSyncResultBuilder(
+                    room_id=room_id,
+                    rtype="joined",
+                    events=events,
+                    newly_joined=newly_joined,
+                    full_state=False,
+                    since_token=None if newly_joined else since_token,
+                    upto_token=prev_batch_token,
+                )
+            else:
+                entry = RoomSyncResultBuilder(
+                    room_id=room_id,
+                    rtype="joined",
+                    events=[],
+                    newly_joined=newly_joined,
+                    full_state=False,
+                    since_token=since_token,
+                    upto_token=since_token,
+                )
+
+            if newly_joined:
+                # debugging for https://github.com/matrix-org/synapse/issues/4422
+                issue4422_logger.debug(
+                    "RoomSyncResultBuilder events for newly joined room %s: %r",
+                    room_id,
+                    entry.events,
+                )
+            room_changes.room_entries.append(entry)
+
+        return room_changes
+
+    async def _classify_rooms_by_membership_changes(
+        self,
+        sync_result_builder: "SyncResultBuilder",
+        membership_change_events: List[EventBase],
+        ignored_users: Collection[str],
+    ) -> _RoomChanges:
+        since_token = sync_result_builder.since_token
+        # This assetion is also made in the caller, `_get_rooms_changed`. We repeat it
+        # here for mypy's benefit.
+        assert since_token is not None
+
+        user_id = sync_result_builder.sync_config.user.to_string()
 
         mem_change_events_by_room_id: Dict[str, List[EventBase]] = {}
         for event in membership_change_events:
@@ -1858,58 +1927,6 @@ class SyncHandler:
                         upto_token=leave_token,
                     )
                 )
-
-        timeline_limit = sync_config.filter_collection.timeline_limit()
-
-        # Get all events since the `from_key` in rooms we're currently joined to.
-        # If there are too many, we get the most recent events only. This leaves
-        # a "gap" in the timeline, as described by the spec for /sync.
-        room_to_events = await self.store.get_room_events_stream_for_rooms(
-            room_ids=sync_result_builder.joined_room_ids,
-            from_key=since_token.room_key,
-            to_key=now_token.room_key,
-            limit=timeline_limit + 1,
-        )
-
-        # We loop through all room ids, even if there are no new events, in case
-        # there are non room events that we need to notify about.
-        for room_id in sync_result_builder.joined_room_ids:
-            room_entry = room_to_events.get(room_id, None)
-
-            newly_joined = room_id in newly_joined_rooms
-            if room_entry:
-                events, start_key = room_entry
-
-                prev_batch_token = now_token.copy_and_replace("room_key", start_key)
-
-                entry = RoomSyncResultBuilder(
-                    room_id=room_id,
-                    rtype="joined",
-                    events=events,
-                    newly_joined=newly_joined,
-                    full_state=False,
-                    since_token=None if newly_joined else since_token,
-                    upto_token=prev_batch_token,
-                )
-            else:
-                entry = RoomSyncResultBuilder(
-                    room_id=room_id,
-                    rtype="joined",
-                    events=[],
-                    newly_joined=newly_joined,
-                    full_state=False,
-                    since_token=since_token,
-                    upto_token=since_token,
-                )
-
-            if newly_joined:
-                # debugging for https://github.com/matrix-org/synapse/issues/4422
-                issue4422_logger.debug(
-                    "RoomSyncResultBuilder events for newly joined room %s: %r",
-                    room_id,
-                    entry.events,
-                )
-            room_entries.append(entry)
 
         return _RoomChanges(
             room_entries,
