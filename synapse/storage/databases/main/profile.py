@@ -62,8 +62,8 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="get_profile_avatar_url",
         )
 
-    async def get_latest_profile_replication_batch_number(self):
-        def f(txn):
+    async def get_latest_profile_replication_batch_number(self) -> Optional[int]:
+        def f(txn: LoggingTransaction) -> Optional[int]:
             txn.execute("SELECT MAX(batch) as maxbatch FROM profiles")
             rows = self.db_pool.cursor_to_dict(txn)
             return rows[0]["maxbatch"]
@@ -72,7 +72,7 @@ class ProfileWorkerStore(SQLBaseStore):
             "get_latest_profile_replication_batch_number", f
         )
 
-    async def get_profile_batch(self, batchnum):
+    async def get_profile_batch(self, batchnum: int) -> List[Dict[str, Any]]:
         return await self.db_pool.simple_select_list(
             table="profiles",
             keyvalues={"batch": batchnum},
@@ -80,8 +80,8 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="get_profile_batch",
         )
 
-    async def assign_profile_batch(self):
-        def f(txn):
+    async def assign_profile_batch(self) -> int:
+        def f(txn: LoggingTransaction) -> int:
             sql = (
                 "UPDATE profiles SET batch = "
                 "(SELECT COALESCE(MAX(batch), -1) + 1 FROM profiles) "
@@ -94,8 +94,8 @@ class ProfileWorkerStore(SQLBaseStore):
 
         return await self.db_pool.runInteraction("assign_profile_batch", f)
 
-    async def get_replication_hosts(self):
-        def f(txn):
+    async def get_replication_hosts(self) -> Dict[str, int]:
+        def f(txn: LoggingTransaction) -> Dict[str, int]:
             txn.execute(
                 "SELECT host, last_synced_batch FROM profile_replication_status"
             )
@@ -106,7 +106,7 @@ class ProfileWorkerStore(SQLBaseStore):
 
     async def update_replication_batch_for_host(
         self, host: str, last_synced_batch: int
-    ):
+    ) -> bool:
         return await self.db_pool.simple_upsert(
             table="profile_replication_status",
             keyvalues={"host": host},
@@ -131,7 +131,10 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     async def set_profile_displayname(
-        self, user_localpart: str, new_displayname: Optional[str], batchnum: int
+        self,
+        user_localpart: str,
+        new_displayname: Optional[str],
+        batchnum: Optional[int],
     ) -> None:
         # Invalidate the read cache for this user
         self.get_profile_displayname.invalidate((user_localpart,))
@@ -145,7 +148,10 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     async def set_profile_avatar_url(
-        self, user_localpart: str, new_avatar_url: Optional[str], batchnum: int
+        self,
+        user_localpart: str,
+        new_avatar_url: Optional[str],
+        batchnum: Optional[int],
     ) -> None:
         # Invalidate the read cache for this user
         self.get_profile_avatar_url.invalidate((user_localpart,))
@@ -163,7 +169,7 @@ class ProfileWorkerStore(SQLBaseStore):
         users: List[UserID],
         active: bool,
         hide: bool,
-        batchnum: int,
+        batchnum: Optional[int],
     ) -> None:
         """Given a set of users, set active and hidden flags on them.
 
@@ -179,13 +185,13 @@ class ProfileWorkerStore(SQLBaseStore):
         user_localparts = [(user.localpart,) for user in users]
 
         # Generate list of value tuples for each user
-        value_names = ("active", "batch")
+        value_names = ["active", "batch"]
         values = [(int(active), batchnum) for _ in user_localparts]  # type: List[Tuple]
 
         if not active and not hide:
             # we are deactivating for real (not in hide mode)
             # so clear the profile information
-            value_names += ("avatar_url", "displayname")
+            value_names += ["avatar_url", "displayname"]
             values = [v + (None, None) for v in values]
 
         return await self.db_pool.runInteraction(
@@ -293,17 +299,6 @@ class ProfileWorkerStore(SQLBaseStore):
 
 
 class ProfileStore(ProfileWorkerStore):
-    def __init__(self, database, db_conn, hs):
-        super().__init__(database, db_conn, hs)
-
-        self.db_pool.updates.register_background_index_update(
-            "profile_replication_status_host_index",
-            index_name="profile_replication_status_idx",
-            table="profile_replication_status",
-            columns=["host"],
-            unique=True,
-        )
-
     async def add_remote_profile_cache(
         self, user_id: str, displayname: str, avatar_url: str
     ) -> None:

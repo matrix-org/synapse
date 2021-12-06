@@ -652,7 +652,9 @@ class RegisterRestServlet(RestServlet):
                                 # something else went wrong.
                                 break
 
-                    if self.hs.config.register_just_use_email_for_display_name:
+                    if (
+                        self.hs.config.registration.register_just_use_email_for_display_name
+                    ):
                         desired_display_name = address
                     else:
                         # Custom mapping between email address and display name

@@ -45,7 +45,7 @@ class AccountDataServlet(RestServlet):
         self.store = hs.get_datastore()
         self.handler = hs.get_account_data_handler()
         self.notifier = hs.get_notifier()
-        self._is_worker = hs.config.worker_app is not None
+        self._is_worker = hs.config.worker.worker_app is not None
         self._profile_handler = hs.get_profile_handler()
 
     async def on_PUT(

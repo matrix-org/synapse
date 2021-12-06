@@ -314,13 +314,12 @@ class ProfileHandler:
                 authenticated_entity=requester.authenticated_entity,
             )
 
+        new_batchnum = None
         if len(self.replicate_user_profiles_to) > 0:
             cur_batchnum = (
                 await self.store.get_latest_profile_replication_batch_number()
             )
             new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
-        else:
-            new_batchnum = None
 
         await self.store.set_profile_displayname(
             target_user.localpart, displayname_to_set, new_batchnum
@@ -366,13 +365,12 @@ class ProfileHandler:
                 False and active is False, user will have their profile
                 erased
         """
+        new_batchnum = None
         if len(self.replicate_user_profiles_to) > 0:
             cur_batchnum = (
                 await self.store.get_latest_profile_replication_batch_number()
             )
             new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
-        else:
-            new_batchnum = None
 
         await self.store.set_profiles_active(users, active, hide, new_batchnum)
 
@@ -487,13 +485,12 @@ class ProfileHandler:
                 target_user, authenticated_entity=requester.authenticated_entity
             )
 
+        new_batchnum = None
         if len(self.replicate_user_profiles_to) > 0:
             cur_batchnum = (
                 await self.store.get_latest_profile_replication_batch_number()
             )
             new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
-        else:
-            new_batchnum = None
 
         await self.store.set_profile_avatar_url(
             target_user.localpart, avatar_url_to_set, new_batchnum

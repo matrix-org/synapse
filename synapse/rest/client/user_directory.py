@@ -72,7 +72,7 @@ class UserDirectorySearchRestServlet(RestServlet):
 
         if self.hs.config.userdirectory.user_directory_defer_to_id_server:
             signed_body = sign_json(
-                body, self.hs.hostname, self.hs.config.signing_key[0]
+                body, self.hs.hostname, self.hs.config.key.signing_key[0]
             )
             url = "%s/_matrix/identity/api/v1/user_directory/search" % (
                 self.hs.config.userdirectory.user_directory_defer_to_id_server,
