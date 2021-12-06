@@ -1593,30 +1593,10 @@ class SyncHandler:
         # 5. Work out which users have joined or left rooms we're in. We use this
         # to build the device_list part of the sync response in
         # `_generate_sync_entry_for_device_list`.
-        newly_joined_or_invited_or_knocked_users = set()
-        newly_left_users = set()
-        if since_token:
-            for joined_sync in sync_result_builder.joined:
-                it = itertools.chain(
-                    joined_sync.timeline.events, joined_sync.state.values()
-                )
-                for event in it:
-                    if event.type == EventTypes.Member:
-                        if (
-                            event.membership == Membership.JOIN
-                            or event.membership == Membership.INVITE
-                            or event.membership == Membership.KNOCK
-                        ):
-                            newly_joined_or_invited_or_knocked_users.add(
-                                event.state_key
-                            )
-                        else:
-                            prev_content = event.unsigned.get("prev_content", {})
-                            prev_membership = prev_content.get("membership", None)
-                            if prev_membership == Membership.JOIN:
-                                newly_left_users.add(event.state_key)
-
-        newly_left_users -= newly_joined_or_invited_or_knocked_users
+        (
+            newly_joined_or_invited_or_knocked_users,
+            newly_left_users,
+        ) = _calculate_user_changes(sync_result_builder)
 
         return (
             set(newly_joined_rooms),
@@ -2351,6 +2331,34 @@ class SyncResultBuilder:
     archived: List[ArchivedSyncResult] = attr.Factory(list)
     groups: Optional[GroupsSyncResult] = None
     to_device: List[JsonDict] = attr.Factory(list)
+
+
+def _calculate_user_changes(
+    sync_result_builder: "SyncResultBuilder",
+) -> Tuple[Set[str], Set[str]]:
+    newly_joined_or_invited_or_knocked_users = set()
+    newly_left_users = set()
+    if sync_result_builder.since_token:
+        for joined_sync in sync_result_builder.joined:
+            it = itertools.chain(
+                joined_sync.timeline.events, joined_sync.state.values()
+            )
+            for event in it:
+                if event.type == EventTypes.Member:
+                    if (
+                        event.membership == Membership.JOIN
+                        or event.membership == Membership.INVITE
+                        or event.membership == Membership.KNOCK
+                    ):
+                        newly_joined_or_invited_or_knocked_users.add(event.state_key)
+                    else:
+                        prev_content = event.unsigned.get("prev_content", {})
+                        prev_membership = prev_content.get("membership", None)
+                        if prev_membership == Membership.JOIN:
+                            newly_left_users.add(event.state_key)
+
+    newly_left_users -= newly_joined_or_invited_or_knocked_users
+    return newly_joined_or_invited_or_knocked_users, newly_left_users
 
 
 @attr.s(slots=True, auto_attribs=True)
