@@ -1,1 +1,1 @@
-Fix a long-standing bug where invites from ignored users would not be omitted from incremental syncs.
+Fix a long-standing bug where invites from ignored users were included in incremental syncs.
