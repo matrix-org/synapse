@@ -215,6 +215,8 @@ class MediaRepository:
         self.mark_recently_accessed(None, media_id)
 
         media_type = media_info["media_type"]
+        if not media_type:
+            media_type = "application/octet-stream"
         media_length = media_info["media_length"]
         upload_name = name if name else media_info["upload_name"]
         url_cache = media_info["url_cache"]
@@ -333,6 +335,9 @@ class MediaRepository:
                 logger.info("Media is quarantined")
                 raise NotFoundError()
 
+            if not media_info["media_type"]:
+                media_info["media_type"] = "application/octet-stream"
+
             responder = await self.media_storage.fetch_media(file_info)
             if responder:
                 return responder, media_info
@@ -354,6 +359,8 @@ class MediaRepository:
                 raise e
 
         file_id = media_info["filesystem_id"]
+        if not media_info["media_type"]:
+            media_info["media_type"] = "application/octet-stream"
         file_info = FileInfo(server_name, file_id)
 
         # We generate thumbnails even if another process downloaded the media
@@ -445,7 +452,10 @@ class MediaRepository:
 
             await finish()
 
-            media_type = headers[b"Content-Type"][0].decode("ascii")
+            if b"Content-Type" in headers:
+                media_type = headers[b"Content-Type"][0].decode("ascii")
+            else:
+                media_type = "application/octet-stream"
             upload_name = get_filename_from_headers(headers)
             time_now_ms = self.clock.time_msec()
 

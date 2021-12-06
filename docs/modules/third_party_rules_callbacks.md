@@ -43,6 +43,14 @@ event with new data by returning the new event's data as a dictionary. In order 
 that, it is recommended the module calls `event.get_dict()` to get the current event as a
 dictionary, and modify the returned dictionary accordingly.
 
+If `check_event_allowed` raises an exception, the module is assumed to have failed.
+The event will not be accepted but is not treated as explicitly rejected, either.
+An HTTP request causing the module check will likely result in a 500 Internal
+Server Error.
+
+When the boolean returned by the module is `False`, the event is rejected.
+(Module developers should not use exceptions for rejection.)
+
 Note that replacing the event only works for events sent by local users, not for events
 received over federation.
 
@@ -118,6 +126,27 @@ If multiple modules implement this callback, they will be considered in order. I
 callback returns `True`, Synapse falls through to the next one. The value of the first
 callback that does not return `True` will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.
+
+### `on_new_event`
+
+_First introduced in Synapse v1.47.0_
+
+```python
+async def on_new_event(
+    event: "synapse.events.EventBase",
+    state_events: "synapse.types.StateMap",
+) -> None:
+```
+
+Called after sending an event into a room. The module is passed the event, as well
+as the state of the room _after_ the event. This means that if the event is a state event,
+it will be included in this state.
+
+Note that this callback is called when the event has already been processed and stored
+into the room, which means this callback cannot be used to deny persisting the event. To
+deny an incoming event, see [`check_event_for_spam`](spam_checker_callbacks.md#check_event_for_spam) instead.
+
+If multiple modules implement this callback, Synapse runs them all in order.
 
 ## Example
 

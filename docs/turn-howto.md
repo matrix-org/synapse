@@ -40,7 +40,9 @@ This will install and start a systemd service called `coturn`.
 
 1.  Configure it:
 
-        ./configure
+    ```sh
+    ./configure
+    ```
 
     You may need to install `libevent2`: if so, you should do so in
     the way recommended by your operating system. You can ignore
@@ -49,22 +51,28 @@ This will install and start a systemd service called `coturn`.
 
 1.  Build and install it:
 
-        make
-        make install
+    ```sh
+    make
+    make install
+    ```
 
 ### Configuration
 
 1.  Create or edit the config file in `/etc/turnserver.conf`. The relevant
     lines, with example values, are:
 
-        use-auth-secret
-        static-auth-secret=[your secret key here]
-        realm=turn.myserver.org
+    ```
+    use-auth-secret
+    static-auth-secret=[your secret key here]
+    realm=turn.myserver.org
+    ```
 
     See `turnserver.conf` for explanations of the options. One way to generate
     the `static-auth-secret` is with `pwgen`:
 
-        pwgen -s 64 1
+    ```sh
+    pwgen -s 64 1
+    ```
 
     A `realm` must be specified, but its value is somewhat arbitrary. (It is
     sent to clients as part of the authentication flow.) It is conventional to
@@ -73,7 +81,9 @@ This will install and start a systemd service called `coturn`.
 1.  You will most likely want to configure coturn to write logs somewhere. The
     easiest way is normally to send them to the syslog:
 
-        syslog
+    ```sh
+    syslog
+    ```
 
     (in which case, the logs will be available via `journalctl -u coturn` on a
     systemd system). Alternatively, coturn can be configured to write to a
@@ -83,31 +93,35 @@ This will install and start a systemd service called `coturn`.
     connect to arbitrary IP addresses and ports. The following configuration is
     suggested as a minimum starting point:
 
-        # VoIP traffic is all UDP. There is no reason to let users connect to arbitrary TCP endpoints via the relay.
-        no-tcp-relay
+    ```
+    # VoIP traffic is all UDP. There is no reason to let users connect to arbitrary TCP endpoints via the relay.
+    no-tcp-relay
 
-        # don't let the relay ever try to connect to private IP address ranges within your network (if any)
-        # given the turn server is likely behind your firewall, remember to include any privileged public IPs too.
-        denied-peer-ip=10.0.0.0-10.255.255.255
-        denied-peer-ip=192.168.0.0-192.168.255.255
-        denied-peer-ip=172.16.0.0-172.31.255.255
+    # don't let the relay ever try to connect to private IP address ranges within your network (if any)
+    # given the turn server is likely behind your firewall, remember to include any privileged public IPs too.
+    denied-peer-ip=10.0.0.0-10.255.255.255
+    denied-peer-ip=192.168.0.0-192.168.255.255
+    denied-peer-ip=172.16.0.0-172.31.255.255
 
-        # special case the turn server itself so that client->TURN->TURN->client flows work
-        allowed-peer-ip=10.0.0.1
+    # special case the turn server itself so that client->TURN->TURN->client flows work
+    allowed-peer-ip=10.0.0.1
 
-        # consider whether you want to limit the quota of relayed streams per user (or total) to avoid risk of DoS.
-        user-quota=12 # 4 streams per video call, so 12 streams = 3 simultaneous relayed calls per user.
-        total-quota=1200
+    # consider whether you want to limit the quota of relayed streams per user (or total) to avoid risk of DoS.
+    user-quota=12 # 4 streams per video call, so 12 streams = 3 simultaneous relayed calls per user.
+    total-quota=1200
+    ```
 
 1.  Also consider supporting TLS/DTLS. To do this, add the following settings
     to `turnserver.conf`:
 
-        # TLS certificates, including intermediate certs.
-        # For Let's Encrypt certificates, use `fullchain.pem` here.
-        cert=/path/to/fullchain.pem
+    ```
+    # TLS certificates, including intermediate certs.
+    # For Let's Encrypt certificates, use `fullchain.pem` here.
+    cert=/path/to/fullchain.pem
 
-        # TLS private key file
-        pkey=/path/to/privkey.pem
+    # TLS private key file
+    pkey=/path/to/privkey.pem
+    ```
 
     In this case, replace the `turn:` schemes in the `turn_uri` settings below
     with `turns:`.
@@ -126,7 +140,9 @@ This will install and start a systemd service called `coturn`.
     If you want to try it anyway, you will at least need to tell coturn its
     external IP address:
 
-        external-ip=192.88.99.1
+    ```
+    external-ip=192.88.99.1
+    ```
 
     ... and your NAT gateway must forward all of the relayed ports directly
     (eg, port 56789 on the external IP must be always be forwarded to port
@@ -186,7 +202,7 @@ After updating the homeserver configuration, you must restart synapse:
     ./synctl restart
     ```
   * If you use systemd:
-    ```
+    ```sh
     systemctl restart matrix-synapse.service
     ```
 ... and then reload any clients (or wait an hour for them to refresh their

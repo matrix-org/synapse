@@ -85,6 +85,29 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.47.0
+
+## Removal of old Room Admin API
+
+The following admin APIs were deprecated in [Synapse 1.34](https://github.com/matrix-org/synapse/blob/v1.34.0/CHANGES.md#deprecations-and-removals)
+(released on 2021-05-17) and have now been removed:
+
+- `POST /_synapse/admin/v1/<room_id>/delete`
+
+Any scripts still using the above APIs should be converted to use the
+[Delete Room API](https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#delete-room-api).
+
+## Deprecation of the `user_may_create_room_with_invites` module callback
+
+The `user_may_create_room_with_invites` is deprecated and will be removed in a future
+version of Synapse. Modules implementing this callback can instead implement
+[`user_may_invite`](https://matrix-org.github.io/synapse/latest/modules/spam_checker_callbacks.html#user_may_invite)
+and use the [`get_room_state`](https://github.com/matrix-org/synapse/blob/872f23b95fa980a61b0866c1475e84491991fa20/synapse/module_api/__init__.py#L869-L876)
+module API method to infer whether the invite is happening in the context of creating a
+room.
+
+We plan to remove this callback in January 2022.
+
 # Upgrading to v1.45.0
 
 ## Changes required to media storage provider modules when reading from the Synapse configuration object
@@ -1163,16 +1186,20 @@ For more information on configuring TLS certificates see the
     For users who have installed Synapse into a virtualenv, we recommend
     doing this by creating a new virtualenv. For example:
 
-        virtualenv -p python3 ~/synapse/env3
-        source ~/synapse/env3/bin/activate
-        pip install matrix-synapse
+    ```sh
+    virtualenv -p python3 ~/synapse/env3
+    source ~/synapse/env3/bin/activate
+    pip install matrix-synapse
+    ```
 
     You can then start synapse as normal, having activated the new
     virtualenv:
 
-        cd ~/synapse
-        source env3/bin/activate
-        synctl start
+    ```sh
+    cd ~/synapse
+    source env3/bin/activate
+    synctl start
+    ```
 
     Users who have installed from distribution packages should see the
     relevant package documentation. See below for notes on Debian
@@ -1184,34 +1211,38 @@ For more information on configuring TLS certificates see the
         `<server>.log.config` file. For example, if your `log.config`
         file contains:
 
-            handlers:
-              file:
-                class: logging.handlers.RotatingFileHandler
-                formatter: precise
-                filename: homeserver.log
-                maxBytes: 104857600
-                backupCount: 10
-                filters: [context]
-              console:
-                class: logging.StreamHandler
-                formatter: precise
-                filters: [context]
+        ```yaml
+        handlers:
+          file:
+            class: logging.handlers.RotatingFileHandler
+            formatter: precise
+            filename: homeserver.log
+            maxBytes: 104857600
+            backupCount: 10
+            filters: [context]
+          console:
+            class: logging.StreamHandler
+            formatter: precise
+            filters: [context]
+        ```
 
         Then you should update this to be:
 
-            handlers:
-              file:
-                class: logging.handlers.RotatingFileHandler
-                formatter: precise
-                filename: homeserver.log
-                maxBytes: 104857600
-                backupCount: 10
-                filters: [context]
-                encoding: utf8
-              console:
-                class: logging.StreamHandler
-                formatter: precise
-                filters: [context]
+        ```yaml
+        handlers:
+          file:
+            class: logging.handlers.RotatingFileHandler
+            formatter: precise
+            filename: homeserver.log
+            maxBytes: 104857600
+            backupCount: 10
+            filters: [context]
+            encoding: utf8
+          console:
+            class: logging.StreamHandler
+            formatter: precise
+            filters: [context]
+        ```
 
         There is no need to revert this change if downgrading to
         Python 2.
@@ -1297,24 +1328,28 @@ with the HS remotely has been removed.
 It has been replaced by specifying a list of application service
 registrations in `homeserver.yaml`:
 
-    app_service_config_files: ["registration-01.yaml", "registration-02.yaml"]
+```yaml
+app_service_config_files: ["registration-01.yaml", "registration-02.yaml"]
+```
 
 Where `registration-01.yaml` looks like:
 
-    url: <String>  # e.g. "https://my.application.service.com"
-    as_token: <String>
-    hs_token: <String>
-    sender_localpart: <String>  # This is a new field which denotes the user_id localpart when using the AS token
-    namespaces:
-      users:
-        - exclusive: <Boolean>
-          regex: <String>  # e.g. "@prefix_.*"
-      aliases:
-        - exclusive: <Boolean>
-          regex: <String>
-      rooms:
-        - exclusive: <Boolean>
-          regex: <String>
+```yaml
+url: <String>  # e.g. "https://my.application.service.com"
+as_token: <String>
+hs_token: <String>
+sender_localpart: <String>  # This is a new field which denotes the user_id localpart when using the AS token
+namespaces:
+  users:
+    - exclusive: <Boolean>
+      regex: <String>  # e.g. "@prefix_.*"
+  aliases:
+    - exclusive: <Boolean>
+      regex: <String>
+  rooms:
+    - exclusive: <Boolean>
+      regex: <String>
+```
 
 # Upgrading to v0.8.0
 

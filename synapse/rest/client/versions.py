@@ -72,6 +72,7 @@ class VersionsRestServlet(RestServlet):
                     "r0.4.0",
                     "r0.5.0",
                     "r0.6.0",
+                    "r0.6.1",
                 ],
                 # as per MSC1497:
                 "unstable_features": {

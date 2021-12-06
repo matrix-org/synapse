@@ -17,8 +17,6 @@ import urllib.parse
 from typing import List, Optional
 from unittest.mock import Mock
 
-from parameterized import parameterized_class
-
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import Codes
@@ -29,13 +27,6 @@ from tests import unittest
 """Tests admin REST events for /rooms paths."""
 
 
-@parameterized_class(
-    ("method", "url_template"),
-    [
-        ("POST", "/_synapse/admin/v1/rooms/%s/delete"),
-        ("DELETE", "/_synapse/admin/v1/rooms/%s"),
-    ],
-)
 class DeleteRoomTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
@@ -67,7 +58,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(
             self.other_user, tok=self.other_user_tok
         )
-        self.url = self.url_template % self.room_id
+        self.url = "/_synapse/admin/v1/rooms/%s" % self.room_id
 
     def test_requester_is_no_admin(self):
         """
@@ -75,7 +66,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url,
             json.dumps({}),
             access_token=self.other_user_tok,
@@ -88,10 +79,10 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         Check that unknown rooms/server return error 404.
         """
-        url = self.url_template % "!unknown:test"
+        url = "/_synapse/admin/v1/rooms/%s" % "!unknown:test"
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             url,
             json.dumps({}),
             access_token=self.admin_user_tok,
@@ -104,10 +95,10 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         Check that invalid room names, return an error 400.
         """
-        url = self.url_template % "invalidroom"
+        url = "/_synapse/admin/v1/rooms/%s" % "invalidroom"
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             url,
             json.dumps({}),
             access_token=self.admin_user_tok,
@@ -126,7 +117,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"new_room_user_id": "@unknown:test"})
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url,
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
@@ -145,7 +136,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"new_room_user_id": "@not:exist.bla"})
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url,
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
@@ -164,7 +155,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"block": "NotBool"})
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url,
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
@@ -180,7 +171,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"purge": "NotBool"})
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url,
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
@@ -206,7 +197,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"block": True, "purge": True})
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url.encode("ascii"),
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
@@ -239,7 +230,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"block": False, "purge": True})
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url.encode("ascii"),
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
@@ -270,10 +261,10 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         # Assert one user in room
         self._is_member(room_id=self.room_id, user_id=self.other_user)
 
-        body = json.dumps({"block": False, "purge": False})
+        body = json.dumps({"block": True, "purge": False})
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url.encode("ascii"),
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
@@ -287,7 +278,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         with self.assertRaises(AssertionError):
             self._is_purged(self.room_id)
-        self._is_blocked(self.room_id, expect=False)
+        self._is_blocked(self.room_id, expect=True)
         self._has_no_members(self.room_id)
 
     def test_shutdown_room_consent(self):
@@ -319,7 +310,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         # Test that the admin can still send shutdown
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url,
             json.dumps({"new_room_user_id": self.admin_user}),
             access_token=self.admin_user_tok,
@@ -365,7 +356,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         # Test that the admin can still send shutdown
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url,
             json.dumps({"new_room_user_id": self.admin_user}),
             access_token=self.admin_user_tok,
@@ -689,36 +680,6 @@ class RoomTestCase(unittest.HomeserverTestCase):
         reversing the order, etc.
         """
 
-        def _set_canonical_alias(room_id: str, test_alias: str, admin_user_tok: str):
-            # Create a new alias to this room
-            url = "/_matrix/client/r0/directory/room/%s" % (
-                urllib.parse.quote(test_alias),
-            )
-            channel = self.make_request(
-                "PUT",
-                url.encode("ascii"),
-                {"room_id": room_id},
-                access_token=admin_user_tok,
-            )
-            self.assertEqual(
-                200, int(channel.result["code"]), msg=channel.result["body"]
-            )
-
-            # Set this new alias as the canonical alias for this room
-            self.helper.send_state(
-                room_id,
-                "m.room.aliases",
-                {"aliases": [test_alias]},
-                tok=admin_user_tok,
-                state_key="test",
-            )
-            self.helper.send_state(
-                room_id,
-                "m.room.canonical_alias",
-                {"alias": test_alias},
-                tok=admin_user_tok,
-            )
-
         def _order_test(
             order_type: str,
             expected_room_list: List[str],
@@ -790,9 +751,9 @@ class RoomTestCase(unittest.HomeserverTestCase):
         )
 
         # Set room canonical room aliases
-        _set_canonical_alias(room_id_1, "#A_alias:test", self.admin_user_tok)
-        _set_canonical_alias(room_id_2, "#B_alias:test", self.admin_user_tok)
-        _set_canonical_alias(room_id_3, "#C_alias:test", self.admin_user_tok)
+        self._set_canonical_alias(room_id_1, "#A_alias:test", self.admin_user_tok)
+        self._set_canonical_alias(room_id_2, "#B_alias:test", self.admin_user_tok)
+        self._set_canonical_alias(room_id_3, "#C_alias:test", self.admin_user_tok)
 
         # Set room member size in the reverse order. room 1 -> 1 member, 2 -> 2, 3 -> 3
         user_1 = self.register_user("bob1", "pass")
@@ -859,7 +820,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         room_id_2 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
 
         room_name_1 = "something"
-        room_name_2 = "else"
+        room_name_2 = "LoremIpsum"
 
         # Set the name for each room
         self.helper.send_state(
@@ -874,6 +835,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
             {"name": room_name_2},
             tok=self.admin_user_tok,
         )
+
+        self._set_canonical_alias(room_id_1, "#Room_Alias1:test", self.admin_user_tok)
 
         def _search_test(
             expected_room_id: Optional[str],
@@ -923,23 +886,35 @@ class RoomTestCase(unittest.HomeserverTestCase):
                 r = rooms[0]
                 self.assertEqual(expected_room_id, r["room_id"])
 
-        # Perform search tests
+        # Test searching by room name
         _search_test(room_id_1, "something")
         _search_test(room_id_1, "thing")
 
-        _search_test(room_id_2, "else")
-        _search_test(room_id_2, "se")
+        _search_test(room_id_2, "LoremIpsum")
+        _search_test(room_id_2, "lorem")
 
         # Test case insensitive
         _search_test(room_id_1, "SOMETHING")
         _search_test(room_id_1, "THING")
 
-        _search_test(room_id_2, "ELSE")
-        _search_test(room_id_2, "SE")
+        _search_test(room_id_2, "LOREMIPSUM")
+        _search_test(room_id_2, "LOREM")
 
         _search_test(None, "foo")
         _search_test(None, "bar")
         _search_test(None, "", expected_http_code=400)
+
+        # Test that the whole room id returns the room
+        _search_test(room_id_1, room_id_1)
+        # Test that the search by room_id is case sensitive
+        _search_test(None, room_id_1.lower())
+        # Test search part of local part of room id do not match
+        _search_test(None, room_id_1[1:10])
+
+        # Test that whole room alias return no result, because of domain
+        _search_test(None, "#Room_Alias1:test")
+        # Test search local part of alias
+        _search_test(room_id_1, "alias1")
 
     def test_search_term_non_ascii(self):
         """Test that searching for a room with non-ASCII characters works correctly"""
@@ -1122,6 +1097,32 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # testing that the state events match is painful and not done here. We assume that
         # the create_room already does the right thing, so no need to verify that we got
         # the state events it created.
+
+    def _set_canonical_alias(self, room_id: str, test_alias: str, admin_user_tok: str):
+        # Create a new alias to this room
+        url = "/_matrix/client/r0/directory/room/%s" % (urllib.parse.quote(test_alias),)
+        channel = self.make_request(
+            "PUT",
+            url.encode("ascii"),
+            {"room_id": room_id},
+            access_token=admin_user_tok,
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Set this new alias as the canonical alias for this room
+        self.helper.send_state(
+            room_id,
+            "m.room.aliases",
+            {"aliases": [test_alias]},
+            tok=admin_user_tok,
+            state_key="test",
+        )
+        self.helper.send_state(
+            room_id,
+            "m.room.canonical_alias",
+            {"alias": test_alias},
+            tok=admin_user_tok,
+        )
 
 
 class JoinAliasRoomTestCase(unittest.HomeserverTestCase):

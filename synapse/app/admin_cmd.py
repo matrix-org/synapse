@@ -145,6 +145,20 @@ class FileExfiltrationWriter(ExfiltrationWriter):
             for event in state.values():
                 print(json.dumps(event), file=f)
 
+    def write_knock(self, room_id, event, state):
+        self.write_events(room_id, [event])
+
+        # We write the knock state somewhere else as they aren't full events
+        # and are only a subset of the state at the event.
+        room_directory = os.path.join(self.base_directory, "rooms", room_id)
+        os.makedirs(room_directory, exist_ok=True)
+
+        knock_state = os.path.join(room_directory, "knock_state")
+
+        with open(knock_state, "a") as f:
+            for event in state.values():
+                print(json.dumps(event), file=f)
+
     def finished(self):
         return self.base_directory
 

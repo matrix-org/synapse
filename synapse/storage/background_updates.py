@@ -100,29 +100,58 @@ class BackgroundUpdater:
         ] = {}
         self._all_done = False
 
+        # Whether we're currently running updates
+        self._running = False
+
+        # Whether background updates are enabled. This allows us to
+        # enable/disable background updates via the admin API.
+        self.enabled = True
+
+    def get_current_update(self) -> Optional[BackgroundUpdatePerformance]:
+        """Returns the current background update, if any."""
+
+        update_name = self._current_background_update
+        if not update_name:
+            return None
+
+        perf = self._background_update_performance.get(update_name)
+        if not perf:
+            perf = BackgroundUpdatePerformance(update_name)
+
+        return perf
+
     def start_doing_background_updates(self) -> None:
-        run_as_background_process("background_updates", self.run_background_updates)
+        if self.enabled:
+            run_as_background_process("background_updates", self.run_background_updates)
 
     async def run_background_updates(self, sleep: bool = True) -> None:
-        logger.info("Starting background schema updates")
-        while True:
-            if sleep:
-                await self._clock.sleep(self.BACKGROUND_UPDATE_INTERVAL_MS / 1000.0)
+        if self._running or not self.enabled:
+            return
 
-            try:
-                result = await self.do_next_background_update(
-                    self.BACKGROUND_UPDATE_DURATION_MS
-                )
-            except Exception:
-                logger.exception("Error doing update")
-            else:
-                if result:
-                    logger.info(
-                        "No more background updates to do."
-                        " Unscheduling background update task."
+        self._running = True
+
+        try:
+            logger.info("Starting background schema updates")
+            while self.enabled:
+                if sleep:
+                    await self._clock.sleep(self.BACKGROUND_UPDATE_INTERVAL_MS / 1000.0)
+
+                try:
+                    result = await self.do_next_background_update(
+                        self.BACKGROUND_UPDATE_DURATION_MS
                     )
-                    self._all_done = True
-                    return None
+                except Exception:
+                    logger.exception("Error doing update")
+                else:
+                    if result:
+                        logger.info(
+                            "No more background updates to do."
+                            " Unscheduling background update task."
+                        )
+                        self._all_done = True
+                        return None
+        finally:
+            self._running = False
 
     async def has_completed_background_updates(self) -> bool:
         """Check if all the background updates have completed

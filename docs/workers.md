@@ -443,19 +443,19 @@ In the `media_repository` worker configuration file, configure the http listener
 expose the `media` resource. For example:
 
 ```yaml
-    worker_listeners:
-     - type: http
-       port: 8085
-       resources:
-         - names:
-           - media
+worker_listeners:
+ - type: http
+   port: 8085
+   resources:
+     - names:
+       - media
 ```
 
 Note that if running multiple media repositories they must be on the same server
 and you must configure a single instance to run the background tasks, e.g.:
 
 ```yaml
-    media_instance_running_background_jobs: "media-repository-1"
+media_instance_running_background_jobs: "media-repository-1"
 ```
 
 Note that if a reverse proxy is used , then `/_matrix/media/` must be routed for both inbound client and federation requests (if they are handled separately).
@@ -492,7 +492,9 @@ must therefore be configured with the location of the main instance, via
 the `worker_main_http_uri` setting in the `frontend_proxy` worker configuration
 file. For example:
 
-    worker_main_http_uri: http://127.0.0.1:8008
+```yaml
+worker_main_http_uri: http://127.0.0.1:8008
+```
 
 ### Historical apps
 

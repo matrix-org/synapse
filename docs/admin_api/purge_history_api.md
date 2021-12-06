@@ -27,7 +27,7 @@ Room state data (such as joins, leaves, topic) is always preserved.
 
 To delete local message events as well, set `delete_local_events` in the body:
 
-```
+```json
 {
    "delete_local_events": true
 }

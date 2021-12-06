@@ -51,6 +51,7 @@
   - [Administration](usage/administration/README.md)
     - [Admin API](usage/administration/admin_api/README.md)
       - [Account Validity](admin_api/account_validity.md)
+      - [Background Updates](usage/administration/admin_api/background_updates.md)
       - [Delete Group](admin_api/delete_group.md)
       - [Event Reports](admin_api/event_reports.md)
       - [Media](admin_api/media_admin_api.md)

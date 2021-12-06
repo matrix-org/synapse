@@ -24,7 +24,7 @@
 set -e
 
 # Change to the repository root
-cd "$(dirname $0)/.."
+cd "$(dirname "$0")/.."
 
 # Check for a user-specified Complement checkout
 if [[ -z "$COMPLEMENT_DIR" ]]; then
@@ -61,8 +61,8 @@ cd "$COMPLEMENT_DIR"
 EXTRA_COMPLEMENT_ARGS=""
 if [[ -n "$1" ]]; then
   # A test name regex has been set, supply it to Complement
-  EXTRA_COMPLEMENT_ARGS+="-run $1 "
+  EXTRA_COMPLEMENT_ARGS=(-run "$1")
 fi
 
 # Run the tests!
-go test -v -tags synapse_blacklist,msc2946,msc3083,msc2403,msc2716 -count=1 $EXTRA_COMPLEMENT_ARGS ./tests/...
+go test -v -tags synapse_blacklist,msc2946,msc3083,msc2403,msc2716 -count=1 "${EXTRA_COMPLEMENT_ARGS[@]}" ./tests/...

@@ -33,6 +33,9 @@ We can't peek into rooms with joined history_visibility
 Local users can peek by room alias
 Peeked rooms only turn up in the sync for the device who peeked them
 
+# Validation needs to be added to Synapse: #10554
+Rejects invalid device keys
+
 # Blacklisted due to https://github.com/matrix-org/synapse-dinsic/issues/43
 Inviting an AS-hosted user asks the AS server
 Accesing an AS-hosted room alias asks the AS server

@@ -328,8 +328,7 @@ class TypingStream(Stream):
     ROW_TYPE = TypingStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        writer_instance = hs.config.worker.writers.typing
-        if writer_instance == hs.get_instance_name():
+        if hs.get_instance_name() in hs.config.worker.writers.typing:
             # On the writer, query the typing handler
             typing_writer_handler = hs.get_typing_writer_handler()
             update_function: Callable[

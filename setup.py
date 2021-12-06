@@ -132,6 +132,9 @@ CONDITIONAL_REQUIREMENTS["dev"] = (
         "GitPython==3.1.14",
         "commonmark==0.9.1",
         "pygithub==1.55",
+        # The following are executed as commands by the release script.
+        "twine",
+        "towncrier",
     ]
 )
 

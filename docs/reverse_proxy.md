@@ -52,7 +52,7 @@ to proxied traffic.)
 
 ### nginx
 
-```
+```nginx
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
@@ -141,7 +141,7 @@ matrix.example.com {
 
 ### Apache
 
-```
+```apache
 <VirtualHost *:443>
     SSLEngine on
     ServerName matrix.example.com
@@ -170,7 +170,7 @@ matrix.example.com {
 
 **NOTE 2**: It appears that Synapse is currently incompatible with the ModSecurity module for Apache (`mod_security2`). If you need it enabled for other services on your web server, you can disable it for Synapse's two VirtualHosts by including the following lines before each of the two `</VirtualHost>` above:
 
-```
+```apache
 <IfModule security2_module>
     SecRuleEngine off
 </IfModule>
@@ -188,7 +188,7 @@ frontend https
   http-request set-header X-Forwarded-For %[src]
 
   # Matrix client traffic
-  acl matrix-host hdr(host) -i matrix.example.com
+  acl matrix-host hdr(host) -i matrix.example.com matrix.example.com:443
   acl matrix-path path_beg /_matrix
   acl matrix-path path_beg /_synapse/client
 

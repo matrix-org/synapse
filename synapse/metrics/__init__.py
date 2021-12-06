@@ -20,7 +20,7 @@ import os
 import platform
 import threading
 import time
-from typing import Callable, Dict, Iterable, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, Mapping, Optional, Tuple, Union
 
 import attr
 from prometheus_client import Counter, Gauge, Histogram
@@ -32,6 +32,7 @@ from prometheus_client.core import (
 )
 
 from twisted.internet import reactor
+from twisted.python.threadpool import ThreadPool
 
 import synapse
 from synapse.metrics._exposition import (
@@ -67,7 +68,11 @@ class LaterGauge:
     labels = attr.ib(hash=False, type=Optional[Iterable[str]])
     # callback: should either return a value (if there are no labels for this metric),
     # or dict mapping from a label tuple to a value
-    caller = attr.ib(type=Callable[[], Union[Dict[Tuple[str, ...], float], float]])
+    caller = attr.ib(
+        type=Callable[
+            [], Union[Mapping[Tuple[str, ...], Union[int, float]], Union[int, float]]
+        ]
+    )
 
     def collect(self):
 
@@ -80,11 +85,11 @@ class LaterGauge:
             yield g
             return
 
-        if isinstance(calls, dict):
+        if isinstance(calls, (int, float)):
+            g.add_metric([], calls)
+        else:
             for k, v in calls.items():
                 g.add_metric(k, v)
-        else:
-            g.add_metric([], calls)
 
         yield g
 
@@ -521,6 +526,42 @@ threepid_send_requests = Histogram(
     buckets=(1, 2, 3, 4, 5, 10),
     labelnames=("type", "reason"),
 )
+
+threadpool_total_threads = Gauge(
+    "synapse_threadpool_total_threads",
+    "Total number of threads currently in the threadpool",
+    ["name"],
+)
+
+threadpool_total_working_threads = Gauge(
+    "synapse_threadpool_working_threads",
+    "Number of threads currently working in the threadpool",
+    ["name"],
+)
+
+threadpool_total_min_threads = Gauge(
+    "synapse_threadpool_min_threads",
+    "Minimum number of threads configured in the threadpool",
+    ["name"],
+)
+
+threadpool_total_max_threads = Gauge(
+    "synapse_threadpool_max_threads",
+    "Maximum number of threads configured in the threadpool",
+    ["name"],
+)
+
+
+def register_threadpool(name: str, threadpool: ThreadPool) -> None:
+    """Add metrics for the threadpool."""
+
+    threadpool_total_min_threads.labels(name).set(threadpool.min)
+    threadpool_total_max_threads.labels(name).set(threadpool.max)
+
+    threadpool_total_threads.labels(name).set_function(lambda: len(threadpool.threads))
+    threadpool_total_working_threads.labels(name).set_function(
+        lambda: len(threadpool.working)
+    )
 
 
 class ReactorLastSeenMetric:

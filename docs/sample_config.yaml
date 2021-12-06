@@ -91,7 +91,27 @@ pid_file: DATADIR/homeserver.pid
 # Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
 # 'listeners' below).
 #
+# Defaults to 'https://<server_name>/'.
+#
 #public_baseurl: https://example.com/
+
+# Uncomment the following to tell other servers to send federation traffic on
+# port 443.
+#
+# By default, other servers will try to reach our server on port 8448, which can
+# be inconvenient in some environments.
+#
+# Provided 'https://<server_name>/' on port 443 is routed to Synapse, this
+# option configures Synapse to serve a file at
+# 'https://<server_name>/.well-known/matrix/server'. This will tell other
+# servers to send traffic to port 443 instead.
+#
+# See https://matrix-org.github.io/synapse/latest/delegate.html for more
+# information.
+#
+# Defaults to 'false'.
+#
+#serve_server_wellknown: true
 
 # Set the soft limit on the number of file descriptors synapse can use
 # Zero is used to indicate synapse should set the soft limit to the
@@ -1373,7 +1393,7 @@ oembed:
 # in on this server.
 #
 # (By default, no suggestion is made, so it is left up to the client.
-# This setting is ignored unless public_baseurl is also set.)
+# This setting is ignored unless public_baseurl is also explicitly set.)
 #
 #default_identity_server: https://matrix.org
 
@@ -1412,8 +1432,6 @@ oembed:
 # Servers handling the these requests must answer the `/requestToken` endpoints defined
 # by the Matrix Identity Service API specification:
 # https://matrix.org/docs/spec/identity_service/latest
-#
-# If a delegate is specified, the config option public_baseurl must also be filled out.
 #
 account_threepid_delegates:
     #email: https://example.com     # Delegate email sending to example.com
@@ -2129,11 +2147,10 @@ sso:
     # phishing attacks from evil.site. To avoid this, include a slash after the
     # hostname: "https://my.client/".
     #
-    # If public_baseurl is set, then the login fallback page (used by clients
-    # that don't natively support the required login flows) is whitelisted in
-    # addition to any URLs in this list.
+    # The login fallback page (used by clients that don't natively support the
+    # required login flows) is whitelisted in addition to any URLs in this list.
     #
-    # By default, this list is empty.
+    # By default, this list contains only the login fallback page.
     #
     #client_whitelist:
     #  - https://riot.im/develop

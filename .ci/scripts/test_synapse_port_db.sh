@@ -7,7 +7,7 @@
 
 
 set -xe
-cd `dirname $0`/../..
+cd "$(dirname "$0")/../.."
 
 echo "--- Install dependencies"
 

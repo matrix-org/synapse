@@ -48,6 +48,7 @@ from synapse.logging.context import (
     current_context,
     make_deferred_yieldable,
 )
+from synapse.metrics import register_threadpool
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
@@ -104,12 +105,16 @@ def make_pool(
                 LoggingDatabaseConnection(conn, engine, "on_new_connection")
             )
 
-    return adbapi.ConnectionPool(
+    connection_pool = adbapi.ConnectionPool(
         db_config.config["name"],
         cp_reactor=reactor,
         cp_openfun=_on_new_connection,
         **db_args,
     )
+
+    register_threadpool(f"database-{db_config.name}", connection_pool.threadpool)
+
+    return connection_pool
 
 
 def make_conn(
@@ -440,6 +445,10 @@ class DatabasePool:
                 "upsert_safety_check",
                 self._check_safe_to_upsert,
             )
+
+    def name(self) -> str:
+        "Return the name of this database"
+        return self._database_config.name
 
     def is_running(self) -> bool:
         """Is the database pool currently running"""
