@@ -2336,6 +2336,12 @@ class SyncResultBuilder:
 def _calculate_user_changes(
     sync_result_builder: "SyncResultBuilder",
 ) -> Tuple[Set[str], Set[str]]:
+    """Work out which other users have joined or left rooms we are joined to.
+
+    Only applies to an incremental sync.
+
+    The sync_result_builder is not modified by this function.
+    """
     newly_joined_or_invited_or_knocked_users = set()
     newly_left_users = set()
     if sync_result_builder.since_token:
