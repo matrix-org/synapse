@@ -2341,7 +2341,7 @@ class SyncResultBuilder:
 
 
 def _calculate_user_changes(
-    sync_result_builder: "SyncResultBuilder",
+    sync_result_builder: SyncResultBuilder,
 ) -> Tuple[Set[str], Set[str]]:
     """Work out which other users have joined or left rooms we are joined to.
 
