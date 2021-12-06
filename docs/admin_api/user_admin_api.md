@@ -948,7 +948,7 @@ The following fields are returned in the JSON response body:
 See also the
 [Client-Server API Spec on pushers](https://matrix.org/docs/spec/client_server/latest#get-matrix-client-r0-pushers).
 
-## Shadow-banning users
+## Controlling whether a user is shadow-banned
 
 Shadow-banning is a useful tool for moderating malicious or egregiously abusive users.
 A shadow-banned users receives successful responses to their client-server API requests,
@@ -961,16 +961,22 @@ or broken behaviour for the client. A shadow-banned user will not receive any
 notification and it is generally more appropriate to ban or kick abusive users.
 A shadow-banned user will be unable to contact anyone on the server.
 
-The API is:
+To shadow-ban a user the API is:
 
 ```
 POST /_synapse/admin/v1/users/<user_id>/shadow_ban
 ```
 
+To un-shadow-ban a user the API is:
+
+```
+DELETE /_synapse/admin/v1/users/<user_id>/shadow_ban
+```
+
 To use it, you will need to authenticate by providing an `access_token` for a
 server admin: [Admin API](../usage/administration/admin_api)
 
-An empty JSON dict is returned.
+An empty JSON dict is returned in both cases.
 
 **Parameters**
 
@@ -1107,7 +1113,7 @@ This endpoint will work even if registration is disabled on the server, unlike
 The API is:
 
 ```
-POST /_synapse/admin/v1/username_availabile?username=$localpart
+GET /_synapse/admin/v1/username_available?username=$localpart
 ```
 
 The request and response format is the same as the [/_matrix/client/r0/register/available](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available) API.

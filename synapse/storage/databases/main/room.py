@@ -396,22 +396,19 @@ class RoomWorkerStore(SQLBaseStore):
             desc="is_room_blocked",
         )
 
-    async def is_room_published(self, room_id: str) -> bool:
-        """Check whether a room has been published in the local public room
-        directory.
-
-        Args:
-            room_id
-        Returns:
-            Whether the room is currently published in the room directory
+    async def room_is_blocked_by(self, room_id: str) -> Optional[str]:
         """
-        # Get room information
-        room_info = await self.get_room(room_id)
-        if not room_info:
-            return False
-
-        # Check the is_public value
-        return room_info.get("is_public", False)
+        Function to retrieve user who has blocked the room.
+        user_id is non-nullable
+        It returns None if the room is not blocked.
+        """
+        return await self.db_pool.simple_select_one_onecol(
+            table="blocked_rooms",
+            keyvalues={"room_id": room_id},
+            retcol="user_id",
+            allow_none=True,
+            desc="room_is_blocked_by",
+        )
 
     async def get_rooms_paginate(
         self,
@@ -1772,7 +1769,12 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         )
 
     async def block_room(self, room_id: str, user_id: str) -> None:
-        """Marks the room as blocked. Can be called multiple times.
+        """Marks the room as blocked.
+
+        Can be called multiple times (though we'll only track the last user to
+        block this room).
+
+        Can be called on a room unknown to this homeserver.
 
         Args:
             room_id: Room to block
@@ -1784,6 +1786,24 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             values={},
             insertion_values={"user_id": user_id},
             desc="block_room",
+        )
+        await self.db_pool.runInteraction(
+            "block_room_invalidation",
+            self._invalidate_cache_and_stream,
+            self.is_room_blocked,
+            (room_id,),
+        )
+
+    async def unblock_room(self, room_id: str) -> None:
+        """Remove the room from blocking list.
+
+        Args:
+            room_id: Room to unblock
+        """
+        await self.db_pool.simple_delete(
+            table="blocked_rooms",
+            keyvalues={"room_id": room_id},
+            desc="unblock_room",
         )
         await self.db_pool.runInteraction(
             "block_room_invalidation",

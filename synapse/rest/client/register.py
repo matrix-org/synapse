@@ -417,7 +417,9 @@ class RegisterRestServlet(RestServlet):
         self.password_policy_handler = hs.get_password_policy_handler()
         self.clock = hs.get_clock()
         self._registration_enabled = self.hs.config.registration.enable_registration
-        self._msc2918_enabled = hs.config.registration.access_token_lifetime is not None
+        self._msc2918_enabled = (
+            hs.config.registration.refreshable_access_token_lifetime is not None
+        )
 
         self._registration_flows = _calculate_registration_flows(
             hs.config, self.auth_handler

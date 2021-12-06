@@ -550,6 +550,7 @@ class RoomMessageListRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
+        self._hs = hs
         self.pagination_handler = hs.get_pagination_handler()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
@@ -567,7 +568,9 @@ class RoomMessageListRestServlet(RestServlet):
         filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter: Optional[Filter] = Filter(json_decoder.decode(filter_json))
+            event_filter: Optional[Filter] = Filter(
+                self._hs, json_decoder.decode(filter_json)
+            )
             if (
                 event_filter
                 and event_filter.filter_json.get("event_format", "client")
@@ -672,6 +675,7 @@ class RoomEventContextServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
+        self._hs = hs
         self.clock = hs.get_clock()
         self.room_context_handler = hs.get_room_context_handler()
         self._event_serializer = hs.get_event_client_serializer()
@@ -688,7 +692,9 @@ class RoomEventContextServlet(RestServlet):
         filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter: Optional[Filter] = Filter(json_decoder.decode(filter_json))
+            event_filter: Optional[Filter] = Filter(
+                self._hs, json_decoder.decode(filter_json)
+            )
         else:
             event_filter = None
 
@@ -713,7 +719,7 @@ class RoomEventContextServlet(RestServlet):
             results["state"],
             time_now,
             # No need to bundle aggregations for state events
-            bundle_aggregations=False,
+            bundle_relations=False,
         )
 
         return 200, results

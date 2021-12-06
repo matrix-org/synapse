@@ -19,6 +19,7 @@ from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
     Any,
+    ClassVar,
     Dict,
     Mapping,
     MutableMapping,
@@ -39,6 +40,7 @@ from zope.interface import Interface
 from twisted.internet.interfaces import (
     IReactorCore,
     IReactorPluggableNameResolver,
+    IReactorSSL,
     IReactorTCP,
     IReactorThreads,
     IReactorTime,
@@ -67,6 +69,7 @@ JsonDict = Dict[str, Any]
 # for mypy-zope to realize it is an interface.
 class ISynapseReactor(
     IReactorTCP,
+    IReactorSSL,
     IReactorPluggableNameResolver,
     IReactorTime,
     IReactorCore,
@@ -218,7 +221,7 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
         'domain' : The domain part of the name
     """
 
-    SIGIL: str = abc.abstractproperty()  # type: ignore
+    SIGIL: ClassVar[str] = abc.abstractproperty()  # type: ignore
 
     localpart = attr.ib(type=str)
     domain = attr.ib(type=str)

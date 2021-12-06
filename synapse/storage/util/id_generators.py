@@ -1,4 +1,5 @@
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import abc
 import heapq
 import logging
 import threading
@@ -87,7 +89,25 @@ def _load_current_id(
     return (max if step > 0 else min)(current_id, step)
 
 
-class StreamIdGenerator:
+class AbstractStreamIdGenerator(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def get_next(self) -> AsyncContextManager[int]:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def get_next_mult(self, n: int) -> AsyncContextManager[Sequence[int]]:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def get_current_token(self) -> int:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def get_current_token_for_writer(self, instance_name: str) -> int:
+        raise NotImplementedError()
+
+
+class StreamIdGenerator(AbstractStreamIdGenerator):
     """Used to generate new stream ids when persisting events while keeping
     track of which transactions have been completed.
 
@@ -209,7 +229,7 @@ class StreamIdGenerator:
         return self.get_current_token()
 
 
-class MultiWriterIdGenerator:
+class MultiWriterIdGenerator(AbstractStreamIdGenerator):
     """An ID generator that tracks a stream that can have multiple writers.
 
     Uses a Postgres sequence to coordinate ID assignment, but positions of other

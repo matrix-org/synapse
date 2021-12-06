@@ -81,8 +81,6 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
             origin,
             event,
             context,
-            state=None,
-            backfilled=False,
         ):
             return context
 

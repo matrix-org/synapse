@@ -45,10 +45,13 @@ Changes in SCHEMA_VERSION = 64:
 Changes in SCHEMA_VERSION = 65:
     - MSC2716: Remove unique event_id constraint from insertion_event_edges
       because an insertion event can have multiple edges.
+    - Remove unused tables `user_stats_historical` and `room_stats_historical`.
 """
 
 
-SCHEMA_COMPAT_VERSION = 60  # 60: "outlier" not in internal_metadata.
+SCHEMA_COMPAT_VERSION = (
+    61  # 61: Remove unused tables `user_stats_historical` and `room_stats_historical`
+)
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 
 This value is stored in the database, and checked on startup. If the value in the

@@ -161,6 +161,54 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(users.keys(), {self.u_alice, self.u_bob})
 
+    def test__null_byte_in_display_name_properly_handled(self):
+        room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
+
+        res = self.get_success(
+            self.store.db_pool.simple_select_list(
+                "room_memberships",
+                {"user_id": "@alice:test"},
+                ["display_name", "event_id"],
+            )
+        )
+        # Check that we only got one result back
+        self.assertEqual(len(res), 1)
+
+        # Check that alice's display name is "alice"
+        self.assertEqual(res[0]["display_name"], "alice")
+
+        # Grab the event_id to use later
+        event_id = res[0]["event_id"]
+
+        # Create a profile with the offending null byte in the display name
+        new_profile = {"displayname": "ali\u0000ce"}
+
+        # Ensure that the change goes smoothly and does not fail due to the null byte
+        self.helper.change_membership(
+            room,
+            self.u_alice,
+            self.u_alice,
+            "join",
+            extra_data=new_profile,
+            tok=self.t_alice,
+        )
+
+        res2 = self.get_success(
+            self.store.db_pool.simple_select_list(
+                "room_memberships",
+                {"user_id": "@alice:test"},
+                ["display_name", "event_id"],
+            )
+        )
+        # Check that we only have two results
+        self.assertEqual(len(res2), 2)
+
+        # Filter out the previous event using the event_id we grabbed above
+        row = [row for row in res2 if row["event_id"] != event_id]
+
+        # Check that alice's display name is now None
+        self.assertEqual(row[0]["display_name"], None)
+
 
 class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
