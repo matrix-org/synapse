@@ -33,7 +33,6 @@ from typing import (
 import attr
 from frozendict import frozendict
 from signedjson.key import decode_verify_key_bytes
-from six.moves import filter
 from unpaddedbase64 import decode_base64
 from zope.interface import Interface
 
