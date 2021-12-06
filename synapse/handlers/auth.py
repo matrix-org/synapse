@@ -627,23 +627,28 @@ class AuthHandler(BaseHandler):
 
     async def add_oob_auth(
         self, stagetype: str, authdict: Dict[str, Any], clientip: str
-    ) -> bool:
+    ) -> None:
         """
         Adds the result of out-of-band authentication into an existing auth
         session. Currently used for adding the result of fallback auth.
+
+        Raises:
+            LoginError if the stagetype is unknown or the session is missing.
+            LoginError is raised by check_auth if authentication fails.
         """
         if stagetype not in self.checkers:
-            raise LoginError(400, "", Codes.MISSING_PARAM)
-        if "session" not in authdict:
-            raise LoginError(400, "", Codes.MISSING_PARAM)
-
-        result = await self.checkers[stagetype].check_auth(authdict, clientip)
-        if result:
-            await self.store.mark_ui_auth_stage_complete(
-                authdict["session"], stagetype, result
+            raise LoginError(
+                400, f"Unknown UIA stage type: {stagetype}", Codes.INVALID_PARAM
             )
-            return True
-        return False
+        if "session" not in authdict:
+            raise LoginError(400, "Missing session ID", Codes.MISSING_PARAM)
+
+        # If authentication fails a LoginError is raised. Otherwise, store
+        # the successful result.
+        result = await self.checkers[stagetype].check_auth(authdict, clientip)
+        await self.store.mark_ui_auth_stage_complete(
+            authdict["session"], stagetype, result
+        )
 
     def get_session_id(self, clientdict: Dict[str, Any]) -> Optional[str]:
         """
@@ -1459,6 +1464,10 @@ class AuthHandler(BaseHandler):
         )
 
         await self.store.user_delete_threepid(user_id, medium, address)
+        if medium == "email":
+            await self.store.delete_pusher_by_app_id_pushkey_user_id(
+                app_id="m.email", pushkey=address, user_id=user_id
+            )
         return result
 
     async def hash(self, password: str) -> str:
@@ -1727,7 +1736,6 @@ class AuthHandler(BaseHandler):
 
 @attr.s(slots=True)
 class MacaroonGenerator:
-
     hs = attr.ib()
 
     def generate_guest_access_token(self, user_id: str) -> str:

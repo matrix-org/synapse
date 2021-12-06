@@ -21,11 +21,15 @@ It returns a JSON body like the following:
     "threepids": [
         {
             "medium": "email",
-            "address": "<user_mail_1>"
+            "address": "<user_mail_1>",
+            "added_at": 1586458409743,
+            "validated_at": 1586458409743
         },
         {
             "medium": "email",
-            "address": "<user_mail_2>"
+            "address": "<user_mail_2>",
+            "added_at": 1586458409743,
+            "validated_at": 1586458409743
         }
     ],
     "avatar_url": "<avatar_url>",

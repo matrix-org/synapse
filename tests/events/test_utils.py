@@ -322,7 +322,7 @@ class PruneEventTestCase(unittest.TestCase):
             },
         )
 
-        # After MSC3083, alias events have no special behavior.
+        # After MSC3083, the allow key is protected from redaction.
         self.run_test(
             {
                 "type": "m.room.join_rules",
@@ -342,6 +342,50 @@ class PruneEventTestCase(unittest.TestCase):
                 "unsigned": {},
             },
             room_version=RoomVersions.V8,
+        )
+
+    def test_member(self):
+        """Member events have changed behavior starting with MSC3375."""
+        self.run_test(
+            {
+                "type": "m.room.member",
+                "event_id": "$test:domain",
+                "content": {
+                    "membership": "join",
+                    "join_authorised_via_users_server": "@user:domain",
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.member",
+                "event_id": "$test:domain",
+                "content": {"membership": "join"},
+                "signatures": {},
+                "unsigned": {},
+            },
+        )
+
+        # After MSC3375, the join_authorised_via_users_server key is protected
+        # from redaction.
+        self.run_test(
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "join",
+                    "join_authorised_via_users_server": "@user:domain",
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "join",
+                    "join_authorised_via_users_server": "@user:domain",
+                },
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.V9,
         )
 
 

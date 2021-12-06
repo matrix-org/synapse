@@ -82,6 +82,11 @@ class RatelimitConfig(Config):
             config.get("rc_third_party_invite", {})
         )
 
+        self.rc_registration_token_validity = RateLimitConfig(
+            config.get("rc_registration_token_validity", {}),
+            defaults={"per_second": 0.1, "burst_count": 5},
+        )
+
         rc_login_config = config.get("rc_login", {})
         self.rc_login_address = RateLimitConfig(rc_login_config.get("address", {}))
         self.rc_login_account = RateLimitConfig(rc_login_config.get("account", {}))
@@ -146,6 +151,8 @@ class RatelimitConfig(Config):
         #     is using
         #   - one for registration that ratelimits registration requests based on the
         #     client's IP address.
+        #   - one for checking the validity of registration tokens that ratelimits
+        #     requests based on the client's IP address.
         #   - one for login that ratelimits login requests based on the client's IP
         #     address.
         #   - one for login that ratelimits login requests based on the account the
@@ -175,6 +182,10 @@ class RatelimitConfig(Config):
         #rc_registration:
         #  per_second: 0.17
         #  burst_count: 3
+        #
+        #rc_registration_token_validity:
+        #  per_second: 0.1
+        #  burst_count: 5
         #
         #rc_login:
         #  address:

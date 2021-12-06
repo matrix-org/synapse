@@ -125,6 +125,8 @@ class EmailPusherTests(HomeserverTestCase):
             )
         )
 
+        self.auth_handler = hs.get_auth_handler()
+
     def test_need_validated_email(self):
         """Test that we can only add an email pusher if the user has validated
         their email.
@@ -304,6 +306,87 @@ class EmailPusherTests(HomeserverTestCase):
 
         # We should get emailed about that message
         self._check_for_mail()
+
+    def test_no_email_sent_after_removed(self):
+        # Create a simple room with two users
+        room = self.helper.create_room_as(self.user_id, tok=self.access_token)
+        self.helper.invite(
+            room=room,
+            src=self.user_id,
+            tok=self.access_token,
+            targ=self.others[0].id,
+        )
+        self.helper.join(
+            room=room,
+            user=self.others[0].id,
+            tok=self.others[0].token,
+        )
+
+        # The other user sends a single message.
+        self.helper.send(room, body="Hi!", tok=self.others[0].token)
+
+        # We should get emailed about that message
+        self._check_for_mail()
+
+        # disassociate the user's email address
+        self.get_success(
+            self.auth_handler.delete_threepid(
+                user_id=self.user_id,
+                medium="email",
+                address="a@example.com",
+            )
+        )
+
+        # check that the pusher for that email address has been deleted
+        pushers = self.get_success(
+            self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
+        )
+        pushers = list(pushers)
+        self.assertEqual(len(pushers), 0)
+
+    def test_remove_unlinked_pushers_background_job(self):
+        """Checks that all existing pushers associated with unlinked email addresses are removed
+        upon running the remove_deleted_email_pushers background update.
+        """
+        # disassociate the user's email address manually (without deleting the pusher).
+        # This resembles the old behaviour, which the background update below is intended
+        # to clean up.
+        self.get_success(
+            self.hs.get_datastore().user_delete_threepid(
+                self.user_id, "email", "a@example.com"
+            )
+        )
+
+        # Run the "remove_deleted_email_pushers" background job
+        self.get_success(
+            self.hs.get_datastore().db_pool.simple_insert(
+                table="background_updates",
+                values={
+                    "update_name": "remove_deleted_email_pushers",
+                    "progress_json": "{}",
+                    "depends_on": None,
+                },
+            )
+        )
+
+        # ... and tell the DataStore that it hasn't finished all updates yet
+        self.hs.get_datastore().db_pool.updates._all_done = False
+
+        # Now let's actually drive the updates to completion
+        while not self.get_success(
+            self.hs.get_datastore().db_pool.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.hs.get_datastore().db_pool.updates.do_next_background_update(100),
+                by=0.1,
+            )
+
+        # Check that all pushers with unlinked addresses were deleted
+        pushers = self.get_success(
+            self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
+        )
+        pushers = list(pushers)
+        self.assertEqual(len(pushers), 0)
 
     def _check_for_mail(self):
         """Check that the user receives an email notification"""

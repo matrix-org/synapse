@@ -64,6 +64,9 @@ server {
     server_name matrix.example.com;
 
     location ~* ^(\/_matrix|\/_synapse\/client) {
+        # note: do not add a path (even a single /) after the port in `proxy_pass`,
+        # otherwise nginx will canonicalise the URI and cause signature verification
+        # errors.
         proxy_pass http://localhost:8008;
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -76,10 +79,7 @@ server {
 }
 ```
 
-**NOTE**: Do not add a path after the port in `proxy_pass`, otherwise nginx will
-canonicalise/normalise the URI.
-
-### Caddy 1
+### Caddy v1
 
 ```
 matrix.example.com {
@@ -99,7 +99,7 @@ example.com:8448 {
 }
 ```
 
-### Caddy 2
+### Caddy v2
 
 ```
 matrix.example.com {

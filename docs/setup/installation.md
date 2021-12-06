@@ -1,44 +1,5 @@
 # Installation Instructions
 
-There are 3 steps to follow under **Installation Instructions**.
-
-- [Installation Instructions](#installation-instructions)
-  - [Choosing your server name](#choosing-your-server-name)
-  - [Installing Synapse](#installing-synapse)
-    - [Installing from source](#installing-from-source)
-      - [Platform-specific prerequisites](#platform-specific-prerequisites)
-        - [Debian/Ubuntu/Raspbian](#debianubunturaspbian)
-        - [ArchLinux](#archlinux)
-        - [CentOS/Fedora](#centosfedora)
-        - [macOS](#macos)
-        - [OpenSUSE](#opensuse)
-        - [OpenBSD](#openbsd)
-        - [Windows](#windows)
-    - [Prebuilt packages](#prebuilt-packages)
-      - [Docker images and Ansible playbooks](#docker-images-and-ansible-playbooks)
-      - [Debian/Ubuntu](#debianubuntu)
-        - [Matrix.org packages](#matrixorg-packages)
-        - [Downstream Debian packages](#downstream-debian-packages)
-        - [Downstream Ubuntu packages](#downstream-ubuntu-packages)
-      - [Fedora](#fedora)
-      - [OpenSUSE](#opensuse-1)
-      - [SUSE Linux Enterprise Server](#suse-linux-enterprise-server)
-      - [ArchLinux](#archlinux-1)
-      - [Void Linux](#void-linux)
-      - [FreeBSD](#freebsd)
-      - [OpenBSD](#openbsd-1)
-      - [NixOS](#nixos)
-  - [Setting up Synapse](#setting-up-synapse)
-    - [Using PostgreSQL](#using-postgresql)
-    - [TLS certificates](#tls-certificates)
-    - [Client Well-Known URI](#client-well-known-uri)
-    - [Email](#email)
-    - [Registering a user](#registering-a-user)
-    - [Setting up a TURN server](#setting-up-a-turn-server)
-    - [URL previews](#url-previews)
-    - [Troubleshooting Installation](#troubleshooting-installation)
-
-
 ## Choosing your server name
 
 It is important to choose the name for your server before you install Synapse,

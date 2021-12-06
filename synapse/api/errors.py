@@ -148,6 +148,14 @@ class SynapseError(CodeMessageException):
         return cs_error(self.msg, self.errcode)
 
 
+class InvalidAPICallError(SynapseError):
+    """You called an existing API endpoint, but fed that endpoint
+    invalid or incomplete data."""
+
+    def __init__(self, msg: str):
+        super().__init__(HTTPStatus.BAD_REQUEST, msg, Codes.BAD_JSON)
+
+
 class ProxiedRequestError(SynapseError):
     """An error from a general matrix endpoint, eg. from a proxied Matrix API call.
 

@@ -19,6 +19,7 @@ from twisted.web.server import Request
 
 from synapse.api.constants import Membership
 from synapse.api.errors import SynapseError
+from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
     parse_json_object_from_request,
@@ -103,5 +104,5 @@ class KnockRoomAliasServlet(RestServlet):
         )
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     KnockRoomAliasServlet(hs).register(http_server)

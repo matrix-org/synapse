@@ -21,7 +21,7 @@ from unittest.mock import Mock
 from urllib import parse
 
 import attr
-from parameterized import parameterized_class
+from parameterized import parameterized, parameterized_class
 from PIL import Image as Image
 
 from twisted.internet import defer
@@ -472,6 +472,43 @@ class MediaRepoTests(unittest.HomeserverTestCase):
                     "error": "Not found [b'example.com', b'12345']",
                 },
             )
+
+    @parameterized.expand([("crop", 16), ("crop", 64), ("scale", 16), ("scale", 64)])
+    def test_same_quality(self, method, desired_size):
+        """Test that choosing between thumbnails with the same quality rating succeeds.
+
+        We are not particular about which thumbnail is chosen."""
+        self.assertIsNotNone(
+            self.thumbnail_resource._select_thumbnail(
+                desired_width=desired_size,
+                desired_height=desired_size,
+                desired_method=method,
+                desired_type=self.test_image.content_type,
+                # Provide two identical thumbnails which are guaranteed to have the same
+                # quality rating.
+                thumbnail_infos=[
+                    {
+                        "thumbnail_width": 32,
+                        "thumbnail_height": 32,
+                        "thumbnail_method": method,
+                        "thumbnail_type": self.test_image.content_type,
+                        "thumbnail_length": 256,
+                        "filesystem_id": f"thumbnail1{self.test_image.extension}",
+                    },
+                    {
+                        "thumbnail_width": 32,
+                        "thumbnail_height": 32,
+                        "thumbnail_method": method,
+                        "thumbnail_type": self.test_image.content_type,
+                        "thumbnail_length": 256,
+                        "filesystem_id": f"thumbnail2{self.test_image.extension}",
+                    },
+                ],
+                file_id=f"image{self.test_image.extension}",
+                url_cache=None,
+                server_name=None,
+            )
+        )
 
     def test_x_robots_tag_header(self):
         """

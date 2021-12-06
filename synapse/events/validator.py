@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import collections.abc
 from typing import Union
+
+import jsonschema
 
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
@@ -20,7 +22,11 @@ from synapse.api.room_versions import EventFormatVersions
 from synapse.config.homeserver import HomeServerConfig
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
-from synapse.events.utils import validate_canonicaljson
+from synapse.events.utils import (
+    CANONICALJSON_MAX_INT,
+    CANONICALJSON_MIN_INT,
+    validate_canonicaljson,
+)
 from synapse.federation.federation_server import server_matches_acl_event
 from synapse.types import EventID, RoomID, UserID
 
@@ -85,6 +91,29 @@ class EventValidator:
             if not server_matches_acl_event(config.server_name, event):
                 raise SynapseError(
                     400, "Can't create an ACL event that denies the local server"
+                )
+
+        if event.type == EventTypes.PowerLevels:
+            try:
+                jsonschema.validate(
+                    instance=event.content,
+                    schema=POWER_LEVELS_SCHEMA,
+                    cls=plValidator,
+                )
+            except jsonschema.ValidationError as e:
+                if e.path:
+                    # example: "users_default": '0' is not of type 'integer'
+                    message = '"' + e.path[-1] + '": ' + e.message  # noqa: B306
+                    # jsonschema.ValidationError.message is a valid attribute
+                else:
+                    # example: '0' is not of type 'integer'
+                    message = e.message  # noqa: B306
+                    # jsonschema.ValidationError.message is a valid attribute
+
+                raise SynapseError(
+                    code=400,
+                    msg=message,
+                    errcode=Codes.BAD_JSON,
                 )
 
     def _validate_retention(self, event: EventBase):
@@ -185,3 +214,47 @@ class EventValidator:
     def _ensure_state_event(self, event):
         if not event.is_state():
             raise SynapseError(400, "'%s' must be state events" % (event.type,))
+
+
+POWER_LEVELS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "ban": {"$ref": "#/definitions/int"},
+        "events": {"$ref": "#/definitions/objectOfInts"},
+        "events_default": {"$ref": "#/definitions/int"},
+        "invite": {"$ref": "#/definitions/int"},
+        "kick": {"$ref": "#/definitions/int"},
+        "notifications": {"$ref": "#/definitions/objectOfInts"},
+        "redact": {"$ref": "#/definitions/int"},
+        "state_default": {"$ref": "#/definitions/int"},
+        "users": {"$ref": "#/definitions/objectOfInts"},
+        "users_default": {"$ref": "#/definitions/int"},
+    },
+    "definitions": {
+        "int": {
+            "type": "integer",
+            "minimum": CANONICALJSON_MIN_INT,
+            "maximum": CANONICALJSON_MAX_INT,
+        },
+        "objectOfInts": {
+            "type": "object",
+            "additionalProperties": {"$ref": "#/definitions/int"},
+        },
+    },
+}
+
+
+def _create_power_level_validator():
+    validator = jsonschema.validators.validator_for(POWER_LEVELS_SCHEMA)
+
+    # by default jsonschema does not consider a frozendict to be an object so
+    # we need to use a custom type checker
+    # https://python-jsonschema.readthedocs.io/en/stable/validate/?highlight=object#validating-with-additional-types
+    type_checker = validator.TYPE_CHECKER.redefine(
+        "object", lambda checker, thing: isinstance(thing, collections.abc.Mapping)
+    )
+
+    return jsonschema.validators.extend(validator, type_checker=type_checker)
+
+
+plValidator = _create_power_level_validator()

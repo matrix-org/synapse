@@ -46,41 +46,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ShutdownRoomRestServlet(RestServlet):
-    """Shuts down a room by removing all local users from the room and blocking
-    all future invites and joins to the room. Any local aliases will be repointed
-    to a new room created by `new_room_user_id` and kicked users will be auto
-    joined to the new room.
-    """
-
-    PATTERNS = admin_patterns("/shutdown_room/(?P<room_id>[^/]+)")
-
-    def __init__(self, hs: "HomeServer"):
-        self.hs = hs
-        self.auth = hs.get_auth()
-        self.room_shutdown_handler = hs.get_room_shutdown_handler()
-
-    async def on_POST(
-        self, request: SynapseRequest, room_id: str
-    ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
-
-        content = parse_json_object_from_request(request)
-        assert_params_in_dict(content, ["new_room_user_id"])
-
-        ret = await self.room_shutdown_handler.shutdown_room(
-            room_id=room_id,
-            new_room_user_id=content["new_room_user_id"],
-            new_room_name=content.get("room_name"),
-            message=content.get("message"),
-            requester_user_id=requester.user.to_string(),
-            block=True,
-        )
-
-        return (200, ret)
-
-
 class DeleteRoomRestServlet(RestServlet):
     """Delete a room from server.
 

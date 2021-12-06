@@ -151,7 +151,7 @@ class InitialSyncHandler(BaseHandler):
             limit = 10
 
         async def handle_room(event: RoomsForUser):
-            d = {
+            d: JsonDict = {
                 "room_id": event.room_id,
                 "membership": event.membership,
                 "visibility": (

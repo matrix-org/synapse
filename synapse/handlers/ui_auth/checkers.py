@@ -49,7 +49,7 @@ class UserInteractiveAuthChecker:
             clientip: The IP address of the client.
 
         Raises:
-            SynapseError if authentication failed
+            LoginError if authentication failed.
 
         Returns:
             The result of authentication (to pass back to the client?)
@@ -131,7 +131,9 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
             )
             if resp_body["success"]:
                 return True
-        raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
+        raise LoginError(
+            401, "Captcha authentication failed", errcode=Codes.UNAUTHORIZED
+        )
 
 
 class _BaseThreepidAuthChecker:
@@ -191,7 +193,9 @@ class _BaseThreepidAuthChecker:
             raise AssertionError("Unrecognized threepid medium: %s" % (medium,))
 
         if not threepid:
-            raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
+            raise LoginError(
+                401, "Unable to get validated threepid", errcode=Codes.UNAUTHORIZED
+            )
 
         if threepid["medium"] != medium:
             raise LoginError(
@@ -237,11 +241,76 @@ class MsisdnAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChecker):
         return await self._check_threepid("msisdn", authdict)
 
 
+class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
+    AUTH_TYPE = LoginType.REGISTRATION_TOKEN
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
+        self.hs = hs
+        self._enabled = bool(hs.config.registration_requires_token)
+        self.store = hs.get_datastore()
+
+    def is_enabled(self) -> bool:
+        return self._enabled
+
+    async def check_auth(self, authdict: dict, clientip: str) -> Any:
+        if "token" not in authdict:
+            raise LoginError(400, "Missing registration token", Codes.MISSING_PARAM)
+        if not isinstance(authdict["token"], str):
+            raise LoginError(
+                400, "Registration token must be a string", Codes.INVALID_PARAM
+            )
+        if "session" not in authdict:
+            raise LoginError(400, "Missing UIA session", Codes.MISSING_PARAM)
+
+        # Get these here to avoid cyclic dependencies
+        from synapse.handlers.ui_auth import UIAuthSessionDataConstants
+
+        auth_handler = self.hs.get_auth_handler()
+
+        session = authdict["session"]
+        token = authdict["token"]
+
+        # If the LoginType.REGISTRATION_TOKEN stage has already been completed,
+        # return early to avoid incrementing `pending` again.
+        stored_token = await auth_handler.get_session_data(
+            session, UIAuthSessionDataConstants.REGISTRATION_TOKEN
+        )
+        if stored_token:
+            if token != stored_token:
+                raise LoginError(
+                    400, "Registration token has changed", Codes.INVALID_PARAM
+                )
+            else:
+                return token
+
+        if await self.store.registration_token_is_valid(token):
+            # Increment pending counter, so that if token has limited uses it
+            # can't be used up by someone else in the meantime.
+            await self.store.set_registration_token_pending(token)
+            # Store the token in the UIA session, so that once registration
+            # is complete `completed` can be incremented.
+            await auth_handler.set_session_data(
+                session,
+                UIAuthSessionDataConstants.REGISTRATION_TOKEN,
+                token,
+            )
+            # The token will be stored as the result of the authentication stage
+            # in ui_auth_sessions_credentials. This allows the pending counter
+            # for tokens to be decremented when expired sessions are deleted.
+            return token
+        else:
+            raise LoginError(
+                401, "Invalid registration token", errcode=Codes.UNAUTHORIZED
+            )
+
+
 INTERACTIVE_AUTH_CHECKERS = [
     DummyAuthChecker,
     TermsAuthChecker,
     RecaptchaAuthChecker,
     EmailIdentityAuthChecker,
     MsisdnAuthChecker,
+    RegistrationTokenAuthChecker,
 ]
 """A list of UserInteractiveAuthChecker classes"""

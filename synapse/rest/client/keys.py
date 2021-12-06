@@ -15,18 +15,24 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING, Any, Optional, Tuple
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import InvalidAPICallError, SynapseError
+from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
     parse_integer,
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import log_kv, set_tag, trace
-from synapse.types import StreamToken
+from synapse.types import JsonDict, StreamToken
 
 from ._base import client_patterns, interactive_auth_handler
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -59,18 +65,16 @@ class KeyUploadServlet(RestServlet):
 
     PATTERNS = client_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
         self.device_handler = hs.get_device_handler()
 
     @trace(opname="upload_keys")
-    async def on_POST(self, request, device_id):
+    async def on_POST(
+        self, request: SynapseRequest, device_id: Optional[str]
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
@@ -148,21 +152,30 @@ class KeyQueryServlet(RestServlet):
 
     PATTERNS = client_patterns("/keys/query$")
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer):
-        """
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
-    async def on_POST(self, request):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         user_id = requester.user.to_string()
         device_id = requester.device_id
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
+
+        device_keys = body.get("device_keys")
+        if not isinstance(device_keys, dict):
+            raise InvalidAPICallError("'device_keys' must be a JSON object")
+
+        def is_list_of_strings(values: Any) -> bool:
+            return isinstance(values, list) and all(isinstance(v, str) for v in values)
+
+        if any(not is_list_of_strings(keys) for keys in device_keys.values()):
+            raise InvalidAPICallError(
+                "'device_keys' values must be a list of strings",
+            )
+
         result = await self.e2e_keys_handler.query_devices(
             body, timeout, user_id, device_id
         )
@@ -181,17 +194,13 @@ class KeyChangesServlet(RestServlet):
 
     PATTERNS = client_patterns("/keys/changes$")
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer):
-        """
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
         self.store = hs.get_datastore()
 
-    async def on_GET(self, request):
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         from_token_string = parse_string(request, "from", required=True)
@@ -231,12 +240,12 @@ class OneTimeKeyServlet(RestServlet):
 
     PATTERNS = client_patterns("/keys/claim$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
-    async def on_POST(self, request):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await self.auth.get_user_by_req(request, allow_guest=True)
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
@@ -255,11 +264,7 @@ class SigningKeyUploadServlet(RestServlet):
 
     PATTERNS = client_patterns("/keys/device_signing/upload$", releases=())
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
@@ -267,7 +272,7 @@ class SigningKeyUploadServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
 
     @interactive_auth_handler
-    async def on_POST(self, request):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
@@ -315,16 +320,12 @@ class SignaturesUploadServlet(RestServlet):
 
     PATTERNS = client_patterns("/keys/signatures/upload$")
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
 
-    async def on_POST(self, request):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
@@ -335,7 +336,7 @@ class SignaturesUploadServlet(RestServlet):
         return 200, result
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     KeyUploadServlet(hs).register(http_server)
     KeyQueryServlet(hs).register(http_server)
     KeyChangesServlet(hs).register(http_server)

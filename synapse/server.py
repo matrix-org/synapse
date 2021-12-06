@@ -76,6 +76,7 @@ from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
 from synapse.handlers.event_auth import EventAuthHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.federation import FederationHandler
+from synapse.handlers.federation_event import FederationEventHandler
 from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
 from synapse.handlers.identity import IdentityHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
@@ -545,6 +546,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_federation_handler(self) -> FederationHandler:
         return FederationHandler(self)
+
+    @cache_in_self
+    def get_federation_event_handler(self) -> FederationEventHandler:
+        return FederationEventHandler(self)
 
     @cache_in_self
     def get_identity_handler(self) -> IdentityHandler:

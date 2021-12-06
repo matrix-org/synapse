@@ -8,6 +8,9 @@
 <body>
 <form id="registrationForm" method="post" action="{{ myurl }}">
     <div>
+        {% if error is defined %}
+            <p class="error"><strong>Error: {{ error }}</strong></p>
+        {% endif %}
         <p>
             Please click the button below if you agree to the
             <a href="{{ terms_url }}">privacy policy of this homeserver.</a>

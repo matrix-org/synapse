@@ -1,6 +1,6 @@
-=========================================================
-Synapse |support| |development| |license| |pypi| |python|
-=========================================================
+=========================================================================
+Synapse |support| |development| |documentation| |license| |pypi| |python|
+=========================================================================
 
 .. contents::
 
@@ -85,9 +85,14 @@ For support installing or managing Synapse, please join |room|_ (from a matrix.o
 account if necessary) and ask questions there. We do not use GitHub issues for
 support requests, only for bug reports and feature requests.
 
+Synapse's documentation is `nicely rendered on GitHub Pages <https://matrix-org.github.io/synapse>`_,
+with its source available in |docs|_.
+
 .. |room| replace:: ``#synapse:matrix.org``
 .. _room: https://matrix.to/#/#synapse:matrix.org
 
+.. |docs| replace:: ``docs``
+.. _docs: docs
 
 Synapse Installation
 ====================
@@ -263,7 +268,23 @@ Then update the ``users`` table in the database::
 Synapse Development
 ===================
 
-Join our developer community on Matrix: `#synapse-dev:matrix.org <https://matrix.to/#/#synapse-dev:matrix.org>`_
+The best place to get started is our
+`guide for contributors <https://matrix-org.github.io/synapse/latest/development/contributing_guide.html>`_.
+This is part of our larger `documentation <https://matrix-org.github.io/synapse/latest>`_, which includes
+information for synapse developers as well as synapse administrators.
+
+Developers might be particularly interested in:
+
+* `Synapse's database schema <https://matrix-org.github.io/synapse/latest/development/database_schema.html>`_,
+* `notes on Synapse's implementation details <https://matrix-org.github.io/synapse/latest/development/internal_documentation/index.html>`_, and
+* `how we use git <https://matrix-org.github.io/synapse/latest/development/git.html>`_.
+
+Alongside all that, join our developer community on Matrix:
+`#synapse-dev:matrix.org <https://matrix.to/#/#synapse-dev:matrix.org>`_, featuring real humans!
+
+
+Quick start
+-----------
 
 Before setting up a development environment for synapse, make sure you have the
 system dependencies (such as the python header files) installed - see
@@ -308,7 +329,7 @@ If you just want to start a single instance of the app and run it directly::
 
 
 Running the unit tests
-======================
+----------------------
 
 After getting up and running, you may wish to run Synapse's unit tests to
 check that everything is installed correctly::
@@ -327,7 +348,7 @@ to see the logging output, see the `CONTRIBUTING doc <CONTRIBUTING.md#run-the-un
 
 
 Running the Integration Tests
-=============================
+-----------------------------
 
 Synapse is accompanied by `SyTest <https://github.com/matrix-org/sytest>`_,
 a Matrix homeserver integration testing suite, which uses HTTP requests to
@@ -444,6 +465,10 @@ This is normally caused by a misconfiguration in your reverse-proxy. See
 .. |development| image:: https://img.shields.io/matrix/synapse-dev:matrix.org?label=development&logo=matrix
   :alt: (discuss development on #synapse-dev:matrix.org)
   :target: https://matrix.to/#/#synapse-dev:matrix.org
+
+.. |documentation| image:: https://img.shields.io/badge/documentation-%E2%9C%93-success
+  :alt: (Rendered documentation on GitHub Pages)
+  :target: https://matrix-org.github.io/synapse/latest/
 
 .. |license| image:: https://img.shields.io/github/license/matrix-org/synapse
   :alt: (check license in LICENSE file)

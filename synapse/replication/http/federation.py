@@ -62,7 +62,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         self.store = hs.get_datastore()
         self.storage = hs.get_storage()
         self.clock = hs.get_clock()
-        self.federation_handler = hs.get_federation_handler()
+        self.federation_event_handler = hs.get_federation_event_handler()
 
     @staticmethod
     async def _serialize_payload(store, room_id, event_and_contexts, backfilled):
@@ -127,7 +127,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
 
         logger.info("Got %d events from federation", len(event_and_contexts))
 
-        max_stream_id = await self.federation_handler.persist_events_and_notify(
+        max_stream_id = await self.federation_event_handler.persist_events_and_notify(
             room_id, event_and_contexts, backfilled
         )
 

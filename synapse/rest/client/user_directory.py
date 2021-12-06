@@ -13,19 +13,24 @@
 # limitations under the License.
 
 import logging
-from typing import Dict
+from typing import TYPE_CHECKING, Dict, Tuple
 
 from signedjson.sign import sign_json
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
 )
-from synapse.types import UserID
+from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict, UserID
 
 from ._base import client_patterns
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -33,18 +38,14 @@ logger = logging.getLogger(__name__)
 class UserDirectorySearchRestServlet(RestServlet):
     PATTERNS = client_patterns("/user_directory/search$")
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.user_directory_handler = hs.get_user_directory_handler()
         self.http_client = hs.get_simple_http_client()
 
-    async def on_POST(self, request):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         """Searches for users in directory
 
         Returns:
@@ -211,7 +212,7 @@ class UserInfoServlet(RestServlet):
         return 200, user_id_to_info_dict
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     UserDirectorySearchRestServlet(hs).register(http_server)
     SingleUserInfoServlet(hs).register(http_server)
     UserInfoServlet(hs).register(http_server)

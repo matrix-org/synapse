@@ -130,7 +130,9 @@ class FederationTestCase(unittest.HomeserverTestCase):
         )
 
         with LoggingContext("send_rejected"):
-            d = run_in_background(self.handler.on_receive_pdu, OTHER_SERVER, ev)
+            d = run_in_background(
+                self.hs.get_federation_event_handler().on_receive_pdu, OTHER_SERVER, ev
+            )
         self.get_success(d)
 
         # that should have been rejected
@@ -182,7 +184,9 @@ class FederationTestCase(unittest.HomeserverTestCase):
         )
 
         with LoggingContext("send_rejected"):
-            d = run_in_background(self.handler.on_receive_pdu, OTHER_SERVER, ev)
+            d = run_in_background(
+                self.hs.get_federation_event_handler().on_receive_pdu, OTHER_SERVER, ev
+            )
         self.get_success(d)
 
         # that should have been rejected
@@ -311,7 +315,9 @@ class FederationTestCase(unittest.HomeserverTestCase):
         with LoggingContext("receive_pdu"):
             # Fake the OTHER_SERVER federating the message event over to our local homeserver
             d = run_in_background(
-                self.handler.on_receive_pdu, OTHER_SERVER, message_event
+                self.hs.get_federation_event_handler().on_receive_pdu,
+                OTHER_SERVER,
+                message_event,
             )
         self.get_success(d)
 
@@ -382,7 +388,9 @@ class FederationTestCase(unittest.HomeserverTestCase):
         join_event.signatures[other_server] = {"x": "y"}
         with LoggingContext("send_join"):
             d = run_in_background(
-                self.handler.on_send_membership_event, other_server, join_event
+                self.hs.get_federation_event_handler().on_send_membership_event,
+                other_server,
+                join_event,
             )
         self.get_success(d)
 
