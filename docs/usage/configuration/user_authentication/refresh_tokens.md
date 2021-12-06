@@ -54,7 +54,7 @@ There are some caveats:
     session expires and you're not able to use your refresh token.
     That would be a giveaway that someone else has compromised your session.
     You would be able to log in again and terminate that session.
-    Previously (with long-length access tokens), a third party that has your access
+    Previously (with long-lived access tokens), a third party that has your access
     token could go undetected for a very long time.
 * Clients need to implement support for refresh tokens in order for them to be a
   useful mechanism.
