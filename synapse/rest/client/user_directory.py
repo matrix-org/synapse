@@ -70,12 +70,12 @@ class UserDirectorySearchRestServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
 
-        if self.hs.config.user_directory_defer_to_id_server:
+        if self.hs.config.userdirectory.user_directory_defer_to_id_server:
             signed_body = sign_json(
                 body, self.hs.hostname, self.hs.config.signing_key[0]
             )
             url = "%s/_matrix/identity/api/v1/user_directory/search" % (
-                self.hs.config.user_directory_defer_to_id_server,
+                self.hs.config.userdirectory.user_directory_defer_to_id_server,
             )
             resp = await self.http_client.post_json_get_json(url, signed_body)
             return 200, resp

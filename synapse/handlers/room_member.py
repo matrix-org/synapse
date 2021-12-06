@@ -51,8 +51,6 @@ from synapse.types import (
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_left_room
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -89,8 +87,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.spam_checker = hs.get_spam_checker()
         self.third_party_event_rules = hs.get_third_party_event_rules()
         self._server_notices_mxid = self.config.servernotices.server_notices_mxid
-        self._enable_lookup = hs.config.enable_3pid_lookup
-        self.allow_per_room_profiles = self.config.allow_per_room_profiles
+        self._enable_lookup = hs.config.registration.enable_3pid_lookup
+        self.allow_per_room_profiles = self.config.server.allow_per_room_profiles
 
         self._join_rate_limiter_local = Ratelimiter(
             store=self.store,
@@ -118,9 +116,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
         )
 
-        # This is only used to get at the ratelimit function. It's fine there are
-        # multiple of these as it doesn't store state.
-        self.base_handler = BaseHandler(hs)
+        self.request_ratelimiter = hs.get_request_ratelimiter()
 
     @abc.abstractmethod
     async def _remote_join(
@@ -632,7 +628,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 is_requester_admin = await self.auth.is_server_admin(requester.user)
 
             if not is_requester_admin:
-                if self.config.block_non_admin_invites:
+                if self.config.server.block_non_admin_invites:
                     logger.info(
                         "Blocking invite: user is not admin and non-admin "
                         "invites disabled"
@@ -1261,7 +1257,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         Raises:
             ShadowBanError if the requester has been shadow-banned.
         """
-        if self.config.block_non_admin_invites:
+        if self.config.server.block_non_admin_invites:
             is_requester_admin = await self.auth.is_server_admin(requester.user)
             if not is_requester_admin:
                 raise SynapseError(
@@ -1275,7 +1271,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         # We need to rate limit *before* we send out any 3PID invites, so we
         # can't just rely on the standard ratelimiting of events.
-        await self.base_handler.ratelimit(requester)
+        await self.request_ratelimiter.ratelimit(requester)
 
         can_invite = await self.third_party_event_rules.check_threepid_can_be_invited(
             medium, address, room_id
@@ -1481,7 +1477,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         Returns: bool of whether the complexity is too great, or None
             if unable to be fetched
         """
-        max_complexity = self.hs.config.limit_remote_rooms.complexity
+        max_complexity = self.hs.config.server.limit_remote_rooms.complexity
         complexity = await self.federation_handler.get_room_complexity(
             remote_room_hosts, room_id
         )
@@ -1497,7 +1493,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         Args:
             room_id: The room ID to check for complexity.
         """
-        max_complexity = self.hs.config.limit_remote_rooms.complexity
+        max_complexity = self.hs.config.server.limit_remote_rooms.complexity
         complexity = await self.store.get_room_complexity(room_id)
 
         return complexity["v1"] > max_complexity
@@ -1521,8 +1517,11 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         if len(remote_room_hosts) == 0:
             raise SynapseError(404, "No known servers")
 
-        check_complexity = self.hs.config.limit_remote_rooms.enabled
-        if check_complexity and self.hs.config.limit_remote_rooms.admins_can_join:
+        check_complexity = self.hs.config.server.limit_remote_rooms.enabled
+        if (
+            check_complexity
+            and self.hs.config.server.limit_remote_rooms.admins_can_join
+        ):
             check_complexity = not await self.auth.is_server_admin(user)
 
         if check_complexity:
@@ -1533,7 +1532,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             if too_complex is True:
                 raise SynapseError(
                     code=400,
-                    msg=self.hs.config.limit_remote_rooms.complexity_error,
+                    msg=self.hs.config.server.limit_remote_rooms.complexity_error,
                     errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
                 )
 
@@ -1568,7 +1567,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             )
             raise SynapseError(
                 code=400,
-                msg=self.hs.config.limit_remote_rooms.complexity_error,
+                msg=self.hs.config.server.limit_remote_rooms.complexity_error,
                 errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
             )
 

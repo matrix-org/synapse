@@ -117,7 +117,7 @@ class ReplicationDataHandler:
         self._instance_name = hs.get_instance_name()
         self._typing_handler = hs.get_typing_handler()
 
-        self._notify_pushers = hs.config.start_pushers
+        self._notify_pushers = hs.config.worker.start_pushers
         self._pusher_pool = hs.get_pusherpool()
         self._presence_handler = hs.get_presence_handler()
 

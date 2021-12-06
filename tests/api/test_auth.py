@@ -217,7 +217,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         user_id = "@baldrick:matrix.org"
         macaroon = pymacaroons.Macaroon(
-            location=self.hs.config.server_name,
+            location=self.hs.config.server.server_name,
             identifier="key",
             key=self.hs.config.key.macaroon_secret_key,
         )
@@ -239,7 +239,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         user_id = "@baldrick:matrix.org"
         macaroon = pymacaroons.Macaroon(
-            location=self.hs.config.server_name,
+            location=self.hs.config.server.server_name,
             identifier="key",
             key=self.hs.config.key.macaroon_secret_key,
         )
@@ -268,7 +268,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.store.get_monthly_active_count = simple_async_mock(lots_of_users)
 
         e = self.get_failure(self.auth.check_auth_blocking(), ResourceLimitError)
-        self.assertEquals(e.value.admin_contact, self.hs.config.admin_contact)
+        self.assertEquals(e.value.admin_contact, self.hs.config.server.admin_contact)
         self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
         self.assertEquals(e.value.code, 403)
 
@@ -303,7 +303,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             "abcd",
-            self.hs.config.server_name,
+            self.hs.config.server.server_name,
             id="1234",
             namespaces={
                 "users": [{"regex": "@_appservice.*:sender", "exclusive": True}]
@@ -332,7 +332,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             "abcd",
-            self.hs.config.server_name,
+            self.hs.config.server.server_name,
             id="1234",
             namespaces={
                 "users": [{"regex": "@_appservice.*:sender", "exclusive": True}]
@@ -372,7 +372,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.auth_blocking._hs_disabled = True
         self.auth_blocking._hs_disabled_message = "Reason for being disabled"
         e = self.get_failure(self.auth.check_auth_blocking(), ResourceLimitError)
-        self.assertEquals(e.value.admin_contact, self.hs.config.admin_contact)
+        self.assertEquals(e.value.admin_contact, self.hs.config.server.admin_contact)
         self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
         self.assertEquals(e.value.code, 403)
 
@@ -387,7 +387,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.auth_blocking._hs_disabled = True
         self.auth_blocking._hs_disabled_message = "Reason for being disabled"
         e = self.get_failure(self.auth.check_auth_blocking(), ResourceLimitError)
-        self.assertEquals(e.value.admin_contact, self.hs.config.admin_contact)
+        self.assertEquals(e.value.admin_contact, self.hs.config.server.admin_contact)
         self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
         self.assertEquals(e.value.code, 403)
 

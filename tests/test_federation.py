@@ -82,7 +82,6 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
             event,
             context,
             state=None,
-            claimed_auth_event_map=None,
             backfilled=False,
         ):
             return context

@@ -52,7 +52,7 @@ try:
 
     is_thread_resource_usage_supported = True
 
-    def get_thread_resource_usage() -> "Optional[resource._RUsage]":
+    def get_thread_resource_usage() -> "Optional[resource.struct_rusage]":
         return resource.getrusage(RUSAGE_THREAD)
 
 
@@ -61,7 +61,7 @@ except Exception:
     # won't track resource usage.
     is_thread_resource_usage_supported = False
 
-    def get_thread_resource_usage() -> "Optional[resource._RUsage]":
+    def get_thread_resource_usage() -> "Optional[resource.struct_rusage]":
         return None
 
 
@@ -226,10 +226,10 @@ class _Sentinel:
     def copy_to(self, record):
         pass
 
-    def start(self, rusage: "Optional[resource._RUsage]"):
+    def start(self, rusage: "Optional[resource.struct_rusage]"):
         pass
 
-    def stop(self, rusage: "Optional[resource._RUsage]"):
+    def stop(self, rusage: "Optional[resource.struct_rusage]"):
         pass
 
     def add_database_transaction(self, duration_sec):
@@ -289,7 +289,7 @@ class LoggingContext:
 
         # The thread resource usage when the logcontext became active. None
         # if the context is not currently active.
-        self.usage_start: Optional[resource._RUsage] = None
+        self.usage_start: Optional[resource.struct_rusage] = None
 
         self.main_thread = get_thread_id()
         self.request = None
@@ -410,7 +410,7 @@ class LoggingContext:
         # we also track the current scope:
         record.scope = self.scope
 
-    def start(self, rusage: "Optional[resource._RUsage]") -> None:
+    def start(self, rusage: "Optional[resource.struct_rusage]") -> None:
         """
         Record that this logcontext is currently running.
 
@@ -435,7 +435,7 @@ class LoggingContext:
         else:
             self.usage_start = rusage
 
-    def stop(self, rusage: "Optional[resource._RUsage]") -> None:
+    def stop(self, rusage: "Optional[resource.struct_rusage]") -> None:
         """
         Record that this logcontext is no longer running.
 
@@ -490,7 +490,7 @@ class LoggingContext:
 
         return res
 
-    def _get_cputime(self, current: "resource._RUsage") -> Tuple[float, float]:
+    def _get_cputime(self, current: "resource.struct_rusage") -> Tuple[float, float]:
         """Get the cpu usage time between start() and the given rusage
 
         Args:

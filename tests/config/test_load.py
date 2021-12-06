@@ -49,7 +49,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
 
         config = HomeServerConfig.load_config("", ["-c", self.file])
         self.assertTrue(
-            hasattr(config, "macaroon_secret_key"),
+            hasattr(config.key, "macaroon_secret_key"),
             "Want config to have attr macaroon_secret_key",
         )
         if len(config.key.macaroon_secret_key) < 5:
@@ -60,7 +60,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
 
         config = HomeServerConfig.load_or_generate_config("", ["-c", self.file])
         self.assertTrue(
-            hasattr(config, "macaroon_secret_key"),
+            hasattr(config.key, "macaroon_secret_key"),
             "Want config to have attr macaroon_secret_key",
         )
         if len(config.key.macaroon_secret_key) < 5:
@@ -74,8 +74,12 @@ class ConfigLoadingTestCase(unittest.TestCase):
         config1 = HomeServerConfig.load_config("", ["-c", self.file])
         config2 = HomeServerConfig.load_config("", ["-c", self.file])
         config3 = HomeServerConfig.load_or_generate_config("", ["-c", self.file])
-        self.assertEqual(config1.macaroon_secret_key, config2.macaroon_secret_key)
-        self.assertEqual(config1.macaroon_secret_key, config3.macaroon_secret_key)
+        self.assertEqual(
+            config1.key.macaroon_secret_key, config2.key.macaroon_secret_key
+        )
+        self.assertEqual(
+            config1.key.macaroon_secret_key, config3.key.macaroon_secret_key
+        )
 
     def test_disable_registration(self):
         self.generate_config()
@@ -84,16 +88,16 @@ class ConfigLoadingTestCase(unittest.TestCase):
         )
         # Check that disable_registration clobbers enable_registration.
         config = HomeServerConfig.load_config("", ["-c", self.file])
-        self.assertFalse(config.enable_registration)
+        self.assertFalse(config.registration.enable_registration)
 
         config = HomeServerConfig.load_or_generate_config("", ["-c", self.file])
-        self.assertFalse(config.enable_registration)
+        self.assertFalse(config.registration.enable_registration)
 
         # Check that either config value is clobbered by the command line.
         config = HomeServerConfig.load_or_generate_config(
             "", ["-c", self.file, "--enable-registration"]
         )
-        self.assertTrue(config.enable_registration)
+        self.assertTrue(config.registration.enable_registration)
 
     def test_stats_enabled(self):
         self.generate_config_and_remove_lines_containing("enable_metrics")

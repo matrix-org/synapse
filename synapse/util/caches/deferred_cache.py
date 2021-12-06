@@ -31,6 +31,7 @@ from prometheus_client import Gauge
 
 from twisted.internet import defer
 from twisted.python import failure
+from twisted.python.failure import Failure
 
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.lrucache import LruCache
@@ -112,7 +113,7 @@ class DeferredCache(Generic[KT, VT]):
         self.thread: Optional[threading.Thread] = None
 
     @property
-    def max_entries(self):
+    def max_entries(self) -> int:
         return self.cache.max_size
 
     def check_thread(self) -> None:
@@ -258,7 +259,7 @@ class DeferredCache(Generic[KT, VT]):
 
             return False
 
-        def cb(result) -> None:
+        def cb(result: VT) -> None:
             if compare_and_pop():
                 self.cache.set(key, result, entry.callbacks)
             else:
@@ -270,7 +271,7 @@ class DeferredCache(Generic[KT, VT]):
                 # not have been. Either way, let's double-check now.
                 entry.invalidate()
 
-        def eb(_fail) -> None:
+        def eb(_fail: Failure) -> None:
             compare_and_pop()
             entry.invalidate()
 
@@ -284,11 +285,11 @@ class DeferredCache(Generic[KT, VT]):
 
     def prefill(
         self, key: KT, value: VT, callback: Optional[Callable[[], None]] = None
-    ):
+    ) -> None:
         callbacks = [callback] if callback else []
         self.cache.set(key, value, callbacks=callbacks)
 
-    def invalidate(self, key):
+    def invalidate(self, key) -> None:
         """Delete a key, or tree of entries
 
         If the cache is backed by a regular dict, then "key" must be of

@@ -29,7 +29,6 @@ from typing import (
 
 from prometheus_client import Counter
 
-from synapse import event_auth
 from synapse.api.constants import (
     EventContentFields,
     EventTypes,
@@ -47,7 +46,11 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.event_auth import auth_types_for_event
+from synapse.event_auth import (
+    auth_types_for_event,
+    check_auth_rules_for_event,
+    validate_event_for_room_version,
+)
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_client import InvalidResponseError
@@ -68,11 +71,7 @@ from synapse.types import (
     UserID,
     get_domain_from_id,
 )
-from synapse.util.async_helpers import (
-    Linearizer,
-    concurrently_execute,
-    yieldable_gather_results,
-)
+from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.iterutils import batch_iter
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import shortstr
@@ -357,6 +356,11 @@ class FederationEventHandler:
                 )
 
         # all looks good, we can persist the event.
+
+        # First, precalculate the joined hosts so that the federation sender doesn't
+        # need to.
+        await self._event_creation_handler.cache_joined_hosts_for_event(event, context)
+
         await self._run_push_actions_and_persist_event(event, context)
         return event, context
 
@@ -890,6 +894,9 @@ class FederationEventHandler:
                 backfilled=backfilled,
             )
         except AuthError as e:
+            # FIXME richvdh 2021/10/07 I don't think this is reachable. Let's log it
+            #   for now
+            logger.exception("Unexpected AuthError from _check_event_auth")
             raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
 
         await self._run_push_actions_and_persist_event(event, context, backfilled)
@@ -1011,9 +1018,8 @@ class FederationEventHandler:
         room_version = await self._store.get_room_version(marker_event.room_id)
         create_event = await self._store.get_create_event_for_room(marker_event.room_id)
         room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
-        if (
-            not room_version.msc2716_historical
-            or not self._config.experimental.msc2716_enabled
+        if not room_version.msc2716_historical and (
+            not self._config.experimental.msc2716_enabled
             or marker_event.sender != room_creator
         ):
             return
@@ -1155,7 +1161,10 @@ class FederationEventHandler:
                 return
 
             logger.info(
-                "Persisting %i of %i remaining events", len(roots), len(event_map)
+                "Persisting %i of %i remaining outliers: %s",
+                len(roots),
+                len(event_map),
+                shortstr(e.event_id for e in roots),
             )
 
             await self._auth_and_persist_fetched_events_inner(origin, room_id, roots)
@@ -1189,7 +1198,10 @@ class FederationEventHandler:
             allow_rejected=True,
         )
 
-        async def prep(event: EventBase) -> Optional[Tuple[EventBase, EventContext]]:
+        room_version = await self._store.get_room_version_id(room_id)
+        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+
+        def prep(event: EventBase) -> Optional[Tuple[EventBase, EventContext]]:
             with nested_logging_context(suffix=event.event_id):
                 auth = {}
                 for auth_event_id in event.auth_event_ids():
@@ -1207,17 +1219,16 @@ class FederationEventHandler:
                     auth[(ae.type, ae.state_key)] = ae
 
                 context = EventContext.for_outlier()
-                context = await self._check_event_auth(
-                    origin,
-                    event,
-                    context,
-                    claimed_auth_event_map=auth,
-                )
+                try:
+                    validate_event_for_room_version(room_version_obj, event)
+                    check_auth_rules_for_event(room_version_obj, event, auth)
+                except AuthError as e:
+                    logger.warning("Rejecting %r because %s", event, e)
+                    context.rejected = RejectedReason.AUTH_ERROR
+
             return event, context
 
-        events_to_persist = (
-            x for x in await yieldable_gather_results(prep, fetched_events) if x
-        )
+        events_to_persist = (x for x in (prep(event) for event in fetched_events) if x)
         await self.persist_events_and_notify(room_id, tuple(events_to_persist))
 
     async def _check_event_auth(
@@ -1226,7 +1237,6 @@ class FederationEventHandler:
         event: EventBase,
         context: EventContext,
         state: Optional[Iterable[EventBase]] = None,
-        claimed_auth_event_map: Optional[StateMap[EventBase]] = None,
         backfilled: bool = False,
     ) -> EventContext:
         """
@@ -1242,42 +1252,45 @@ class FederationEventHandler:
                 The state events used to check the event for soft-fail. If this is
                 not provided the current state events will be used.
 
-            claimed_auth_event_map:
-                A map of (type, state_key) => event for the event's claimed auth_events.
-                Possibly including events that were rejected, or are in the wrong room.
-
-                Only populated when populating outliers.
-
             backfilled: True if the event was backfilled.
 
         Returns:
             The updated context object.
         """
-        # claimed_auth_event_map should be given iff the event is an outlier
-        assert bool(claimed_auth_event_map) == event.internal_metadata.outlier
+        # This method should only be used for non-outliers
+        assert not event.internal_metadata.outlier
 
+        # first of all, check that the event itself is valid.
         room_version = await self._store.get_room_version_id(event.room_id)
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
-        if claimed_auth_event_map:
-            # if we have a copy of the auth events from the event, use that as the
-            # basis for auth.
-            auth_events = claimed_auth_event_map
-        else:
-            # otherwise, we calculate what the auth events *should* be, and use that
-            prev_state_ids = await context.get_prev_state_ids()
-            auth_events_ids = self._event_auth_handler.compute_auth_events(
-                event, prev_state_ids, for_verification=True
-            )
-            auth_events_x = await self._store.get_events(auth_events_ids)
-            auth_events = {(e.type, e.state_key): e for e in auth_events_x.values()}
+        try:
+            validate_event_for_room_version(room_version_obj, event)
+        except AuthError as e:
+            logger.warning("While validating received event %r: %s", event, e)
+            # TODO: use a different rejected reason here?
+            context.rejected = RejectedReason.AUTH_ERROR
+            return context
+
+        # calculate what the auth events *should* be, to use as a basis for auth.
+        prev_state_ids = await context.get_prev_state_ids()
+        auth_events_ids = self._event_auth_handler.compute_auth_events(
+            event, prev_state_ids, for_verification=True
+        )
+        auth_events_x = await self._store.get_events(auth_events_ids)
+        calculated_auth_event_map = {
+            (e.type, e.state_key): e for e in auth_events_x.values()
+        }
 
         try:
             (
                 context,
                 auth_events_for_auth,
             ) = await self._update_auth_events_and_context_for_auth(
-                origin, event, context, auth_events
+                origin,
+                event,
+                context,
+                calculated_auth_event_map=calculated_auth_event_map,
             )
         except Exception:
             # We don't really mind if the above fails, so lets not fail
@@ -1289,24 +1302,17 @@ class FederationEventHandler:
                 "Ignoring failure and continuing processing of event.",
                 event.event_id,
             )
-            auth_events_for_auth = auth_events
+            auth_events_for_auth = calculated_auth_event_map
 
         try:
-            event_auth.check(room_version_obj, event, auth_events=auth_events_for_auth)
+            check_auth_rules_for_event(room_version_obj, event, auth_events_for_auth)
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR
+            return context
 
-        if not context.rejected:
-            await self._check_for_soft_fail(event, state, backfilled, origin=origin)
-            await self._maybe_kick_guest_users(event)
-
-        # If we are going to send this event over federation we precaclculate
-        # the joined hosts.
-        if event.internal_metadata.get_send_on_behalf_of():
-            await self._event_creation_handler.cache_joined_hosts_for_event(
-                event, context
-            )
+        await self._check_for_soft_fail(event, state, backfilled, origin=origin)
+        await self._maybe_kick_guest_users(event)
 
         return context
 
@@ -1404,7 +1410,7 @@ class FederationEventHandler:
         }
 
         try:
-            event_auth.check(room_version_obj, event, auth_events=current_auth_events)
+            check_auth_rules_for_event(room_version_obj, event, current_auth_events)
         except AuthError as e:
             logger.warning(
                 "Soft-failing %r (from %s) because %s",
@@ -1425,7 +1431,7 @@ class FederationEventHandler:
         origin: str,
         event: EventBase,
         context: EventContext,
-        input_auth_events: StateMap[EventBase],
+        calculated_auth_event_map: StateMap[EventBase],
     ) -> Tuple[EventContext, StateMap[EventBase]]:
         """Helper for _check_event_auth. See there for docs.
 
@@ -1443,19 +1449,17 @@ class FederationEventHandler:
             event:
             context:
 
-            input_auth_events:
-                Map from (event_type, state_key) to event
-
-                Normally, our calculated auth_events based on the state of the room
-                at the event's position in the DAG, though occasionally (eg if the
-                event is an outlier), may be the auth events claimed by the remote
-                server.
+            calculated_auth_event_map:
+                Our calculated auth_events based on the state of the room
+                at the event's position in the DAG.
 
         Returns:
             updated context, updated auth event map
         """
-        # take a copy of input_auth_events before we modify it.
-        auth_events: MutableStateMap[EventBase] = dict(input_auth_events)
+        assert not event.internal_metadata.outlier
+
+        # take a copy of calculated_auth_event_map before we modify it.
+        auth_events: MutableStateMap[EventBase] = dict(calculated_auth_event_map)
 
         event_auth_events = set(event.auth_event_ids())
 
@@ -1474,6 +1478,11 @@ class FederationEventHandler:
             )
             logger.debug("Events %s are in the store", have_events)
             missing_auth.difference_update(have_events)
+
+        # missing_auth is now the set of event_ids which:
+        #  a. are listed in event.auth_events, *and*
+        #  b. are *not* part of our calculated auth events based on room state, *and*
+        #  c. are *not* yet in our database.
 
         if missing_auth:
             # If we don't have all the auth events, we need to get them.
@@ -1496,18 +1505,30 @@ class FederationEventHandler:
                     }
                 )
 
-        if event.internal_metadata.is_outlier():
-            # XXX: given that, for an outlier, we'll be working with the
-            # event's *claimed* auth events rather than those we calculated:
-            # (a) is there any point in this test, since different_auth below will
-            # obviously be empty
-            # (b) alternatively, why don't we do it earlier?
-            logger.info("Skipping auth_event fetch for outlier")
-            return context, auth_events
+        # auth_events now contains
+        #   1. our *calculated* auth events based on the room state, plus:
+        #   2. any events which:
+        #       a. are listed in `event.auth_events`, *and*
+        #       b. are not part of our calculated auth events, *and*
+        #       c. were not in our database before the call to /event_auth
+        #       d. have since been added to our database (most likely by /event_auth).
 
         different_auth = event_auth_events.difference(
             e.event_id for e in auth_events.values()
         )
+
+        # different_auth is the set of events which *are* in `event.auth_events`, but
+        # which are *not* in `auth_events`. Comparing with (2.) above, this means
+        # exclusively the set of `event.auth_events` which we already had in our
+        # database before any call to /event_auth.
+        #
+        # I'm reasonably sure that the fact that events returned by /event_auth are
+        # blindly added to auth_events (and hence excluded from different_auth) is a bug
+        # - though it's a very long-standing one (see
+        # https://github.com/matrix-org/synapse/commit/78015948a7febb18e000651f72f8f58830a55b93#diff-0bc92da3d703202f5b9be2d3f845e375f5b1a6bc6ba61705a8af9be1121f5e42R786
+        # from Jan 2015 which seems to add it, though it actually just moves it from
+        # elsewhere (before that, it gets lost in a mess of huge "various bug fixes"
+        # PRs).
 
         if not different_auth:
             return context, auth_events

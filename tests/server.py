@@ -317,7 +317,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
     def __init__(self):
         self.threadpool = ThreadPool(self)
 
-        self._tcp_callbacks = {}
+        self._tcp_callbacks: Dict[Tuple[str, int], Callable] = {}
         self._udp = []
         self.lookups: Dict[str, str] = {}
         self._thread_callbacks: Deque[Callable[[], None]] = deque()
@@ -355,7 +355,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
     def getThreadPool(self):
         return self.threadpool
 
-    def add_tcp_client_callback(self, host, port, callback):
+    def add_tcp_client_callback(self, host: str, port: int, callback: Callable):
         """Add a callback that will be invoked when we receive a connection
         attempt to the given IP/port using `connectTCP`.
 
@@ -364,7 +364,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         """
         self._tcp_callbacks[(host, port)] = callback
 
-    def connectTCP(self, host, port, factory, timeout=30, bindAddress=None):
+    def connectTCP(self, host: str, port: int, factory, timeout=30, bindAddress=None):
         """Fake L{IReactorTCP.connectTCP}."""
 
         conn = super().connectTCP(
@@ -475,7 +475,7 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
     return server
 
 
-def get_clock():
+def get_clock() -> Tuple[ThreadedMemoryReactorClock, Clock]:
     clock = ThreadedMemoryReactorClock()
     hs_clock = Clock(clock)
     return clock, hs_clock

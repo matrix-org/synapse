@@ -43,12 +43,11 @@ async def check_3pid_allowed(hs: "HomeServer", medium: str, address: str) -> boo
     Returns:
         bool: whether the 3PID medium/address is allowed to be added to this HS
     """
-
-    if hs.config.check_is_for_allowed_local_3pids:
+    if hs.config.registration.check_is_for_allowed_local_3pids:
         data = await hs.get_simple_http_client().get_json(
             "https://%s%s"
             % (
-                hs.config.check_is_for_allowed_local_3pids,
+                hs.config.registration.check_is_for_allowed_local_3pids,
                 "/_matrix/identity/api/v1/internal-info",
             ),
             {"medium": medium, "address": address},
@@ -60,8 +59,8 @@ async def check_3pid_allowed(hs: "HomeServer", medium: str, address: str) -> boo
 
         # Check if this user is intended to register for this homeserver
         if (
-            data.get("hs") != hs.config.server_name
-            and data.get("shadow_hs") != hs.config.server_name
+            data.get("hs") != hs.config.server.server_name
+            and data.get("shadow_hs") != hs.config.server.server_name
         ):
             return False
 
@@ -71,8 +70,8 @@ async def check_3pid_allowed(hs: "HomeServer", medium: str, address: str) -> boo
 
         return True
 
-    if hs.config.allowed_local_3pids:
-        for constraint in hs.config.allowed_local_3pids:
+    if hs.config.registration.allowed_local_3pids:
+        for constraint in hs.config.registration.allowed_local_3pids:
             logger.debug(
                 "Checking 3PID %s (%s) against %s (%s)",
                 address,

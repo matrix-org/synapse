@@ -19,6 +19,21 @@ either a `bool` to indicate whether the event must be rejected because of spam, 
 to indicate the event must be rejected because of spam and to give a rejection reason to
 forward to clients.
 
+### `user_may_join_room`
+
+```python
+async def user_may_join_room(user: str, room: str, is_invited: bool) -> bool
+```
+
+Called when a user is trying to join a room. The module must return a `bool` to indicate
+whether the user can join the room. The user is represented by their Matrix user ID (e.g.
+`@alice:example.com`) and the room is represented by its Matrix ID (e.g.
+`!room:example.com`). The module is also given a boolean to indicate whether the user
+currently has a pending invite in the room.
+
+This callback isn't called if the join is performed by a server administrator, or in the
+context of a room creation.
+
 ### `user_may_invite`
 
 ```python
@@ -28,6 +43,41 @@ async def user_may_invite(inviter: str, invitee: str, room_id: str) -> bool
 Called when processing an invitation. The module must return a `bool` indicating whether
 the inviter can invite the invitee to the given room. Both inviter and invitee are
 represented by their Matrix user ID (e.g. `@alice:example.com`).
+
+### `user_may_send_3pid_invite`
+
+```python
+async def user_may_send_3pid_invite(
+    inviter: str,
+    medium: str,
+    address: str,
+    room_id: str,
+) -> bool
+```
+
+Called when processing an invitation using a third-party identifier (also called a 3PID,
+e.g. an email address or a phone number). The module must return a `bool` indicating
+whether the inviter can invite the invitee to the given room.
+
+The inviter is represented by their Matrix user ID (e.g. `@alice:example.com`), and the
+invitee is represented by its medium (e.g. "email") and its address
+(e.g. `alice@example.com`). See [the Matrix specification](https://matrix.org/docs/spec/appendices#pid-types)
+for more information regarding third-party identifiers.
+
+For example, a call to this callback to send an invitation to the email address
+`alice@example.com` would look like this:
+
+```python
+await user_may_send_3pid_invite(
+    "@bob:example.com",  # The inviter's user ID
+    "email",  # The medium of the 3PID to invite
+    "alice@example.com",  # The address of the 3PID to invite
+    "!some_room:example.com",  # The ID of the room to send the invite into
+)
+```
+
+**Note**: If the third-party identifier is already associated with a matrix user ID,
+[`user_may_invite`](#user_may_invite) will be used instead.
 
 ### `user_may_create_room`
 

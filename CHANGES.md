@@ -1,3 +1,137 @@
+Synapse 1.45.0 (2021-10-19)
+===========================
+
+No functional changes since Synapse 1.45.0rc2.
+
+Known Issues
+------------
+
+- A suspected [performance regression](https://github.com/matrix-org/synapse/issues/11049) which was first reported after the release of 1.44.0 remains unresolved.
+
+  We have not been able to identify a probable cause. Affected users report that setting up a federation sender worker appears to alleviate symptoms of the regression.
+
+Improved Documentation
+----------------------
+
+- Reword changelog to clarify concerns about a suspected performance regression in 1.44.0. ([\#11117](https://github.com/matrix-org/synapse/issues/11117))
+
+
+Synapse 1.45.0rc2 (2021-10-14)
+==============================
+
+This release candidate [fixes](https://github.com/matrix-org/synapse/issues/11053) a user directory [bug](https://github.com/matrix-org/synapse/issues/11025) present in 1.45.0rc1.
+
+Known Issues
+------------
+
+- A suspected [performance regression](https://github.com/matrix-org/synapse/issues/11049) which was first reported after the release of 1.44.0 remains unresolved.
+
+  We have not been able to identify a probable cause. Affected users report that setting up a federation sender worker appears to alleviate symptoms of the regression.
+
+Bugfixes
+--------
+
+- Fix a long-standing bug when using multiple event persister workers where events were not correctly sent down `/sync` due to a race. ([\#11045](https://github.com/matrix-org/synapse/issues/11045))
+- Fix a bug introduced in Synapse 1.45.0rc1 where the user directory would stop updating if it processed an event from a
+  user not in the `users` table. ([\#11053](https://github.com/matrix-org/synapse/issues/11053))
+- Fix a bug introduced in Synapse 1.44.0 when logging errors during oEmbed processing. ([\#11061](https://github.com/matrix-org/synapse/issues/11061))
+
+
+Internal Changes
+----------------
+
+- Add an 'approximate difference' method to `StateFilter`. ([\#10825](https://github.com/matrix-org/synapse/issues/10825))
+- Fix inconsistent behavior of `get_last_client_by_ip` when reporting data that has not been stored in the database yet. ([\#10970](https://github.com/matrix-org/synapse/issues/10970))
+- Fix a bug introduced in Synapse 1.21.0 that causes opentracing and Prometheus metrics for replication requests to be measured incorrectly. ([\#10996](https://github.com/matrix-org/synapse/issues/10996))
+- Ensure that cache config tests do not share state. ([\#11036](https://github.com/matrix-org/synapse/issues/11036))
+
+
+Synapse 1.45.0rc1 (2021-10-12)
+==============================
+
+**Note:** Media storage providers module that read from Synapse's configuration need changes as of this version, see the [upgrade notes](https://matrix-org.github.io/synapse/develop/upgrade#upgrading-to-v1450) for more information.
+
+Known Issues
+------------
+
+- We are investigating [a performance issue](https://github.com/matrix-org/synapse/issues/11049) which was reported after the release of 1.44.0.
+- We are aware of [a bug](https://github.com/matrix-org/synapse/issues/11025) with the user directory when using application services. A second release candidate is expected which will resolve this.
+
+Features
+--------
+
+- Add [MSC3069](https://github.com/matrix-org/matrix-doc/pull/3069) support to `/account/whoami`. ([\#9655](https://github.com/matrix-org/synapse/issues/9655))
+- Support autodiscovery of oEmbed previews. ([\#10822](https://github.com/matrix-org/synapse/issues/10822))
+- Add a `user_may_send_3pid_invite` spam checker callback for modules to allow or deny 3PID invites. ([\#10894](https://github.com/matrix-org/synapse/issues/10894))
+- Add a spam checker callback to allow or deny room joins. ([\#10910](https://github.com/matrix-org/synapse/issues/10910))
+- Include an `update_synapse_database` script in the distribution. Contributed by @Fizzadar at Beeper. ([\#10954](https://github.com/matrix-org/synapse/issues/10954))
+- Include exception information in JSON logging output. Contributed by @Fizzadar at Beeper. ([\#11028](https://github.com/matrix-org/synapse/issues/11028))
+
+
+Bugfixes
+--------
+
+- Fix a minor bug in the response to `/_matrix/client/r0/voip/turnServer`. Contributed by @lukaslihotzki. ([\#10922](https://github.com/matrix-org/synapse/issues/10922))
+- Fix a bug where empty `yyyy-mm-dd/` directories would be left behind in the media store's `url_cache_thumbnails/` directory. ([\#10924](https://github.com/matrix-org/synapse/issues/10924))
+- Fix a bug introduced in Synapse v1.40.0 where the signature checks for room version 8 and 9 could be applied to earlier room versions in some situations. ([\#10927](https://github.com/matrix-org/synapse/issues/10927))
+- Fix a long-standing bug wherein deactivated users still count towards the monthly active users limit. ([\#10947](https://github.com/matrix-org/synapse/issues/10947))
+- Fix a long-standing bug which meant that events received over federation were sometimes incorrectly accepted into the room state. ([\#10956](https://github.com/matrix-org/synapse/issues/10956))
+- Fix a long-standing bug where rebuilding the user directory wouldn't exclude support and deactivated users. ([\#10960](https://github.com/matrix-org/synapse/issues/10960))
+- Fix [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) `/batch_send` endpoint rejecting subsequent batches with unknown batch ID error in existing room versions from the room creator. ([\#10962](https://github.com/matrix-org/synapse/issues/10962))
+- Fix a bug that could leak local users' per-room nicknames and avatars when the user directory is rebuilt. ([\#10981](https://github.com/matrix-org/synapse/issues/10981))
+- Fix a long-standing bug where the remainder of a batch of user directory changes would be silently dropped if the server left a room early in the batch. ([\#10982](https://github.com/matrix-org/synapse/issues/10982))
+- Correct a bugfix introduced in Synapse v1.44.0 that would catch the wrong error if a connection is lost before a response could be written to it. ([\#10995](https://github.com/matrix-org/synapse/issues/10995))
+- Fix a long-standing bug where local users' per-room nicknames/avatars were visible to anyone who could see you in the user directory. ([\#11002](https://github.com/matrix-org/synapse/issues/11002))
+- Fix a long-standing bug where a user's per-room nickname/avatar would overwrite their profile in the user directory when a room was made public. ([\#11003](https://github.com/matrix-org/synapse/issues/11003))
+- Work around a regression, introduced in Synapse v1.39.0, that caused `SynapseError`s raised by the experimental third-party rules module callback `check_event_allowed` to be ignored. ([\#11042](https://github.com/matrix-org/synapse/issues/11042))
+- Fix a bug in [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) insertion events in rooms that could cause cross-talk/conflicts between batches. ([\#10877](https://github.com/matrix-org/synapse/issues/10877))
+
+
+Improved Documentation
+----------------------
+
+- Change wording ("reference homeserver") in Synapse repository documentation. Contributed by @maxkratz. ([\#10971](https://github.com/matrix-org/synapse/issues/10971))
+- Fix a dead URL in development documentation (SAML) and change wording from "Riot" to "Element". Contributed by @maxkratz. ([\#10973](https://github.com/matrix-org/synapse/issues/10973))
+- Add additional content to the Welcome and Overview page of the documentation. ([\#10990](https://github.com/matrix-org/synapse/issues/10990))
+- Update links to MSCs in documentation. Contributed by @dklimpel. ([\#10991](https://github.com/matrix-org/synapse/issues/10991))
+
+
+Internal Changes
+----------------
+
+- Improve type hinting in `synapse.util`. ([\#10888](https://github.com/matrix-org/synapse/issues/10888))
+- Add further type hints to `synapse.storage.util`. ([\#10892](https://github.com/matrix-org/synapse/issues/10892))
+- Fix type hints to be compatible with an upcoming change to Twisted. ([\#10895](https://github.com/matrix-org/synapse/issues/10895))
+- Update utility code to handle C implementations of frozendict. ([\#10902](https://github.com/matrix-org/synapse/issues/10902))
+- Drop old functionality which maintained database compatibility with Synapse versions before v1.31. ([\#10903](https://github.com/matrix-org/synapse/issues/10903))
+- Clean-up configuration helper classes for the `ServerConfig` class. ([\#10915](https://github.com/matrix-org/synapse/issues/10915))
+- Use direct references to config flags. ([\#10916](https://github.com/matrix-org/synapse/issues/10916), [\#10959](https://github.com/matrix-org/synapse/issues/10959), [\#10985](https://github.com/matrix-org/synapse/issues/10985))
+- Clean up some of the federation event authentication code for clarity. ([\#10926](https://github.com/matrix-org/synapse/issues/10926), [\#10940](https://github.com/matrix-org/synapse/issues/10940), [\#10986](https://github.com/matrix-org/synapse/issues/10986), [\#10987](https://github.com/matrix-org/synapse/issues/10987), [\#10988](https://github.com/matrix-org/synapse/issues/10988), [\#11010](https://github.com/matrix-org/synapse/issues/11010), [\#11011](https://github.com/matrix-org/synapse/issues/11011))
+- Refactor various parts of the codebase to use `RoomVersion` objects instead of room version identifier strings. ([\#10934](https://github.com/matrix-org/synapse/issues/10934))
+- Refactor user directory tests in preparation for upcoming changes. ([\#10935](https://github.com/matrix-org/synapse/issues/10935))
+- Include the event id in the logcontext when handling PDUs received over federation. ([\#10936](https://github.com/matrix-org/synapse/issues/10936))
+- Fix logged errors in unit tests. ([\#10939](https://github.com/matrix-org/synapse/issues/10939))
+- Fix a broken test to ensure that consent configuration works during registration. ([\#10945](https://github.com/matrix-org/synapse/issues/10945))
+- Add type hints to filtering classes. ([\#10958](https://github.com/matrix-org/synapse/issues/10958))
+- Add type-hint to `HomeserverTestcase.setup_test_homeserver`. ([\#10961](https://github.com/matrix-org/synapse/issues/10961))
+- Fix the test utility function `create_room_as` so that `is_public=True` will explicitly set the `visibility` parameter of room creation requests to `public`. Contributed by @AndrewFerr. ([\#10963](https://github.com/matrix-org/synapse/issues/10963))
+- Make the release script more robust and transparent. ([\#10966](https://github.com/matrix-org/synapse/issues/10966))
+- Refactor [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) `/batch_send` mega function into smaller handler functions. ([\#10974](https://github.com/matrix-org/synapse/issues/10974))
+- Log stack traces when a missing opentracing span is detected. ([\#10983](https://github.com/matrix-org/synapse/issues/10983))
+- Update GHA config to run tests against Python 3.10 and PostgreSQL 14. ([\#10992](https://github.com/matrix-org/synapse/issues/10992))
+- Fix a long-standing bug where `ReadWriteLock`s could drop logging contexts on exit. ([\#10993](https://github.com/matrix-org/synapse/issues/10993))
+- Add a `CODEOWNERS` file to automatically request reviews from the `@matrix-org/synapse-core` team on new pull requests. ([\#10994](https://github.com/matrix-org/synapse/issues/10994))
+- Add further type hints to `synapse.state`. ([\#11004](https://github.com/matrix-org/synapse/issues/11004))
+- Remove the deprecated `BaseHandler` object. ([\#11005](https://github.com/matrix-org/synapse/issues/11005))
+- Bump mypy version for CI to 0.910, and pull in new type stubs for dependencies. ([\#11006](https://github.com/matrix-org/synapse/issues/11006))
+- Fix CI to run the unit tests without optional deps. ([\#11017](https://github.com/matrix-org/synapse/issues/11017))
+- Ensure that cache config tests do not share state. ([\#11019](https://github.com/matrix-org/synapse/issues/11019))
+- Add additional type hints to `synapse.server_notices`. ([\#11021](https://github.com/matrix-org/synapse/issues/11021))
+- Add additional type hints for `synapse.push`. ([\#11023](https://github.com/matrix-org/synapse/issues/11023))
+- When installing the optional developer dependencies, also include the dependencies needed for type-checking and unit testing. ([\#11034](https://github.com/matrix-org/synapse/issues/11034))
+- Remove unnecessary list comprehension from `synapse_port_db` to satisfy code style requirements. ([\#11043](https://github.com/matrix-org/synapse/issues/11043))
+
+
 Synapse 1.44.0 (2021-10-05)
 ===========================
 

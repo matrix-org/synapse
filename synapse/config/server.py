@@ -1,6 +1,4 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2017-2018 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +17,7 @@ import logging
 import os.path
 import re
 from textwrap import indent
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import attr
 import yaml
@@ -184,49 +182,74 @@ KNOWN_RESOURCES = {
 
 @attr.s(frozen=True)
 class HttpResourceConfig:
-    names = attr.ib(
-        type=List[str],
+    names: List[str] = attr.ib(
         factory=list,
         validator=attr.validators.deep_iterable(attr.validators.in_(KNOWN_RESOURCES)),  # type: ignore
     )
-    compress = attr.ib(
-        type=bool,
+    compress: bool = attr.ib(
         default=False,
         validator=attr.validators.optional(attr.validators.instance_of(bool)),  # type: ignore[arg-type]
     )
 
 
-@attr.s(frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class HttpListenerConfig:
     """Object describing the http-specific parts of the config of a listener"""
 
-    x_forwarded = attr.ib(type=bool, default=False)
-    resources = attr.ib(type=List[HttpResourceConfig], factory=list)
-    additional_resources = attr.ib(type=Dict[str, dict], factory=dict)
-    tag = attr.ib(type=str, default=None)
+    x_forwarded: bool = False
+    resources: List[HttpResourceConfig] = attr.ib(factory=list)
+    additional_resources: Dict[str, dict] = attr.ib(factory=dict)
+    tag: Optional[str] = None
 
 
-@attr.s(frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class ListenerConfig:
     """Object describing the configuration of a single listener."""
 
-    port = attr.ib(type=int, validator=attr.validators.instance_of(int))
-    bind_addresses = attr.ib(type=List[str])
-    type = attr.ib(type=str, validator=attr.validators.in_(KNOWN_LISTENER_TYPES))
-    tls = attr.ib(type=bool, default=False)
+    port: int = attr.ib(validator=attr.validators.instance_of(int))
+    bind_addresses: List[str]
+    type: str = attr.ib(validator=attr.validators.in_(KNOWN_LISTENER_TYPES))
+    tls: bool = False
 
     # http_options is only populated if type=http
-    http_options = attr.ib(type=Optional[HttpListenerConfig], default=None)
+    http_options: Optional[HttpListenerConfig] = None
 
 
-@attr.s(frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class ManholeConfig:
     """Object describing the configuration of the manhole"""
 
-    username = attr.ib(type=str, validator=attr.validators.instance_of(str))
-    password = attr.ib(type=str, validator=attr.validators.instance_of(str))
-    priv_key = attr.ib(type=Optional[Key])
-    pub_key = attr.ib(type=Optional[Key])
+    username: str = attr.ib(validator=attr.validators.instance_of(str))
+    password: str = attr.ib(validator=attr.validators.instance_of(str))
+    priv_key: Optional[Key]
+    pub_key: Optional[Key]
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RetentionConfig:
+    """Object describing the configuration of the manhole"""
+
+    interval: int
+    shortest_max_lifetime: Optional[int]
+    longest_max_lifetime: Optional[int]
+
+
+@attr.s(frozen=True)
+class LimitRemoteRoomsConfig:
+    enabled: bool = attr.ib(validator=attr.validators.instance_of(bool), default=False)
+    complexity: Union[float, int] = attr.ib(
+        validator=attr.validators.instance_of(
+            (float, int)  # type: ignore[arg-type] # noqa
+        ),
+        default=1.0,
+    )
+    complexity_error: str = attr.ib(
+        validator=attr.validators.instance_of(str),
+        default=ROOM_COMPLEXITY_TOO_GREAT,
+    )
+    admins_can_join: bool = attr.ib(
+        validator=attr.validators.instance_of(bool), default=False
+    )
 
 
 class ServerConfig(Config):
@@ -525,7 +548,7 @@ class ServerConfig(Config):
                 " greater than 'allowed_lifetime_max'"
             )
 
-        self.retention_purge_jobs: List[Dict[str, Optional[int]]] = []
+        self.retention_purge_jobs: List[RetentionConfig] = []
         for purge_job_config in retention_config.get("purge_jobs", []):
             interval_config = purge_job_config.get("interval")
 
@@ -559,20 +582,12 @@ class ServerConfig(Config):
                 )
 
             self.retention_purge_jobs.append(
-                {
-                    "interval": interval,
-                    "shortest_max_lifetime": shortest_max_lifetime,
-                    "longest_max_lifetime": longest_max_lifetime,
-                }
+                RetentionConfig(interval, shortest_max_lifetime, longest_max_lifetime)
             )
 
         if not self.retention_purge_jobs:
             self.retention_purge_jobs = [
-                {
-                    "interval": self.parse_duration("1d"),
-                    "shortest_max_lifetime": None,
-                    "longest_max_lifetime": None,
-                }
+                RetentionConfig(self.parse_duration("1d"), None, None)
             ]
 
         self.listeners = [parse_listener_def(x) for x in config.get("listeners", [])]
@@ -596,25 +611,6 @@ class ServerConfig(Config):
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
         self.gc_seconds = self.read_gc_intervals(config.get("gc_min_interval", None))
-
-        @attr.s
-        class LimitRemoteRoomsConfig:
-            enabled = attr.ib(
-                validator=attr.validators.instance_of(bool), default=False
-            )
-            complexity = attr.ib(
-                validator=attr.validators.instance_of(
-                    (float, int)  # type: ignore[arg-type] # noqa
-                ),
-                default=1.0,
-            )
-            complexity_error = attr.ib(
-                validator=attr.validators.instance_of(str),
-                default=ROOM_COMPLEXITY_TOO_GREAT,
-            )
-            admins_can_join = attr.ib(
-                validator=attr.validators.instance_of(bool), default=False
-            )
 
         self.limit_remote_rooms = LimitRemoteRoomsConfig(
             **(config.get("limit_remote_rooms") or {})

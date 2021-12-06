@@ -39,9 +39,9 @@ class WellKnownBuilder:
 
         result = {"m.homeserver": {"base_url": self._config.server.public_baseurl}}
 
-        if self._config.default_identity_server:
+        if self._config.registration.default_identity_server:
             result["m.identity_server"] = {
-                "base_url": self._config.default_identity_server
+                "base_url": self._config.registration.default_identity_server
             }
 
         return result

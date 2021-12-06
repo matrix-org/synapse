@@ -26,6 +26,8 @@ from typing import (
     cast,
 )
 
+from synapse.api.errors import StoreError
+
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -40,12 +42,10 @@ from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
-
 TEMP_TABLE = "_temp_populate_user_directory"
 
 
 class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
-
     # How many records do we calculate before sending it to
     # add_users_who_share_private_rooms?
     SHARE_PRIVATE_WORKING_SET = 500
@@ -230,36 +230,47 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             is_in_room = await self.is_host_joined(room_id, self.server_name)
 
             if is_in_room:
-                is_public = await self.is_room_world_readable_or_publicly_joinable(
-                    room_id
-                )
-
                 users_with_profile = await self.get_users_in_room_with_profiles(room_id)
+                # Throw away users excluded from the directory.
+                users_with_profile = {
+                    user_id: profile
+                    for user_id, profile in users_with_profile.items()
+                    if not self.hs.is_mine_id(user_id)
+                    or await self.should_include_local_user_in_dir(user_id)
+                }
 
-                # Update each user in the user directory.
+                # Upsert a user_directory record for each remote user we see.
                 for user_id, profile in users_with_profile.items():
+                    # Local users are processed separately in
+                    # `_populate_user_directory_users`; there we can read from
+                    # the `profiles` table to ensure we don't leak their per-room
+                    # profiles. It also means we write local users to this table
+                    # exactly once, rather than once for every room they're in.
+                    if self.hs.is_mine_id(user_id):
+                        continue
+                    # TODO `users_with_profile` above reads from the `user_directory`
+                    #   table, meaning that `profile` is bespoke to this room.
+                    #   and this leaks remote users' per-room profiles to the user directory.
                     await self.update_profile_in_user_dir(
                         user_id, profile.display_name, profile.avatar_url
                     )
 
-                to_insert = set()
-
+                # Now update the room sharing tables to include this room.
+                is_public = await self.is_room_world_readable_or_publicly_joinable(
+                    room_id
+                )
                 if is_public:
-                    for user_id in users_with_profile:
-                        if self.get_if_app_services_interested_in_user(user_id):
-                            continue
-
-                        to_insert.add(user_id)
-
-                    if to_insert:
-                        await self.add_users_in_public_rooms(room_id, to_insert)
-                        to_insert.clear()
+                    if users_with_profile:
+                        await self.add_users_in_public_rooms(
+                            room_id, users_with_profile.keys()
+                        )
                 else:
+                    to_insert = set()
                     for user_id in users_with_profile:
+                        # We want the set of pairs (L, M) where L and M are
+                        # in `users_with_profile` and L is local.
+                        # Do so by looking for the local user L first.
                         if not self.hs.is_mine_id(user_id):
-                            continue
-
-                        if self.get_if_app_services_interested_in_user(user_id):
                             continue
 
                         for other_user_id in users_with_profile:
@@ -349,10 +360,11 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
 
         for user_id in users_to_work_on:
-            profile = await self.get_profileinfo(get_localpart_from_id(user_id))
-            await self.update_profile_in_user_dir(
-                user_id, profile.display_name, profile.avatar_url
-            )
+            if await self.should_include_local_user_in_dir(user_id):
+                profile = await self.get_profileinfo(get_localpart_from_id(user_id))
+                await self.update_profile_in_user_dir(
+                    user_id, profile.display_name, profile.avatar_url
+                )
 
             # We've finished processing a user. Delete it from the table.
             await self.db_pool.simple_delete_one(
@@ -368,6 +380,42 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             )
 
         return len(users_to_work_on)
+
+    async def should_include_local_user_in_dir(self, user: str) -> bool:
+        """Certain classes of local user are omitted from the user directory.
+        Is this user one of them?
+        """
+        # We're opting to exclude the appservice sender (user defined by the
+        # `sender_localpart` in the appservice registration) even though
+        # technically it could be DM-able. In the future, this could potentially
+        # be configurable per-appservice whether the appservice sender can be
+        # contacted.
+        if self.get_app_service_by_user_id(user) is not None:
+            return False
+
+        # We're opting to exclude appservice users (anyone matching the user
+        # namespace regex in the appservice registration) even though technically
+        # they could be DM-able. In the future, this could potentially
+        # be configurable per-appservice whether the appservice users can be
+        # contacted.
+        if self.get_if_app_services_interested_in_user(user):
+            # TODO we might want to make this configurable for each app service
+            return False
+
+        # Support users are for diagnostics and should not appear in the user directory.
+        if await self.is_support_user(user):
+            return False
+
+        # Deactivated users aren't contactable, so should not appear in the user directory.
+        try:
+            if await self.get_user_deactivated_status(user):
+                return False
+        except StoreError:
+            # No such user in the users table. No need to do this when calling
+            # is_support_user---that returns False if the user is missing.
+            return False
+
+        return True
 
     async def is_room_world_readable_or_publicly_joinable(self, room_id: str) -> bool:
         """Check if the room is either world_readable or publically joinable"""
@@ -527,7 +575,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             desc="get_user_in_directory",
         )
 
-    async def update_user_directory_stream_pos(self, stream_id: int) -> None:
+    async def update_user_directory_stream_pos(self, stream_id: Optional[int]) -> None:
         await self.db_pool.simple_update_one(
             table="user_directory_stream_pos",
             keyvalues={},
@@ -537,7 +585,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
 
 class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
-
     # How many records do we calculate before sending it to
     # add_users_who_share_private_rooms?
     SHARE_PRIVATE_WORKING_SET = 500

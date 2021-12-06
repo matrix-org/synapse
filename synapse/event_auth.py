@@ -41,42 +41,112 @@ from synapse.types import StateMap, UserID, get_domain_from_id
 logger = logging.getLogger(__name__)
 
 
-def check(
-    room_version_obj: RoomVersion,
-    event: EventBase,
-    auth_events: StateMap[EventBase],
-    do_sig_check: bool = True,
-    do_size_check: bool = True,
+def validate_event_for_room_version(
+    room_version_obj: RoomVersion, event: EventBase
 ) -> None:
-    """Checks if this event is correctly authed.
+    """Ensure that the event complies with the limits, and has the right signatures
+
+    NB: does not *validate* the signatures - it assumes that any signatures present
+    have already been checked.
+
+    NB: it does not check that the event satisfies the auth rules (that is done in
+    check_auth_rules_for_event) - these tests are independent of the rest of the state
+    in the room.
+
+    NB: This is used to check events that have been received over federation. As such,
+    it can only enforce the checks specified in the relevant room version, to avoid
+    a split-brain situation where some servers accept such events, and others reject
+    them.
+
+    TODO: consider moving this into EventValidator
 
     Args:
-        room_version_obj: the version of the room
-        event: the event being checked.
-        auth_events: the existing room state.
-        do_sig_check: True if it should be verified that the sending server
-            signed the event.
-        do_size_check: True if the size of the event fields should be verified.
+        room_version_obj: the version of the room which contains this event
+        event: the event to be checked
 
     Raises:
-        AuthError if the checks fail
-
-    Returns:
-         if the auth checks pass.
+        SynapseError if there is a problem with the event
     """
-    assert isinstance(auth_events, dict)
-
-    if do_size_check:
-        _check_size_limits(event)
+    _check_size_limits(event)
 
     if not hasattr(event, "room_id"):
         raise AuthError(500, "Event has no room_id: %s" % event)
 
-    room_id = event.room_id
+    # check that the event has the correct signatures
+    sender_domain = get_domain_from_id(event.sender)
+
+    is_invite_via_3pid = (
+        event.type == EventTypes.Member
+        and event.membership == Membership.INVITE
+        and "third_party_invite" in event.content
+    )
+
+    # Check the sender's domain has signed the event
+    if not event.signatures.get(sender_domain):
+        # We allow invites via 3pid to have a sender from a different
+        # HS, as the sender must match the sender of the original
+        # 3pid invite. This is checked further down with the
+        # other dedicated membership checks.
+        if not is_invite_via_3pid:
+            raise AuthError(403, "Event not signed by sender's server")
+
+    if event.format_version in (EventFormatVersions.V1,):
+        # Only older room versions have event IDs to check.
+        event_id_domain = get_domain_from_id(event.event_id)
+
+        # Check the origin domain has signed the event
+        if not event.signatures.get(event_id_domain):
+            raise AuthError(403, "Event not signed by sending server")
+
+    is_invite_via_allow_rule = (
+        room_version_obj.msc3083_join_rules
+        and event.type == EventTypes.Member
+        and event.membership == Membership.JOIN
+        and EventContentFields.AUTHORISING_USER in event.content
+    )
+    if is_invite_via_allow_rule:
+        authoriser_domain = get_domain_from_id(
+            event.content[EventContentFields.AUTHORISING_USER]
+        )
+        if not event.signatures.get(authoriser_domain):
+            raise AuthError(403, "Event not signed by authorising server")
+
+
+def check_auth_rules_for_event(
+    room_version_obj: RoomVersion, event: EventBase, auth_events: StateMap[EventBase]
+) -> None:
+    """Check that an event complies with the auth rules
+
+    Checks whether an event passes the auth rules with a given set of state events
+
+    Assumes that we have already checked that the event is the right shape (it has
+    enough signatures, has a room ID, etc). In other words:
+
+     - it's fine for use in state resolution, when we have already decided whether to
+       accept the event or not, and are now trying to decide whether it should make it
+       into the room state
+
+     - when we're doing the initial event auth, it is only suitable in combination with
+       a bunch of other tests.
+
+    Args:
+        room_version_obj: the version of the room
+        event: the event being checked.
+        auth_events: the room state to check the events against.
+
+    Raises:
+        AuthError if the checks fail
+    """
+    assert isinstance(auth_events, dict)
 
     # We need to ensure that the auth events are actually for the same room, to
     # stop people from using powers they've been granted in other rooms for
     # example.
+    #
+    # Arguably we don't need to do this when we're just doing state res, as presumably
+    # the state res algorithm isn't silly enough to give us events from different rooms.
+    # Still, it's easier to do it anyway.
+    room_id = event.room_id
     for auth_event in auth_events.values():
         if auth_event.room_id != room_id:
             raise AuthError(
@@ -85,44 +155,12 @@ def check(
                 "which is in room %s"
                 % (event.event_id, room_id, auth_event.event_id, auth_event.room_id),
             )
-
-    if do_sig_check:
-        sender_domain = get_domain_from_id(event.sender)
-
-        is_invite_via_3pid = (
-            event.type == EventTypes.Member
-            and event.membership == Membership.INVITE
-            and "third_party_invite" in event.content
-        )
-
-        # Check the sender's domain has signed the event
-        if not event.signatures.get(sender_domain):
-            # We allow invites via 3pid to have a sender from a different
-            # HS, as the sender must match the sender of the original
-            # 3pid invite. This is checked further down with the
-            # other dedicated membership checks.
-            if not is_invite_via_3pid:
-                raise AuthError(403, "Event not signed by sender's server")
-
-        if event.format_version in (EventFormatVersions.V1,):
-            # Only older room versions have event IDs to check.
-            event_id_domain = get_domain_from_id(event.event_id)
-
-            # Check the origin domain has signed the event
-            if not event.signatures.get(event_id_domain):
-                raise AuthError(403, "Event not signed by sending server")
-
-        is_invite_via_allow_rule = (
-            event.type == EventTypes.Member
-            and event.membership == Membership.JOIN
-            and EventContentFields.AUTHORISING_USER in event.content
-        )
-        if is_invite_via_allow_rule:
-            authoriser_domain = get_domain_from_id(
-                event.content[EventContentFields.AUTHORISING_USER]
+        if auth_event.rejected_reason:
+            raise AuthError(
+                403,
+                "During auth for event %s: found rejected event %s in the state"
+                % (event.event_id, auth_event.event_id),
             )
-            if not event.signatures.get(authoriser_domain):
-                raise AuthError(403, "Event not signed by authorising server")
 
     # Implementation of https://matrix.org/docs/spec/rooms/v1#authorization-rules
     #

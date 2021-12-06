@@ -172,9 +172,12 @@ class TlsConfig(Config):
                 )
 
         # YYYYMMDDhhmmssZ -- in UTC
-        expires_on = datetime.strptime(
-            tls_certificate.get_notAfter().decode("ascii"), "%Y%m%d%H%M%SZ"
-        )
+        expiry_data = tls_certificate.get_notAfter()
+        if expiry_data is None:
+            raise ValueError(
+                "TLS Certificate has no expiry date, and this is not permitted"
+            )
+        expires_on = datetime.strptime(expiry_data.decode("ascii"), "%Y%m%d%H%M%SZ")
         now = datetime.utcnow()
         days_remaining = (expires_on - now).days
         return days_remaining

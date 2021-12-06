@@ -65,7 +65,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             as_token,
-            self.hs.config.server_name,
+            self.hs.config.server.server_name,
             id="1234",
             namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
             sender="@as:test",
@@ -89,7 +89,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             as_token,
-            self.hs.config.server_name,
+            self.hs.config.server.server_name,
             id="1234",
             namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
             sender="@as:test",
@@ -155,7 +155,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     def test_POST_guest_registration(self):
         self.hs.config.key.macaroon_secret_key = "test"
-        self.hs.config.allow_guest_access = True
+        self.hs.config.registration.allow_guest_access = True
 
         channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
 
@@ -164,7 +164,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertDictContainsSubset(det_data, channel.json_body)
 
     def test_POST_disabled_guest_registration(self):
-        self.hs.config.allow_guest_access = False
+        self.hs.config.registration.allow_guest_access = False
 
         channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
 

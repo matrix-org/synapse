@@ -59,7 +59,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         self.hs = self.setup_test_homeserver()
 
-        self.hs.config.registration_shared_secret = "shared"
+        self.hs.config.registration.registration_shared_secret = "shared"
 
         self.hs.get_media_repository = Mock()
         self.hs.get_deactivate_account_handler = Mock()
@@ -71,7 +71,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         If there is no shared secret, registration through this method will be
         prevented.
         """
-        self.hs.config.registration_shared_secret = None
+        self.hs.config.registration.registration_shared_secret = None
 
         channel = self.make_request("POST", self.url, b"{}")
 
@@ -422,7 +422,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         # Set monthly active users to the limit
         store.get_monthly_active_count = Mock(
-            return_value=make_awaitable(self.hs.config.max_mau_value)
+            return_value=make_awaitable(self.hs.config.server.max_mau_value)
         )
         # Check that the blocking of monthly active users is working as expected
         # The registration of a new user fails due to the limit
@@ -1490,7 +1490,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         # Set monthly active users to the limit
         self.store.get_monthly_active_count = Mock(
-            return_value=make_awaitable(self.hs.config.max_mau_value)
+            return_value=make_awaitable(self.hs.config.server.max_mau_value)
         )
         # Check that the blocking of monthly active users is working as expected
         # The registration of a new user fails due to the limit
@@ -1527,7 +1527,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         # Set monthly active users to the limit
         self.store.get_monthly_active_count = Mock(
-            return_value=make_awaitable(self.hs.config.max_mau_value)
+            return_value=make_awaitable(self.hs.config.server.max_mau_value)
         )
         # Check that the blocking of monthly active users is working as expected
         # The registration of a new user fails due to the limit

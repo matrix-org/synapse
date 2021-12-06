@@ -58,7 +58,7 @@ class OIDCConfig(Config):
                     "Multiple OIDC providers have the idp_id %r." % idp_id
                 )
 
-        public_baseurl = self.public_baseurl
+        public_baseurl = self.root.server.public_baseurl
         if public_baseurl is None:
             raise ConfigError("oidc_config requires a public_baseurl to be set")
         self.oidc_callback_url = public_baseurl + "_synapse/client/oidc/callback"

@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, List, Optional
 from signedjson.sign import sign_json
 
 from twisted.internet import reactor
+from twisted.internet.defer import Deferred
 
 from synapse.api.errors import (
     AuthError,
@@ -41,8 +42,6 @@ from synapse.types import (
     get_domain_from_id,
 )
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -52,7 +51,7 @@ MAX_DISPLAYNAME_LEN = 256
 MAX_AVATAR_URL_LEN = 1000
 
 
-class ProfileHandler(BaseHandler):
+class ProfileHandler:
     """Handles fetching and updating user profile information.
 
     ProfileHandler can be instantiated directly on workers and will
@@ -65,7 +64,9 @@ class ProfileHandler(BaseHandler):
     PROFILE_REPLICATE_INTERVAL = 2 * 60 * 1000
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
+        self.clock = hs.get_clock()
+        self.hs = hs
 
         self.federation = hs.get_federation_client()
         hs.get_federation_registry().register_query_handler(
@@ -73,19 +74,22 @@ class ProfileHandler(BaseHandler):
         )
 
         self.user_directory_handler = hs.get_user_directory_handler()
+        self.request_ratelimiter = hs.get_request_ratelimiter()
 
         self.http_client = hs.get_simple_http_client()
 
-        self.max_avatar_size = hs.config.max_avatar_size
-        self.allowed_avatar_mimetypes = hs.config.allowed_avatar_mimetypes
-        self.replicate_user_profiles_to = hs.config.replicate_user_profiles_to
+        self.max_avatar_size = hs.config.media.max_avatar_size
+        self.allowed_avatar_mimetypes = hs.config.media.allowed_avatar_mimetypes
+        self.replicate_user_profiles_to = (
+            hs.config.registration.replicate_user_profiles_to
+        )
 
         if hs.config.worker.run_background_tasks:
             self.clock.looping_call(
                 self._update_remote_profile_cache, self.PROFILE_UPDATE_MS
             )
 
-            if len(self.hs.config.replicate_user_profiles_to) > 0:
+            if len(self.replicate_user_profiles_to) > 0:
                 reactor.callWhenRunning(self._do_assign_profile_replication_batches)  # type: ignore
                 reactor.callWhenRunning(self._start_replicate_profiles)  # type: ignore
                 # Add a looping call to replicate_profiles: this handles retries
@@ -95,18 +99,18 @@ class ProfileHandler(BaseHandler):
                     self._start_replicate_profiles, self.PROFILE_REPLICATE_INTERVAL
                 )
 
-    def _do_assign_profile_replication_batches(self):
+    def _do_assign_profile_replication_batches(self) -> Deferred:
         return run_as_background_process(
             "_assign_profile_replication_batches",
             self._assign_profile_replication_batches,
         )
 
-    def _start_replicate_profiles(self):
+    def _start_replicate_profiles(self) -> Deferred:
         return run_as_background_process(
             "_replicate_profiles", self._replicate_profiles
         )
 
-    async def _assign_profile_replication_batches(self):
+    async def _assign_profile_replication_batches(self) -> None:
         """If no profile replication has been done yet, allocate replication batch
         numbers to each profile to start the replication process.
         """
@@ -119,7 +123,7 @@ class ProfileHandler(BaseHandler):
                 break
         logger.info("Assigned %d profile batch numbers", total)
 
-    async def _replicate_profiles(self):
+    async def _replicate_profiles(self) -> None:
         """If any profile data has been updated and not pushed to the replication targets,
         replicate it.
         """
@@ -127,7 +131,7 @@ class ProfileHandler(BaseHandler):
         latest_batch = await self.store.get_latest_profile_replication_batch_number()
         if latest_batch is None:
             latest_batch = -1
-        for repl_host in self.hs.config.replicate_user_profiles_to:
+        for repl_host in self.replicate_user_profiles_to:
             if repl_host not in host_batches:
                 host_batches[repl_host] = -1
             try:
@@ -138,7 +142,7 @@ class ProfileHandler(BaseHandler):
                     "Exception while replicating to %s: aborting for now", repl_host
                 )
 
-    async def _replicate_host_profile_batch(self, host, batchnum):
+    async def _replicate_host_profile_batch(self, host: str, batchnum: int) -> None:
         logger.info("Replicating profile batch %d to %s", batchnum, host)
         batch_rows = await self.store.get_profile_batch(batchnum)
         batch = {
@@ -152,7 +156,9 @@ class ProfileHandler(BaseHandler):
 
         url = "https://%s/_matrix/identity/api/v1/replicate_profiles" % (host,)
         body = {"batchnum": batchnum, "batch": batch, "origin_server": self.hs.hostname}
-        signed_body = sign_json(body, self.hs.hostname, self.hs.config.signing_key[0])
+        signed_body = sign_json(
+            body, self.hs.hostname, self.hs.config.key.signing_key[0]
+        )
         try:
             await self.http_client.post_json_get_json(url, signed_body)
             await self.store.update_replication_batch_for_host(host, batchnum)
@@ -276,7 +282,7 @@ class ProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's displayname")
 
-        if not by_admin and not self.hs.config.enable_set_displayname:
+        if not by_admin and not self.hs.config.registration.enable_set_displayname:
             profile = await self.store.get_profileinfo(target_user.localpart)
             if profile.display_name:
                 raise SynapseError(
@@ -308,7 +314,7 @@ class ProfileHandler(BaseHandler):
                 authenticated_entity=requester.authenticated_entity,
             )
 
-        if len(self.hs.config.replicate_user_profiles_to) > 0:
+        if len(self.replicate_user_profiles_to) > 0:
             cur_batchnum = (
                 await self.store.get_latest_profile_replication_batch_number()
             )
@@ -338,7 +344,7 @@ class ProfileHandler(BaseHandler):
         users: List[UserID],
         active: bool,
         hide: bool,
-    ):
+    ) -> None:
         """
         Sets the 'active' flag on a set of user profiles. If set to false, the
         accounts are considered deactivated or hidden.
@@ -420,7 +426,7 @@ class ProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
 
-        if not by_admin and not self.hs.config.enable_set_avatar_url:
+        if not by_admin and not self.hs.config.registration.enable_set_avatar_url:
             profile = await self.store.get_profileinfo(target_user.localpart)
             if profile.avatar_url:
                 raise SynapseError(
@@ -481,7 +487,7 @@ class ProfileHandler(BaseHandler):
                 target_user, authenticated_entity=requester.authenticated_entity
             )
 
-        if len(self.hs.config.replicate_user_profiles_to) > 0:
+        if len(self.replicate_user_profiles_to) > 0:
             cur_batchnum = (
                 await self.store.get_latest_profile_replication_batch_number()
             )
@@ -503,14 +509,14 @@ class ProfileHandler(BaseHandler):
         # start a profile replication push
         run_in_background(self._replicate_profiles)
 
-    def _validate_and_parse_media_id_from_avatar_url(self, mxc):
+    def _validate_and_parse_media_id_from_avatar_url(self, mxc: str) -> str:
         """Validate and parse a provided avatar url and return the local media id
 
         Args:
-            mxc (str): A mxc URL
+            mxc: A mxc URL
 
         Returns:
-            str: The ID of the media
+            The ID of the media
         """
         avatar_pieces = mxc.split("/")
         if len(avatar_pieces) != 4 or avatar_pieces[0] != "mxc:":
@@ -561,7 +567,7 @@ class ProfileHandler(BaseHandler):
             return
 
         if ratelimit:
-            await self.ratelimit(requester)
+            await self.request_ratelimiter.ratelimit(requester)
 
         # Do not actually update the room state for shadow-banned users.
         if requester.shadow_banned:
@@ -612,7 +618,7 @@ class ProfileHandler(BaseHandler):
         # when building a membership event. In this case, we must allow the
         # lookup.
         if (
-            not self.hs.config.limit_profile_requests_to_users_who_share_rooms
+            not self.hs.config.server.limit_profile_requests_to_users_who_share_rooms
             or not requester
         ):
             return

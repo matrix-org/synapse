@@ -120,7 +120,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         )
 
         if existing_user_id is None:
-            if self.config.request_token_inhibit_3pid_errors:
+            if self.config.server.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
@@ -131,11 +131,11 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
         if self.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            assert self.hs.config.account_threepid_delegate_email
+            assert self.hs.config.registration.account_threepid_delegate_email
 
             # Have the configured identity server handle the request
             ret = await self.identity_handler.requestEmailToken(
-                self.hs.config.account_threepid_delegate_email,
+                self.hs.config.registration.account_threepid_delegate_email,
                 email,
                 client_secret,
                 send_attempt,
@@ -412,7 +412,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         existing_user_id = await self.store.get_user_id_by_threepid("email", email)
 
         if existing_user_id is not None:
-            if self.config.request_token_inhibit_3pid_errors:
+            if self.config.server.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
@@ -423,11 +423,11 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         if self.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            assert self.hs.config.account_threepid_delegate_email
+            assert self.hs.config.registration.account_threepid_delegate_email
 
             # Have the configured identity server handle the request
             ret = await self.identity_handler.requestEmailToken(
-                self.hs.config.account_threepid_delegate_email,
+                self.hs.config.registration.account_threepid_delegate_email,
                 email,
                 client_secret,
                 send_attempt,
@@ -495,7 +495,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         existing_user_id = await self.store.get_user_id_by_threepid("msisdn", msisdn)
 
         if existing_user_id is not None:
-            if self.hs.config.request_token_inhibit_3pid_errors:
+            if self.hs.config.server.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
                 # Also wait for some random amount of time between 100ms and 1s to make it
@@ -505,7 +505,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
 
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
-        if not self.hs.config.account_threepid_delegate_msisdn:
+        if not self.hs.config.registration.account_threepid_delegate_msisdn:
             logger.warning(
                 "No upstream msisdn account_threepid_delegate configured on the server to "
                 "handle this request"
@@ -516,7 +516,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             )
 
         ret = await self.identity_handler.requestMsisdnToken(
-            self.hs.config.account_threepid_delegate_msisdn,
+            self.hs.config.registration.account_threepid_delegate_msisdn,
             country,
             phone_number,
             client_secret,
@@ -613,7 +613,7 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
         self.identity_handler = hs.get_identity_handler()
 
     async def on_POST(self, request: Request) -> Tuple[int, JsonDict]:
-        if not self.config.account_threepid_delegate_msisdn:
+        if not self.config.registration.account_threepid_delegate_msisdn:
             raise SynapseError(
                 400,
                 "This homeserver is not validating phone numbers. Use an identity server "
@@ -626,7 +626,7 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
 
         # Proxy submit_token request to msisdn threepid delegate
         response = await self.identity_handler.proxy_msisdn_submit_token(
-            self.config.account_threepid_delegate_msisdn,
+            self.config.registration.account_threepid_delegate_msisdn,
             body["client_secret"],
             body["sid"],
             body["token"],
@@ -653,7 +653,7 @@ class ThreepidRestServlet(RestServlet):
         return 200, {"threepids": threepids}
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        if not self.hs.config.enable_3pid_changes:
+        if not self.hs.config.registration.enable_3pid_changes:
             raise SynapseError(
                 400, "3PID changes are disabled on this server", Codes.FORBIDDEN
             )
@@ -703,7 +703,7 @@ class ThreepidAddRestServlet(RestServlet):
 
     @interactive_auth_handler
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        if not self.hs.config.enable_3pid_changes:
+        if not self.hs.config.registration.enable_3pid_changes:
             raise SynapseError(
                 400, "3PID changes are disabled on this server", Codes.FORBIDDEN
             )
@@ -811,7 +811,7 @@ class ThreepidDeleteRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        if not self.hs.config.enable_3pid_changes:
+        if not self.hs.config.registration.enable_3pid_changes:
             raise SynapseError(
                 400, "3PID changes are disabled on this server", Codes.FORBIDDEN
             )
@@ -924,8 +924,8 @@ def assert_valid_next_link(hs: "HomeServer", next_link: str) -> None:
     # If the domain whitelist is set, the domain must be in it
     if (
         valid
-        and hs.config.next_link_domain_whitelist is not None
-        and next_link_parsed.hostname not in hs.config.next_link_domain_whitelist
+        and hs.config.server.next_link_domain_whitelist is not None
+        and next_link_parsed.hostname not in hs.config.server.next_link_domain_whitelist
     ):
         valid = False
 
@@ -945,9 +945,13 @@ class WhoamiRestServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
-        response = {"user_id": requester.user.to_string()}
+        response = {
+            "user_id": requester.user.to_string(),
+            # MSC: https://github.com/matrix-org/matrix-doc/pull/3069
+            "org.matrix.msc3069.is_guest": bool(requester.is_guest),
+        }
 
         # Appservices and similar accounts do not have device IDs
         # that we can report on, so exclude them for compliance.

@@ -145,11 +145,13 @@ class KeyConfig(Config):
 
         # list of TrustedKeyServer objects
         self.key_servers = list(
-            _parse_key_servers(key_servers, self.federation_verify_certificates)
+            _parse_key_servers(
+                key_servers, self.root.tls.federation_verify_certificates
+            )
         )
 
         self.macaroon_secret_key = config.get(
-            "macaroon_secret_key", self.registration_shared_secret
+            "macaroon_secret_key", self.root.registration.registration_shared_secret
         )
 
         if not self.macaroon_secret_key:

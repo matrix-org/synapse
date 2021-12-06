@@ -41,28 +41,27 @@ from synapse.util.stringutils import (
     valid_id_server_location,
 )
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class IdentityHandler(BaseHandler):
+class IdentityHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.store = hs.get_datastore()
         # An HTTP client for contacting trusted URLs.
         self.http_client = SimpleHttpClient(hs)
         # An HTTP client for contacting identity servers specified by clients.
         self.blacklisting_http_client = SimpleHttpClient(
-            hs, ip_blacklist=hs.config.federation_ip_range_blacklist
+            hs, ip_blacklist=hs.config.server.federation_ip_range_blacklist
         )
         self.federation_http_client = hs.get_federation_http_client()
         self.hs = hs
 
-        self.rewrite_identity_server_urls = hs.config.registration.rewrite_identity_server_urls
+        self.rewrite_identity_server_urls = (
+            hs.config.registration.rewrite_identity_server_urls
+        )
         self._enable_lookup = hs.config.registration.enable_3pid_lookup
 
         self._web_client_location = hs.config.email.invite_client_location
@@ -344,8 +343,8 @@ class IdentityHandler(BaseHandler):
         # the server we connect to.
         id_server_url = self.rewrite_id_server_url(id_server, add_https=True)
 
-        if self.hs.config.bind_new_user_emails_to_sydent:
-            id_server_url = self.hs.config.bind_new_user_emails_to_sydent
+        if self.hs.config.registration.bind_new_user_emails_to_sydent:
+            id_server_url = self.hs.config.registration.bind_new_user_emails_to_sydent
 
         url = "%s/_matrix/identity/api/v1/3pid/unbind" % (id_server_url,)
 
@@ -630,9 +629,15 @@ class IdentityHandler(BaseHandler):
 
         # Try to validate as email
         if self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            # Remote emails will only be used if a valid identity server is provided.
+            assert (
+                self.hs.config.registration.account_threepid_delegate_email is not None
+            )
+
             # Ask our delegated email identity server
             validation_session = await self.threepid_from_creds(
-                self.hs.config.account_threepid_delegate_email, threepid_creds
+                self.hs.config.registration.account_threepid_delegate_email,
+                threepid_creds,
             )
         elif self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             # Get a validated session matching these details
@@ -644,10 +649,11 @@ class IdentityHandler(BaseHandler):
             return validation_session
 
         # Try to validate as msisdn
-        if self.hs.config.account_threepid_delegate_msisdn:
+        if self.hs.config.registration.account_threepid_delegate_msisdn:
             # Ask our delegated msisdn identity server
             validation_session = await self.threepid_from_creds(
-                self.hs.config.account_threepid_delegate_msisdn, threepid_creds
+                self.hs.config.registration.account_threepid_delegate_msisdn,
+                threepid_creds,
             )
 
         return validation_session

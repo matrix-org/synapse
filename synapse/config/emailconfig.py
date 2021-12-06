@@ -19,7 +19,6 @@ import email.utils
 import logging
 import os
 from enum import Enum
-from typing import Optional
 
 import attr
 
@@ -135,7 +134,7 @@ class EmailConfig(Config):
             # msisdn is currently always remote while Synapse does not support any method of
             # sending SMS messages
             ThreepidBehaviour.REMOTE
-            if self.account_threepid_delegate_email
+            if self.root.registration.account_threepid_delegate_email
             else ThreepidBehaviour.LOCAL
         )
         # Prior to Synapse v1.4.0, there was another option that defined whether Synapse would
@@ -144,7 +143,7 @@ class EmailConfig(Config):
         # identity server in the process.
         self.using_identity_server_from_trusted_list = False
         if (
-            not self.account_threepid_delegate_email
+            not self.root.registration.account_threepid_delegate_email
             and config.get("trust_identity_server_for_password_resets", False) is True
         ):
             # Use the first entry in self.trusted_third_party_id_servers instead
@@ -156,7 +155,7 @@ class EmailConfig(Config):
 
                 # trusted_third_party_id_servers does not contain a scheme whereas
                 # account_threepid_delegate_email is expected to. Presume https
-                self.account_threepid_delegate_email: Optional[str] = (
+                self.root.registration.account_threepid_delegate_email = (
                     "https://" + first_trusted_identity_server
                 )
                 self.using_identity_server_from_trusted_list = True
@@ -335,7 +334,7 @@ class EmailConfig(Config):
                 "client_base_url", email_config.get("riot_base_url", None)
             )
 
-        if self.account_validity_renew_by_email_enabled:
+        if self.root.account_validity.account_validity_renew_by_email_enabled:
             expiry_template_html = email_config.get(
                 "expiry_template_html", "notice_expiry.html"
             )

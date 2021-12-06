@@ -26,17 +26,18 @@ from synapse.storage.state import StateFilter
 from synapse.types import JsonDict, UserID
 from synapse.visibility import filter_events_for_client
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class SearchHandler(BaseHandler):
+class SearchHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
+        self.state_handler = hs.get_state_handler()
+        self.clock = hs.get_clock()
+        self.hs = hs
         self._event_serializer = hs.get_event_client_serializer()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
@@ -105,7 +106,7 @@ class SearchHandler(BaseHandler):
             dict to be returned to the client with results of search
         """
 
-        if not self.hs.config.enable_search:
+        if not self.hs.config.server.enable_search:
             raise SynapseError(400, "Search is disabled on this homeserver")
 
         batch_group = None

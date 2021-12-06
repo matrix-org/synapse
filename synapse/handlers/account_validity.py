@@ -59,7 +59,9 @@ class AccountValidityHandler:
             hs.config.account_validity.account_validity_renew_by_email_enabled
         )
 
-        self._show_users_in_user_directory = self.hs.config.show_users_in_user_directory
+        self._show_users_in_user_directory = (
+            self.hs.config.server.show_users_in_user_directory
+        )
 
         self._account_validity_period = None
         if self._account_validity_enabled:
@@ -72,12 +74,8 @@ class AccountValidityHandler:
             and self._account_validity_renew_by_email_enabled
         ):
             # Don't do email-specific configuration if renewal by email is disabled.
-            self._template_html = (
-                hs.config.account_validity.account_validity_template_html
-            )
-            self._template_text = (
-                hs.config.account_validity.account_validity_template_text
-            )
+            self._template_html = hs.config.email.account_validity_template_html
+            self._template_text = hs.config.email.account_validity_template_text
             self._renew_email_subject = (
                 hs.config.account_validity.account_validity_renew_email_subject
             )

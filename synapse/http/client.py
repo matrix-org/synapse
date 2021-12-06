@@ -912,7 +912,7 @@ class InsecureInterceptableContextFactory(ssl.ContextFactory):
 
     def __init__(self):
         self._context = SSL.Context(SSL.SSLv23_METHOD)
-        self._context.set_verify(VERIFY_NONE, lambda *_: None)
+        self._context.set_verify(VERIFY_NONE, lambda *_: False)
 
     def getContext(self, hostname=None, port=None):
         return self._context

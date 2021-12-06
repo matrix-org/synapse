@@ -14,23 +14,28 @@
 
 import os.path
 import tempfile
+from unittest.mock import Mock
 
 from synapse.config import ConfigError
+from synapse.config._base import Config
 from synapse.util.stringutils import random_string
 
 from tests import unittest
 
 
-class BaseConfigTestCase(unittest.HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
-        self.hs = hs
+class BaseConfigTestCase(unittest.TestCase):
+    def setUp(self):
+        # The root object needs a server property with a public_baseurl.
+        root = Mock()
+        root.server.public_baseurl = "http://test"
+        self.config = Config(root)
 
     def test_loading_missing_templates(self):
         # Use a temporary directory that exists on the system, but that isn't likely to
         # contain template files
         with tempfile.TemporaryDirectory() as tmp_dir:
             # Attempt to load an HTML template from our custom template directory
-            template = self.hs.config.read_templates(["sso_error.html"], (tmp_dir,))[0]
+            template = self.config.read_templates(["sso_error.html"], (tmp_dir,))[0]
 
         # If no errors, we should've gotten the default template instead
 
@@ -60,7 +65,7 @@ class BaseConfigTestCase(unittest.HomeserverTestCase):
 
                 # Attempt to load the template from our custom template directory
                 template = (
-                    self.hs.config.read_templates([template_filename], (tmp_dir,))
+                    self.config.read_templates([template_filename], (tmp_dir,))
                 )[0]
 
         # Render the template
@@ -97,7 +102,7 @@ class BaseConfigTestCase(unittest.HomeserverTestCase):
 
         # Retrieve the template.
         template = (
-            self.hs.config.read_templates(
+            self.config.read_templates(
                 [template_filename],
                 (td.name for td in tempdirs),
             )
@@ -118,7 +123,7 @@ class BaseConfigTestCase(unittest.HomeserverTestCase):
 
         # Retrieve the template.
         template = (
-            self.hs.config.read_templates(
+            self.config.read_templates(
                 [other_template_name],
                 (td.name for td in tempdirs),
             )
@@ -134,6 +139,6 @@ class BaseConfigTestCase(unittest.HomeserverTestCase):
 
     def test_loading_template_from_nonexistent_custom_directory(self):
         with self.assertRaises(ConfigError):
-            self.hs.config.read_templates(
+            self.config.read_templates(
                 ["some_filename.html"], ("a_nonexistent_directory",)
             )

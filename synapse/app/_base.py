@@ -86,11 +86,11 @@ def start_worker_reactor(appname, config, run_command=reactor.run):
 
     start_reactor(
         appname,
-        soft_file_limit=config.soft_file_limit,
-        gc_thresholds=config.gc_thresholds,
+        soft_file_limit=config.server.soft_file_limit,
+        gc_thresholds=config.server.gc_thresholds,
         pid_file=config.worker.worker_pid_file,
         daemonize=config.worker.worker_daemonize,
-        print_pidfile=config.print_pidfile,
+        print_pidfile=config.server.print_pidfile,
         logger=logger,
         run_command=run_command,
     )
@@ -298,10 +298,10 @@ def refresh_certificate(hs):
     Refresh the TLS certificates that Synapse is using by re-reading them from
     disk and updating the TLS context factories to use them.
     """
-    if not hs.config.has_tls_listener():
+    if not hs.config.server.has_tls_listener():
         return
 
-    hs.config.read_certificate_from_disk()
+    hs.config.tls.read_certificate_from_disk()
     hs.tls_server_context_factory = context_factory.ServerContextFactory(hs.config)
 
     if hs._listening_services:

@@ -21,18 +21,15 @@ from synapse.events import EventBase
 from synapse.types import JsonDict, RoomStreamToken, StateMap, UserID
 from synapse.visibility import filter_events_for_client
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class AdminHandler(BaseHandler):
+class AdminHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.store = hs.get_datastore()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
 

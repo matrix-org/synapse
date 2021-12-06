@@ -36,16 +36,35 @@ class MockHomeserver(HomeServer):
 
     def __init__(self, config, **kwargs):
         super(MockHomeserver, self).__init__(
-            config.server_name, reactor=reactor, config=config, **kwargs
+            config.server.server_name, reactor=reactor, config=config, **kwargs
         )
 
         self.version_string = "Synapse/" + get_version_string(synapse)
 
 
-if __name__ == "__main__":
+def run_background_updates(hs):
+    store = hs.get_datastore()
+
+    async def run_background_updates():
+        await store.db_pool.updates.run_background_updates(sleep=False)
+        # Stop the reactor to exit the script once every background update is run.
+        reactor.stop()
+
+    def run():
+        # Apply all background updates on the database.
+        defer.ensureDeferred(
+            run_as_background_process("background_updates", run_background_updates)
+        )
+
+    reactor.callWhenRunning(run)
+
+    reactor.run()
+
+
+def main():
     parser = argparse.ArgumentParser(
         description=(
-            "Updates a synapse database to the latest schema and runs background updates"
+            "Updates a synapse database to the latest schema and optionally runs background updates"
             " on it."
         )
     )
@@ -54,7 +73,13 @@ if __name__ == "__main__":
         "--database-config",
         type=argparse.FileType("r"),
         required=True,
-        help="A database config file for either a SQLite3 database or a PostgreSQL one.",
+        help="Synapse configuration file, giving the details of the database to be updated",
+    )
+    parser.add_argument(
+        "--run-background-updates",
+        action="store_true",
+        required=False,
+        help="run background updates after upgrading the database schema",
     )
 
     args = parser.parse_args()
@@ -82,19 +107,10 @@ if __name__ == "__main__":
     # Setup instantiates the store within the homeserver object and updates the
     # DB.
     hs.setup()
-    store = hs.get_datastore()
 
-    async def run_background_updates():
-        await store.db_pool.updates.run_background_updates(sleep=False)
-        # Stop the reactor to exit the script once every background update is run.
-        reactor.stop()
+    if args.run_background_updates:
+        run_background_updates(hs)
 
-    def run():
-        # Apply all background updates on the database.
-        defer.ensureDeferred(
-            run_as_background_process("background_updates", run_background_updates)
-        )
 
-    reactor.callWhenRunning(run)
-
-    reactor.run()
+if __name__ == "__main__":
+    main()

@@ -45,11 +45,11 @@ def load_legacy_presence_router(hs: "HomeServer"):
     configuration, and registers the hooks they implement.
     """
 
-    if hs.config.presence_router_module_class is None:
+    if hs.config.server.presence_router_module_class is None:
         return
 
-    module = hs.config.presence_router_module_class
-    config = hs.config.presence_router_config
+    module = hs.config.server.presence_router_module_class
+    config = hs.config.server.presence_router_config
     api = hs.get_module_api()
 
     presence_router = module(config=config, module_api=api)

@@ -11,47 +11,245 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Tuple
-from unittest.mock import Mock
+from typing import Tuple
+from unittest.mock import Mock, patch
 from urllib.parse import quote
 
 from twisted.internet import defer
+from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
 from synapse.api.room_versions import RoomVersion, RoomVersions
-from synapse.rest.client import account, account_validity, login, room, user_directory
+from synapse.appservice import ApplicationService
+from synapse.rest.client import (
+    account,
+    account_validity,
+    login,
+    register,
+    room,
+    user_directory,
+)
+from synapse.server import HomeServer
 from synapse.storage.roommember import ProfileInfo
 from synapse.types import create_requester
+from synapse.util import Clock
 
 from tests import unittest
+from tests.storage.test_user_directory import GetUserDirectoryTables
+from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import override_config
 
 
 class UserDirectoryTestCase(unittest.HomeserverTestCase):
-    """
-    Tests the UserDirectoryHandler.
+    """Tests the UserDirectoryHandler.
+
+    We're broadly testing two kinds of things here.
+
+    1. Check that we correctly update the user directory in response
+       to events (e.g. join a room, leave a room, change name, make public)
+    2. Check that the search logic behaves as expected.
+
+    The background process that rebuilds the user directory is tested in
+    tests/storage/test_user_directory.py.
     """
 
     servlets = [
         login.register_servlets,
         synapse.rest.admin.register_servlets,
+        register.register_servlets,
         room.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
-
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
         config["update_user_directory"] = True
-        return self.setup_test_homeserver(config=config)
 
-    def prepare(self, reactor, clock, hs):
+        self.appservice = ApplicationService(
+            token="i_am_an_app_service",
+            hostname="test",
+            id="1234",
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+            # Note: this user does not match the regex above, so that tests
+            # can distinguish the sender from the AS user.
+            sender="@as_main:test",
+        )
+
+        mock_load_appservices = Mock(return_value=[self.appservice])
+        with patch(
+            "synapse.storage.databases.main.appservice.load_appservices",
+            mock_load_appservices,
+        ):
+            hs = self.setup_test_homeserver(config=config)
+        return hs
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastore()
         self.handler = hs.get_user_directory_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
         self.event_creation_handler = self.hs.get_event_creation_handler()
+        self.user_dir_helper = GetUserDirectoryTables(self.store)
 
-    def test_handle_local_profile_change_with_support_user(self):
+    def test_normal_user_pair(self) -> None:
+        """Sanity check that the room-sharing tables are updated correctly."""
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        bob = self.register_user("bob", "pass")
+        bob_token = self.login(bob, "pass")
+
+        public = self.helper.create_room_as(
+            alice,
+            is_public=True,
+            extra_content={"visibility": "public"},
+            tok=alice_token,
+        )
+        private = self.helper.create_room_as(alice, is_public=False, tok=alice_token)
+        self.helper.invite(private, alice, bob, tok=alice_token)
+        self.helper.join(public, bob, tok=bob_token)
+        self.helper.join(private, bob, tok=bob_token)
+
+        # Alice also makes a second public room but no-one else joins
+        public2 = self.helper.create_room_as(
+            alice,
+            is_public=True,
+            extra_content={"visibility": "public"},
+            tok=alice_token,
+        )
+
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        in_public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        in_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+
+        self.assertEqual(users, {alice, bob})
+        self.assertEqual(
+            set(in_public), {(alice, public), (bob, public), (alice, public2)}
+        )
+        self.assertEqual(
+            self.user_dir_helper._compress_shared(in_private),
+            {(alice, bob, private), (bob, alice, private)},
+        )
+
+    # The next four tests (test_excludes_*) all setup
+    #   - A normal user included in the user dir
+    #   - A public and private room created by that user
+    #   - A user excluded from the room dir, belonging to both rooms
+
+    # They match similar logic in storage/test_user_directory. But that tests
+    # rebuilding the directory; this tests updating it incrementally.
+
+    def test_excludes_support_user(self) -> None:
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        support = "@support1:test"
+        self.get_success(
+            self.store.register_user(
+                user_id=support, password_hash=None, user_type=UserTypes.SUPPORT
+            )
+        )
+
+        public, private = self._create_rooms_and_inject_memberships(
+            alice, alice_token, support
+        )
+        self._check_only_one_user_in_directory(alice, public)
+
+    def test_excludes_deactivated_user(self) -> None:
+        admin = self.register_user("admin", "pass", admin=True)
+        admin_token = self.login(admin, "pass")
+        user = self.register_user("naughty", "pass")
+
+        # Deactivate the user.
+        channel = self.make_request(
+            "PUT",
+            f"/_synapse/admin/v2/users/{user}",
+            access_token=admin_token,
+            content={"deactivated": True},
+        )
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["deactivated"], True)
+
+        # Join the deactivated user to rooms owned by the admin.
+        # Is this something that could actually happen outside of a test?
+        public, private = self._create_rooms_and_inject_memberships(
+            admin, admin_token, user
+        )
+        self._check_only_one_user_in_directory(admin, public)
+
+    def test_excludes_appservices_user(self) -> None:
+        # Register an AS user.
+        user = self.register_user("user", "pass")
+        token = self.login(user, "pass")
+        as_user = self.register_appservice_user("as_user_potato", self.appservice.token)
+
+        # Join the AS user to rooms owned by the normal user.
+        public, private = self._create_rooms_and_inject_memberships(
+            user, token, as_user
+        )
+        self._check_only_one_user_in_directory(user, public)
+
+    def test_excludes_appservice_sender(self) -> None:
+        user = self.register_user("user", "pass")
+        token = self.login(user, "pass")
+        room = self.helper.create_room_as(user, is_public=True, tok=token)
+        self.helper.join(room, self.appservice.sender, tok=self.appservice.token)
+        self._check_only_one_user_in_directory(user, room)
+
+    def test_user_not_in_users_table(self) -> None:
+        """Unclear how it happens, but on matrix.org we've seen join events
+        for users who aren't in the users table. Test that we don't fall over
+        when processing such a user.
+        """
+        user1 = self.register_user("user1", "pass")
+        token1 = self.login(user1, "pass")
+        room = self.helper.create_room_as(user1, is_public=True, tok=token1)
+
+        # Inject a join event for a user who doesn't exist
+        self.get_success(inject_member_event(self.hs, room, "@not-a-user:test", "join"))
+
+        # Another new user registers and joins the room
+        user2 = self.register_user("user2", "pass")
+        token2 = self.login(user2, "pass")
+        self.helper.join(room, user2, tok=token2)
+
+        # The dodgy event should not have stopped us from processing user2's join.
+        in_public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        self.assertEqual(set(in_public), {(user1, room), (user2, room)})
+
+    def _create_rooms_and_inject_memberships(
+        self, creator: str, token: str, joiner: str
+    ) -> Tuple[str, str]:
+        """Create a public and private room as a normal user.
+        Then get the `joiner` into those rooms.
+        """
+        # TODO: Duplicates the same-named method in UserDirectoryInitialPopulationTest.
+        public_room = self.helper.create_room_as(
+            creator,
+            is_public=True,
+            # See https://github.com/matrix-org/synapse/issues/10951
+            extra_content={"visibility": "public"},
+            tok=token,
+        )
+        private_room = self.helper.create_room_as(creator, is_public=False, tok=token)
+
+        # HACK: get the user into these rooms
+        self.get_success(inject_member_event(self.hs, public_room, joiner, "join"))
+        self.get_success(inject_member_event(self.hs, private_room, joiner, "join"))
+
+        return public_room, private_room
+
+    def _check_only_one_user_in_directory(self, user: str, public: str) -> None:
+        users = self.get_success(self.user_dir_helper.get_users_in_user_directory())
+        in_public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        in_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+
+        self.assertEqual(users, {user})
+        self.assertEqual(set(in_public), {(user, public)})
+        self.assertEqual(in_private, [])
+
+    def test_handle_local_profile_change_with_support_user(self) -> None:
         support_user_id = "@support:test"
         self.get_success(
             self.store.register_user(
@@ -64,10 +262,12 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         self.get_success(
-            self.handler.handle_local_profile_change(support_user_id, None)
+            self.handler.handle_local_profile_change(
+                support_user_id, ProfileInfo("I love support me", None)
+            )
         )
         profile = self.get_success(self.store.get_user_in_directory(support_user_id))
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
         display_name = "display_name"
 
         profile_info = ProfileInfo(avatar_url="avatar_url", display_name=display_name)
@@ -77,7 +277,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         profile = self.get_success(self.store.get_user_in_directory(regular_user_id))
         self.assertTrue(profile["display_name"] == display_name)
 
-    def test_handle_local_profile_change_with_deactivated_user(self):
+    def test_handle_local_profile_change_with_deactivated_user(self) -> None:
         # create user
         r_user_id = "@regular:test"
         self.get_success(
@@ -101,7 +301,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # profile is not in directory
         profile = self.get_success(self.store.get_user_in_directory(r_user_id))
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
 
         # update profile after deactivation
         self.get_success(
@@ -110,9 +310,50 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # profile is furthermore not in directory
         profile = self.get_success(self.store.get_user_in_directory(r_user_id))
-        self.assertTrue(profile is None)
+        self.assertIsNone(profile)
 
-    def test_handle_user_deactivated_support_user(self):
+    def test_handle_local_profile_change_with_appservice_user(self) -> None:
+        # create user
+        as_user_id = self.register_appservice_user(
+            "as_user_alice", self.appservice.token
+        )
+
+        # profile is not in directory
+        profile = self.get_success(self.store.get_user_in_directory(as_user_id))
+        self.assertIsNone(profile)
+
+        # update profile
+        profile_info = ProfileInfo(avatar_url="avatar_url", display_name="4L1c3")
+        self.get_success(
+            self.handler.handle_local_profile_change(as_user_id, profile_info)
+        )
+
+        # profile is still not in directory
+        profile = self.get_success(self.store.get_user_in_directory(as_user_id))
+        self.assertIsNone(profile)
+
+    def test_handle_local_profile_change_with_appservice_sender(self) -> None:
+        # profile is not in directory
+        profile = self.get_success(
+            self.store.get_user_in_directory(self.appservice.sender)
+        )
+        self.assertIsNone(profile)
+
+        # update profile
+        profile_info = ProfileInfo(avatar_url="avatar_url", display_name="4L1c3")
+        self.get_success(
+            self.handler.handle_local_profile_change(
+                self.appservice.sender, profile_info
+            )
+        )
+
+        # profile is still not in directory
+        profile = self.get_success(
+            self.store.get_user_in_directory(self.appservice.sender)
+        )
+        self.assertIsNone(profile)
+
+    def test_handle_user_deactivated_support_user(self) -> None:
         s_user_id = "@support:test"
         self.get_success(
             self.store.register_user(
@@ -120,20 +361,29 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
-        self.get_success(self.handler.handle_local_user_deactivated(s_user_id))
-        self.store.remove_from_user_dir.not_called()
+        mock_remove_from_user_dir = Mock(return_value=defer.succeed(None))
+        with patch.object(
+            self.store, "remove_from_user_dir", mock_remove_from_user_dir
+        ):
+            self.get_success(self.handler.handle_local_user_deactivated(s_user_id))
+        # BUG: the correct spelling is assert_not_called, but that makes the test fail
+        # and it's not clear that this is actually the behaviour we want.
+        mock_remove_from_user_dir.not_called()
 
-    def test_handle_user_deactivated_regular_user(self):
+    def test_handle_user_deactivated_regular_user(self) -> None:
         r_user_id = "@regular:test"
         self.get_success(
             self.store.register_user(user_id=r_user_id, password_hash=None)
         )
-        self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
-        self.get_success(self.handler.handle_local_user_deactivated(r_user_id))
-        self.store.remove_from_user_dir.called_once_with(r_user_id)
 
-    def test_reactivation_makes_regular_user_searchable(self):
+        mock_remove_from_user_dir = Mock(return_value=defer.succeed(None))
+        with patch.object(
+            self.store, "remove_from_user_dir", mock_remove_from_user_dir
+        ):
+            self.get_success(self.handler.handle_local_user_deactivated(r_user_id))
+        mock_remove_from_user_dir.assert_called_once_with(r_user_id)
+
+    def test_reactivation_makes_regular_user_searchable(self) -> None:
         user = self.register_user("regular", "pass")
         user_token = self.login(user, "pass")
         admin_user = self.register_user("admin", "pass", admin=True)
@@ -171,7 +421,147 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(s["results"]), 1)
         self.assertEqual(s["results"][0]["user_id"], user)
 
-    def test_private_room(self):
+    def test_process_join_after_server_leaves_room(self) -> None:
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        bob = self.register_user("bob", "pass")
+        bob_token = self.login(bob, "pass")
+
+        # Alice makes two rooms. Bob joins one of them.
+        room1 = self.helper.create_room_as(alice, tok=alice_token)
+        room2 = self.helper.create_room_as(alice, tok=alice_token)
+        self.helper.join(room1, bob, tok=bob_token)
+
+        # The user sharing tables should have been updated.
+        public1 = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        self.assertEqual(set(public1), {(alice, room1), (alice, room2), (bob, room1)})
+
+        # Alice leaves room1. The user sharing tables should be updated.
+        self.helper.leave(room1, alice, tok=alice_token)
+        public2 = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        self.assertEqual(set(public2), {(alice, room2), (bob, room1)})
+
+        # Pause the processing of new events.
+        dir_handler = self.hs.get_user_directory_handler()
+        dir_handler.update_user_directory = False
+
+        # Bob leaves one room and joins the other.
+        self.helper.leave(room1, bob, tok=bob_token)
+        self.helper.join(room2, bob, tok=bob_token)
+
+        # Process the leave and join in one go.
+        dir_handler.update_user_directory = True
+        dir_handler.notify_new_event()
+        self.wait_for_background_updates()
+
+        # The user sharing tables should have been updated.
+        public3 = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        self.assertEqual(set(public3), {(alice, room2), (bob, room2)})
+
+    def test_per_room_profile_doesnt_alter_directory_entry(self) -> None:
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        bob = self.register_user("bob", "pass")
+
+        # Alice should have a user directory entry created at registration.
+        users = self.get_success(self.user_dir_helper.get_profiles_in_user_directory())
+        self.assertEqual(
+            users[alice], ProfileInfo(display_name="alice", avatar_url=None)
+        )
+
+        # Alice makes a room for herself.
+        room = self.helper.create_room_as(alice, is_public=True, tok=alice_token)
+
+        # Alice sets a nickname unique to that room.
+        self.helper.send_state(
+            room,
+            "m.room.member",
+            {
+                "displayname": "Freddy Mercury",
+                "membership": "join",
+            },
+            alice_token,
+            state_key=alice,
+        )
+
+        # Alice's display name remains the same in the user directory.
+        search_result = self.get_success(self.handler.search_users(bob, alice, 10))
+        self.assertEqual(
+            search_result["results"],
+            [{"display_name": "alice", "avatar_url": None, "user_id": alice}],
+            0,
+        )
+
+    def test_making_room_public_doesnt_alter_directory_entry(self) -> None:
+        """Per-room names shouldn't go to the directory when the room becomes public.
+
+        This isn't about preventing a leak (the room is now public, so the nickname
+        is too). It's about preserving the invariant that we only show a user's public
+        profile in the user directory results.
+
+        I made this a Synapse test case rather than a Complement one because
+        I think this is (strictly speaking) an implementation choice. Synapse
+        has chosen to only ever use the public profile when responding to a user
+        directory search. There's no privacy leak here, because making the room
+        public discloses the per-room name.
+
+        The spec doesn't mandate anything about _how_ a user
+        should appear in a /user_directory/search result. Hypothetical example:
+        suppose Bob searches for Alice. When representing Alice in a search
+        result, it's reasonable to use any of Alice's nicknames that Bob is
+        aware of. Heck, maybe we even want to use lots of them in a combined
+        displayname like `Alice (aka "ali", "ally", "41iC3")`.
+        """
+
+        # TODO the same should apply when Alice is a remote user.
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        bob = self.register_user("bob", "pass")
+        bob_token = self.login(bob, "pass")
+
+        # Alice and Bob are in a private room.
+        room = self.helper.create_room_as(alice, is_public=False, tok=alice_token)
+        self.helper.invite(room, src=alice, targ=bob, tok=alice_token)
+        self.helper.join(room, user=bob, tok=bob_token)
+
+        # Alice has a nickname unique to that room.
+
+        self.helper.send_state(
+            room,
+            "m.room.member",
+            {
+                "displayname": "Freddy Mercury",
+                "membership": "join",
+            },
+            alice_token,
+            state_key=alice,
+        )
+
+        # Check Alice isn't recorded as being in a public room.
+        public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        self.assertNotIn((alice, room), public)
+
+        # One of them makes the room public.
+        self.helper.send_state(
+            room,
+            "m.room.join_rules",
+            {"join_rule": "public"},
+            alice_token,
+        )
+
+        # Check that Alice is now recorded as being in a public room
+        public = self.get_success(self.user_dir_helper.get_users_in_public_rooms())
+        self.assertIn((alice, room), public)
+
+        # Alice's display name remains the same in the user directory.
+        search_result = self.get_success(self.handler.search_users(bob, alice, 10))
+        self.assertEqual(
+            search_result["results"],
+            [{"display_name": "alice", "avatar_url": None, "user_id": alice}],
+            0,
+        )
+
+    def test_private_room(self) -> None:
         """
         A user can be searched for only by people that are either in a public
         room, or that share a private chat.
@@ -191,11 +581,16 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.helper.join(room, user=u2, tok=u2_token)
 
         # Check we have populated the database correctly.
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
+        shares_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        public_users = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
 
         self.assertEqual(
-            self._compress_shared(shares_private), {(u1, u2, room), (u2, u1, room)}
+            self.user_dir_helper._compress_shared(shares_private),
+            {(u1, u2, room), (u2, u1, room)},
         )
         self.assertEqual(public_users, [])
 
@@ -215,10 +610,14 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.helper.leave(room, user=u2, tok=u2_token)
 
         # Check we have removed the values.
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
+        shares_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        public_users = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
 
-        self.assertEqual(self._compress_shared(shares_private), set())
+        self.assertEqual(self.user_dir_helper._compress_shared(shares_private), set())
         self.assertEqual(public_users, [])
 
         # User1 now gets no search results for any of the other users.
@@ -228,7 +627,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user3", 10))
         self.assertEqual(len(s["results"]), 0)
 
-    def test_spam_checker(self):
+    def test_spam_checker(self) -> None:
         """
         A user which fails the spam checks will not appear in search results.
         """
@@ -246,11 +645,16 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.helper.join(room, user=u2, tok=u2_token)
 
         # Check we have populated the database correctly.
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
+        shares_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        public_users = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
 
         self.assertEqual(
-            self._compress_shared(shares_private), {(u1, u2, room), (u2, u1, room)}
+            self.user_dir_helper._compress_shared(shares_private),
+            {(u1, u2, room), (u2, u1, room)},
         )
         self.assertEqual(public_users, [])
 
@@ -258,7 +662,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 1)
 
-        async def allow_all(user_profile):
+        async def allow_all(user_profile: ProfileInfo) -> bool:
             # Allow all users.
             return False
 
@@ -272,7 +676,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(s["results"]), 1)
 
         # Configure a spam checker that filters all users.
-        async def block_all(user_profile):
+        async def block_all(user_profile: ProfileInfo) -> bool:
             # All users are spammy.
             return True
 
@@ -282,7 +686,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 0)
 
-    def test_legacy_spam_checker(self):
+    def test_legacy_spam_checker(self) -> None:
         """
         A spam checker without the expected method should be ignored.
         """
@@ -300,11 +704,16 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.helper.join(room, user=u2, tok=u2_token)
 
         # Check we have populated the database correctly.
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
+        shares_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        public_users = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
 
         self.assertEqual(
-            self._compress_shared(shares_private), {(u1, u2, room), (u2, u1, room)}
+            self.user_dir_helper._compress_shared(shares_private),
+            {(u1, u2, room), (u2, u1, room)},
         )
         self.assertEqual(public_users, [])
 
@@ -317,134 +726,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 1)
 
-    def _compress_shared(self, shared):
-        """
-        Compress a list of users who share rooms dicts to a list of tuples.
-        """
-        r = set()
-        for i in shared:
-            r.add((i["user_id"], i["other_user_id"], i["room_id"]))
-        return r
-
-    def get_users_in_public_rooms(self) -> List[Tuple[str, str]]:
-        r = self.get_success(
-            self.store.db_pool.simple_select_list(
-                "users_in_public_rooms", None, ("user_id", "room_id")
-            )
-        )
-        retval = []
-        for i in r:
-            retval.append((i["user_id"], i["room_id"]))
-        return retval
-
-    def get_users_who_share_private_rooms(self) -> List[Tuple[str, str, str]]:
-        return self.get_success(
-            self.store.db_pool.simple_select_list(
-                "users_who_share_private_rooms",
-                None,
-                ["user_id", "other_user_id", "room_id"],
-            )
-        )
-
-    def _add_background_updates(self):
-        """
-        Add the background updates we need to run.
-        """
-        # Ugh, have to reset this flag
-        self.store.db_pool.updates._all_done = False
-
-        self.get_success(
-            self.store.db_pool.simple_insert(
-                "background_updates",
-                {
-                    "update_name": "populate_user_directory_createtables",
-                    "progress_json": "{}",
-                },
-            )
-        )
-        self.get_success(
-            self.store.db_pool.simple_insert(
-                "background_updates",
-                {
-                    "update_name": "populate_user_directory_process_rooms",
-                    "progress_json": "{}",
-                    "depends_on": "populate_user_directory_createtables",
-                },
-            )
-        )
-        self.get_success(
-            self.store.db_pool.simple_insert(
-                "background_updates",
-                {
-                    "update_name": "populate_user_directory_process_users",
-                    "progress_json": "{}",
-                    "depends_on": "populate_user_directory_process_rooms",
-                },
-            )
-        )
-        self.get_success(
-            self.store.db_pool.simple_insert(
-                "background_updates",
-                {
-                    "update_name": "populate_user_directory_cleanup",
-                    "progress_json": "{}",
-                    "depends_on": "populate_user_directory_process_users",
-                },
-            )
-        )
-
-    def test_initial(self):
-        """
-        The user directory's initial handler correctly updates the search tables.
-        """
-        u1 = self.register_user("user1", "pass")
-        u1_token = self.login(u1, "pass")
-        u2 = self.register_user("user2", "pass")
-        u2_token = self.login(u2, "pass")
-        u3 = self.register_user("user3", "pass")
-        u3_token = self.login(u3, "pass")
-
-        room = self.helper.create_room_as(u1, is_public=True, tok=u1_token)
-        self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
-        self.helper.join(room, user=u2, tok=u2_token)
-
-        private_room = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
-        self.helper.invite(private_room, src=u1, targ=u3, tok=u1_token)
-        self.helper.join(private_room, user=u3, tok=u3_token)
-
-        self.get_success(self.store.update_user_directory_stream_pos(None))
-        self.get_success(self.store.delete_all_from_user_dir())
-
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
-
-        # Nothing updated yet
-        self.assertEqual(shares_private, [])
-        self.assertEqual(public_users, [])
-
-        # Do the initial population of the user directory via the background update
-        self._add_background_updates()
-
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
-
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
-
-        # User 1 and User 2 are in the same public room
-        self.assertEqual(set(public_users), {(u1, room), (u2, room)})
-
-        # User 1 and User 3 share private rooms
-        self.assertEqual(
-            self._compress_shared(shares_private),
-            {(u1, u3, private_room), (u3, u1, private_room)},
-        )
-
-    def test_initial_share_all_users(self):
+    def test_initial_share_all_users(self) -> None:
         """
         Search all users = True means that a user does not have to share a
         private room with the searching user or be in a public room to be search
@@ -457,26 +739,16 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.register_user("user2", "pass")
         u3 = self.register_user("user3", "pass")
 
-        # Wipe the user dir
-        self.get_success(self.store.update_user_directory_stream_pos(None))
-        self.get_success(self.store.delete_all_from_user_dir())
-
-        # Do the initial population of the user directory via the background update
-        self._add_background_updates()
-
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
-
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
+        shares_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        public_users = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
 
         # No users share rooms
         self.assertEqual(public_users, [])
-        self.assertEqual(self._compress_shared(shares_private), set())
+        self.assertEqual(self.user_dir_helper._compress_shared(shares_private), set())
 
         # Despite not sharing a room, search_all_users means we get a search
         # result.
@@ -501,7 +773,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             }
         }
     )
-    def test_prefer_local_users(self):
+    def test_prefer_local_users(self) -> None:
         """Tests that local users are shown higher in search results when
         user_directory.prefer_local_users is True.
         """
@@ -535,15 +807,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         local_users = [local_user_1, local_user_2, local_user_3]
         remote_users = [remote_user_1, remote_user_2, remote_user_3]
 
-        # Populate the user directory via background update
-        self._add_background_updates()
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
-
         # The local searching user searches for the term "user", which other users have
         # in their user id
         results = self.get_success(
@@ -565,7 +828,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         room_id: str,
         room_version: RoomVersion,
         user_id: str,
-    ):
+    ) -> None:
         # Add a user to the room.
         builder = self.event_builder_factory.for_room_version(
             room_version,
@@ -588,8 +851,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
 
 class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
-    user_id = "@test:test"
-
     servlets = [
         user_directory.register_servlets,
         room.register_servlets,
@@ -597,7 +858,7 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         synapse.rest.admin.register_servlets_for_client_rest_resource,
     ]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
         config["update_user_directory"] = True
         hs = self.setup_test_homeserver(config=config)
@@ -606,19 +867,24 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
 
         return hs
 
-    def test_disabling_room_list(self):
+    def test_disabling_room_list(self) -> None:
         self.config.userdirectory.user_directory_search_enabled = True
 
-        # First we create a room with another user so that user dir is non-empty
-        # for our user
-        self.helper.create_room_as(self.user_id)
+        # Create two users and put them in the same room.
+        u1 = self.register_user("user1", "pass")
+        u1_token = self.login(u1, "pass")
         u2 = self.register_user("user2", "pass")
-        room = self.helper.create_room_as(self.user_id)
-        self.helper.join(room, user=u2)
+        u2_token = self.login(u2, "pass")
 
-        # Assert user directory is not empty
+        room = self.helper.create_room_as(u1, tok=u1_token)
+        self.helper.join(room, user=u2, tok=u2_token)
+
+        # Each should see the other when searching the user directory.
         channel = self.make_request(
-            "POST", b"user_directory/search", b'{"search_term":"user2"}'
+            "POST",
+            b"user_directory/search",
+            b'{"search_term":"user2"}',
+            access_token=u1_token,
         )
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["results"]) > 0)
@@ -626,7 +892,10 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         # Disable user directory and check search returns nothing
         self.config.userdirectory.user_directory_search_enabled = False
         channel = self.make_request(
-            "POST", b"user_directory/search", b'{"search_term":"user2"}'
+            "POST",
+            b"user_directory/search",
+            b'{"search_term":"user2"}',
+            access_token=u1_token,
         )
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["results"]) == 0)

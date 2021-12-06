@@ -22,7 +22,6 @@ from saml2.client import Saml2Client
 
 from synapse.api.errors import SynapseError
 from synapse.config import ConfigError
-from synapse.handlers._base import BaseHandler
 from synapse.handlers.sso import MappingException, UserAttributes
 from synapse.http.servlet import parse_string
 from synapse.http.site import SynapseRequest
@@ -51,9 +50,11 @@ class Saml2SessionData:
     ui_auth_session_id: Optional[str] = None
 
 
-class SamlHandler(BaseHandler):
+class SamlHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
+        self.clock = hs.get_clock()
+        self.server_name = hs.hostname
         self._saml_client = Saml2Client(hs.config.saml2.saml2_sp_config)
         self._saml_idp_entityid = hs.config.saml2.saml2_idp_entityid
 

@@ -19,19 +19,17 @@ from synapse.api.errors import SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import Requester, UserID, create_requester
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class DeactivateAccountHandler(BaseHandler):
+class DeactivateAccountHandler:
     """Handler which deals with deactivating user accounts."""
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
         self.hs = hs
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
@@ -137,6 +135,10 @@ class DeactivateAccountHandler(BaseHandler):
 
         # delete from user directory
         await self.user_directory_handler.handle_local_user_deactivated(user_id)
+
+        # If the user is present in the monthly active users table
+        # remove them
+        await self.store.remove_deactivated_user_from_mau_table(user_id)
 
         # Mark the user as erased, if they asked for that
         if erase_data:

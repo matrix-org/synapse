@@ -41,12 +41,8 @@ class ServerNoticesManager:
         self._notifier = hs.get_notifier()
         self.server_notices_mxid = self._config.servernotices.server_notices_mxid
 
-    def is_enabled(self):
-        """Checks if server notices are enabled on this server.
-
-        Returns:
-            bool
-        """
+    def is_enabled(self) -> bool:
+        """Checks if server notices are enabled on this server."""
         return self.server_notices_mxid is not None
 
     async def send_notice(

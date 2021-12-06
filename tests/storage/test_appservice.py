@@ -126,7 +126,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.db_pool = database._db_pool
         self.engine = database.engine
 
-        db_config = hs.config.get_single_database()
+        db_config = hs.config.database.get_single_database()
         self.store = TestTransactionStore(
             database, make_conn(db_config, self.engine, "test"), hs
         )

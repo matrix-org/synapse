@@ -60,6 +60,8 @@ class IdentityDisabledTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
     def test_3pid_lookup_disabled(self):
+        self.hs.config.registration.enable_3pid_lookup = False
+
         url = (
             "/_matrix/client/unstable/account/3pid/lookup"
             "?id_server=testis&medium=email&address=foo@bar.baz"

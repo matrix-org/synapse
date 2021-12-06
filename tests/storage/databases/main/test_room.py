@@ -79,12 +79,7 @@ class RoomBackgroundUpdateStoreTestCase(HomeserverTestCase):
         self.store.db_pool.updates._all_done = False
 
         # Now let's actually drive the updates to completion
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         # Make sure the background update filled in the room creator
         room_creator_after = self.get_success(

@@ -85,6 +85,15 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.45.0
+
+## Changes required to media storage provider modules when reading from the Synapse configuration object
+
+Media storage provider modules that read from the Synapse configuration object (i.e. that
+read the value of `hs.config.[...]`) now need to specify the configuration section they're
+reading from. This means that if a module reads the value of e.g. `hs.config.media_store_path`,
+it needs to replace it with `hs.config.media.media_store_path`.
+
 # Upgrading to v1.44.0
 
 ## The URL preview cache is no longer mirrored to storage providers

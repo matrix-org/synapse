@@ -13,14 +13,14 @@
 # limitations under the License.
 from typing import List, Optional, Tuple
 
-from synapse.storage.types import Connection
+from synapse.storage.database import LoggingDatabaseConnection
 from synapse.storage.util.id_generators import _load_current_id
 
 
 class SlavedIdTracker:
     def __init__(
         self,
-        db_conn: Connection,
+        db_conn: LoggingDatabaseConnection,
         table: str,
         column: str,
         extra_tables: Optional[List[Tuple[str, str]]] = None,

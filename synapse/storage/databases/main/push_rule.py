@@ -14,7 +14,7 @@
 # limitations under the License.
 import abc
 import logging
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 from synapse.api.errors import NotFoundError, StoreError
 from synapse.push.baserules import list_with_base_rules
@@ -101,7 +101,9 @@ class PushRulesWorkerStore(
             prefilled_cache=push_rules_prefill,
         )
 
-        self._users_new_default_push_rules = hs.config.users_new_default_push_rules
+        self._users_new_default_push_rules = (
+            hs.config.server.users_new_default_push_rules
+        )
 
     @abc.abstractmethod
     def get_max_push_rules_stream_id(self):
@@ -137,7 +139,7 @@ class PushRulesWorkerStore(
         return _load_rules(rows, enabled_map, use_new_defaults)
 
     @cached(max_entries=5000)
-    async def get_push_rules_enabled_for_user(self, user_id):
+    async def get_push_rules_enabled_for_user(self, user_id) -> Dict[str, bool]:
         results = await self.db_pool.simple_select_list(
             table="push_rules_enable",
             keyvalues={"user_name": user_id},

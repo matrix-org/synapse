@@ -55,7 +55,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
             self.assertTrue(room_version in KNOWN_ROOM_VERSIONS, "" + room_version)
 
         self.assertEqual(
-            self.config.default_room_version.identifier,
+            self.config.server.default_room_version.identifier,
             capabilities["m.room_versions"]["default"],
         )
 

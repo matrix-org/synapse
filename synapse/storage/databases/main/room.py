@@ -676,7 +676,7 @@ class RoomWorkerStore(SQLBaseStore):
         # If the room retention feature is disabled, return a policy with no minimum nor
         # maximum, in order not to filter out events we should filter out when sending to
         # the client.
-        if not self.config.retention_enabled:
+        if not self.config.server.retention_enabled:
             return {"min_lifetime": None, "max_lifetime": None}
 
         def get_retention_policy_for_room_txn(txn):
@@ -700,8 +700,8 @@ class RoomWorkerStore(SQLBaseStore):
         # policy.
         if not ret:
             return {
-                "min_lifetime": self.config.retention_default_min_lifetime,
-                "max_lifetime": self.config.retention_default_max_lifetime,
+                "min_lifetime": self.config.server.retention_default_min_lifetime,
+                "max_lifetime": self.config.server.retention_default_max_lifetime,
             }
 
         row = ret[0]
@@ -711,10 +711,10 @@ class RoomWorkerStore(SQLBaseStore):
         # The default values will be None if no default policy has been defined, or if one
         # of the attributes is missing from the default policy.
         if row["min_lifetime"] is None:
-            row["min_lifetime"] = self.config.retention_default_min_lifetime
+            row["min_lifetime"] = self.config.server.retention_default_min_lifetime
 
         if row["max_lifetime"] is None:
-            row["max_lifetime"] = self.config.retention_default_max_lifetime
+            row["max_lifetime"] = self.config.server.retention_default_max_lifetime
 
         return row
 

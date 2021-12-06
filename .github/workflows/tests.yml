@@ -76,22 +76,25 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.6", "3.7", "3.8", "3.9"]
+        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10"]
         database: ["sqlite"]
+        toxenv: ["py"]
         include:
           # Newest Python without optional deps
-          - python-version: "3.9"
-            toxenv: "py-noextras,combine"
+          - python-version: "3.10"
+            toxenv: "py-noextras"
 
           # Oldest Python with PostgreSQL
           - python-version: "3.6"
             database: "postgres"
             postgres-version: "9.6"
+            toxenv: "py"
 
-          # Newest Python with PostgreSQL
-          - python-version: "3.9"
+          # Newest Python with newest PostgreSQL
+          - python-version: "3.10"
             database: "postgres"
-            postgres-version: "13"
+            postgres-version: "14"
+            toxenv: "py"
 
     steps:
       - uses: actions/checkout@v2
@@ -111,7 +114,7 @@ jobs:
         if: ${{ matrix.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
-      - run: tox -e py,combine
+      - run: tox -e ${{ matrix.toxenv }}
         env:
           TRIAL_FLAGS: "--jobs=2"
           SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
@@ -169,7 +172,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install tox
-      - run: tox -e py,combine
+      - run: tox -e py
         env:
           TRIAL_FLAGS: "--jobs=2"
       - name: Dump logs
@@ -249,8 +252,8 @@ jobs:
           - python-version: "3.6"
             postgres-version: "9.6"
 
-          - python-version: "3.9"
-            postgres-version: "13"
+          - python-version: "3.10"
+            postgres-version: "14"
 
     services:
       postgres:

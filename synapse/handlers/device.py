@@ -40,8 +40,6 @@ from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
 from synapse.util.retryutils import NotRetryingDestination
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -50,14 +48,16 @@ logger = logging.getLogger(__name__)
 MAX_DEVICE_DISPLAY_NAME_LEN = 100
 
 
-class DeviceWorkerHandler(BaseHandler):
+class DeviceWorkerHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.clock = hs.get_clock()
         self.hs = hs
+        self.store = hs.get_datastore()
+        self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
         self.state_store = hs.get_storage().state
         self._auth_handler = hs.get_auth_handler()
+        self.server_name = hs.hostname
 
     @trace
     async def get_devices_by_user(self, user_id: str) -> List[JsonDict]:

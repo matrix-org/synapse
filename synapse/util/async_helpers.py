@@ -438,7 +438,8 @@ class ReadWriteLock:
             try:
                 yield
             finally:
-                new_defer.callback(None)
+                with PreserveLoggingContext():
+                    new_defer.callback(None)
                 self.key_to_current_readers.get(key, set()).discard(new_defer)
 
         return _ctx_manager()
@@ -466,7 +467,8 @@ class ReadWriteLock:
             try:
                 yield
             finally:
-                new_defer.callback(None)
+                with PreserveLoggingContext():
+                    new_defer.callback(None)
                 if self.key_to_current_writer[key] == new_defer:
                     self.key_to_current_writer.pop(key)
 

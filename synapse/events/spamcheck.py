@@ -276,9 +276,7 @@ class SpamChecker:
 
         return False
 
-    async def user_may_join_room(
-        self, user_id: str, room_id: str, is_invited: bool
-    ) -> bool:
+    async def user_may_join_room(self, user_id: str, room_id: str, is_invited: bool):
         """Checks if a given users is allowed to join a room.
         Not called when a user creates a room.
 
@@ -288,7 +286,7 @@ class SpamChecker:
             is_invited: Whether the user is invited into the room
 
         Returns:
-            Whether the user may join the room
+            bool: Whether the user may join the room
         """
         for callback in self._user_may_join_room_callbacks:
             if await callback(user_id, room_id, is_invited) is False:

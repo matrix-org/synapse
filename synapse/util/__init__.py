@@ -50,7 +50,16 @@ def _handle_frozendict(obj: Any) -> Dict[Any, Any]:
     if type(obj) is frozendict:
         # fishing the protected dict out of the object is a bit nasty,
         # but we don't really want the overhead of copying the dict.
-        return obj._dict
+        try:
+            # Safety: we catch the AttributeError immediately below.
+            # See https://github.com/matrix-org/python-canonicaljson/issues/36#issuecomment-927816293
+            # for discussion on how frozendict's internals have changed over time.
+            return obj._dict  # type: ignore[attr-defined]
+        except AttributeError:
+            # When the C implementation of frozendict is used,
+            # there isn't a `_dict` attribute with a dict
+            # so we resort to making a copy of the frozendict
+            return dict(obj)
     raise TypeError(
         "Object of type %s is not JSON serializable" % obj.__class__.__name__
     )

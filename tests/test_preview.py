@@ -13,7 +13,8 @@
 # limitations under the License.
 
 from synapse.rest.media.v1.preview_url_resource import (
-    decode_and_calc_og,
+    _calc_og,
+    decode_body,
     get_html_media_encoding,
     summarize_paragraphs,
 )
@@ -158,7 +159,8 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        og = decode_and_calc_og(html, "http://example.com/test.html")
+        tree = decode_body(html)
+        og = _calc_og(tree, "http://example.com/test.html")
 
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
@@ -173,7 +175,8 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        og = decode_and_calc_og(html, "http://example.com/test.html")
+        tree = decode_body(html)
+        og = _calc_og(tree, "http://example.com/test.html")
 
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
@@ -191,7 +194,8 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        og = decode_and_calc_og(html, "http://example.com/test.html")
+        tree = decode_body(html)
+        og = _calc_og(tree, "http://example.com/test.html")
 
         self.assertEqual(
             og,
@@ -212,7 +216,8 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        og = decode_and_calc_og(html, "http://example.com/test.html")
+        tree = decode_body(html)
+        og = _calc_og(tree, "http://example.com/test.html")
 
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
@@ -225,7 +230,8 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        og = decode_and_calc_og(html, "http://example.com/test.html")
+        tree = decode_body(html)
+        og = _calc_og(tree, "http://example.com/test.html")
 
         self.assertEqual(og, {"og:title": None, "og:description": "Some text."})
 
@@ -239,7 +245,8 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        og = decode_and_calc_og(html, "http://example.com/test.html")
+        tree = decode_body(html)
+        og = _calc_og(tree, "http://example.com/test.html")
 
         self.assertEqual(og, {"og:title": "Title", "og:description": "Some text."})
 
@@ -253,21 +260,22 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        og = decode_and_calc_og(html, "http://example.com/test.html")
+        tree = decode_body(html)
+        og = _calc_og(tree, "http://example.com/test.html")
 
         self.assertEqual(og, {"og:title": None, "og:description": "Some text."})
 
     def test_empty(self):
         """Test a body with no data in it."""
         html = b""
-        og = decode_and_calc_og(html, "http://example.com/test.html")
-        self.assertEqual(og, {})
+        tree = decode_body(html)
+        self.assertIsNone(tree)
 
     def test_no_tree(self):
         """A valid body with no tree in it."""
         html = b"\x00"
-        og = decode_and_calc_og(html, "http://example.com/test.html")
-        self.assertEqual(og, {})
+        tree = decode_body(html)
+        self.assertIsNone(tree)
 
     def test_invalid_encoding(self):
         """An invalid character encoding should be ignored and treated as UTF-8, if possible."""
@@ -279,9 +287,8 @@ class CalcOgTestCase(unittest.TestCase):
         </body>
         </html>
         """
-        og = decode_and_calc_og(
-            html, "http://example.com/test.html", "invalid-encoding"
-        )
+        tree = decode_body(html, "invalid-encoding")
+        og = _calc_og(tree, "http://example.com/test.html")
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
     def test_invalid_encoding2(self):
@@ -295,7 +302,8 @@ class CalcOgTestCase(unittest.TestCase):
         </body>
         </html>
         """
-        og = decode_and_calc_og(html, "http://example.com/test.html")
+        tree = decode_body(html)
+        og = _calc_og(tree, "http://example.com/test.html")
         self.assertEqual(og, {"og:title": "ÿÿ Foo", "og:description": "Some text."})
 
 
