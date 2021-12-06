@@ -1506,7 +1506,11 @@ class SyncHandler:
             account_data_by_room: Dictionary of per room account data
 
         Returns:
-            Returns a 4-tuple whose entries are:
+            Returns a 4-tuple describing rooms we've joined or left, and users who've
+            joined or left rooms we're in. This gets used later in
+            `_generate_sync_entry_for_device_list`.
+
+            Its entries are:
             - newly_joined_rooms
             - newly_joined_or_invited_or_knocked_users
             - newly_left_rooms
@@ -1514,7 +1518,7 @@ class SyncHandler:
         """
         since_token = sync_result_builder.since_token
 
-        # Start by fetching all ephemeral events in rooms we've joined (if required).
+        # 1. Start by fetching all ephemeral events in rooms we've joined (if required).
         user_id = sync_result_builder.sync_config.user.to_string()
         block_all_room_ephemeral = (
             since_token is None
@@ -1531,7 +1535,7 @@ class SyncHandler:
             )
             sync_result_builder.now_token = now_token
 
-        # We check up front if anything has changed, if it hasn't then there is
+        # 2. We check up front if anything has changed, if it hasn't then there is
         # no point in going further.
         if not sync_result_builder.full_state:
             if since_token and not ephemeral_by_room and not account_data_by_room:
@@ -1545,8 +1549,8 @@ class SyncHandler:
                         logger.debug("no-oping sync")
                         return set(), set(), set(), set()
 
+        # 3. Work out which rooms need reporting in the sync response.
         ignored_users = await self._get_ignored_users(user_id)
-
         if since_token:
             room_changes = await self._get_rooms_changed(
                 sync_result_builder, ignored_users
@@ -1556,7 +1560,6 @@ class SyncHandler:
             )
         else:
             room_changes = await self._get_all_rooms(sync_result_builder, ignored_users)
-
             tags_by_room = await self.store.get_tags_for_user(user_id)
 
         log_kv({"rooms_changed": len(room_changes.room_entries)})
@@ -1567,6 +1570,8 @@ class SyncHandler:
         newly_joined_rooms = room_changes.newly_joined_rooms
         newly_left_rooms = room_changes.newly_left_rooms
 
+        # 4. We need to apply further processing to `room_entries` (rooms considered
+        # joined or archived).
         async def handle_room_entries(room_entry: "RoomSyncResultBuilder") -> None:
             logger.debug("Generating room entry for %s", room_entry.room_id)
             await self._generate_room_entry(
@@ -1585,7 +1590,9 @@ class SyncHandler:
         sync_result_builder.invited.extend(invited)
         sync_result_builder.knocked.extend(knocked)
 
-        # Now we want to get any newly joined, invited or knocking users
+        # 5. Work out which users have joined or left rooms we're in. We use this
+        # to build the device_list part of the sync response in
+        # `_generate_sync_entry_for_device_list`.
         newly_joined_or_invited_or_knocked_users = set()
         newly_left_users = set()
         if since_token:
