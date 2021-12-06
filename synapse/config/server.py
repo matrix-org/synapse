@@ -893,7 +893,10 @@ class ServerConfig(Config):
         # If specified, a worker with that name will be the only one able to update
         # the user directory. Important for querying shared rooms. If the worker is
         # specified, but not running, the user directory may become outdated.
+        #
         # Defaults to null, meaning the main process will handle this.
+        #
+        # Set to false to make sure no process will handle the user_directory.
         #worker_to_update_user_directory: null
 
         # Uncomment to prevent a user's profile data from being retrieved and
