@@ -60,14 +60,15 @@ There are some caveats:
   useful mechanism.
   * It is up to homeserver administrators if they want to issue long-lived access
     tokens to clients not implementing refresh tokens.
-    * For compatibility, it is likely that they should at least until client support
+    * For compatibility, it is likely that they should, at least until client support
       is widespread.
       * Users with clients that support refresh tokens will still benefit from the
         added security; it's not possible to downgrade a session to using long-lived
         access tokens so this effectively gives users the choice.
     * In a closed environment where all users use known clients, this may not be
       an issue as the homeserver administrator can know if the clients have refresh
-      token support.
+      token support. In that case, the non-refreshable access token lifetime
+      may be set to a short duration so that a similar level of security is provided.
 
 
 ## Configuration Guide
@@ -82,7 +83,7 @@ The following configuration options, in the `registration` section, are related:
   This should be short; a good value might be 5 minutes (`5m`).
 * `nonrefreshable_access_token_lifetime`: lifetime of access tokens that are created
   by clients which don't support refresh tokens.
-  Make this short if you want to force use of refresh tokens.
+  Make this short if you want to effectively force use of refresh tokens.
   Make this long if you don't want to inconvenience users of clients which don't
   support refresh tokens.
 * `refresh_token_lifetime`: lifetime of refresh tokens.
