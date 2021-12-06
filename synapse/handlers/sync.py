@@ -1545,19 +1545,7 @@ class SyncHandler:
                         logger.debug("no-oping sync")
                         return set(), set(), set(), set()
 
-        ignored_account_data = (
-            await self.store.get_global_account_data_by_type_for_user(
-                AccountDataTypes.IGNORED_USER_LIST, user_id=user_id
-            )
-        )
-
-        # If there is ignored users account data and it matches the proper type,
-        # then use it.
-        ignored_users: FrozenSet[str] = frozenset()
-        if ignored_account_data:
-            ignored_users_data = ignored_account_data.get("ignored_users", {})
-            if isinstance(ignored_users_data, dict):
-                ignored_users = frozenset(ignored_users_data.keys())
+        ignored_users = await self._get_ignored_users(user_id)
 
         if since_token:
             room_changes = await self._get_rooms_changed(
@@ -1629,6 +1617,22 @@ class SyncHandler:
             set(newly_left_rooms),
             newly_left_users,
         )
+
+    async def _get_ignored_users(self, user_id: str) -> FrozenSet[str]:
+        ignored_account_data = (
+            await self.store.get_global_account_data_by_type_for_user(
+                AccountDataTypes.IGNORED_USER_LIST, user_id=user_id
+            )
+        )
+
+        # If there is ignored users account data and it matches the proper type,
+        # then use it.
+        ignored_users: FrozenSet[str] = frozenset()
+        if ignored_account_data:
+            ignored_users_data = ignored_account_data.get("ignored_users", {})
+            if isinstance(ignored_users_data, dict):
+                ignored_users = frozenset(ignored_users_data.keys())
+        return ignored_users
 
     async def _have_rooms_changed(
         self, sync_result_builder: "SyncResultBuilder"
