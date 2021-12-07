@@ -290,6 +290,41 @@ class SynapseHomeServer(HomeServer):
 
         return resources
 
+    def _listen_health(self) -> List[Port]:
+        resources: Dict[str, Resource] = {"/health": HealthResource()}
+
+        root_resource = OptionsResource()
+
+        config = ListenerConfig(
+            self.config.server.health_override_port,
+            [self.config.server.health_override_addr],
+            "http",
+            False,
+        )
+
+        site = SynapseSite(
+            "synapse.access.http.health",
+            "health",
+            config,
+            create_resource_tree(resources, root_resource),
+            self.version_string,
+            max_request_body_size=max_request_body_size(self.config),
+            reactor=self.get_reactor(),
+        )
+
+        ports = listen_tcp(
+            config.bind_addresses,
+            config.port,
+            site,
+            reactor=self.get_reactor(),
+        )
+
+        logger.info(
+            "Synapse now listening to health requests on TCP port %d", config.port
+        )
+
+        return ports
+
     def start_listening(self) -> None:
         if self.config.redis.redis_enabled:
             # If redis is enabled we connect via the replication command handler
@@ -331,6 +366,9 @@ class SynapseHomeServer(HomeServer):
                 # this shouldn't happen, as the listener type should have been checked
                 # during parsing
                 logger.warning("Unrecognized listener type: %s", listener.type)
+
+        if self.config.server.health_override:
+            self._listening_services.extend(self._listen_health())
 
 
 def setup(config_options: List[str]) -> SynapseHomeServer:

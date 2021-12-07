@@ -490,6 +490,44 @@ class ServerConfig(Config):
 
         self.listeners = [parse_listener_def(x) for x in config.get("listeners", [])]
 
+        self.health_override = (
+            True if os.environ.get("SYNAPSE_DOCKER_HEALTH_OVERRIDE", None) else False
+        )
+
+        # Preset these to default values
+        self.health_override_port = 0
+        self.health_override_addr = ""
+
+        if self.health_override:
+            health_override_addr = os.environ.get(
+                "SYNAPSE_DOCKER_HEALTH_OVERRIDE_ADDR", None
+            )
+            if health_override_addr is None:
+                logger.warning(
+                    HEALTH_CHECK_OVERRIDE_DISABLED,
+                    "SYNAPSE_DOCKER_HEALTH_OVERRIDE_ADDR",
+                )
+                self.health_override = False
+            else:
+                self.health_override_addr = health_override_addr
+
+            port = os.environ.get("SYNAPSE_DOCKER_HEALTH_OVERRIDE_PORT", None)
+            if port is None:
+                logger.warning(
+                    HEALTH_CHECK_OVERRIDE_DISABLED,
+                    "SYNAPSE_DOCKER_HEALTH_OVERRIDE_PORT",
+                )
+                self.health_override = False
+            else:
+                try:
+                    self.health_override_port = int(port)
+                except ValueError:
+                    logger.warning(
+                        HEALTH_CHECK_OVERRIDE_DISABLED,
+                        "SYNAPSE_DOCKER_HEALTH_OVERRIDE_PORT",
+                    )
+                    self.health_override = False
+
         # no_tls is not really supported any more, but let's grandfather it in
         # here.
         if config.get("no_tls", False):
@@ -1348,6 +1386,11 @@ Synapse no longer includes a web client. To enable a web client, configure
 web_client_location. To remove this warning, remove 'webclient' from the 'listeners'
 configuration.
 """
+
+
+HEALTH_CHECK_OVERRIDE_DISABLED = (
+    """You have supplied an invalid %s variable, health check override is disabled."""
+)
 
 
 def _warn_if_webclient_configured(listeners: Iterable[ListenerConfig]) -> None:

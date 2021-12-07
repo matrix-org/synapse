@@ -88,5 +88,9 @@ EXPOSE 8008/tcp 8009/tcp 8448/tcp
 
 ENTRYPOINT ["/start.py"]
 
+ENV SYNAPSE_DOCKER_HEALTH_OVERRIDE = "yes"
+ENV SYNAPSE_DOCKER_HEALTH_OVERRIDE_ADDR = "127.0.0.1"
+ENV SYNAPSE_DOCKER_HEALTH_OVERRIDE_PORT = 55555
+
 HEALTHCHECK --start-period=5s --interval=15s --timeout=5s \
-    CMD curl -fSs http://localhost:8008/health || exit 1
+    CMD curl -fSs http://localhost:55555/health || exit 1

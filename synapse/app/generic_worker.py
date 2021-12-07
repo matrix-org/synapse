@@ -394,6 +394,35 @@ class GenericWorkerServer(HomeServer):
 
         logger.info("Synapse worker now listening on port %d", port)
 
+    def _listen_health(self) -> None:
+        resources: Dict[str, Resource] = {"/health": HealthResource()}
+
+        root_resource = create_resource_tree(resources, OptionsResource())
+
+        config = ListenerConfig(
+            self.config.server.health_override_port,
+            [self.config.server.health_override_addr],
+            "http",
+            False,
+        )
+
+        _base.listen_tcp(
+            config.bind_addresses,
+            config.port,
+            SynapseSite(
+                "synapse.access.http.health",
+                "health",
+                config,
+                root_resource,
+                self.version_string,
+                max_request_body_size=max_request_body_size(self.config),
+                reactor=self.get_reactor(),
+            ),
+            reactor=self.get_reactor(),
+        )
+
+        logger.info("Synapse worker health now listening on port %d", config.port)
+
     def start_listening(self) -> None:
         for listener in self.config.worker.worker_listeners:
             if listener.type == "http":
@@ -415,6 +444,9 @@ class GenericWorkerServer(HomeServer):
                     _base.listen_metrics(listener.bind_addresses, listener.port)
             else:
                 logger.warning("Unsupported listener type: %s", listener.type)
+
+        if self.config.server.health_override:
+            self._listen_health()
 
         self.get_tcp_replication().start_replication(self)
 
