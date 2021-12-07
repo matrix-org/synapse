@@ -331,16 +331,13 @@ class HomeserverTestCase(TestCase):
             time.sleep(0.01)
 
     def wait_for_background_updates(self) -> None:
-        """Block until all background database updates have completed.
-
-        Note that callers must ensure there's a store property created on the
-        testcase.
-        """
+        """Block until all background database updates have completed."""
+        store = self.hs.get_datastore()
         while not self.get_success(
-            self.hs.get_datastore().db_pool.updates.has_completed_background_updates()
+            store.db_pool.updates.has_completed_background_updates()
         ):
             self.get_success(
-                self.store.db_pool.updates.do_next_background_update(False), by=0.1
+                store.db_pool.updates.do_next_background_update(False), by=0.1
             )
 
     def make_homeserver(self, reactor, clock):
