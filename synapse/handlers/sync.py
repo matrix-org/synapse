@@ -204,9 +204,41 @@ class _RoomChanges:
 
     room_entries: List["RoomSyncResultBuilder"]
     invited: List[InvitedSyncResult]
+    """Our outstanding invitations at the `now_token`."""
+
     knocked: List[KnockedSyncResult]
+    """Rooms we have knocked on at the `now_token`."""
+
     newly_joined_rooms: List[str]
+    """Rooms we joined at some point between `since` and `now`.
+
+    Note: we need not be joined to these rooms at the `since` or `now` tokens.
+    Some examples:
+
+    Since       Midway    Now
+    --------------------------
+    <none>                join
+    invite                join
+    join        leave     join
+    invite      join      leave
+    """
     newly_left_rooms: List[str]
+    """Rooms we are not joined to at the `now_token` and left between `since` and `now`.
+
+    "Left" means "membership changed from 'join` to something else". It's not the same
+    as moving to the membership `leave`.
+
+    Note: we need not have membership "leave" at the `since` or `now` tokens.
+    Some examples:
+    Since       Midway    Now
+    --------------------------
+    join                  leave
+    join                  ban
+    invite      join      leave
+    leave       join      leave
+    join        leave     invite
+    join        leave     knock
+    """
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -1767,6 +1799,17 @@ class SyncHandler:
         membership_change_events: List[EventBase],
         ignored_users: Collection[str],
     ) -> _RoomChanges:
+        """Classify each room by the membership changes from `since` upto `now`.
+
+        Rooms are grouped by the user's membership at the `now_token`, either "invite",
+        "join", "leave" or "knock".
+
+        Invite and knock are the simplest: to include these in the sync body, we need
+        just the room ID and the invite/knock event.
+
+        See the _RoomChanges struct for the meaning of the five lists we build up and
+        return.
+        """
         since_token = sync_result_builder.since_token
         # This assetion is also made in the caller, `_get_rooms_changed`. We repeat it
         # here for mypy's benefit.
@@ -1774,15 +1817,17 @@ class SyncHandler:
 
         user_id = sync_result_builder.sync_config.user.to_string()
 
-        mem_change_events_by_room_id: Dict[str, List[EventBase]] = {}
-        for event in membership_change_events:
-            mem_change_events_by_room_id.setdefault(event.room_id, []).append(event)
-
         newly_joined_rooms: List[str] = []
         newly_left_rooms: List[str] = []
         room_entries: List[RoomSyncResultBuilder] = []
         invited: List[InvitedSyncResult] = []
         knocked: List[KnockedSyncResult] = []
+
+        # 0. Do a first pass to group the events by room id.
+        mem_change_events_by_room_id: Dict[str, List[EventBase]] = {}
+        for event in membership_change_events:
+            mem_change_events_by_room_id.setdefault(event.room_id, []).append(event)
+
         for room_id, events in mem_change_events_by_room_id.items():
             # The body of this loop will add this room to at least one of the five lists
             # above. Things get messy if you've e.g. joined, left, joined then left the
@@ -1796,10 +1841,10 @@ class SyncHandler:
             non_joins = [e for e in events if e.membership != Membership.JOIN]
             has_join = len(non_joins) != len(events)
 
+            # 1. Should we add this room to `newly_joined_rooms`?
             # We want to figure out if we joined the room at some point since
             # the last sync (even if we have since left). This is to make sure
-            # we do send down the room, and with full state, where necessary
-
+            # we do send down the room, and with full state, where necessary.
             old_state_ids = None
             if room_id in sync_result_builder.joined_room_ids and non_joins:
                 # Always include if the user (re)joined the room, especially
@@ -1839,6 +1884,7 @@ class SyncHandler:
             if room_id in sync_result_builder.joined_room_ids:
                 continue
 
+            # 2. Should we add this to `newly_left_rooms`?
             # Check if we have left the room. This can either be because we were
             # joined before *or* that we since joined and then left.
             if events[-1].membership != Membership.JOIN:
@@ -1858,6 +1904,7 @@ class SyncHandler:
                     if old_mem_ev and old_mem_ev.membership == Membership.JOIN:
                         newly_left_rooms.append(room_id)
 
+            # 3. Should we add this room to `invited`?
             # Only bother if we're still currently invited
             last_non_join = non_joins[-1]
             should_invite = last_non_join.membership == Membership.INVITE
@@ -1867,6 +1914,7 @@ class SyncHandler:
                     if invite_room_sync:
                         invited.append(invite_room_sync)
 
+            # 4. Should we add this room to `knocked`?
             # Only bother if our latest membership in the room is knock (and we haven't
             # been accepted/rejected in the meantime).
             should_knock = last_non_join.membership == Membership.KNOCK
@@ -1875,6 +1923,7 @@ class SyncHandler:
                 if knock_room_sync:
                     knocked.append(knock_room_sync)
 
+            # 5. Do we need to add this to `room_entries`?
             # Always include leave/ban events. Just take the last one.
             # TODO: How do we handle ban -> leave in same batch?
             leave_events = [
