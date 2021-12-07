@@ -1270,14 +1270,6 @@ class LogoutToken(JWTClaims):
         self.validate_events()
         self.validate_nonce()
 
-    def validate_exp(self, now: Optional[int] = None, leeway: int = 0) -> None:
-        """Do not validate the exp claim"""
-        pass
-
-    def validate_nbf(self, now: Optional[int] = None, leeway: int = 0) -> None:
-        """Do not validate the nbf claim"""
-        pass
-
     def validate_sid(self) -> None:
         """Ensure the sid claim is present"""
         sid = self.get("sid")
