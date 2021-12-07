@@ -38,16 +38,15 @@ Most-recent-in-time events in the DAG which are not referenced by any other even
 The forward extremities of a room are used as the `prev_events` when the next event is sent.
 
 
-## Backwards extremity
+## Backward extremity
 
 The current marker of where we have backfilled up to and will generally be the
-oldest-in-time events we know of in the DAG.
+`prev_events` of the oldest-in-time events we have in the DAG. This gives a starting point when
+backfilling history.
 
-This is an event where we haven't fetched all of the `prev_events` for.
-
-Once we have fetched all of its `prev_events`, it's unmarked as a backwards
-extremity (although we may have formed new backwards extremities from the prev
-events during the backfilling process).
+When we persist a non-outlier event, we clear it as a backward extremity and set
+all of its `prev_events` as the new backward extremities if they aren't already
+persisted in the `events` table.
 
 
 ## Outliers
@@ -56,8 +55,7 @@ We mark an event as an `outlier` when we haven't figured out the state for the
 room at that point in the DAG yet.
 
 We won't *necessarily* have the `prev_events` of an `outlier` in the database,
-but it's entirely possible that we *might*. The status of whether we have all of
-the `prev_events` is marked as a [backwards extremity](#backwards-extremity).
+but it's entirely possible that we *might*.
 
 For example, when we fetch the event auth chain or state for a given event, we
 mark all of those claimed auth events as outliers because we haven't done the

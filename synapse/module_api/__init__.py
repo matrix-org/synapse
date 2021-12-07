@@ -24,6 +24,7 @@ from typing import (
     List,
     Optional,
     Tuple,
+    TypeVar,
     Union,
 )
 
@@ -81,10 +82,19 @@ from synapse.http.server import (
 )
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
-from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.logging.context import (
+    defer_to_thread,
+    make_deferred_yieldable,
+    run_in_background,
+)
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
+from synapse.storage.background_updates import (
+    DEFAULT_BATCH_SIZE_CALLBACK,
+    MIN_BATCH_SIZE_CALLBACK,
+    ON_UPDATE_CALLBACK,
+)
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
@@ -98,11 +108,15 @@ from synapse.types import (
     create_requester,
 )
 from synapse.util import Clock
+from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
     from synapse.app.generic_worker import GenericWorkerSlavedStore
     from synapse.server import HomeServer
+
+
+T = TypeVar("T")
 
 """
 This package defines the 'stable' API which can be used by extension modules which
@@ -307,7 +321,25 @@ class ModuleApi:
             auth_checkers=auth_checkers,
         )
 
-    def register_web_resource(self, path: str, resource: Resource):
+    def register_background_update_controller_callbacks(
+        self,
+        on_update: ON_UPDATE_CALLBACK,
+        default_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
+        min_batch_size: Optional[MIN_BATCH_SIZE_CALLBACK] = None,
+    ) -> None:
+        """Registers background update controller callbacks.
+
+        Added in Synapse v1.49.0.
+        """
+
+        for db in self._hs.get_datastores().databases:
+            db.updates.register_update_controller_callbacks(
+                on_update=on_update,
+                default_batch_size=default_batch_size,
+                min_batch_size=min_batch_size,
+            )
+
+    def register_web_resource(self, path: str, resource: Resource) -> None:
         """Registers a web resource to be served at the given path.
 
         This function should be called during initialisation of the module.
@@ -432,7 +464,7 @@ class ModuleApi:
             username: provided user id
 
         Returns:
-            str: qualified @user:id
+            qualified @user:id
         """
         if username.startswith("@"):
             return username
@@ -468,7 +500,7 @@ class ModuleApi:
         """
         return await self._store.user_get_threepids(user_id)
 
-    def check_user_exists(self, user_id: str):
+    def check_user_exists(self, user_id: str) -> "defer.Deferred[Optional[str]]":
         """Check if user exists.
 
         Added in Synapse v0.25.0.
@@ -477,13 +509,18 @@ class ModuleApi:
             user_id: Complete @user:id
 
         Returns:
-            Deferred[str|None]: Canonical (case-corrected) user_id, or None
+            Canonical (case-corrected) user_id, or None
                if the user is not registered.
         """
         return defer.ensureDeferred(self._auth_handler.check_user_exists(user_id))
 
     @defer.inlineCallbacks
-    def register(self, localpart, displayname=None, emails: Optional[List[str]] = None):
+    def register(
+        self,
+        localpart: str,
+        displayname: Optional[str] = None,
+        emails: Optional[List[str]] = None,
+    ) -> Generator["defer.Deferred[Any]", Any, Tuple[str, str]]:
         """Registers a new user with given localpart and optional displayname, emails.
 
         Also returns an access token for the new user.
@@ -495,12 +532,12 @@ class ModuleApi:
         Added in Synapse v0.25.0.
 
         Args:
-            localpart (str): The localpart of the new user.
-            displayname (str|None): The displayname of the new user.
-            emails (List[str]): Emails to bind to the new user.
+            localpart: The localpart of the new user.
+            displayname: The displayname of the new user.
+            emails: Emails to bind to the new user.
 
         Returns:
-            Deferred[tuple[str, str]]: a 2-tuple of (user_id, access_token)
+            a 2-tuple of (user_id, access_token)
         """
         logger.warning(
             "Using deprecated ModuleApi.register which creates a dummy user device."
@@ -510,23 +547,26 @@ class ModuleApi:
         return user_id, access_token
 
     def register_user(
-        self, localpart, displayname=None, emails: Optional[List[str]] = None
-    ):
+        self,
+        localpart: str,
+        displayname: Optional[str] = None,
+        emails: Optional[List[str]] = None,
+    ) -> "defer.Deferred[str]":
         """Registers a new user with given localpart and optional displayname, emails.
 
         Added in Synapse v1.2.0.
 
         Args:
-            localpart (str): The localpart of the new user.
-            displayname (str|None): The displayname of the new user.
-            emails (List[str]): Emails to bind to the new user.
+            localpart: The localpart of the new user.
+            displayname: The displayname of the new user.
+            emails: Emails to bind to the new user.
 
         Raises:
             SynapseError if there is an error performing the registration. Check the
                 'errcode' property for more information on the reason for failure
 
         Returns:
-            defer.Deferred[str]: user_id
+            user_id
         """
         return defer.ensureDeferred(
             self._hs.get_registration_handler().register_user(
@@ -536,20 +576,25 @@ class ModuleApi:
             )
         )
 
-    def register_device(self, user_id, device_id=None, initial_display_name=None):
+    def register_device(
+        self,
+        user_id: str,
+        device_id: Optional[str] = None,
+        initial_display_name: Optional[str] = None,
+    ) -> "defer.Deferred[Tuple[str, str, Optional[int], Optional[str]]]":
         """Register a device for a user and generate an access token.
 
         Added in Synapse v1.2.0.
 
         Args:
-            user_id (str): full canonical @user:id
-            device_id (str|None): The device ID to check, or None to generate
+            user_id: full canonical @user:id
+            device_id: The device ID to check, or None to generate
                 a new one.
-            initial_display_name (str|None): An optional display name for the
+            initial_display_name: An optional display name for the
                 device.
 
         Returns:
-            defer.Deferred[tuple[str, str]]: Tuple of device ID and access token
+            Tuple of device ID, access token, access token expiration time and refresh token
         """
         return defer.ensureDeferred(
             self._hs.get_registration_handler().register_device(
@@ -582,6 +627,7 @@ class ModuleApi:
         user_id: str,
         duration_in_ms: int = (2 * 60 * 1000),
         auth_provider_id: str = "",
+        auth_provider_session_id: Optional[str] = None,
     ) -> str:
         """Generate a login token suitable for m.login.token authentication
 
@@ -599,11 +645,14 @@ class ModuleApi:
         return self._hs.get_macaroon_generator().generate_short_term_login_token(
             user_id,
             auth_provider_id,
+            auth_provider_session_id,
             duration_in_ms,
         )
 
     @defer.inlineCallbacks
-    def invalidate_access_token(self, access_token):
+    def invalidate_access_token(
+        self, access_token: str
+    ) -> Generator["defer.Deferred[Any]", Any, None]:
         """Invalidate an access token for a user
 
         Added in Synapse v0.25.0.
@@ -635,14 +684,20 @@ class ModuleApi:
                 self._auth_handler.delete_access_token(access_token)
             )
 
-    def run_db_interaction(self, desc, func, *args, **kwargs):
+    def run_db_interaction(
+        self,
+        desc: str,
+        func: Callable[..., T],
+        *args: Any,
+        **kwargs: Any,
+    ) -> "defer.Deferred[T]":
         """Run a function with a database connection
 
         Added in Synapse v0.25.0.
 
         Args:
-            desc (str): description for the transaction, for metrics etc
-            func (func): function to be run. Passed a database cursor object
+            desc: description for the transaction, for metrics etc
+            func: function to be run. Passed a database cursor object
                 as well as *args and **kwargs
             *args: positional args to be passed to func
             **kwargs: named args to be passed to func
@@ -656,7 +711,7 @@ class ModuleApi:
 
     def complete_sso_login(
         self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
-    ):
+    ) -> None:
         """Complete a SSO login by redirecting the user to a page to confirm whether they
         want their access token sent to `client_redirect_url`, or redirect them to that
         URL with a token directly if the URL matches with one of the whitelisted clients.
@@ -686,7 +741,7 @@ class ModuleApi:
         client_redirect_url: str,
         new_user: bool = False,
         auth_provider_id: str = "<unknown>",
-    ):
+    ) -> None:
         """Complete a SSO login by redirecting the user to a page to confirm whether they
         want their access token sent to `client_redirect_url`, or redirect them to that
         URL with a token directly if the URL matches with one of the whitelisted clients.
@@ -925,11 +980,11 @@ class ModuleApi:
         self,
         f: Callable,
         msec: float,
-        *args,
+        *args: object,
         desc: Optional[str] = None,
         run_on_all_instances: bool = False,
-        **kwargs,
-    ):
+        **kwargs: object,
+    ) -> None:
         """Wraps a function as a background process and calls it repeatedly.
 
         NOTE: Will only run on the instance that is configured to run
@@ -960,9 +1015,7 @@ class ModuleApi:
                 run_as_background_process,
                 msec,
                 desc,
-                f,
-                *args,
-                **kwargs,
+                lambda: maybe_awaitable(f(*args, **kwargs)),
             )
         else:
             logger.warning(
@@ -970,13 +1023,18 @@ class ModuleApi:
                 f,
             )
 
+    async def sleep(self, seconds: float) -> None:
+        """Sleeps for the given number of seconds."""
+
+        await self._clock.sleep(seconds)
+
     async def send_mail(
         self,
         recipient: str,
         subject: str,
         html: str,
         text: str,
-    ):
+    ) -> None:
         """Send an email on behalf of the homeserver.
 
         Added in Synapse v1.39.0.
@@ -1123,6 +1181,26 @@ class ModuleApi:
         state_events = await self._store.get_events(state_ids.values())
 
         return {key: state_events[event_id] for key, event_id in state_ids.items()}
+
+    async def defer_to_thread(
+        self,
+        f: Callable[..., T],
+        *args: Any,
+        **kwargs: Any,
+    ) -> T:
+        """Runs the given function in a separate thread from Synapse's thread pool.
+
+        Added in Synapse v1.49.0.
+
+        Args:
+            f: The function to run.
+            args: The function's arguments.
+            kwargs: The function's keyword arguments.
+
+        Returns:
+            The return value of the function once ran in a thread.
+        """
+        return await defer_to_thread(self._hs.get_reactor(), f, *args, **kwargs)
 
 
 class PublicRoomListManager:
