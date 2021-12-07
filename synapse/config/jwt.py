@@ -31,6 +31,8 @@ class JWTConfig(Config):
             self.jwt_secret = jwt_config["secret"]
             self.jwt_algorithm = jwt_config["algorithm"]
 
+            self.jwt_subject_claim = jwt_config.get("subject_claim", "sub")
+
             # The issuer and audiences are optional, if provided, it is asserted
             # that the claims exist on the JWT.
             self.jwt_issuer = jwt_config.get("issuer")
@@ -46,6 +48,7 @@ class JWTConfig(Config):
             self.jwt_enabled = False
             self.jwt_secret = None
             self.jwt_algorithm = None
+            self.jwt_subject_claim = None
             self.jwt_issuer = None
             self.jwt_audiences = None
 
@@ -87,6 +90,12 @@ class JWTConfig(Config):
             # Required if 'enabled' is true.
             #
             #algorithm: "provided-by-your-issuer"
+
+            # Name of the claim containing a unique identifier for the user.
+            #
+            # Optional, defaults to `sub`.
+            #
+            #subject_claim: "sub"
 
             # The issuer to validate the "iss" claim against.
             #

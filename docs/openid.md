@@ -83,7 +83,7 @@ oidc_providers:
 
 ### Dex
 
-[Dex][dex-idp] is a simple, open-source, certified OpenID Connect Provider.
+[Dex][dex-idp] is a simple, open-source OpenID Connect Provider.
 Although it is designed to help building a full-blown provider with an
 external database, it can be configured with static passwords in a config file.
 
@@ -523,7 +523,7 @@ The synapse config will look like this:
         email_template: "{{ user.email }}"
 ```
 
-## Django OAuth Toolkit
+### Django OAuth Toolkit
 
 [django-oauth-toolkit](https://github.com/jazzband/django-oauth-toolkit) is a
 Django application providing out of the box all the endpoints, data and logic

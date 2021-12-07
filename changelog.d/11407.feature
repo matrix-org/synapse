@@ -1,0 +1,1 @@
+Add admin API to get some information about federation status with remote servers.

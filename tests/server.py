@@ -24,6 +24,7 @@ from typing import (
     MutableMapping,
     Optional,
     Tuple,
+    Type,
     Union,
 )
 
@@ -226,7 +227,7 @@ def make_request(
     path: Union[bytes, str],
     content: Union[bytes, str, JsonDict] = b"",
     access_token: Optional[str] = None,
-    request: Request = SynapseRequest,
+    request: Type[Request] = SynapseRequest,
     shorthand: bool = True,
     federation_auth_origin: Optional[bytes] = None,
     content_is_form: bool = False,

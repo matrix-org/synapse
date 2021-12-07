@@ -32,6 +32,7 @@ from typing import (
     Iterable,
     List,
     NoReturn,
+    Optional,
     Tuple,
     cast,
 )
@@ -129,7 +130,7 @@ def start_worker_reactor(
 def start_reactor(
     appname: str,
     soft_file_limit: int,
-    gc_thresholds: Tuple[int, int, int],
+    gc_thresholds: Optional[Tuple[int, int, int]],
     pid_file: str,
     daemonize: bool,
     print_pidfile: bool,
@@ -402,7 +403,7 @@ async def start(hs: "HomeServer") -> None:
     if hasattr(signal, "SIGHUP"):
 
         @wrap_as_background_process("sighup")
-        def handle_sighup(*args: Any, **kwargs: Any) -> None:
+        async def handle_sighup(*args: Any, **kwargs: Any) -> None:
             # Tell systemd our state, if we're using it. This will silently fail if
             # we're not using systemd.
             sdnotify(b"RELOADING=1")
