@@ -840,7 +840,10 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         if self.config.worker.worker_app is None:  # we're the main process
             return self.config.server.worker_to_update_user_directory is None
-        elif self.config.server.worker_to_update_user_directory is ANY_USER_DIRECTORY_WORKER:
+        elif (
+            self.config.server.worker_to_update_user_directory
+            is ANY_USER_DIRECTORY_WORKER
+        ):
             # A special backwards-compatible case for if update_user_directory is False
             return self.config.worker.worker_app == "synapse.app.user_dir"
         else:
