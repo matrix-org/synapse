@@ -79,14 +79,14 @@ class UsersRestServletV2(RestServlet):
 
         if start < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Query parameter from must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
 
         if limit < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Query parameter limit must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
@@ -122,7 +122,7 @@ class UsersRestServletV2(RestServlet):
         if (start + limit) < total:
             ret["next_token"] = str(start + len(users))
 
-        return HTTPStatus.OK, ret
+        return 200, ret
 
 
 class UserRestServletV2(RestServlet):
@@ -172,14 +172,14 @@ class UserRestServletV2(RestServlet):
 
         target_user = UserID.from_string(user_id)
         if not self.hs.is_mine(target_user):
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only look up local users")
+            raise SynapseError(400, "Can only look up local users")
 
         ret = await self.admin_handler.get_user(target_user)
 
         if not ret:
             raise NotFoundError("User not found")
 
-        return HTTPStatus.OK, ret
+        return 200, ret
 
     async def on_PUT(
         self, request: SynapseRequest, user_id: str
@@ -191,10 +191,7 @@ class UserRestServletV2(RestServlet):
         body = parse_json_object_from_request(request)
 
         if not self.hs.is_mine(target_user):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "This endpoint can only be used with local users",
-            )
+            raise SynapseError(400, "This endpoint can only be used with local users")
 
         user = await self.admin_handler.get_user(target_user)
         user_id = target_user.to_string()
@@ -213,7 +210,7 @@ class UserRestServletV2(RestServlet):
 
         user_type = body.get("user_type", None)
         if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Invalid user type")
+            raise SynapseError(400, "Invalid user type")
 
         set_admin_to = body.get("admin", False)
         if not isinstance(set_admin_to, bool):
@@ -226,13 +223,11 @@ class UserRestServletV2(RestServlet):
         password = body.get("password", None)
         if password is not None:
             if not isinstance(password, str) or len(password) > 512:
-                raise SynapseError(HTTPStatus.BAD_REQUEST, "Invalid password")
+                raise SynapseError(400, "Invalid password")
 
         deactivate = body.get("deactivated", False)
         if not isinstance(deactivate, bool):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "'deactivated' parameter is not of type boolean"
-            )
+            raise SynapseError(400, "'deactivated' parameter is not of type boolean")
 
         # convert List[Dict[str, str]] into List[Tuple[str, str]]
         if external_ids is not None:
@@ -287,9 +282,7 @@ class UserRestServletV2(RestServlet):
                         user_id,
                     )
                 except ExternalIDReuseException:
-                    raise SynapseError(
-                        HTTPStatus.CONFLICT, "External id is already in use."
-                    )
+                    raise SynapseError(409, "External id is already in use.")
 
             if "avatar_url" in body and isinstance(body["avatar_url"], str):
                 await self.profile_handler.set_avatar_url(
@@ -300,9 +293,7 @@ class UserRestServletV2(RestServlet):
                 if set_admin_to != user["admin"]:
                     auth_user = requester.user
                     if target_user == auth_user and not set_admin_to:
-                        raise SynapseError(
-                            HTTPStatus.BAD_REQUEST, "You may not demote yourself."
-                        )
+                        raise SynapseError(400, "You may not demote yourself.")
 
                     await self.store.set_server_admin(target_user, set_admin_to)
 
@@ -328,8 +319,7 @@ class UserRestServletV2(RestServlet):
                         and self.auth_handler.can_change_password()
                     ):
                         raise SynapseError(
-                            HTTPStatus.BAD_REQUEST,
-                            "Must provide a password to re-activate an account.",
+                            400, "Must provide a password to re-activate an account."
                         )
 
                     await self.deactivate_account_handler.activate_account(
@@ -342,7 +332,7 @@ class UserRestServletV2(RestServlet):
             user = await self.admin_handler.get_user(target_user)
             assert user is not None
 
-            return HTTPStatus.OK, user
+            return 200, user
 
         else:  # create user
             displayname = body.get("displayname", None)
@@ -391,9 +381,7 @@ class UserRestServletV2(RestServlet):
                             user_id,
                         )
                 except ExternalIDReuseException:
-                    raise SynapseError(
-                        HTTPStatus.CONFLICT, "External id is already in use."
-                    )
+                    raise SynapseError(409, "External id is already in use.")
 
             if "avatar_url" in body and isinstance(body["avatar_url"], str):
                 await self.profile_handler.set_avatar_url(
@@ -441,61 +429,51 @@ class UserRegisterServlet(RestServlet):
 
         nonce = secrets.token_hex(64)
         self.nonces[nonce] = int(self.reactor.seconds())
-        return HTTPStatus.OK, {"nonce": nonce}
+        return 200, {"nonce": nonce}
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         self._clear_old_nonces()
 
         if not self.hs.config.registration.registration_shared_secret:
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "Shared secret registration is not enabled"
-            )
+            raise SynapseError(400, "Shared secret registration is not enabled")
 
         body = parse_json_object_from_request(request)
 
         if "nonce" not in body:
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "nonce must be specified",
-                errcode=Codes.BAD_JSON,
-            )
+            raise SynapseError(400, "nonce must be specified", errcode=Codes.BAD_JSON)
 
         nonce = body["nonce"]
 
         if nonce not in self.nonces:
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "unrecognised nonce")
+            raise SynapseError(400, "unrecognised nonce")
 
         # Delete the nonce, so it can't be reused, even if it's invalid
         del self.nonces[nonce]
 
         if "username" not in body:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "username must be specified",
-                errcode=Codes.BAD_JSON,
+                400, "username must be specified", errcode=Codes.BAD_JSON
             )
         else:
             if not isinstance(body["username"], str) or len(body["username"]) > 512:
-                raise SynapseError(HTTPStatus.BAD_REQUEST, "Invalid username")
+                raise SynapseError(400, "Invalid username")
 
             username = body["username"].encode("utf-8")
             if b"\x00" in username:
-                raise SynapseError(HTTPStatus.BAD_REQUEST, "Invalid username")
+                raise SynapseError(400, "Invalid username")
 
         if "password" not in body:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "password must be specified",
-                errcode=Codes.BAD_JSON,
+                400, "password must be specified", errcode=Codes.BAD_JSON
             )
         else:
             password = body["password"]
             if not isinstance(password, str) or len(password) > 512:
-                raise SynapseError(HTTPStatus.BAD_REQUEST, "Invalid password")
+                raise SynapseError(400, "Invalid password")
 
             password_bytes = password.encode("utf-8")
             if b"\x00" in password_bytes:
-                raise SynapseError(HTTPStatus.BAD_REQUEST, "Invalid password")
+                raise SynapseError(400, "Invalid password")
 
             password_hash = await self.auth_handler.hash(password)
 
@@ -504,12 +482,10 @@ class UserRegisterServlet(RestServlet):
         displayname = body.get("displayname", None)
 
         if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Invalid user type")
+            raise SynapseError(400, "Invalid user type")
 
         if "mac" not in body:
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "mac must be specified", errcode=Codes.BAD_JSON
-            )
+            raise SynapseError(400, "mac must be specified", errcode=Codes.BAD_JSON)
 
         got_mac = body["mac"]
 
@@ -531,7 +507,7 @@ class UserRegisterServlet(RestServlet):
         want_mac = want_mac_builder.hexdigest()
 
         if not hmac.compare_digest(want_mac.encode("ascii"), got_mac.encode("ascii")):
-            raise SynapseError(HTTPStatus.FORBIDDEN, "HMAC incorrect")
+            raise SynapseError(403, "HMAC incorrect")
 
         # Reuse the parts of RegisterRestServlet to reduce code duplication
         from synapse.rest.client.register import RegisterRestServlet
@@ -548,7 +524,7 @@ class UserRegisterServlet(RestServlet):
         )
 
         result = await register._create_registration_details(user_id, body)
-        return HTTPStatus.OK, result
+        return 200, result
 
 
 class WhoisRestServlet(RestServlet):
@@ -576,11 +552,11 @@ class WhoisRestServlet(RestServlet):
             await assert_user_is_admin(self.auth, auth_user)
 
         if not self.hs.is_mine(target_user):
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only whois a local user")
+            raise SynapseError(400, "Can only whois a local user")
 
         ret = await self.admin_handler.get_whois(target_user)
 
-        return HTTPStatus.OK, ret
+        return 200, ret
 
 
 class DeactivateAccountRestServlet(RestServlet):
@@ -599,9 +575,7 @@ class DeactivateAccountRestServlet(RestServlet):
         await assert_user_is_admin(self.auth, requester.user)
 
         if not self.is_mine(UserID.from_string(target_user_id)):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "Can only deactivate local users"
-            )
+            raise SynapseError(400, "Can only deactivate local users")
 
         if not await self.store.get_user_by_id(target_user_id):
             raise NotFoundError("User not found")
@@ -623,7 +597,7 @@ class DeactivateAccountRestServlet(RestServlet):
         else:
             id_server_unbind_result = "no-support"
 
-        return HTTPStatus.OK, {"id_server_unbind_result": id_server_unbind_result}
+        return 200, {"id_server_unbind_result": id_server_unbind_result}
 
 
 class AccountValidityRenewServlet(RestServlet):
@@ -646,7 +620,7 @@ class AccountValidityRenewServlet(RestServlet):
 
             if "user_id" not in body:
                 raise SynapseError(
-                    HTTPStatus.BAD_REQUEST,
+                    400,
                     "Missing property 'user_id' in the request body",
                 )
 
@@ -657,7 +631,7 @@ class AccountValidityRenewServlet(RestServlet):
             )
 
         res = {"expiration_ts": expiration_ts}
-        return HTTPStatus.OK, res
+        return 200, res
 
 
 class ResetPasswordRestServlet(RestServlet):
@@ -704,7 +678,7 @@ class ResetPasswordRestServlet(RestServlet):
         await self._set_password_handler.set_password(
             target_user_id, new_password_hash, logout_devices, requester
         )
-        return HTTPStatus.OK, {}
+        return 200, {}
 
 
 class SearchUsersRestServlet(RestServlet):
@@ -738,16 +712,16 @@ class SearchUsersRestServlet(RestServlet):
 
         # To allow all users to get the users list
         # if not is_admin and target_user != auth_user:
-        #     raise AuthError(HTTPStatus.FORBIDDEN, "You are not a server admin")
+        #     raise AuthError(403, "You are not a server admin")
 
         if not self.hs.is_mine(target_user):
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only users a local user")
+            raise SynapseError(400, "Can only users a local user")
 
         term = parse_string(request, "term", required=True)
         logger.info("term: %s ", term)
 
         ret = await self.store.search_users(term)
-        return HTTPStatus.OK, ret
+        return 200, ret
 
 
 class UserAdminServlet(RestServlet):
@@ -791,14 +765,11 @@ class UserAdminServlet(RestServlet):
         target_user = UserID.from_string(user_id)
 
         if not self.hs.is_mine(target_user):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Only local users can be admins of this homeserver",
-            )
+            raise SynapseError(400, "Only local users can be admins of this homeserver")
 
         is_admin = await self.store.is_server_admin(target_user)
 
-        return HTTPStatus.OK, {"admin": is_admin}
+        return 200, {"admin": is_admin}
 
     async def on_PUT(
         self, request: SynapseRequest, user_id: str
@@ -814,19 +785,16 @@ class UserAdminServlet(RestServlet):
         assert_params_in_dict(body, ["admin"])
 
         if not self.hs.is_mine(target_user):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Only local users can be admins of this homeserver",
-            )
+            raise SynapseError(400, "Only local users can be admins of this homeserver")
 
         set_admin_to = bool(body["admin"])
 
         if target_user == auth_user and not set_admin_to:
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "You may not demote yourself.")
+            raise SynapseError(400, "You may not demote yourself.")
 
         await self.store.set_server_admin(target_user, set_admin_to)
 
-        return HTTPStatus.OK, {}
+        return 200, {}
 
 
 class UserMembershipRestServlet(RestServlet):
@@ -848,7 +816,7 @@ class UserMembershipRestServlet(RestServlet):
 
         room_ids = await self.store.get_rooms_for_user(user_id)
         ret = {"joined_rooms": list(room_ids), "total": len(room_ids)}
-        return HTTPStatus.OK, ret
+        return 200, ret
 
 
 class PushersRestServlet(RestServlet):
@@ -877,7 +845,7 @@ class PushersRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if not self.is_mine(UserID.from_string(user_id)):
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only look up local users")
+            raise SynapseError(400, "Can only look up local users")
 
         if not await self.store.get_user_by_id(user_id):
             raise NotFoundError("User not found")
@@ -886,10 +854,7 @@ class PushersRestServlet(RestServlet):
 
         filtered_pushers = [p.as_dict() for p in pushers]
 
-        return HTTPStatus.OK, {
-            "pushers": filtered_pushers,
-            "total": len(filtered_pushers),
-        }
+        return 200, {"pushers": filtered_pushers, "total": len(filtered_pushers)}
 
 
 class UserTokenRestServlet(RestServlet):
@@ -922,22 +887,16 @@ class UserTokenRestServlet(RestServlet):
         auth_user = requester.user
 
         if not self.hs.is_mine_id(user_id):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "Only local users can be logged in as"
-            )
+            raise SynapseError(400, "Only local users can be logged in as")
 
         body = parse_json_object_from_request(request, allow_empty_body=True)
 
         valid_until_ms = body.get("valid_until_ms")
         if valid_until_ms and not isinstance(valid_until_ms, int):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "'valid_until_ms' parameter must be an int"
-            )
+            raise SynapseError(400, "'valid_until_ms' parameter must be an int")
 
         if auth_user.to_string() == user_id:
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "Cannot use admin API to login as self"
-            )
+            raise SynapseError(400, "Cannot use admin API to login as self")
 
         token = await self.auth_handler.create_access_token_for_user_id(
             user_id=auth_user.to_string(),
@@ -946,7 +905,7 @@ class UserTokenRestServlet(RestServlet):
             puppets_user_id=user_id,
         )
 
-        return HTTPStatus.OK, {"access_token": token}
+        return 200, {"access_token": token}
 
 
 class ShadowBanRestServlet(RestServlet):
@@ -988,13 +947,11 @@ class ShadowBanRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if not self.hs.is_mine_id(user_id):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "Only local users can be shadow-banned"
-            )
+            raise SynapseError(400, "Only local users can be shadow-banned")
 
         await self.store.set_shadow_banned(UserID.from_string(user_id), True)
 
-        return HTTPStatus.OK, {}
+        return 200, {}
 
     async def on_DELETE(
         self, request: SynapseRequest, user_id: str
@@ -1002,13 +959,11 @@ class ShadowBanRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if not self.hs.is_mine_id(user_id):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "Only local users can be shadow-banned"
-            )
+            raise SynapseError(400, "Only local users can be shadow-banned")
 
         await self.store.set_shadow_banned(UserID.from_string(user_id), False)
 
-        return HTTPStatus.OK, {}
+        return 200, {}
 
 
 class RateLimitRestServlet(RestServlet):
@@ -1040,7 +995,7 @@ class RateLimitRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if not self.hs.is_mine_id(user_id):
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only look up local users")
+            raise SynapseError(400, "Can only look up local users")
 
         if not await self.store.get_user_by_id(user_id):
             raise NotFoundError("User not found")
@@ -1061,7 +1016,7 @@ class RateLimitRestServlet(RestServlet):
         else:
             ret = {}
 
-        return HTTPStatus.OK, ret
+        return 200, ret
 
     async def on_POST(
         self, request: SynapseRequest, user_id: str
@@ -1069,9 +1024,7 @@ class RateLimitRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if not self.hs.is_mine_id(user_id):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "Only local users can be ratelimited"
-            )
+            raise SynapseError(400, "Only local users can be ratelimited")
 
         if not await self.store.get_user_by_id(user_id):
             raise NotFoundError("User not found")
@@ -1083,14 +1036,14 @@ class RateLimitRestServlet(RestServlet):
 
         if not isinstance(messages_per_second, int) or messages_per_second < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "%r parameter must be a positive int" % (messages_per_second,),
                 errcode=Codes.INVALID_PARAM,
             )
 
         if not isinstance(burst_count, int) or burst_count < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "%r parameter must be a positive int" % (burst_count,),
                 errcode=Codes.INVALID_PARAM,
             )
@@ -1106,7 +1059,7 @@ class RateLimitRestServlet(RestServlet):
             "burst_count": ratelimit.burst_count,
         }
 
-        return HTTPStatus.OK, ret
+        return 200, ret
 
     async def on_DELETE(
         self, request: SynapseRequest, user_id: str
@@ -1114,13 +1067,11 @@ class RateLimitRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if not self.hs.is_mine_id(user_id):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "Only local users can be ratelimited"
-            )
+            raise SynapseError(400, "Only local users can be ratelimited")
 
         if not await self.store.get_user_by_id(user_id):
             raise NotFoundError("User not found")
 
         await self.store.delete_ratelimit_for_user(user_id)
 
-        return HTTPStatus.OK, {}
+        return 200, {}

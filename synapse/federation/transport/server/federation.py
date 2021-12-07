@@ -174,46 +174,6 @@ class FederationBackfillServlet(BaseFederationServerServlet):
         return await self.handler.on_backfill_request(origin, room_id, versions, limit)
 
 
-class FederationTimestampLookupServlet(BaseFederationServerServlet):
-    """
-    API endpoint to fetch the `event_id` of the closest event to the given
-    timestamp (`ts` query parameter) in the given direction (`dir` query
-    parameter).
-
-    Useful for other homeservers when they're unable to find an event locally.
-
-    `ts` is a timestamp in milliseconds where we will find the closest event in
-    the given direction.
-
-    `dir` can be `f` or `b` to indicate forwards and backwards in time from the
-    given timestamp.
-
-    GET /_matrix/federation/unstable/org.matrix.msc3030/timestamp_to_event/<roomID>?ts=<timestamp>&dir=<direction>
-    {
-        "event_id": ...
-    }
-    """
-
-    PATH = "/timestamp_to_event/(?P<room_id>[^/]*)/?"
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc3030"
-
-    async def on_GET(
-        self,
-        origin: str,
-        content: Literal[None],
-        query: Dict[bytes, List[bytes]],
-        room_id: str,
-    ) -> Tuple[int, JsonDict]:
-        timestamp = parse_integer_from_args(query, "ts", required=True)
-        direction = parse_string_from_args(
-            query, "dir", default="f", allowed_values=["f", "b"], required=True
-        )
-
-        return await self.handler.on_timestamp_to_event_request(
-            origin, room_id, timestamp, direction
-        )
-
-
 class FederationQueryServlet(BaseFederationServerServlet):
     PATH = "/query/(?P<query_type>[^/]*)"
 
@@ -651,6 +611,7 @@ class FederationSpaceSummaryServlet(BaseFederationServlet):
 
 
 class FederationRoomHierarchyServlet(BaseFederationServlet):
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc2946"
     PATH = "/hierarchy/(?P<room_id>[^/]*)"
 
     def __init__(
@@ -674,10 +635,6 @@ class FederationRoomHierarchyServlet(BaseFederationServlet):
         return 200, await self.handler.get_federation_hierarchy(
             origin, room_id, suggested_only
         )
-
-
-class FederationRoomHierarchyUnstableServlet(FederationRoomHierarchyServlet):
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc2946"
 
 
 class RoomComplexityServlet(BaseFederationServlet):
@@ -723,7 +680,6 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationStateV1Servlet,
     FederationStateIdsServlet,
     FederationBackfillServlet,
-    FederationTimestampLookupServlet,
     FederationQueryServlet,
     FederationMakeJoinServlet,
     FederationMakeLeaveServlet,
@@ -745,7 +701,6 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     RoomComplexityServlet,
     FederationSpaceSummaryServlet,
     FederationRoomHierarchyServlet,
-    FederationRoomHierarchyUnstableServlet,
     FederationV1SendKnockServlet,
     FederationMakeKnockServlet,
 )

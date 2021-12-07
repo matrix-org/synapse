@@ -143,7 +143,7 @@ class ApplicationServiceTransactionWorkerStore(
             A list of ApplicationServices, which may be empty.
         """
         results = await self.db_pool.simple_select_list(
-            "application_services_state", {"state": state.value}, ["as_id"]
+            "application_services_state", {"state": state}, ["as_id"]
         )
         # NB: This assumes this class is linked with ApplicationServiceStore
         as_list = self.get_app_services()
@@ -173,7 +173,7 @@ class ApplicationServiceTransactionWorkerStore(
             desc="get_appservice_state",
         )
         if result:
-            return ApplicationServiceState(result.get("state"))
+            return result.get("state")
         return None
 
     async def set_appservice_state(
@@ -186,7 +186,7 @@ class ApplicationServiceTransactionWorkerStore(
             state: The connectivity state to apply.
         """
         await self.db_pool.simple_upsert(
-            "application_services_state", {"as_id": service.id}, {"state": state.value}
+            "application_services_state", {"as_id": service.id}, {"state": state}
         )
 
     async def create_appservice_txn(

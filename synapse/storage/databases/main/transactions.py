@@ -14,7 +14,6 @@
 
 import logging
 from collections import namedtuple
-from enum import Enum
 from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
 import attr
@@ -43,16 +42,6 @@ _TransactionRow = namedtuple(
 _UpdateTransactionRow = namedtuple(
     "_TransactionRow", ("response_code", "response_json")
 )
-
-
-class DestinationSortOrder(Enum):
-    """Enum to define the sorting method used when returning destinations."""
-
-    DESTINATION = "destination"
-    RETRY_LAST_TS = "retry_last_ts"
-    RETTRY_INTERVAL = "retry_interval"
-    FAILURE_TS = "failure_ts"
-    LAST_SUCCESSFUL_STREAM_ORDERING = "last_successful_stream_ordering"
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -491,62 +480,3 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
 
         destinations = [row[0] for row in txn]
         return destinations
-
-    async def get_destinations_paginate(
-        self,
-        start: int,
-        limit: int,
-        destination: Optional[str] = None,
-        order_by: str = DestinationSortOrder.DESTINATION.value,
-        direction: str = "f",
-    ) -> Tuple[List[JsonDict], int]:
-        """Function to retrieve a paginated list of destinations.
-        This will return a json list of destinations and the
-        total number of destinations matching the filter criteria.
-
-        Args:
-            start: start number to begin the query from
-            limit: number of rows to retrieve
-            destination: search string in destination
-            order_by: the sort order of the returned list
-            direction: sort ascending or descending
-        Returns:
-            A tuple of a list of mappings from destination to information
-            and a count of total destinations.
-        """
-
-        def get_destinations_paginate_txn(
-            txn: LoggingTransaction,
-        ) -> Tuple[List[JsonDict], int]:
-            order_by_column = DestinationSortOrder(order_by).value
-
-            if direction == "b":
-                order = "DESC"
-            else:
-                order = "ASC"
-
-            args = []
-            where_statement = ""
-            if destination:
-                args.extend(["%" + destination.lower() + "%"])
-                where_statement = "WHERE LOWER(destination) LIKE ?"
-
-            sql_base = f"FROM destinations {where_statement} "
-            sql = f"SELECT COUNT(*) as total_destinations {sql_base}"
-            txn.execute(sql, args)
-            count = txn.fetchone()[0]
-
-            sql = f"""
-                SELECT destination, retry_last_ts, retry_interval, failure_ts,
-                last_successful_stream_ordering
-                {sql_base}
-                ORDER BY {order_by_column} {order}, destination ASC
-                LIMIT ? OFFSET ?
-            """
-            txn.execute(sql, args + [limit, start])
-            destinations = self.db_pool.cursor_to_dict(txn)
-            return destinations, count
-
-        return await self.db_pool.runInteraction(
-            "get_destinations_paginate_txn", get_destinations_paginate_txn
-        )

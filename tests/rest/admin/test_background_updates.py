@@ -16,14 +16,11 @@ from typing import Collection
 
 from parameterized import parameterized
 
-from twisted.test.proto_helpers import MemoryReactor
-
 import synapse.rest.admin
 from synapse.api.errors import Codes
 from synapse.rest.client import login
 from synapse.server import HomeServer
 from synapse.storage.background_updates import BackgroundUpdater
-from synapse.util import Clock
 
 from tests import unittest
 
@@ -34,7 +31,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+    def prepare(self, reactor, clock, hs: HomeServer):
         self.store = hs.get_datastore()
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -47,9 +44,9 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             ("POST", "/_synapse/admin/v1/background_updates/start_job"),
         ]
     )
-    def test_requester_is_no_admin(self, method: str, url: str) -> None:
+    def test_requester_is_no_admin(self, method: str, url: str):
         """
-        If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
+        If the user is not a server admin, an error 403 is returned.
         """
 
         self.register_user("user", "pass", admin=False)
@@ -65,7 +62,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_invalid_parameter(self) -> None:
+    def test_invalid_parameter(self):
         """
         If parameters are invalid, an error is returned.
         """
@@ -93,7 +90,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
 
-    def _register_bg_update(self) -> None:
+    def _register_bg_update(self):
         "Adds a bg update but doesn't start it"
 
         async def _fake_update(progress, batch_size) -> int:
@@ -115,7 +112,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             )
         )
 
-    def test_status_empty(self) -> None:
+    def test_status_empty(self):
         """Test the status API works."""
 
         channel = self.make_request(
@@ -130,7 +127,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             channel.json_body, {"current_updates": {}, "enabled": True}
         )
 
-    def test_status_bg_update(self) -> None:
+    def test_status_bg_update(self):
         """Test the status API works with a background update."""
 
         # Create a new background update
@@ -138,7 +135,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
         self._register_bg_update()
 
         self.store.db_pool.updates.start_doing_background_updates()
-        self.reactor.pump([1.0, 1.0, 1.0])
+        self.reactor.pump([1.0, 1.0])
 
         channel = self.make_request(
             "GET",
@@ -165,7 +162,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             },
         )
 
-    def test_enabled(self) -> None:
+    def test_enabled(self):
         """Test the enabled API works."""
 
         # Create a new background update
@@ -302,7 +299,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             ),
         ]
     )
-    def test_start_backround_job(self, job_name: str, updates: Collection[str]) -> None:
+    def test_start_backround_job(self, job_name: str, updates: Collection[str]):
         """
         Test that background updates add to database and be processed.
 
@@ -344,7 +341,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             )
         )
 
-    def test_start_backround_job_twice(self) -> None:
+    def test_start_backround_job_twice(self):
         """Test that add a background update twice return an error."""
 
         # add job to database

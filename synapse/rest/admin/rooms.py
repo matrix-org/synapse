@@ -102,9 +102,10 @@ class RoomRestV2Servlet(RestServlet):
             )
 
         if not RoomID.is_valid(room_id):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "%s is not a legal room ID" % (room_id,)
-            )
+            raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
+
+        if not await self._store.get_room(room_id):
+            raise NotFoundError("Unknown room id %s" % (room_id,))
 
         delete_id = self._pagination_handler.start_shutdown_and_purge_room(
             room_id=room_id,
@@ -117,7 +118,7 @@ class RoomRestV2Servlet(RestServlet):
             force_purge=force_purge,
         )
 
-        return HTTPStatus.OK, {"delete_id": delete_id}
+        return 200, {"delete_id": delete_id}
 
 
 class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
@@ -136,9 +137,7 @@ class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
         await assert_requester_is_admin(self._auth, request)
 
         if not RoomID.is_valid(room_id):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, "%s is not a legal room ID" % (room_id,)
-            )
+            raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
 
         delete_ids = self._pagination_handler.get_delete_ids_by_room(room_id)
         if delete_ids is None:
@@ -154,7 +153,7 @@ class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
                         **delete.asdict(),
                     }
                 ]
-        return HTTPStatus.OK, {"results": cast(JsonDict, response)}
+        return 200, {"results": cast(JsonDict, response)}
 
 
 class DeleteRoomStatusByDeleteIdRestServlet(RestServlet):
@@ -176,7 +175,7 @@ class DeleteRoomStatusByDeleteIdRestServlet(RestServlet):
         if delete_status is None:
             raise NotFoundError("delete id '%s' not found" % delete_id)
 
-        return HTTPStatus.OK, cast(JsonDict, delete_status.asdict())
+        return 200, cast(JsonDict, delete_status.asdict())
 
 
 class ListRoomRestServlet(RestServlet):
@@ -218,7 +217,7 @@ class ListRoomRestServlet(RestServlet):
             RoomSortOrder.STATE_EVENTS.value,
         ):
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Unknown value for order_by: %s" % (order_by,),
                 errcode=Codes.INVALID_PARAM,
             )
@@ -226,7 +225,7 @@ class ListRoomRestServlet(RestServlet):
         search_term = parse_string(request, "search_term", encoding="utf-8")
         if search_term == "":
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "search_term cannot be an empty string",
                 errcode=Codes.INVALID_PARAM,
             )
@@ -234,9 +233,7 @@ class ListRoomRestServlet(RestServlet):
         direction = parse_string(request, "dir", default="f")
         if direction not in ("f", "b"):
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Unknown direction: %s" % (direction,),
-                errcode=Codes.INVALID_PARAM,
+                400, "Unknown direction: %s" % (direction,), errcode=Codes.INVALID_PARAM
             )
 
         reverse_order = True if direction == "b" else False
@@ -268,7 +265,7 @@ class ListRoomRestServlet(RestServlet):
             else:
                 response["prev_batch"] = 0
 
-        return HTTPStatus.OK, response
+        return 200, response
 
 
 class RoomRestServlet(RestServlet):
@@ -313,7 +310,7 @@ class RoomRestServlet(RestServlet):
         members = await self.store.get_users_in_room(room_id)
         ret["joined_local_devices"] = await self.store.count_devices_by_users(members)
 
-        return HTTPStatus.OK, ret
+        return 200, ret
 
     async def on_DELETE(
         self, request: SynapseRequest, room_id: str
@@ -389,7 +386,7 @@ class RoomRestServlet(RestServlet):
         # See https://github.com/python/mypy/issues/4976#issuecomment-579883622
         # for some discussion on why this is necessary. Either way,
         # `ret` is an opaque dictionary blob as far as the rest of the app cares.
-        return HTTPStatus.OK, cast(JsonDict, ret)
+        return 200, cast(JsonDict, ret)
 
 
 class RoomMembersRestServlet(RestServlet):
@@ -416,7 +413,7 @@ class RoomMembersRestServlet(RestServlet):
         members = await self.store.get_users_in_room(room_id)
         ret = {"members": members, "total": len(members)}
 
-        return HTTPStatus.OK, ret
+        return 200, ret
 
 
 class RoomStateRestServlet(RestServlet):
@@ -446,10 +443,16 @@ class RoomStateRestServlet(RestServlet):
         event_ids = await self.store.get_current_state_ids(room_id)
         events = await self.store.get_events(event_ids.values())
         now = self.clock.time_msec()
-        room_state = await self._event_serializer.serialize_events(events.values(), now)
+        room_state = await self._event_serializer.serialize_events(
+            events.values(),
+            now,
+            # We don't bother bundling aggregations in when asked for state
+            # events, as clients won't use them.
+            bundle_relations=False,
+        )
         ret = {"state": room_state}
 
-        return HTTPStatus.OK, ret
+        return 200, ret
 
 
 class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
@@ -478,10 +481,7 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
         target_user = UserID.from_string(content["user_id"])
 
         if not self.hs.is_mine(target_user):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "This endpoint can only be used with local users",
-            )
+            raise SynapseError(400, "This endpoint can only be used with local users")
 
         if not await self.admin_handler.get_user(target_user):
             raise NotFoundError("User not found")
@@ -527,7 +527,7 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
             ratelimit=False,
         )
 
-        return HTTPStatus.OK, {"room_id": room_id}
+        return 200, {"room_id": room_id}
 
 
 class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
@@ -568,7 +568,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         # Figure out which local users currently have power in the room, if any.
         room_state = await self.state_handler.get_current_state(room_id)
         if not room_state:
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Server not in room")
+            raise SynapseError(400, "Server not in room")
 
         create_event = room_state[(EventTypes.Create, "")]
         power_levels = room_state.get((EventTypes.PowerLevels, ""))
@@ -582,9 +582,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
             admin_users.sort(key=lambda user: user_power[user])
 
             if not admin_users:
-                raise SynapseError(
-                    HTTPStatus.BAD_REQUEST, "No local admin user in room"
-                )
+                raise SynapseError(400, "No local admin user in room")
 
             admin_user_id = None
 
@@ -601,7 +599,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
 
             if not admin_user_id:
                 raise SynapseError(
-                    HTTPStatus.BAD_REQUEST,
+                    400,
                     "No local admin user in room",
                 )
 
@@ -612,7 +610,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
             admin_user_id = create_event.sender
             if not self.is_mine_id(admin_user_id):
                 raise SynapseError(
-                    HTTPStatus.BAD_REQUEST,
+                    400,
                     "No local admin user in room",
                 )
 
@@ -641,8 +639,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         except AuthError:
             # The admin user we found turned out not to have enough power.
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "No local admin user in room with power to update power levels.",
+                400, "No local admin user in room with power to update power levels."
             )
 
         # Now we check if the user we're granting admin rights to is already in
@@ -656,7 +653,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
             )
 
         if is_joined:
-            return HTTPStatus.OK, {}
+            return 200, {}
 
         join_rules = room_state.get((EventTypes.JoinRules, ""))
         is_public = False
@@ -664,7 +661,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
             is_public = join_rules.content.get("join_rule") == JoinRules.PUBLIC
 
         if is_public:
-            return HTTPStatus.OK, {}
+            return 200, {}
 
         await self.room_member_handler.update_membership(
             fake_requester,
@@ -673,7 +670,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
             action=Membership.INVITE,
         )
 
-        return HTTPStatus.OK, {}
+        return 200, {}
 
 
 class ForwardExtremitiesRestServlet(ResolveRoomIdMixin, RestServlet):
@@ -705,7 +702,7 @@ class ForwardExtremitiesRestServlet(ResolveRoomIdMixin, RestServlet):
         room_id, _ = await self.resolve_room_id(room_identifier)
 
         deleted_count = await self.store.delete_forward_extremities_for_room(room_id)
-        return HTTPStatus.OK, {"deleted": deleted_count}
+        return 200, {"deleted": deleted_count}
 
     async def on_GET(
         self, request: SynapseRequest, room_identifier: str
@@ -716,7 +713,7 @@ class ForwardExtremitiesRestServlet(ResolveRoomIdMixin, RestServlet):
         room_id, _ = await self.resolve_room_id(room_identifier)
 
         extremities = await self.store.get_forward_extremities_for_room(room_id)
-        return HTTPStatus.OK, {"count": len(extremities), "results": extremities}
+        return 200, {"count": len(extremities), "results": extremities}
 
 
 class RoomEventContextServlet(RestServlet):
@@ -765,9 +762,7 @@ class RoomEventContextServlet(RestServlet):
         )
 
         if not results:
-            raise SynapseError(
-                HTTPStatus.NOT_FOUND, "Event not found.", errcode=Codes.NOT_FOUND
-            )
+            raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
         time_now = self.clock.time_msec()
         results["events_before"] = await self._event_serializer.serialize_events(
@@ -780,10 +775,13 @@ class RoomEventContextServlet(RestServlet):
             results["events_after"], time_now
         )
         results["state"] = await self._event_serializer.serialize_events(
-            results["state"], time_now
+            results["state"],
+            time_now,
+            # No need to bundle aggregations for state events
+            bundle_relations=False,
         )
 
-        return HTTPStatus.OK, results
+        return 200, results
 
 
 class BlockRoomRestServlet(RestServlet):

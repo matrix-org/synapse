@@ -118,9 +118,6 @@ performance:
 Note that the appropriate values for those fields depend on the amount
 of free memory the database host has available.
 
-Additionally, admins of large deployments might want to consider using huge pages
-to help manage memory, especially when using large values of `shared_buffers`. You
-can read more about that [here](https://www.postgresql.org/docs/10/kernel-resources.html#LINUX-HUGE-PAGES).
 
 ## Porting from SQLite
 

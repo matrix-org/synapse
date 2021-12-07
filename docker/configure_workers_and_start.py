@@ -474,16 +474,10 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
 
     # Determine the load-balancing upstreams to configure
     nginx_upstream_config = ""
-
-    # At the same time, prepare a list of internal endpoints to healthcheck
-    # starting with the main process which exists even if no workers do.
-    healthcheck_urls = ["http://localhost:8080/health"]
-
     for upstream_worker_type, upstream_worker_ports in nginx_upstreams.items():
         body = ""
         for port in upstream_worker_ports:
             body += "    server localhost:%d;\n" % (port,)
-            healthcheck_urls.append("http://localhost:%d/health" % (port,))
 
         # Add to the list of configured upstreams
         nginx_upstream_config += NGINX_UPSTREAM_CONFIG_BLOCK.format(
@@ -514,13 +508,6 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
         "/etc/supervisor/conf.d/supervisord.conf",
         main_config_path=config_path,
         worker_config=supervisord_config,
-    )
-
-    # healthcheck config
-    convert(
-        "/conf/healthcheck.sh.j2",
-        "/healthcheck.sh",
-        healthcheck_urls=healthcheck_urls,
     )
 
     # Ensure the logging directory exists

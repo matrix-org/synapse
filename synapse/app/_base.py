@@ -32,7 +32,6 @@ from typing import (
     Iterable,
     List,
     NoReturn,
-    Optional,
     Tuple,
     cast,
 )
@@ -130,7 +129,7 @@ def start_worker_reactor(
 def start_reactor(
     appname: str,
     soft_file_limit: int,
-    gc_thresholds: Optional[Tuple[int, int, int]],
+    gc_thresholds: Tuple[int, int, int],
     pid_file: str,
     daemonize: bool,
     print_pidfile: bool,

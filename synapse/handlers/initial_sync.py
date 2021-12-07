@@ -165,11 +165,7 @@ class InitialSyncHandler:
 
                 invite_event = await self.store.get_event(event.event_id)
                 d["invite"] = await self._event_serializer.serialize_event(
-                    invite_event,
-                    time_now,
-                    # Don't bundle aggregations as this is a deprecated API.
-                    bundle_aggregations=False,
-                    as_client_event=as_client_event,
+                    invite_event, time_now, as_client_event
                 )
 
             rooms_ret.append(d)
@@ -220,11 +216,7 @@ class InitialSyncHandler:
                 d["messages"] = {
                     "chunk": (
                         await self._event_serializer.serialize_events(
-                            messages,
-                            time_now=time_now,
-                            # Don't bundle aggregations as this is a deprecated API.
-                            bundle_aggregations=False,
-                            as_client_event=as_client_event,
+                            messages, time_now=time_now, as_client_event=as_client_event
                         )
                     ),
                     "start": await start_token.to_string(self.store),
@@ -234,8 +226,6 @@ class InitialSyncHandler:
                 d["state"] = await self._event_serializer.serialize_events(
                     current_state.values(),
                     time_now=time_now,
-                    # Don't bundle aggregations as this is a deprecated API.
-                    bundle_aggregations=False,
                     as_client_event=as_client_event,
                 )
 
@@ -376,18 +366,14 @@ class InitialSyncHandler:
             "room_id": room_id,
             "messages": {
                 "chunk": (
-                    # Don't bundle aggregations as this is a deprecated API.
-                    await self._event_serializer.serialize_events(
-                        messages, time_now, bundle_aggregations=False
-                    )
+                    await self._event_serializer.serialize_events(messages, time_now)
                 ),
                 "start": await start_token.to_string(self.store),
                 "end": await end_token.to_string(self.store),
             },
             "state": (
-                # Don't bundle aggregations as this is a deprecated API.
                 await self._event_serializer.serialize_events(
-                    room_state.values(), time_now, bundle_aggregations=False
+                    room_state.values(), time_now
                 )
             ),
             "presence": [],
@@ -406,9 +392,8 @@ class InitialSyncHandler:
 
         # TODO: These concurrently
         time_now = self.clock.time_msec()
-        # Don't bundle aggregations as this is a deprecated API.
         state = await self._event_serializer.serialize_events(
-            current_state.values(), time_now, bundle_aggregations=False
+            current_state.values(), time_now
         )
 
         now_token = self.hs.get_event_sources().get_current_token()
@@ -482,10 +467,7 @@ class InitialSyncHandler:
             "room_id": room_id,
             "messages": {
                 "chunk": (
-                    # Don't bundle aggregations as this is a deprecated API.
-                    await self._event_serializer.serialize_events(
-                        messages, time_now, bundle_aggregations=False
-                    )
+                    await self._event_serializer.serialize_events(messages, time_now)
                 ),
                 "start": await start_token.to_string(self.store),
                 "end": await end_token.to_string(self.store),

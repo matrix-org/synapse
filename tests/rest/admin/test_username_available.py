@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from http import HTTPStatus
-
 import synapse.rest.admin
 from synapse.api.errors import Codes, SynapseError
 from synapse.rest.client import login
@@ -35,38 +33,30 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
         async def check_username(username):
             if username == "allowed":
                 return True
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "User ID already taken.",
-                errcode=Codes.USER_IN_USE,
-            )
+            raise SynapseError(400, "User ID already taken.", errcode=Codes.USER_IN_USE)
 
         handler = self.hs.get_registration_handler()
         handler.check_username = check_username
 
     def test_username_available(self):
         """
-        The endpoint should return a HTTPStatus.OK response if the username does not exist
+        The endpoint should return a 200 response if the username does not exist
         """
 
         url = "%s?username=%s" % (self.url, "allowed")
         channel = self.make_request("GET", url, None, self.admin_user_tok)
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertTrue(channel.json_body["available"])
 
     def test_username_unavailable(self):
         """
-        The endpoint should return a HTTPStatus.OK response if the username does not exist
+        The endpoint should return a 200 response if the username does not exist
         """
 
         url = "%s?username=%s" % (self.url, "disallowed")
         channel = self.make_request("GET", url, None, self.admin_user_tok)
 
-        self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["errcode"], "M_USER_IN_USE")
         self.assertEqual(channel.json_body["error"], "User ID already taken.")

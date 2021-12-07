@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import NotFoundError, SynapseError
@@ -54,7 +53,7 @@ class DeviceRestServlet(RestServlet):
 
         target_user = UserID.from_string(user_id)
         if not self.hs.is_mine(target_user):
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only lookup local users")
+            raise SynapseError(400, "Can only lookup local users")
 
         u = await self.store.get_user_by_id(target_user.to_string())
         if u is None:
@@ -63,7 +62,7 @@ class DeviceRestServlet(RestServlet):
         device = await self.device_handler.get_device(
             target_user.to_string(), device_id
         )
-        return HTTPStatus.OK, device
+        return 200, device
 
     async def on_DELETE(
         self, request: SynapseRequest, user_id: str, device_id: str
@@ -72,14 +71,14 @@ class DeviceRestServlet(RestServlet):
 
         target_user = UserID.from_string(user_id)
         if not self.hs.is_mine(target_user):
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only lookup local users")
+            raise SynapseError(400, "Can only lookup local users")
 
         u = await self.store.get_user_by_id(target_user.to_string())
         if u is None:
             raise NotFoundError("Unknown user")
 
         await self.device_handler.delete_device(target_user.to_string(), device_id)
-        return HTTPStatus.OK, {}
+        return 200, {}
 
     async def on_PUT(
         self, request: SynapseRequest, user_id: str, device_id: str
@@ -88,7 +87,7 @@ class DeviceRestServlet(RestServlet):
 
         target_user = UserID.from_string(user_id)
         if not self.hs.is_mine(target_user):
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only lookup local users")
+            raise SynapseError(400, "Can only lookup local users")
 
         u = await self.store.get_user_by_id(target_user.to_string())
         if u is None:
@@ -98,7 +97,7 @@ class DeviceRestServlet(RestServlet):
         await self.device_handler.update_device(
             target_user.to_string(), device_id, body
         )
-        return HTTPStatus.OK, {}
+        return 200, {}
 
 
 class DevicesRestServlet(RestServlet):
@@ -125,14 +124,14 @@ class DevicesRestServlet(RestServlet):
 
         target_user = UserID.from_string(user_id)
         if not self.hs.is_mine(target_user):
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only lookup local users")
+            raise SynapseError(400, "Can only lookup local users")
 
         u = await self.store.get_user_by_id(target_user.to_string())
         if u is None:
             raise NotFoundError("Unknown user")
 
         devices = await self.device_handler.get_devices_by_user(target_user.to_string())
-        return HTTPStatus.OK, {"devices": devices, "total": len(devices)}
+        return 200, {"devices": devices, "total": len(devices)}
 
 
 class DeleteDevicesRestServlet(RestServlet):
@@ -156,7 +155,7 @@ class DeleteDevicesRestServlet(RestServlet):
 
         target_user = UserID.from_string(user_id)
         if not self.hs.is_mine(target_user):
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only lookup local users")
+            raise SynapseError(400, "Can only lookup local users")
 
         u = await self.store.get_user_by_id(target_user.to_string())
         if u is None:
@@ -168,4 +167,4 @@ class DeleteDevicesRestServlet(RestServlet):
         await self.device_handler.delete_devices(
             target_user.to_string(), body["devices"]
         )
-        return HTTPStatus.OK, {}
+        return 200, {}

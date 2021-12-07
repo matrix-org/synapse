@@ -22,8 +22,6 @@ import yaml
 from signedjson.key import read_signing_keys
 from signedjson.sign import sign_json
 
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.util import json_encoder
 
 
@@ -67,16 +65,6 @@ Example usage:
             "Path to synapse config file, from which the server name and/or signing "
             "key path will be read. Ignored if --server-name and --signing-key(-path) "
             "are both given."
-        ),
-    )
-
-    parser.add_argument(
-        "--sign-event-room-version",
-        type=str,
-        help=(
-            "Sign the JSON as an event for the given room version, rather than raw JSON. "
-            "This means that we will add a 'hashes' object, and redact the event before "
-            "signing."
         ),
     )
 
@@ -128,17 +116,7 @@ Example usage:
         print("Input json was not an object", file=sys.stderr)
         sys.exit(1)
 
-    if args.sign_event_room_version:
-        room_version = KNOWN_ROOM_VERSIONS.get(args.sign_event_room_version)
-        if not room_version:
-            print(
-                f"Unknown room version {args.sign_event_room_version}", file=sys.stderr
-            )
-            sys.exit(1)
-        add_hashes_and_signatures(room_version, obj, args.server_name, keys[0])
-    else:
-        sign_json(obj, args.server_name, keys[0])
-
+    sign_json(obj, args.server_name, keys[0])
     for c in json_encoder.iterencode(obj):
         args.output.write(c)
     args.output.write("\n")

@@ -14,18 +14,10 @@
 from typing import List, Optional, Tuple
 
 from synapse.storage.database import LoggingDatabaseConnection
-from synapse.storage.util.id_generators import AbstractStreamIdTracker, _load_current_id
+from synapse.storage.util.id_generators import _load_current_id
 
 
-class SlavedIdTracker(AbstractStreamIdTracker):
-    """Tracks the "current" stream ID of a stream with a single writer.
-
-    See `AbstractStreamIdTracker` for more details.
-
-    Note that this class does not work correctly when there are multiple
-    writers.
-    """
-
+class SlavedIdTracker:
     def __init__(
         self,
         db_conn: LoggingDatabaseConnection,
@@ -44,7 +36,17 @@ class SlavedIdTracker(AbstractStreamIdTracker):
         self._current = (max if self.step > 0 else min)(self._current, new_id)
 
     def get_current_token(self) -> int:
+        """
+
+        Returns:
+            int
+        """
         return self._current
 
     def get_current_token_for_writer(self, instance_name: str) -> int:
+        """Returns the position of the given writer.
+
+        For streams with single writers this is equivalent to
+        `get_current_token`.
+        """
         return self.get_current_token()

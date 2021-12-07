@@ -194,7 +194,6 @@ class SynapseHomeServer(HomeServer):
                 {
                     "/_matrix/client/api/v1": client_resource,
                     "/_matrix/client/r0": client_resource,
-                    "/_matrix/client/v1": client_resource,
                     "/_matrix/client/v3": client_resource,
                     "/_matrix/client/unstable": client_resource,
                     "/_matrix/client/v2_alpha": client_resource,
@@ -357,13 +356,6 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
         # If a config isn't returned, and an exception isn't raised, we're just
         # generating config files and shouldn't try to continue.
         sys.exit(0)
-
-    if config.worker.worker_app:
-        raise ConfigError(
-            "You have specified `worker_app` in the config but are attempting to start a non-worker "
-            "instance. Please use `python -m synapse.app.generic_worker` instead (or remove the option if this is the main process)."
-        )
-        sys.exit(1)
 
     events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
     synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage

@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import logging
-from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import Codes, SynapseError
@@ -54,7 +53,7 @@ class UserMediaStatisticsRestServlet(RestServlet):
             UserSortOrder.DISPLAYNAME.value,
         ):
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Unknown value for order_by: %s" % (order_by,),
                 errcode=Codes.INVALID_PARAM,
             )
@@ -62,7 +61,7 @@ class UserMediaStatisticsRestServlet(RestServlet):
         start = parse_integer(request, "from", default=0)
         if start < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Query parameter from must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
@@ -70,7 +69,7 @@ class UserMediaStatisticsRestServlet(RestServlet):
         limit = parse_integer(request, "limit", default=100)
         if limit < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Query parameter limit must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
@@ -78,7 +77,7 @@ class UserMediaStatisticsRestServlet(RestServlet):
         from_ts = parse_integer(request, "from_ts", default=0)
         if from_ts < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Query parameter from_ts must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
@@ -87,13 +86,13 @@ class UserMediaStatisticsRestServlet(RestServlet):
         if until_ts is not None:
             if until_ts < 0:
                 raise SynapseError(
-                    HTTPStatus.BAD_REQUEST,
+                    400,
                     "Query parameter until_ts must be a string representing a positive integer.",
                     errcode=Codes.INVALID_PARAM,
                 )
             if until_ts <= from_ts:
                 raise SynapseError(
-                    HTTPStatus.BAD_REQUEST,
+                    400,
                     "Query parameter until_ts must be greater than from_ts.",
                     errcode=Codes.INVALID_PARAM,
                 )
@@ -101,7 +100,7 @@ class UserMediaStatisticsRestServlet(RestServlet):
         search_term = parse_string(request, "search_term")
         if search_term == "":
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Query parameter search_term cannot be an empty string.",
                 errcode=Codes.INVALID_PARAM,
             )
@@ -109,9 +108,7 @@ class UserMediaStatisticsRestServlet(RestServlet):
         direction = parse_string(request, "dir", default="f")
         if direction not in ("f", "b"):
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Unknown direction: %s" % (direction,),
-                errcode=Codes.INVALID_PARAM,
+                400, "Unknown direction: %s" % (direction,), errcode=Codes.INVALID_PARAM
             )
 
         users_media, total = await self.store.get_users_media_usage_paginate(
@@ -121,4 +118,4 @@ class UserMediaStatisticsRestServlet(RestServlet):
         if (start + limit) < total:
             ret["next_token"] = start + len(users_media)
 
-        return HTTPStatus.OK, ret
+        return 200, ret

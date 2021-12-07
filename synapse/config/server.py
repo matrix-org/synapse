@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import itertools
 import logging
 import os.path
@@ -28,7 +27,6 @@ from netaddr import AddrFormatError, IPNetwork, IPSet
 from twisted.conch.ssh.keys import Key
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.types import JsonDict
 from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_server_name
 
@@ -1225,7 +1223,7 @@ class ServerConfig(Config):
             % locals()
         )
 
-    def read_arguments(self, args: argparse.Namespace) -> None:
+    def read_arguments(self, args):
         if args.manhole is not None:
             self.manhole = args.manhole
         if args.daemonize is not None:
@@ -1234,7 +1232,7 @@ class ServerConfig(Config):
             self.print_pidfile = args.print_pidfile
 
     @staticmethod
-    def add_arguments(parser: argparse.ArgumentParser) -> None:
+    def add_arguments(parser):
         server_group = parser.add_argument_group("server")
         server_group.add_argument(
             "-D",
@@ -1276,16 +1274,14 @@ class ServerConfig(Config):
             )
 
 
-def is_threepid_reserved(
-    reserved_threepids: List[JsonDict], threepid: JsonDict
-) -> bool:
+def is_threepid_reserved(reserved_threepids, threepid):
     """Check the threepid against the reserved threepid config
     Args:
-        reserved_threepids: List of reserved threepids
-        threepid: The threepid to test for
+        reserved_threepids([dict]) - list of reserved threepids
+        threepid(dict) - The threepid to test for
 
     Returns:
-        Is the threepid undertest reserved_user
+        boolean Is the threepid undertest reserved_user
     """
 
     for tp in reserved_threepids:
@@ -1294,9 +1290,7 @@ def is_threepid_reserved(
     return False
 
 
-def read_gc_thresholds(
-    thresholds: Optional[List[Any]],
-) -> Optional[Tuple[int, int, int]]:
+def read_gc_thresholds(thresholds):
     """Reads the three integer thresholds for garbage collection. Ensures that
     the thresholds are integers if thresholds are supplied.
     """

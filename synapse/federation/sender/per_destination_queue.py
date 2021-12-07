@@ -1,6 +1,5 @@
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
-# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,8 +14,7 @@
 # limitations under the License.
 import datetime
 import logging
-from types import TracebackType
-from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Tuple
 
 import attr
 from prometheus_client import Counter
@@ -215,7 +213,7 @@ class PerDestinationQueue:
         self._pending_edus_keyed[(edu.edu_type, key)] = edu
         self.attempt_new_transaction()
 
-    def send_edu(self, edu: Edu) -> None:
+    def send_edu(self, edu) -> None:
         self._pending_edus.append(edu)
         self.attempt_new_transaction()
 
@@ -703,12 +701,7 @@ class _TransactionQueueManager:
 
         return self._pdus, pending_edus
 
-    async def __aexit__(
-        self,
-        exc_type: Optional[Type[BaseException]],
-        exc: Optional[BaseException],
-        tb: Optional[TracebackType],
-    ) -> None:
+    async def __aexit__(self, exc_type, exc, tb):
         if exc_type is not None:
             # Failed to send transaction, so we bail out.
             return

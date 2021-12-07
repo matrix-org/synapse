@@ -71,12 +71,7 @@ Below are the templates Synapse will look for when generating the content of an 
                 * `sender_avatar_url`: the avatar URL (as a `mxc://` URL) for the event's
                   sender
                 * `sender_hash`: a hash of the user ID of the sender
-                * `msgtype`: the type of the message
-                * `body_text_html`: html representation of the message
-                * `body_text_plain`: plaintext representation of the message
-                * `image_url`: mxc url of an image, when "msgtype" is "m.image"
         * `link`: a `matrix.to` link to the room
-        * `avator_url`: url to the room's avator
     * `reason`: information on the event that triggered the email to be sent. It's an
       object with the following attributes:
         * `room_id`: the ID of the room the event was sent in

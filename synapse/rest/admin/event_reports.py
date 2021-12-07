@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import logging
-from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import Codes, NotFoundError, SynapseError
@@ -67,23 +66,21 @@ class EventReportsRestServlet(RestServlet):
 
         if start < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "The start parameter must be a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
 
         if limit < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "The limit parameter must be a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
 
         if direction not in ("f", "b"):
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Unknown direction: %s" % (direction,),
-                errcode=Codes.INVALID_PARAM,
+                400, "Unknown direction: %s" % (direction,), errcode=Codes.INVALID_PARAM
             )
 
         event_reports, total = await self.store.get_event_reports_paginate(
@@ -93,7 +90,7 @@ class EventReportsRestServlet(RestServlet):
         if (start + limit) < total:
             ret["next_token"] = start + len(event_reports)
 
-        return HTTPStatus.OK, ret
+        return 200, ret
 
 
 class EventReportDetailRestServlet(RestServlet):
@@ -130,17 +127,13 @@ class EventReportDetailRestServlet(RestServlet):
         try:
             resolved_report_id = int(report_id)
         except ValueError:
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, message, errcode=Codes.INVALID_PARAM
-            )
+            raise SynapseError(400, message, errcode=Codes.INVALID_PARAM)
 
         if resolved_report_id < 0:
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST, message, errcode=Codes.INVALID_PARAM
-            )
+            raise SynapseError(400, message, errcode=Codes.INVALID_PARAM)
 
         ret = await self.store.get_event_report(resolved_report_id)
         if not ret:
             raise NotFoundError("Event report not found")
 
-        return HTTPStatus.OK, ret
+        return 200, ret

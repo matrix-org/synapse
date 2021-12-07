@@ -84,7 +84,7 @@ class ListNode(Generic[P]):
         # immediately rather than at the next GC.
         self.cache_entry = None
 
-    def move_after(self, node: "ListNode[P]") -> None:
+    def move_after(self, node: "ListNode") -> None:
         """Move this node from its current location in the list to after the
         given node.
         """
@@ -122,7 +122,7 @@ class ListNode(Generic[P]):
         self.prev_node = None
         self.next_node = None
 
-    def _refs_insert_after(self, node: "ListNode[P]") -> None:
+    def _refs_insert_after(self, node: "ListNode") -> None:
         """Internal method to insert the node after the given node."""
 
         # This method should only be called when we're not already in the list.

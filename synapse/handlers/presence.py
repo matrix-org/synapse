@@ -421,7 +421,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
             self._on_shutdown,
         )
 
-    async def _on_shutdown(self) -> None:
+    def _on_shutdown(self) -> None:
         if self._presence_enabled:
             self.hs.get_tcp_replication().send_command(
                 ClearUserSyncsCommand(self.instance_id)

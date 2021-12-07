@@ -322,11 +322,6 @@ class _AsyncEventContextImpl(EventContext):
         attributes by loading from the database.
         """
         if self.state_group is None:
-            # No state group means the event is an outlier. Usually the state_ids dicts are also
-            # pre-set to empty dicts, but they get reset when the context is serialized, so set
-            # them to empty dicts again here.
-            self._current_state_ids = {}
-            self._prev_state_ids = {}
             return
 
         current_state_ids = await self._storage.state.get_state_ids_for_group(

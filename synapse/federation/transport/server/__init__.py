@@ -22,10 +22,7 @@ from synapse.federation.transport.server._base import (
     Authenticator,
     BaseFederationServlet,
 )
-from synapse.federation.transport.server.federation import (
-    FEDERATION_SERVLET_CLASSES,
-    FederationTimestampLookupServlet,
-)
+from synapse.federation.transport.server.federation import FEDERATION_SERVLET_CLASSES
 from synapse.federation.transport.server.groups_local import GROUP_LOCAL_SERVLET_CLASSES
 from synapse.federation.transport.server.groups_server import (
     GROUP_SERVER_SERVLET_CLASSES,
@@ -302,7 +299,7 @@ def register_servlets(
     authenticator: Authenticator,
     ratelimiter: FederationRateLimiter,
     servlet_groups: Optional[Iterable[str]] = None,
-) -> None:
+):
     """Initialize and register servlet classes.
 
     Will by default register all servlets. For custom behaviour, pass in
@@ -327,13 +324,6 @@ def register_servlets(
             )
 
         for servletclass in DEFAULT_SERVLET_GROUPS[servlet_group]:
-            # Only allow the `/timestamp_to_event` servlet if msc3030 is enabled
-            if (
-                servletclass == FederationTimestampLookupServlet
-                and not hs.config.experimental.msc3030_enabled
-            ):
-                continue
-
             servletclass(
                 hs=hs,
                 authenticator=authenticator,

@@ -24,7 +24,7 @@ import signal
 import subprocess
 import sys
 import time
-from typing import Iterable, Optional
+from typing import Iterable
 
 import yaml
 
@@ -41,24 +41,11 @@ NORMAL = "\x1b[m"
 def pid_running(pid):
     try:
         os.kill(pid, 0)
+        return True
     except OSError as err:
         if err.errno == errno.EPERM:
-            pass  # process exists
-        else:
-            return False
-
-    # When running in a container, orphan processes may not get reaped and their
-    # PIDs may remain valid. Try to work around the issue.
-    try:
-        with open(f"/proc/{pid}/status") as status_file:
-            if "zombie" in status_file.read():
-                return False
-    except Exception:
-        # This isn't Linux or `/proc/` is unavailable.
-        # Assume that the process is still running.
-        pass
-
-    return True
+            return True
+        return False
 
 
 def write(message, colour=NORMAL, stream=sys.stdout):
@@ -122,14 +109,15 @@ def start(pidfile: str, app: str, config_files: Iterable[str], daemonize: bool) 
         return False
 
 
-def stop(pidfile: str, app: str) -> Optional[int]:
+def stop(pidfile: str, app: str) -> bool:
     """Attempts to kill a synapse worker from the pidfile.
     Args:
         pidfile: path to file containing worker's pid
         app: name of the worker's appservice
 
     Returns:
-        process id, or None if the process was not running
+        True if the process stopped successfully
+        False if process was already stopped or an error occured
     """
 
     if os.path.exists(pidfile):
@@ -137,7 +125,7 @@ def stop(pidfile: str, app: str) -> Optional[int]:
         try:
             os.kill(pid, signal.SIGTERM)
             write("stopped %s" % (app,), colour=GREEN)
-            return pid
+            return True
         except OSError as err:
             if err.errno == errno.ESRCH:
                 write("%s not running" % (app,), colour=YELLOW)
@@ -145,13 +133,14 @@ def stop(pidfile: str, app: str) -> Optional[int]:
                 abort("Cannot stop %s: Operation not permitted" % (app,))
             else:
                 abort("Cannot stop %s: Unknown error" % (app,))
+            return False
     else:
         write(
             "No running worker of %s found (from %s)\nThe process might be managed by another controller (e.g. systemd)"
             % (app, pidfile),
             colour=YELLOW,
         )
-    return None
+    return False
 
 
 Worker = collections.namedtuple(
@@ -299,23 +288,32 @@ def main():
     action = options.action
 
     if action == "stop" or action == "restart":
-        running_pids = []
+        has_stopped = True
         for worker in workers:
-            pid = stop(worker.pidfile, worker.app)
-            if pid is not None:
-                running_pids.append(pid)
+            if not stop(worker.pidfile, worker.app):
+                # A worker could not be stopped.
+                has_stopped = False
 
         if start_stop_synapse:
-            pid = stop(pidfile, MAIN_PROCESS)
-            if pid is not None:
-                running_pids.append(pid)
+            if not stop(pidfile, MAIN_PROCESS):
+                has_stopped = False
+        if not has_stopped and action == "stop":
+            sys.exit(1)
 
+    # Wait for synapse to actually shutdown before starting it again
+    if action == "restart":
+        running_pids = []
+        if start_stop_synapse and os.path.exists(pidfile):
+            running_pids.append(int(open(pidfile).read()))
+        for worker in workers:
+            if os.path.exists(worker.pidfile):
+                running_pids.append(int(open(worker.pidfile).read()))
         if len(running_pids) > 0:
-            write("Waiting for processes to exit...")
+            write("Waiting for process to exit before restarting...")
             for running_pid in running_pids:
                 while pid_running(running_pid):
                     time.sleep(0.2)
-            write("All processes exited")
+            write("All processes exited; now restarting...")
 
     if action == "start" or action == "restart":
         error = False

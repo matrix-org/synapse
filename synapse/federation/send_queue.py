@@ -1,5 +1,4 @@
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -351,7 +350,7 @@ class BaseFederationRow:
     TypeId = ""  # Unique string that ids the type. Must be overridden in sub classes.
 
     @staticmethod
-    def from_data(data: JsonDict) -> "BaseFederationRow":
+    def from_data(data):
         """Parse the data from the federation stream into a row.
 
         Args:
@@ -360,7 +359,7 @@ class BaseFederationRow:
         """
         raise NotImplementedError()
 
-    def to_data(self) -> JsonDict:
+    def to_data(self):
         """Serialize this row to be sent over the federation stream.
 
         Returns:
@@ -369,7 +368,7 @@ class BaseFederationRow:
         """
         raise NotImplementedError()
 
-    def add_to_buffer(self, buff: "ParsedFederationStreamData") -> None:
+    def add_to_buffer(self, buff):
         """Add this row to the appropriate field in the buffer ready for this
         to be sent over federation.
 
@@ -392,15 +391,15 @@ class PresenceDestinationsRow(
     TypeId = "pd"
 
     @staticmethod
-    def from_data(data: JsonDict) -> "PresenceDestinationsRow":
+    def from_data(data):
         return PresenceDestinationsRow(
             state=UserPresenceState.from_dict(data["state"]), destinations=data["dests"]
         )
 
-    def to_data(self) -> JsonDict:
+    def to_data(self):
         return {"state": self.state.as_dict(), "dests": self.destinations}
 
-    def add_to_buffer(self, buff: "ParsedFederationStreamData") -> None:
+    def add_to_buffer(self, buff):
         buff.presence_destinations.append((self.state, self.destinations))
 
 
@@ -418,13 +417,13 @@ class KeyedEduRow(
     TypeId = "k"
 
     @staticmethod
-    def from_data(data: JsonDict) -> "KeyedEduRow":
+    def from_data(data):
         return KeyedEduRow(key=tuple(data["key"]), edu=Edu(**data["edu"]))
 
-    def to_data(self) -> JsonDict:
+    def to_data(self):
         return {"key": self.key, "edu": self.edu.get_internal_dict()}
 
-    def add_to_buffer(self, buff: "ParsedFederationStreamData") -> None:
+    def add_to_buffer(self, buff):
         buff.keyed_edus.setdefault(self.edu.destination, {})[self.key] = self.edu
 
 
@@ -434,13 +433,13 @@ class EduRow(BaseFederationRow, namedtuple("EduRow", ("edu",))):  # Edu
     TypeId = "e"
 
     @staticmethod
-    def from_data(data: JsonDict) -> "EduRow":
+    def from_data(data):
         return EduRow(Edu(**data))
 
-    def to_data(self) -> JsonDict:
+    def to_data(self):
         return self.edu.get_internal_dict()
 
-    def add_to_buffer(self, buff: "ParsedFederationStreamData") -> None:
+    def add_to_buffer(self, buff):
         buff.edus.setdefault(self.edu.destination, []).append(self.edu)
 
 

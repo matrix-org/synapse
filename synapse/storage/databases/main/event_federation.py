@@ -1552,9 +1552,9 @@ class EventFederationStore(EventFederationWorkerStore):
                 DELETE FROM event_auth
                 WHERE event_id IN (
                     SELECT event_id FROM events
-                    LEFT JOIN state_events AS se USING (room_id, event_id)
+                    LEFT JOIN state_events USING (room_id, event_id)
                     WHERE ? <= stream_ordering AND stream_ordering < ?
-                        AND se.state_key IS null
+                        AND state_key IS null
                 )
             """
 

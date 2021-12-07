@@ -21,7 +21,7 @@ from synapse.storage.database import LoggingTransaction  # noqa: F401
 from synapse.storage.database import make_in_list_sql_clause  # noqa: F401
 from synapse.storage.database import DatabasePool
 from synapse.storage.types import Connection
-from synapse.types import get_domain_from_id
+from synapse.types import StreamToken, get_domain_from_id
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
@@ -48,7 +48,7 @@ class SQLBaseStore(metaclass=ABCMeta):
         self,
         stream_name: str,
         instance_name: str,
-        token: int,
+        token: StreamToken,
         rows: Iterable[Any],
     ) -> None:
         pass

@@ -14,7 +14,7 @@
 
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, TypeVar
 
 import bleach
 import jinja2
@@ -28,14 +28,6 @@ from synapse.push.presentable_names import (
     descriptor_from_member_events,
     name_from_member_event,
 )
-from synapse.push.push_types import (
-    EmailReason,
-    MessageVars,
-    NotifVars,
-    RoomVars,
-    TemplateVars,
-)
-from synapse.storage.databases.main.event_push_actions import EmailPushAction
 from synapse.storage.state import StateFilter
 from synapse.types import StateMap, UserID
 from synapse.util.async_helpers import concurrently_execute
@@ -143,7 +135,7 @@ class Mailer:
             % urllib.parse.urlencode(params)
         )
 
-        template_vars: TemplateVars = {"link": link}
+        template_vars = {"link": link}
 
         await self.send_email(
             email_address,
@@ -173,7 +165,7 @@ class Mailer:
             % urllib.parse.urlencode(params)
         )
 
-        template_vars: TemplateVars = {"link": link}
+        template_vars = {"link": link}
 
         await self.send_email(
             email_address,
@@ -204,7 +196,7 @@ class Mailer:
             % urllib.parse.urlencode(params)
         )
 
-        template_vars: TemplateVars = {"link": link}
+        template_vars = {"link": link}
 
         await self.send_email(
             email_address,
@@ -218,8 +210,8 @@ class Mailer:
         app_id: str,
         user_id: str,
         email_address: str,
-        push_actions: Iterable[EmailPushAction],
-        reason: EmailReason,
+        push_actions: Iterable[Dict[str, Any]],
+        reason: Dict[str, Any],
     ) -> None:
         """
         Send email regarding a user's room notifications
@@ -238,7 +230,7 @@ class Mailer:
             [pa["event_id"] for pa in push_actions]
         )
 
-        notifs_by_room: Dict[str, List[EmailPushAction]] = {}
+        notifs_by_room: Dict[str, List[Dict[str, Any]]] = {}
         for pa in push_actions:
             notifs_by_room.setdefault(pa["room_id"], []).append(pa)
 
@@ -266,7 +258,7 @@ class Mailer:
         # actually sort our so-called rooms_in_order list, most recent room first
         rooms_in_order.sort(key=lambda r: -(notifs_by_room[r][-1]["received_ts"] or 0))
 
-        rooms: List[RoomVars] = []
+        rooms: List[Dict[str, Any]] = []
 
         for r in rooms_in_order:
             roomvars = await self._get_room_vars(
@@ -297,7 +289,7 @@ class Mailer:
                 notifs_by_room, state_by_room, notif_events, reason
             )
 
-        template_vars: TemplateVars = {
+        template_vars = {
             "user_display_name": user_display_name,
             "unsubscribe_link": self._make_unsubscribe_link(
                 user_id, app_id, email_address
@@ -310,10 +302,10 @@ class Mailer:
         await self.send_email(email_address, summary_text, template_vars)
 
     async def send_email(
-        self, email_address: str, subject: str, extra_template_vars: TemplateVars
+        self, email_address: str, subject: str, extra_template_vars: Dict[str, Any]
     ) -> None:
         """Send an email with the given information and template text"""
-        template_vars: TemplateVars = {
+        template_vars = {
             "app_name": self.app_name,
             "server_name": self.hs.config.server.server_name,
         }
@@ -335,10 +327,10 @@ class Mailer:
         self,
         room_id: str,
         user_id: str,
-        notifs: Iterable[EmailPushAction],
+        notifs: Iterable[Dict[str, Any]],
         notif_events: Dict[str, EventBase],
         room_state_ids: StateMap[str],
-    ) -> RoomVars:
+    ) -> Dict[str, Any]:
         """
         Generate the variables for notifications on a per-room basis.
 
@@ -364,7 +356,7 @@ class Mailer:
 
         room_name = await calculate_room_name(self.store, room_state_ids, user_id)
 
-        room_vars: RoomVars = {
+        room_vars: Dict[str, Any] = {
             "title": room_name,
             "hash": string_ordinal_total(room_id),  # See sender avatar hash
             "notifs": [],
@@ -425,11 +417,11 @@ class Mailer:
 
     async def _get_notif_vars(
         self,
-        notif: EmailPushAction,
+        notif: Dict[str, Any],
         user_id: str,
         notif_event: EventBase,
         room_state_ids: StateMap[str],
-    ) -> NotifVars:
+    ) -> Dict[str, Any]:
         """
         Generate the variables for a single notification.
 
@@ -450,7 +442,7 @@ class Mailer:
             after_limit=CONTEXT_AFTER,
         )
 
-        ret: NotifVars = {
+        ret = {
             "link": self._make_notif_link(notif),
             "ts": notif["received_ts"],
             "messages": [],
@@ -469,8 +461,8 @@ class Mailer:
         return ret
 
     async def _get_message_vars(
-        self, notif: EmailPushAction, event: EventBase, room_state_ids: StateMap[str]
-    ) -> Optional[MessageVars]:
+        self, notif: Dict[str, Any], event: EventBase, room_state_ids: StateMap[str]
+    ) -> Optional[Dict[str, Any]]:
         """
         Generate the variables for a single event, if possible.
 
@@ -502,9 +494,7 @@ class Mailer:
 
         if sender_state_event:
             sender_name = name_from_member_event(sender_state_event)
-            sender_avatar_url: Optional[str] = sender_state_event.content.get(
-                "avatar_url"
-            )
+            sender_avatar_url = sender_state_event.content.get("avatar_url")
         else:
             # No state could be found, fallback to the MXID.
             sender_name = event.sender
@@ -514,7 +504,7 @@ class Mailer:
         # sender_hash % the number of default images to choose from
         sender_hash = string_ordinal_total(event.sender)
 
-        ret: MessageVars = {
+        ret = {
             "event_type": event.type,
             "is_historical": event.event_id != notif["event_id"],
             "id": event.event_id,
@@ -529,8 +519,6 @@ class Mailer:
             return ret
 
         msgtype = event.content.get("msgtype")
-        if not isinstance(msgtype, str):
-            msgtype = None
 
         ret["msgtype"] = msgtype
 
@@ -545,7 +533,7 @@ class Mailer:
         return ret
 
     def _add_text_message_vars(
-        self, messagevars: MessageVars, event: EventBase
+        self, messagevars: Dict[str, Any], event: EventBase
     ) -> None:
         """
         Potentially add a sanitised message body to the message variables.
@@ -555,8 +543,8 @@ class Mailer:
             event: The event under consideration.
         """
         msgformat = event.content.get("format")
-        if not isinstance(msgformat, str):
-            msgformat = None
+
+        messagevars["format"] = msgformat
 
         formatted_body = event.content.get("formatted_body")
         body = event.content.get("body")
@@ -567,7 +555,7 @@ class Mailer:
             messagevars["body_text_html"] = safe_text(body)
 
     def _add_image_message_vars(
-        self, messagevars: MessageVars, event: EventBase
+        self, messagevars: Dict[str, Any], event: EventBase
     ) -> None:
         """
         Potentially add an image URL to the message variables.
@@ -582,7 +570,7 @@ class Mailer:
     async def _make_summary_text_single_room(
         self,
         room_id: str,
-        notifs: List[EmailPushAction],
+        notifs: List[Dict[str, Any]],
         room_state_ids: StateMap[str],
         notif_events: Dict[str, EventBase],
         user_id: str,
@@ -697,10 +685,10 @@ class Mailer:
 
     async def _make_summary_text(
         self,
-        notifs_by_room: Dict[str, List[EmailPushAction]],
+        notifs_by_room: Dict[str, List[Dict[str, Any]]],
         room_state_ids: Dict[str, StateMap[str]],
         notif_events: Dict[str, EventBase],
-        reason: EmailReason,
+        reason: Dict[str, Any],
     ) -> str:
         """
         Make a summary text for the email when multiple rooms have notifications.
@@ -730,7 +718,7 @@ class Mailer:
     async def _make_summary_text_from_member_events(
         self,
         room_id: str,
-        notifs: List[EmailPushAction],
+        notifs: List[Dict[str, Any]],
         room_state_ids: StateMap[str],
         notif_events: Dict[str, EventBase],
     ) -> str:
@@ -817,7 +805,7 @@ class Mailer:
             base_url = "https://matrix.to/#"
         return "%s/%s" % (base_url, room_id)
 
-    def _make_notif_link(self, notif: EmailPushAction) -> str:
+    def _make_notif_link(self, notif: Dict[str, str]) -> str:
         """
         Generate a link to open an event in the web client.
 

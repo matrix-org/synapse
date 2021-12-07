@@ -667,35 +667,27 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             perspective_name,
         )
 
-        request: JsonDict = {}
-        for queue_value in keys_to_fetch:
-            # there may be multiple requests for each server, so we have to merge
-            # them intelligently.
-            request_for_server = {
-                key_id: {
-                    "minimum_valid_until_ts": queue_value.minimum_valid_until_ts,
-                }
-                for key_id in queue_value.key_ids
-            }
-            request.setdefault(queue_value.server_name, {}).update(request_for_server)
-
-        logger.debug("Request to notary server %s: %s", perspective_name, request)
-
         try:
             query_response = await self.client.post_json(
                 destination=perspective_name,
                 path="/_matrix/key/v2/query",
-                data={"server_keys": request},
+                data={
+                    "server_keys": {
+                        queue_value.server_name: {
+                            key_id: {
+                                "minimum_valid_until_ts": queue_value.minimum_valid_until_ts,
+                            }
+                            for key_id in queue_value.key_ids
+                        }
+                        for queue_value in keys_to_fetch
+                    }
+                },
             )
         except (NotRetryingDestination, RequestSendFailed) as e:
             # these both have str() representations which we can't really improve upon
             raise KeyLookupError(str(e))
         except HttpResponseException as e:
             raise KeyLookupError("Remote server returned an error: %s" % (e,))
-
-        logger.debug(
-            "Response from notary server %s: %s", perspective_name, query_response
-        )
 
         keys: Dict[str, Dict[str, FetchKeyResult]] = {}
         added_keys: List[Tuple[str, str, FetchKeyResult]] = []

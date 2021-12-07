@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import logging
-from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
@@ -63,7 +62,7 @@ class QuarantineMediaInRoom(RestServlet):
             room_id, requester.user.to_string()
         )
 
-        return HTTPStatus.OK, {"num_quarantined": num_quarantined}
+        return 200, {"num_quarantined": num_quarantined}
 
 
 class QuarantineMediaByUser(RestServlet):
@@ -90,7 +89,7 @@ class QuarantineMediaByUser(RestServlet):
             user_id, requester.user.to_string()
         )
 
-        return HTTPStatus.OK, {"num_quarantined": num_quarantined}
+        return 200, {"num_quarantined": num_quarantined}
 
 
 class QuarantineMediaByID(RestServlet):
@@ -119,7 +118,7 @@ class QuarantineMediaByID(RestServlet):
             server_name, media_id, requester.user.to_string()
         )
 
-        return HTTPStatus.OK, {}
+        return 200, {}
 
 
 class UnquarantineMediaByID(RestServlet):
@@ -148,7 +147,7 @@ class UnquarantineMediaByID(RestServlet):
         # Remove from quarantine this media id
         await self.store.quarantine_media_by_id(server_name, media_id, None)
 
-        return HTTPStatus.OK, {}
+        return 200, {}
 
 
 class ProtectMediaByID(RestServlet):
@@ -171,7 +170,7 @@ class ProtectMediaByID(RestServlet):
         # Protect this media id
         await self.store.mark_local_media_as_safe(media_id, safe=True)
 
-        return HTTPStatus.OK, {}
+        return 200, {}
 
 
 class UnprotectMediaByID(RestServlet):
@@ -194,7 +193,7 @@ class UnprotectMediaByID(RestServlet):
         # Unprotect this media id
         await self.store.mark_local_media_as_safe(media_id, safe=False)
 
-        return HTTPStatus.OK, {}
+        return 200, {}
 
 
 class ListMediaInRoom(RestServlet):
@@ -212,11 +211,11 @@ class ListMediaInRoom(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         is_admin = await self.auth.is_server_admin(requester.user)
         if not is_admin:
-            raise AuthError(HTTPStatus.FORBIDDEN, "You are not a server admin")
+            raise AuthError(403, "You are not a server admin")
 
         local_mxcs, remote_mxcs = await self.store.get_media_mxcs_in_room(room_id)
 
-        return HTTPStatus.OK, {"local": local_mxcs, "remote": remote_mxcs}
+        return 200, {"local": local_mxcs, "remote": remote_mxcs}
 
 
 class PurgeMediaCacheRestServlet(RestServlet):
@@ -234,13 +233,13 @@ class PurgeMediaCacheRestServlet(RestServlet):
 
         if before_ts < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Query parameter before_ts must be a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
         elif before_ts < 30000000000:  # Dec 1970 in milliseconds, Aug 2920 in seconds
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Query parameter before_ts you provided is from the year 1970. "
                 + "Double check that you are providing a timestamp in milliseconds.",
                 errcode=Codes.INVALID_PARAM,
@@ -248,7 +247,7 @@ class PurgeMediaCacheRestServlet(RestServlet):
 
         ret = await self.media_repository.delete_old_remote_media(before_ts)
 
-        return HTTPStatus.OK, ret
+        return 200, ret
 
 
 class DeleteMediaByID(RestServlet):
@@ -268,7 +267,7 @@ class DeleteMediaByID(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if self.server_name != server_name:
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only delete local media")
+            raise SynapseError(400, "Can only delete local media")
 
         if await self.store.get_local_media(media_id) is None:
             raise NotFoundError("Unknown media")
@@ -278,7 +277,7 @@ class DeleteMediaByID(RestServlet):
         deleted_media, total = await self.media_repository.delete_local_media_ids(
             [media_id]
         )
-        return HTTPStatus.OK, {"deleted_media": deleted_media, "total": total}
+        return 200, {"deleted_media": deleted_media, "total": total}
 
 
 class DeleteMediaByDateSize(RestServlet):
@@ -305,26 +304,26 @@ class DeleteMediaByDateSize(RestServlet):
 
         if before_ts < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Query parameter before_ts must be a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
         elif before_ts < 30000000000:  # Dec 1970 in milliseconds, Aug 2920 in seconds
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Query parameter before_ts you provided is from the year 1970. "
                 + "Double check that you are providing a timestamp in milliseconds.",
                 errcode=Codes.INVALID_PARAM,
             )
         if size_gt < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Query parameter size_gt must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
 
         if self.server_name != server_name:
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only delete local media")
+            raise SynapseError(400, "Can only delete local media")
 
         logging.info(
             "Deleting local media by timestamp: %s, size larger than: %s, keep profile media: %s"
@@ -334,7 +333,7 @@ class DeleteMediaByDateSize(RestServlet):
         deleted_media, total = await self.media_repository.delete_old_local_media(
             before_ts, size_gt, keep_profiles
         )
-        return HTTPStatus.OK, {"deleted_media": deleted_media, "total": total}
+        return 200, {"deleted_media": deleted_media, "total": total}
 
 
 class UserMediaRestServlet(RestServlet):
@@ -370,7 +369,7 @@ class UserMediaRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if not self.is_mine(UserID.from_string(user_id)):
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only look up local users")
+            raise SynapseError(400, "Can only look up local users")
 
         user = await self.store.get_user_by_id(user_id)
         if user is None:
@@ -381,14 +380,14 @@ class UserMediaRestServlet(RestServlet):
 
         if start < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Query parameter from must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
 
         if limit < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Query parameter limit must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
@@ -426,7 +425,7 @@ class UserMediaRestServlet(RestServlet):
         if (start + limit) < total:
             ret["next_token"] = start + len(media)
 
-        return HTTPStatus.OK, ret
+        return 200, ret
 
     async def on_DELETE(
         self, request: SynapseRequest, user_id: str
@@ -437,7 +436,7 @@ class UserMediaRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if not self.is_mine(UserID.from_string(user_id)):
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only look up local users")
+            raise SynapseError(400, "Can only look up local users")
 
         user = await self.store.get_user_by_id(user_id)
         if user is None:
@@ -448,14 +447,14 @@ class UserMediaRestServlet(RestServlet):
 
         if start < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Query parameter from must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
 
         if limit < 0:
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Query parameter limit must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
@@ -493,7 +492,7 @@ class UserMediaRestServlet(RestServlet):
             ([row["media_id"] for row in media])
         )
 
-        return HTTPStatus.OK, {"deleted_media": deleted_media, "total": total}
+        return 200, {"deleted_media": deleted_media, "total": total}
 
 
 def register_servlets_for_media_repo(hs: "HomeServer", http_server: HttpServer) -> None:

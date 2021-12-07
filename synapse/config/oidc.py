@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from collections import Counter
-from typing import Any, Collection, Iterable, List, Mapping, Optional, Tuple, Type
+from typing import Collection, Iterable, List, Mapping, Optional, Tuple, Type
 
 import attr
 
@@ -36,7 +36,7 @@ LEGACY_USER_MAPPING_PROVIDER = "synapse.handlers.oidc_handler.JinjaOidcMappingPr
 class OIDCConfig(Config):
     section = "oidc"
 
-    def read_config(self, config, **kwargs) -> None:
+    def read_config(self, config, **kwargs):
         self.oidc_providers = tuple(_parse_oidc_provider_configs(config))
         if not self.oidc_providers:
             return
@@ -66,7 +66,7 @@ class OIDCConfig(Config):
         # OIDC is enabled if we have a provider
         return bool(self.oidc_providers)
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs) -> str:
+    def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
         # List of OpenID Connect (OIDC) / OAuth 2.0 identity providers, for registration
         # and login.
@@ -495,89 +495,89 @@ def _parse_oidc_config_dict(
     )
 
 
-@attr.s(slots=True, frozen=True, auto_attribs=True)
+@attr.s(slots=True, frozen=True)
 class OidcProviderClientSecretJwtKey:
     # a pem-encoded signing key
-    key: str
+    key = attr.ib(type=str)
 
     # properties to include in the JWT header
-    jwt_header: Mapping[str, str]
+    jwt_header = attr.ib(type=Mapping[str, str])
 
     # properties to include in the JWT payload.
-    jwt_payload: Mapping[str, str]
+    jwt_payload = attr.ib(type=Mapping[str, str])
 
 
-@attr.s(slots=True, frozen=True, auto_attribs=True)
+@attr.s(slots=True, frozen=True)
 class OidcProviderConfig:
     # a unique identifier for this identity provider. Used in the 'user_external_ids'
     # table, as well as the query/path parameter used in the login protocol.
-    idp_id: str
+    idp_id = attr.ib(type=str)
 
     # user-facing name for this identity provider.
-    idp_name: str
+    idp_name = attr.ib(type=str)
 
     # Optional MXC URI for icon for this IdP.
-    idp_icon: Optional[str]
+    idp_icon = attr.ib(type=Optional[str])
 
     # Optional brand identifier for this IdP.
-    idp_brand: Optional[str]
+    idp_brand = attr.ib(type=Optional[str])
 
     # whether the OIDC discovery mechanism is used to discover endpoints
-    discover: bool
+    discover = attr.ib(type=bool)
 
     # the OIDC issuer. Used to validate tokens and (if discovery is enabled) to
     # discover the provider's endpoints.
-    issuer: str
+    issuer = attr.ib(type=str)
 
     # oauth2 client id to use
-    client_id: str
+    client_id = attr.ib(type=str)
 
     # oauth2 client secret to use. if `None`, use client_secret_jwt_key to generate
     # a secret.
-    client_secret: Optional[str]
+    client_secret = attr.ib(type=Optional[str])
 
     # key to use to construct a JWT to use as a client secret. May be `None` if
     # `client_secret` is set.
-    client_secret_jwt_key: Optional[OidcProviderClientSecretJwtKey]
+    client_secret_jwt_key = attr.ib(type=Optional[OidcProviderClientSecretJwtKey])
 
     # auth method to use when exchanging the token.
     # Valid values are 'client_secret_basic', 'client_secret_post' and
     # 'none'.
-    client_auth_method: str
+    client_auth_method = attr.ib(type=str)
 
     # list of scopes to request
-    scopes: Collection[str]
+    scopes = attr.ib(type=Collection[str])
 
     # the oauth2 authorization endpoint. Required if discovery is disabled.
-    authorization_endpoint: Optional[str]
+    authorization_endpoint = attr.ib(type=Optional[str])
 
     # the oauth2 token endpoint. Required if discovery is disabled.
-    token_endpoint: Optional[str]
+    token_endpoint = attr.ib(type=Optional[str])
 
     # the OIDC userinfo endpoint. Required if discovery is disabled and the
     # "openid" scope is not requested.
-    userinfo_endpoint: Optional[str]
+    userinfo_endpoint = attr.ib(type=Optional[str])
 
     # URI where to fetch the JWKS. Required if discovery is disabled and the
     # "openid" scope is used.
-    jwks_uri: Optional[str]
+    jwks_uri = attr.ib(type=Optional[str])
 
     # Whether to skip metadata verification
-    skip_verification: bool
+    skip_verification = attr.ib(type=bool)
 
     # Whether to fetch the user profile from the userinfo endpoint. Valid
     # values are: "auto" or "userinfo_endpoint".
-    user_profile_method: str
+    user_profile_method = attr.ib(type=str)
 
     # whether to allow a user logging in via OIDC to match a pre-existing account
     # instead of failing
-    allow_existing_users: bool
+    allow_existing_users = attr.ib(type=bool)
 
     # the class of the user mapping provider
-    user_mapping_provider_class: Type
+    user_mapping_provider_class = attr.ib(type=Type)
 
     # the config of the user mapping provider
-    user_mapping_provider_config: Any
+    user_mapping_provider_config = attr.ib()
 
     # required attributes to require in userinfo to allow login/registration
-    attribute_requirements: List[SsoAttributeRequirement]
+    attribute_requirements = attr.ib(type=List[SsoAttributeRequirement])

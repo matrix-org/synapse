@@ -664,7 +664,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
         ):
             iterations += 1
             self.get_success(
-                self.store.db_pool.updates.do_next_background_update(False), by=0.1
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
         # Ensure that we did actually take multiple iterations to process the
@@ -723,7 +723,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
         ):
             iterations += 1
             self.get_success(
-                self.store.db_pool.updates.do_next_background_update(False), by=0.1
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
         # Ensure that we did actually take multiple iterations to process the

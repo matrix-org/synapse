@@ -1,5 +1,4 @@
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +18,7 @@ import os
 import sys
 import threading
 from string import Template
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict
 
 import yaml
 from zope.interface import implementer
@@ -41,7 +40,6 @@ from synapse.util.versionstring import get_version_string
 from ._base import Config, ConfigError
 
 if TYPE_CHECKING:
-    from synapse.config.homeserver import HomeServerConfig
     from synapse.server import HomeServer
 
 DEFAULT_LOG_CONFIG = Template(
@@ -143,13 +141,13 @@ removed in Synapse 1.3.0. You should instead set up a separate log configuration
 class LoggingConfig(Config):
     section = "logging"
 
-    def read_config(self, config, **kwargs) -> None:
+    def read_config(self, config, **kwargs):
         if config.get("log_file"):
             raise ConfigError(LOG_FILE_ERROR)
         self.log_config = self.abspath(config.get("log_config"))
         self.no_redirect_stdio = config.get("no_redirect_stdio", False)
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs) -> str:
+    def generate_config_section(self, config_dir_path, server_name, **kwargs):
         log_config = os.path.join(config_dir_path, server_name + ".log.config")
         return (
             """\
@@ -163,14 +161,14 @@ class LoggingConfig(Config):
             % locals()
         )
 
-    def read_arguments(self, args: argparse.Namespace) -> None:
+    def read_arguments(self, args):
         if args.no_redirect_stdio is not None:
             self.no_redirect_stdio = args.no_redirect_stdio
         if args.log_file is not None:
             raise ConfigError(LOG_FILE_ERROR)
 
     @staticmethod
-    def add_arguments(parser: argparse.ArgumentParser) -> None:
+    def add_arguments(parser):
         logging_group = parser.add_argument_group("logging")
         logging_group.add_argument(
             "-n",
@@ -199,9 +197,7 @@ class LoggingConfig(Config):
                 log_config_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=log_file))
 
 
-def _setup_stdlib_logging(
-    config: "HomeServerConfig", log_config_path: Optional[str], logBeginner: LogBeginner
-) -> None:
+def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> None:
     """
     Set up Python standard library logging.
     """
@@ -234,7 +230,7 @@ def _setup_stdlib_logging(
     log_metadata_filter = MetadataFilter({"server_name": config.server.server_name})
     old_factory = logging.getLogRecordFactory()
 
-    def factory(*args: Any, **kwargs: Any) -> logging.LogRecord:
+    def factory(*args, **kwargs):
         record = old_factory(*args, **kwargs)
         log_context_filter.filter(record)
         log_metadata_filter.filter(record)
@@ -301,7 +297,7 @@ def _load_logging_config(log_config_path: str) -> None:
     logging.config.dictConfig(log_config)
 
 
-def _reload_logging_config(log_config_path: Optional[str]) -> None:
+def _reload_logging_config(log_config_path):
     """
     Reload the log configuration from the file and apply it.
     """
@@ -315,8 +311,8 @@ def _reload_logging_config(log_config_path: Optional[str]) -> None:
 
 def setup_logging(
     hs: "HomeServer",
-    config: "HomeServerConfig",
-    use_worker_options: bool = False,
+    config,
+    use_worker_options=False,
     logBeginner: LogBeginner = globalLogBeginner,
 ) -> None:
     """
