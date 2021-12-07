@@ -337,7 +337,9 @@ class StripUnsignedFromEventsTestCase(MessageAcceptTests):
                 },
             }
         )
-        self.get_success(federation_event_handler.on_send_membership_event("test.serv", event2))
+        self.get_success(
+            federation_event_handler.on_send_membership_event("test.serv", event2)
+        )
 
         event = self.get_success(self.store.get_event("$event2:test.serv"))
         event_dict = event.get_dict()
@@ -379,5 +381,3 @@ class StripUnsignedFromEventsTestCase(MessageAcceptTests):
         self.assertTrue("age" in event_dict["unsigned"])
         self.assertTrue("invite_room_state" not in event_dict["unsigned"])
         self.assertTrue("more warez" not in event_dict["unsigned"])
-
-
