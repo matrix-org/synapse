@@ -108,6 +108,7 @@ from synapse.types import (
     create_requester,
 )
 from synapse.util import Clock
+from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
@@ -1014,9 +1015,7 @@ class ModuleApi:
                 run_as_background_process,
                 msec,
                 desc,
-                f,
-                *args,
-                **kwargs,
+                lambda: maybe_awaitable(f(*args, **kwargs)),
             )
         else:
             logger.warning(
