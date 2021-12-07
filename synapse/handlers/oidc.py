@@ -22,7 +22,7 @@ from urllib.parse import urlencode, urlparse
 import attr
 import unpaddedbase64
 from authlib.common.security import generate_token
-from authlib.jose import JsonWebToken, JWTClaims, jwt
+from authlib.jose import JsonWebToken, JWTClaims
 from authlib.jose.errors import InvalidClaimError, MissingClaimError
 from authlib.oauth2.auth import ClientAuth
 from authlib.oauth2.rfc6749.parameters import prepare_grant_uri
@@ -257,17 +257,18 @@ class OidcHandler:
     async def handle_backchannel_logout(self, request: SynapseRequest) -> None:
         """Handle an incoming request to /_synapse/client/oidc/backchannel_logout
 
-        This extracts the logout_token from the request and try to figure out
-        from whom it is coming from. This works by matching the iss claim with
-        the issuer and the aud claim with the client_id.
+        This extracts the logout_token from the request and tries to figure out
+        which account it is associated with. This works by matching the iss claim
+        with the issuer and the aud claim with the client_id.
 
         Since at this point we don't know who signed the JWT, we can't just
-        decode it automatically, we have to manually parse the JWT to extract
-        both claims.
+        decode it using authlib since it will always verifies the signature. We
+        have to decode it manually without validating the signature.
 
         Args:
             request: the incoming request from the browser.
         """
+        logger.warn("OHAI")
         logout_token = parse_string(request, "logout_token")
         if logout_token is None:
             raise SynapseError(400, "Missing logout_token in request")
@@ -279,18 +280,18 @@ class OidcHandler:
         # is a JSON object.
         try:
             # This raises if there are too many or not enough segments in the token
-            header, payload, signature = logout_token.rsplit(".", 4)
+            _, payload, _ = logout_token.rsplit(".", 4)
         except ValueError:
             raise SynapseError(400, "Invalid logout_token in request")
 
         try:
             payload_bytes = unpaddedbase64.decode_base64(payload)
-            claims = json.loads(payload_bytes)
-        except (json.JSONDecodeError, binascii.Error):
+            claims = json_decoder.decode(payload_bytes.decode("utf-8"))
+        except (json.JSONDecodeError, binascii.Error, UnicodeError):
             raise SynapseError(400, "Invalid logout_token payload in request")
 
         try:
-            # Let's extract the iss and aud claim
+            # Let's extract the iss and aud claims
             iss = claims["iss"]
             aud = claims["aud"]
             # The aud claim can be either a string or a list of string. Here we
@@ -299,15 +300,16 @@ class OidcHandler:
                 aud = [aud]
 
             # Check that we have the right types for the aud and the iss claims
-            assert isinstance(iss, str)
-            assert isinstance(aud, list)
+            if not isinstance(iss, str) or not isinstance(aud, list):
+                raise TypeError()
             for a in aud:
-                assert isinstance(a, str)
+                if not isinstance(a, str):
+                    raise TypeError()
 
             # At this point we properly checked both claims types
             issuer: str = iss
             audience: List[str] = aud
-        except (TypeError, KeyError, AssertionError):
+        except (TypeError, KeyError):
             raise SynapseError(400, "Invalid issuer/audience in logout_token")
 
         # Now that we know the audience and the issuer, we can figure out from
@@ -323,7 +325,7 @@ class OidcHandler:
         if oidc_provider is None:
             raise SynapseError(400, "Could not find the OP that issued this event")
 
-        # We now figured out what provider should handle the logout request
+        # Ask the provider to handle the logout request.
         await oidc_provider.handle_backchannel_logout(request, logout_token)
 
 
@@ -488,7 +490,7 @@ class OidcProvider:
                     self.issuer,
                 )
 
-            if not m.get("backchannel_logout_session_supported", False):
+            elif not m.get("backchannel_logout_session_supported", False):
                 logger.warning(
                     "OIDC Back-Channel Logout is enabled and supported "
                     "by issuer %r but it might not send session ID with "
@@ -1231,7 +1233,7 @@ class OidcProvider:
         # point the `sid` claim exists and is a string.
         sid: str = claims.get("sid")
 
-        # Find in the store if we have a device associated with that SID
+        # Fetch any device(s) in the store associated with the session ID.
         devices = await self._store.get_devices_by_auth_provider_session_id(
             auth_provider_id=self.idp_id,
             auth_provider_session_id=sid,
@@ -1263,7 +1265,7 @@ class LogoutToken(JWTClaims):
 
     def validate(self, now: Optional[int] = None, leeway: int = 0) -> None:
         """Validate everything in claims payload."""
-        super(LogoutToken, self).validate(now, leeway)
+        super().validate(now, leeway)
         self.validate_sid()
         self.validate_events()
         self.validate_nonce()
@@ -1291,7 +1293,7 @@ class LogoutToken(JWTClaims):
             raise InvalidClaimError("nonce")
 
     def validate_events(self) -> None:
-        """Ensure the events is present and with the right value"""
+        """Ensure the events claim is present and with the right value"""
         events = self.get("events")
         if not events:
             raise MissingClaimError("events")
@@ -1371,6 +1373,7 @@ class JwtClientSecret:
         logger.info(
             "Generating new JWT for %s: %s %s", self._oauth_issuer, header, payload
         )
+        jwt = JsonWebToken(header["alg"])
         self._cached_secret = jwt.encode(header, payload, self._key.key)
         self._cached_secret_replacement_time = (
             expires_at - CLIENT_SECRET_MIN_VALIDITY_SECONDS
