@@ -1855,11 +1855,10 @@ class SyncHandler:
                 # User is in the room so we don't need to do the invite/leave checks
                 continue
 
+            old_mem_ev = await self._fetch_membership_event_at(
+                room_id, user_id, since_token
+            )
             if room_id in sync_result_builder.joined_room_ids or has_join:
-                old_mem_ev = await self._fetch_membership_event_at(
-                    room_id, user_id, since_token
-                )
-
                 # debug for #4422
                 if has_join and old_mem_ev is not None:
                     issue4422_logger.debug(
@@ -1883,9 +1882,6 @@ class SyncHandler:
                 if has_join:
                     newly_left_rooms.append(room_id)
                 else:
-                    old_mem_ev = await self._fetch_membership_event_at(
-                        room_id, user_id, since_token
-                    )
                     if (
                         old_mem_ev is not None
                         and old_mem_ev.membership == Membership.JOIN
