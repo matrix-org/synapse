@@ -1878,15 +1878,11 @@ class SyncHandler:
             # 2. Should we add this to `newly_left_rooms`?
             # Check if we have left the room. This can either be because we were
             # joined before *or* that we since joined and then left.
-            if events[-1].membership != Membership.JOIN:
-                if has_join:
+            if has_join:
+                newly_left_rooms.append(room_id)
+            else:
+                if old_mem_ev is not None and old_mem_ev.membership == Membership.JOIN:
                     newly_left_rooms.append(room_id)
-                else:
-                    if (
-                        old_mem_ev is not None
-                        and old_mem_ev.membership == Membership.JOIN
-                    ):
-                        newly_left_rooms.append(room_id)
 
             # 3. Should we add this room to `invited`?
             # Only bother if we're still currently invited
