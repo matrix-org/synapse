@@ -1,4 +1,4 @@
-# Copyright 2019 Matrix.org Foundation C.I.C.
+# Copyright 2019-2021 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,9 @@
 import os
 import re
 import threading
-from typing import Callable, Dict
+from typing import Callable, Dict, Optional
+
+import attr
 
 from synapse.python_dependencies import DependencyException, check_requirements
 
@@ -34,13 +36,13 @@ _DEFAULT_FACTOR_SIZE = 0.5
 _DEFAULT_EVENT_CACHE_SIZE = "10K"
 
 
+@attr.s(slots=True, auto_attribs=True)
 class CacheProperties:
-    def __init__(self):
-        # The default factor size for all caches
-        self.default_factor_size = float(
-            os.environ.get(_CACHE_PREFIX, _DEFAULT_FACTOR_SIZE)
-        )
-        self.resize_all_caches_func = None
+    # The default factor size for all caches
+    default_factor_size: float = float(
+        os.environ.get(_CACHE_PREFIX, _DEFAULT_FACTOR_SIZE)
+    )
+    resize_all_caches_func: Optional[Callable[[], None]] = None
 
 
 properties = CacheProperties()
@@ -62,7 +64,7 @@ def _canonicalise_cache_name(cache_name: str) -> str:
 
 def add_resizable_cache(
     cache_name: str, cache_resize_callback: Callable[[float], None]
-):
+) -> None:
     """Register a cache that's size can dynamically change
 
     Args:
@@ -91,7 +93,7 @@ class CacheConfig(Config):
     _environ = os.environ
 
     @staticmethod
-    def reset():
+    def reset() -> None:
         """Resets the caches to their defaults. Used for tests."""
         properties.default_factor_size = float(
             os.environ.get(_CACHE_PREFIX, _DEFAULT_FACTOR_SIZE)
@@ -100,7 +102,7 @@ class CacheConfig(Config):
         with _CACHES_LOCK:
             _CACHES.clear()
 
-    def generate_config_section(self, **kwargs):
+    def generate_config_section(self, **kwargs) -> str:
         return """\
         ## Caching ##
 
@@ -162,7 +164,7 @@ class CacheConfig(Config):
           #sync_response_cache_duration: 2m
         """
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config, **kwargs) -> None:
         self.event_cache_size = self.parse_size(
             config.get("event_cache_size", _DEFAULT_EVENT_CACHE_SIZE)
         )
@@ -217,7 +219,7 @@ class CacheConfig(Config):
 
         expiry_time = cache_config.get("expiry_time")
         if expiry_time:
-            self.expiry_time_msec = self.parse_duration(expiry_time)
+            self.expiry_time_msec: Optional[int] = self.parse_duration(expiry_time)
         else:
             self.expiry_time_msec = None
 
@@ -232,7 +234,7 @@ class CacheConfig(Config):
         # needing an instance of Config
         properties.resize_all_caches_func = self.resize_all_caches
 
-    def resize_all_caches(self):
+    def resize_all_caches(self) -> None:
         """Ensure all cache sizes are up to date
 
         For each cache, run the mapped callback function with either

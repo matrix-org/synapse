@@ -220,7 +220,7 @@ Here are a few things to try:
    anyone who has successfully set this up.
 
  * Check that you have opened your firewall to allow TCP and UDP traffic to the
-   TURN ports (normally 3478 and 5479).
+   TURN ports (normally 3478 and 5349).
 
  * Check that you have opened your firewall to allow UDP traffic to the UDP
    relay ports (49152-65535 by default).

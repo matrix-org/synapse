@@ -13,6 +13,7 @@
 # limitations under the License.
 import logging
 import re
+from enum import Enum
 from typing import TYPE_CHECKING, Iterable, List, Match, Optional
 
 from synapse.api.constants import EventTypes
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ApplicationServiceState:
+class ApplicationServiceState(Enum):
     DOWN = "down"
     UP = "up"
 

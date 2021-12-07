@@ -1,4 +1,5 @@
 # Copyright 2018 New Vector Ltd
+# Copyright 2021 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util import glob_to_regex
+from typing import List
+
+from matrix_common.regex import glob_to_regex
+
+from synapse.types import JsonDict
 
 from ._base import Config, ConfigError
 
@@ -20,7 +25,7 @@ from ._base import Config, ConfigError
 class RoomDirectoryConfig(Config):
     section = "roomdirectory"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config, **kwargs) -> None:
         self.enable_room_list_search = config.get("enable_room_list_search", True)
 
         alias_creation_rules = config.get("alias_creation_rules")
@@ -47,7 +52,7 @@ class RoomDirectoryConfig(Config):
                 _RoomDirectoryRule("room_list_publication_rules", {"action": "allow"})
             ]
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, config_dir_path, server_name, **kwargs) -> str:
         return """
         # Uncomment to disable searching the public room list. When disabled
         # blocks searching local and remote room lists for local and remote
@@ -113,16 +118,16 @@ class RoomDirectoryConfig(Config):
         #    action: allow
         """
 
-    def is_alias_creation_allowed(self, user_id, room_id, alias):
+    def is_alias_creation_allowed(self, user_id: str, room_id: str, alias: str) -> bool:
         """Checks if the given user is allowed to create the given alias
 
         Args:
-            user_id (str)
-            room_id (str)
-            alias (str)
+            user_id: The user to check.
+            room_id: The room ID for the alias.
+            alias: The alias being created.
 
         Returns:
-            boolean: True if user is allowed to create the alias
+            True if user is allowed to create the alias
         """
         for rule in self._alias_creation_rules:
             if rule.matches(user_id, room_id, [alias]):
@@ -130,16 +135,18 @@ class RoomDirectoryConfig(Config):
 
         return False
 
-    def is_publishing_room_allowed(self, user_id, room_id, aliases):
+    def is_publishing_room_allowed(
+        self, user_id: str, room_id: str, aliases: List[str]
+    ) -> bool:
         """Checks if the given user is allowed to publish the room
 
         Args:
-            user_id (str)
-            room_id (str)
-            aliases (list[str]): any local aliases associated with the room
+            user_id: The user ID publishing the room.
+            room_id: The room being published.
+            aliases: any local aliases associated with the room
 
         Returns:
-            boolean: True if user can publish room
+            True if user can publish room
         """
         for rule in self._room_list_publication_rules:
             if rule.matches(user_id, room_id, aliases):
@@ -153,11 +160,11 @@ class _RoomDirectoryRule:
     creating an alias or publishing a room.
     """
 
-    def __init__(self, option_name, rule):
+    def __init__(self, option_name: str, rule: JsonDict):
         """
         Args:
-            option_name (str): Name of the config option this rule belongs to
-            rule (dict): The rule as specified in the config
+            option_name: Name of the config option this rule belongs to
+            rule: The rule as specified in the config
         """
 
         action = rule["action"]
@@ -181,18 +188,18 @@ class _RoomDirectoryRule:
         except Exception as e:
             raise ConfigError("Failed to parse glob into regex") from e
 
-    def matches(self, user_id, room_id, aliases):
+    def matches(self, user_id: str, room_id: str, aliases: List[str]) -> bool:
         """Tests if this rule matches the given user_id, room_id and aliases.
 
         Args:
-            user_id (str)
-            room_id (str)
-            aliases (list[str]): The associated aliases to the room. Will be a
-                single element for testing alias creation, and can be empty for
-                testing room publishing.
+            user_id: The user ID to check.
+            room_id: The room ID to check.
+            aliases: The associated aliases to the room. Will be a single element
+                for testing alias creation, and can be empty for testing room
+                publishing.
 
         Returns:
-            boolean
+            True if the rule matches.
         """
 
         # Note: The regexes are anchored at both ends

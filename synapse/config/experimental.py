@@ -47,6 +47,9 @@ class ExperimentalConfig(Config):
         # MSC3266 (room summary api)
         self.msc3266_enabled: bool = experimental.get("msc3266_enabled", False)
 
+        # MSC3030 (Jump to date API endpoint)
+        self.msc3030_enabled: bool = experimental.get("msc3030_enabled", False)
+
         # MSC2409 (this setting only relates to optionally sending to-device messages).
         # Presence, typing and read receipt EDUs are already sent to application services that
         # have opted in to receive them. This setting, if enabled, adds to-device messages

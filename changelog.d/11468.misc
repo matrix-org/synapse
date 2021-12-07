@@ -1,0 +1,1 @@
+Refactor `get_version_string` to fix-up types and duplicated code.

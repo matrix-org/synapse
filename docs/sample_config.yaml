@@ -647,8 +647,8 @@ retention:
 #
 #federation_certificate_verification_whitelist:
 #  - lon.example.com
-#  - *.domain.com
-#  - *.onion
+#  - "*.domain.com"
+#  - "*.onion"
 
 # List of custom certificate authorities for federation traffic.
 #
@@ -1208,6 +1208,44 @@ oembed:
 # By default, this is infinite.
 #
 #session_lifetime: 24h
+
+# Time that an access token remains valid for, if the session is
+# using refresh tokens.
+# For more information about refresh tokens, please see the manual.
+# Note that this only applies to clients which advertise support for
+# refresh tokens.
+#
+# Note also that this is calculated at login time and refresh time:
+# changes are not applied to existing sessions until they are refreshed.
+#
+# By default, this is 5 minutes.
+#
+#refreshable_access_token_lifetime: 5m
+
+# Time that a refresh token remains valid for (provided that it is not
+# exchanged for another one first).
+# This option can be used to automatically log-out inactive sessions.
+# Please see the manual for more information.
+#
+# Note also that this is calculated at login time and refresh time:
+# changes are not applied to existing sessions until they are refreshed.
+#
+# By default, this is infinite.
+#
+#refresh_token_lifetime: 24h
+
+# Time that an access token remains valid for, if the session is NOT
+# using refresh tokens.
+# Please note that not all clients support refresh tokens, so setting
+# this to a short value may be inconvenient for some users who will
+# then be logged out frequently.
+#
+# Note also that this is calculated at login time: changes are not applied
+# retrospectively to existing sessions for users that have already logged in.
+#
+# By default, this is infinite.
+#
+#nonrefreshable_access_token_lifetime: 24h
 
 # The user must provide all of the below types of 3PID when registering.
 #
@@ -2039,6 +2077,12 @@ sso:
     #
     #algorithm: "provided-by-your-issuer"
 
+    # Name of the claim containing a unique identifier for the user.
+    #
+    # Optional, defaults to `sub`.
+    #
+    #subject_claim: "sub"
+
     # The issuer to validate the "iss" claim against.
     #
     # Optional, if provided the "iss" claim will be required and
@@ -2360,8 +2404,8 @@ user_directory:
     # indexes were (re)built was before Synapse 1.44, you'll have to
     # rebuild the indexes in order to search through all known users.
     # These indexes are built the first time Synapse starts; admins can
-    # manually trigger a rebuild following the instructions at
-    #     https://matrix-org.github.io/synapse/latest/user_directory.html
+    # manually trigger a rebuild via API following the instructions at
+    #     https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/background_updates.html#run
     #
     # Uncomment to return search results containing all known users, even if that
     # user does not share a room with the requester.

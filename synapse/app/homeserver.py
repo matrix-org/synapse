@@ -29,7 +29,8 @@ from synapse import events
 from synapse.api.urls import (
     FEDERATION_PREFIX,
     LEGACY_MEDIA_PREFIX,
-    MEDIA_PREFIX,
+    MEDIA_R0_PREFIX,
+    MEDIA_V3_PREFIX,
     SERVER_KEY_V2_PREFIX,
     STATIC_PREFIX,
     WEB_CLIENT_PREFIX,
@@ -193,6 +194,8 @@ class SynapseHomeServer(HomeServer):
                 {
                     "/_matrix/client/api/v1": client_resource,
                     "/_matrix/client/r0": client_resource,
+                    "/_matrix/client/v1": client_resource,
+                    "/_matrix/client/v3": client_resource,
                     "/_matrix/client/unstable": client_resource,
                     "/_matrix/client/v2_alpha": client_resource,
                     "/_matrix/client/versions": client_resource,
@@ -244,7 +247,11 @@ class SynapseHomeServer(HomeServer):
             if self.config.server.enable_media_repo:
                 media_repo = self.get_media_repository_resource()
                 resources.update(
-                    {MEDIA_PREFIX: media_repo, LEGACY_MEDIA_PREFIX: media_repo}
+                    {
+                        MEDIA_R0_PREFIX: media_repo,
+                        MEDIA_V3_PREFIX: media_repo,
+                        LEGACY_MEDIA_PREFIX: media_repo,
+                    }
                 )
             elif name == "media":
                 raise ConfigError(
@@ -350,6 +357,13 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
         # If a config isn't returned, and an exception isn't raised, we're just
         # generating config files and shouldn't try to continue.
         sys.exit(0)
+
+    if config.worker.worker_app:
+        raise ConfigError(
+            "You have specified `worker_app` in the config but are attempting to start a non-worker "
+            "instance. Please use `python -m synapse.app.generic_worker` instead (or remove the option if this is the main process)."
+        )
+        sys.exit(1)
 
     events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
     synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
