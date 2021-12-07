@@ -1070,7 +1070,7 @@ class SyncHandler:
         At the end, we transfer data from the `sync_result_builder` to a new `SyncResult`
         instance to signify that the sync calculation is complete.
         """
-        # NB: The now_token gets changed by some of the generate_sync_* methods,
+        # NB: Parts of the now_token get changed by some of the generate_sync_* methods,
         # this is due to some of the underlying streams not supporting the ability
         # to query up to a given point.
         # Always use the `now_token` in `SyncResultBuilder`
@@ -1091,6 +1091,8 @@ class SyncHandler:
             # See https://github.com/matrix-org/matrix-doc/issues/1144
             raise NotImplementedError()
         else:
+            # The `room_key` part of the `now_token` is not changed by the sync
+            # machinery. If it did, `joined_room_ids` could become out of date.
             joined_room_ids = await self.get_rooms_for_user_at(
                 user_id, now_token.room_key
             )
@@ -1837,10 +1839,6 @@ class SyncHandler:
             if room_id in sync_result_builder.joined_room_ids:
                 continue
 
-            if not non_joins:
-                continue
-            last_non_join = non_joins[-1]
-
             # Check if we have left the room. This can either be because we were
             # joined before *or* that we since joined and then left.
             if events[-1].membership != Membership.JOIN:
@@ -1861,6 +1859,7 @@ class SyncHandler:
                         newly_left_rooms.append(room_id)
 
             # Only bother if we're still currently invited
+            last_non_join = non_joins[-1]
             should_invite = last_non_join.membership == Membership.INVITE
             if should_invite:
                 if last_non_join.sender not in ignored_users:
