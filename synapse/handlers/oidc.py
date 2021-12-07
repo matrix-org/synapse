@@ -515,10 +515,12 @@ class OidcProvider:
 
     @property
     def issuer(self) -> str:
+        """The issuer identifying this provider."""
         return self._config.issuer
 
     @property
     def client_id(self) -> str:
+        """The client_id used when interacting with this provider."""
         return self._config.client_id
 
     async def load_metadata(self, force: bool = False) -> OpenIDProviderMetadata:
