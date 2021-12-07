@@ -349,7 +349,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.delete_device(
             self.user_tok,
             "dev2",
-            403,
+            HTTPStatus.FORBIDDEN,
             {
                 "auth": {
                     "type": "m.login.password",
@@ -515,7 +515,10 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
         # ... and the delete op should now fail with a 403
         self.delete_device(
-            self.user_tok, self.device_id, 403, body={"auth": {"session": session_id}}
+            self.user_tok,
+            self.device_id,
+            HTTPStatus.FORBIDDEN,
+            body={"auth": {"session": session_id}},
         )
 
 
@@ -873,7 +876,9 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         # This should fail because the refresh token's lifetime has also been
         # diminished as our session expired.
         refresh_response = self.use_refresh_token(refresh_token)
-        self.assertEqual(refresh_response.code, 403, refresh_response.result)
+        self.assertEqual(
+            refresh_response.code, HTTPStatus.FORBIDDEN, refresh_response.result
+        )
 
     def test_refresh_token_invalidation(self):
         """Refresh tokens are invalidated after first use of the next token.
@@ -965,7 +970,9 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             {"refresh_token": login_response.json_body["refresh_token"]},
         )
         self.assertEqual(
-            fourth_refresh_response.code, 403, fourth_refresh_response.result
+            fourth_refresh_response.code,
+            HTTPStatus.FORBIDDEN,
+            fourth_refresh_response.result,
         )
 
         # But refreshing from the last valid refresh token still works
