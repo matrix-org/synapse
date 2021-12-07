@@ -106,9 +106,6 @@ class RoomRestV2Servlet(RestServlet):
                 HTTPStatus.BAD_REQUEST, "%s is not a legal room ID" % (room_id,)
             )
 
-        if not await self._store.get_room(room_id):
-            raise NotFoundError("Unknown room id %s" % (room_id,))
-
         delete_id = self._pagination_handler.start_shutdown_and_purge_room(
             room_id=room_id,
             new_room_user_id=content.get("new_room_user_id"),
@@ -449,13 +446,7 @@ class RoomStateRestServlet(RestServlet):
         event_ids = await self.store.get_current_state_ids(room_id)
         events = await self.store.get_events(event_ids.values())
         now = self.clock.time_msec()
-        room_state = await self._event_serializer.serialize_events(
-            events.values(),
-            now,
-            # We don't bother bundling aggregations in when asked for state
-            # events, as clients won't use them.
-            bundle_relations=False,
-        )
+        room_state = await self._event_serializer.serialize_events(events.values(), now)
         ret = {"state": room_state}
 
         return HTTPStatus.OK, ret
@@ -789,10 +780,7 @@ class RoomEventContextServlet(RestServlet):
             results["events_after"], time_now
         )
         results["state"] = await self._event_serializer.serialize_events(
-            results["state"],
-            time_now,
-            # No need to bundle aggregations for state events
-            bundle_relations=False,
+            results["state"], time_now
         )
 
         return HTTPStatus.OK, results
