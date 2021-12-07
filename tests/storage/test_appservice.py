@@ -266,7 +266,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         service = Mock(id=self.as_list[0]["id"])
         events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
         txn = self.get_success(
-            defer.ensureDeferred(self.store.create_appservice_txn(service, events, []))
+            defer.ensureDeferred(
+                self.store.create_appservice_txn(service, events, [], [])
+            )
         )
         self.assertEquals(txn.id, 1)
         self.assertEquals(txn.events, events)
@@ -280,7 +282,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         self.get_success(self._set_last_txn(service.id, 9643))  # AS is falling behind
         self.get_success(self._insert_txn(service.id, 9644, events))
         self.get_success(self._insert_txn(service.id, 9645, events))
-        txn = self.get_success(self.store.create_appservice_txn(service, events, []))
+        txn = self.get_success(
+            self.store.create_appservice_txn(service, events, [], [])
+        )
         self.assertEquals(txn.id, 9646)
         self.assertEquals(txn.events, events)
         self.assertEquals(txn.service, service)
@@ -291,7 +295,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         service = Mock(id=self.as_list[0]["id"])
         events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
         self.get_success(self._set_last_txn(service.id, 9643))
-        txn = self.get_success(self.store.create_appservice_txn(service, events, []))
+        txn = self.get_success(
+            self.store.create_appservice_txn(service, events, [], [])
+        )
         self.assertEquals(txn.id, 9644)
         self.assertEquals(txn.events, events)
         self.assertEquals(txn.service, service)
@@ -313,7 +319,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         self.get_success(self._insert_txn(self.as_list[2]["id"], 10, events))
         self.get_success(self._insert_txn(self.as_list[3]["id"], 9643, events))
 
-        txn = self.get_success(self.store.create_appservice_txn(service, events, []))
+        txn = self.get_success(
+            self.store.create_appservice_txn(service, events, [], [])
+        )
         self.assertEquals(txn.id, 9644)
         self.assertEquals(txn.events, events)
         self.assertEquals(txn.service, service)
