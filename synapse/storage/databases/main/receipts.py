@@ -32,7 +32,7 @@ from synapse.api.constants import ReceiptTypes
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import ReceiptsStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
 from synapse.types import JsonDict
@@ -145,7 +145,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     async def get_receipts_for_user_with_orderings(
         self, user_id: str, receipt_type: str
     ) -> JsonDict:
-        def f(txn) -> List[Tuple[str, str, int, int]]:
+        def f(txn: LoggingTransaction) -> List[Tuple[str, str, int, int]]:
             sql = (
                 "SELECT rl.room_id, rl.event_id,"
                 " e.topological_ordering, e.stream_ordering"
@@ -224,10 +224,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
     @cached(num_args=3, tree=True)
     async def _get_linearized_receipts_for_room(
         self, room_id: str, to_key: int, from_key: Optional[int] = None
-    ) -> List[dict]:
+    ) -> List[JsonDict]:
         """See get_linearized_receipts_for_room"""
 
-        def f(txn):
+        def f(txn: LoggingTransaction) -> List[Dict[str, Any]]:
             if from_key:
                 sql = (
                     "SELECT * FROM receipts_linearized WHERE"
@@ -271,7 +271,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         if not room_ids:
             return {}
 
-        def f(txn) -> List[Dict[str, Any]]:
+        def f(txn: LoggingTransaction) -> List[Dict[str, Any]]:
             if from_key:
                 sql = """
                     SELECT * FROM receipts_linearized WHERE
@@ -340,7 +340,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             A dictionary of roomids to a list of receipts.
         """
 
-        def f(txn):
+        def f(txn: LoggingTransaction) -> List[Dict[str, Any]]:
             if from_key:
                 sql = """
                     SELECT * FROM receipts_linearized WHERE
@@ -396,7 +396,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         if last_id == current_id:
             return defer.succeed([])
 
-        def _get_users_sent_receipts_between_txn(txn):
+        def _get_users_sent_receipts_between_txn(txn: LoggingTransaction) -> List[str]:
             sql = """
                 SELECT DISTINCT user_id FROM receipts_linearized
                 WHERE ? < stream_id AND stream_id <= ?
@@ -436,7 +436,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
         if last_id == current_id:
             return [], current_id, False
 
-        def get_all_updated_receipts_txn(txn):
+        def get_all_updated_receipts_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[List[Tuple[int, list]], int, bool]:
             sql = """
                 SELECT stream_id, room_id, receipt_type, user_id, event_id, data
                 FROM receipts_linearized
@@ -502,7 +504,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     def insert_linearized_receipt_txn(
         self,
-        txn,
+        txn: LoggingTransaction,
         room_id: str,
         receipt_type: str,
         user_id: str,
@@ -606,7 +608,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         else:
             # we need to points in graph -> linearized form.
             # TODO: Make this better.
-            def graph_to_linear(txn):
+            def graph_to_linear(txn: LoggingTransaction) -> str:
                 clause, args = make_in_list_sql_clause(
                     self.database_engine, "event_id", event_ids
                 )
@@ -681,7 +683,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     def insert_graph_receipt_txn(
         self,
-        txn,
+        txn: LoggingTransaction,
         room_id: str,
         receipt_type: str,
         user_id: str,
