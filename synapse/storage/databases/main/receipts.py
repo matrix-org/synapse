@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
 
 from twisted.internet import defer
 
+from synapse.api.constants import ReceiptTypes
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import ReceiptsStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
@@ -88,7 +89,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     @cached()
     async def get_users_with_read_receipts_in_room(self, room_id):
-        receipts = await self.get_receipts_for_room(room_id, "m.read")
+        receipts = await self.get_receipts_for_room(room_id, ReceiptTypes.READ)
         return {r["user_id"] for r in receipts}
 
     @cached(num_args=2)
@@ -447,7 +448,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     def _invalidate_get_users_with_receipts_in_room(
         self, room_id: str, receipt_type: str, user_id: str
     ):
-        if receipt_type != "m.read":
+        if receipt_type != ReceiptTypes.READ:
             return
 
         res = self.get_users_with_read_receipts_in_room.cache.get_immediate(
@@ -550,7 +551,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             lock=False,
         )
 
-        if receipt_type == "m.read" and stream_ordering is not None:
+        if receipt_type == ReceiptTypes.READ and stream_ordering is not None:
             self._remove_old_push_actions_before_txn(
                 txn, room_id=room_id, user_id=user_id, stream_ordering=stream_ordering
             )

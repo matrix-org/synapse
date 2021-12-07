@@ -15,7 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.constants import ReadReceiptEventFields
+from synapse.api.constants import ReadReceiptEventFields, ReceiptTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -62,7 +62,7 @@ class ReadMarkerRestServlet(RestServlet):
         if read_event_id:
             await self.receipts_handler.received_client_receipt(
                 room_id,
-                "m.read",
+                ReceiptTypes.READ,
                 user_id=requester.user.to_string(),
                 event_id=read_event_id,
                 hidden=hidden,
