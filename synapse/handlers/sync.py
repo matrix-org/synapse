@@ -1845,7 +1845,6 @@ class SyncHandler:
             # We want to figure out if we joined the room at some point since
             # the last sync (even if we have since left). This is to make sure
             # we do send down the room, and with full state, where necessary.
-            old_state_ids = None
             if room_id in sync_result_builder.joined_room_ids and non_joins:
                 # Always include if the user (re)joined the room, especially
                 # important so that device list changes are calculated correctly.
@@ -1857,27 +1856,20 @@ class SyncHandler:
                 continue
 
             if room_id in sync_result_builder.joined_room_ids or has_join:
-                old_state_ids = await self.get_state_at(room_id, since_token)
-                old_mem_ev_id = old_state_ids.get((EventTypes.Member, user_id), None)
-                old_mem_ev = None
-                if old_mem_ev_id:
-                    old_mem_ev = await self.store.get_event(
-                        old_mem_ev_id, allow_none=True
-                    )
+                old_mem_ev = await self._fetch_membership_event_at(
+                    room_id, user_id, since_token
+                )
 
                 # debug for #4422
-                if has_join:
-                    prev_membership = None
-                    if old_mem_ev:
-                        prev_membership = old_mem_ev.membership
+                if has_join and old_mem_ev is not None:
                     issue4422_logger.debug(
                         "Previous membership for room %s with join: %s (event %s)",
                         room_id,
-                        prev_membership,
-                        old_mem_ev_id,
+                        old_mem_ev.membership,
+                        old_mem_ev.event_id,
                     )
 
-                if not old_mem_ev or old_mem_ev.membership != Membership.JOIN:
+                if old_mem_ev is None or old_mem_ev.membership != Membership.JOIN:
                     newly_joined_rooms.append(room_id)
 
             # If user is in the room then we don't need to do the invite/leave checks
@@ -1891,17 +1883,13 @@ class SyncHandler:
                 if has_join:
                     newly_left_rooms.append(room_id)
                 else:
-                    if not old_state_ids:
-                        old_state_ids = await self.get_state_at(room_id, since_token)
-                        old_mem_ev_id = old_state_ids.get(
-                            (EventTypes.Member, user_id), None
-                        )
-                        old_mem_ev = None
-                        if old_mem_ev_id:
-                            old_mem_ev = await self.store.get_event(
-                                old_mem_ev_id, allow_none=True
-                            )
-                    if old_mem_ev and old_mem_ev.membership == Membership.JOIN:
+                    old_mem_ev = await self._fetch_membership_event_at(
+                        room_id, user_id, since_token
+                    )
+                    if (
+                        old_mem_ev is not None
+                        and old_mem_ev.membership == Membership.JOIN
+                    ):
                         newly_left_rooms.append(room_id)
 
             # 3. Should we add this room to `invited`?
@@ -1983,6 +1971,24 @@ class SyncHandler:
             newly_joined_rooms,
             newly_left_rooms,
         )
+
+    async def _fetch_membership_event_at(
+        self, room_id: str, user_id: str, since_token: StreamToken
+    ) -> Optional[EventBase]:
+        """What was the user's membership in this room at the given stream_token?
+
+        Returns None if
+        - there was no membership for the user at the given time
+        - the user had a membership event, but we couldn't find it.
+
+        Otherwise, returns the membership event itself.
+        """
+
+        old_state_ids = await self.get_state_at(room_id, since_token)
+        old_mem_ev_id = old_state_ids.get((EventTypes.Member, user_id), None)
+        if old_mem_ev_id is not None:
+            return await self.store.get_event(old_mem_ev_id, allow_none=True)
+        return None
 
     async def _get_all_rooms(
         self, sync_result_builder: "SyncResultBuilder", ignored_users: FrozenSet[str]
