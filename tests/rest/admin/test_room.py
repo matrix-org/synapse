@@ -83,7 +83,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
     def test_room_does_not_exist(self):
         """
-        Check that unknown rooms/server return error HTTPStatus.NOT_FOUND.
+        Check that unknown rooms/server return 200
         """
         url = "/_synapse/admin/v1/rooms/%s" % "!unknown:test"
 
@@ -94,8 +94,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
-        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
     def test_room_is_not_valid(self):
         """
@@ -508,27 +507,36 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    @parameterized.expand(
-        [
-            ("DELETE", "/_synapse/admin/v2/rooms/%s"),
-            ("GET", "/_synapse/admin/v2/rooms/%s/delete_status"),
-            ("GET", "/_synapse/admin/v2/rooms/delete_status/%s"),
-        ]
-    )
-    def test_room_does_not_exist(self, method: str, url: str):
+    def test_room_does_not_exist(self):
         """
-        Check that unknown rooms/server return error HTTPStatus.NOT_FOUND.
-        """
+        Check that unknown rooms/server return 200
 
+        This is important, as it allows incomplete vestiges of rooms to be cleared up
+        even if the create event/etc is missing.
+        """
+        room_id = "!unknown:test"
         channel = self.make_request(
-            method,
-            url % "!unknown:test",
+            "DELETE",
+            f"/_synapse/admin/v2/rooms/{room_id}",
             content={},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
-        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertIn("delete_id", channel.json_body)
+        delete_id = channel.json_body["delete_id"]
+
+        # get status
+        channel = self.make_request(
+            "GET",
+            f"/_synapse/admin/v2/rooms/{room_id}/delete_status",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(1, len(channel.json_body["results"]))
+        self.assertEqual("complete", channel.json_body["results"][0]["status"])
+        self.assertEqual(delete_id, channel.json_body["results"][0]["delete_id"])
 
     @parameterized.expand(
         [
