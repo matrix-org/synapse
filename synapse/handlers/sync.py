@@ -1885,20 +1885,15 @@ class SyncHandler:
                     newly_left_rooms.append(room_id)
 
             # 3. Should we add this room to `invited`?
-            # Only bother if we're still currently invited
             last_non_join = non_joins[-1]
-            should_invite = last_non_join.membership == Membership.INVITE
-            if should_invite:
+            if last_non_join.membership == Membership.INVITE:
                 if last_non_join.sender not in ignored_users:
                     invite_room_sync = InvitedSyncResult(room_id, invite=last_non_join)
                     if invite_room_sync:
                         invited.append(invite_room_sync)
 
             # 4. Should we add this room to `knocked`?
-            # Only bother if our latest membership in the room is knock (and we haven't
-            # been accepted/rejected in the meantime).
-            should_knock = last_non_join.membership == Membership.KNOCK
-            if should_knock:
+            elif last_non_join.membership == Membership.KNOCK:
                 knock_room_sync = KnockedSyncResult(room_id, knock=last_non_join)
                 if knock_room_sync:
                     knocked.append(knock_room_sync)
