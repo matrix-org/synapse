@@ -14,7 +14,17 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 
 from twisted.internet import defer
 
@@ -79,7 +89,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             "ReceiptsRoomChangeCache", self.get_max_receipt_stream_id()
         )
 
-    def get_max_receipt_stream_id(self):
+    def get_max_receipt_stream_id(self) -> int:
         """Get the current max stream ID for receipts stream
 
         Returns:
@@ -88,7 +98,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         return self._receipts_id_gen.get_current_token()
 
     @cached()
-    async def get_users_with_read_receipts_in_room(self, room_id):
+    async def get_users_with_read_receipts_in_room(self, room_id: str) -> Set[str]:
         receipts = await self.get_receipts_for_room(room_id, ReceiptTypes.READ)
         return {r["user_id"] for r in receipts}
 
@@ -120,7 +130,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
         )
 
     @cached(num_args=2)
-    async def get_receipts_for_user(self, user_id, receipt_type):
+    async def get_receipts_for_user(
+        self, user_id: str, receipt_type: str
+    ) -> Dict[str, str]:
         rows = await self.db_pool.simple_select_list(
             table="receipts_linearized",
             keyvalues={"user_id": user_id, "receipt_type": receipt_type},
@@ -130,8 +142,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         return {row["room_id"]: row["event_id"] for row in rows}
 
-    async def get_receipts_for_user_with_orderings(self, user_id, receipt_type):
-        def f(txn):
+    async def get_receipts_for_user_with_orderings(
+        self, user_id: str, receipt_type: str
+    ) -> JsonDict:
+        def f(txn) -> List[Tuple[str, str, int, int]]:
             sql = (
                 "SELECT rl.room_id, rl.event_id,"
                 " e.topological_ordering, e.stream_ordering"
@@ -251,11 +265,13 @@ class ReceiptsWorkerStore(SQLBaseStore):
         list_name="room_ids",
         num_args=3,
     )
-    async def _get_linearized_receipts_for_rooms(self, room_ids, to_key, from_key=None):
+    async def _get_linearized_receipts_for_rooms(
+        self, room_ids: Collection[str], to_key: int, from_key: Optional[int] = None
+    ) -> Dict[str, List[JsonDict]]:
         if not room_ids:
             return {}
 
-        def f(txn):
+        def f(txn) -> List[Dict[str, Any]]:
             if from_key:
                 sql = """
                     SELECT * FROM receipts_linearized WHERE
@@ -447,7 +463,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     def _invalidate_get_users_with_receipts_in_room(
         self, room_id: str, receipt_type: str, user_id: str
-    ):
+    ) -> None:
         if receipt_type != ReceiptTypes.READ:
             return
 
@@ -462,7 +478,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         self.get_users_with_read_receipts_in_room.invalidate((room_id,))
 
-    def invalidate_caches_for_receipt(self, room_id, receipt_type, user_id):
+    def invalidate_caches_for_receipt(
+        self, room_id: str, receipt_type: str, user_id: str
+    ) -> None:
         self.get_receipts_for_user.invalidate((user_id, receipt_type))
         self._get_linearized_receipts_for_room.invalidate((room_id,))
         self.get_last_receipt_event_id_for_user.invalidate(
@@ -483,8 +501,15 @@ class ReceiptsWorkerStore(SQLBaseStore):
         return super().process_replication_rows(stream_name, instance_name, token, rows)
 
     def insert_linearized_receipt_txn(
-        self, txn, room_id, receipt_type, user_id, event_id, data, stream_id
-    ):
+        self,
+        txn,
+        room_id: str,
+        receipt_type: str,
+        user_id: str,
+        event_id: str,
+        data: JsonDict,
+        stream_id: int,
+    ) -> Optional[int]:
         """Inserts a read-receipt into the database if it's newer than the current RR
 
         Returns: int|None
@@ -635,11 +660,16 @@ class ReceiptsWorkerStore(SQLBaseStore):
         return stream_id, max_persisted_id
 
     async def insert_graph_receipt(
-        self, room_id, receipt_type, user_id, event_ids, data
-    ):
+        self,
+        room_id: str,
+        receipt_type: str,
+        user_id: str,
+        event_ids: List[str],
+        data: JsonDict,
+    ) -> None:
         assert self._can_write_to_receipts
 
-        return await self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "insert_graph_receipt",
             self.insert_graph_receipt_txn,
             room_id,
@@ -650,8 +680,14 @@ class ReceiptsWorkerStore(SQLBaseStore):
         )
 
     def insert_graph_receipt_txn(
-        self, txn, room_id, receipt_type, user_id, event_ids, data
-    ):
+        self,
+        txn,
+        room_id: str,
+        receipt_type: str,
+        user_id: str,
+        event_ids: List[str],
+        data: JsonDict,
+    ) -> None:
         assert self._can_write_to_receipts
 
         txn.call_after(self.get_receipts_for_room.invalidate, (room_id, receipt_type))
