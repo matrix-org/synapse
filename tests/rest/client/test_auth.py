@@ -85,7 +85,7 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET", "auth/m.login.recaptcha/fallback/web?session=" + session
         )
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, HTTPStatus.OK)
 
         channel = self.make_request(
             "POST",
@@ -116,15 +116,17 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         )
 
         # Complete the recaptcha step.
-        self.recaptcha(session, 200)
+        self.recaptcha(session, HTTPStatus.OK)
 
         # also complete the dummy auth
-        self.register(200, {"auth": {"session": session, "type": "m.login.dummy"}})
+        self.register(
+            HTTPStatus.OK, {"auth": {"session": session, "type": "m.login.dummy"}}
+        )
 
         # Now we should have fulfilled a complete auth flow, including
         # the recaptcha fallback step, we can then send a
         # request to the register API with the session in the authdict.
-        channel = self.register(200, {"auth": {"session": session}})
+        channel = self.register(HTTPStatus.OK, {"auth": {"session": session}})
 
         # We're given a registered user.
         self.assertEqual(channel.json_body["user_id"], "@user:test")
@@ -242,7 +244,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.delete_device(
             self.user_tok,
             self.device_id,
-            200,
+            HTTPStatus.OK,
             {
                 "auth": {
                     "type": "m.login.password",
@@ -267,7 +269,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.delete_device(
             self.user_tok,
             self.device_id,
-            200,
+            HTTPStatus.OK,
             {
                 "auth": {
                     "type": "m.login.password",
@@ -303,7 +305,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         # Make another request providing the UI auth flow, but try to delete the
         # second device.
         self.delete_devices(
-            200,
+            HTTPStatus.OK,
             {
                 "devices": ["dev2"],
                 "auth": {
@@ -361,7 +363,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.login("test", self.user_pass, "dev3")
 
         # Attempt to delete a device. This works since the user just logged in.
-        self.delete_device(self.user_tok, "dev2", 200)
+        self.delete_device(self.user_tok, "dev2", HTTPStatus.OK)
 
         # Move the clock forward past the validation timeout.
         self.reactor.advance(6)
@@ -378,7 +380,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.delete_device(
             self.user_tok,
             "dev3",
-            200,
+            HTTPStatus.OK,
             {
                 "auth": {
                     "type": "m.login.password",
@@ -393,7 +395,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         # due to re-using the previous session.
         #
         # Note that *no auth* information is provided, not even a session iD!
-        self.delete_device(self.user_tok, self.device_id, 200)
+        self.delete_device(self.user_tok, self.device_id, HTTPStatus.OK)
 
     @skip_unless(HAS_OIDC, "requires OIDC")
     @override_config({"oidc_config": TEST_OIDC_CONFIG})
@@ -426,13 +428,13 @@ class UIAuthTests(unittest.HomeserverTestCase):
         )
 
         # that should serve a confirmation page
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
 
         # and now the delete request should succeed.
         self.delete_device(
             self.user_tok,
             self.device_id,
-            200,
+            HTTPStatus.OK,
             body={"auth": {"session": session_id}},
         )
 
@@ -551,7 +553,9 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         login_without_refresh = self.make_request(
             "POST", "/_matrix/client/r0/login", body
         )
-        self.assertEqual(login_without_refresh.code, 200, login_without_refresh.result)
+        self.assertEqual(
+            login_without_refresh.code, HTTPStatus.OK, login_without_refresh.result
+        )
         self.assertNotIn("refresh_token", login_without_refresh.json_body)
 
         login_with_refresh = self.make_request(
@@ -559,7 +563,9 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             "/_matrix/client/r0/login",
             {"refresh_token": True, **body},
         )
-        self.assertEqual(login_with_refresh.code, 200, login_with_refresh.result)
+        self.assertEqual(
+            login_with_refresh.code, HTTPStatus.OK, login_with_refresh.result
+        )
         self.assertIn("refresh_token", login_with_refresh.json_body)
         self.assertIn("expires_in_ms", login_with_refresh.json_body)
 
@@ -577,7 +583,9 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             },
         )
         self.assertEqual(
-            register_without_refresh.code, 200, register_without_refresh.result
+            register_without_refresh.code,
+            HTTPStatus.OK,
+            register_without_refresh.result,
         )
         self.assertNotIn("refresh_token", register_without_refresh.json_body)
 
@@ -591,7 +599,9 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
                 "refresh_token": True,
             },
         )
-        self.assertEqual(register_with_refresh.code, 200, register_with_refresh.result)
+        self.assertEqual(
+            register_with_refresh.code, HTTPStatus.OK, register_with_refresh.result
+        )
         self.assertIn("refresh_token", register_with_refresh.json_body)
         self.assertIn("expires_in_ms", register_with_refresh.json_body)
 
@@ -610,14 +620,14 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             "/_matrix/client/r0/login",
             body,
         )
-        self.assertEqual(login_response.code, 200, login_response.result)
+        self.assertEqual(login_response.code, HTTPStatus.OK, login_response.result)
 
         refresh_response = self.make_request(
             "POST",
             "/_matrix/client/v1/refresh",
             {"refresh_token": login_response.json_body["refresh_token"]},
         )
-        self.assertEqual(refresh_response.code, 200, refresh_response.result)
+        self.assertEqual(refresh_response.code, HTTPStatus.OK, refresh_response.result)
         self.assertIn("access_token", refresh_response.json_body)
         self.assertIn("refresh_token", refresh_response.json_body)
         self.assertIn("expires_in_ms", refresh_response.json_body)
@@ -648,7 +658,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             "/_matrix/client/r0/login",
             body,
         )
-        self.assertEqual(login_response.code, 200, login_response.result)
+        self.assertEqual(login_response.code, HTTPStatus.OK, login_response.result)
         self.assertApproximates(
             login_response.json_body["expires_in_ms"], 60 * 1000, 100
         )
@@ -658,7 +668,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             "/_matrix/client/v1/refresh",
             {"refresh_token": login_response.json_body["refresh_token"]},
         )
-        self.assertEqual(refresh_response.code, 200, refresh_response.result)
+        self.assertEqual(refresh_response.code, HTTPStatus.OK, refresh_response.result)
         self.assertApproximates(
             refresh_response.json_body["expires_in_ms"], 60 * 1000, 100
         )
@@ -705,7 +715,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             "/_matrix/client/r0/login",
             {"org.matrix.msc2918.refresh_token": True, **body},
         )
-        self.assertEqual(login_response1.code, 200, login_response1.result)
+        self.assertEqual(login_response1.code, HTTPStatus.OK, login_response1.result)
         self.assertApproximates(
             login_response1.json_body["expires_in_ms"], 60 * 1000, 100
         )
@@ -716,7 +726,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             "/_matrix/client/r0/login",
             body,
         )
-        self.assertEqual(login_response2.code, 200, login_response2.result)
+        self.assertEqual(login_response2.code, HTTPStatus.OK, login_response2.result)
         nonrefreshable_access_token = login_response2.json_body["access_token"]
 
         # Advance 59 seconds in the future (just shy of 1 minute, the time of expiry)
@@ -818,7 +828,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             "/_matrix/client/r0/login",
             body,
         )
-        self.assertEqual(login_response.code, 200, login_response.result)
+        self.assertEqual(login_response.code, HTTPStatus.OK, login_response.result)
         refresh_token = login_response.json_body["refresh_token"]
 
         # Advance shy of 2 minutes into the future
@@ -826,7 +836,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
 
         # Refresh our session. The refresh token should still be valid right now.
         refresh_response = self.use_refresh_token(refresh_token)
-        self.assertEqual(refresh_response.code, 200, refresh_response.result)
+        self.assertEqual(refresh_response.code, HTTPStatus.OK, refresh_response.result)
         self.assertIn(
             "refresh_token",
             refresh_response.json_body,
@@ -875,7 +885,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             "/_matrix/client/r0/login",
             body,
         )
-        self.assertEqual(login_response.code, 200, login_response.result)
+        self.assertEqual(login_response.code, HTTPStatus.OK, login_response.result)
 
         # This first refresh should work properly
         first_refresh_response = self.make_request(
@@ -884,7 +894,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             {"refresh_token": login_response.json_body["refresh_token"]},
         )
         self.assertEqual(
-            first_refresh_response.code, 200, first_refresh_response.result
+            first_refresh_response.code, HTTPStatus.OK, first_refresh_response.result
         )
 
         # This one as well, since the token in the first one was never used
@@ -894,7 +904,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             {"refresh_token": login_response.json_body["refresh_token"]},
         )
         self.assertEqual(
-            second_refresh_response.code, 200, second_refresh_response.result
+            second_refresh_response.code, HTTPStatus.OK, second_refresh_response.result
         )
 
         # This one should not, since the token from the first refresh is not valid anymore
@@ -923,7 +933,9 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             whoami_response = self.make_request(
                 "GET", "/_matrix/client/r0/account/whoami", access_token=access_token
             )
-            self.assertEqual(whoami_response.code, 200, whoami_response.result)
+            self.assertEqual(
+                whoami_response.code, HTTPStatus.OK, whoami_response.result
+            )
 
         # Now that the access token from the last valid refresh was used once, refreshing with the N-1 token should fail
         fourth_refresh_response = self.make_request(
@@ -942,5 +954,5 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             {"refresh_token": second_refresh_response.json_body["refresh_token"]},
         )
         self.assertEqual(
-            fifth_refresh_response.code, 200, fifth_refresh_response.result
+            fifth_refresh_response.code, HTTPStatus.OK, fifth_refresh_response.result
         )
