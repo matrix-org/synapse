@@ -1,0 +1,1 @@
+Fix a regression in Synapse 1.48.0 where presence workers would not clear their presence updates over replication on shutdown.
