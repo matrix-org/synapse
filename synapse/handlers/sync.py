@@ -1506,16 +1506,22 @@ class SyncHandler:
             account_data_by_room: Dictionary of per room account data
 
         Returns:
-            Returns a 4-tuple whose entries are:
+            Returns a 4-tuple describing rooms the user has joined or left, and users who've
+            joined or left rooms any rooms the user is in. This gets used later in
+            `_generate_sync_entry_for_device_list`.
+
+            Its entries are:
             - newly_joined_rooms
             - newly_joined_or_invited_or_knocked_users
             - newly_left_rooms
             - newly_left_users
         """
-        # Start by fetching all ephemeral events in rooms we've joined (if required).
+        since_token = sync_result_builder.since_token
+
+        # 1. Start by fetching all ephemeral events in rooms we've joined (if required).
         user_id = sync_result_builder.sync_config.user.to_string()
         block_all_room_ephemeral = (
-            sync_result_builder.since_token is None
+            since_token is None
             and sync_result_builder.sync_config.filter_collection.blocks_all_room_ephemeral()
         )
 
@@ -1529,9 +1535,8 @@ class SyncHandler:
             )
             sync_result_builder.now_token = now_token
 
-        # We check up front if anything has changed, if it hasn't then there is
+        # 2. We check up front if anything has changed, if it hasn't then there is
         # no point in going further.
-        since_token = sync_result_builder.since_token
         if not sync_result_builder.full_state:
             if since_token and not ephemeral_by_room and not account_data_by_room:
                 have_changed = await self._have_rooms_changed(sync_result_builder)
@@ -1544,20 +1549,8 @@ class SyncHandler:
                         logger.debug("no-oping sync")
                         return set(), set(), set(), set()
 
-        ignored_account_data = (
-            await self.store.get_global_account_data_by_type_for_user(
-                AccountDataTypes.IGNORED_USER_LIST, user_id=user_id
-            )
-        )
-
-        # If there is ignored users account data and it matches the proper type,
-        # then use it.
-        ignored_users: FrozenSet[str] = frozenset()
-        if ignored_account_data:
-            ignored_users_data = ignored_account_data.get("ignored_users", {})
-            if isinstance(ignored_users_data, dict):
-                ignored_users = frozenset(ignored_users_data.keys())
-
+        # 3. Work out which rooms need reporting in the sync response.
+        ignored_users = await self._get_ignored_users(user_id)
         if since_token:
             room_changes = await self._get_rooms_changed(
                 sync_result_builder, ignored_users
@@ -1567,7 +1560,6 @@ class SyncHandler:
             )
         else:
             room_changes = await self._get_all_rooms(sync_result_builder, ignored_users)
-
             tags_by_room = await self.store.get_tags_for_user(user_id)
 
         log_kv({"rooms_changed": len(room_changes.room_entries)})
@@ -1578,6 +1570,8 @@ class SyncHandler:
         newly_joined_rooms = room_changes.newly_joined_rooms
         newly_left_rooms = room_changes.newly_left_rooms
 
+        # 4. We need to apply further processing to `room_entries` (rooms considered
+        # joined or archived).
         async def handle_room_entries(room_entry: "RoomSyncResultBuilder") -> None:
             logger.debug("Generating room entry for %s", room_entry.room_id)
             await self._generate_room_entry(
@@ -1596,31 +1590,13 @@ class SyncHandler:
         sync_result_builder.invited.extend(invited)
         sync_result_builder.knocked.extend(knocked)
 
-        # Now we want to get any newly joined, invited or knocking users
-        newly_joined_or_invited_or_knocked_users = set()
-        newly_left_users = set()
-        if since_token:
-            for joined_sync in sync_result_builder.joined:
-                it = itertools.chain(
-                    joined_sync.timeline.events, joined_sync.state.values()
-                )
-                for event in it:
-                    if event.type == EventTypes.Member:
-                        if (
-                            event.membership == Membership.JOIN
-                            or event.membership == Membership.INVITE
-                            or event.membership == Membership.KNOCK
-                        ):
-                            newly_joined_or_invited_or_knocked_users.add(
-                                event.state_key
-                            )
-                        else:
-                            prev_content = event.unsigned.get("prev_content", {})
-                            prev_membership = prev_content.get("membership", None)
-                            if prev_membership == Membership.JOIN:
-                                newly_left_users.add(event.state_key)
-
-        newly_left_users -= newly_joined_or_invited_or_knocked_users
+        # 5. Work out which users have joined or left rooms we're in. We use this
+        # to build the device_list part of the sync response in
+        # `_generate_sync_entry_for_device_list`.
+        (
+            newly_joined_or_invited_or_knocked_users,
+            newly_left_users,
+        ) = sync_result_builder.calculate_user_changes()
 
         return (
             set(newly_joined_rooms),
@@ -1628,6 +1604,29 @@ class SyncHandler:
             set(newly_left_rooms),
             newly_left_users,
         )
+
+    async def _get_ignored_users(self, user_id: str) -> FrozenSet[str]:
+        """Retrieve the users ignored by the given user from their global account_data.
+
+        Returns an empty set if
+        - there is no global account_data entry for ignored_users
+        - there is such an entry, but it's not a JSON object.
+        """
+        # TODO: Can we `SELECT ignored_user_id FROM ignored_users WHERE ignorer_user_id=?;` instead?
+        ignored_account_data = (
+            await self.store.get_global_account_data_by_type_for_user(
+                AccountDataTypes.IGNORED_USER_LIST, user_id=user_id
+            )
+        )
+
+        # If there is ignored users account data and it matches the proper type,
+        # then use it.
+        ignored_users: FrozenSet[str] = frozenset()
+        if ignored_account_data:
+            ignored_users_data = ignored_account_data.get("ignored_users", {})
+            if isinstance(ignored_users_data, dict):
+                ignored_users = frozenset(ignored_users_data.keys())
+        return ignored_users
 
     async def _have_rooms_changed(
         self, sync_result_builder: "SyncResultBuilder"
@@ -2340,6 +2339,39 @@ class SyncResultBuilder:
     archived: List[ArchivedSyncResult] = attr.Factory(list)
     groups: Optional[GroupsSyncResult] = None
     to_device: List[JsonDict] = attr.Factory(list)
+
+    def calculate_user_changes(self) -> Tuple[Set[str], Set[str]]:
+        """Work out which other users have joined or left rooms we are joined to.
+
+        This data only is only useful for an incremental sync.
+
+        The SyncResultBuilder is not modified by this function.
+        """
+        newly_joined_or_invited_or_knocked_users = set()
+        newly_left_users = set()
+        if self.since_token:
+            for joined_sync in self.joined:
+                it = itertools.chain(
+                    joined_sync.timeline.events, joined_sync.state.values()
+                )
+                for event in it:
+                    if event.type == EventTypes.Member:
+                        if (
+                            event.membership == Membership.JOIN
+                            or event.membership == Membership.INVITE
+                            or event.membership == Membership.KNOCK
+                        ):
+                            newly_joined_or_invited_or_knocked_users.add(
+                                event.state_key
+                            )
+                        else:
+                            prev_content = event.unsigned.get("prev_content", {})
+                            prev_membership = prev_content.get("membership", None)
+                            if prev_membership == Membership.JOIN:
+                                newly_left_users.add(event.state_key)
+
+        newly_left_users -= newly_joined_or_invited_or_knocked_users
+        return newly_joined_or_invited_or_knocked_users, newly_left_users
 
 
 @attr.s(slots=True, auto_attribs=True)
