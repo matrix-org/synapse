@@ -21,6 +21,8 @@ from twisted.internet.interfaces import IDelayedCall
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import Pusher, PusherConfig, PusherConfigException, ThrottleParams
 from synapse.push.mailer import Mailer
+from synapse.push.push_types import EmailReason
+from synapse.storage.databases.main.event_push_actions import EmailPushAction
 from synapse.util.threepids import validate_email
 
 if TYPE_CHECKING:
@@ -184,13 +186,13 @@ class EmailPusher(Pusher):
 
             should_notify_at = max(notif_ready_at, room_ready_at)
 
-            if should_notify_at < self.clock.time_msec():
+            if should_notify_at <= self.clock.time_msec():
                 # one of our notifications is ready for sending, so we send
                 # *one* email updating the user on their notifications,
                 # we then consider all previously outstanding notifications
                 # to be delivered.
 
-                reason = {
+                reason: EmailReason = {
                     "room_id": push_action["room_id"],
                     "now": self.clock.time_msec(),
                     "received_at": received_at,
@@ -275,7 +277,7 @@ class EmailPusher(Pusher):
         return may_send_at
 
     async def sent_notif_update_throttle(
-        self, room_id: str, notified_push_action: dict
+        self, room_id: str, notified_push_action: EmailPushAction
     ) -> None:
         # We have sent a notification, so update the throttle accordingly.
         # If the event that triggered the notif happened more than
@@ -315,7 +317,9 @@ class EmailPusher(Pusher):
             self.pusher_id, room_id, self.throttle_params[room_id]
         )
 
-    async def send_notification(self, push_actions: List[dict], reason: dict) -> None:
+    async def send_notification(
+        self, push_actions: List[EmailPushAction], reason: EmailReason
+    ) -> None:
         logger.info("Sending notif email for user %r", self.user_id)
 
         await self.mailer.send_notification_mail(

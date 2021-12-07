@@ -1,4 +1,5 @@
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,31 +14,50 @@
 # limitations under the License.
 
 import logging
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.logging import issue9533_logger
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.replication.tcp.streams import ToDeviceStream
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.storage.engines import PostgresEngine
-from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
+from synapse.storage.util.id_generators import (
+    AbstractStreamIdGenerator,
+    MultiWriterIdGenerator,
+    StreamIdGenerator,
+)
+from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.stream_change_cache import StreamChangeCache
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
 class DeviceInboxWorkerStore(SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
         self._instance_name = hs.get_instance_name()
 
         # Map of (user_id, device_id) to the last stream_id that has been
         # deleted up to. This is so that we can no op deletions.
-        self._last_device_delete_cache = ExpiringCache(
+        self._last_device_delete_cache: ExpiringCache[
+            Tuple[str, Optional[str]], int
+        ] = ExpiringCache(
             cache_name="last_device_delete_cache",
             clock=self._clock,
             max_len=10000,
@@ -49,14 +69,16 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 self._instance_name in hs.config.worker.writers.to_device
             )
 
-            self._device_inbox_id_gen = MultiWriterIdGenerator(
-                db_conn=db_conn,
-                db=database,
-                stream_name="to_device",
-                instance_name=self._instance_name,
-                tables=[("device_inbox", "instance_name", "stream_id")],
-                sequence_name="device_inbox_sequence",
-                writers=hs.config.worker.writers.to_device,
+            self._device_inbox_id_gen: AbstractStreamIdGenerator = (
+                MultiWriterIdGenerator(
+                    db_conn=db_conn,
+                    db=database,
+                    stream_name="to_device",
+                    instance_name=self._instance_name,
+                    tables=[("device_inbox", "instance_name", "stream_id")],
+                    sequence_name="device_inbox_sequence",
+                    writers=hs.config.worker.writers.to_device,
+                )
             )
         else:
             self._can_write_to_device = True
@@ -97,6 +119,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
     def process_replication_rows(self, stream_name, instance_name, token, rows):
         if stream_name == ToDeviceStream.NAME:
+            # If replication is happening than postgres must be being used.
+            assert isinstance(self._device_inbox_id_gen, MultiWriterIdGenerator)
             self._device_inbox_id_gen.advance(instance_name, token)
             for row in rows:
                 if row.entity.startswith("@"):
@@ -130,13 +154,16 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             limit: The maximum number of messages to retrieve.
 
         Returns:
-            A list of messages for the device and where in the stream the messages got to.
+            A tuple containing:
+                * A list of messages for the device.
+                * The max stream token of these messages. There may be more to retrieve
+                  if the given limit was reached.
         """
         has_changed = self._device_inbox_stream_cache.has_entity_changed(
             user_id, last_stream_id
         )
         if not has_changed:
-            return ([], current_stream_id)
+            return [], current_stream_id
 
         def get_new_messages_for_device_txn(txn):
             sql = (
@@ -149,12 +176,19 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             txn.execute(
                 sql, (user_id, device_id, last_stream_id, current_stream_id, limit)
             )
+
             messages = []
+            stream_pos = current_stream_id
+
             for row in txn:
                 stream_pos = row[0]
                 messages.append(db_to_json(row[1]))
+
+            # If the limit was not reached we know that there's no more data for this
+            # user/device pair up to current_stream_id.
             if len(messages) < limit:
                 stream_pos = current_stream_id
+
             return messages, stream_pos
 
         return await self.db_pool.runInteraction(
@@ -206,11 +240,11 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         log_kv({"message": f"deleted {count} messages for device", "count": count})
 
         # Update the cache, ensuring that we only ever increase the value
-        last_deleted_stream_id = self._last_device_delete_cache.get(
+        updated_last_deleted_stream_id = self._last_device_delete_cache.get(
             (user_id, device_id), 0
         )
         self._last_device_delete_cache[(user_id, device_id)] = max(
-            last_deleted_stream_id, up_to_stream_id
+            updated_last_deleted_stream_id, up_to_stream_id
         )
 
         return count
@@ -240,11 +274,11 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         )
         if not has_changed or last_stream_id == current_stream_id:
             log_kv({"message": "No new messages in stream"})
-            return ([], current_stream_id)
+            return [], current_stream_id
 
         if limit <= 0:
             # This can happen if we run out of room for EDUs in the transaction.
-            return ([], last_stream_id)
+            return [], last_stream_id
 
         @trace
         def get_new_messages_for_remote_destination_txn(txn):
@@ -256,13 +290,20 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 " LIMIT ?"
             )
             txn.execute(sql, (destination, last_stream_id, current_stream_id, limit))
+
             messages = []
+            stream_pos = current_stream_id
+
             for row in txn:
                 stream_pos = row[0]
                 messages.append(db_to_json(row[1]))
+
+            # If the limit was not reached we know that there's no more data for this
+            # user/device pair up to current_stream_id.
             if len(messages) < limit:
                 log_kv({"message": "Set stream position to current position"})
                 stream_pos = current_stream_id
+
             return messages, stream_pos
 
         return await self.db_pool.runInteraction(
@@ -368,8 +409,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         """Used to send messages from this server.
 
         Args:
-            local_messages_by_user_and_device:
-                Dictionary of user_id to device_id to message.
+            local_messages_by_user_then_device:
+                Dictionary of recipient user_id to recipient device_id to message.
             remote_messages_by_destination:
                 Dictionary of destination server_name to the EDU JSON to send.
 
@@ -411,7 +452,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 )
 
         async with self._device_inbox_id_gen.get_next() as stream_id:
-            now_ms = self.clock.time_msec()
+            now_ms = self._clock.time_msec()
             await self.db_pool.runInteraction(
                 "add_messages_to_device_inbox", add_messages_txn, now_ms, stream_id
             )
@@ -462,7 +503,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             )
 
         async with self._device_inbox_id_gen.get_next() as stream_id:
-            now_ms = self.clock.time_msec()
+            now_ms = self._clock.time_msec()
             await self.db_pool.runInteraction(
                 "add_messages_from_remote_to_device_inbox",
                 add_messages_txn,
@@ -485,10 +526,12 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             devices = list(messages_by_device.keys())
             if len(devices) == 1 and devices[0] == "*":
                 # Handle wildcard device_ids.
+                # We exclude hidden devices (such as cross-signing keys) here as they are
+                # not expected to receive to-device messages.
                 devices = self.db_pool.simple_select_onecol_txn(
                     txn,
                     table="devices",
-                    keyvalues={"user_id": user_id},
+                    keyvalues={"user_id": user_id, "hidden": False},
                     retcol="device_id",
                 )
 
@@ -501,10 +544,12 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 if not devices:
                     continue
 
+                # We exclude hidden devices (such as cross-signing keys) here as they are
+                # not expected to receive to-device messages.
                 rows = self.db_pool.simple_select_many_txn(
                     txn,
                     table="devices",
-                    keyvalues={"user_id": user_id},
+                    keyvalues={"user_id": user_id, "hidden": False},
                     column="device_id",
                     iterable=devices,
                     retcols=("device_id",),
@@ -552,8 +597,11 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
 class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
     DEVICE_INBOX_STREAM_ID = "device_inbox_stream_drop"
+    REMOVE_DELETED_DEVICES = "remove_deleted_devices_from_device_inbox"
+    REMOVE_HIDDEN_DEVICES = "remove_hidden_devices_from_device_inbox"
+    REMOVE_DEAD_DEVICES_FROM_INBOX = "remove_dead_devices_from_device_inbox"
 
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
 
         self.db_pool.updates.register_background_index_update(
@@ -567,6 +615,20 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
             self.DEVICE_INBOX_STREAM_ID, self._background_drop_index_device_inbox
         )
 
+        # Used to be a background update that deletes all device_inboxes for deleted
+        # devices.
+        self.db_pool.updates.register_noop_background_update(
+            self.REMOVE_DELETED_DEVICES
+        )
+        # Used to be a background update that deletes all device_inboxes for hidden
+        # devices.
+        self.db_pool.updates.register_noop_background_update(self.REMOVE_HIDDEN_DEVICES)
+
+        self.db_pool.updates.register_background_update_handler(
+            self.REMOVE_DEAD_DEVICES_FROM_INBOX,
+            self._remove_dead_devices_from_device_inbox,
+        )
+
     async def _background_drop_index_device_inbox(self, progress, batch_size):
         def reindex_txn(conn):
             txn = conn.cursor()
@@ -578,6 +640,84 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
         await self.db_pool.updates._end_background_update(self.DEVICE_INBOX_STREAM_ID)
 
         return 1
+
+    async def _remove_dead_devices_from_device_inbox(
+        self,
+        progress: JsonDict,
+        batch_size: int,
+    ) -> int:
+        """A background update to remove devices that were either deleted or hidden from
+        the device_inbox table.
+
+        Args:
+            progress: The update's progress dict.
+            batch_size: The batch size for this update.
+
+        Returns:
+            The number of rows deleted.
+        """
+
+        def _remove_dead_devices_from_device_inbox_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[int, bool]:
+
+            if "max_stream_id" in progress:
+                max_stream_id = progress["max_stream_id"]
+            else:
+                txn.execute("SELECT max(stream_id) FROM device_inbox")
+                # There's a type mismatch here between how we want to type the row and
+                # what fetchone says it returns, but we silence it because we know that
+                # res can't be None.
+                res: Tuple[Optional[int]] = txn.fetchone()  # type: ignore[assignment]
+                if res[0] is None:
+                    # this can only happen if the `device_inbox` table is empty, in which
+                    # case we have no work to do.
+                    return 0, True
+                else:
+                    max_stream_id = res[0]
+
+            start = progress.get("stream_id", 0)
+            stop = start + batch_size
+
+            # delete rows in `device_inbox` which do *not* correspond to a known,
+            # unhidden device.
+            sql = """
+                DELETE FROM device_inbox
+                WHERE
+                    stream_id >= ? AND stream_id < ?
+                    AND NOT EXISTS (
+                        SELECT * FROM devices d
+                        WHERE
+                            d.device_id=device_inbox.device_id
+                            AND d.user_id=device_inbox.user_id
+                            AND NOT hidden
+                    )
+                """
+
+            txn.execute(sql, (start, stop))
+
+            self.db_pool.updates._background_update_progress_txn(
+                txn,
+                self.REMOVE_DEAD_DEVICES_FROM_INBOX,
+                {
+                    "stream_id": stop,
+                    "max_stream_id": max_stream_id,
+                },
+            )
+
+            return stop > max_stream_id
+
+        finished = await self.db_pool.runInteraction(
+            "_remove_devices_from_device_inbox_txn",
+            _remove_dead_devices_from_device_inbox_txn,
+        )
+
+        if finished:
+            await self.db_pool.updates._end_background_update(
+                self.REMOVE_DEAD_DEVICES_FROM_INBOX,
+            )
+
+        return batch_size
 
 
 class DeviceInboxStore(DeviceInboxWorkerStore, DeviceInboxBackgroundUpdateStore):

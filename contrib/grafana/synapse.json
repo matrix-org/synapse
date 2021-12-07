@@ -54,7 +54,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": null,
-  "iteration": 1621258266004,
+  "iteration": 1628606819564,
   "links": [
     {
       "asDropdown": false,
@@ -307,7 +307,6 @@
       ],
       "thresholds": [
         {
-          "$$hashKey": "object:283",
           "colorMode": "warning",
           "fill": false,
           "line": true,
@@ -316,7 +315,6 @@
           "yaxis": "left"
         },
         {
-          "$$hashKey": "object:284",
           "colorMode": "critical",
           "fill": false,
           "line": true,
@@ -344,7 +342,6 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:255",
           "decimals": null,
           "format": "s",
           "label": "",
@@ -354,7 +351,6 @@
           "show": true
         },
         {
-          "$$hashKey": "object:256",
           "format": "hertz",
           "label": "",
           "logBase": 1,
@@ -429,7 +425,6 @@
       ],
       "thresholds": [
         {
-          "$$hashKey": "object:566",
           "colorMode": "critical",
           "fill": true,
           "line": true,
@@ -457,7 +452,6 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:538",
           "decimals": null,
           "format": "percentunit",
           "label": null,
@@ -467,7 +461,6 @@
           "show": true
         },
         {
-          "$$hashKey": "object:539",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -573,7 +566,6 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:1560",
           "format": "bytes",
           "logBase": 1,
           "max": null,
@@ -581,7 +573,6 @@
           "show": true
         },
         {
-          "$$hashKey": "object:1561",
           "format": "short",
           "logBase": 1,
           "max": null,
@@ -641,7 +632,6 @@
       "renderer": "flot",
       "seriesOverrides": [
         {
-          "$$hashKey": "object:639",
           "alias": "/max$/",
           "color": "#890F02",
           "fill": 0,
@@ -693,7 +683,6 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:650",
           "decimals": null,
           "format": "none",
           "label": "",
@@ -703,7 +692,6 @@
           "show": true
         },
         {
-          "$$hashKey": "object:651",
           "decimals": null,
           "format": "short",
           "label": null,
@@ -783,11 +771,9 @@
           "renderer": "flot",
           "seriesOverrides": [
             {
-              "$$hashKey": "object:1240",
               "alias": "/user/"
             },
             {
-              "$$hashKey": "object:1241",
               "alias": "/system/"
             }
           ],
@@ -817,7 +803,6 @@
           ],
           "thresholds": [
             {
-              "$$hashKey": "object:1278",
               "colorMode": "custom",
               "fillColor": "rgba(255, 255, 255, 1)",
               "line": true,
@@ -827,7 +812,6 @@
               "yaxis": "left"
             },
             {
-              "$$hashKey": "object:1279",
               "colorMode": "custom",
               "fillColor": "rgba(255, 255, 255, 1)",
               "line": true,
@@ -837,7 +821,6 @@
               "yaxis": "left"
             },
             {
-              "$$hashKey": "object:1498",
               "colorMode": "critical",
               "fill": true,
               "line": true,
@@ -865,7 +848,6 @@
           },
           "yaxes": [
             {
-              "$$hashKey": "object:1250",
               "decimals": null,
               "format": "percentunit",
               "label": "",
@@ -875,7 +857,6 @@
               "show": true
             },
             {
-              "$$hashKey": "object:1251",
               "format": "short",
               "logBase": 1,
               "max": null,
@@ -1427,7 +1408,6 @@
           },
           "yaxes": [
             {
-              "$$hashKey": "object:572",
               "format": "percentunit",
               "label": null,
               "logBase": 1,
@@ -1436,7 +1416,6 @@
               "show": true
             },
             {
-              "$$hashKey": "object:573",
               "format": "short",
               "label": null,
               "logBase": 1,
@@ -1720,7 +1699,6 @@
           },
           "yaxes": [
             {
-              "$$hashKey": "object:102",
               "format": "hertz",
               "logBase": 1,
               "max": null,
@@ -1728,7 +1706,6 @@
               "show": true
             },
             {
-              "$$hashKey": "object:103",
               "format": "short",
               "logBase": 1,
               "max": null,
@@ -3425,7 +3402,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 33
+            "y": 6
           },
           "hiddenSeries": false,
           "id": 79,
@@ -3442,9 +3419,12 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "7.3.7",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -3526,7 +3506,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 33
+            "y": 6
           },
           "hiddenSeries": false,
           "id": 83,
@@ -3543,9 +3523,12 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "7.3.7",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -3629,7 +3612,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 42
+            "y": 15
           },
           "hiddenSeries": false,
           "id": 109,
@@ -3646,9 +3629,12 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "7.3.7",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -3733,7 +3719,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 42
+            "y": 15
           },
           "hiddenSeries": false,
           "id": 111,
@@ -3750,9 +3736,12 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "7.3.7",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -3831,7 +3820,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 51
+            "y": 24
           },
           "hiddenSeries": false,
           "id": 142,
@@ -3847,8 +3836,11 @@
           "lines": true,
           "linewidth": 1,
           "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "7.3.7",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -3931,7 +3923,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 51
+            "y": 24
           },
           "hiddenSeries": false,
           "id": 140,
@@ -3948,9 +3940,12 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "7.3.7",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -4079,7 +4074,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 59
+            "y": 32
           },
           "heatmap": {},
           "hideZeroBuckets": false,
@@ -4145,7 +4140,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 60
+            "y": 33
           },
           "hiddenSeries": false,
           "id": 162,
@@ -4163,9 +4158,12 @@
           "linewidth": 0,
           "links": [],
           "nullPointMode": "connected",
+          "options": {
+            "alertThreshold": true
+          },
           "paceLength": 10,
           "percentage": false,
-          "pluginVersion": "7.1.3",
+          "pluginVersion": "7.3.7",
           "pointradius": 5,
           "points": false,
           "renderer": "flot",
@@ -4350,7 +4348,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 68
+            "y": 41
           },
           "heatmap": {},
           "hideZeroBuckets": false,
@@ -4396,6 +4394,311 @@
           "yBucketBound": "auto",
           "yBucketNumber": null,
           "yBucketSize": null
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
+          "fill": 1,
+          "fillGradient": 0,
+          "grid": {},
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 42
+          },
+          "hiddenSeries": false,
+          "id": 203,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "paceLength": 10,
+          "percentage": false,
+          "pluginVersion": "7.3.7",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "synapse_federation_server_oldest_inbound_pdu_in_staging{job=\"$job\",index=~\"$index\",instance=\"$instance\"}",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "rss {{index}}",
+              "refId": "A",
+              "step": 4
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Age of oldest event in staging area",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "ms",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "editable": true,
+          "error": false,
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
+          "fill": 1,
+          "fillGradient": 0,
+          "grid": {},
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 50
+          },
+          "hiddenSeries": false,
+          "id": 202,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "paceLength": 10,
+          "percentage": false,
+          "pluginVersion": "7.3.7",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "synapse_federation_server_number_inbound_pdu_in_staging{job=\"$job\",index=~\"$index\",instance=\"$instance\"}",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "rss {{index}}",
+              "refId": "A",
+              "step": 4
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Number of events in federation staging area",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "none",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": []
+          },
+          "fill": 1,
+          "fillGradient": 0,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 51
+          },
+          "hiddenSeries": false,
+          "id": 205,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "7.3.7",
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "sum(rate(synapse_federation_soft_failed_events_total{instance=\"$instance\"}[$bucket_size]))",
+              "interval": "",
+              "legendFormat": "soft-failed events",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Soft-failed event rate",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "hertz",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": false
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
         }
       ],
       "title": "Federation",
@@ -4647,7 +4950,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 8
+            "y": 33
           },
           "hiddenSeries": false,
           "id": 48,
@@ -4749,7 +5052,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 8
+            "y": 33
           },
           "hiddenSeries": false,
           "id": 104,
@@ -4877,7 +5180,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 15
+            "y": 40
           },
           "hiddenSeries": false,
           "id": 10,
@@ -4981,7 +5284,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 15
+            "y": 40
           },
           "hiddenSeries": false,
           "id": 11,
@@ -5086,7 +5389,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 22
+            "y": 47
           },
           "hiddenSeries": false,
           "id": 180,
@@ -5162,6 +5465,126 @@
               "max": null,
               "min": null,
               "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
+          "fill": 6,
+          "fillGradient": 0,
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 47
+          },
+          "hiddenSeries": false,
+          "id": 200,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "alertThreshold": true
+          },
+          "percentage": false,
+          "pluginVersion": "7.3.7",
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(synapse_storage_schedule_time_bucket{index=~\"$index\",instance=\"$instance\",job=\"$job\"}[$bucket_size])) by (le))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "99%",
+              "refId": "D"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(synapse_storage_schedule_time_bucket{index=~\"$index\",instance=\"$instance\",job=\"$job\"}[$bucket_size])) by (le))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "90%",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.75, sum(rate(synapse_storage_schedule_time_bucket{index=~\"$index\",instance=\"$instance\",job=\"$job\"}[$bucket_size])) by (le))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "75%",
+              "refId": "C"
+            },
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(synapse_storage_schedule_time_bucket{index=~\"$index\",instance=\"$instance\",job=\"$job\"}[$bucket_size])) by (le))",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "50%",
+              "refId": "B"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Time waiting for DB connection quantiles",
+          "tooltip": {
+            "shared": true,
+            "sort": 2,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "decimals": null,
+              "format": "s",
+              "label": "",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": false
             }
           ],
           "yaxis": {
@@ -5916,7 +6339,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 84
+            "y": 35
           },
           "hiddenSeries": false,
           "id": 1,
@@ -6022,7 +6445,7 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 84
+            "y": 35
           },
           "hiddenSeries": false,
           "id": 8,
@@ -6126,7 +6549,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 94
+            "y": 45
           },
           "hiddenSeries": false,
           "id": 38,
@@ -6226,7 +6649,7 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 94
+            "y": 45
           },
           "hiddenSeries": false,
           "id": 39,
@@ -6258,8 +6681,9 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "topk(10, rate(synapse_util_caches_cache:total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]) - rate(synapse_util_caches_cache:hits{job=\"$job\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "topk(10, rate(synapse_util_caches_cache:total{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]) - rate(synapse_util_caches_cache:hits{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
+              "interval": "",
               "intervalFactor": 2,
               "legendFormat": "{{name}} {{job}}-{{index}}",
               "refId": "A",
@@ -6326,7 +6750,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 104
+            "y": 55
           },
           "hiddenSeries": false,
           "id": 65,
@@ -6361,7 +6785,7 @@
               "expr": "rate(synapse_util_caches_cache:evicted_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 1,
-              "legendFormat": "{{name}} {{job}}-{{index}}",
+              "legendFormat": "{{name}} ({{reason}}) {{job}}-{{index}}",
               "refId": "A"
             }
           ],
@@ -9051,7 +9475,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 119
+            "y": 41
           },
           "hiddenSeries": false,
           "id": 156,
@@ -9089,7 +9513,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "synapse_admin_mau:current{instance=\"$instance\"}",
+              "expr": "synapse_admin_mau:current{instance=\"$instance\", job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -9097,7 +9521,7 @@
               "refId": "A"
             },
             {
-              "expr": "synapse_admin_mau:max{instance=\"$instance\"}",
+              "expr": "synapse_admin_mau:max{instance=\"$instance\", job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -9164,7 +9588,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 119
+            "y": 41
           },
           "hiddenSeries": false,
           "id": 160,
@@ -9484,7 +9908,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 73
+            "y": 43
           },
           "hiddenSeries": false,
           "id": 168,
@@ -9516,7 +9940,7 @@
             {
               "expr": "rate(synapse_appservice_api_sent_events{instance=\"$instance\"}[$bucket_size])",
               "interval": "",
-              "legendFormat": "{{exported_service}}",
+              "legendFormat": "{{service}}",
               "refId": "A"
             }
           ],
@@ -9579,7 +10003,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 73
+            "y": 43
           },
           "hiddenSeries": false,
           "id": 171,
@@ -9611,7 +10035,7 @@
             {
               "expr": "rate(synapse_appservice_api_sent_transactions{instance=\"$instance\"}[$bucket_size])",
               "interval": "",
-              "legendFormat": "{{exported_service}}",
+              "legendFormat": "{{service}}",
               "refId": "A"
             }
           ],
@@ -9959,7 +10383,6 @@
           },
           "yaxes": [
             {
-              "$$hashKey": "object:165",
               "format": "hertz",
               "label": null,
               "logBase": 1,
@@ -9968,7 +10391,6 @@
               "show": true
             },
             {
-              "$$hashKey": "object:166",
               "format": "short",
               "label": null,
               "logBase": 1,
@@ -10071,7 +10493,6 @@
           },
           "yaxes": [
             {
-              "$$hashKey": "object:390",
               "format": "hertz",
               "label": null,
               "logBase": 1,
@@ -10080,7 +10501,6 @@
               "show": true
             },
             {
-              "$$hashKey": "object:391",
               "format": "short",
               "label": null,
               "logBase": 1,
@@ -10169,7 +10589,6 @@
           },
           "yaxes": [
             {
-              "$$hashKey": "object:390",
               "format": "hertz",
               "label": null,
               "logBase": 1,
@@ -10178,7 +10597,6 @@
               "show": true
             },
             {
-              "$$hashKey": "object:391",
               "format": "short",
               "label": null,
               "logBase": 1,
@@ -10470,5 +10888,5 @@
   "timezone": "",
   "title": "Synapse",
   "uid": "000000012",
-  "version": 90
+  "version": 100
 }

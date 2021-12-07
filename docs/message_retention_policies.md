@@ -69,9 +69,9 @@ A default policy can be defined as such, in the `retention` section of
 the configuration file:
 
 ```yaml
-  default_policy:
-    min_lifetime: 1d
-    max_lifetime: 1y
+default_policy:
+  min_lifetime: 1d
+  max_lifetime: 1y
 ```
 
 Here, `min_lifetime` and `max_lifetime` have the same meaning and level
@@ -95,14 +95,14 @@ depending on an event's room's policy. This can be done by setting the
 file. An example of such configuration could be:
 
 ```yaml
-  purge_jobs:
-    - longest_max_lifetime: 3d
-      interval: 12h
-    - shortest_max_lifetime: 3d
-      longest_max_lifetime: 1w
-      interval: 1d
-    - shortest_max_lifetime: 1w
-      interval: 2d
+purge_jobs:
+  - longest_max_lifetime: 3d
+    interval: 12h
+  - shortest_max_lifetime: 3d
+    longest_max_lifetime: 1w
+    interval: 1d
+  - shortest_max_lifetime: 1w
+    interval: 2d
 ```
 
 In this example, we define three jobs:
@@ -141,8 +141,8 @@ purging old events in a room. These limits can be defined as such in the
 `retention` section of the configuration file:
 
 ```yaml
-  allowed_lifetime_min: 1d
-  allowed_lifetime_max: 1y
+allowed_lifetime_min: 1d
+allowed_lifetime_max: 1y
 ```
 
 The limits are considered when running purge jobs. If necessary, the

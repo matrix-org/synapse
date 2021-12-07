@@ -14,6 +14,10 @@
 import logging
 import urllib.parse
 from typing import Any, Generator, List, Optional
+from urllib.request import (  # type: ignore[attr-defined]
+    getproxies_environment,
+    proxy_bypass_environment,
+)
 
 from netaddr import AddrFormatError, IPAddress, IPSet
 from zope.interface import implementer
@@ -30,9 +34,12 @@ from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent, IAgentEndpointFactory, IBodyProducer, IResponse
 
 from synapse.crypto.context_factory import FederationPolicyForHTTPS
-from synapse.http.client import BlacklistingAgentWrapper
+from synapse.http import proxyagent
+from synapse.http.client import BlacklistingAgentWrapper, BlacklistingReactorWrapper
+from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint
 from synapse.http.federation.srv_resolver import Server, SrvResolver
 from synapse.http.federation.well_known_resolver import WellKnownResolver
+from synapse.http.proxyagent import ProxyAgent
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import ISynapseReactor
 from synapse.util import Clock
@@ -57,6 +64,14 @@ class MatrixFederationAgent:
         user_agent:
             The user agent header to use for federation requests.
 
+        ip_whitelist: Allowed IP addresses.
+
+        ip_blacklist: Disallowed IP addresses.
+
+        proxy_reactor: twisted reactor to use for connections to the proxy server
+           reactor might have some blacklisting applied (i.e. for DNS queries),
+           but we need unblocked access to the proxy.
+
         _srv_resolver:
             SrvResolver implementation to use for looking up SRV records. None
             to use a default implementation.
@@ -71,11 +86,18 @@ class MatrixFederationAgent:
         reactor: ISynapseReactor,
         tls_client_options_factory: Optional[FederationPolicyForHTTPS],
         user_agent: bytes,
+        ip_whitelist: IPSet,
         ip_blacklist: IPSet,
         _srv_resolver: Optional[SrvResolver] = None,
         _well_known_resolver: Optional[WellKnownResolver] = None,
     ):
-        self._reactor = reactor
+        # proxy_reactor is not blacklisted
+        proxy_reactor = reactor
+
+        # We need to use a DNS resolver which filters out blacklisted IP
+        # addresses, to prevent DNS rebinding.
+        reactor = BlacklistingReactorWrapper(reactor, ip_whitelist, ip_blacklist)
+
         self._clock = Clock(reactor)
         self._pool = HTTPConnectionPool(reactor)
         self._pool.retryAutomatically = False
@@ -83,24 +105,27 @@ class MatrixFederationAgent:
         self._pool.cachedConnectionTimeout = 2 * 60
 
         self._agent = Agent.usingEndpointFactory(
-            self._reactor,
+            reactor,
             MatrixHostnameEndpointFactory(
-                reactor, tls_client_options_factory, _srv_resolver
+                reactor,
+                proxy_reactor,
+                tls_client_options_factory,
+                _srv_resolver,
             ),
             pool=self._pool,
         )
         self.user_agent = user_agent
 
         if _well_known_resolver is None:
-            # Note that the name resolver has already been wrapped in a
-            # IPBlacklistingResolver by MatrixFederationHttpClient.
             _well_known_resolver = WellKnownResolver(
-                self._reactor,
+                reactor,
                 agent=BlacklistingAgentWrapper(
-                    Agent(
-                        self._reactor,
+                    ProxyAgent(
+                        reactor,
+                        proxy_reactor,
                         pool=self._pool,
                         contextFactory=tls_client_options_factory,
+                        use_proxy=True,
                     ),
                     ip_blacklist=ip_blacklist,
                 ),
@@ -200,10 +225,12 @@ class MatrixHostnameEndpointFactory:
     def __init__(
         self,
         reactor: IReactorCore,
+        proxy_reactor: IReactorCore,
         tls_client_options_factory: Optional[FederationPolicyForHTTPS],
         srv_resolver: Optional[SrvResolver],
     ):
         self._reactor = reactor
+        self._proxy_reactor = proxy_reactor
         self._tls_client_options_factory = tls_client_options_factory
 
         if srv_resolver is None:
@@ -211,9 +238,10 @@ class MatrixHostnameEndpointFactory:
 
         self._srv_resolver = srv_resolver
 
-    def endpointForURI(self, parsed_uri):
+    def endpointForURI(self, parsed_uri: URI):
         return MatrixHostnameEndpoint(
             self._reactor,
+            self._proxy_reactor,
             self._tls_client_options_factory,
             self._srv_resolver,
             parsed_uri,
@@ -227,22 +255,44 @@ class MatrixHostnameEndpoint:
 
     Args:
         reactor: twisted reactor to use for underlying requests
+        proxy_reactor: twisted reactor to use for connections to the proxy server.
+           'reactor' might have some blacklisting applied (i.e. for DNS queries),
+           but we need unblocked access to the proxy.
         tls_client_options_factory:
             factory to use for fetching client tls options, or none to disable TLS.
         srv_resolver: The SRV resolver to use
         parsed_uri: The parsed URI that we're wanting to connect to.
+
+    Raises:
+        ValueError if the environment variables contain an invalid proxy specification.
+        RuntimeError if no tls_options_factory is given for a https connection
     """
 
     def __init__(
         self,
         reactor: IReactorCore,
+        proxy_reactor: IReactorCore,
         tls_client_options_factory: Optional[FederationPolicyForHTTPS],
         srv_resolver: SrvResolver,
         parsed_uri: URI,
     ):
         self._reactor = reactor
-
         self._parsed_uri = parsed_uri
+
+        # http_proxy is not needed because federation is always over TLS
+        proxies = getproxies_environment()
+        https_proxy = proxies["https"].encode() if "https" in proxies else None
+        self.no_proxy = proxies["no"] if "no" in proxies else None
+
+        # endpoint and credentials to use to connect to the outbound https proxy, if any.
+        (
+            self._https_proxy_endpoint,
+            self._https_proxy_creds,
+        ) = proxyagent.http_proxy_endpoint(
+            https_proxy,
+            proxy_reactor,
+            tls_client_options_factory,
+        )
 
         # set up the TLS connection params
         #
@@ -273,9 +323,33 @@ class MatrixHostnameEndpoint:
             host = server.host
             port = server.port
 
+            should_skip_proxy = False
+            if self.no_proxy is not None:
+                should_skip_proxy = proxy_bypass_environment(
+                    host.decode(),
+                    proxies={"no": self.no_proxy},
+                )
+
+            endpoint: IStreamClientEndpoint
             try:
-                logger.debug("Connecting to %s:%i", host.decode("ascii"), port)
-                endpoint = HostnameEndpoint(self._reactor, host, port)
+                if self._https_proxy_endpoint and not should_skip_proxy:
+                    logger.debug(
+                        "Connecting to %s:%i via %s",
+                        host.decode("ascii"),
+                        port,
+                        self._https_proxy_endpoint,
+                    )
+                    endpoint = HTTPConnectProxyEndpoint(
+                        self._reactor,
+                        self._https_proxy_endpoint,
+                        host,
+                        port,
+                        proxy_creds=self._https_proxy_creds,
+                    )
+                else:
+                    logger.debug("Connecting to %s:%i", host.decode("ascii"), port)
+                    # not using a proxy
+                    endpoint = HostnameEndpoint(self._reactor, host, port)
                 if self._tls_options:
                     endpoint = wrapClientTLS(self._tls_options, endpoint)
                 result = await make_deferred_yieldable(

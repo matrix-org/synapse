@@ -17,6 +17,7 @@
 
 import logging
 import platform
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Optional, Tuple
 
 import synapse
@@ -25,6 +26,11 @@ from synapse.http.server import HttpServer, JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
+from synapse.rest.admin.background_updates import (
+    BackgroundUpdateEnabledRestServlet,
+    BackgroundUpdateRestServlet,
+    BackgroundUpdateStartJobRestServlet,
+)
 from synapse.rest.admin.devices import (
     DeleteDevicesRestServlet,
     DeviceRestServlet,
@@ -34,11 +40,21 @@ from synapse.rest.admin.event_reports import (
     EventReportDetailRestServlet,
     EventReportsRestServlet,
 )
+from synapse.rest.admin.federation import (
+    DestinationsRestServlet,
+    ListDestinationsRestServlet,
+)
 from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
-from synapse.rest.admin.purge_room_servlet import PurgeRoomServlet
+from synapse.rest.admin.registration_tokens import (
+    ListRegistrationTokensRestServlet,
+    NewRegistrationTokenRestServlet,
+    RegistrationTokenRestServlet,
+)
 from synapse.rest.admin.rooms import (
-    DeleteRoomRestServlet,
+    BlockRoomRestServlet,
+    DeleteRoomStatusByDeleteIdRestServlet,
+    DeleteRoomStatusByRoomIdRestServlet,
     ForwardExtremitiesRestServlet,
     JoinRoomAliasServlet,
     ListRoomRestServlet,
@@ -46,11 +62,12 @@ from synapse.rest.admin.rooms import (
     RoomEventContextServlet,
     RoomMembersRestServlet,
     RoomRestServlet,
+    RoomRestV2Servlet,
     RoomStateRestServlet,
-    ShutdownRoomRestServlet,
 )
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
 from synapse.rest.admin.statistics import UserMediaStatisticsRestServlet
+from synapse.rest.admin.username_available import UsernameAvailableRestServlet
 from synapse.rest.admin.users import (
     AccountValidityRenewServlet,
     DeactivateAccountRestServlet,
@@ -60,7 +77,6 @@ from synapse.rest.admin.users import (
     SearchUsersRestServlet,
     ShadowBanRestServlet,
     UserAdminServlet,
-    UserMediaRestServlet,
     UserMembershipRestServlet,
     UserRegisterServlet,
     UserRestServletV2,
@@ -87,7 +103,7 @@ class VersionServlet(RestServlet):
         }
 
     def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        return 200, self.res
+        return HTTPStatus.OK, self.res
 
 
 class PurgeHistoryRestServlet(RestServlet):
@@ -119,7 +135,7 @@ class PurgeHistoryRestServlet(RestServlet):
             event = await self.store.get_event(event_id)
 
             if event.room_id != room_id:
-                raise SynapseError(400, "Event is for wrong room.")
+                raise SynapseError(HTTPStatus.BAD_REQUEST, "Event is for wrong room.")
 
             # RoomStreamToken expects [int] not Optional[int]
             assert event.internal_metadata.stream_ordering is not None
@@ -133,7 +149,9 @@ class PurgeHistoryRestServlet(RestServlet):
             ts = body["purge_up_to_ts"]
             if not isinstance(ts, int):
                 raise SynapseError(
-                    400, "purge_up_to_ts must be an int", errcode=Codes.BAD_JSON
+                    HTTPStatus.BAD_REQUEST,
+                    "purge_up_to_ts must be an int",
+                    errcode=Codes.BAD_JSON,
                 )
 
             stream_ordering = await self.store.find_first_stream_ordering_after_ts(ts)
@@ -149,7 +167,9 @@ class PurgeHistoryRestServlet(RestServlet):
                     stream_ordering,
                 )
                 raise SynapseError(
-                    404, "there is no event to be purged", errcode=Codes.NOT_FOUND
+                    HTTPStatus.NOT_FOUND,
+                    "there is no event to be purged",
+                    errcode=Codes.NOT_FOUND,
                 )
             (stream, topo, _event_id) = r
             token = "t%d-%d" % (topo, stream)
@@ -162,7 +182,7 @@ class PurgeHistoryRestServlet(RestServlet):
             )
         else:
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "must specify purge_up_to_event_id or purge_up_to_ts",
                 errcode=Codes.BAD_JSON,
             )
@@ -171,7 +191,7 @@ class PurgeHistoryRestServlet(RestServlet):
             room_id, token, delete_local_events=delete_local_events
         )
 
-        return 200, {"purge_id": purge_id}
+        return HTTPStatus.OK, {"purge_id": purge_id}
 
 
 class PurgeHistoryStatusRestServlet(RestServlet):
@@ -190,7 +210,7 @@ class PurgeHistoryStatusRestServlet(RestServlet):
         if purge_status is None:
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
-        return 200, purge_status.asdict()
+        return HTTPStatus.OK, purge_status.asdict()
 
 
 ########################################################################################
@@ -214,17 +234,17 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     Register all the admin servlets.
     """
     register_servlets_for_client_rest_resource(hs, http_server)
+    BlockRoomRestServlet(hs).register(http_server)
     ListRoomRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
     RoomRestServlet(hs).register(http_server)
+    RoomRestV2Servlet(hs).register(http_server)
     RoomMembersRestServlet(hs).register(http_server)
-    DeleteRoomRestServlet(hs).register(http_server)
+    DeleteRoomStatusByDeleteIdRestServlet(hs).register(http_server)
+    DeleteRoomStatusByRoomIdRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
-    PurgeRoomServlet(hs).register(http_server)
-    SendServerNoticeServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
     UserAdminServlet(hs).register(http_server)
-    UserMediaRestServlet(hs).register(http_server)
     UserMembershipRestServlet(hs).register(http_server)
     UserTokenRestServlet(hs).register(http_server)
     UserRestServletV2(hs).register(http_server)
@@ -241,6 +261,19 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ForwardExtremitiesRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
     RateLimitRestServlet(hs).register(http_server)
+    UsernameAvailableRestServlet(hs).register(http_server)
+    ListRegistrationTokensRestServlet(hs).register(http_server)
+    NewRegistrationTokenRestServlet(hs).register(http_server)
+    RegistrationTokenRestServlet(hs).register(http_server)
+    DestinationsRestServlet(hs).register(http_server)
+    ListDestinationsRestServlet(hs).register(http_server)
+
+    # Some servlets only get registered for the main process.
+    if hs.config.worker.worker_app is None:
+        SendServerNoticeServlet(hs).register(http_server)
+        BackgroundUpdateEnabledRestServlet(hs).register(http_server)
+        BackgroundUpdateRestServlet(hs).register(http_server)
+        BackgroundUpdateStartJobRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(
@@ -253,14 +286,13 @@ def register_servlets_for_client_rest_resource(
     PurgeHistoryRestServlet(hs).register(http_server)
     ResetPasswordRestServlet(hs).register(http_server)
     SearchUsersRestServlet(hs).register(http_server)
-    ShutdownRoomRestServlet(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
     DeleteGroupAdminRestServlet(hs).register(http_server)
     AccountValidityRenewServlet(hs).register(http_server)
 
     # Load the media repo ones if we're using them. Otherwise load the servlets which
     # don't need a media repo (typically readonly admin APIs).
-    if hs.config.can_load_media_repo:
+    if hs.config.media.can_load_media_repo:
         register_servlets_for_media_repo(hs, http_server)
     else:
         ListMediaInRoom(hs).register(http_server)

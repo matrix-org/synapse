@@ -1,5 +1,6 @@
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +15,8 @@
 # limitations under the License.
 import datetime
 import logging
-from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Tuple
+from types import TracebackType
+from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Tuple, Type
 
 import attr
 from prometheus_client import Counter
@@ -213,7 +215,7 @@ class PerDestinationQueue:
         self._pending_edus_keyed[(edu.edu_type, key)] = edu
         self.attempt_new_transaction()
 
-    def send_edu(self, edu) -> None:
+    def send_edu(self, edu: Edu) -> None:
         self._pending_edus.append(edu)
         self.attempt_new_transaction()
 
@@ -560,7 +562,7 @@ class PerDestinationQueue:
 
         assert len(edus) <= limit, "get_device_updates_by_remote returned too many EDUs"
 
-        return (edus, now_stream_id)
+        return edus, now_stream_id
 
     async def _get_to_device_message_edus(self, limit: int) -> Tuple[List[Edu], int]:
         last_device_stream_id = self._last_device_stream_id
@@ -593,7 +595,7 @@ class PerDestinationQueue:
                 stream_id,
             )
 
-        return (edus, stream_id)
+        return edus, stream_id
 
     def _start_catching_up(self) -> None:
         """
@@ -701,7 +703,12 @@ class _TransactionQueueManager:
 
         return self._pdus, pending_edus
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc: Optional[BaseException],
+        tb: Optional[TracebackType],
+    ) -> None:
         if exc_type is not None:
             # Failed to send transaction, so we bail out.
             return

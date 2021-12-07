@@ -11,7 +11,7 @@ Note that this will give administrative access to synapse to **all users** with
 shell access to the server. It should therefore **not** be enabled in
 environments where untrusted users have shell access.
 
-***
+## Configuring the manhole
 
 To enable it, first uncomment the `manhole` listener configuration in
 `homeserver.yaml`. The configuration is slightly different if you're using docker.
@@ -52,22 +52,43 @@ listeners:
     type: manhole
 ```
 
-#### Accessing synapse manhole
+### Security settings
+
+The following config options are available:
+
+- `username` - The username for the manhole (defaults to `matrix`)
+- `password` - The password for the manhole (defaults to `rabbithole`)
+- `ssh_priv_key` - The path to a private SSH key (defaults to a hardcoded value)
+- `ssh_pub_key` - The path to a public SSH key (defaults to a hardcoded value)
+
+For example:
+
+```yaml
+manhole_settings:
+  username: manhole
+  password: mypassword
+  ssh_priv_key: "/home/synapse/manhole_keys/id_rsa"
+  ssh_pub_key: "/home/synapse/manhole_keys/id_rsa.pub"
+```
+
+
+## Accessing synapse manhole
 
 Then restart synapse, and point an ssh client at port 9000 on localhost, using
-the username `matrix`:
+the username and password configured in `homeserver.yaml` - with the default 
+configuration, this would be:
 
 ```bash
 ssh -p9000 matrix@localhost
 ```
 
-The password is `rabbithole`.
+Then enter the password when prompted (the default is `rabbithole`).
 
 This gives a Python REPL in which `hs` gives access to the
 `synapse.server.HomeServer` object - which in turn gives access to many other
 parts of the process.
 
-Note that any call which returns a coroutine will need to be wrapped in `ensureDeferred`.
+Note that, prior to Synapse 1.41, any call which returns a coroutine will need to be wrapped in `ensureDeferred`.
 
 As a simple example, retrieving an event from the database:
 

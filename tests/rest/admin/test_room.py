@@ -11,148 +11,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import json
 import urllib.parse
+from http import HTTPStatus
 from typing import List, Optional
 from unittest.mock import Mock
 
-from parameterized import parameterized_class
+from parameterized import parameterized
+
+from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import Codes
-from synapse.rest.client.v1 import directory, events, login, room
+from synapse.handlers.pagination import PaginationHandler
+from synapse.rest.client import directory, events, login, room
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 
 """Tests admin REST events for /rooms paths."""
 
 
-class ShutdownRoomTestCase(unittest.HomeserverTestCase):
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-        login.register_servlets,
-        events.register_servlets,
-        room.register_servlets,
-        room.register_deprecated_servlets,
-    ]
-
-    def prepare(self, reactor, clock, hs):
-        self.event_creation_handler = hs.get_event_creation_handler()
-        hs.config.user_consent_version = "1"
-
-        consent_uri_builder = Mock()
-        consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
-        self.event_creation_handler._consent_uri_builder = consent_uri_builder
-
-        self.store = hs.get_datastore()
-
-        self.admin_user = self.register_user("admin", "pass", admin=True)
-        self.admin_user_tok = self.login("admin", "pass")
-
-        self.other_user = self.register_user("user", "pass")
-        self.other_user_token = self.login("user", "pass")
-
-        # Mark the admin user as having consented
-        self.get_success(self.store.user_set_consent_version(self.admin_user, "1"))
-
-    def test_shutdown_room_consent(self):
-        """Test that we can shutdown rooms with local users who have not
-        yet accepted the privacy policy. This used to fail when we tried to
-        force part the user from the old room.
-        """
-        self.event_creation_handler._block_events_without_consent_error = None
-
-        room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_token)
-
-        # Assert one user in room
-        users_in_room = self.get_success(self.store.get_users_in_room(room_id))
-        self.assertEqual([self.other_user], users_in_room)
-
-        # Enable require consent to send events
-        self.event_creation_handler._block_events_without_consent_error = "Error"
-
-        # Assert that the user is getting consent error
-        self.helper.send(
-            room_id, body="foo", tok=self.other_user_token, expect_code=403
-        )
-
-        # Test that the admin can still send shutdown
-        url = "/_synapse/admin/v1/shutdown_room/" + room_id
-        channel = self.make_request(
-            "POST",
-            url.encode("ascii"),
-            json.dumps({"new_room_user_id": self.admin_user}),
-            access_token=self.admin_user_tok,
-        )
-
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-
-        # Assert there is now no longer anyone in the room
-        users_in_room = self.get_success(self.store.get_users_in_room(room_id))
-        self.assertEqual([], users_in_room)
-
-    def test_shutdown_room_block_peek(self):
-        """Test that a world_readable room can no longer be peeked into after
-        it has been shut down.
-        """
-
-        self.event_creation_handler._block_events_without_consent_error = None
-
-        room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_token)
-
-        # Enable world readable
-        url = "rooms/%s/state/m.room.history_visibility" % (room_id,)
-        channel = self.make_request(
-            "PUT",
-            url.encode("ascii"),
-            json.dumps({"history_visibility": "world_readable"}),
-            access_token=self.other_user_token,
-        )
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-
-        # Test that the admin can still send shutdown
-        url = "/_synapse/admin/v1/shutdown_room/" + room_id
-        channel = self.make_request(
-            "POST",
-            url.encode("ascii"),
-            json.dumps({"new_room_user_id": self.admin_user}),
-            access_token=self.admin_user_tok,
-        )
-
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-
-        # Assert we can no longer peek into the room
-        self._assert_peek(room_id, expect_code=403)
-
-    def _assert_peek(self, room_id, expect_code):
-        """Assert that the admin user can (or cannot) peek into the room."""
-
-        url = "rooms/%s/initialSync" % (room_id,)
-        channel = self.make_request(
-            "GET", url.encode("ascii"), access_token=self.admin_user_tok
-        )
-        self.assertEqual(
-            expect_code, int(channel.result["code"]), msg=channel.result["body"]
-        )
-
-        url = "events?timeout=0&room_id=" + room_id
-        channel = self.make_request(
-            "GET", url.encode("ascii"), access_token=self.admin_user_tok
-        )
-        self.assertEqual(
-            expect_code, int(channel.result["code"]), msg=channel.result["body"]
-        )
-
-
-@parameterized_class(
-    ("method", "url_template"),
-    [
-        ("POST", "/_synapse/admin/v1/rooms/%s/delete"),
-        ("DELETE", "/_synapse/admin/v1/rooms/%s"),
-    ],
-)
 class DeleteRoomTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
@@ -162,9 +42,9 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         room.register_deprecated_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.event_creation_handler = hs.get_event_creation_handler()
-        hs.config.user_consent_version = "1"
+        hs.config.consent.user_consent_version = "1"
 
         consent_uri_builder = Mock()
         consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
@@ -184,53 +64,52 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(
             self.other_user, tok=self.other_user_tok
         )
-        self.url = self.url_template % self.room_id
+        self.url = "/_synapse/admin/v1/rooms/%s" % self.room_id
 
     def test_requester_is_no_admin(self):
         """
-        If the user is not a server admin, an error 403 is returned.
+        If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
         """
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url,
-            json.dumps({}),
+            {},
             access_token=self.other_user_tok,
         )
 
-        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_room_does_not_exist(self):
         """
-        Check that unknown rooms/server return error 404.
+        Check that unknown rooms/server return 200
         """
-        url = self.url_template % "!unknown:test"
+        url = "/_synapse/admin/v1/rooms/%s" % "!unknown:test"
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             url,
-            json.dumps({}),
+            {},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(404, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
     def test_room_is_not_valid(self):
         """
-        Check that invalid room names, return an error 400.
+        Check that invalid room names, return an error HTTPStatus.BAD_REQUEST.
         """
-        url = self.url_template % "invalidroom"
+        url = "/_synapse/admin/v1/rooms/%s" % "invalidroom"
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             url,
-            json.dumps({}),
+            {},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(
             "invalidroom is not a legal room ID",
             channel.json_body["error"],
@@ -240,16 +119,15 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         Tests that the user ID must be from local server but it does not have to exist.
         """
-        body = json.dumps({"new_room_user_id": "@unknown:test"})
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url,
-            content=body.encode(encoding="utf_8"),
+            content={"new_room_user_id": "@unknown:test"},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertIn("new_room_id", channel.json_body)
         self.assertIn("kicked_users", channel.json_body)
         self.assertIn("failed_to_kick_users", channel.json_body)
@@ -259,16 +137,15 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         Check that only local users can create new room to move members.
         """
-        body = json.dumps({"new_room_user_id": "@not:exist.bla"})
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url,
-            content=body.encode(encoding="utf_8"),
+            content={"new_room_user_id": "@not:exist.bla"},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(
             "User must be our own: @not:exist.bla",
             channel.json_body["error"],
@@ -278,32 +155,30 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         If parameter `block` is not boolean, return an error
         """
-        body = json.dumps({"block": "NotBool"})
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url,
-            content=body.encode(encoding="utf_8"),
+            content={"block": "NotBool"},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
 
     def test_purge_is_not_bool(self):
         """
         If parameter `purge` is not boolean, return an error
         """
-        body = json.dumps({"purge": "NotBool"})
 
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url,
-            content=body.encode(encoding="utf_8"),
+            content={"purge": "NotBool"},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
 
     def test_purge_room_and_block(self):
@@ -320,16 +195,14 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         # Assert one user in room
         self._is_member(room_id=self.room_id, user_id=self.other_user)
 
-        body = json.dumps({"block": True, "purge": True})
-
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url.encode("ascii"),
-            content=body.encode(encoding="utf_8"),
+            content={"block": True, "purge": True},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(None, channel.json_body["new_room_id"])
         self.assertEqual(self.other_user, channel.json_body["kicked_users"][0])
         self.assertIn("failed_to_kick_users", channel.json_body)
@@ -353,16 +226,14 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         # Assert one user in room
         self._is_member(room_id=self.room_id, user_id=self.other_user)
 
-        body = json.dumps({"block": False, "purge": True})
-
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url.encode("ascii"),
-            content=body.encode(encoding="utf_8"),
+            content={"block": False, "purge": True},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(None, channel.json_body["new_room_id"])
         self.assertEqual(self.other_user, channel.json_body["kicked_users"][0])
         self.assertIn("failed_to_kick_users", channel.json_body)
@@ -387,16 +258,14 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         # Assert one user in room
         self._is_member(room_id=self.room_id, user_id=self.other_user)
 
-        body = json.dumps({"block": False, "purge": False})
-
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url.encode("ascii"),
-            content=body.encode(encoding="utf_8"),
+            content={"block": True, "purge": False},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(None, channel.json_body["new_room_id"])
         self.assertEqual(self.other_user, channel.json_body["kicked_users"][0])
         self.assertIn("failed_to_kick_users", channel.json_body)
@@ -404,8 +273,31 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         with self.assertRaises(AssertionError):
             self._is_purged(self.room_id)
-        self._is_blocked(self.room_id, expect=False)
+        self._is_blocked(self.room_id, expect=True)
         self._has_no_members(self.room_id)
+
+    @parameterized.expand([(True,), (False,)])
+    def test_block_unknown_room(self, purge: bool) -> None:
+        """
+        We can block an unknown room. In this case, the `purge` argument
+        should be ignored.
+        """
+        room_id = "!unknown:test"
+
+        # The room isn't already in the blocked rooms table
+        self._is_blocked(room_id, expect=False)
+
+        # Request the room be blocked.
+        channel = self.make_request(
+            "DELETE",
+            f"/_synapse/admin/v1/rooms/{room_id}",
+            {"block": True, "purge": purge},
+            access_token=self.admin_user_tok,
+        )
+
+        # The room is now blocked.
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self._is_blocked(room_id)
 
     def test_shutdown_room_consent(self):
         """Test that we can shutdown rooms with local users who have not
@@ -424,7 +316,10 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         # Assert that the user is getting consent error
         self.helper.send(
-            self.room_id, body="foo", tok=self.other_user_tok, expect_code=403
+            self.room_id,
+            body="foo",
+            tok=self.other_user_tok,
+            expect_code=HTTPStatus.FORBIDDEN,
         )
 
         # Test that room is not purged
@@ -436,13 +331,13 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         # Test that the admin can still send shutdown
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url,
-            json.dumps({"new_room_user_id": self.admin_user}),
+            {"new_room_user_id": self.admin_user},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(self.other_user, channel.json_body["kicked_users"][0])
         self.assertIn("new_room_id", channel.json_body)
         self.assertIn("failed_to_kick_users", channel.json_body)
@@ -468,10 +363,10 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "PUT",
             url.encode("ascii"),
-            json.dumps({"history_visibility": "world_readable"}),
+            {"history_visibility": "world_readable"},
             access_token=self.other_user_tok,
         )
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # Test that room is not purged
         with self.assertRaises(AssertionError):
@@ -482,13 +377,13 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         # Test that the admin can still send shutdown
         channel = self.make_request(
-            self.method,
+            "DELETE",
             self.url,
-            json.dumps({"new_room_user_id": self.admin_user}),
+            {"new_room_user_id": self.admin_user},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(self.other_user, channel.json_body["kicked_users"][0])
         self.assertIn("new_room_id", channel.json_body)
         self.assertIn("failed_to_kick_users", channel.json_body)
@@ -503,7 +398,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         self._has_no_members(self.room_id)
 
         # Assert we can no longer peek into the room
-        self._assert_peek(self.room_id, expect_code=403)
+        self._assert_peek(self.room_id, expect_code=HTTPStatus.FORBIDDEN)
 
     def _is_blocked(self, room_id, expect=True):
         """Assert that the room is blocked or not"""
@@ -544,51 +439,544 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
-        self.assertEqual(
-            expect_code, int(channel.result["code"]), msg=channel.result["body"]
-        )
+        self.assertEqual(expect_code, channel.code, msg=channel.json_body)
 
         url = "events?timeout=0&room_id=" + room_id
         channel = self.make_request(
             "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
-        self.assertEqual(
-            expect_code, int(channel.result["code"]), msg=channel.result["body"]
-        )
+        self.assertEqual(expect_code, channel.code, msg=channel.json_body)
 
 
-class PurgeRoomTestCase(unittest.HomeserverTestCase):
-    """Test /purge_room admin API."""
-
+class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
+        events.register_servlets,
         room.register_servlets,
+        room.register_deprecated_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.event_creation_handler = hs.get_event_creation_handler()
+        hs.config.consent.user_consent_version = "1"
+
+        consent_uri_builder = Mock()
+        consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
+        self.event_creation_handler._consent_uri_builder = consent_uri_builder
+
         self.store = hs.get_datastore()
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
-    def test_purge_room(self):
-        room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+        self.other_user = self.register_user("user", "pass")
+        self.other_user_tok = self.login("user", "pass")
 
-        # All users have to have left the room.
-        self.helper.leave(room_id, user=self.admin_user, tok=self.admin_user_tok)
+        # Mark the admin user as having consented
+        self.get_success(self.store.user_set_consent_version(self.admin_user, "1"))
 
-        url = "/_synapse/admin/v1/purge_room"
+        self.room_id = self.helper.create_room_as(
+            self.other_user, tok=self.other_user_tok
+        )
+        self.url = f"/_synapse/admin/v2/rooms/{self.room_id}"
+        self.url_status_by_room_id = (
+            f"/_synapse/admin/v2/rooms/{self.room_id}/delete_status"
+        )
+        self.url_status_by_delete_id = "/_synapse/admin/v2/rooms/delete_status/"
+
+    @parameterized.expand(
+        [
+            ("DELETE", "/_synapse/admin/v2/rooms/%s"),
+            ("GET", "/_synapse/admin/v2/rooms/%s/delete_status"),
+            ("GET", "/_synapse/admin/v2/rooms/delete_status/%s"),
+        ]
+    )
+    def test_requester_is_no_admin(self, method: str, url: str):
+        """
+        If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
+        """
+
         channel = self.make_request(
-            "POST",
-            url.encode("ascii"),
-            {"room_id": room_id},
+            method,
+            url % self.room_id,
+            content={},
+            access_token=self.other_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    def test_room_does_not_exist(self):
+        """
+        Check that unknown rooms/server return 200
+
+        This is important, as it allows incomplete vestiges of rooms to be cleared up
+        even if the create event/etc is missing.
+        """
+        room_id = "!unknown:test"
+        channel = self.make_request(
+            "DELETE",
+            f"/_synapse/admin/v2/rooms/{room_id}",
+            content={},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertIn("delete_id", channel.json_body)
+        delete_id = channel.json_body["delete_id"]
 
-        # Test that the following tables have been purged of all rows related to the room.
+        # get status
+        channel = self.make_request(
+            "GET",
+            f"/_synapse/admin/v2/rooms/{room_id}/delete_status",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(1, len(channel.json_body["results"]))
+        self.assertEqual("complete", channel.json_body["results"][0]["status"])
+        self.assertEqual(delete_id, channel.json_body["results"][0]["delete_id"])
+
+    @parameterized.expand(
+        [
+            ("DELETE", "/_synapse/admin/v2/rooms/%s"),
+            ("GET", "/_synapse/admin/v2/rooms/%s/delete_status"),
+        ]
+    )
+    def test_room_is_not_valid(self, method: str, url: str):
+        """
+        Check that invalid room names, return an error HTTPStatus.BAD_REQUEST.
+        """
+
+        channel = self.make_request(
+            method,
+            url % "invalidroom",
+            content={},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(
+            "invalidroom is not a legal room ID",
+            channel.json_body["error"],
+        )
+
+    def test_new_room_user_does_not_exist(self):
+        """
+        Tests that the user ID must be from local server but it does not have to exist.
+        """
+
+        channel = self.make_request(
+            "DELETE",
+            self.url,
+            content={"new_room_user_id": "@unknown:test"},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertIn("delete_id", channel.json_body)
+        delete_id = channel.json_body["delete_id"]
+
+        self._test_result(delete_id, self.other_user, expect_new_room=True)
+
+    def test_new_room_user_is_not_local(self):
+        """
+        Check that only local users can create new room to move members.
+        """
+
+        channel = self.make_request(
+            "DELETE",
+            self.url,
+            content={"new_room_user_id": "@not:exist.bla"},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(
+            "User must be our own: @not:exist.bla",
+            channel.json_body["error"],
+        )
+
+    def test_block_is_not_bool(self):
+        """
+        If parameter `block` is not boolean, return an error
+        """
+
+        channel = self.make_request(
+            "DELETE",
+            self.url,
+            content={"block": "NotBool"},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
+
+    def test_purge_is_not_bool(self):
+        """
+        If parameter `purge` is not boolean, return an error
+        """
+
+        channel = self.make_request(
+            "DELETE",
+            self.url,
+            content={"purge": "NotBool"},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
+
+    def test_delete_expired_status(self):
+        """Test that the task status is removed after expiration."""
+
+        # first task, do not purge, that we can create a second task
+        channel = self.make_request(
+            "DELETE",
+            self.url.encode("ascii"),
+            content={"purge": False},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertIn("delete_id", channel.json_body)
+        delete_id1 = channel.json_body["delete_id"]
+
+        # go ahead
+        self.reactor.advance(PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000 / 2)
+
+        # second task
+        channel = self.make_request(
+            "DELETE",
+            self.url.encode("ascii"),
+            content={"purge": True},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertIn("delete_id", channel.json_body)
+        delete_id2 = channel.json_body["delete_id"]
+
+        # get status
+        channel = self.make_request(
+            "GET",
+            self.url_status_by_room_id,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(2, len(channel.json_body["results"]))
+        self.assertEqual("complete", channel.json_body["results"][0]["status"])
+        self.assertEqual("complete", channel.json_body["results"][1]["status"])
+        self.assertEqual(delete_id1, channel.json_body["results"][0]["delete_id"])
+        self.assertEqual(delete_id2, channel.json_body["results"][1]["delete_id"])
+
+        # get status after more than clearing time for first task
+        # second task is not cleared
+        self.reactor.advance(PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000 / 2)
+
+        channel = self.make_request(
+            "GET",
+            self.url_status_by_room_id,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(1, len(channel.json_body["results"]))
+        self.assertEqual("complete", channel.json_body["results"][0]["status"])
+        self.assertEqual(delete_id2, channel.json_body["results"][0]["delete_id"])
+
+        # get status after more than clearing time for all tasks
+        self.reactor.advance(PaginationHandler.CLEAR_PURGE_AFTER_MS / 1000 / 2)
+
+        channel = self.make_request(
+            "GET",
+            self.url_status_by_room_id,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+
+    def test_delete_same_room_twice(self):
+        """Test that the call for delete a room at second time gives an exception."""
+
+        body = {"new_room_user_id": self.admin_user}
+
+        # first call to delete room
+        # and do not wait for finish the task
+        first_channel = self.make_request(
+            "DELETE",
+            self.url.encode("ascii"),
+            content=body,
+            access_token=self.admin_user_tok,
+            await_result=False,
+        )
+
+        # second call to delete room
+        second_channel = self.make_request(
+            "DELETE",
+            self.url.encode("ascii"),
+            content=body,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(
+            HTTPStatus.BAD_REQUEST, second_channel.code, msg=second_channel.json_body
+        )
+        self.assertEqual(Codes.UNKNOWN, second_channel.json_body["errcode"])
+        self.assertEqual(
+            f"History purge already in progress for {self.room_id}",
+            second_channel.json_body["error"],
+        )
+
+        # get result of first call
+        first_channel.await_result()
+        self.assertEqual(HTTPStatus.OK, first_channel.code, msg=first_channel.json_body)
+        self.assertIn("delete_id", first_channel.json_body)
+
+        # check status after finish the task
+        self._test_result(
+            first_channel.json_body["delete_id"],
+            self.other_user,
+            expect_new_room=True,
+        )
+
+    def test_purge_room_and_block(self):
+        """Test to purge a room and block it.
+        Members will not be moved to a new room and will not receive a message.
+        """
+        # Test that room is not purged
+        with self.assertRaises(AssertionError):
+            self._is_purged(self.room_id)
+
+        # Test that room is not blocked
+        self._is_blocked(self.room_id, expect=False)
+
+        # Assert one user in room
+        self._is_member(room_id=self.room_id, user_id=self.other_user)
+
+        channel = self.make_request(
+            "DELETE",
+            self.url.encode("ascii"),
+            content={"block": True, "purge": True},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertIn("delete_id", channel.json_body)
+        delete_id = channel.json_body["delete_id"]
+
+        self._test_result(delete_id, self.other_user)
+
+        self._is_purged(self.room_id)
+        self._is_blocked(self.room_id, expect=True)
+        self._has_no_members(self.room_id)
+
+    def test_purge_room_and_not_block(self):
+        """Test to purge a room and do not block it.
+        Members will not be moved to a new room and will not receive a message.
+        """
+        # Test that room is not purged
+        with self.assertRaises(AssertionError):
+            self._is_purged(self.room_id)
+
+        # Test that room is not blocked
+        self._is_blocked(self.room_id, expect=False)
+
+        # Assert one user in room
+        self._is_member(room_id=self.room_id, user_id=self.other_user)
+
+        channel = self.make_request(
+            "DELETE",
+            self.url.encode("ascii"),
+            content={"block": False, "purge": True},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertIn("delete_id", channel.json_body)
+        delete_id = channel.json_body["delete_id"]
+
+        self._test_result(delete_id, self.other_user)
+
+        self._is_purged(self.room_id)
+        self._is_blocked(self.room_id, expect=False)
+        self._has_no_members(self.room_id)
+
+    def test_block_room_and_not_purge(self):
+        """Test to block a room without purging it.
+        Members will not be moved to a new room and will not receive a message.
+        The room will not be purged.
+        """
+        # Test that room is not purged
+        with self.assertRaises(AssertionError):
+            self._is_purged(self.room_id)
+
+        # Test that room is not blocked
+        self._is_blocked(self.room_id, expect=False)
+
+        # Assert one user in room
+        self._is_member(room_id=self.room_id, user_id=self.other_user)
+
+        channel = self.make_request(
+            "DELETE",
+            self.url.encode("ascii"),
+            content={"block": True, "purge": False},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertIn("delete_id", channel.json_body)
+        delete_id = channel.json_body["delete_id"]
+
+        self._test_result(delete_id, self.other_user)
+
+        with self.assertRaises(AssertionError):
+            self._is_purged(self.room_id)
+        self._is_blocked(self.room_id, expect=True)
+        self._has_no_members(self.room_id)
+
+    def test_shutdown_room_consent(self):
+        """Test that we can shutdown rooms with local users who have not
+        yet accepted the privacy policy. This used to fail when we tried to
+        force part the user from the old room.
+        Members will be moved to a new room and will receive a message.
+        """
+        self.event_creation_handler._block_events_without_consent_error = None
+
+        # Assert one user in room
+        users_in_room = self.get_success(self.store.get_users_in_room(self.room_id))
+        self.assertEqual([self.other_user], users_in_room)
+
+        # Enable require consent to send events
+        self.event_creation_handler._block_events_without_consent_error = "Error"
+
+        # Assert that the user is getting consent error
+        self.helper.send(
+            self.room_id,
+            body="foo",
+            tok=self.other_user_tok,
+            expect_code=HTTPStatus.FORBIDDEN,
+        )
+
+        # Test that room is not purged
+        with self.assertRaises(AssertionError):
+            self._is_purged(self.room_id)
+
+        # Assert one user in room
+        self._is_member(room_id=self.room_id, user_id=self.other_user)
+
+        # Test that the admin can still send shutdown
+        channel = self.make_request(
+            "DELETE",
+            self.url,
+            content={"new_room_user_id": self.admin_user},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertIn("delete_id", channel.json_body)
+        delete_id = channel.json_body["delete_id"]
+
+        self._test_result(delete_id, self.other_user, expect_new_room=True)
+
+        channel = self.make_request(
+            "GET",
+            self.url_status_by_room_id,
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(1, len(channel.json_body["results"]))
+
+        # Test that member has moved to new room
+        self._is_member(
+            room_id=channel.json_body["results"][0]["shutdown_room"]["new_room_id"],
+            user_id=self.other_user,
+        )
+
+        self._is_purged(self.room_id)
+        self._has_no_members(self.room_id)
+
+    def test_shutdown_room_block_peek(self):
+        """Test that a world_readable room can no longer be peeked into after
+        it has been shut down.
+        Members will be moved to a new room and will receive a message.
+        """
+        self.event_creation_handler._block_events_without_consent_error = None
+
+        # Enable world readable
+        url = "rooms/%s/state/m.room.history_visibility" % (self.room_id,)
+        channel = self.make_request(
+            "PUT",
+            url.encode("ascii"),
+            content={"history_visibility": "world_readable"},
+            access_token=self.other_user_tok,
+        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+
+        # Test that room is not purged
+        with self.assertRaises(AssertionError):
+            self._is_purged(self.room_id)
+
+        # Assert one user in room
+        self._is_member(room_id=self.room_id, user_id=self.other_user)
+
+        # Test that the admin can still send shutdown
+        channel = self.make_request(
+            "DELETE",
+            self.url,
+            content={"new_room_user_id": self.admin_user},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertIn("delete_id", channel.json_body)
+        delete_id = channel.json_body["delete_id"]
+
+        self._test_result(delete_id, self.other_user, expect_new_room=True)
+
+        channel = self.make_request(
+            "GET",
+            self.url_status_by_room_id,
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(1, len(channel.json_body["results"]))
+
+        # Test that member has moved to new room
+        self._is_member(
+            room_id=channel.json_body["results"][0]["shutdown_room"]["new_room_id"],
+            user_id=self.other_user,
+        )
+
+        self._is_purged(self.room_id)
+        self._has_no_members(self.room_id)
+
+        # Assert we can no longer peek into the room
+        self._assert_peek(self.room_id, expect_code=HTTPStatus.FORBIDDEN)
+
+    def _is_blocked(self, room_id: str, expect: bool = True) -> None:
+        """Assert that the room is blocked or not"""
+        d = self.store.is_room_blocked(room_id)
+        if expect:
+            self.assertTrue(self.get_success(d))
+        else:
+            self.assertIsNone(self.get_success(d))
+
+    def _has_no_members(self, room_id: str) -> None:
+        """Assert there is now no longer anyone in the room"""
+        users_in_room = self.get_success(self.store.get_users_in_room(room_id))
+        self.assertEqual([], users_in_room)
+
+    def _is_member(self, room_id: str, user_id: str) -> None:
+        """Test that user is member of the room"""
+        users_in_room = self.get_success(self.store.get_users_in_room(room_id))
+        self.assertIn(user_id, users_in_room)
+
+    def _is_purged(self, room_id: str) -> None:
+        """Test that the following tables have been purged of all rows related to the room."""
         for table in PURGE_TABLES:
             count = self.get_success(
                 self.store.db_pool.simple_select_one_onecol(
@@ -601,6 +989,79 @@ class PurgeRoomTestCase(unittest.HomeserverTestCase):
 
             self.assertEqual(count, 0, msg=f"Rows not purged in {table}")
 
+    def _assert_peek(self, room_id: str, expect_code: int) -> None:
+        """Assert that the admin user can (or cannot) peek into the room."""
+
+        url = f"rooms/{room_id}/initialSync"
+        channel = self.make_request(
+            "GET", url.encode("ascii"), access_token=self.admin_user_tok
+        )
+        self.assertEqual(expect_code, channel.code, msg=channel.json_body)
+
+        url = "events?timeout=0&room_id=" + room_id
+        channel = self.make_request(
+            "GET", url.encode("ascii"), access_token=self.admin_user_tok
+        )
+        self.assertEqual(expect_code, channel.code, msg=channel.json_body)
+
+    def _test_result(
+        self,
+        delete_id: str,
+        kicked_user: str,
+        expect_new_room: bool = False,
+    ) -> None:
+        """
+        Test that the result is the expected.
+        Uses both APIs (status by room_id and delete_id)
+
+        Args:
+            delete_id: id of this purge
+            kicked_user: a user_id which is kicked from the room
+            expect_new_room: if we expect that a new room was created
+        """
+
+        # get information by room_id
+        channel_room_id = self.make_request(
+            "GET",
+            self.url_status_by_room_id,
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(
+            HTTPStatus.OK, channel_room_id.code, msg=channel_room_id.json_body
+        )
+        self.assertEqual(1, len(channel_room_id.json_body["results"]))
+        self.assertEqual(
+            delete_id, channel_room_id.json_body["results"][0]["delete_id"]
+        )
+
+        # get information by delete_id
+        channel_delete_id = self.make_request(
+            "GET",
+            self.url_status_by_delete_id + delete_id,
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(
+            HTTPStatus.OK,
+            channel_delete_id.code,
+            msg=channel_delete_id.json_body,
+        )
+
+        # test values that are the same in both responses
+        for content in [
+            channel_room_id.json_body["results"][0],
+            channel_delete_id.json_body,
+        ]:
+            self.assertEqual("complete", content["status"])
+            self.assertEqual(kicked_user, content["shutdown_room"]["kicked_users"][0])
+            self.assertIn("failed_to_kick_users", content["shutdown_room"])
+            self.assertIn("local_aliases", content["shutdown_room"])
+            self.assertNotIn("error", content)
+
+            if expect_new_room:
+                self.assertIsNotNone(content["shutdown_room"]["new_room_id"])
+            else:
+                self.assertIsNone(content["shutdown_room"]["new_room_id"])
+
 
 class RoomTestCase(unittest.HomeserverTestCase):
     """Test /room admin API."""
@@ -612,12 +1073,12 @@ class RoomTestCase(unittest.HomeserverTestCase):
         directory.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         # Create user
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
-    def test_list_rooms(self):
+    def test_list_rooms(self) -> None:
         """Test that we can list rooms"""
         # Create 3 test rooms
         total_rooms = 3
@@ -637,7 +1098,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         )
 
         # Check request completed successfully
-        self.assertEqual(200, int(channel.code), msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # Check that response json body contains a "rooms" key
         self.assertTrue(
@@ -681,7 +1142,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # We shouldn't receive a next token here as there's no further rooms to show
         self.assertNotIn("next_batch", channel.json_body)
 
-    def test_list_rooms_pagination(self):
+    def test_list_rooms_pagination(self) -> None:
         """Test that we can get a full list of rooms through pagination"""
         # Create 5 test rooms
         total_rooms = 5
@@ -721,9 +1182,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
                 url.encode("ascii"),
                 access_token=self.admin_user_tok,
             )
-            self.assertEqual(
-                200, int(channel.result["code"]), msg=channel.result["body"]
-            )
+            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
             self.assertTrue("rooms" in channel.json_body)
             for r in channel.json_body["rooms"]:
@@ -763,9 +1222,9 @@ class RoomTestCase(unittest.HomeserverTestCase):
             url.encode("ascii"),
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
-    def test_correct_room_attributes(self):
+    def test_correct_room_attributes(self) -> None:
         """Test the correct attributes for a room are returned"""
         # Create a test room
         room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
@@ -786,7 +1245,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
             {"room_id": room_id},
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # Set this new alias as the canonical alias for this room
         self.helper.send_state(
@@ -818,7 +1277,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
             url.encode("ascii"),
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # Check that rooms were returned
         self.assertTrue("rooms" in channel.json_body)
@@ -846,46 +1305,16 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(test_room_name, r["name"])
         self.assertEqual(test_alias, r["canonical_alias"])
 
-    def test_room_list_sort_order(self):
+    def test_room_list_sort_order(self) -> None:
         """Test room list sort ordering. alphabetical name versus number of members,
         reversing the order, etc.
         """
-
-        def _set_canonical_alias(room_id: str, test_alias: str, admin_user_tok: str):
-            # Create a new alias to this room
-            url = "/_matrix/client/r0/directory/room/%s" % (
-                urllib.parse.quote(test_alias),
-            )
-            channel = self.make_request(
-                "PUT",
-                url.encode("ascii"),
-                {"room_id": room_id},
-                access_token=admin_user_tok,
-            )
-            self.assertEqual(
-                200, int(channel.result["code"]), msg=channel.result["body"]
-            )
-
-            # Set this new alias as the canonical alias for this room
-            self.helper.send_state(
-                room_id,
-                "m.room.aliases",
-                {"aliases": [test_alias]},
-                tok=admin_user_tok,
-                state_key="test",
-            )
-            self.helper.send_state(
-                room_id,
-                "m.room.canonical_alias",
-                {"alias": test_alias},
-                tok=admin_user_tok,
-            )
 
         def _order_test(
             order_type: str,
             expected_room_list: List[str],
             reverse: bool = False,
-        ):
+        ) -> None:
             """Request the list of rooms in a certain order. Assert that order is what
             we expect
 
@@ -903,7 +1332,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
                 url.encode("ascii"),
                 access_token=self.admin_user_tok,
             )
-            self.assertEqual(200, channel.code, msg=channel.json_body)
+            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
             # Check that rooms were returned
             self.assertTrue("rooms" in channel.json_body)
@@ -952,9 +1381,9 @@ class RoomTestCase(unittest.HomeserverTestCase):
         )
 
         # Set room canonical room aliases
-        _set_canonical_alias(room_id_1, "#A_alias:test", self.admin_user_tok)
-        _set_canonical_alias(room_id_2, "#B_alias:test", self.admin_user_tok)
-        _set_canonical_alias(room_id_3, "#C_alias:test", self.admin_user_tok)
+        self._set_canonical_alias(room_id_1, "#A_alias:test", self.admin_user_tok)
+        self._set_canonical_alias(room_id_2, "#B_alias:test", self.admin_user_tok)
+        self._set_canonical_alias(room_id_3, "#C_alias:test", self.admin_user_tok)
 
         # Set room member size in the reverse order. room 1 -> 1 member, 2 -> 2, 3 -> 3
         user_1 = self.register_user("bob1", "pass")
@@ -1014,14 +1443,14 @@ class RoomTestCase(unittest.HomeserverTestCase):
         _order_test("state_events", [room_id_3, room_id_2, room_id_1])
         _order_test("state_events", [room_id_1, room_id_2, room_id_3], reverse=True)
 
-    def test_search_term(self):
+    def test_search_term(self) -> None:
         """Test that searching for a room works correctly"""
         # Create two test rooms
         room_id_1 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
         room_id_2 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
 
         room_name_1 = "something"
-        room_name_2 = "else"
+        room_name_2 = "LoremIpsum"
 
         # Set the name for each room
         self.helper.send_state(
@@ -1037,11 +1466,13 @@ class RoomTestCase(unittest.HomeserverTestCase):
             tok=self.admin_user_tok,
         )
 
+        self._set_canonical_alias(room_id_1, "#Room_Alias1:test", self.admin_user_tok)
+
         def _search_test(
             expected_room_id: Optional[str],
             search_term: str,
-            expected_http_code: int = 200,
-        ):
+            expected_http_code: int = HTTPStatus.OK,
+        ) -> None:
             """Search for a room and check that the returned room's id is a match
 
             Args:
@@ -1058,7 +1489,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
             )
             self.assertEqual(expected_http_code, channel.code, msg=channel.json_body)
 
-            if expected_http_code != 200:
+            if expected_http_code != HTTPStatus.OK:
                 return
 
             # Check that rooms were returned
@@ -1085,25 +1516,64 @@ class RoomTestCase(unittest.HomeserverTestCase):
                 r = rooms[0]
                 self.assertEqual(expected_room_id, r["room_id"])
 
-        # Perform search tests
+        # Test searching by room name
         _search_test(room_id_1, "something")
         _search_test(room_id_1, "thing")
 
-        _search_test(room_id_2, "else")
-        _search_test(room_id_2, "se")
+        _search_test(room_id_2, "LoremIpsum")
+        _search_test(room_id_2, "lorem")
 
         # Test case insensitive
         _search_test(room_id_1, "SOMETHING")
         _search_test(room_id_1, "THING")
 
-        _search_test(room_id_2, "ELSE")
-        _search_test(room_id_2, "SE")
+        _search_test(room_id_2, "LOREMIPSUM")
+        _search_test(room_id_2, "LOREM")
 
         _search_test(None, "foo")
         _search_test(None, "bar")
-        _search_test(None, "", expected_http_code=400)
+        _search_test(None, "", expected_http_code=HTTPStatus.BAD_REQUEST)
 
-    def test_single_room(self):
+        # Test that the whole room id returns the room
+        _search_test(room_id_1, room_id_1)
+        # Test that the search by room_id is case sensitive
+        _search_test(None, room_id_1.lower())
+        # Test search part of local part of room id do not match
+        _search_test(None, room_id_1[1:10])
+
+        # Test that whole room alias return no result, because of domain
+        _search_test(None, "#Room_Alias1:test")
+        # Test search local part of alias
+        _search_test(room_id_1, "alias1")
+
+    def test_search_term_non_ascii(self) -> None:
+        """Test that searching for a room with non-ASCII characters works correctly"""
+
+        # Create test room
+        room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+        room_name = "ж"
+
+        # Set the name for the room
+        self.helper.send_state(
+            room_id,
+            "m.room.name",
+            {"name": room_name},
+            tok=self.admin_user_tok,
+        )
+
+        # make the request and test that the response is what we wanted
+        search_term = urllib.parse.quote("ж", "utf-8")
+        url = "/_synapse/admin/v1/rooms?search_term=%s" % (search_term,)
+        channel = self.make_request(
+            "GET",
+            url.encode("ascii"),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(room_id, channel.json_body.get("rooms")[0].get("room_id"))
+        self.assertEqual("ж", channel.json_body.get("rooms")[0].get("name"))
+
+    def test_single_room(self) -> None:
         """Test that a single room can be requested correctly"""
         # Create two test rooms
         room_id_1 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
@@ -1132,7 +1602,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
             url.encode("ascii"),
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         self.assertIn("room_id", channel.json_body)
         self.assertIn("name", channel.json_body)
@@ -1154,7 +1624,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(room_id_1, channel.json_body["room_id"])
 
-    def test_single_room_devices(self):
+    def test_single_room_devices(self) -> None:
         """Test that `joined_local_devices` can be requested correctly"""
         room_id_1 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
 
@@ -1164,7 +1634,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
             url.encode("ascii"),
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(1, channel.json_body["joined_local_devices"])
 
         # Have another user join the room
@@ -1178,7 +1648,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
             url.encode("ascii"),
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(2, channel.json_body["joined_local_devices"])
 
         # leave room
@@ -1190,10 +1660,10 @@ class RoomTestCase(unittest.HomeserverTestCase):
             url.encode("ascii"),
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["joined_local_devices"])
 
-    def test_room_members(self):
+    def test_room_members(self) -> None:
         """Test that room members can be requested correctly"""
         # Create two test rooms
         room_id_1 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
@@ -1221,7 +1691,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
             url.encode("ascii"),
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         self.assertCountEqual(
             ["@admin:test", "@foo:test", "@bar:test"], channel.json_body["members"]
@@ -1234,14 +1704,14 @@ class RoomTestCase(unittest.HomeserverTestCase):
             url.encode("ascii"),
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         self.assertCountEqual(
             ["@admin:test", "@bar:test", "@foobar:test"], channel.json_body["members"]
         )
         self.assertEqual(channel.json_body["total"], 3)
 
-    def test_room_state(self):
+    def test_room_state(self) -> None:
         """Test that room state can be requested correctly"""
         # Create two test rooms
         room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
@@ -1252,11 +1722,39 @@ class RoomTestCase(unittest.HomeserverTestCase):
             url.encode("ascii"),
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertIn("state", channel.json_body)
         # testing that the state events match is painful and not done here. We assume that
         # the create_room already does the right thing, so no need to verify that we got
         # the state events it created.
+
+    def _set_canonical_alias(
+        self, room_id: str, test_alias: str, admin_user_tok: str
+    ) -> None:
+        # Create a new alias to this room
+        url = "/_matrix/client/r0/directory/room/%s" % (urllib.parse.quote(test_alias),)
+        channel = self.make_request(
+            "PUT",
+            url.encode("ascii"),
+            {"room_id": room_id},
+            access_token=admin_user_tok,
+        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+
+        # Set this new alias as the canonical alias for this room
+        self.helper.send_state(
+            room_id,
+            "m.room.aliases",
+            {"aliases": [test_alias]},
+            tok=admin_user_tok,
+            state_key="test",
+        )
+        self.helper.send_state(
+            room_id,
+            "m.room.canonical_alias",
+            {"alias": test_alias},
+            tok=admin_user_tok,
+        )
 
 
 class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
@@ -1267,7 +1765,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
@@ -1282,124 +1780,117 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         )
         self.url = f"/_synapse/admin/v1/join/{self.public_room_id}"
 
-    def test_requester_is_no_admin(self):
+    def test_requester_is_no_admin(self) -> None:
         """
-        If the user is not a server admin, an error 403 is returned.
+        If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
         """
-        body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
             "POST",
             self.url,
-            content=body.encode(encoding="utf_8"),
+            content={"user_id": self.second_user_id},
             access_token=self.second_tok,
         )
 
-        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_invalid_parameter(self):
+    def test_invalid_parameter(self) -> None:
         """
         If a parameter is missing, return an error
         """
-        body = json.dumps({"unknown_parameter": "@unknown:test"})
 
         channel = self.make_request(
             "POST",
             self.url,
-            content=body.encode(encoding="utf_8"),
+            content={"unknown_parameter": "@unknown:test"},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
 
-    def test_local_user_does_not_exist(self):
+    def test_local_user_does_not_exist(self) -> None:
         """
-        Tests that a lookup for a user that does not exist returns a 404
+        Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND
         """
-        body = json.dumps({"user_id": "@unknown:test"})
 
         channel = self.make_request(
             "POST",
             self.url,
-            content=body.encode(encoding="utf_8"),
+            content={"user_id": "@unknown:test"},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(404, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
-    def test_remote_user(self):
+    def test_remote_user(self) -> None:
         """
         Check that only local user can join rooms.
         """
-        body = json.dumps({"user_id": "@not:exist.bla"})
 
         channel = self.make_request(
             "POST",
             self.url,
-            content=body.encode(encoding="utf_8"),
+            content={"user_id": "@not:exist.bla"},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(
             "This endpoint can only be used with local users",
             channel.json_body["error"],
         )
 
-    def test_room_does_not_exist(self):
+    def test_room_does_not_exist(self) -> None:
         """
-        Check that unknown rooms/server return error 404.
+        Check that unknown rooms/server return error HTTPStatus.NOT_FOUND.
         """
-        body = json.dumps({"user_id": self.second_user_id})
         url = "/_synapse/admin/v1/join/!unknown:test"
 
         channel = self.make_request(
             "POST",
             url,
-            content=body.encode(encoding="utf_8"),
+            content={"user_id": self.second_user_id},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(404, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
         self.assertEqual("No known servers", channel.json_body["error"])
 
-    def test_room_is_not_valid(self):
+    def test_room_is_not_valid(self) -> None:
         """
-        Check that invalid room names, return an error 400.
+        Check that invalid room names, return an error HTTPStatus.BAD_REQUEST.
         """
-        body = json.dumps({"user_id": self.second_user_id})
         url = "/_synapse/admin/v1/join/invalidroom"
 
         channel = self.make_request(
             "POST",
             url,
-            content=body.encode(encoding="utf_8"),
+            content={"user_id": self.second_user_id},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(
             "invalidroom was not legal room ID or room alias",
             channel.json_body["error"],
         )
 
-    def test_join_public_room(self):
+    def test_join_public_room(self) -> None:
         """
         Test joining a local user to a public room with "JoinRules.PUBLIC"
         """
-        body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
             "POST",
             self.url,
-            content=body.encode(encoding="utf_8"),
+            content={"user_id": self.second_user_id},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(self.public_room_id, channel.json_body["room_id"])
 
         # Validate if user is a member of the room
@@ -1409,10 +1900,10 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/joined_rooms",
             access_token=self.second_tok,
         )
-        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEquals(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(self.public_room_id, channel.json_body["joined_rooms"][0])
 
-    def test_join_private_room_if_not_member(self):
+    def test_join_private_room_if_not_member(self) -> None:
         """
         Test joining a local user to a private room with "JoinRules.INVITE"
         when server admin is not member of this room.
@@ -1421,19 +1912,18 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             self.creator, tok=self.creator_tok, is_public=False
         )
         url = f"/_synapse/admin/v1/join/{private_room_id}"
-        body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
             "POST",
             url,
-            content=body.encode(encoding="utf_8"),
+            content={"user_id": self.second_user_id},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_join_private_room_if_member(self):
+    def test_join_private_room_if_member(self) -> None:
         """
         Test joining a local user to a private room with "JoinRules.INVITE",
         when server admin is member of this room.
@@ -1458,21 +1948,20 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/joined_rooms",
             access_token=self.admin_user_tok,
         )
-        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEquals(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
 
         # Join user to room.
 
         url = f"/_synapse/admin/v1/join/{private_room_id}"
-        body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
             "POST",
             url,
-            content=body.encode(encoding="utf_8"),
+            content={"user_id": self.second_user_id},
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(private_room_id, channel.json_body["room_id"])
 
         # Validate if user is a member of the room
@@ -1482,10 +1971,10 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/joined_rooms",
             access_token=self.second_tok,
         )
-        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEquals(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
 
-    def test_join_private_room_if_owner(self):
+    def test_join_private_room_if_owner(self) -> None:
         """
         Test joining a local user to a private room with "JoinRules.INVITE",
         when server admin is owner of this room.
@@ -1494,16 +1983,15 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             self.admin_user, tok=self.admin_user_tok, is_public=False
         )
         url = f"/_synapse/admin/v1/join/{private_room_id}"
-        body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
             "POST",
             url,
-            content=body.encode(encoding="utf_8"),
+            content={"user_id": self.second_user_id},
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(private_room_id, channel.json_body["room_id"])
 
         # Validate if user is a member of the room
@@ -1513,10 +2001,10 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/joined_rooms",
             access_token=self.second_tok,
         )
-        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEquals(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
 
-    def test_context_as_non_admin(self):
+    def test_context_as_non_admin(self) -> None:
         """
         Test that, without being admin, one cannot use the context admin API
         """
@@ -1547,12 +2035,10 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
                 % (room_id, events[midway]["event_id"]),
                 access_token=tok,
             )
-            self.assertEquals(
-                403, int(channel.result["code"]), msg=channel.result["body"]
-            )
+            self.assertEquals(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
             self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_context_as_admin(self):
+    def test_context_as_admin(self) -> None:
         """
         Test that, as admin, we can find the context of an event without having joined the room.
         """
@@ -1579,7 +2065,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             % (room_id, events[midway]["event_id"]),
             access_token=self.admin_user_tok,
         )
-        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEquals(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEquals(
             channel.json_body["event"]["event_id"], events[midway]["event_id"]
         )
@@ -1608,7 +2094,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
@@ -1625,7 +2111,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
             self.public_room_id
         )
 
-    def test_public_room(self):
+    def test_public_room(self) -> None:
         """Test that getting admin in a public room works."""
         room_id = self.helper.create_room_as(
             self.creator, tok=self.creator_tok, is_public=True
@@ -1638,7 +2124,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # Now we test that we can join the room and ban a user.
         self.helper.join(room_id, self.admin_user, tok=self.admin_user_tok)
@@ -1650,7 +2136,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
             tok=self.admin_user_tok,
         )
 
-    def test_private_room(self):
+    def test_private_room(self) -> None:
         """Test that getting admin in a private room works and we get invited."""
         room_id = self.helper.create_room_as(
             self.creator,
@@ -1665,7 +2151,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # Now we test that we can join the room (we should have received an
         # invite) and can ban a user.
@@ -1678,7 +2164,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
             tok=self.admin_user_tok,
         )
 
-    def test_other_user(self):
+    def test_other_user(self) -> None:
         """Test that giving admin in a public room works to a non-admin user works."""
         room_id = self.helper.create_room_as(
             self.creator, tok=self.creator_tok, is_public=True
@@ -1691,7 +2177,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # Now we test that we can join the room and ban a user.
         self.helper.join(room_id, self.second_user_id, tok=self.second_tok)
@@ -1703,7 +2189,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
             tok=self.second_tok,
         )
 
-    def test_not_enough_power(self):
+    def test_not_enough_power(self) -> None:
         """Test that we get a sensible error if there are no local room admins."""
         room_id = self.helper.create_room_as(
             self.creator, tok=self.creator_tok, is_public=True
@@ -1725,15 +2211,243 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        # We expect this to fail with a 400 as there are no room admins.
+        # We expect this to fail with a HTTPStatus.BAD_REQUEST as there are no room admins.
         #
         # (Note we assert the error message to ensure that it's not denied for
         # some other reason)
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(
             channel.json_body["error"],
             "No local admin user in room with power to update power levels.",
         )
+
+
+class BlockRoomTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self._store = hs.get_datastore()
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.other_user_tok = self.login("user", "pass")
+
+        self.room_id = self.helper.create_room_as(
+            self.other_user, tok=self.other_user_tok
+        )
+        self.url = "/_synapse/admin/v1/rooms/%s/block"
+
+    @parameterized.expand([("PUT",), ("GET",)])
+    def test_requester_is_no_admin(self, method: str) -> None:
+        """If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned."""
+
+        channel = self.make_request(
+            method,
+            self.url % self.room_id,
+            content={},
+            access_token=self.other_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    @parameterized.expand([("PUT",), ("GET",)])
+    def test_room_is_not_valid(self, method: str) -> None:
+        """Check that invalid room names, return an error HTTPStatus.BAD_REQUEST."""
+
+        channel = self.make_request(
+            method,
+            self.url % "invalidroom",
+            content={},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(
+            "invalidroom is not a legal room ID",
+            channel.json_body["error"],
+        )
+
+    def test_block_is_not_valid(self) -> None:
+        """If parameter `block` is not valid, return an error."""
+
+        # `block` is not valid
+        channel = self.make_request(
+            "PUT",
+            self.url % self.room_id,
+            content={"block": "NotBool"},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
+
+        # `block` is not set
+        channel = self.make_request(
+            "PUT",
+            self.url % self.room_id,
+            content={},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
+
+        # no content is send
+        channel = self.make_request(
+            "PUT",
+            self.url % self.room_id,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.NOT_JSON, channel.json_body["errcode"])
+
+    def test_block_room(self) -> None:
+        """Test that block a room is successful."""
+
+        def _request_and_test_block_room(room_id: str) -> None:
+            self._is_blocked(room_id, expect=False)
+            channel = self.make_request(
+                "PUT",
+                self.url % room_id,
+                content={"block": True},
+                access_token=self.admin_user_tok,
+            )
+            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+            self.assertTrue(channel.json_body["block"])
+            self._is_blocked(room_id, expect=True)
+
+        # known internal room
+        _request_and_test_block_room(self.room_id)
+
+        # unknown internal room
+        _request_and_test_block_room("!unknown:test")
+
+        # unknown remote room
+        _request_and_test_block_room("!unknown:remote")
+
+    def test_block_room_twice(self) -> None:
+        """Test that block a room that is already blocked is successful."""
+
+        self._is_blocked(self.room_id, expect=False)
+        for _ in range(2):
+            channel = self.make_request(
+                "PUT",
+                self.url % self.room_id,
+                content={"block": True},
+                access_token=self.admin_user_tok,
+            )
+            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+            self.assertTrue(channel.json_body["block"])
+            self._is_blocked(self.room_id, expect=True)
+
+    def test_unblock_room(self) -> None:
+        """Test that unblock a room is successful."""
+
+        def _request_and_test_unblock_room(room_id: str) -> None:
+            self._block_room(room_id)
+
+            channel = self.make_request(
+                "PUT",
+                self.url % room_id,
+                content={"block": False},
+                access_token=self.admin_user_tok,
+            )
+            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+            self.assertFalse(channel.json_body["block"])
+            self._is_blocked(room_id, expect=False)
+
+        # known internal room
+        _request_and_test_unblock_room(self.room_id)
+
+        # unknown internal room
+        _request_and_test_unblock_room("!unknown:test")
+
+        # unknown remote room
+        _request_and_test_unblock_room("!unknown:remote")
+
+    def test_unblock_room_twice(self) -> None:
+        """Test that unblock a room that is not blocked is successful."""
+
+        self._block_room(self.room_id)
+        for _ in range(2):
+            channel = self.make_request(
+                "PUT",
+                self.url % self.room_id,
+                content={"block": False},
+                access_token=self.admin_user_tok,
+            )
+            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+            self.assertFalse(channel.json_body["block"])
+            self._is_blocked(self.room_id, expect=False)
+
+    def test_get_blocked_room(self) -> None:
+        """Test get status of a blocked room"""
+
+        def _request_blocked_room(room_id: str) -> None:
+            self._block_room(room_id)
+
+            channel = self.make_request(
+                "GET",
+                self.url % room_id,
+                access_token=self.admin_user_tok,
+            )
+            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+            self.assertTrue(channel.json_body["block"])
+            self.assertEqual(self.other_user, channel.json_body["user_id"])
+
+        # known internal room
+        _request_blocked_room(self.room_id)
+
+        # unknown internal room
+        _request_blocked_room("!unknown:test")
+
+        # unknown remote room
+        _request_blocked_room("!unknown:remote")
+
+    def test_get_unblocked_room(self) -> None:
+        """Test get status of a unblocked room"""
+
+        def _request_unblocked_room(room_id: str) -> None:
+            self._is_blocked(room_id, expect=False)
+
+            channel = self.make_request(
+                "GET",
+                self.url % room_id,
+                access_token=self.admin_user_tok,
+            )
+            self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+            self.assertFalse(channel.json_body["block"])
+            self.assertNotIn("user_id", channel.json_body)
+
+        # known internal room
+        _request_unblocked_room(self.room_id)
+
+        # unknown internal room
+        _request_unblocked_room("!unknown:test")
+
+        # unknown remote room
+        _request_unblocked_room("!unknown:remote")
+
+    def _is_blocked(self, room_id: str, expect: bool = True) -> None:
+        """Assert that the room is blocked or not"""
+        d = self._store.is_room_blocked(room_id)
+        if expect:
+            self.assertTrue(self.get_success(d))
+        else:
+            self.assertIsNone(self.get_success(d))
+
+    def _block_room(self, room_id: str) -> None:
+        """Block a room in database"""
+        self.get_success(self._store.block_room(room_id, self.other_user))
+        self._is_blocked(room_id, expect=True)
 
 
 PURGE_TABLES = [

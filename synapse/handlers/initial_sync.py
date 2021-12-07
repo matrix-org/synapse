@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from twisted.internet import defer
 
@@ -31,8 +31,6 @@ from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.visibility import filter_events_for_client
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -40,9 +38,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class InitialSyncHandler(BaseHandler):
+class InitialSyncHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.state_handler = hs.get_state_handler()
         self.hs = hs
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
@@ -125,7 +125,7 @@ class InitialSyncHandler(BaseHandler):
 
         now_token = self.hs.get_event_sources().get_current_token()
 
-        presence_stream = self.hs.get_event_sources().sources["presence"]
+        presence_stream = self.hs.get_event_sources().sources.presence
         presence, _ = await presence_stream.get_new_events(
             user, from_key=None, include_offline=False
         )
@@ -150,8 +150,8 @@ class InitialSyncHandler(BaseHandler):
         if limit is None:
             limit = 10
 
-        async def handle_room(event: RoomsForUser):
-            d = {
+        async def handle_room(event: RoomsForUser) -> None:
+            d: JsonDict = {
                 "room_id": event.room_id,
                 "membership": event.membership,
                 "visibility": (
@@ -165,7 +165,11 @@ class InitialSyncHandler(BaseHandler):
 
                 invite_event = await self.store.get_event(event.event_id)
                 d["invite"] = await self._event_serializer.serialize_event(
-                    invite_event, time_now, as_client_event
+                    invite_event,
+                    time_now,
+                    # Don't bundle aggregations as this is a deprecated API.
+                    bundle_aggregations=False,
+                    as_client_event=as_client_event,
                 )
 
             rooms_ret.append(d)
@@ -216,7 +220,11 @@ class InitialSyncHandler(BaseHandler):
                 d["messages"] = {
                     "chunk": (
                         await self._event_serializer.serialize_events(
-                            messages, time_now=time_now, as_client_event=as_client_event
+                            messages,
+                            time_now=time_now,
+                            # Don't bundle aggregations as this is a deprecated API.
+                            bundle_aggregations=False,
+                            as_client_event=as_client_event,
                         )
                     ),
                     "start": await start_token.to_string(self.store),
@@ -226,6 +234,8 @@ class InitialSyncHandler(BaseHandler):
                 d["state"] = await self._event_serializer.serialize_events(
                     current_state.values(),
                     time_now=time_now,
+                    # Don't bundle aggregations as this is a deprecated API.
+                    bundle_aggregations=False,
                     as_client_event=as_client_event,
                 )
 
@@ -366,14 +376,18 @@ class InitialSyncHandler(BaseHandler):
             "room_id": room_id,
             "messages": {
                 "chunk": (
-                    await self._event_serializer.serialize_events(messages, time_now)
+                    # Don't bundle aggregations as this is a deprecated API.
+                    await self._event_serializer.serialize_events(
+                        messages, time_now, bundle_aggregations=False
+                    )
                 ),
                 "start": await start_token.to_string(self.store),
                 "end": await end_token.to_string(self.store),
             },
             "state": (
+                # Don't bundle aggregations as this is a deprecated API.
                 await self._event_serializer.serialize_events(
-                    room_state.values(), time_now
+                    room_state.values(), time_now, bundle_aggregations=False
                 )
             ),
             "presence": [],
@@ -392,8 +406,9 @@ class InitialSyncHandler(BaseHandler):
 
         # TODO: These concurrently
         time_now = self.clock.time_msec()
+        # Don't bundle aggregations as this is a deprecated API.
         state = await self._event_serializer.serialize_events(
-            current_state.values(), time_now
+            current_state.values(), time_now, bundle_aggregations=False
         )
 
         now_token = self.hs.get_event_sources().get_current_token()
@@ -411,9 +426,9 @@ class InitialSyncHandler(BaseHandler):
 
         presence_handler = self.hs.get_presence_handler()
 
-        async def get_presence():
+        async def get_presence() -> List[JsonDict]:
             # If presence is disabled, return an empty list
-            if not self.hs.config.use_presence:
+            if not self.hs.config.server.use_presence:
                 return []
 
             states = await presence_handler.get_states(
@@ -428,7 +443,7 @@ class InitialSyncHandler(BaseHandler):
                 for s in states
             ]
 
-        async def get_receipts():
+        async def get_receipts() -> List[JsonDict]:
             receipts = await self.store.get_linearized_receipts_for_room(
                 room_id, to_key=now_token.receipt_key
             )
@@ -467,7 +482,10 @@ class InitialSyncHandler(BaseHandler):
             "room_id": room_id,
             "messages": {
                 "chunk": (
-                    await self._event_serializer.serialize_events(messages, time_now)
+                    # Don't bundle aggregations as this is a deprecated API.
+                    await self._event_serializer.serialize_events(
+                        messages, time_now, bundle_aggregations=False
+                    )
                 ),
                 "start": await start_token.to_string(self.store),
                 "end": await end_token.to_string(self.store),

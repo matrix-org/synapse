@@ -26,6 +26,7 @@ from typing import (
     FrozenSet,
     Iterable,
     List,
+    Mapping,
     Optional,
     Sequence,
     Set,
@@ -118,7 +119,7 @@ class _StateCacheEntry:
         else:
             self.state_id = _gen_state_id()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.state)
 
 
@@ -246,7 +247,7 @@ class StateHandler:
         return await self.get_hosts_in_room_at_events(room_id, event_ids)
 
     async def get_hosts_in_room_at_events(
-        self, room_id: str, event_ids: List[str]
+        self, room_id: str, event_ids: Iterable[str]
     ) -> Set[str]:
         """Get the hosts that were in a room at the given event ids
 
@@ -263,7 +264,9 @@ class StateHandler:
     async def compute_event_context(
         self, event: EventBase, old_state: Optional[Iterable[EventBase]] = None
     ) -> EventContext:
-        """Build an EventContext structure for the event.
+        """Build an EventContext structure for a non-outlier event.
+
+        (for an outlier, call EventContext.for_outlier directly)
 
         This works out what the current state should be for the event, and
         generates a new state group if necessary.
@@ -278,35 +281,7 @@ class StateHandler:
             The event context.
         """
 
-        if event.internal_metadata.is_outlier():
-            # If this is an outlier, then we know it shouldn't have any current
-            # state. Certainly store.get_current_state won't return any, and
-            # persisting the event won't store the state group.
-
-            # FIXME: why do we populate current_state_ids? I thought the point was
-            # that we weren't supposed to have any state for outliers?
-            if old_state:
-                prev_state_ids = {(s.type, s.state_key): s.event_id for s in old_state}
-                if event.is_state():
-                    current_state_ids = dict(prev_state_ids)
-                    key = (event.type, event.state_key)
-                    current_state_ids[key] = event.event_id
-                else:
-                    current_state_ids = prev_state_ids
-            else:
-                current_state_ids = {}
-                prev_state_ids = {}
-
-            # We don't store state for outliers, so we don't generate a state
-            # group for it.
-            context = EventContext.with_state(
-                state_group=None,
-                state_group_before_event=None,
-                current_state_ids=current_state_ids,
-                prev_state_ids=prev_state_ids,
-            )
-
-            return context
+        assert not event.internal_metadata.is_outlier()
 
         #
         # first of all, figure out the state before the event
@@ -545,7 +520,7 @@ class StateResolutionHandler:
         self,
         room_id: str,
         room_version: str,
-        state_groups_ids: Dict[int, StateMap[str]],
+        state_groups_ids: Mapping[int, StateMap[str]],
         event_map: Optional[Dict[str, EventBase]],
         state_res_store: "StateResolutionStore",
     ) -> _StateCacheEntry:
@@ -729,7 +704,7 @@ class StateResolutionHandler:
 
 
 def _make_state_cache_entry(
-    new_state: StateMap[str], state_groups_ids: Dict[int, StateMap[str]]
+    new_state: StateMap[str], state_groups_ids: Mapping[int, StateMap[str]]
 ) -> _StateCacheEntry:
     """Given a resolved state, and a set of input state groups, pick one to base
     a new state group on (if any), and return an appropriately-constructed
@@ -789,7 +764,7 @@ class StateResolutionStore:
     store: "DataStore"
 
     def get_events(
-        self, event_ids: Iterable[str], allow_rejected: bool = False
+        self, event_ids: Collection[str], allow_rejected: bool = False
     ) -> Awaitable[Dict[str, EventBase]]:
         """Get events from the database
 

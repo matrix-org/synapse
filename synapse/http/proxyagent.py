@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import base64
 import logging
 import re
 from typing import Any, Dict, Optional, Tuple
@@ -21,7 +20,6 @@ from urllib.request import (  # type: ignore[attr-defined]
     proxy_bypass_environment,
 )
 
-import attr
 from zope.interface import implementer
 
 from twisted.internet import defer
@@ -38,28 +36,12 @@ from twisted.web.error import SchemeNotSupported
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent, IBodyProducer, IPolicyForHTTPS
 
-from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint
+from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint, ProxyCredentials
 from synapse.types import ISynapseReactor
 
 logger = logging.getLogger(__name__)
 
 _VALID_URI = re.compile(br"\A[\x21-\x7e]+\Z")
-
-
-@attr.s
-class ProxyCredentials:
-    username_password = attr.ib(type=bytes)
-
-    def as_proxy_authorization_value(self) -> bytes:
-        """
-        Return the value for a Proxy-Authorization header (i.e. 'Basic abdef==').
-
-        Returns:
-            A transformation of the authentication string the encoded value for
-            a Proxy-Authorization header.
-        """
-        # Encode as base64 and prepend the authorization type
-        return b"Basic " + base64.encodebytes(self.username_password)
 
 
 @implementer(IAgent)
@@ -95,6 +77,7 @@ class ProxyAgent(_AgentBase):
     Raises:
         ValueError if use_proxy is set and the environment variables
             contain an invalid proxy specification.
+        RuntimeError if no tls_options_factory is given for a https connection
     """
 
     def __init__(
@@ -131,11 +114,11 @@ class ProxyAgent(_AgentBase):
             https_proxy = proxies["https"].encode() if "https" in proxies else None
             no_proxy = proxies["no"] if "no" in proxies else None
 
-        self.http_proxy_endpoint, self.http_proxy_creds = _http_proxy_endpoint(
+        self.http_proxy_endpoint, self.http_proxy_creds = http_proxy_endpoint(
             http_proxy, self.proxy_reactor, contextFactory, **self._endpoint_kwargs
         )
 
-        self.https_proxy_endpoint, self.https_proxy_creds = _http_proxy_endpoint(
+        self.https_proxy_endpoint, self.https_proxy_creds = http_proxy_endpoint(
             https_proxy, self.proxy_reactor, contextFactory, **self._endpoint_kwargs
         )
 
@@ -190,7 +173,7 @@ class ProxyAgent(_AgentBase):
             raise ValueError(f"Invalid URI {uri!r}")
 
         parsed_uri = URI.fromBytes(uri)
-        pool_key = (parsed_uri.scheme, parsed_uri.host, parsed_uri.port)
+        pool_key = f"{parsed_uri.scheme!r}{parsed_uri.host!r}{parsed_uri.port}"
         request_path = parsed_uri.originForm
 
         should_skip_proxy = False
@@ -216,7 +199,7 @@ class ProxyAgent(_AgentBase):
                 )
             # Cache *all* connections under the same key, since we are only
             # connecting to a single destination, the proxy:
-            pool_key = ("http-proxy", self.http_proxy_endpoint)
+            pool_key = "http-proxy"
             endpoint = self.http_proxy_endpoint
             request_path = uri
         elif (
@@ -224,22 +207,12 @@ class ProxyAgent(_AgentBase):
             and self.https_proxy_endpoint
             and not should_skip_proxy
         ):
-            connect_headers = Headers()
-
-            # Determine whether we need to set Proxy-Authorization headers
-            if self.https_proxy_creds:
-                # Set a Proxy-Authorization header
-                connect_headers.addRawHeader(
-                    b"Proxy-Authorization",
-                    self.https_proxy_creds.as_proxy_authorization_value(),
-                )
-
             endpoint = HTTPConnectProxyEndpoint(
                 self.proxy_reactor,
                 self.https_proxy_endpoint,
                 parsed_uri.host,
                 parsed_uri.port,
-                headers=connect_headers,
+                self.https_proxy_creds,
             )
         else:
             # not using a proxy
@@ -268,10 +241,10 @@ class ProxyAgent(_AgentBase):
         )
 
 
-def _http_proxy_endpoint(
+def http_proxy_endpoint(
     proxy: Optional[bytes],
     reactor: IReactorCore,
-    tls_options_factory: IPolicyForHTTPS,
+    tls_options_factory: Optional[IPolicyForHTTPS],
     **kwargs,
 ) -> Tuple[Optional[IStreamClientEndpoint], Optional[ProxyCredentials]]:
     """Parses an http proxy setting and returns an endpoint for the proxy
@@ -294,6 +267,7 @@ def _http_proxy_endpoint(
 
     Raise:
         ValueError if proxy has no hostname or unsupported scheme.
+        RuntimeError if no tls_options_factory is given for a https connection
     """
     if proxy is None:
         return None, None
@@ -305,8 +279,13 @@ def _http_proxy_endpoint(
     proxy_endpoint = HostnameEndpoint(reactor, host, port, **kwargs)
 
     if scheme == b"https":
-        tls_options = tls_options_factory.creatorForNetloc(host, port)
-        proxy_endpoint = wrapClientTLS(tls_options, proxy_endpoint)
+        if tls_options_factory:
+            tls_options = tls_options_factory.creatorForNetloc(host, port)
+            proxy_endpoint = wrapClientTLS(tls_options, proxy_endpoint)
+        else:
+            raise RuntimeError(
+                f"No TLS options for a https connection via proxy {proxy!s}"
+            )
 
     return proxy_endpoint, credentials
 

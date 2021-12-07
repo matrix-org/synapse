@@ -15,14 +15,15 @@
 import logging
 import threading
 import weakref
+from enum import Enum
 from functools import wraps
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
     Collection,
+    Dict,
     Generic,
-    Iterable,
     List,
     Optional,
     Type,
@@ -35,11 +36,12 @@ from typing import (
 from typing_extensions import Literal
 
 from twisted.internet import reactor
+from twisted.internet.interfaces import IReactorTime
 
 from synapse.config import cache as cache_config
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.util import Clock, caches
-from synapse.util.caches import CacheMetric, register_cache
+from synapse.util.caches import CacheMetric, EvictionReason, register_cache
 from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
 from synapse.util.linked_list import ListNode
 
@@ -51,7 +53,7 @@ logger = logging.getLogger(__name__)
 try:
     from pympler.asizeof import Asizer
 
-    def _get_size_of(val: Any, *, recurse=True) -> int:
+    def _get_size_of(val: Any, *, recurse: bool = True) -> int:
         """Get an estimate of the size in bytes of the object.
 
         Args:
@@ -70,7 +72,7 @@ try:
 
 except ImportError:
 
-    def _get_size_of(val: Any, *, recurse=True) -> int:
+    def _get_size_of(val: Any, *, recurse: bool = True) -> int:
         return 0
 
 
@@ -84,15 +86,6 @@ VT = TypeVar("VT")
 # a general type var, distinct from either KT or VT
 T = TypeVar("T")
 
-
-def enumerate_leaves(node, depth):
-    if depth == 0:
-        yield node
-    else:
-        for n in node.values():
-            yield from enumerate_leaves(n, depth - 1)
-
-
 P = TypeVar("P")
 
 
@@ -101,7 +94,7 @@ class _TimedListNode(ListNode[P]):
 
     __slots__ = ["last_access_ts_secs"]
 
-    def update_last_access(self, clock: Clock):
+    def update_last_access(self, clock: Clock) -> None:
         self.last_access_ts_secs = int(clock.time())
 
 
@@ -114,7 +107,7 @@ GLOBAL_ROOT = ListNode["_Node"].create_root_node()
 
 
 @wrap_as_background_process("LruCache._expire_old_entries")
-async def _expire_old_entries(clock: Clock, expiry_seconds: int):
+async def _expire_old_entries(clock: Clock, expiry_seconds: int) -> None:
     """Walks the global cache list to find cache entries that haven't been
     accessed in the given number of seconds.
     """
@@ -162,7 +155,7 @@ async def _expire_old_entries(clock: Clock, expiry_seconds: int):
     logger.info("Dropped %d items from caches", i)
 
 
-def setup_expire_lru_cache_entries(hs: "HomeServer"):
+def setup_expire_lru_cache_entries(hs: "HomeServer") -> None:
     """Start a background job that expires all cache entries if they have not
     been accessed for the given number of seconds.
     """
@@ -182,7 +175,7 @@ def setup_expire_lru_cache_entries(hs: "HomeServer"):
     )
 
 
-class _Node:
+class _Node(Generic[KT, VT]):
     __slots__ = [
         "_list_node",
         "_global_list_node",
@@ -196,15 +189,16 @@ class _Node:
     def __init__(
         self,
         root: "ListNode[_Node]",
-        key,
-        value,
-        cache: "weakref.ReferenceType[LruCache]",
+        key: KT,
+        value: VT,
+        cache: "weakref.ReferenceType[LruCache[KT, VT]]",
         clock: Clock,
         callbacks: Collection[Callable[[], None]] = (),
+        prune_unread_entries: bool = True,
     ):
         self._list_node = ListNode.insert_after(self, root)
-        self._global_list_node = None
-        if USE_GLOBAL_LIST:
+        self._global_list_node: Optional[_TimedListNode] = None
+        if USE_GLOBAL_LIST and prune_unread_entries:
             self._global_list_node = _TimedListNode.insert_after(self, GLOBAL_ROOT)
             self._global_list_node.update_last_access(clock)
 
@@ -277,7 +271,10 @@ class _Node:
         removed from all lists.
         """
         cache = self._cache()
-        if not cache or not cache.pop(self.key, None):
+        if (
+            cache is None
+            or cache.pop(self.key, _Sentinel.sentinel) is _Sentinel.sentinel
+        ):
             # `cache.pop` should call `drop_from_lists()`, unless this Node had
             # already been removed from the cache.
             self.drop_from_lists()
@@ -297,6 +294,12 @@ class _Node:
             self._global_list_node.update_last_access(clock)
 
 
+class _Sentinel(Enum):
+    # defining a sentinel in this way allows mypy to correctly handle the
+    # type of a dictionary lookup.
+    sentinel = object()
+
+
 class LruCache(Generic[KT, VT]):
     """
     Least-recently-used cache, supporting prometheus metrics and invalidation callbacks.
@@ -309,10 +312,11 @@ class LruCache(Generic[KT, VT]):
         max_size: int,
         cache_name: Optional[str] = None,
         cache_type: Type[Union[dict, TreeCache]] = dict,
-        size_callback: Optional[Callable] = None,
+        size_callback: Optional[Callable[[VT], int]] = None,
         metrics_collection_callback: Optional[Callable[[], None]] = None,
         apply_cache_factor_from_config: bool = True,
         clock: Optional[Clock] = None,
+        prune_unread_entries: bool = True,
     ):
         """
         Args:
@@ -341,11 +345,11 @@ class LruCache(Generic[KT, VT]):
         # Default `clock` to something sensible. Note that we rename it to
         # `real_clock` so that mypy doesn't think its still `Optional`.
         if clock is None:
-            real_clock = Clock(reactor)
+            real_clock = Clock(cast(IReactorTime, reactor))
         else:
             real_clock = clock
 
-        cache = cache_type()
+        cache: Union[Dict[KT, _Node[KT, VT]], TreeCache] = cache_type()
         self.cache = cache  # Used for introspection.
         self.apply_cache_factor_from_config = apply_cache_factor_from_config
 
@@ -380,11 +384,11 @@ class LruCache(Generic[KT, VT]):
         # creating more each time we create a `_Node`.
         weak_ref_to_self = weakref.ref(self)
 
-        list_root = ListNode[_Node].create_root_node()
+        list_root = ListNode[_Node[KT, VT]].create_root_node()
 
         lock = threading.Lock()
 
-        def evict():
+        def evict() -> None:
             while cache_len() > self.max_size:
                 # Get the last node in the list (i.e. the oldest node).
                 todelete = list_root.prev_node
@@ -402,11 +406,11 @@ class LruCache(Generic[KT, VT]):
                 evicted_len = delete_node(node)
                 cache.pop(node.key, None)
                 if metrics:
-                    metrics.inc_evictions(evicted_len)
+                    metrics.inc_evictions(EvictionReason.size, evicted_len)
 
         def synchronized(f: FT) -> FT:
             @wraps(f)
-            def inner(*args, **kwargs):
+            def inner(*args: Any, **kwargs: Any) -> Any:
                 with lock:
                     return f(*args, **kwargs)
 
@@ -415,18 +419,28 @@ class LruCache(Generic[KT, VT]):
         cached_cache_len = [0]
         if size_callback is not None:
 
-            def cache_len():
+            def cache_len() -> int:
                 return cached_cache_len[0]
 
         else:
 
-            def cache_len():
+            def cache_len() -> int:
                 return len(cache)
 
         self.len = synchronized(cache_len)
 
-        def add_node(key, value, callbacks: Collection[Callable[[], None]] = ()):
-            node = _Node(list_root, key, value, weak_ref_to_self, real_clock, callbacks)
+        def add_node(
+            key: KT, value: VT, callbacks: Collection[Callable[[], None]] = ()
+        ) -> None:
+            node: _Node[KT, VT] = _Node(
+                list_root,
+                key,
+                value,
+                weak_ref_to_self,
+                real_clock,
+                callbacks,
+                prune_unread_entries,
+            )
             cache[key] = node
 
             if size_callback:
@@ -435,10 +449,10 @@ class LruCache(Generic[KT, VT]):
             if caches.TRACK_MEMORY_USAGE and metrics:
                 metrics.inc_memory_usage(node.memory)
 
-        def move_node_to_front(node: _Node):
+        def move_node_to_front(node: _Node[KT, VT]) -> None:
             node.move_to_front(real_clock, list_root)
 
-        def delete_node(node: _Node) -> int:
+        def delete_node(node: _Node[KT, VT]) -> int:
             node.drop_from_lists()
 
             deleted_len = 1
@@ -477,7 +491,7 @@ class LruCache(Generic[KT, VT]):
             default: Optional[T] = None,
             callbacks: Collection[Callable[[], None]] = (),
             update_metrics: bool = True,
-        ):
+        ) -> Union[None, T, VT]:
             node = cache.get(key, None)
             if node is not None:
                 move_node_to_front(node)
@@ -491,7 +505,9 @@ class LruCache(Generic[KT, VT]):
                 return default
 
         @synchronized
-        def cache_set(key: KT, value: VT, callbacks: Iterable[Callable[[], None]] = ()):
+        def cache_set(
+            key: KT, value: VT, callbacks: Collection[Callable[[], None]] = ()
+        ) -> None:
             node = cache.get(key, None)
             if node is not None:
                 # We sometimes store large objects, e.g. dicts, which cause
@@ -536,7 +552,7 @@ class LruCache(Generic[KT, VT]):
             ...
 
         @synchronized
-        def cache_pop(key: KT, default: Optional[T] = None):
+        def cache_pop(key: KT, default: Optional[T] = None) -> Union[None, T, VT]:
             node = cache.get(key, None)
             if node:
                 delete_node(node)
@@ -584,8 +600,6 @@ class LruCache(Generic[KT, VT]):
         def cache_contains(key: KT) -> bool:
             return key in cache
 
-        self.sentinel = object()
-
         # make sure that we clear out any excess entries after we get resized.
         self._on_resize = evict
 
@@ -601,25 +615,25 @@ class LruCache(Generic[KT, VT]):
         self.contains = cache_contains
         self.clear = cache_clear
 
-    def __getitem__(self, key):
-        result = self.get(key, self.sentinel)
-        if result is self.sentinel:
+    def __getitem__(self, key: KT) -> VT:
+        result = self.get(key, _Sentinel.sentinel)
+        if result is _Sentinel.sentinel:
             raise KeyError()
         else:
             return result
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: KT, value: VT) -> None:
         self.set(key, value)
 
-    def __delitem__(self, key, value):
-        result = self.pop(key, self.sentinel)
-        if result is self.sentinel:
+    def __delitem__(self, key: KT, value: VT) -> None:
+        result = self.pop(key, _Sentinel.sentinel)
+        if result is _Sentinel.sentinel:
             raise KeyError()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.len()
 
-    def __contains__(self, key):
+    def __contains__(self, key: KT) -> bool:
         return self.contains(key)
 
     def set_cache_factor(self, factor: float) -> bool:

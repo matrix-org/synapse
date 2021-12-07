@@ -23,6 +23,7 @@ from synapse.metrics.background_process_metrics import (
     wrap_as_background_process,
 )
 from synapse.replication.tcp.streams import TypingStream
+from synapse.streams import EventSource
 from synapse.types import JsonDict, Requester, UserID, get_domain_from_id
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.metrics import Measure
@@ -53,7 +54,7 @@ class FollowerTypingHandler:
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
-        self.server_name = hs.config.server_name
+        self.server_name = hs.config.server.server_name
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
 
@@ -61,8 +62,8 @@ class FollowerTypingHandler:
         if hs.should_send_federation():
             self.federation = hs.get_federation_sender()
 
-        if hs.config.worker.writers.typing != hs.get_instance_name():
-            hs.get_federation_registry().register_instance_for_edu(
+        if hs.get_instance_name() not in hs.config.worker.writers.typing:
+            hs.get_federation_registry().register_instances_for_edu(
                 "m.typing",
                 hs.config.worker.writers.typing,
             )
@@ -73,7 +74,7 @@ class FollowerTypingHandler:
         self._room_typing: Dict[str, Set[str]] = {}
 
         self._member_last_federation_poke: Dict[RoomMember, int] = {}
-        self.wheel_timer = WheelTimer(bucket_size=5000)
+        self.wheel_timer: WheelTimer[RoomMember] = WheelTimer(bucket_size=5000)
         self._latest_room_serial = 0
 
         self.clock.looping_call(self._handle_timeouts, 5000)
@@ -89,7 +90,7 @@ class FollowerTypingHandler:
         self.wheel_timer = WheelTimer(bucket_size=5000)
 
     @wrap_as_background_process("typing._handle_timeouts")
-    def _handle_timeouts(self) -> None:
+    async def _handle_timeouts(self) -> None:
         logger.debug("Checking for typing timeouts")
 
         now = self.clock.time_msec()
@@ -204,7 +205,7 @@ class TypingWriterHandler(FollowerTypingHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        assert hs.config.worker.writers.typing == hs.get_instance_name()
+        assert hs.get_instance_name() in hs.config.worker.writers.typing
 
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
@@ -439,7 +440,7 @@ class TypingWriterHandler(FollowerTypingHandler):
         raise Exception("Typing writer instance got typing info over replication")
 
 
-class TypingNotificationEventSource:
+class TypingNotificationEventSource(EventSource[int, JsonDict]):
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.clock = hs.get_clock()
@@ -464,17 +465,23 @@ class TypingNotificationEventSource:
         may be interested in.
 
         Args:
-            from_key: the stream position at which events should be fetched from
-            service: The appservice which may be interested
+            from_key: the stream position at which events should be fetched from.
+            service: The appservice which may be interested.
+
+        Returns:
+            A two-tuple containing the following:
+                * A list of json dictionaries derived from typing events that the
+                  appservice may be interested in.
+                * The latest known room serial.
         """
         with Measure(self.clock, "typing.get_new_events_as"):
-            from_key = int(from_key)
             handler = self.get_typing_handler()
 
             events = []
             for room_id in handler._room_serials.keys():
                 if handler._room_serials[room_id] <= from_key:
                     continue
+
                 if not await service.matches_user_in_member_list(
                     room_id, handler.store
                 ):
@@ -482,10 +489,16 @@ class TypingNotificationEventSource:
 
                 events.append(self._make_event_for(room_id))
 
-            return (events, handler._latest_room_serial)
+            return events, handler._latest_room_serial
 
     async def get_new_events(
-        self, from_key: int, room_ids: Iterable[str], **kwargs
+        self,
+        user: UserID,
+        from_key: int,
+        limit: Optional[int],
+        room_ids: Iterable[str],
+        is_guest: bool,
+        explicit_room_id: Optional[str] = None,
     ) -> Tuple[List[JsonDict], int]:
         with Measure(self.clock, "typing.get_new_events"):
             from_key = int(from_key)
@@ -500,7 +513,7 @@ class TypingNotificationEventSource:
 
                 events.append(self._make_event_for(room_id))
 
-            return (events, handler._latest_room_serial)
+            return events, handler._latest_room_serial
 
     def get_current_key(self) -> int:
         return self.get_typing_handler()._latest_room_serial

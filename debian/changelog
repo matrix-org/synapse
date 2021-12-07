@@ -1,3 +1,193 @@
+matrix-synapse-py3 (1.49.0~rc1) stable; urgency=medium
+
+  * New synapse release 1.49.0~rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 07 Dec 2021 13:52:21 +0000
+
+matrix-synapse-py3 (1.48.0) stable; urgency=medium
+
+  * New synapse release 1.48.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 30 Nov 2021 11:24:15 +0000
+
+matrix-synapse-py3 (1.48.0~rc1) stable; urgency=medium
+
+  * New synapse release 1.48.0~rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 25 Nov 2021 15:56:03 +0000
+
+matrix-synapse-py3 (1.47.1) stable; urgency=medium
+
+  * New synapse release 1.47.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 19 Nov 2021 13:44:32 +0000
+
+matrix-synapse-py3 (1.47.0) stable; urgency=medium
+
+  * New synapse release 1.47.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 17 Nov 2021 13:09:43 +0000
+
+matrix-synapse-py3 (1.47.0~rc3) stable; urgency=medium
+
+  * New synapse release 1.47.0~rc3.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 16 Nov 2021 14:32:47 +0000
+
+matrix-synapse-py3 (1.47.0~rc2) stable; urgency=medium
+
+  [ Dan Callahan ]
+  * Update scripts to pass Shellcheck lints.
+  * Remove unused Vagrant scripts from debian/ directory.
+  * Allow building Debian packages for any architecture, not just amd64.
+  * Preinstall the "wheel" package when building virtualenvs.
+  * Do not error if /etc/default/matrix-synapse is missing.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.47.0~rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 10 Nov 2021 09:41:01 +0000
+
+matrix-synapse-py3 (1.46.0) stable; urgency=medium
+
+  [ Richard van der Hoff ]
+  * Compress debs with xz, to fix incompatibility of impish debs with reprepro.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.46.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 02 Nov 2021 13:22:53 +0000
+
+matrix-synapse-py3 (1.46.0~rc1) stable; urgency=medium
+
+  * New synapse release 1.46.0~rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 26 Oct 2021 14:04:04 +0100
+
+matrix-synapse-py3 (1.45.1) stable; urgency=medium
+
+  * New synapse release 1.45.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 20 Oct 2021 11:58:27 +0100
+
+matrix-synapse-py3 (1.45.0) stable; urgency=medium
+
+  * New synapse release 1.45.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 19 Oct 2021 11:18:53 +0100
+
+matrix-synapse-py3 (1.45.0~rc2) stable; urgency=medium
+
+  * New synapse release 1.45.0~rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 14 Oct 2021 10:58:24 +0100
+
+matrix-synapse-py3 (1.45.0~rc1) stable; urgency=medium
+
+  [ Nick @ Beeper ]
+  * Include an `update_synapse_database` script in the distribution.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.45.0~rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 12 Oct 2021 10:46:27 +0100
+
+matrix-synapse-py3 (1.44.0) stable; urgency=medium
+
+  * New synapse release 1.44.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 05 Oct 2021 13:43:57 +0100
+
+matrix-synapse-py3 (1.44.0~rc3) stable; urgency=medium
+
+  * New synapse release 1.44.0~rc3.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 04 Oct 2021 14:57:22 +0100
+
+matrix-synapse-py3 (1.44.0~rc2) stable; urgency=medium
+
+  * New synapse release 1.44.0~rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 30 Sep 2021 12:39:10 +0100
+
+matrix-synapse-py3 (1.44.0~rc1) stable; urgency=medium
+
+  * New synapse release 1.44.0~rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 28 Sep 2021 13:41:28 +0100
+
+matrix-synapse-py3 (1.43.0) stable; urgency=medium
+
+  * New synapse release 1.43.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 21 Sep 2021 11:49:05 +0100
+
+matrix-synapse-py3 (1.43.0~rc2) stable; urgency=medium
+
+  * New synapse release 1.43.0~rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 17 Sep 2021 10:43:21 +0100
+
+matrix-synapse-py3 (1.43.0~rc1) stable; urgency=medium
+
+  * New synapse release 1.43.0~rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 14 Sep 2021 11:39:46 +0100
+
+matrix-synapse-py3 (1.42.0) stable; urgency=medium
+
+  * New synapse release 1.42.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 07 Sep 2021 16:19:09 +0100
+
+matrix-synapse-py3 (1.42.0~rc2) stable; urgency=medium
+
+  * New synapse release 1.42.0~rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 06 Sep 2021 15:25:13 +0100
+
+matrix-synapse-py3 (1.42.0~rc1) stable; urgency=medium
+
+  * New synapse release 1.42.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 01 Sep 2021 11:37:48 +0100
+
+matrix-synapse-py3 (1.41.1) stable; urgency=high
+
+  * New synapse release 1.41.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 31 Aug 2021 12:59:10 +0100
+
+matrix-synapse-py3 (1.41.0) stable; urgency=medium
+
+  * New synapse release 1.41.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 24 Aug 2021 15:31:45 +0100
+
+matrix-synapse-py3 (1.41.0~rc1) stable; urgency=medium
+
+  * New synapse release 1.41.0~rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 18 Aug 2021 15:52:00 +0100
+
+matrix-synapse-py3 (1.40.0) stable; urgency=medium
+
+  * New synapse release 1.40.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 10 Aug 2021 13:50:48 +0100
+
+matrix-synapse-py3 (1.40.0~rc3) stable; urgency=medium
+
+  * New synapse release 1.40.0~rc3.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 09 Aug 2021 13:41:08 +0100
+
+matrix-synapse-py3 (1.40.0~rc2) stable; urgency=medium
+
+  * New synapse release 1.40.0~rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 04 Aug 2021 17:08:55 +0100
+
 matrix-synapse-py3 (1.40.0~rc1) stable; urgency=medium
 
   [ Richard van der Hoff ]

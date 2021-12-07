@@ -20,13 +20,14 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Sequence
 
 DISTS = (
-    "debian:buster",
+    "debian:buster",  # oldstable: EOL 2022-08
     "debian:bullseye",
+    "debian:bookworm",
     "debian:sid",
     "ubuntu:bionic",  # 18.04 LTS (our EOL forced by Py36 on 2021-12-23)
     "ubuntu:focal",  # 20.04 LTS (our EOL forced by Py38 on 2024-10-14)
-    "ubuntu:groovy",  # 20.10 (EOL 2021-07-07)
     "ubuntu:hirsute",  # 21.04 (EOL 2022-01-05)
+    "ubuntu:impish",  # 21.10  (EOL 2022-07)
 )
 
 DESC = """\

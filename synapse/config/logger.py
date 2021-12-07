@@ -1,4 +1,5 @@
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +19,7 @@ import os
 import sys
 import threading
 from string import Template
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import yaml
 from zope.interface import implementer
@@ -37,6 +39,10 @@ from synapse.logging.filter import MetadataFilter
 from synapse.util.versionstring import get_version_string
 
 from ._base import Config, ConfigError
+
+if TYPE_CHECKING:
+    from synapse.config.homeserver import HomeServerConfig
+    from synapse.server import HomeServer
 
 DEFAULT_LOG_CONFIG = Template(
     """\
@@ -67,18 +73,31 @@ handlers:
         backupCount: 3  # Does not include the current log file.
         encoding: utf8
 
-    # Default to buffering writes to log file for efficiency. This means that
-    # will be a delay for INFO/DEBUG logs to get written, but WARNING/ERROR
-    # logs will still be flushed immediately.
+    # Default to buffering writes to log file for efficiency.
+    # WARNING/ERROR logs will still be flushed immediately, but there will be a
+    # delay (of up to `period` seconds, or until the buffer is full with
+    # `capacity` messages) before INFO/DEBUG logs get written.
     buffer:
-        class: logging.handlers.MemoryHandler
+        class: synapse.logging.handlers.PeriodicallyFlushingMemoryHandler
         target: file
-        # The capacity is the number of log lines that are buffered before
-        # being written to disk. Increasing this will lead to better
+
+        # The capacity is the maximum number of log lines that are buffered
+        # before being written to disk. Increasing this will lead to better
         # performance, at the expensive of it taking longer for log lines to
         # be written to disk.
+        # This parameter is required.
         capacity: 10
-        flushLevel: 30  # Flush for WARNING logs as well
+
+        # Logs with a level at or above the flush level will cause the buffer to
+        # be flushed immediately.
+        # Default value: 40 (ERROR)
+        # Other values: 50 (CRITICAL), 30 (WARNING), 20 (INFO), 10 (DEBUG)
+        flushLevel: 30  # Flush immediately for WARNING logs and higher
+
+        # The period of time, in seconds, between forced flushes.
+        # Messages will not be delayed for longer than this time.
+        # Default value: 5 seconds
+        period: 5
 
     # A handler that writes logs to stderr. Unused by default, but can be used
     # instead of "buffer" and "file" in the logger handlers.
@@ -124,13 +143,13 @@ removed in Synapse 1.3.0. You should instead set up a separate log configuration
 class LoggingConfig(Config):
     section = "logging"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config, **kwargs) -> None:
         if config.get("log_file"):
             raise ConfigError(LOG_FILE_ERROR)
         self.log_config = self.abspath(config.get("log_config"))
         self.no_redirect_stdio = config.get("no_redirect_stdio", False)
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, config_dir_path, server_name, **kwargs) -> str:
         log_config = os.path.join(config_dir_path, server_name + ".log.config")
         return (
             """\
@@ -144,14 +163,14 @@ class LoggingConfig(Config):
             % locals()
         )
 
-    def read_arguments(self, args):
+    def read_arguments(self, args: argparse.Namespace) -> None:
         if args.no_redirect_stdio is not None:
             self.no_redirect_stdio = args.no_redirect_stdio
         if args.log_file is not None:
             raise ConfigError(LOG_FILE_ERROR)
 
     @staticmethod
-    def add_arguments(parser):
+    def add_arguments(parser: argparse.ArgumentParser) -> None:
         logging_group = parser.add_argument_group("logging")
         logging_group.add_argument(
             "-n",
@@ -168,7 +187,7 @@ class LoggingConfig(Config):
             help=argparse.SUPPRESS,
         )
 
-    def generate_files(self, config, config_dir_path):
+    def generate_files(self, config: Dict[str, Any], config_dir_path: str) -> None:
         log_config = config.get("log_config")
         if log_config and not os.path.exists(log_config):
             log_file = self.abspath("homeserver.log")
@@ -180,7 +199,9 @@ class LoggingConfig(Config):
                 log_config_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=log_file))
 
 
-def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> None:
+def _setup_stdlib_logging(
+    config: "HomeServerConfig", log_config_path: Optional[str], logBeginner: LogBeginner
+) -> None:
     """
     Set up Python standard library logging.
     """
@@ -210,10 +231,10 @@ def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> 
     # writes.
 
     log_context_filter = LoggingContextFilter()
-    log_metadata_filter = MetadataFilter({"server_name": config.server_name})
+    log_metadata_filter = MetadataFilter({"server_name": config.server.server_name})
     old_factory = logging.getLogRecordFactory()
 
-    def factory(*args, **kwargs):
+    def factory(*args: Any, **kwargs: Any) -> logging.LogRecord:
         record = old_factory(*args, **kwargs)
         log_context_filter.filter(record)
         log_metadata_filter.filter(record)
@@ -280,7 +301,7 @@ def _load_logging_config(log_config_path: str) -> None:
     logging.config.dictConfig(log_config)
 
 
-def _reload_logging_config(log_config_path):
+def _reload_logging_config(log_config_path: Optional[str]) -> None:
     """
     Reload the log configuration from the file and apply it.
     """
@@ -293,7 +314,10 @@ def _reload_logging_config(log_config_path):
 
 
 def setup_logging(
-    hs, config, use_worker_options=False, logBeginner: LogBeginner = globalLogBeginner
+    hs: "HomeServer",
+    config: "HomeServerConfig",
+    use_worker_options: bool = False,
+    logBeginner: LogBeginner = globalLogBeginner,
 ) -> None:
     """
     Set up the logging subsystem.
@@ -309,7 +333,9 @@ def setup_logging(
 
     """
     log_config_path = (
-        config.worker_log_config if use_worker_options else config.log_config
+        config.worker.worker_log_config
+        if use_worker_options
+        else config.logging.log_config
     )
 
     # Perform one-time logging configuration.
@@ -322,5 +348,5 @@ def setup_logging(
     # Log immediately so we can grep backwards.
     logging.warning("***** STARTING SERVER *****")
     logging.warning("Server %s version %s", sys.argv[0], get_version_string(synapse))
-    logging.info("Server hostname: %s", config.server_name)
+    logging.info("Server hostname: %s", config.server.server_name)
     logging.info("Instance name: %s", hs.get_instance_name())

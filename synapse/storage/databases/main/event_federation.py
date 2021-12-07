@@ -14,7 +14,7 @@
 import itertools
 import logging
 from queue import Empty, PriorityQueue
-from typing import Collection, Dict, Iterable, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Collection, Dict, Iterable, List, Optional, Set, Tuple
 
 from prometheus_client import Counter, Gauge
 
@@ -33,6 +33,9 @@ from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.iterutils import batch_iter
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 oldest_pdu_in_federation_staging = Gauge(
     "synapse_federation_server_oldest_inbound_pdu_in_staging",
@@ -59,10 +62,10 @@ class _NoChainCoverIndex(Exception):
 
 
 class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
 
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             hs.get_clock().looping_call(
                 self._delete_old_forward_extrem_cache, 60 * 60 * 1000
             )
@@ -671,27 +674,97 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # Return all events where not all sets can reach them.
         return {eid for eid, n in event_to_missing_sets.items() if n}
 
-    async def get_oldest_events_with_depth_in_room(self, room_id):
+    async def get_oldest_event_ids_with_depth_in_room(self, room_id) -> Dict[str, int]:
+        """Gets the oldest events(backwards extremities) in the room along with the
+        aproximate depth.
+
+        We use this function so that we can compare and see if someones current
+        depth at their current scrollback is within pagination range of the
+        event extremeties. If the current depth is close to the depth of given
+        oldest event, we can trigger a backfill.
+
+        Args:
+            room_id: Room where we want to find the oldest events
+
+        Returns:
+            Map from event_id to depth
+        """
+
+        def get_oldest_event_ids_with_depth_in_room_txn(txn, room_id):
+            # Assemble a dictionary with event_id -> depth for the oldest events
+            # we know of in the room. Backwards extremeties are the oldest
+            # events we know of in the room but we only know of them because
+            # some other event referenced them by prev_event and aren't peristed
+            # in our database yet (meaning we don't know their depth
+            # specifically). So we need to look for the aproximate depth from
+            # the events connected to the current backwards extremeties.
+            sql = """
+                SELECT b.event_id, MAX(e.depth) FROM events as e
+                /**
+                 * Get the edge connections from the event_edges table
+                 * so we can see whether this event's prev_events points
+                 * to a backward extremity in the next join.
+                 */
+                INNER JOIN event_edges as g
+                ON g.event_id = e.event_id
+                /**
+                 * We find the "oldest" events in the room by looking for
+                 * events connected to backwards extremeties (oldest events
+                 * in the room that we know of so far).
+                 */
+                INNER JOIN event_backward_extremities as b
+                ON g.prev_event_id = b.event_id
+                WHERE b.room_id = ? AND g.is_state is ?
+                GROUP BY b.event_id
+            """
+
+            txn.execute(sql, (room_id, False))
+
+            return dict(txn)
+
         return await self.db_pool.runInteraction(
-            "get_oldest_events_with_depth_in_room",
-            self.get_oldest_events_with_depth_in_room_txn,
+            "get_oldest_event_ids_with_depth_in_room",
+            get_oldest_event_ids_with_depth_in_room_txn,
             room_id,
         )
 
-    def get_oldest_events_with_depth_in_room_txn(self, txn, room_id):
-        sql = (
-            "SELECT b.event_id, MAX(e.depth) FROM events as e"
-            " INNER JOIN event_edges as g"
-            " ON g.event_id = e.event_id"
-            " INNER JOIN event_backward_extremities as b"
-            " ON g.prev_event_id = b.event_id"
-            " WHERE b.room_id = ? AND g.is_state is ?"
-            " GROUP BY b.event_id"
+    async def get_insertion_event_backwards_extremities_in_room(
+        self, room_id
+    ) -> Dict[str, int]:
+        """Get the insertion events we know about that we haven't backfilled yet.
+
+        We use this function so that we can compare and see if someones current
+        depth at their current scrollback is within pagination range of the
+        insertion event. If the current depth is close to the depth of given
+        insertion event, we can trigger a backfill.
+
+        Args:
+            room_id: Room where we want to find the oldest events
+
+        Returns:
+            Map from event_id to depth
+        """
+
+        def get_insertion_event_backwards_extremities_in_room_txn(txn, room_id):
+            sql = """
+                SELECT b.event_id, MAX(e.depth) FROM insertion_events as i
+                /* We only want insertion events that are also marked as backwards extremities */
+                INNER JOIN insertion_event_extremities as b USING (event_id)
+                /* Get the depth of the insertion event from the events table */
+                INNER JOIN events AS e USING (event_id)
+                WHERE b.room_id = ?
+                GROUP BY b.event_id
+            """
+
+            txn.execute(sql, (room_id,))
+
+            return dict(txn)
+
+        return await self.db_pool.runInteraction(
+            "get_insertion_event_backwards_extremities_in_room",
+            get_insertion_event_backwards_extremities_in_room_txn,
+            room_id,
         )
-
-        txn.execute(sql, (room_id, False))
-
-        return dict(txn)
 
     async def get_max_depth_of(self, event_ids: List[str]) -> Tuple[str, int]:
         """Returns the event ID and depth for the event that has the max depth from a set of event IDs
@@ -836,7 +909,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             desc="get_latest_event_ids_in_room",
         )
 
-    async def get_min_depth(self, room_id: str) -> int:
+    async def get_min_depth(self, room_id: str) -> Optional[int]:
         """For the given room, get the minimum depth we have seen for it."""
         return await self.db_pool.runInteraction(
             "get_min_depth", self._get_min_depth_interaction, room_id
@@ -964,13 +1037,13 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             LIMIT ?
         """
 
-        # Find any chunk connections of a given insertion event
-        chunk_connection_query = """
+        # Find any batch connections of a given insertion event
+        batch_connection_query = """
             SELECT e.depth, c.event_id FROM insertion_events AS i
-            /* Find the chunk that connects to the given insertion event */
-            INNER JOIN chunk_events AS c
-            ON i.next_chunk_id = c.chunk_id
-            /* Get the depth of the chunk start event from the events table */
+            /* Find the batch that connects to the given insertion event */
+            INNER JOIN batch_events AS c
+            ON i.next_batch_id = c.batch_id
+            /* Get the depth of the batch start event from the events table */
             INNER JOIN events AS e USING (event_id)
             /* Find an insertion event which matches the given event_id */
             WHERE i.event_id = ?
@@ -1007,12 +1080,12 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
             event_results.add(event_id)
 
-            # Try and find any potential historical chunks of message history.
+            # Try and find any potential historical batches of message history.
             #
             # First we look for an insertion event connected to the current
             # event (by prev_event). If we find any, we need to go and try to
-            # find any chunk events connected to the insertion event (by
-            # chunk_id). If we find any, we'll add them to the queue and
+            # find any batch events connected to the insertion event (by
+            # batch_id). If we find any, we'll add them to the queue and
             # navigate up the DAG like normal in the next iteration of the loop.
             txn.execute(
                 connected_insertion_event_query, (event_id, limit - len(event_results))
@@ -1027,21 +1100,20 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 connected_insertion_event = row[1]
                 queue.put((-connected_insertion_event_depth, connected_insertion_event))
 
-                # Find any chunk connections for the given insertion event
+                # Find any batch connections for the given insertion event
                 txn.execute(
-                    chunk_connection_query,
+                    batch_connection_query,
                     (connected_insertion_event, limit - len(event_results)),
                 )
-                chunk_start_event_id_results = txn.fetchall()
+                batch_start_event_id_results = txn.fetchall()
                 logger.debug(
-                    "_get_backfill_events: chunk_start_event_id_results %s",
-                    chunk_start_event_id_results,
+                    "_get_backfill_events: batch_start_event_id_results %s",
+                    batch_start_event_id_results,
                 )
-                for row in chunk_start_event_id_results:
+                for row in batch_start_event_id_results:
                     if row[1] not in event_results:
                         queue.put((-row[0], row[1]))
 
-            # Navigate up the DAG by prev_event
             txn.execute(query, (event_id, False, limit - len(event_results)))
             prev_event_id_results = txn.fetchall()
             logger.debug(
@@ -1134,6 +1206,19 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         await self.db_pool.runInteraction(
             "_delete_old_forward_extrem_cache",
             _delete_old_forward_extrem_cache_txn,
+        )
+
+    async def insert_insertion_extremity(self, event_id: str, room_id: str) -> None:
+        await self.db_pool.simple_upsert(
+            table="insertion_event_extremities",
+            keyvalues={"event_id": event_id},
+            values={
+                "event_id": event_id,
+                "room_id": room_id,
+            },
+            insertion_values={},
+            desc="insert_insertion_extremity",
+            lock=False,
         )
 
     async def insert_received_event_to_staging(
@@ -1429,7 +1514,7 @@ class EventFederationStore(EventFederationWorkerStore):
 
     EVENT_AUTH_STATE_ONLY = "event_auth_state_only"
 
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
 
         self.db_pool.updates.register_background_update_handler(
@@ -1467,9 +1552,9 @@ class EventFederationStore(EventFederationWorkerStore):
                 DELETE FROM event_auth
                 WHERE event_id IN (
                     SELECT event_id FROM events
-                    LEFT JOIN state_events USING (room_id, event_id)
+                    LEFT JOIN state_events AS se USING (room_id, event_id)
                     WHERE ? <= stream_ordering AND stream_ordering < ?
-                        AND state_key IS null
+                        AND se.state_key IS null
                 )
             """
 

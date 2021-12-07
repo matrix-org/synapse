@@ -29,7 +29,8 @@ from twisted.protocols.tls import TLSMemoryBIOFactory, TLSMemoryBIOProtocol
 from twisted.web.http import HTTPChannel
 
 from synapse.http.client import BlacklistingReactorWrapper
-from synapse.http.proxyagent import ProxyAgent, ProxyCredentials, parse_proxy
+from synapse.http.connectproxyclient import ProxyCredentials
+from synapse.http.proxyagent import ProxyAgent, parse_proxy
 
 from tests.http import TestServerTLSConnectionFactory, get_test_https_policy
 from tests.server import FakeTransport, ThreadedMemoryReactorClock
@@ -392,7 +393,9 @@ class MatrixFederationAgentTests(TestCase):
         """
         Tests that requests can be made through a proxy.
         """
-        self._do_http_request_via_proxy(ssl=False, auth_credentials=None)
+        self._do_http_request_via_proxy(
+            expect_proxy_ssl=False, expected_auth_credentials=None
+        )
 
     @patch.dict(
         os.environ,
@@ -402,13 +405,17 @@ class MatrixFederationAgentTests(TestCase):
         """
         Tests that authenticated requests can be made through a proxy.
         """
-        self._do_http_request_via_proxy(ssl=False, auth_credentials=b"bob:pinkponies")
+        self._do_http_request_via_proxy(
+            expect_proxy_ssl=False, expected_auth_credentials=b"bob:pinkponies"
+        )
 
     @patch.dict(
         os.environ, {"http_proxy": "https://proxy.com:8888", "no_proxy": "unused.com"}
     )
     def test_http_request_via_https_proxy(self):
-        self._do_http_request_via_proxy(ssl=True, auth_credentials=None)
+        self._do_http_request_via_proxy(
+            expect_proxy_ssl=True, expected_auth_credentials=None
+        )
 
     @patch.dict(
         os.environ,
@@ -418,12 +425,16 @@ class MatrixFederationAgentTests(TestCase):
         },
     )
     def test_http_request_via_https_proxy_with_auth(self):
-        self._do_http_request_via_proxy(ssl=True, auth_credentials=b"bob:pinkponies")
+        self._do_http_request_via_proxy(
+            expect_proxy_ssl=True, expected_auth_credentials=b"bob:pinkponies"
+        )
 
     @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
     def test_https_request_via_proxy(self):
         """Tests that TLS-encrypted requests can be made through a proxy"""
-        self._do_https_request_via_proxy(ssl=False, auth_credentials=None)
+        self._do_https_request_via_proxy(
+            expect_proxy_ssl=False, expected_auth_credentials=None
+        )
 
     @patch.dict(
         os.environ,
@@ -431,14 +442,18 @@ class MatrixFederationAgentTests(TestCase):
     )
     def test_https_request_via_proxy_with_auth(self):
         """Tests that authenticated, TLS-encrypted requests can be made through a proxy"""
-        self._do_https_request_via_proxy(ssl=False, auth_credentials=b"bob:pinkponies")
+        self._do_https_request_via_proxy(
+            expect_proxy_ssl=False, expected_auth_credentials=b"bob:pinkponies"
+        )
 
     @patch.dict(
         os.environ, {"https_proxy": "https://proxy.com", "no_proxy": "unused.com"}
     )
     def test_https_request_via_https_proxy(self):
         """Tests that TLS-encrypted requests can be made through a proxy"""
-        self._do_https_request_via_proxy(ssl=True, auth_credentials=None)
+        self._do_https_request_via_proxy(
+            expect_proxy_ssl=True, expected_auth_credentials=None
+        )
 
     @patch.dict(
         os.environ,
@@ -446,20 +461,22 @@ class MatrixFederationAgentTests(TestCase):
     )
     def test_https_request_via_https_proxy_with_auth(self):
         """Tests that authenticated, TLS-encrypted requests can be made through a proxy"""
-        self._do_https_request_via_proxy(ssl=True, auth_credentials=b"bob:pinkponies")
+        self._do_https_request_via_proxy(
+            expect_proxy_ssl=True, expected_auth_credentials=b"bob:pinkponies"
+        )
 
     def _do_http_request_via_proxy(
         self,
-        ssl: bool = False,
-        auth_credentials: Optional[bytes] = None,
+        expect_proxy_ssl: bool = False,
+        expected_auth_credentials: Optional[bytes] = None,
     ):
         """Send a http request via an agent and check that it is correctly received at
             the proxy. The proxy can use either http or https.
         Args:
-            ssl: True if we expect the request to connect via https to proxy
-            auth_credentials: credentials to authenticate at proxy
+            expect_proxy_ssl: True if we expect the request to connect via https to proxy
+            expected_auth_credentials: credentials to authenticate at proxy
         """
-        if ssl:
+        if expect_proxy_ssl:
             agent = ProxyAgent(
                 self.reactor, use_proxy=True, contextFactory=get_test_https_policy()
             )
@@ -480,9 +497,9 @@ class MatrixFederationAgentTests(TestCase):
         http_server = self._make_connection(
             client_factory,
             _get_test_protocol_factory(),
-            ssl=ssl,
-            tls_sanlist=[b"DNS:proxy.com"] if ssl else None,
-            expected_sni=b"proxy.com" if ssl else None,
+            ssl=expect_proxy_ssl,
+            tls_sanlist=[b"DNS:proxy.com"] if expect_proxy_ssl else None,
+            expected_sni=b"proxy.com" if expect_proxy_ssl else None,
         )
 
         # the FakeTransport is async, so we need to pump the reactor
@@ -498,9 +515,9 @@ class MatrixFederationAgentTests(TestCase):
             b"Proxy-Authorization"
         )
 
-        if auth_credentials is not None:
+        if expected_auth_credentials is not None:
             # Compute the correct header value for Proxy-Authorization
-            encoded_credentials = base64.b64encode(auth_credentials)
+            encoded_credentials = base64.b64encode(expected_auth_credentials)
             expected_header_value = b"Basic " + encoded_credentials
 
             # Validate the header's value
@@ -523,14 +540,14 @@ class MatrixFederationAgentTests(TestCase):
 
     def _do_https_request_via_proxy(
         self,
-        ssl: bool = False,
-        auth_credentials: Optional[bytes] = None,
+        expect_proxy_ssl: bool = False,
+        expected_auth_credentials: Optional[bytes] = None,
     ):
         """Send a https request via an agent and check that it is correctly received at
             the proxy and client. The proxy can use either http or https.
         Args:
-            ssl: True if we expect the request to connect via https to proxy
-            auth_credentials: credentials to authenticate at proxy
+            expect_proxy_ssl: True if we expect the request to connect via https to proxy
+            expected_auth_credentials: credentials to authenticate at proxy
         """
         agent = ProxyAgent(
             self.reactor,
@@ -552,9 +569,9 @@ class MatrixFederationAgentTests(TestCase):
         proxy_server = self._make_connection(
             client_factory,
             _get_test_protocol_factory(),
-            ssl=ssl,
-            tls_sanlist=[b"DNS:proxy.com"] if ssl else None,
-            expected_sni=b"proxy.com" if ssl else None,
+            ssl=expect_proxy_ssl,
+            tls_sanlist=[b"DNS:proxy.com"] if expect_proxy_ssl else None,
+            expected_sni=b"proxy.com" if expect_proxy_ssl else None,
         )
         assert isinstance(proxy_server, HTTPChannel)
 
@@ -570,9 +587,9 @@ class MatrixFederationAgentTests(TestCase):
             b"Proxy-Authorization"
         )
 
-        if auth_credentials is not None:
+        if expected_auth_credentials is not None:
             # Compute the correct header value for Proxy-Authorization
-            encoded_credentials = base64.b64encode(auth_credentials)
+            encoded_credentials = base64.b64encode(expected_auth_credentials)
             expected_header_value = b"Basic " + encoded_credentials
 
             # Validate the header's value
@@ -606,7 +623,7 @@ class MatrixFederationAgentTests(TestCase):
         # Protocol to implement the proxy, which starts out by forwarding to an
         # HTTPChannel (to implement the CONNECT command) and can then be switched
         # into a mode where it forwards its traffic to another Protocol.)
-        if ssl:
+        if expect_proxy_ssl:
             assert isinstance(proxy_server_transport, TLSMemoryBIOProtocol)
             proxy_server_transport.wrappedProtocol = server_ssl_protocol
         else:

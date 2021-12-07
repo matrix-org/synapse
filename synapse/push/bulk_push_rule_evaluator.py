@@ -232,6 +232,8 @@ class BulkPushRuleEvaluator:
                 # that user, as they might not be already joined.
                 if event.type == EventTypes.Member and event.state_key == uid:
                     display_name = event.content.get("displayname", None)
+                    if not isinstance(display_name, str):
+                        display_name = None
 
             if count_as_unread:
                 # Add an element for the current user if the event needs to be marked as
@@ -268,7 +270,7 @@ def _condition_checker(
     evaluator: PushRuleEvaluatorForEvent,
     conditions: List[dict],
     uid: str,
-    display_name: str,
+    display_name: Optional[str],
     cache: Dict[str, bool],
 ) -> bool:
     for cond in conditions:
@@ -290,6 +292,12 @@ def _condition_checker(
     return True
 
 
+MemberMap = Dict[str, Tuple[str, str]]
+Rule = Dict[str, dict]
+RulesByUser = Dict[str, List[Rule]]
+StateGroup = Union[object, int]
+
+
 @attr.s(slots=True)
 class RulesForRoomData:
     """The data stored in the cache by `RulesForRoom`.
@@ -299,16 +307,16 @@ class RulesForRoomData:
     """
 
     # event_id -> (user_id, state)
-    member_map = attr.ib(type=Dict[str, Tuple[str, str]], factory=dict)
+    member_map = attr.ib(type=MemberMap, factory=dict)
     # user_id -> rules
-    rules_by_user = attr.ib(type=Dict[str, List[Dict[str, dict]]], factory=dict)
+    rules_by_user = attr.ib(type=RulesByUser, factory=dict)
 
     # The last state group we updated the caches for. If the state_group of
     # a new event comes along, we know that we can just return the cached
     # result.
     # On invalidation of the rules themselves (if the user changes them),
     # we invalidate everything and set state_group to `object()`
-    state_group = attr.ib(type=Union[object, int], factory=object)
+    state_group = attr.ib(type=StateGroup, factory=object)
 
     # A sequence number to keep track of when we're allowed to update the
     # cache. We bump the sequence number when we invalidate the cache. If
@@ -532,7 +540,13 @@ class RulesForRoom:
 
         self.update_cache(sequence, members, ret_rules_by_user, state_group)
 
-    def update_cache(self, sequence, members, rules_by_user, state_group) -> None:
+    def update_cache(
+        self,
+        sequence: int,
+        members: MemberMap,
+        rules_by_user: RulesByUser,
+        state_group: StateGroup,
+    ) -> None:
         if sequence == self.data.sequence:
             self.data.member_map.update(members)
             self.data.rules_by_user = rules_by_user

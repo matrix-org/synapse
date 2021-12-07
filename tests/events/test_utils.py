@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.api.constants import EventContentFields
 from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.events.utils import (
@@ -322,7 +323,7 @@ class PruneEventTestCase(unittest.TestCase):
             },
         )
 
-        # After MSC3083, alias events have no special behavior.
+        # After MSC3083, the allow key is protected from redaction.
         self.run_test(
             {
                 "type": "m.room.join_rules",
@@ -341,7 +342,51 @@ class PruneEventTestCase(unittest.TestCase):
                 "signatures": {},
                 "unsigned": {},
             },
-            room_version=RoomVersions.MSC3083,
+            room_version=RoomVersions.V8,
+        )
+
+    def test_member(self):
+        """Member events have changed behavior starting with MSC3375."""
+        self.run_test(
+            {
+                "type": "m.room.member",
+                "event_id": "$test:domain",
+                "content": {
+                    "membership": "join",
+                    EventContentFields.AUTHORISING_USER: "@user:domain",
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.member",
+                "event_id": "$test:domain",
+                "content": {"membership": "join"},
+                "signatures": {},
+                "unsigned": {},
+            },
+        )
+
+        # After MSC3375, the join_authorised_via_users_server key is protected
+        # from redaction.
+        self.run_test(
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "join",
+                    EventContentFields.AUTHORISING_USER: "@user:domain",
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "join",
+                    EventContentFields.AUTHORISING_USER: "@user:domain",
+                },
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.V9,
         )
 
 

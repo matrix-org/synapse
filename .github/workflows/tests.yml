@@ -8,7 +8,7 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-  
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -38,20 +38,15 @@ jobs:
     if: ${{ github.base_ref == 'develop'  || contains(github.base_ref, 'release-') }}
     runs-on: ubuntu-latest
     steps:
-      # Note: This and the script can be simplified once we drop Buildkite. See:
-      #   https://github.com/actions/checkout/issues/266#issuecomment-638346893
-      #   https://github.com/actions/checkout/issues/416
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: actions/setup-python@v2
       - run: pip install tox
-      - name: Patch Buildkite-specific test script
-        run: |
-          sed -i -e 's/\$BUILDKITE_PULL_REQUEST/${{ github.event.number }}/' \
-            scripts-dev/check-newsfragment
       - run: scripts-dev/check-newsfragment
+        env:
+          PULL_REQUEST_NUMBER: ${{ github.event.number }}
 
   lint-sdist:
     runs-on: ubuntu-latest
@@ -81,22 +76,25 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.6", "3.7", "3.8", "3.9"]
+        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10"]
         database: ["sqlite"]
+        toxenv: ["py"]
         include:
           # Newest Python without optional deps
-          - python-version: "3.9"
-            toxenv: "py-noextras,combine"
+          - python-version: "3.10"
+            toxenv: "py-noextras"
 
           # Oldest Python with PostgreSQL
           - python-version: "3.6"
             database: "postgres"
             postgres-version: "9.6"
+            toxenv: "py"
 
-          # Newest Python with PostgreSQL
-          - python-version: "3.9"
+          # Newest Python with newest PostgreSQL
+          - python-version: "3.10"
             database: "postgres"
-            postgres-version: "13"
+            postgres-version: "14"
+            toxenv: "py"
 
     steps:
       - uses: actions/checkout@v2
@@ -116,7 +114,7 @@ jobs:
         if: ${{ matrix.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
-      - run: tox -e py,combine
+      - run: tox -e ${{ matrix.toxenv }}
         env:
           TRIAL_FLAGS: "--jobs=2"
           SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
@@ -124,6 +122,8 @@ jobs:
           SYNAPSE_POSTGRES_USER: postgres
           SYNAPSE_POSTGRES_PASSWORD: postgres
       - name: Dump logs
+        # Logs are most useful when the command fails, always include them.
+        if: ${{ always() }}
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
         #       It also ignores find's exit code; this is a best effort affair
@@ -144,10 +144,12 @@ jobs:
         uses: docker://ubuntu:bionic # For old python and sqlite
         with:
           workdir: /github/workspace
-          entrypoint: .buildkite/scripts/test_old_deps.sh
+          entrypoint: .ci/scripts/test_old_deps.sh
         env:
           TRIAL_FLAGS: "--jobs=2"
       - name: Dump logs
+        # Logs are most useful when the command fails, always include them.
+        if: ${{ always() }}
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
         #       It also ignores find's exit code; this is a best effort affair
@@ -174,10 +176,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install tox
-      - run: tox -e py,combine
+      - run: tox -e py
         env:
           TRIAL_FLAGS: "--jobs=2"
       - name: Dump logs
+        # Logs are most useful when the command fails, always include them.
+        if: ${{ always() }}
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
         #       It also ignores find's exit code; this is a best effort affair
@@ -197,12 +201,13 @@ jobs:
       volumes:
         - ${{ github.workspace }}:/src
       env:
-        BUILDKITE_BRANCH: ${{ github.head_ref }}
+        SYTEST_BRANCH: ${{ github.head_ref }}
         POSTGRES: ${{ matrix.postgres && 1}}
         MULTI_POSTGRES: ${{ (matrix.postgres == 'multi-postgres') && 1}}
         WORKERS: ${{ matrix.workers && 1 }}
         REDIS: ${{ matrix.redis && 1 }}
         BLACKLIST: ${{ matrix.workers && 'synapse-blacklist-with-workers' }}
+        TOP: ${{ github.workspace }}
 
     strategy:
       fail-fast: false
@@ -232,7 +237,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Prepare test blacklist
-        run: cat sytest-blacklist .buildkite/worker-blacklist > synapse-blacklist-with-workers
+        run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
@@ -248,18 +253,49 @@ jobs:
             /logs/results.tap
             /logs/**/*.log*
 
+  export-data:
+    if: ${{ !failure() && !cancelled() }} # Allow previous steps to be skipped, but not fail
+    needs: [linting-done, portdb]
+    runs-on: ubuntu-latest
+    env:
+      TOP: ${{ github.workspace }}
+
+    services:
+      postgres:
+        image: postgres
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_PASSWORD: "postgres"
+          POSTGRES_INITDB_ARGS: "--lc-collate C --lc-ctype C --encoding UTF8"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v2
+      - run: sudo apt-get -qq install xmlsec1
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.9"
+      - run: .ci/scripts/test_export_data_command.sh
+
   portdb:
     if: ${{ !failure() && !cancelled() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
     runs-on: ubuntu-latest
+    env:
+      TOP: ${{ github.workspace }}
     strategy:
       matrix:
         include:
           - python-version: "3.6"
             postgres-version: "9.6"
 
-          - python-version: "3.9"
-            postgres-version: "13"
+          - python-version: "3.10"
+            postgres-version: "14"
 
     services:
       postgres:
@@ -281,13 +317,7 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Patch Buildkite-specific test scripts
-        run: |
-          sed -i -e 's/host="postgres"/host="localhost"/' .buildkite/scripts/postgres_exec.py
-          sed -i -e 's/host: postgres/host: localhost/' .buildkite/postgres-config.yaml
-          sed -i -e 's|/src/||' .buildkite/{sqlite,postgres}-config.yaml
-          sed -i -e 's/\$TOP/\$GITHUB_WORKSPACE/' .coveragerc
-      - run: .buildkite/scripts/test_synapse_port_db.sh
+      - run: .ci/scripts/test_synapse_port_db.sh
 
   complement:
     if: ${{ !failure() && !cancelled() }}
@@ -344,7 +374,7 @@ jobs:
         working-directory: complement/dockerfiles
 
       # Run Complement
-      - run: go test -v -tags synapse_blacklist,msc2403,msc2946,msc3083 ./tests/...
+      - run: go test -v -tags synapse_blacklist,msc2403 ./tests/...
         env:
           COMPLEMENT_BASE_IMAGE: complement-synapse:latest
         working-directory: complement
@@ -374,6 +404,11 @@ jobs:
           rc=0
           results=$(jq -r 'to_entries[] | [.key,.value.result] | join(" ")' <<< $NEEDS_CONTEXT)
           while read job result ; do
+              # The newsfile lint may be skipped on non PR builds
+              if [ $result == "skipped" ] && [ $job == "lint-newsfile" ]; then
+                continue
+              fi
+
               if [ "$result" != "success" ]; then
                   echo "::set-failed ::Job $job returned $result"
                   rc=1

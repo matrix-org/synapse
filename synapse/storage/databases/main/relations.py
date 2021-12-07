@@ -13,13 +13,14 @@
 # limitations under the License.
 
 import logging
-from typing import Optional
+from typing import List, Optional, Tuple, Union
 
 import attr
 
 from synapse.api.constants import RelationTypes
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
+from synapse.storage.database import LoggingTransaction, make_in_list_sql_clause
 from synapse.storage.databases.main.stream import generate_pagination_where_clause
 from synapse.storage.relations import (
     AggregationPaginationToken,
@@ -63,7 +64,7 @@ class RelationsWorkerStore(SQLBaseStore):
         """
 
         where_clause = ["relates_to_id = ?"]
-        where_args = [event_id]
+        where_args: List[Union[str, int]] = [event_id]
 
         if relation_type is not None:
             where_clause.append("relation_type = ?")
@@ -80,8 +81,8 @@ class RelationsWorkerStore(SQLBaseStore):
         pagination_clause = generate_pagination_where_clause(
             direction=direction,
             column_names=("topological_ordering", "stream_ordering"),
-            from_token=attr.astuple(from_token) if from_token else None,
-            to_token=attr.astuple(to_token) if to_token else None,
+            from_token=attr.astuple(from_token) if from_token else None,  # type: ignore[arg-type]
+            to_token=attr.astuple(to_token) if to_token else None,  # type: ignore[arg-type]
             engine=self.database_engine,
         )
 
@@ -106,7 +107,9 @@ class RelationsWorkerStore(SQLBaseStore):
             order,
         )
 
-        def _get_recent_references_for_event_txn(txn):
+        def _get_recent_references_for_event_txn(
+            txn: LoggingTransaction,
+        ) -> PaginationChunk:
             txn.execute(sql, where_args + [limit + 1])
 
             last_topo_id = None
@@ -128,6 +131,69 @@ class RelationsWorkerStore(SQLBaseStore):
         return await self.db_pool.runInteraction(
             "get_recent_references_for_event", _get_recent_references_for_event_txn
         )
+
+    async def event_includes_relation(self, event_id: str) -> bool:
+        """Check if the given event relates to another event.
+
+        An event has a relation if it has a valid m.relates_to with a rel_type
+        and event_id in the content:
+
+        {
+            "content": {
+                "m.relates_to": {
+                    "rel_type": "m.replace",
+                    "event_id": "$other_event_id"
+                }
+            }
+        }
+
+        Args:
+            event_id: The event to check.
+
+        Returns:
+            True if the event includes a valid relation.
+        """
+
+        result = await self.db_pool.simple_select_one_onecol(
+            table="event_relations",
+            keyvalues={"event_id": event_id},
+            retcol="event_id",
+            allow_none=True,
+            desc="event_includes_relation",
+        )
+        return result is not None
+
+    async def event_is_target_of_relation(self, parent_id: str) -> bool:
+        """Check if the given event is the target of another event's relation.
+
+        An event is the target of an event relation if it has a valid
+        m.relates_to with a rel_type and event_id pointing to parent_id in the
+        content:
+
+        {
+            "content": {
+                "m.relates_to": {
+                    "rel_type": "m.replace",
+                    "event_id": "$parent_id"
+                }
+            }
+        }
+
+        Args:
+            parent_id: The event to check.
+
+        Returns:
+            True if the event is the target of another event's relation.
+        """
+
+        result = await self.db_pool.simple_select_one_onecol(
+            table="event_relations",
+            keyvalues={"relates_to_id": parent_id},
+            retcol="event_id",
+            allow_none=True,
+            desc="event_is_target_of_relation",
+        )
+        return result is not None
 
     @cached(tree=True)
     async def get_aggregation_groups_for_event(
@@ -160,7 +226,7 @@ class RelationsWorkerStore(SQLBaseStore):
         """
 
         where_clause = ["relates_to_id = ?", "relation_type = ?"]
-        where_args = [event_id, RelationTypes.ANNOTATION]
+        where_args: List[Union[str, int]] = [event_id, RelationTypes.ANNOTATION]
 
         if event_type:
             where_clause.append("type = ?")
@@ -169,8 +235,8 @@ class RelationsWorkerStore(SQLBaseStore):
         having_clause = generate_pagination_where_clause(
             direction=direction,
             column_names=("COUNT(*)", "MAX(stream_ordering)"),
-            from_token=attr.astuple(from_token) if from_token else None,
-            to_token=attr.astuple(to_token) if to_token else None,
+            from_token=attr.astuple(from_token) if from_token else None,  # type: ignore[arg-type]
+            to_token=attr.astuple(to_token) if to_token else None,  # type: ignore[arg-type]
             engine=self.database_engine,
         )
 
@@ -199,7 +265,9 @@ class RelationsWorkerStore(SQLBaseStore):
             having_clause=having_clause,
         )
 
-        def _get_aggregation_groups_for_event_txn(txn):
+        def _get_aggregation_groups_for_event_txn(
+            txn: LoggingTransaction,
+        ) -> PaginationChunk:
             txn.execute(sql, where_args + [limit + 1])
 
             next_batch = None
@@ -254,11 +322,12 @@ class RelationsWorkerStore(SQLBaseStore):
             LIMIT 1
         """
 
-        def _get_applicable_edit_txn(txn):
+        def _get_applicable_edit_txn(txn: LoggingTransaction) -> Optional[str]:
             txn.execute(sql, (event_id, RelationTypes.REPLACE))
             row = txn.fetchone()
             if row:
                 return row[0]
+            return None
 
         edit_id = await self.db_pool.runInteraction(
             "get_applicable_edit", _get_applicable_edit_txn
@@ -267,7 +336,122 @@ class RelationsWorkerStore(SQLBaseStore):
         if not edit_id:
             return None
 
-        return await self.get_event(edit_id, allow_none=True)
+        return await self.get_event(edit_id, allow_none=True)  # type: ignore[attr-defined]
+
+    @cached()
+    async def get_thread_summary(
+        self, event_id: str
+    ) -> Tuple[int, Optional[EventBase]]:
+        """Get the number of threaded replies, the senders of those replies, and
+        the latest reply (if any) for the given event.
+
+        Args:
+            event_id: The original event ID
+
+        Returns:
+            The number of items in the thread and the most recent response, if any.
+        """
+
+        def _get_thread_summary_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[int, Optional[str]]:
+            # Fetch the count of threaded events and the latest event ID.
+            # TODO Should this only allow m.room.message events.
+            sql = """
+                SELECT event_id
+                FROM event_relations
+                INNER JOIN events USING (event_id)
+                WHERE
+                    relates_to_id = ?
+                    AND relation_type = ?
+                ORDER BY topological_ordering DESC, stream_ordering DESC
+                LIMIT 1
+            """
+
+            txn.execute(sql, (event_id, RelationTypes.THREAD))
+            row = txn.fetchone()
+            if row is None:
+                return 0, None
+
+            latest_event_id = row[0]
+
+            sql = """
+                SELECT COALESCE(COUNT(event_id), 0)
+                FROM event_relations
+                WHERE
+                    relates_to_id = ?
+                    AND relation_type = ?
+            """
+            txn.execute(sql, (event_id, RelationTypes.THREAD))
+            count = txn.fetchone()[0]  # type: ignore[index]
+
+            return count, latest_event_id
+
+        count, latest_event_id = await self.db_pool.runInteraction(
+            "get_thread_summary", _get_thread_summary_txn
+        )
+
+        latest_event = None
+        if latest_event_id:
+            latest_event = await self.get_event(latest_event_id, allow_none=True)  # type: ignore[attr-defined]
+
+        return count, latest_event
+
+    async def events_have_relations(
+        self,
+        parent_ids: List[str],
+        relation_senders: Optional[List[str]],
+        relation_types: Optional[List[str]],
+    ) -> List[str]:
+        """Check which events have a relationship from the given senders of the
+        given types.
+
+        Args:
+            parent_ids: The events being annotated
+            relation_senders: The relation senders to check.
+            relation_types: The relation types to check.
+
+        Returns:
+            True if the event has at least one relationship from one of the given senders of the given type.
+        """
+        # If no restrictions are given then the event has the required relations.
+        if not relation_senders and not relation_types:
+            return parent_ids
+
+        sql = """
+            SELECT relates_to_id FROM event_relations
+            INNER JOIN events USING (event_id)
+            WHERE
+                %s;
+        """
+
+        def _get_if_events_have_relations(txn) -> List[str]:
+            clauses: List[str] = []
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "relates_to_id", parent_ids
+            )
+            clauses.append(clause)
+
+            if relation_senders:
+                clause, temp_args = make_in_list_sql_clause(
+                    txn.database_engine, "sender", relation_senders
+                )
+                clauses.append(clause)
+                args.extend(temp_args)
+            if relation_types:
+                clause, temp_args = make_in_list_sql_clause(
+                    txn.database_engine, "relation_type", relation_types
+                )
+                clauses.append(clause)
+                args.extend(temp_args)
+
+            txn.execute(sql % " AND ".join(clauses), args)
+
+            return [row[0] for row in txn]
+
+        return await self.db_pool.runInteraction(
+            "get_if_events_have_relations", _get_if_events_have_relations
+        )
 
     async def has_user_annotated_event(
         self, parent_id: str, event_type: str, aggregation_key: str, sender: str
@@ -297,7 +481,7 @@ class RelationsWorkerStore(SQLBaseStore):
             LIMIT 1;
         """
 
-        def _get_if_user_has_annotated_event(txn):
+        def _get_if_user_has_annotated_event(txn: LoggingTransaction) -> bool:
             txn.execute(
                 sql,
                 (

@@ -102,19 +102,23 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             (room_id,),
         )
         rows = txn.fetchall()
-        max_depth = max(row[1] for row in rows)
+        # if we already have no forwards extremities (for example because they were
+        # cleared out by the `delete_old_current_state_events` background database
+        # update), then we may as well carry on.
+        if rows:
+            max_depth = max(row[1] for row in rows)
 
-        if max_depth < token.topological:
-            # We need to ensure we don't delete all the events from the database
-            # otherwise we wouldn't be able to send any events (due to not
-            # having any backwards extremities)
-            raise SynapseError(
-                400, "topological_ordering is greater than forward extremeties"
-            )
+            if max_depth < token.topological:
+                # We need to ensure we don't delete all the events from the database
+                # otherwise we wouldn't be able to send any events (due to not
+                # having any backwards extremities)
+                raise SynapseError(
+                    400, "topological_ordering is greater than forward extremities"
+                )
 
         logger.info("[purge] looking for events to delete")
 
-        should_delete_expr = "state_key IS NULL"
+        should_delete_expr = "state_events.state_key IS NULL"
         should_delete_params: Tuple[Any, ...] = ()
         if not delete_local_events:
             should_delete_expr += " AND event_id NOT LIKE ?"
@@ -295,6 +299,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
                 self._invalidate_cache_and_stream(
                     txn, self.have_seen_event, (room_id, event_id)
                 )
+                self._invalidate_get_event_cache(event_id)
 
         logger.info("[purge] done")
 

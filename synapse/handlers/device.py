@@ -14,7 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Collection, Dict, Iterable, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+)
 
 from synapse.api import errors
 from synapse.api.constants import EventTypes
@@ -40,8 +51,6 @@ from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
 from synapse.util.retryutils import NotRetryingDestination
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -50,14 +59,16 @@ logger = logging.getLogger(__name__)
 MAX_DEVICE_DISPLAY_NAME_LEN = 100
 
 
-class DeviceWorkerHandler(BaseHandler):
+class DeviceWorkerHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.clock = hs.get_clock()
         self.hs = hs
+        self.store = hs.get_datastore()
+        self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
         self.state_store = hs.get_storage().state
         self._auth_handler = hs.get_auth_handler()
+        self.server_name = hs.hostname
 
     @trace
     async def get_devices_by_user(self, user_id: str) -> List[JsonDict]:
@@ -267,7 +278,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
 
-    def _check_device_name_length(self, name: Optional[str]):
+    def _check_device_name_length(self, name: Optional[str]) -> None:
         """
         Checks whether a device name is longer than the maximum allowed length.
 
@@ -290,6 +301,8 @@ class DeviceHandler(DeviceWorkerHandler):
         user_id: str,
         device_id: Optional[str],
         initial_device_display_name: Optional[str] = None,
+        auth_provider_id: Optional[str] = None,
+        auth_provider_session_id: Optional[str] = None,
     ) -> str:
         """
         If the given device has not been registered, register it with the
@@ -301,6 +314,8 @@ class DeviceHandler(DeviceWorkerHandler):
             user_id:  @user:id
             device_id: device id supplied by client
             initial_device_display_name: device display name from client
+            auth_provider_id: The SSO IdP the user used, if any.
+            auth_provider_session_id: The session ID (sid) got from the SSO IdP.
         Returns:
             device id (generated if none was supplied)
         """
@@ -312,6 +327,8 @@ class DeviceHandler(DeviceWorkerHandler):
                 user_id=user_id,
                 device_id=device_id,
                 initial_device_display_name=initial_device_display_name,
+                auth_provider_id=auth_provider_id,
+                auth_provider_session_id=auth_provider_session_id,
             )
             if new_device:
                 await self.notify_device_update(user_id, [device_id])
@@ -326,6 +343,8 @@ class DeviceHandler(DeviceWorkerHandler):
                 user_id=user_id,
                 device_id=new_device_id,
                 initial_device_display_name=initial_device_display_name,
+                auth_provider_id=auth_provider_id,
+                auth_provider_session_id=auth_provider_session_id,
             )
             if new_device:
                 await self.notify_device_update(user_id, [new_device_id])
@@ -443,6 +462,10 @@ class DeviceHandler(DeviceWorkerHandler):
     ) -> None:
         """Notify that a user's device(s) has changed. Pokes the notifier, and
         remote servers if the user is local.
+
+        Args:
+            user_id: The Matrix ID of the user who's device list has been updated.
+            device_ids: The device IDs that have changed.
         """
         if not device_ids:
             # No changes to notify about, so this is a no-op.
@@ -595,7 +618,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
 
 def _update_device_from_client_ips(
-    device: JsonDict, client_ips: Dict[Tuple[str, str], JsonDict]
+    device: JsonDict, client_ips: Mapping[Tuple[str, str], Mapping[str, Any]]
 ) -> None:
     ip = client_ips.get((device["user_id"], device["device_id"]), {})
     device.update({"last_seen_ts": ip.get("last_seen"), "last_seen_ip": ip.get("ip")})

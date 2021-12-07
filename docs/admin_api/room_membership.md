@@ -28,7 +28,7 @@ server admin: see [Admin API](../usage/administration/admin_api).
 
 Response:
 
-```
+```json
 {
   "room_id": "!636q39766251:server.com"
 }

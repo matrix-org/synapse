@@ -22,6 +22,7 @@ from prometheus_client import Counter
 from typing_extensions import Literal
 
 from twisted.internet import defer
+from twisted.internet.interfaces import IDelayedCall
 
 import synapse.metrics
 from synapse.api.presence import UserPresenceState
@@ -280,11 +281,14 @@ class FederationSender(AbstractFederationSender):
         self._queues_awaiting_rr_flush_by_room: Dict[str, Set[PerDestinationQueue]] = {}
 
         self._rr_txn_interval_per_room_ms = (
-            1000.0 / hs.config.federation_rr_transactions_per_room_per_second
+            1000.0
+            / hs.config.ratelimiting.federation_rr_transactions_per_room_per_second
         )
 
         # wake up destinations that have outstanding PDUs to be caught up
-        self._catchup_after_startup_timer = self.clock.call_later(
+        self._catchup_after_startup_timer: Optional[
+            IDelayedCall
+        ] = self.clock.call_later(
             CATCH_UP_STARTUP_DELAY_SEC,
             run_as_background_process,
             "wake_destinations_needing_catchup",
@@ -406,7 +410,7 @@ class FederationSender(AbstractFederationSender):
 
                         now = self.clock.time_msec()
                         ts = await self.store.get_received_ts(event.event_id)
-
+                        assert ts is not None
                         synapse.metrics.event_processing_lag_by_event.labels(
                             "federation_sender"
                         ).observe((now - ts) / 1000)
@@ -435,6 +439,7 @@ class FederationSender(AbstractFederationSender):
                 if events:
                     now = self.clock.time_msec()
                     ts = await self.store.get_received_ts(events[-1].event_id)
+                    assert ts is not None
 
                     synapse.metrics.event_processing_lag.labels(
                         "federation_sender"
@@ -589,7 +594,7 @@ class FederationSender(AbstractFederationSender):
         destinations (list[str])
         """
 
-        if not states or not self.hs.config.use_presence:
+        if not states or not self.hs.config.server.use_presence:
             # No-op if presence is disabled.
             return
 

@@ -33,13 +33,26 @@ Let's assume that we expect clients to connect to our server at
 `https://example.com:8448`.  The following sections detail the configuration of
 the reverse proxy and the homeserver.
 
+
+## Homeserver Configuration
+
+The HTTP configuration will need to be updated for Synapse to correctly record 
+client IP addresses and generate redirect URLs while behind a reverse proxy. 
+
+In `homeserver.yaml` set `x_forwarded: true` in the port 8008 section and 
+consider setting `bind_addresses: ['127.0.0.1']` so that the server only
+listens to traffic on localhost. (Do not change `bind_addresses` to `127.0.0.1` 
+when using a containerized Synapse, as that will prevent it from responding
+to proxied traffic.)
+
+
 ## Reverse-proxy configuration examples
 
 **NOTE**: You only need one of these.
 
 ### nginx
 
-```
+```nginx
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
@@ -51,6 +64,9 @@ server {
     server_name matrix.example.com;
 
     location ~* ^(\/_matrix|\/_synapse\/client) {
+        # note: do not add a path (even a single /) after the port in `proxy_pass`,
+        # otherwise nginx will canonicalise the URI and cause signature verification
+        # errors.
         proxy_pass http://localhost:8008;
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -63,10 +79,7 @@ server {
 }
 ```
 
-**NOTE**: Do not add a path after the port in `proxy_pass`, otherwise nginx will
-canonicalise/normalise the URI.
-
-### Caddy 1
+### Caddy v1
 
 ```
 matrix.example.com {
@@ -86,7 +99,7 @@ example.com:8448 {
 }
 ```
 
-### Caddy 2
+### Caddy v2
 
 ```
 matrix.example.com {
@@ -128,7 +141,7 @@ matrix.example.com {
 
 ### Apache
 
-```
+```apache
 <VirtualHost *:443>
     SSLEngine on
     ServerName matrix.example.com
@@ -157,7 +170,7 @@ matrix.example.com {
 
 **NOTE 2**: It appears that Synapse is currently incompatible with the ModSecurity module for Apache (`mod_security2`). If you need it enabled for other services on your web server, you can disable it for Synapse's two VirtualHosts by including the following lines before each of the two `</VirtualHost>` above:
 
-```
+```apache
 <IfModule security2_module>
     SecRuleEngine off
 </IfModule>
@@ -175,7 +188,7 @@ frontend https
   http-request set-header X-Forwarded-For %[src]
 
   # Matrix client traffic
-  acl matrix-host hdr(host) -i matrix.example.com
+  acl matrix-host hdr(host) -i matrix.example.com matrix.example.com:443
   acl matrix-path path_beg /_matrix
   acl matrix-path path_beg /_synapse/client
 
@@ -238,16 +251,6 @@ relay "matrix_federation" {
     forward to <matrixserver> port 8008 check tcp
 }
 ```
-
-## Homeserver Configuration
-
-You will also want to set `bind_addresses: ['127.0.0.1']` and
-`x_forwarded: true` for port 8008 in `homeserver.yaml` to ensure that
-client IP addresses are recorded correctly.
-
-Having done so, you can then use `https://matrix.example.com` (instead
-of `https://matrix.example.com:8448`) as the "Custom server" when
-connecting to Synapse from a client.
 
 
 ## Health check endpoint

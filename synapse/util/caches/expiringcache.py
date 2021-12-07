@@ -19,10 +19,12 @@ from typing import Any, Generic, Optional, TypeVar, Union, overload
 import attr
 from typing_extensions import Literal
 
+from twisted.internet import defer
+
 from synapse.config import cache as cache_config
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util import Clock
-from synapse.util.caches import register_cache
+from synapse.util.caches import EvictionReason, register_cache
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +83,7 @@ class ExpiringCache(Generic[KT, VT]):
             # Don't bother starting the loop if things never expire
             return
 
-        def f():
+        def f() -> "defer.Deferred[None]":
             return run_as_background_process(
                 "prune_cache_%s" % self._cache_name, self._prune_cache
             )
@@ -98,9 +100,9 @@ class ExpiringCache(Generic[KT, VT]):
         while self._max_size and len(self) > self._max_size:
             _key, value = self._cache.popitem(last=False)
             if self.iterable:
-                self.metrics.inc_evictions(len(value.value))
+                self.metrics.inc_evictions(EvictionReason.size, len(value.value))
             else:
-                self.metrics.inc_evictions()
+                self.metrics.inc_evictions(EvictionReason.size)
 
     def __getitem__(self, key: KT) -> VT:
         try:
@@ -157,7 +159,7 @@ class ExpiringCache(Generic[KT, VT]):
             self[key] = value
             return value
 
-    def _prune_cache(self) -> None:
+    async def _prune_cache(self) -> None:
         if not self._expiry_ms:
             # zero expiry time means don't expire. This should never get called
             # since we have this check in start too.
@@ -175,9 +177,9 @@ class ExpiringCache(Generic[KT, VT]):
         for k in keys_to_delete:
             value = self._cache.pop(k)
             if self.iterable:
-                self.metrics.inc_evictions(len(value.value))
+                self.metrics.inc_evictions(EvictionReason.time, len(value.value))
             else:
-                self.metrics.inc_evictions()
+                self.metrics.inc_evictions(EvictionReason.time)
 
         logger.debug(
             "[%s] _prune_cache before: %d, after len: %d",
@@ -210,7 +212,7 @@ class ExpiringCache(Generic[KT, VT]):
         return False
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class _CacheEntry:
-    time = attr.ib(type=int)
-    value = attr.ib()
+    time: int
+    value: Any

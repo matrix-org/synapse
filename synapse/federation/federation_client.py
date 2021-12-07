@@ -37,12 +37,13 @@ from typing import (
 import attr
 from prometheus_client import Counter
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
     FederationDeniedError,
     HttpResponseException,
+    RequestSendFailed,
     SynapseError,
     UnsupportedRoomVersionError,
 )
@@ -110,7 +111,24 @@ class FederationClient(FederationBase):
             reset_expiry_on_get=False,
         )
 
-    def _clear_tried_cache(self):
+        # A cache for fetching the room hierarchy over federation.
+        #
+        # Some stale data over federation is OK, but must be refreshed
+        # periodically since the local server is in the room.
+        #
+        # It is a map of (room ID, suggested-only) -> the response of
+        # get_room_hierarchy.
+        self._get_room_hierarchy_cache: ExpiringCache[
+            Tuple[str, bool], Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]
+        ] = ExpiringCache(
+            cache_name="get_room_hierarchy_cache",
+            clock=self._clock,
+            max_len=1000,
+            expiry_ms=5 * 60 * 1000,
+            reset_expiry_on_get=False,
+        )
+
+    def _clear_tried_cache(self) -> None:
         """Clear pdu_destination_tried cache"""
         now = self._clock.time_msec()
 
@@ -209,7 +227,7 @@ class FederationClient(FederationBase):
         )
 
     async def backfill(
-        self, dest: str, room_id: str, limit: int, extremities: Iterable[str]
+        self, dest: str, room_id: str, limit: int, extremities: Collection[str]
     ) -> Optional[List[EventBase]]:
         """Requests some more historic PDUs for the given room from the
         given destination server.
@@ -219,6 +237,8 @@ class FederationClient(FederationBase):
             room_id: The room_id to backfill.
             limit: The maximum number of events to return.
             extremities: our current backwards extremities, to backfill from
+                Must be a Collection that is falsy when empty.
+                (Iterable is not enough here!)
         """
         logger.debug("backfill extrem=%s", extremities)
 
@@ -232,11 +252,22 @@ class FederationClient(FederationBase):
 
         logger.debug("backfill transaction_data=%r", transaction_data)
 
+        if not isinstance(transaction_data, dict):
+            # TODO we probably want an exception type specific to federation
+            # client validation.
+            raise TypeError("Backfill transaction_data is not a dict.")
+
+        transaction_data_pdus = transaction_data.get("pdus")
+        if not isinstance(transaction_data_pdus, list):
+            # TODO we probably want an exception type specific to federation
+            # client validation.
+            raise TypeError("transaction_data.pdus is not a list.")
+
         room_version = await self.store.get_room_version(room_id)
 
         pdus = [
             event_from_pdu_json(p, room_version, outlier=False)
-            for p in transaction_data["pdus"]
+            for p in transaction_data_pdus
         ]
 
         # Check signatures and hash of pdus, removing any from the list that fail checks
@@ -245,6 +276,58 @@ class FederationClient(FederationBase):
         )
 
         return pdus
+
+    async def get_pdu_from_destination_raw(
+        self,
+        destination: str,
+        event_id: str,
+        room_version: RoomVersion,
+        outlier: bool = False,
+        timeout: Optional[int] = None,
+    ) -> Optional[EventBase]:
+        """Requests the PDU with given origin and ID from the remote home
+        server. Does not have any caching or rate limiting!
+
+        Args:
+            destination: Which homeserver to query
+            event_id: event to fetch
+            room_version: version of the room
+            outlier: Indicates whether the PDU is an `outlier`, i.e. if
+                it's from an arbitrary point in the context as opposed to part
+                of the current block of PDUs. Defaults to `False`
+            timeout: How long to try (in ms) each destination for before
+                moving to the next destination. None indicates no timeout.
+
+        Returns:
+            The requested PDU, or None if we were unable to find it.
+
+        Raises:
+            SynapseError, NotRetryingDestination, FederationDeniedError
+        """
+        transaction_data = await self.transport_layer.get_event(
+            destination, event_id, timeout=timeout
+        )
+
+        logger.debug(
+            "retrieved event id %s from %s: %r",
+            event_id,
+            destination,
+            transaction_data,
+        )
+
+        pdu_list: List[EventBase] = [
+            event_from_pdu_json(p, room_version, outlier=outlier)
+            for p in transaction_data["pdus"]
+        ]
+
+        if pdu_list and pdu_list[0]:
+            pdu = pdu_list[0]
+
+            # Check signatures are correct.
+            signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
+            return signed_pdu
+
+        return None
 
     async def get_pdu(
         self,
@@ -290,29 +373,13 @@ class FederationClient(FederationBase):
                 continue
 
             try:
-                transaction_data = await self.transport_layer.get_event(
-                    destination, event_id, timeout=timeout
+                signed_pdu = await self.get_pdu_from_destination_raw(
+                    destination=destination,
+                    event_id=event_id,
+                    room_version=room_version,
+                    outlier=outlier,
+                    timeout=timeout,
                 )
-
-                logger.debug(
-                    "retrieved event id %s from %s: %r",
-                    event_id,
-                    destination,
-                    transaction_data,
-                )
-
-                pdu_list: List[EventBase] = [
-                    event_from_pdu_json(p, room_version, outlier=outlier)
-                    for p in transaction_data["pdus"]
-                ]
-
-                if pdu_list and pdu_list[0]:
-                    pdu = pdu_list[0]
-
-                    # Check signatures are correct.
-                    signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
-
-                    break
 
                 pdu_attempts[destination] = now
 
@@ -483,8 +550,6 @@ class FederationClient(FederationBase):
             destination, auth_chain, outlier=True, room_version=room_version
         )
 
-        signed_auth.sort(key=lambda e: e.depth)
-
         return signed_auth
 
     def _is_unknown_endpoint(
@@ -558,7 +623,11 @@ class FederationClient(FederationBase):
 
             try:
                 return await callback(destination)
-            except InvalidResponseError as e:
+            except (
+                RequestSendFailed,
+                InvalidResponseError,
+                NotRetryingDestination,
+            ) as e:
                 logger.warning("Failed to %s via %s: %s", description, destination, e)
             except UnsupportedRoomVersionError:
                 raise
@@ -731,7 +800,7 @@ class FederationClient(FederationBase):
                 no servers successfully handle the request.
         """
 
-        async def send_request(destination) -> SendJoinResult:
+        async def send_request(destination: str) -> SendJoinResult:
             response = await self._do_send_join(room_version, destination, pdu)
 
             # If an event was returned (and expected to be returned):
@@ -855,9 +924,9 @@ class FederationClient(FederationBase):
             # If the join is being authorised via allow rules, we need to send
             # the /send_join back to the same server that was originally used
             # with /make_join.
-            if "join_authorised_via_users_server" in pdu.content:
+            if EventContentFields.AUTHORISING_USER in pdu.content:
                 destinations = [
-                    get_domain_from_id(pdu.content["join_authorised_via_users_server"])
+                    get_domain_from_id(pdu.content[EventContentFields.AUTHORISING_USER])
                 ]
 
         return await self._try_destination_list(
@@ -1108,7 +1177,8 @@ class FederationClient(FederationBase):
             The response from the remote server.
 
         Raises:
-            HttpResponseException: There was an exception returned from the remote server
+            HttpResponseException / RequestSendFailed: There was an exception
+                returned from the remote server
             SynapseException: M_FORBIDDEN when the remote server has disallowed publicRoom
                 requests over federation
 
@@ -1289,8 +1359,243 @@ class FederationClient(FederationBase):
             failover_on_unknown_endpoint=True,
         )
 
+    async def get_room_hierarchy(
+        self,
+        destinations: Iterable[str],
+        room_id: str,
+        suggested_only: bool,
+    ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]:
+        """
+        Call other servers to get a hierarchy of the given room.
 
-@attr.s(frozen=True, slots=True)
+        Performs simple data validates and parsing of the response.
+
+        Args:
+            destinations: The remote servers. We will try them in turn, omitting any
+                that have been blacklisted.
+            room_id: ID of the space to be queried
+            suggested_only:  If true, ask the remote server to only return children
+                with the "suggested" flag set
+
+        Returns:
+            A tuple of:
+                The room as a JSON dictionary.
+                A list of children rooms, as JSON dictionaries.
+                A list of inaccessible children room IDs.
+
+        Raises:
+            SynapseError if we were unable to get a valid summary from any of the
+               remote servers
+        """
+
+        cached_result = self._get_room_hierarchy_cache.get((room_id, suggested_only))
+        if cached_result:
+            return cached_result
+
+        async def send_request(
+            destination: str,
+        ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]:
+            try:
+                res = await self.transport_layer.get_room_hierarchy(
+                    destination=destination,
+                    room_id=room_id,
+                    suggested_only=suggested_only,
+                )
+            except HttpResponseException as e:
+                # If an error is received that is due to an unrecognised endpoint,
+                # fallback to the unstable endpoint. Otherwise consider it a
+                # legitmate error and raise.
+                if not self._is_unknown_endpoint(e):
+                    raise
+
+                logger.debug(
+                    "Couldn't fetch room hierarchy with the v1 API, falling back to the unstable API"
+                )
+
+                res = await self.transport_layer.get_room_hierarchy_unstable(
+                    destination=destination,
+                    room_id=room_id,
+                    suggested_only=suggested_only,
+                )
+
+            room = res.get("room")
+            if not isinstance(room, dict):
+                raise InvalidResponseError("'room' must be a dict")
+
+            # Validate children_state of the room.
+            children_state = room.get("children_state", [])
+            if not isinstance(children_state, Sequence):
+                raise InvalidResponseError("'room.children_state' must be a list")
+            if any(not isinstance(e, dict) for e in children_state):
+                raise InvalidResponseError("Invalid event in 'children_state' list")
+            try:
+                [
+                    FederationSpaceSummaryEventResult.from_json_dict(e)
+                    for e in children_state
+                ]
+            except ValueError as e:
+                raise InvalidResponseError(str(e))
+
+            # Validate the children rooms.
+            children = res.get("children", [])
+            if not isinstance(children, Sequence):
+                raise InvalidResponseError("'children' must be a list")
+            if any(not isinstance(r, dict) for r in children):
+                raise InvalidResponseError("Invalid room in 'children' list")
+
+            # Validate the inaccessible children.
+            inaccessible_children = res.get("inaccessible_children", [])
+            if not isinstance(inaccessible_children, Sequence):
+                raise InvalidResponseError("'inaccessible_children' must be a list")
+            if any(not isinstance(r, str) for r in inaccessible_children):
+                raise InvalidResponseError(
+                    "Invalid room ID in 'inaccessible_children' list"
+                )
+
+            return room, children, inaccessible_children
+
+        try:
+            result = await self._try_destination_list(
+                "fetch room hierarchy",
+                destinations,
+                send_request,
+                failover_on_unknown_endpoint=True,
+            )
+        except SynapseError as e:
+            # If an unexpected error occurred, re-raise it.
+            if e.code != 502:
+                raise
+
+            logger.debug(
+                "Couldn't fetch room hierarchy, falling back to the spaces API"
+            )
+
+            # Fallback to the old federation API and translate the results if
+            # no servers implement the new API.
+            #
+            # The algorithm below is a bit inefficient as it only attempts to
+            # parse information for the requested room, but the legacy API may
+            # return additional layers.
+            legacy_result = await self.get_space_summary(
+                destinations,
+                room_id,
+                suggested_only,
+                max_rooms_per_space=None,
+                exclude_rooms=[],
+            )
+
+            # Find the requested room in the response (and remove it).
+            for _i, room in enumerate(legacy_result.rooms):
+                if room.get("room_id") == room_id:
+                    break
+            else:
+                # The requested room was not returned, nothing we can do.
+                raise
+            requested_room = legacy_result.rooms.pop(_i)
+
+            # Find any children events of the requested room.
+            children_events = []
+            children_room_ids = set()
+            for event in legacy_result.events:
+                if event.room_id == room_id:
+                    children_events.append(event.data)
+                    children_room_ids.add(event.state_key)
+            # And add them under the requested room.
+            requested_room["children_state"] = children_events
+
+            # Find the children rooms.
+            children = []
+            for room in legacy_result.rooms:
+                if room.get("room_id") in children_room_ids:
+                    children.append(room)
+
+            # It isn't clear from the response whether some of the rooms are
+            # not accessible.
+            result = (requested_room, children, ())
+
+        # Cache the result to avoid fetching data over federation every time.
+        self._get_room_hierarchy_cache[(room_id, suggested_only)] = result
+        return result
+
+    async def timestamp_to_event(
+        self, destination: str, room_id: str, timestamp: int, direction: str
+    ) -> "TimestampToEventResponse":
+        """
+        Calls a remote federating server at `destination` asking for their
+        closest event to the given timestamp in the given direction. Also
+        validates the response to always return the expected keys or raises an
+        error.
+
+        Args:
+            destination: Domain name of the remote homeserver
+            room_id: Room to fetch the event from
+            timestamp: The point in time (inclusive) we should navigate from in
+                the given direction to find the closest event.
+            direction: ["f"|"b"] to indicate whether we should navigate forward
+                or backward from the given timestamp to find the closest event.
+
+        Returns:
+            A parsed TimestampToEventResponse including the closest event_id
+            and origin_server_ts
+
+        Raises:
+            Various exceptions when the request fails
+            InvalidResponseError when the response does not have the correct
+            keys or wrong types
+        """
+        remote_response = await self.transport_layer.timestamp_to_event(
+            destination, room_id, timestamp, direction
+        )
+
+        if not isinstance(remote_response, dict):
+            raise InvalidResponseError(
+                "Response must be a JSON dictionary but received %r" % remote_response
+            )
+
+        try:
+            return TimestampToEventResponse.from_json_dict(remote_response)
+        except ValueError as e:
+            raise InvalidResponseError(str(e))
+
+
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class TimestampToEventResponse:
+    """Typed response dictionary for the federation /timestamp_to_event endpoint"""
+
+    event_id: str
+    origin_server_ts: int
+
+    # the raw data, including the above keys
+    data: JsonDict
+
+    @classmethod
+    def from_json_dict(cls, d: JsonDict) -> "TimestampToEventResponse":
+        """Parsed response from the federation /timestamp_to_event endpoint
+
+        Args:
+            d: JSON object response to be parsed
+
+        Raises:
+            ValueError if d does not the correct keys or they are the wrong types
+        """
+
+        event_id = d.get("event_id")
+        if not isinstance(event_id, str):
+            raise ValueError(
+                "Invalid response: 'event_id' must be a str but received %r" % event_id
+            )
+
+        origin_server_ts = d.get("origin_server_ts")
+        if not isinstance(origin_server_ts, int):
+            raise ValueError(
+                "Invalid response: 'origin_server_ts' must be a int but received %r"
+                % origin_server_ts
+            )
+
+        return cls(event_id, origin_server_ts, d)
+
+
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class FederationSpaceSummaryEventResult:
     """Represents a single event in the result of a successful get_space_summary call.
 
@@ -1299,12 +1604,13 @@ class FederationSpaceSummaryEventResult:
     object attributes.
     """
 
-    event_type = attr.ib(type=str)
-    state_key = attr.ib(type=str)
-    via = attr.ib(type=Sequence[str])
+    event_type: str
+    room_id: str
+    state_key: str
+    via: Sequence[str]
 
     # the raw data, including the above keys
-    data = attr.ib(type=JsonDict)
+    data: JsonDict
 
     @classmethod
     def from_json_dict(cls, d: JsonDict) -> "FederationSpaceSummaryEventResult":
@@ -1321,6 +1627,10 @@ class FederationSpaceSummaryEventResult:
         if not isinstance(event_type, str):
             raise ValueError("Invalid event: 'event_type' must be a str")
 
+        room_id = d.get("room_id")
+        if not isinstance(room_id, str):
+            raise ValueError("Invalid event: 'room_id' must be a str")
+
         state_key = d.get("state_key")
         if not isinstance(state_key, str):
             raise ValueError("Invalid event: 'state_key' must be a str")
@@ -1335,15 +1645,15 @@ class FederationSpaceSummaryEventResult:
         if any(not isinstance(v, str) for v in via):
             raise ValueError("Invalid event: 'via' must be a list of strings")
 
-        return cls(event_type, state_key, via, d)
+        return cls(event_type, room_id, state_key, via, d)
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class FederationSpaceSummaryResult:
     """Represents the data returned by a successful get_space_summary call."""
 
-    rooms = attr.ib(type=Sequence[JsonDict])
-    events = attr.ib(type=Sequence[FederationSpaceSummaryEventResult])
+    rooms: List[JsonDict]
+    events: Sequence[FederationSpaceSummaryEventResult]
 
     @classmethod
     def from_json_dict(cls, d: JsonDict) -> "FederationSpaceSummaryResult":
@@ -1356,7 +1666,7 @@ class FederationSpaceSummaryResult:
             ValueError if d is not a valid /spaces/ response
         """
         rooms = d.get("rooms")
-        if not isinstance(rooms, Sequence):
+        if not isinstance(rooms, List):
             raise ValueError("'rooms' must be a list")
         if any(not isinstance(r, dict) for r in rooms):
             raise ValueError("Invalid room in 'rooms' list")

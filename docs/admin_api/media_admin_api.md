@@ -12,6 +12,7 @@
 - [Delete local media](#delete-local-media)
   * [Delete a specific local media](#delete-a-specific-local-media)
   * [Delete local media by date or size](#delete-local-media-by-date-or-size)
+  * [Delete media uploaded by a user](#delete-media-uploaded-by-a-user)
 - [Purge Remote Media API](#purge-remote-media-api)
 
 # Querying media
@@ -47,7 +48,8 @@ The API returns a JSON body like the following:
 ## List all media uploaded by a user
 
 Listing all media that has been uploaded by a local user can be achieved through
-the use of the [List media of a user](user_admin_api.md#list-media-of-a-user)
+the use of the
+[List media uploaded by a user](user_admin_api.md#list-media-uploaded-by-a-user)
 Admin API.
 
 # Quarantine media
@@ -255,9 +257,9 @@ POST /_synapse/admin/v1/media/<server_name>/delete?before_ts=<before_ts>
 URL Parameters
 
 * `server_name`: string - The name of your local server (e.g `matrix.org`).
-* `before_ts`: string representing a positive integer - Unix timestamp in ms.
+* `before_ts`: string representing a positive integer - Unix timestamp in milliseconds.
 Files that were last used before this timestamp will be deleted. It is the timestamp of
-last access and not the timestamp creation.
+last access, not the timestamp when the file was created.
 * `size_gt`: Optional - string representing a positive integer - Size of the media in bytes.
 Files that are larger will be deleted. Defaults to `0`.
 * `keep_profiles`: Optional - string representing a boolean - Switch to also delete files
@@ -281,6 +283,11 @@ The following fields are returned in the JSON response body:
 * `deleted_media`: an array of strings - List of deleted `media_id`
 * `total`: integer - Total number of deleted `media_id`
 
+## Delete media uploaded by a user
+
+You can find details of how to delete multiple media uploaded by a user in
+[User Admin API](user_admin_api.md#delete-media-uploaded-by-a-user).
+
 # Purge Remote Media API
 
 The purge remote media API allows server admins to purge old cached remote media.
@@ -295,7 +302,7 @@ POST /_synapse/admin/v1/purge_media_cache?before_ts=<unix_timestamp_in_ms>
 
 URL Parameters
 
-* `unix_timestamp_in_ms`: string representing a positive integer - Unix timestamp in ms.
+* `unix_timestamp_in_ms`: string representing a positive integer - Unix timestamp in milliseconds.
 All cached media that was last accessed before this timestamp will be removed.
 
 Response:

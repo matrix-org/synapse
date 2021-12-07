@@ -15,7 +15,20 @@
 
 import logging
 import urllib
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple, Union
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Collection,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import attr
 import ijson
@@ -100,7 +113,7 @@ class TransportLayerClient:
 
     @log_function
     async def backfill(
-        self, destination: str, room_id: str, event_tuples: Iterable[str], limit: int
+        self, destination: str, room_id: str, event_tuples: Collection[str], limit: int
     ) -> Optional[JsonDict]:
         """Requests `limit` previous PDUs in a given context before list of
         PDUs.
@@ -108,7 +121,9 @@ class TransportLayerClient:
         Args:
             destination
             room_id
-            event_tuples
+            event_tuples:
+                Must be a Collection that is falsy when empty.
+                (Iterable is not enough here!)
             limit
 
         Returns:
@@ -135,6 +150,42 @@ class TransportLayerClient:
         )
 
     @log_function
+    async def timestamp_to_event(
+        self, destination: str, room_id: str, timestamp: int, direction: str
+    ) -> Union[JsonDict, List]:
+        """
+        Calls a remote federating server at `destination` asking for their
+        closest event to the given timestamp in the given direction.
+
+        Args:
+            destination: Domain name of the remote homeserver
+            room_id: Room to fetch the event from
+            timestamp: The point in time (inclusive) we should navigate from in
+                the given direction to find the closest event.
+            direction: ["f"|"b"] to indicate whether we should navigate forward
+                or backward from the given timestamp to find the closest event.
+
+        Returns:
+            Response dict received from the remote homeserver.
+
+        Raises:
+            Various exceptions when the request fails
+        """
+        path = _create_path(
+            FEDERATION_UNSTABLE_PREFIX,
+            "/org.matrix.msc3030/timestamp_to_event/%s",
+            room_id,
+        )
+
+        args = {"ts": [str(timestamp)], "dir": [direction]}
+
+        remote_response = await self.client.get_json(
+            destination, path=path, args=args, try_trailing_slash_on_400=True
+        )
+
+        return remote_response
+
+    @log_function
     async def send_transaction(
         self,
         transaction: Transaction,
@@ -143,7 +194,7 @@ class TransportLayerClient:
         """Sends the given Transaction to its destination
 
         Args:
-            transaction (Transaction)
+            transaction
 
         Returns:
             Succeeds when we get a 2xx HTTP response. The result
@@ -185,11 +236,16 @@ class TransportLayerClient:
 
     @log_function
     async def make_query(
-        self, destination, query_type, args, retry_on_dns_fail, ignore_backoff=False
-    ):
+        self,
+        destination: str,
+        query_type: str,
+        args: dict,
+        retry_on_dns_fail: bool,
+        ignore_backoff: bool = False,
+    ) -> JsonDict:
         path = _create_v1_path("/query/%s", query_type)
 
-        content = await self.client.get_json(
+        return await self.client.get_json(
             destination=destination,
             path=path,
             args=args,
@@ -197,8 +253,6 @@ class TransportLayerClient:
             timeout=10000,
             ignore_backoff=ignore_backoff,
         )
-
-        return content
 
     @log_function
     async def make_membership_event(
@@ -786,7 +840,7 @@ class TransportLayerClient:
     @log_function
     def join_group(
         self, destination: str, group_id: str, user_id: str, content: JsonDict
-    ) -> JsonDict:
+    ) -> Awaitable[JsonDict]:
         """Attempts to join a group"""
         path = _create_v1_path("/groups/%s/users/%s/join", group_id, user_id)
 
@@ -1177,6 +1231,42 @@ class TransportLayerClient:
             destination=destination, path=path, data=params
         )
 
+    async def get_room_hierarchy(
+        self, destination: str, room_id: str, suggested_only: bool
+    ) -> JsonDict:
+        """
+        Args:
+            destination: The remote server
+            room_id: The room ID to ask about.
+            suggested_only: if True, only suggested rooms will be returned
+        """
+        path = _create_v1_path("/hierarchy/%s", room_id)
+
+        return await self.client.get_json(
+            destination=destination,
+            path=path,
+            args={"suggested_only": "true" if suggested_only else "false"},
+        )
+
+    async def get_room_hierarchy_unstable(
+        self, destination: str, room_id: str, suggested_only: bool
+    ) -> JsonDict:
+        """
+        Args:
+            destination: The remote server
+            room_id: The room ID to ask about.
+            suggested_only: if True, only suggested rooms will be returned
+        """
+        path = _create_path(
+            FEDERATION_UNSTABLE_PREFIX, "/org.matrix.msc2946/hierarchy/%s", room_id
+        )
+
+        return await self.client.get_json(
+            destination=destination,
+            path=path,
+            args={"suggested_only": "true" if suggested_only else "false"},
+        )
+
 
 def _create_path(federation_prefix: str, path: str, *args: str) -> str:
     """
@@ -1231,7 +1321,7 @@ class SendJoinResponse:
 
 
 @ijson.coroutine
-def _event_parser(event_dict: JsonDict):
+def _event_parser(event_dict: JsonDict) -> Generator[None, Tuple[str, Any], None]:
     """Helper function for use with `ijson.kvitems_coro` to parse key-value pairs
     to add them to a given dictionary.
     """
@@ -1242,7 +1332,9 @@ def _event_parser(event_dict: JsonDict):
 
 
 @ijson.coroutine
-def _event_list_parser(room_version: RoomVersion, events: List[EventBase]):
+def _event_list_parser(
+    room_version: RoomVersion, events: List[EventBase]
+) -> Generator[None, JsonDict, None]:
     """Helper function for use with `ijson.items_coro` to parse an array of
     events and add them to the given list.
     """
@@ -1274,19 +1366,33 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
         self._coro_state = ijson.items_coro(
             _event_list_parser(room_version, self._response.state),
             prefix + "state.item",
+            use_float=True,
         )
         self._coro_auth = ijson.items_coro(
             _event_list_parser(room_version, self._response.auth_events),
             prefix + "auth_chain.item",
+            use_float=True,
+        )
+        # TODO Remove the unstable prefix when servers have updated.
+        #
+        # By re-using the same event dictionary this will cause the parsing of
+        # org.matrix.msc3083.v2.event and event to stomp over each other.
+        # Generally this should be fine.
+        self._coro_unstable_event = ijson.kvitems_coro(
+            _event_parser(self._response.event_dict),
+            prefix + "org.matrix.msc3083.v2.event",
+            use_float=True,
         )
         self._coro_event = ijson.kvitems_coro(
             _event_parser(self._response.event_dict),
-            prefix + "org.matrix.msc3083.v2.event",
+            prefix + "event",
+            use_float=True,
         )
 
     def write(self, data: bytes) -> int:
         self._coro_state.send(data)
         self._coro_auth.send(data)
+        self._coro_unstable_event.send(data)
         self._coro_event.send(data)
 
         return len(data)

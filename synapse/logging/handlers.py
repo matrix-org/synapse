@@ -3,7 +3,7 @@ import time
 from logging import Handler, LogRecord
 from logging.handlers import MemoryHandler
 from threading import Thread
-from typing import Optional
+from typing import Optional, cast
 
 from twisted.internet.interfaces import IReactorCore
 
@@ -45,6 +45,7 @@ class PeriodicallyFlushingMemoryHandler(MemoryHandler):
         self._flushing_thread: Thread = Thread(
             name="PeriodicallyFlushingMemoryHandler flushing thread",
             target=self._flush_periodically,
+            daemon=True,
         )
         self._flushing_thread.start()
 
@@ -55,7 +56,7 @@ class PeriodicallyFlushingMemoryHandler(MemoryHandler):
         if reactor is None:
             from twisted.internet import reactor as global_reactor
 
-            reactor_to_use = global_reactor  # type: ignore[assignment]
+            reactor_to_use = cast(IReactorCore, global_reactor)
         else:
             reactor_to_use = reactor
 

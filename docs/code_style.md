@@ -10,7 +10,9 @@ The necessary tools are detailed below.
 
 First install them with:
 
-    pip install -e ".[lint,mypy]"
+```sh
+pip install -e ".[lint,mypy]"
+```
 
 -   **black**
 
@@ -21,7 +23,9 @@ First install them with:
     Have `black` auto-format your code (it shouldn't change any
     functionality) with:
 
-        black . --exclude="\.tox|build|env"
+    ```sh
+    black . --exclude="\.tox|build|env"
+    ```
 
 -   **flake8**
 
@@ -30,7 +34,9 @@ First install them with:
 
     Check all application and test code with:
 
-        flake8 synapse tests
+    ```sh
+    flake8 synapse tests
+    ```
 
 -   **isort**
 
@@ -39,7 +45,9 @@ First install them with:
 
     Auto-fix imports with:
 
-        isort -rc synapse tests
+    ```sh
+    isort -rc synapse tests
+    ```
 
     `-rc` means to recursively search the given directories.
 
@@ -66,15 +74,19 @@ save as it takes a while and is very resource intensive.
 
         Example:
 
-            from synapse.types import UserID
-            ...
-            user_id = UserID(local, server)
+        ```python
+        from synapse.types import UserID
+        ...
+        user_id = UserID(local, server)
+        ```
 
         is preferred over:
 
-            from synapse import types
-            ...
-            user_id = types.UserID(local, server)
+        ```python
+        from synapse import types
+        ...
+        user_id = types.UserID(local, server)
+        ```
 
         (or any other variant).
 
@@ -134,28 +146,30 @@ Some guidelines follow:
 
 Example:
 
-    ## Frobnication ##
+```yaml
+## Frobnication ##
 
-    # The frobnicator will ensure that all requests are fully frobnicated.
-    # To enable it, uncomment the following.
-    #
-    #frobnicator_enabled: true
+# The frobnicator will ensure that all requests are fully frobnicated.
+# To enable it, uncomment the following.
+#
+#frobnicator_enabled: true
 
-    # By default, the frobnicator will frobnicate with the default frobber.
-    # The following will make it use an alternative frobber.
-    #
-    #frobincator_frobber: special_frobber
+# By default, the frobnicator will frobnicate with the default frobber.
+# The following will make it use an alternative frobber.
+#
+#frobincator_frobber: special_frobber
 
-    # Settings for the frobber
-    #
-    frobber:
-      # frobbing speed. Defaults to 1.
-      #
-      #speed: 10
+# Settings for the frobber
+#
+frobber:
+  # frobbing speed. Defaults to 1.
+  #
+  #speed: 10
 
-      # frobbing distance. Defaults to 1000.
-      #
-      #distance: 100
+  # frobbing distance. Defaults to 1000.
+  #
+  #distance: 100
+```
 
 Note that the sample configuration is generated from the synapse code
 and is maintained by a script, `scripts-dev/generate_sample_config`.

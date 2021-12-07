@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple
 
 from synapse.api.constants import AccountDataTypes
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
@@ -28,6 +28,9 @@ from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,7 +39,7 @@ class AccountDataWorkerStore(SQLBaseStore):
     `get_max_account_data_stream_id` which can be called in the initializer.
     """
 
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         self._instance_name = hs.get_instance_name()
 
         if isinstance(database.engine, PostgresEngine):
@@ -324,7 +327,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             user_id, int(stream_id)
         )
         if not changed:
-            return ({}, {})
+            return {}, {}
 
         return await self.db_pool.runInteraction(
             "get_updated_account_data_for_user", get_updated_account_data_for_user_txn
@@ -494,7 +497,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             txn,
             table="ignored_users",
             column="ignored_user_id",
-            iterable=previously_ignored_users - currently_ignored_users,
+            values=previously_ignored_users - currently_ignored_users,
             keyvalues={"ignorer_user_id": user_id},
         )
 

@@ -20,7 +20,20 @@ import inspect
 import logging
 import secrets
 import time
-from typing import Callable, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union
+from typing import (
+    Any,
+    AnyStr,
+    Callable,
+    ClassVar,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 from unittest.mock import Mock, patch
 
 from canonicaljson import json
@@ -28,8 +41,10 @@ from canonicaljson import json
 from twisted.internet.defer import Deferred, ensureDeferred, succeed
 from twisted.python.failure import Failure
 from twisted.python.threadpool import ThreadPool
+from twisted.test.proto_helpers import MemoryReactor
 from twisted.trial import unittest
 from twisted.web.resource import Resource
+from twisted.web.server import Request
 
 from synapse import events
 from synapse.api.constants import EventTypes, Membership
@@ -44,8 +59,10 @@ from synapse.logging.context import (
     current_context,
     set_current_context,
 )
+from synapse.rest import RegisterServletsFunc
 from synapse.server import HomeServer
-from synapse.types import UserID, create_requester
+from synapse.types import JsonDict, UserID, create_requester
+from synapse.util import Clock
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.ratelimitutils import FederationRateLimiter
 
@@ -79,16 +96,13 @@ def around(target):
     return _around
 
 
-T = TypeVar("T")
-
-
 class TestCase(unittest.TestCase):
     """A subclass of twisted.trial's TestCase which looks for 'loglevel'
     attributes on both itself and its individual test methods, to override the
     root logger's logging level while that test (case|method) runs."""
 
-    def __init__(self, methodName, *args, **kwargs):
-        super().__init__(methodName, *args, **kwargs)
+    def __init__(self, methodName: str):
+        super().__init__(methodName)
 
         method = getattr(self, methodName)
 
@@ -202,18 +216,18 @@ class HomeserverTestCase(TestCase):
       config dict.
 
     Attributes:
-        servlets (list[function]): List of servlet registration function.
+        servlets: List of servlet registration function.
         user_id (str): The user ID to assume if auth is hijacked.
-        hijack_auth (bool): Whether to hijack auth to return the user specified
+        hijack_auth: Whether to hijack auth to return the user specified
         in user_id.
     """
 
-    servlets = []
-    hijack_auth = True
-    needs_threadpool = False
+    hijack_auth: ClassVar[bool] = True
+    needs_threadpool: ClassVar[bool] = False
+    servlets: ClassVar[List[RegisterServletsFunc]] = []
 
-    def __init__(self, methodName, *args, **kwargs):
-        super().__init__(methodName, *args, **kwargs)
+    def __init__(self, methodName: str):
+        super().__init__(methodName)
 
         # see if we have any additional config for this test
         method = getattr(self, methodName)
@@ -232,7 +246,7 @@ class HomeserverTestCase(TestCase):
         # Honour the `use_frozen_dicts` config option. We have to do this
         # manually because this is taken care of in the app `start` code, which
         # we don't run. Plus we want to reset it on tearDown.
-        events.USE_FROZEN_DICTS = self.hs.config.use_frozen_dicts
+        events.USE_FROZEN_DICTS = self.hs.config.server.use_frozen_dicts
 
         if self.hs is None:
             raise Exception("No homeserver returned from make_homeserver.")
@@ -252,7 +266,7 @@ class HomeserverTestCase(TestCase):
             reactor=self.reactor,
         )
 
-        from tests.rest.client.v1.utils import RestHelper
+        from tests.rest.client.utils import RestHelper
 
         self.helper = RestHelper(self.hs, self.site, getattr(self, "user_id", None))
 
@@ -285,9 +299,10 @@ class HomeserverTestCase(TestCase):
                         None,
                     )
 
-                self.hs.get_auth().get_user_by_req = get_user_by_req
-                self.hs.get_auth().get_user_by_access_token = get_user_by_access_token
-                self.hs.get_auth().get_access_token_from_request = Mock(
+                # Type ignore: mypy doesn't like us assigning to methods.
+                self.hs.get_auth().get_user_by_req = get_user_by_req  # type: ignore[assignment]
+                self.hs.get_auth().get_user_by_access_token = get_user_by_access_token  # type: ignore[assignment]
+                self.hs.get_auth().get_access_token_from_request = Mock(  # type: ignore[assignment]
                     return_value="1234"
                 )
 
@@ -314,6 +329,16 @@ class HomeserverTestCase(TestCase):
                 raise ValueError("Timed out waiting for threadpool")
             self.reactor.advance(0.01)
             time.sleep(0.01)
+
+    def wait_for_background_updates(self) -> None:
+        """Block until all background database updates have completed."""
+        store = self.hs.get_datastore()
+        while not self.get_success(
+            store.db_pool.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                store.db_pool.updates.do_next_background_update(False), by=0.1
+            )
 
     def make_homeserver(self, reactor, clock):
         """
@@ -371,7 +396,7 @@ class HomeserverTestCase(TestCase):
 
         return config
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer):
         """
         Prepare for the test.  This involves things like mocking out parts of
         the homeserver, or building test data common across the whole test
@@ -390,16 +415,14 @@ class HomeserverTestCase(TestCase):
         self,
         method: Union[bytes, str],
         path: Union[bytes, str],
-        content: Union[bytes, dict] = b"",
+        content: Union[bytes, str, JsonDict] = b"",
         access_token: Optional[str] = None,
-        request: Type[T] = SynapseRequest,
+        request: Type[Request] = SynapseRequest,
         shorthand: bool = True,
-        federation_auth_origin: str = None,
+        federation_auth_origin: Optional[bytes] = None,
         content_is_form: bool = False,
         await_result: bool = True,
-        custom_headers: Optional[
-            Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
-        ] = None,
+        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
         client_ip: str = "127.0.0.1",
     ) -> FakeChannel:
         """
@@ -414,7 +437,7 @@ class HomeserverTestCase(TestCase):
             a dict.
             shorthand: Whether to try and be helpful and prefix the given URL
             with the usual REST API path, if it doesn't contain it.
-            federation_auth_origin (bytes|None): if set to not-None, we will add a fake
+            federation_auth_origin: if set to not-None, we will add a fake
                 Authorization header pretenting to be the given server name.
             content_is_form: Whether the content is URL encoded form data. Adds the
                 'Content-Type': 'application/x-www-form-urlencoded' header.
@@ -447,7 +470,7 @@ class HomeserverTestCase(TestCase):
             client_ip,
         )
 
-    def setup_test_homeserver(self, *args, **kwargs):
+    def setup_test_homeserver(self, *args: Any, **kwargs: Any) -> HomeServer:
         """
         Set up the test homeserver, meant to be called by the overridable
         make_homeserver. It automatically passes through the test class's
@@ -473,8 +496,7 @@ class HomeserverTestCase(TestCase):
 
         async def run_bg_updates():
             with LoggingContext("run_bg_updates"):
-                while not await stor.db_pool.updates.has_completed_background_updates():
-                    await stor.db_pool.updates.do_next_background_update(1)
+                self.get_success(stor.db_pool.updates.run_background_updates(False))
 
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
         stor = hs.get_datastore()
@@ -558,7 +580,7 @@ class HomeserverTestCase(TestCase):
         Returns:
             The MXID of the new user.
         """
-        self.hs.config.registration_shared_secret = "shared"
+        self.hs.config.registration.registration_shared_secret = "shared"
 
         # Create the user
         channel = self.make_request("GET", "/_synapse/admin/v1/register")
@@ -573,7 +595,7 @@ class HomeserverTestCase(TestCase):
             nonce_str += b"\x00notadmin"
 
         want_mac.update(nonce.encode("ascii") + b"\x00" + nonce_str)
-        want_mac = want_mac.hexdigest()
+        want_mac_digest = want_mac.hexdigest()
 
         body = json.dumps(
             {
@@ -582,7 +604,7 @@ class HomeserverTestCase(TestCase):
                 "displayname": displayname,
                 "password": password,
                 "admin": admin,
-                "mac": want_mac,
+                "mac": want_mac_digest,
                 "inhibit_login": True,
             }
         )
@@ -594,14 +616,41 @@ class HomeserverTestCase(TestCase):
         user_id = channel.json_body["user_id"]
         return user_id
 
+    def register_appservice_user(
+        self,
+        username: str,
+        appservice_token: str,
+    ) -> str:
+        """Register an appservice user as an application service.
+        Requires the client-facing registration API be registered.
+
+        Args:
+            username: the user to be registered by an application service.
+                Should be a full username, i.e. ""@localpart:hostname" as opposed to just "localpart"
+            appservice_token: the acccess token for that application service.
+
+        Raises: if the request to '/register' does not return 200 OK.
+
+        Returns: the MXID of the new user.
+        """
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/register",
+            {
+                "username": username,
+                "type": "m.login.application_service",
+            },
+            access_token=appservice_token,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        return channel.json_body["user_id"]
+
     def login(
         self,
         username,
         password,
         device_id=None,
-        custom_headers: Optional[
-            Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
-        ] = None,
+        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
     ):
         """
         Log in a user, and get an access token. Requires the Login API be
@@ -734,9 +783,9 @@ class TestTransportLayerServer(JsonResource):
             FederationRateLimitConfig(
                 window_size=1,
                 sleep_limit=1,
-                sleep_msec=1,
+                sleep_delay=1,
                 reject_limit=1000,
-                concurrent_requests=1000,
+                concurrent=1000,
             ),
         )
 

@@ -19,6 +19,7 @@ from hashlib import sha256
 from urllib.parse import urlencode
 
 from synapse.config import ConfigError
+from synapse.config.homeserver import HomeServerConfig
 
 SYNAPSE_CLIENT_API_PREFIX = "/_synapse/client"
 CLIENT_API_PREFIX = "/_matrix/client"
@@ -29,33 +30,27 @@ FEDERATION_UNSTABLE_PREFIX = FEDERATION_PREFIX + "/unstable"
 STATIC_PREFIX = "/_matrix/static"
 WEB_CLIENT_PREFIX = "/_matrix/client"
 SERVER_KEY_V2_PREFIX = "/_matrix/key/v2"
-MEDIA_PREFIX = "/_matrix/media/r0"
+MEDIA_R0_PREFIX = "/_matrix/media/r0"
+MEDIA_V3_PREFIX = "/_matrix/media/v3"
 LEGACY_MEDIA_PREFIX = "/_matrix/media/v1"
 
 
 class ConsentURIBuilder:
-    def __init__(self, hs_config):
-        """
-        Args:
-            hs_config (synapse.config.homeserver.HomeServerConfig):
-        """
-        if hs_config.form_secret is None:
+    def __init__(self, hs_config: HomeServerConfig):
+        if hs_config.key.form_secret is None:
             raise ConfigError("form_secret not set in config")
-        if hs_config.public_baseurl is None:
-            raise ConfigError("public_baseurl not set in config")
+        self._hmac_secret = hs_config.key.form_secret.encode("utf-8")
+        self._public_baseurl = hs_config.server.public_baseurl
 
-        self._hmac_secret = hs_config.form_secret.encode("utf-8")
-        self._public_baseurl = hs_config.public_baseurl
-
-    def build_user_consent_uri(self, user_id):
+    def build_user_consent_uri(self, user_id: str) -> str:
         """Build a URI which we can give to the user to do their privacy
         policy consent
 
         Args:
-            user_id (str): mxid or username of user
+            user_id: mxid or username of user
 
         Returns
-            (str) the URI where the user can do consent
+            The URI where the user can do consent
         """
         mac = hmac.new(
             key=self._hmac_secret, msg=user_id.encode("ascii"), digestmod=sha256

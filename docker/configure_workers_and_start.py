@@ -48,7 +48,7 @@ WORKERS_CONFIG = {
         "app": "synapse.app.user_dir",
         "listener_resources": ["client"],
         "endpoint_patterns": [
-            "^/_matrix/client/(api/v1|r0|unstable)/user_directory/search$"
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/user_directory/search$"
         ],
         "shared_extra_conf": {"update_user_directory": False},
         "worker_extra_conf": "",
@@ -85,10 +85,10 @@ WORKERS_CONFIG = {
         "app": "synapse.app.generic_worker",
         "listener_resources": ["client"],
         "endpoint_patterns": [
-            "^/_matrix/client/(v2_alpha|r0)/sync$",
-            "^/_matrix/client/(api/v1|v2_alpha|r0)/events$",
-            "^/_matrix/client/(api/v1|r0)/initialSync$",
-            "^/_matrix/client/(api/v1|r0)/rooms/[^/]+/initialSync$",
+            "^/_matrix/client/(v2_alpha|r0|v3)/sync$",
+            "^/_matrix/client/(api/v1|v2_alpha|r0|v3)/events$",
+            "^/_matrix/client/(api/v1|r0|v3)/initialSync$",
+            "^/_matrix/client/(api/v1|r0|v3)/rooms/[^/]+/initialSync$",
         ],
         "shared_extra_conf": {},
         "worker_extra_conf": "",
@@ -146,11 +146,11 @@ WORKERS_CONFIG = {
         "app": "synapse.app.generic_worker",
         "listener_resources": ["client"],
         "endpoint_patterns": [
-            "^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/redact",
-            "^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/send",
-            "^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$",
-            "^/_matrix/client/(api/v1|r0|unstable)/join/",
-            "^/_matrix/client/(api/v1|r0|unstable)/profile/",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/redact",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/send",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/join/",
+            "^/_matrix/client/(api/v1|r0|v3|unstable)/profile/",
         ],
         "shared_extra_conf": {},
         "worker_extra_conf": "",
@@ -158,11 +158,11 @@ WORKERS_CONFIG = {
     "frontend_proxy": {
         "app": "synapse.app.frontend_proxy",
         "listener_resources": ["client", "replication"],
-        "endpoint_patterns": ["^/_matrix/client/(api/v1|r0|unstable)/keys/upload"],
+        "endpoint_patterns": ["^/_matrix/client/(api/v1|r0|v3|unstable)/keys/upload"],
         "shared_extra_conf": {},
         "worker_extra_conf": (
             "worker_main_http_uri: http://127.0.0.1:%d"
-            % (MAIN_PROCESS_HTTP_LISTENER_PORT,),
+            % (MAIN_PROCESS_HTTP_LISTENER_PORT,)
         ),
     },
 }
@@ -474,10 +474,16 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
 
     # Determine the load-balancing upstreams to configure
     nginx_upstream_config = ""
+
+    # At the same time, prepare a list of internal endpoints to healthcheck
+    # starting with the main process which exists even if no workers do.
+    healthcheck_urls = ["http://localhost:8080/health"]
+
     for upstream_worker_type, upstream_worker_ports in nginx_upstreams.items():
         body = ""
         for port in upstream_worker_ports:
             body += "    server localhost:%d;\n" % (port,)
+            healthcheck_urls.append("http://localhost:%d/health" % (port,))
 
         # Add to the list of configured upstreams
         nginx_upstream_config += NGINX_UPSTREAM_CONFIG_BLOCK.format(
@@ -508,6 +514,13 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
         "/etc/supervisor/conf.d/supervisord.conf",
         main_config_path=config_path,
         worker_config=supervisord_config,
+    )
+
+    # healthcheck config
+    convert(
+        "/conf/healthcheck.sh.j2",
+        "/healthcheck.sh",
+        healthcheck_urls=healthcheck_urls,
     )
 
     # Ensure the logging directory exists

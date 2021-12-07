@@ -1,4 +1,4 @@
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import os
 import urllib.parse
-from binascii import unhexlify
+from http import HTTPStatus
 from unittest.mock import Mock
 
 from twisted.internet.defer import Deferred
@@ -24,11 +23,11 @@ import synapse.rest.admin
 from synapse.http.server import JsonResource
 from synapse.logging.context import make_deferred_yieldable
 from synapse.rest.admin import VersionServlet
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import groups
+from synapse.rest.client import groups, login, room
 
 from tests import unittest
 from tests.server import FakeSite, make_request
+from tests.test_utils import SMALL_PNG
 
 
 class VersionTestCase(unittest.HomeserverTestCase):
@@ -42,7 +41,7 @@ class VersionTestCase(unittest.HomeserverTestCase):
     def test_version_string(self):
         channel = self.make_request("GET", self.url, shorthand=False)
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(
             {"server_version", "python_version"}, set(channel.json_body.keys())
         )
@@ -71,11 +70,11 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
             content={"localpart": "test"},
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         group_id = channel.json_body["group_id"]
 
-        self._check_group(group_id, expect_code=200)
+        self._check_group(group_id, expect_code=HTTPStatus.OK)
 
         # Invite/join another user
 
@@ -83,13 +82,13 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "PUT", url.encode("ascii"), access_token=self.admin_user_tok, content={}
         )
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         url = "/groups/%s/self/accept_invite" % (group_id,)
         channel = self.make_request(
             "PUT", url.encode("ascii"), access_token=self.other_user_token, content={}
         )
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # Check other user knows they're in the group
         self.assertIn(group_id, self._get_groups_user_is_in(self.admin_user_tok))
@@ -104,10 +103,10 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
             content={"localpart": "test"},
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
-        # Check group returns 404
-        self._check_group(group_id, expect_code=404)
+        # Check group returns HTTPStatus.NOT_FOUND
+        self._check_group(group_id, expect_code=HTTPStatus.NOT_FOUND)
 
         # Check users don't think they're in the group
         self.assertNotIn(group_id, self._get_groups_user_is_in(self.admin_user_tok))
@@ -123,15 +122,13 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
             "GET", url.encode("ascii"), access_token=self.admin_user_tok
         )
 
-        self.assertEqual(
-            expect_code, int(channel.result["code"]), msg=channel.result["body"]
-        )
+        self.assertEqual(expect_code, channel.code, msg=channel.json_body)
 
     def _get_groups_user_is_in(self, access_token):
         """Returns the list of groups the user is in (given their access token)"""
         channel = self.make_request("GET", b"/joined_groups", access_token=access_token)
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         return channel.json_body["groups"]
 
@@ -151,11 +148,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         self.media_repo = hs.get_media_repository_resource()
         self.download_resource = self.media_repo.children[b"download"]
         self.upload_resource = self.media_repo.children[b"upload"]
-        self.image_data = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
 
     def make_homeserver(self, reactor, clock):
 
@@ -207,7 +199,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         """Ensure a piece of media is quarantined when trying to access it."""
         channel = make_request(
             self.reactor,
-            FakeSite(self.download_resource),
+            FakeSite(self.download_resource, self.reactor),
             "GET",
             server_and_media_id,
             shorthand=False,
@@ -216,10 +208,10 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Should be quarantined
         self.assertEqual(
-            404,
-            int(channel.code),
+            HTTPStatus.NOT_FOUND,
+            channel.code,
             msg=(
-                "Expected to receive a 404 on accessing quarantined media: %s"
+                "Expected to receive a HTTPStatus.NOT_FOUND on accessing quarantined media: %s"
                 % server_and_media_id
             ),
         )
@@ -238,8 +230,8 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Expect a forbidden error
         self.assertEqual(
-            403,
-            int(channel.result["code"]),
+            HTTPStatus.FORBIDDEN,
+            channel.code,
             msg="Expected forbidden on quarantining media as a non-admin",
         )
 
@@ -253,8 +245,8 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Expect a forbidden error
         self.assertEqual(
-            403,
-            int(channel.result["code"]),
+            HTTPStatus.FORBIDDEN,
+            channel.code,
             msg="Expected forbidden on quarantining media as a non-admin",
         )
 
@@ -267,7 +259,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Upload some media into the room
         response = self.helper.upload_media(
-            self.upload_resource, self.image_data, tok=admin_user_tok
+            self.upload_resource, SMALL_PNG, tok=admin_user_tok
         )
 
         # Extract media ID from the response
@@ -277,7 +269,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         # Attempt to access the media
         channel = make_request(
             self.reactor,
-            FakeSite(self.download_resource),
+            FakeSite(self.download_resource, self.reactor),
             "GET",
             server_name_and_media_id,
             shorthand=False,
@@ -285,7 +277,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         )
 
         # Should be successful
-        self.assertEqual(200, int(channel.code), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code)
 
         # Quarantine the media
         url = "/_synapse/admin/v1/media/quarantine/%s/%s" % (
@@ -298,7 +290,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             access_token=admin_user_tok,
         )
         self.pump(1.0)
-        self.assertEqual(200, int(channel.code), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # Attempt to access the media
         self._ensure_quarantined(admin_user_tok, server_name_and_media_id)
@@ -315,10 +307,10 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Upload some media
         response_1 = self.helper.upload_media(
-            self.upload_resource, self.image_data, tok=non_admin_user_tok
+            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
         )
         response_2 = self.helper.upload_media(
-            self.upload_resource, self.image_data, tok=non_admin_user_tok
+            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
         )
 
         # Extract mxcs
@@ -354,11 +346,9 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             access_token=admin_user_tok,
         )
         self.pump(1.0)
-        self.assertEqual(200, int(channel.code), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(
-            json.loads(channel.result["body"].decode("utf-8")),
-            {"num_quarantined": 2},
-            "Expected 2 quarantined items",
+            channel.json_body, {"num_quarantined": 2}, "Expected 2 quarantined items"
         )
 
         # Convert mxc URLs to server/media_id strings
@@ -382,10 +372,10 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Upload some media
         response_1 = self.helper.upload_media(
-            self.upload_resource, self.image_data, tok=non_admin_user_tok
+            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
         )
         response_2 = self.helper.upload_media(
-            self.upload_resource, self.image_data, tok=non_admin_user_tok
+            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
         )
 
         # Extract media IDs
@@ -402,11 +392,9 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             access_token=admin_user_tok,
         )
         self.pump(1.0)
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(
-            json.loads(channel.result["body"].decode("utf-8")),
-            {"num_quarantined": 2},
-            "Expected 2 quarantined items",
+            channel.json_body, {"num_quarantined": 2}, "Expected 2 quarantined items"
         )
 
         # Attempt to access each piece of media
@@ -422,10 +410,10 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Upload some media
         response_1 = self.helper.upload_media(
-            self.upload_resource, self.image_data, tok=non_admin_user_tok
+            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
         )
         response_2 = self.helper.upload_media(
-            self.upload_resource, self.image_data, tok=non_admin_user_tok
+            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
         )
 
         # Extract media IDs
@@ -438,7 +426,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v1/media/protect/%s" % (urllib.parse.quote(media_id_2),)
         channel = self.make_request("POST", url, access_token=admin_user_tok)
         self.pump(1.0)
-        self.assertEqual(200, int(channel.code), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
         # Quarantine all media by this user
         url = "/_synapse/admin/v1/user/%s/media/quarantine" % urllib.parse.quote(
@@ -450,11 +438,9 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             access_token=admin_user_tok,
         )
         self.pump(1.0)
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(
-            json.loads(channel.result["body"].decode("utf-8")),
-            {"num_quarantined": 1},
-            "Expected 1 quarantined item",
+            channel.json_body, {"num_quarantined": 1}, "Expected 1 quarantined item"
         )
 
         # Attempt to access each piece of media, the first should fail, the
@@ -464,7 +450,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         # Attempt to access each piece of media
         channel = make_request(
             self.reactor,
-            FakeSite(self.download_resource),
+            FakeSite(self.download_resource, self.reactor),
             "GET",
             server_and_media_id_2,
             shorthand=False,
@@ -473,10 +459,58 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Shouldn't be quarantined
         self.assertEqual(
-            200,
-            int(channel.code),
+            HTTPStatus.OK,
+            channel.code,
             msg=(
-                "Expected to receive a 200 on accessing not-quarantined media: %s"
+                "Expected to receive a HTTPStatus.OK on accessing not-quarantined media: %s"
                 % server_and_media_id_2
             ),
         )
+
+
+class PurgeHistoryTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.other_user_tok = self.login("user", "pass")
+
+        self.room_id = self.helper.create_room_as(
+            self.other_user, tok=self.other_user_tok
+        )
+        self.url = f"/_synapse/admin/v1/purge_history/{self.room_id}"
+        self.url_status = "/_synapse/admin/v1/purge_history_status/"
+
+    def test_purge_history(self):
+        """
+        Simple test of purge history API.
+        Test only that is is possible to call, get status HTTPStatus.OK and purge_id.
+        """
+
+        channel = self.make_request(
+            "POST",
+            self.url,
+            content={"delete_local_events": True, "purge_up_to_ts": 0},
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertIn("purge_id", channel.json_body)
+        purge_id = channel.json_body["purge_id"]
+
+        # get status
+        channel = self.make_request(
+            "GET",
+            self.url_status + purge_id,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual("complete", channel.json_body["status"])

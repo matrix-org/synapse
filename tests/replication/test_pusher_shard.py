@@ -17,7 +17,7 @@ from unittest.mock import Mock
 from twisted.internet import defer
 
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 

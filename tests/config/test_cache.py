@@ -12,39 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.config._base import Config, RootConfig
 from synapse.config.cache import CacheConfig, add_resizable_cache
 from synapse.util.caches.lrucache import LruCache
 
 from tests.unittest import TestCase
 
 
-class FakeServer(Config):
-    section = "server"
-
-
-class TestConfig(RootConfig):
-    config_classes = [FakeServer, CacheConfig]
-
-
 class CacheConfigTests(TestCase):
     def setUp(self):
-        # Reset caches before each test
-        TestConfig().caches.reset()
+        # Reset caches before each test since there's global state involved.
+        self.config = CacheConfig()
+        self.config.reset()
+
+    def tearDown(self):
+        # Also reset the caches after each test to leave state pristine.
+        self.config.reset()
 
     def test_individual_caches_from_environ(self):
         """
         Individual cache factors will be loaded from the environment.
         """
         config = {}
-        t = TestConfig()
-        t.caches._environ = {
+        self.config._environ = {
             "SYNAPSE_CACHE_FACTOR_SOMETHING_OR_OTHER": "2",
             "SYNAPSE_NOT_CACHE": "BLAH",
         }
-        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.config.read_config(config, config_dir_path="", data_dir_path="")
 
-        self.assertEqual(dict(t.caches.cache_factors), {"something_or_other": 2.0})
+        self.assertEqual(dict(self.config.cache_factors), {"something_or_other": 2.0})
 
     def test_config_overrides_environ(self):
         """
@@ -52,15 +47,14 @@ class CacheConfigTests(TestCase):
         over those in the config.
         """
         config = {"caches": {"per_cache_factors": {"foo": 2, "bar": 3}}}
-        t = TestConfig()
-        t.caches._environ = {
+        self.config._environ = {
             "SYNAPSE_CACHE_FACTOR_SOMETHING_OR_OTHER": "2",
             "SYNAPSE_CACHE_FACTOR_FOO": 1,
         }
-        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.config.read_config(config, config_dir_path="", data_dir_path="")
 
         self.assertEqual(
-            dict(t.caches.cache_factors),
+            dict(self.config.cache_factors),
             {"foo": 1.0, "bar": 3.0, "something_or_other": 2.0},
         )
 
@@ -76,8 +70,7 @@ class CacheConfigTests(TestCase):
         self.assertEqual(cache.max_size, 50)
 
         config = {"caches": {"per_cache_factors": {"foo": 3}}}
-        t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.config.read_config(config)
 
         self.assertEqual(cache.max_size, 300)
 
@@ -88,8 +81,7 @@ class CacheConfigTests(TestCase):
         there is one.
         """
         config = {"caches": {"per_cache_factors": {"foo": 2}}}
-        t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.config.read_config(config, config_dir_path="", data_dir_path="")
 
         cache = LruCache(100)
         add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
@@ -106,8 +98,7 @@ class CacheConfigTests(TestCase):
         self.assertEqual(cache.max_size, 50)
 
         config = {"caches": {"global_factor": 4}}
-        t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.config.read_config(config, config_dir_path="", data_dir_path="")
 
         self.assertEqual(cache.max_size, 400)
 
@@ -118,8 +109,7 @@ class CacheConfigTests(TestCase):
         is no per-cache factor.
         """
         config = {"caches": {"global_factor": 1.5}}
-        t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.config.read_config(config, config_dir_path="", data_dir_path="")
 
         cache = LruCache(100)
         add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
@@ -133,12 +123,11 @@ class CacheConfigTests(TestCase):
                 "per_cache_factors": {"*cache_a*": 5, "cache_b": 6, "cache_c": 2}
             }
         }
-        t = TestConfig()
-        t.caches._environ = {
+        self.config._environ = {
             "SYNAPSE_CACHE_FACTOR_CACHE_A": "2",
             "SYNAPSE_CACHE_FACTOR_CACHE_B": 3,
         }
-        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.config.read_config(config, config_dir_path="", data_dir_path="")
 
         cache_a = LruCache(100)
         add_resizable_cache("*cache_a*", cache_resize_callback=cache_a.set_cache_factor)
@@ -158,11 +147,10 @@ class CacheConfigTests(TestCase):
         """
 
         config = {"caches": {"event_cache_size": "10k"}}
-        t = TestConfig()
-        t.read_config(config, config_dir_path="", data_dir_path="")
+        self.config.read_config(config, config_dir_path="", data_dir_path="")
 
         cache = LruCache(
-            max_size=t.caches.event_cache_size,
+            max_size=self.config.event_cache_size,
             apply_cache_factor_from_config=False,
         )
         add_resizable_cache("event_cache", cache_resize_callback=cache.set_cache_factor)

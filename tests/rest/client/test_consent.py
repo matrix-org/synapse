@@ -16,7 +16,7 @@ import os
 
 import synapse.rest.admin
 from synapse.api.urls import ConsentURIBuilder
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.rest.consent import consent_resource
 
 from tests import unittest
@@ -35,7 +35,6 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         config = self.default_config()
-        config["public_baseurl"] = "aaaa"
         config["form_secret"] = "123abc"
 
         # Make some temporary templates...
@@ -61,7 +60,11 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         """You can observe the terms form without specifying a user"""
         resource = consent_resource.ConsentResource(self.hs)
         channel = make_request(
-            self.reactor, FakeSite(resource), "GET", "/consent?v=1", shorthand=False
+            self.reactor,
+            FakeSite(resource, self.reactor),
+            "GET",
+            "/consent?v=1",
+            shorthand=False,
         )
         self.assertEqual(channel.code, 200)
 
@@ -83,7 +86,7 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         )
         channel = make_request(
             self.reactor,
-            FakeSite(resource),
+            FakeSite(resource, self.reactor),
             "GET",
             consent_uri,
             access_token=access_token,
@@ -98,7 +101,7 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         # POST to the consent page, saying we've agreed
         channel = make_request(
             self.reactor,
-            FakeSite(resource),
+            FakeSite(resource, self.reactor),
             "POST",
             consent_uri + "&v=" + version,
             access_token=access_token,
@@ -110,7 +113,7 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         # changed
         channel = make_request(
             self.reactor,
-            FakeSite(resource),
+            FakeSite(resource, self.reactor),
             "GET",
             consent_uri,
             access_token=access_token,

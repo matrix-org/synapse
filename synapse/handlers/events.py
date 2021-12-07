@@ -25,8 +25,6 @@ from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, UserID
 from synapse.visibility import filter_events_for_client
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -34,11 +32,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class EventStreamHandler(BaseHandler):
+class EventStreamHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.store = hs.get_datastore()
         self.clock = hs.get_clock()
+        self.hs = hs
 
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
@@ -124,8 +122,7 @@ class EventStreamHandler(BaseHandler):
                 events,
                 time_now,
                 as_client_event=as_client_event,
-                # We don't bundle "live" events, as otherwise clients
-                # will end up double counting annotations.
+                # Don't bundle aggregations as this is a deprecated API.
                 bundle_aggregations=False,
             )
 
@@ -138,9 +135,9 @@ class EventStreamHandler(BaseHandler):
             return chunk
 
 
-class EventHandler(BaseHandler):
+class EventHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
         self.storage = hs.get_storage()
 
     async def get_event(

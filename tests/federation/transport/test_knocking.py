@@ -18,7 +18,7 @@ from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.events import builder
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.server import HomeServer
 from synapse.types import RoomAlias
 
@@ -208,7 +208,7 @@ class FederationKnockingTestCase(
         async def _check_event_auth(origin, event, context, *args, **kwargs):
             return context
 
-        homeserver.get_federation_handler()._check_event_auth = _check_event_auth
+        homeserver.get_federation_event_handler()._check_event_auth = _check_event_auth
 
         return super().prepare(reactor, clock, homeserver)
 
