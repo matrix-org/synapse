@@ -104,7 +104,7 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         """Ensure that fallback auth via a captcha works."""
         # Returns a 401 as per the spec
         channel = self.register(
-            401,
+            HTTPStatus.UNAUTHORIZED,
             {"username": "user", "type": "m.login.password", "password": "bar"},
         )
 
@@ -139,7 +139,8 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         # will be used.)
         # Returns a 401 as per the spec
         channel = self.register(
-            401, {"username": "user", "type": "m.login.password", "password": "bar"}
+            HTTPStatus.UNAUTHORIZED,
+            {"username": "user", "type": "m.login.password", "password": "bar"},
         )
 
         # Grab the session
@@ -233,7 +234,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
         """
         # Attempt to delete this device.
         # Returns a 401 as per the spec
-        channel = self.delete_device(self.user_tok, self.device_id, 401)
+        channel = self.delete_device(
+            self.user_tok, self.device_id, HTTPStatus.UNAUTHORIZED
+        )
 
         # Grab the session
         session = channel.json_body["session"]
@@ -262,7 +265,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
         UIA - check that still works.
         """
 
-        channel = self.delete_device(self.user_tok, self.device_id, 401)
+        channel = self.delete_device(
+            self.user_tok, self.device_id, HTTPStatus.UNAUTHORIZED
+        )
         session = channel.json_body["session"]
 
         # Make another request providing the UI auth flow.
@@ -295,7 +300,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
         # Attempt to delete the first device.
         # Returns a 401 as per the spec
-        channel = self.delete_devices(401, {"devices": [self.device_id]})
+        channel = self.delete_devices(
+            HTTPStatus.UNAUTHORIZED, {"devices": [self.device_id]}
+        )
 
         # Grab the session
         session = channel.json_body["session"]
@@ -326,7 +333,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
         # Attempt to delete the first device.
         # Returns a 401 as per the spec
-        channel = self.delete_device(self.user_tok, self.device_id, 401)
+        channel = self.delete_device(
+            self.user_tok, self.device_id, HTTPStatus.UNAUTHORIZED
+        )
 
         # Grab the session
         session = channel.json_body["session"]
@@ -369,7 +378,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.reactor.advance(6)
 
         # Deleting another devices throws the user into UI auth.
-        channel = self.delete_device(self.user_tok, "dev3", 401)
+        channel = self.delete_device(self.user_tok, "dev3", HTTPStatus.UNAUTHORIZED)
 
         # Grab the session
         session = channel.json_body["session"]
@@ -415,7 +424,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.assertEqual(login_resp["user_id"], self.user)
 
         # initiate a UI Auth process by attempting to delete the device
-        channel = self.delete_device(self.user_tok, self.device_id, 401)
+        channel = self.delete_device(
+            self.user_tok, self.device_id, HTTPStatus.UNAUTHORIZED
+        )
 
         # check that SSO is offered
         flows = channel.json_body["flows"]
@@ -447,13 +458,15 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
         # now call the device deletion API: we should get the option to auth with SSO
         # and not password.
-        channel = self.delete_device(user_tok, device_id, 401)
+        channel = self.delete_device(user_tok, device_id, HTTPStatus.UNAUTHORIZED)
 
         flows = channel.json_body["flows"]
         self.assertEqual(flows, [{"stages": ["m.login.sso"]}])
 
     def test_does_not_offer_sso_for_password_user(self):
-        channel = self.delete_device(self.user_tok, self.device_id, 401)
+        channel = self.delete_device(
+            self.user_tok, self.device_id, HTTPStatus.UNAUTHORIZED
+        )
 
         flows = channel.json_body["flows"]
         self.assertEqual(flows, [{"stages": ["m.login.password"]}])
@@ -465,7 +478,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
         login_resp = self.helper.login_via_oidc(UserID.from_string(self.user).localpart)
         self.assertEqual(login_resp["user_id"], self.user)
 
-        channel = self.delete_device(self.user_tok, self.device_id, 401)
+        channel = self.delete_device(
+            self.user_tok, self.device_id, HTTPStatus.UNAUTHORIZED
+        )
 
         flows = channel.json_body["flows"]
         # we have no particular expectations of ordering here
@@ -482,7 +497,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.assertEqual(login_resp["user_id"], self.user)
 
         # start a UI Auth flow by attempting to delete a device
-        channel = self.delete_device(self.user_tok, self.device_id, 401)
+        channel = self.delete_device(
+            self.user_tok, self.device_id, HTTPStatus.UNAUTHORIZED
+        )
 
         flows = channel.json_body["flows"]
         self.assertIn({"stages": ["m.login.sso"]}, flows)
@@ -914,7 +931,9 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             {"refresh_token": first_refresh_response.json_body["refresh_token"]},
         )
         self.assertEqual(
-            third_refresh_response.code, 401, third_refresh_response.result
+            third_refresh_response.code,
+            HTTPStatus.UNAUTHORIZED,
+            third_refresh_response.result,
         )
 
         # The associated access token should also be invalid
@@ -923,7 +942,9 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             "/_matrix/client/r0/account/whoami",
             access_token=first_refresh_response.json_body["access_token"],
         )
-        self.assertEqual(whoami_response.code, 401, whoami_response.result)
+        self.assertEqual(
+            whoami_response.code, HTTPStatus.UNAUTHORIZED, whoami_response.result
+        )
 
         # But all other tokens should work (they will expire after some time)
         for access_token in [
