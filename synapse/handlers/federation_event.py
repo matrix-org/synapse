@@ -330,6 +330,11 @@ class FederationEventHandler:
 
         assert not event.internal_metadata.outlier
 
+        # Strip any unauthorized unsigned values if they exist
+        event_dict = event.get_dict()
+        if event.unsigned and event_dict["unsigned"] != {}:
+            event = self.strip_unsigned_values(event, event_dict)
+
         # Send this event on behalf of the other server.
         #
         # The remote server isn't a full participant in the room at this point, so
