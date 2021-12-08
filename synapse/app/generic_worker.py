@@ -40,7 +40,7 @@ from synapse.app._base import (
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
-from synapse.config.server import ListenerConfig
+from synapse.config.server import ANY_USER_DIRECTORY_WORKER, ListenerConfig
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.server import JsonResource, OptionsResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -458,8 +458,6 @@ def start(config_options: List[str]) -> None:
         config.appservice.notify_appservices = False
 
     if config.worker.worker_app == "synapse.app.user_dir":
-        from synapse.config.server import ANY_USER_DIRECTORY_WORKER
-
         if (
             config.worker.worker_name != config.server.worker_to_update_user_directory
             and config.server.worker_to_update_user_directory

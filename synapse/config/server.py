@@ -331,7 +331,12 @@ class ServerConfig(Config):
 
         # Which worker is responsible for updating the user directory,
         # None means the main process handles this.
-        self.worker_to_update_user_directory = config.get(
+        # Eventually this is expected to hold None, a `str`, or ANY_USER_DIRECTORY_WORKER
+        # But it is possible for a user to pass a non-string value here as well, such as False,
+        # in which case that'll not match with anything.
+        # Consider this an `Any`, only match positively with '== worker_name', 'is None' or
+        # 'is ANY_USER_DIRECTORY_WORKER' to determine if the local process should be updating the directory.
+        self.worker_to_update_user_directory: Any = config.get(
             "worker_to_update_user_directory", UNDEFINED
         )
 
@@ -353,6 +358,9 @@ class ServerConfig(Config):
                     self.worker_to_update_user_directory = None
                 else:
                     self.worker_to_update_user_directory = ANY_USER_DIRECTORY_WORKER
+
+        # Via all branches, this value is defined
+        assert self.worker_to_update_user_directory is not UNDEFINED
 
         # whether to enable the media repository endpoints. This should be set
         # to false if the media repository is running as a separate endpoint;
