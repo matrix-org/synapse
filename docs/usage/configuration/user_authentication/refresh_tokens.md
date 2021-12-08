@@ -87,6 +87,7 @@ The following configuration options, in the `registration` section, are related:
   Make this long if you don't want to inconvenience users of clients which don't
   support refresh tokens.
 * `refresh_token_lifetime`: lifetime of refresh tokens.
+  In other words, the client must refresh within this time period to maintain its session.
   Unless you want to log inactive sessions out, it is often fine to use a long
   value here or even leave it unset (infinite).
   Beware that making it too short will inconvenience clients that do not connect
