@@ -92,8 +92,7 @@ The following configuration options, in the `registration` section, are related:
   Beware that making it too short will inconvenience clients that do not connect
   very often, including mobile clients and clients of infrequent users.
 
-**Note:** All these options only apply to newly-created tokens (i.e. tokens
-obtained from logging in or from refreshing), so won't apply retroactively.
+**Note:** All four options above only apply when tokens are created (by logging in or refreshing). Changes to these settings do not apply retroactively.
 
 
 ### Using refresh token expiry to log out inactive sessions
