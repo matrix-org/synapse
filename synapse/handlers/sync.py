@@ -1356,7 +1356,7 @@ class SyncHandler:
 
             return DeviceLists(changed=users_that_have_changed, left=newly_left_users)
         else:
-            return DeviceLists(changed=[], left=[])
+            return DeviceLists()
 
     async def _generate_sync_entry_for_to_device(
         self, sync_result_builder: "SyncResultBuilder"

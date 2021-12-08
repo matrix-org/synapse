@@ -19,13 +19,13 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Collection,
     Dict,
     List,
     Mapping,
     Match,
     MutableMapping,
     Optional,
+    Set,
     Tuple,
     Type,
     TypeVar,
@@ -748,12 +748,17 @@ class ReadReceipt:
 class DeviceLists:
     """
     Attributes:
-        changed: List of user_ids whose devices may have changed
-        left: List of user_ids whose devices we no longer track
+        changed: user_ids whose devices may have changed
+        left: user_ids whose devices we no longer track
     """
 
-    changed: Collection[str]
-    left: Collection[str]
+    # We need to use a factory here, otherwise `set` is not evaluated at
+    # object instantiation, but instead at class definition instantiation.
+    # The latter happening only once, thus always giving you the same sets
+    # across multiple DeviceLists instances.
+    # Also see: don't define mutable default arguments.
+    changed: Set[str] = attr.ib(factory=set)
+    left: Set[str] = attr.ib(factory=set)
 
     def __bool__(self) -> bool:
         return bool(self.changed or self.left)
