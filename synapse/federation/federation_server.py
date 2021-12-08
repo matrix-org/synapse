@@ -1,6 +1,6 @@
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
-# Copyright 2019 Matrix.org Federation C.I.C
+# Copyright 2019-2021 Matrix.org Federation C.I.C
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -110,6 +110,7 @@ class FederationServer(FederationBase):
         super().__init__(hs)
 
         self.handler = hs.get_federation_handler()
+        self.storage = hs.get_storage()
         self._federation_event_handler = hs.get_federation_event_handler()
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
@@ -199,6 +200,48 @@ class FederationServer(FederationBase):
             res = self._transaction_dict_from_pdus(pdus)
 
         return 200, res
+
+    async def on_timestamp_to_event_request(
+        self, origin: str, room_id: str, timestamp: int, direction: str
+    ) -> Tuple[int, Dict[str, Any]]:
+        """When we receive a federated `/timestamp_to_event` request,
+        handle all of the logic for validating and fetching the event.
+
+        Args:
+            origin: The server we received the event from
+            room_id: Room to fetch the event from
+            timestamp: The point in time (inclusive) we should navigate from in
+                the given direction to find the closest event.
+            direction: ["f"|"b"] to indicate whether we should navigate forward
+                or backward from the given timestamp to find the closest event.
+
+        Returns:
+            Tuple indicating the response status code and dictionary response
+            body including `event_id`.
+        """
+        with (await self._server_linearizer.queue((origin, room_id))):
+            origin_host, _ = parse_server_name(origin)
+            await self.check_server_matches_acl(origin_host, room_id)
+
+            # We only try to fetch data from the local database
+            event_id = await self.store.get_event_id_for_timestamp(
+                room_id, timestamp, direction
+            )
+            if event_id:
+                event = await self.store.get_event(
+                    event_id, allow_none=False, allow_rejected=False
+                )
+
+                return 200, {
+                    "event_id": event_id,
+                    "origin_server_ts": event.origin_server_ts,
+                }
+
+        raise SynapseError(
+            404,
+            "Unable to find event from %s in direction %s" % (timestamp, direction),
+            errcode=Codes.NOT_FOUND,
+        )
 
     async def on_incoming_transaction(
         self,
@@ -407,7 +450,7 @@ class FederationServer(FederationBase):
         # require callouts to other servers to fetch missing events), but
         # impose a limit to avoid going too crazy with ram/cpu.
 
-        async def process_pdus_for_room(room_id: str):
+        async def process_pdus_for_room(room_id: str) -> None:
             with nested_logging_context(room_id):
                 logger.debug("Processing PDUs for %s", room_id)
 
@@ -504,7 +547,7 @@ class FederationServer(FederationBase):
 
     async def on_state_ids_request(
         self, origin: str, room_id: str, event_id: str
-    ) -> Tuple[int, Dict[str, Any]]:
+    ) -> Tuple[int, JsonDict]:
         if not event_id:
             raise NotImplementedError("Specify an event")
 
@@ -524,7 +567,9 @@ class FederationServer(FederationBase):
 
         return 200, resp
 
-    async def _on_state_ids_request_compute(self, room_id, event_id):
+    async def _on_state_ids_request_compute(
+        self, room_id: str, event_id: str
+    ) -> JsonDict:
         state_ids = await self.handler.get_state_ids_for_pdu(room_id, event_id)
         auth_chain_ids = await self.store.get_auth_chain_ids(room_id, state_ids)
         return {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids}

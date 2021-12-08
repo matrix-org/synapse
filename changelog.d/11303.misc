@@ -1,1 +1,0 @@
-Fix an issue which prevented the 'remove deleted devices from device_inbox column' background process from running when updating from a recent Synapse version.

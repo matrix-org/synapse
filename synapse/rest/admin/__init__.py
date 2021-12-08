@@ -17,6 +17,7 @@
 
 import logging
 import platform
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Optional, Tuple
 
 import synapse
@@ -38,6 +39,10 @@ from synapse.rest.admin.devices import (
 from synapse.rest.admin.event_reports import (
     EventReportDetailRestServlet,
     EventReportsRestServlet,
+)
+from synapse.rest.admin.federation import (
+    DestinationsRestServlet,
+    ListDestinationsRestServlet,
 )
 from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
@@ -99,7 +104,7 @@ class VersionServlet(RestServlet):
         }
 
     def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        return 200, self.res
+        return HTTPStatus.OK, self.res
 
 
 class PurgeHistoryRestServlet(RestServlet):
@@ -131,7 +136,7 @@ class PurgeHistoryRestServlet(RestServlet):
             event = await self.store.get_event(event_id)
 
             if event.room_id != room_id:
-                raise SynapseError(400, "Event is for wrong room.")
+                raise SynapseError(HTTPStatus.BAD_REQUEST, "Event is for wrong room.")
 
             # RoomStreamToken expects [int] not Optional[int]
             assert event.internal_metadata.stream_ordering is not None
@@ -145,7 +150,9 @@ class PurgeHistoryRestServlet(RestServlet):
             ts = body["purge_up_to_ts"]
             if not isinstance(ts, int):
                 raise SynapseError(
-                    400, "purge_up_to_ts must be an int", errcode=Codes.BAD_JSON
+                    HTTPStatus.BAD_REQUEST,
+                    "purge_up_to_ts must be an int",
+                    errcode=Codes.BAD_JSON,
                 )
 
             stream_ordering = await self.store.find_first_stream_ordering_after_ts(ts)
@@ -161,7 +168,9 @@ class PurgeHistoryRestServlet(RestServlet):
                     stream_ordering,
                 )
                 raise SynapseError(
-                    404, "there is no event to be purged", errcode=Codes.NOT_FOUND
+                    HTTPStatus.NOT_FOUND,
+                    "there is no event to be purged",
+                    errcode=Codes.NOT_FOUND,
                 )
             (stream, topo, _event_id) = r
             token = "t%d-%d" % (topo, stream)
@@ -174,7 +183,7 @@ class PurgeHistoryRestServlet(RestServlet):
             )
         else:
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "must specify purge_up_to_event_id or purge_up_to_ts",
                 errcode=Codes.BAD_JSON,
             )
@@ -183,7 +192,7 @@ class PurgeHistoryRestServlet(RestServlet):
             room_id, token, delete_local_events=delete_local_events
         )
 
-        return 200, {"purge_id": purge_id}
+        return HTTPStatus.OK, {"purge_id": purge_id}
 
 
 class PurgeHistoryStatusRestServlet(RestServlet):
@@ -202,7 +211,7 @@ class PurgeHistoryStatusRestServlet(RestServlet):
         if purge_status is None:
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
-        return 200, purge_status.asdict()
+        return HTTPStatus.OK, purge_status.asdict()
 
 
 ########################################################################################
@@ -257,6 +266,8 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ListRegistrationTokensRestServlet(hs).register(http_server)
     NewRegistrationTokenRestServlet(hs).register(http_server)
     RegistrationTokenRestServlet(hs).register(http_server)
+    DestinationsRestServlet(hs).register(http_server)
+    ListDestinationsRestServlet(hs).register(http_server)
     RemoveSpaceMemberRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
