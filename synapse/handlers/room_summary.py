@@ -28,12 +28,17 @@ from synapse.api.constants import (
     Membership,
     RoomTypes,
 )
-from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    NotFoundError,
+    StoreError,
+    SynapseError,
+    UnsupportedRoomVersionError,
+)
 from synapse.events import EventBase
-from synapse.events.utils import format_event_for_client_v2
 from synapse.types import JsonDict
 from synapse.util.caches.response_cache import ResponseCache
-from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -76,46 +81,27 @@ class _PaginationSession:
 
 
 class RoomSummaryHandler:
+    # A unique key used for pagination sessions for the room hierarchy endpoint.
+    _PAGINATION_SESSION_TYPE = "room_hierarchy_pagination"
+
     # The time a pagination session remains valid for.
     _PAGINATION_SESSION_VALIDITY_PERIOD_MS = 5 * 60 * 1000
 
     def __init__(self, hs: "HomeServer"):
-        self._clock = hs.get_clock()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._store = hs.get_datastore()
         self._event_serializer = hs.get_event_client_serializer()
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()
 
-        # A map of query information to the current pagination state.
-        #
-        # TODO Allow for multiple workers to share this data.
-        # TODO Expire pagination tokens.
-        self._pagination_sessions: Dict[_PaginationKey, _PaginationSession] = {}
-
         # If a user tries to fetch the same page multiple times in quick succession,
         # only process the first attempt and return its result to subsequent requests.
         self._pagination_response_cache: ResponseCache[
-            Tuple[str, bool, Optional[int], Optional[int], Optional[str]]
+            Tuple[str, str, bool, Optional[int], Optional[int], Optional[str]]
         ] = ResponseCache(
             hs.get_clock(),
             "get_room_hierarchy",
         )
-
-    def _expire_pagination_sessions(self):
-        """Expire pagination session which are old."""
-        expire_before = (
-            self._clock.time_msec() - self._PAGINATION_SESSION_VALIDITY_PERIOD_MS
-        )
-        to_expire = []
-
-        for key, value in self._pagination_sessions.items():
-            if value.creation_time_ms < expire_before:
-                to_expire.append(key)
-
-        for key in to_expire:
-            logger.debug("Expiring pagination session id %s", key)
-            del self._pagination_sessions[key]
 
     async def get_space_summary(
         self,
@@ -296,7 +282,14 @@ class RoomSummaryHandler:
         # This is due to the pagination process mutating internal state, attempting
         # to process multiple requests for the same page will result in errors.
         return await self._pagination_response_cache.wrap(
-            (requested_room_id, suggested_only, max_depth, limit, from_token),
+            (
+                requester,
+                requested_room_id,
+                suggested_only,
+                max_depth,
+                limit,
+                from_token,
+            ),
             self._get_room_hierarchy,
             requester,
             requested_room_id,
@@ -327,18 +320,29 @@ class RoomSummaryHandler:
 
         # If this is continuing a previous session, pull the persisted data.
         if from_token:
-            self._expire_pagination_sessions()
+            try:
+                pagination_session = await self._store.get_session(
+                    session_type=self._PAGINATION_SESSION_TYPE,
+                    session_id=from_token,
+                )
+            except StoreError:
+                raise SynapseError(400, "Unknown pagination token", Codes.INVALID_PARAM)
 
-            pagination_key = _PaginationKey(
-                requested_room_id, suggested_only, max_depth, from_token
-            )
-            if pagination_key not in self._pagination_sessions:
+            # If the requester, room ID, suggested-only, or max depth were modified
+            # the session is invalid.
+            if (
+                requester != pagination_session["requester"]
+                or requested_room_id != pagination_session["room_id"]
+                or suggested_only != pagination_session["suggested_only"]
+                or max_depth != pagination_session["max_depth"]
+            ):
                 raise SynapseError(400, "Unknown pagination token", Codes.INVALID_PARAM)
 
             # Load the previous state.
-            pagination_session = self._pagination_sessions[pagination_key]
-            room_queue = pagination_session.room_queue
-            processed_rooms = pagination_session.processed_rooms
+            room_queue = [
+                _RoomQueueEntry(*fields) for fields in pagination_session["room_queue"]
+            ]
+            processed_rooms = set(pagination_session["processed_rooms"])
         else:
             # The queue of rooms to process, the next room is last on the stack.
             room_queue = [_RoomQueueEntry(requested_room_id, ())]
@@ -456,13 +460,21 @@ class RoomSummaryHandler:
 
         # If there's additional data, generate a pagination token (and persist state).
         if room_queue:
-            next_batch = random_string(24)
-            result["next_batch"] = next_batch
-            pagination_key = _PaginationKey(
-                requested_room_id, suggested_only, max_depth, next_batch
-            )
-            self._pagination_sessions[pagination_key] = _PaginationSession(
-                self._clock.time_msec(), room_queue, processed_rooms
+            result["next_batch"] = await self._store.create_session(
+                session_type=self._PAGINATION_SESSION_TYPE,
+                value={
+                    # Information which must be identical across pagination.
+                    "requester": requester,
+                    "room_id": requested_room_id,
+                    "suggested_only": suggested_only,
+                    "max_depth": max_depth,
+                    # The stored state.
+                    "room_queue": [
+                        attr.astuple(room_entry) for room_entry in room_queue
+                    ],
+                    "processed_rooms": list(processed_rooms),
+                },
+                expiry_ms=self._PAGINATION_SESSION_VALIDITY_PERIOD_MS,
             )
 
         return result
@@ -536,7 +548,7 @@ class RoomSummaryHandler:
         origin: str,
         requested_room_id: str,
         suggested_only: bool,
-    ):
+    ) -> JsonDict:
         """
         Implementation of the room hierarchy Federation API.
 
@@ -641,18 +653,18 @@ class RoomSummaryHandler:
         if max_children is None or max_children > MAX_ROOMS_PER_SPACE:
             max_children = MAX_ROOMS_PER_SPACE
 
-        now = self._clock.time_msec()
-        events_result: List[JsonDict] = []
-        for edge_event in itertools.islice(child_events, max_children):
-            events_result.append(
-                await self._event_serializer.serialize_event(
-                    edge_event,
-                    time_now=now,
-                    event_format=format_event_for_client_v2,
-                )
-            )
-
-        return _RoomEntry(room_id, room_entry, events_result)
+        stripped_events: List[JsonDict] = [
+            {
+                "type": e.type,
+                "state_key": e.state_key,
+                "content": e.content,
+                "room_id": e.room_id,
+                "sender": e.sender,
+                "origin_server_ts": e.origin_server_ts,
+            }
+            for e in itertools.islice(child_events, max_children)
+        ]
+        return _RoomEntry(room_id, room_entry, stripped_events)
 
     async def _summarize_remote_room(
         self,
@@ -814,7 +826,12 @@ class RoomSummaryHandler:
             logger.info("room %s is unknown, omitting from summary", room_id)
             return False
 
-        room_version = await self._store.get_room_version(room_id)
+        try:
+            room_version = await self._store.get_room_version(room_id)
+        except UnsupportedRoomVersionError:
+            # If a room with an unsupported room version is encountered, ignore
+            # it to avoid breaking the entire summary response.
+            return False
 
         # Include the room if it has join rules of public or knock.
         join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""))
@@ -1139,17 +1156,17 @@ def _is_suggested_child_event(edge_event: EventBase) -> bool:
 _INVALID_ORDER_CHARS_RE = re.compile(r"[^\x20-\x7E]")
 
 
-def _child_events_comparison_key(child: EventBase) -> Tuple[bool, Optional[str], str]:
+def _child_events_comparison_key(
+    child: EventBase,
+) -> Tuple[bool, Optional[str], int, str]:
     """
     Generate a value for comparing two child events for ordering.
 
-    The rules for ordering are supposed to be:
+    The rules for ordering are:
 
     1. The 'order' key, if it is valid.
-    2. The 'origin_server_ts' of the 'm.room.create' event.
+    2. The 'origin_server_ts' of the 'm.space.child' event.
     3. The 'room_id'.
-
-    But we skip step 2 since we may not have any state from the room.
 
     Args:
         child: The event for generating a comparison key.
@@ -1157,7 +1174,8 @@ def _child_events_comparison_key(child: EventBase) -> Tuple[bool, Optional[str],
     Returns:
         The comparison key as a tuple of:
             False if the ordering is valid.
-            The ordering field.
+            The 'order' field or None if it is not given or invalid.
+            The 'origin_server_ts' field.
             The room ID.
     """
     order = child.content.get("order")
@@ -1168,4 +1186,4 @@ def _child_events_comparison_key(child: EventBase) -> Tuple[bool, Optional[str],
         order = None
 
     # Items without an order come last.
-    return (order is None, order, child.room_id)
+    return order is None, order, child.origin_server_ts, child.room_id

@@ -37,6 +37,7 @@ from twisted.web.server import Request
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, NotFoundError, RedirectException, SynapseError
 from synapse.config.sso import SsoAttributeRequirement
+from synapse.handlers.register import init_counters_for_auth_provider
 from synapse.handlers.ui_auth import UIAuthSessionDataConstants
 from synapse.http import get_request_user_agent
 from synapse.http.server import respond_with_html, respond_with_redirect
@@ -101,11 +102,6 @@ class SsoIdentityProvider(Protocol):
     @property
     def idp_brand(self) -> Optional[str]:
         """Optional branding identifier"""
-        return None
-
-    @property
-    def unstable_idp_brand(self) -> Optional[str]:
-        """Optional brand identifier for the unstable API (see MSC2858)."""
         return None
 
     @abc.abstractmethod
@@ -188,15 +184,17 @@ class SsoHandler:
         self._server_name = hs.hostname
         self._registration_handler = hs.get_registration_handler()
         self._auth_handler = hs.get_auth_handler()
-        self._error_template = hs.config.sso_error_template
-        self._bad_user_template = hs.config.sso_auth_bad_user_template
+        self._error_template = hs.config.sso.sso_error_template
+        self._bad_user_template = hs.config.sso.sso_auth_bad_user_template
         self._profile_handler = hs.get_profile_handler()
 
         # The following template is shown after a successful user interactive
         # authentication session. It tells the user they can close the window.
-        self._sso_auth_success_template = hs.config.sso_auth_success_template
+        self._sso_auth_success_template = hs.config.sso.sso_auth_success_template
 
-        self._sso_update_profile_information = hs.config.sso_update_profile_information
+        self._sso_update_profile_information = (
+            hs.config.sso.sso_update_profile_information
+        )
 
         # a lock on the mappings
         self._mapping_lock = Linearizer(name="sso_user_mapping", clock=hs.get_clock())
@@ -209,10 +207,11 @@ class SsoHandler:
 
         self._consent_at_registration = hs.config.consent.user_consent_at_registration
 
-    def register_identity_provider(self, p: SsoIdentityProvider):
+    def register_identity_provider(self, p: SsoIdentityProvider) -> None:
         p_id = p.idp_id
         assert p_id not in self._identity_providers
         self._identity_providers[p_id] = p
+        init_counters_for_auth_provider(p_id)
 
     def get_identity_providers(self) -> Mapping[str, SsoIdentityProvider]:
         """Get the configured identity providers"""
@@ -447,14 +446,16 @@ class SsoHandler:
             if not user_id:
                 attributes = await self._call_attribute_mapper(sso_to_matrix_id_mapper)
 
-                if attributes.localpart is None:
-                    # the mapper doesn't return a username. bail out with a redirect to
-                    # the username picker.
-                    await self._redirect_to_username_picker(
+                next_step_url = self._get_url_for_next_new_user_step(
+                    attributes=attributes
+                )
+                if next_step_url:
+                    await self._redirect_to_next_new_user_step(
                         auth_provider_id,
                         remote_user_id,
                         attributes,
                         client_redirect_url,
+                        next_step_url,
                         extra_login_attributes,
                     )
 
@@ -533,18 +534,53 @@ class SsoHandler:
             )
         return attributes
 
-    async def _redirect_to_username_picker(
+    def _get_url_for_next_new_user_step(
+        self,
+        attributes: Optional[UserAttributes] = None,
+        session: Optional[UsernameMappingSession] = None,
+    ) -> bytes:
+        """Returns the URL to redirect to for the next step of new user registration
+
+        Given attributes from the user mapping provider or a UsernameMappingSession,
+        returns the URL to redirect to for the next step of the registration flow.
+
+        Args:
+            attributes: the user attributes returned by the user mapping provider,
+                from before a UsernameMappingSession has begun.
+
+            session: an active UsernameMappingSession, possibly with some of its
+                attributes chosen by the user.
+
+        Returns:
+            The URL to redirect to, or an empty value if no redirect is necessary
+        """
+        # Must provide either attributes or session, not both
+        assert (attributes is not None) != (session is not None)
+
+        if (attributes and attributes.localpart is None) or (
+            session and session.chosen_localpart is None
+        ):
+            return b"/_synapse/client/pick_username/account_details"
+        elif self._consent_at_registration and not (
+            session and session.terms_accepted_version
+        ):
+            return b"/_synapse/client/new_user_consent"
+        else:
+            return b"/_synapse/client/sso_register" if session else b""
+
+    async def _redirect_to_next_new_user_step(
         self,
         auth_provider_id: str,
         remote_user_id: str,
         attributes: UserAttributes,
         client_redirect_url: str,
+        next_step_url: bytes,
         extra_login_attributes: Optional[JsonDict],
     ) -> NoReturn:
         """Creates a UsernameMappingSession and redirects the browser
 
-        Called if the user mapping provider doesn't return a localpart for a new user.
-        Raises a RedirectException which redirects the browser to the username picker.
+        Called if the user mapping provider doesn't return complete information for a new user.
+        Raises a RedirectException which redirects the browser to a specified URL.
 
         Args:
             auth_provider_id: A unique identifier for this SSO provider, e.g.
@@ -557,12 +593,15 @@ class SsoHandler:
             client_redirect_url: The redirect URL passed in by the client, which we
                 will eventually redirect back to.
 
+            next_step_url: The URL to redirect to for the next step of the new user flow.
+
             extra_login_attributes: An optional dictionary of extra
                 attributes to be provided to the client in the login response.
 
         Raises:
             RedirectException
         """
+        # TODO: If needed, allow using/looking up an existing session here.
         session_id = random_string(16)
         now = self._clock.time_msec()
         session = UsernameMappingSession(
@@ -573,13 +612,18 @@ class SsoHandler:
             client_redirect_url=client_redirect_url,
             expiry_time_ms=now + self._MAPPING_SESSION_VALIDITY_PERIOD_MS,
             extra_login_attributes=extra_login_attributes,
+            # Treat the localpart returned by the user mapping provider as though
+            # it was chosen by the user. If it's None, it must be chosen eventually.
+            chosen_localpart=attributes.localpart,
+            # TODO: Consider letting the user mapping provider specify defaults for
+            #       other user-chosen attributes.
         )
 
         self._username_mapping_sessions[session_id] = session
         logger.info("Recorded registration session id %s", session_id)
 
-        # Set the cookie and redirect to the username picker
-        e = RedirectException(b"/_synapse/client/pick_username/account_details")
+        # Set the cookie and redirect to the next step
+        e = RedirectException(next_step_url)
         e.cookies.append(
             b"%s=%s; path=/"
             % (USERNAME_MAPPING_SESSION_COOKIE_NAME, session_id.encode("ascii"))
@@ -808,20 +852,13 @@ class SsoHandler:
                 )
         session.emails_to_use = filtered_emails
 
-        # we may now need to collect consent from the user, in which case, redirect
-        # to the consent-extraction-unit
-        if self._consent_at_registration:
-            redirect_url = b"/_synapse/client/new_user_consent"
-
-        # otherwise, redirect to the completion page
-        else:
-            redirect_url = b"/_synapse/client/sso_register"
-
-        respond_with_redirect(request, redirect_url)
+        respond_with_redirect(
+            request, self._get_url_for_next_new_user_step(session=session)
+        )
 
     async def handle_terms_accepted(
         self, request: Request, session_id: str, terms_version: str
-    ):
+    ) -> None:
         """Handle a request to the new-user 'consent' endpoint
 
         Will serve an HTTP response to the request.
@@ -845,8 +882,9 @@ class SsoHandler:
 
         session.terms_accepted_version = terms_version
 
-        # we're done; now we can register the user
-        respond_with_redirect(request, b"/_synapse/client/sso_register")
+        respond_with_redirect(
+            request, self._get_url_for_next_new_user_step(session=session)
+        )
 
     async def register_sso_user(self, request: Request, session_id: str) -> None:
         """Called once we have all the info we need to register a new user.
@@ -923,7 +961,7 @@ class SsoHandler:
             new_user=True,
         )
 
-    def _expire_old_sessions(self):
+    def _expire_old_sessions(self) -> None:
         to_expire = []
         now = int(self._clock.time_msec())
 

@@ -40,6 +40,8 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 from signedjson.sign import sign_json
 
+from twisted.internet.defer import Deferred
+
 from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import JsonDict, get_domain_from_id
@@ -144,7 +146,7 @@ class GroupAttestionRenewer:
         self.is_mine_id = hs.is_mine_id
         self.attestations = hs.get_groups_attestation_signing()
 
-        if not hs.config.worker_app:
+        if not hs.config.worker.worker_app:
             self._renew_attestations_loop = self.clock.looping_call(
                 self._start_renew_attestations, 30 * 60 * 1000
             )
@@ -166,7 +168,7 @@ class GroupAttestionRenewer:
 
         return {}
 
-    def _start_renew_attestations(self) -> None:
+    def _start_renew_attestations(self) -> "Deferred[None]":
         return run_as_background_process("renew_attestations", self._renew_attestations)
 
     async def _renew_attestations(self) -> None:

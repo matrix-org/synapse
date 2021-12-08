@@ -13,7 +13,7 @@
 # limitations under the License.
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple, cast
 from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
@@ -34,7 +34,7 @@ from synapse.rest.admin._base import (
     assert_user_is_admin,
 )
 from synapse.storage.databases.main.room import RoomSortOrder
-from synapse.types import JsonDict, UserID, create_requester
+from synapse.types import JsonDict, RoomID, UserID, create_requester
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
@@ -46,43 +46,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ShutdownRoomRestServlet(RestServlet):
-    """Shuts down a room by removing all local users from the room and blocking
-    all future invites and joins to the room. Any local aliases will be repointed
-    to a new room created by `new_room_user_id` and kicked users will be auto
-    joined to the new room.
-    """
-
-    PATTERNS = admin_patterns("/shutdown_room/(?P<room_id>[^/]+)")
-
-    def __init__(self, hs: "HomeServer"):
-        self.hs = hs
-        self.auth = hs.get_auth()
-        self.room_shutdown_handler = hs.get_room_shutdown_handler()
-
-    async def on_POST(
-        self, request: SynapseRequest, room_id: str
-    ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
-
-        content = parse_json_object_from_request(request)
-        assert_params_in_dict(content, ["new_room_user_id"])
-
-        ret = await self.room_shutdown_handler.shutdown_room(
-            room_id=room_id,
-            new_room_user_id=content["new_room_user_id"],
-            new_room_name=content.get("room_name"),
-            message=content.get("message"),
-            requester_user_id=requester.user.to_string(),
-            block=True,
-        )
-
-        return (200, ret)
-
-
-class DeleteRoomRestServlet(RestServlet):
-    """Delete a room from server.
+class RoomRestV2Servlet(RestServlet):
+    """Delete a room from server asynchronously with a background task.
 
     It is a combination and improvement of shutdown and purge room.
 
@@ -96,24 +61,121 @@ class DeleteRoomRestServlet(RestServlet):
     If 'purge' is true, it will remove all traces of a room from the database.
     """
 
-    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/delete$")
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)$", "v2")
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
-        self.auth = hs.get_auth()
-        self.room_shutdown_handler = hs.get_room_shutdown_handler()
-        self.pagination_handler = hs.get_pagination_handler()
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastore()
+        self._pagination_handler = hs.get_pagination_handler()
 
-    async def on_POST(
+    async def on_DELETE(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-        return await _delete_room(
-            request,
-            room_id,
-            self.auth,
-            self.room_shutdown_handler,
-            self.pagination_handler,
+
+        requester = await self._auth.get_user_by_req(request)
+        await assert_user_is_admin(self._auth, requester.user)
+
+        content = parse_json_object_from_request(request)
+
+        block = content.get("block", False)
+        if not isinstance(block, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'block' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
+        purge = content.get("purge", True)
+        if not isinstance(purge, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'purge' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
+        force_purge = content.get("force_purge", False)
+        if not isinstance(force_purge, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'force_purge' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
+        if not RoomID.is_valid(room_id):
+            raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
+
+        if not await self._store.get_room(room_id):
+            raise NotFoundError("Unknown room id %s" % (room_id,))
+
+        delete_id = self._pagination_handler.start_shutdown_and_purge_room(
+            room_id=room_id,
+            new_room_user_id=content.get("new_room_user_id"),
+            new_room_name=content.get("room_name"),
+            message=content.get("message"),
+            requester_user_id=requester.user.to_string(),
+            block=block,
+            purge=purge,
+            force_purge=force_purge,
         )
+
+        return 200, {"delete_id": delete_id}
+
+
+class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
+    """Get the status of the delete room background task."""
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/delete_status$", "v2")
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._pagination_handler = hs.get_pagination_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+
+        await assert_requester_is_admin(self._auth, request)
+
+        if not RoomID.is_valid(room_id):
+            raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
+
+        delete_ids = self._pagination_handler.get_delete_ids_by_room(room_id)
+        if delete_ids is None:
+            raise NotFoundError("No delete task for room_id '%s' found" % room_id)
+
+        response = []
+        for delete_id in delete_ids:
+            delete = self._pagination_handler.get_delete_status(delete_id)
+            if delete:
+                response += [
+                    {
+                        "delete_id": delete_id,
+                        **delete.asdict(),
+                    }
+                ]
+        return 200, {"results": cast(JsonDict, response)}
+
+
+class DeleteRoomStatusByDeleteIdRestServlet(RestServlet):
+    """Get the status of the delete room background task."""
+
+    PATTERNS = admin_patterns("/rooms/delete_status/(?P<delete_id>[^/]+)$", "v2")
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._pagination_handler = hs.get_pagination_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, delete_id: str
+    ) -> Tuple[int, JsonDict]:
+
+        await assert_requester_is_admin(self._auth, request)
+
+        delete_status = self._pagination_handler.get_delete_status(delete_id)
+        if delete_status is None:
+            raise NotFoundError("delete id '%s' not found" % delete_id)
+
+        return 200, cast(JsonDict, delete_status.asdict())
 
 
 class ListRoomRestServlet(RestServlet):
@@ -160,7 +222,7 @@ class ListRoomRestServlet(RestServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
-        search_term = parse_string(request, "search_term")
+        search_term = parse_string(request, "search_term", encoding="utf-8")
         if search_term == "":
             raise SynapseError(
                 400,
@@ -248,18 +310,83 @@ class RoomRestServlet(RestServlet):
         members = await self.store.get_users_in_room(room_id)
         ret["joined_local_devices"] = await self.store.count_devices_by_users(members)
 
-        return (200, ret)
+        return 200, ret
 
     async def on_DELETE(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-        return await _delete_room(
+        return await self._delete_room(
             request,
             room_id,
             self.auth,
             self.room_shutdown_handler,
             self.pagination_handler,
         )
+
+    async def _delete_room(
+        self,
+        request: SynapseRequest,
+        room_id: str,
+        auth: "Auth",
+        room_shutdown_handler: "RoomShutdownHandler",
+        pagination_handler: "PaginationHandler",
+    ) -> Tuple[int, JsonDict]:
+        requester = await auth.get_user_by_req(request)
+        await assert_user_is_admin(auth, requester.user)
+
+        content = parse_json_object_from_request(request)
+
+        block = content.get("block", False)
+        if not isinstance(block, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'block' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
+        purge = content.get("purge", True)
+        if not isinstance(purge, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'purge' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
+        force_purge = content.get("force_purge", False)
+        if not isinstance(force_purge, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'force_purge' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
+        ret = await room_shutdown_handler.shutdown_room(
+            room_id=room_id,
+            new_room_user_id=content.get("new_room_user_id"),
+            new_room_name=content.get("room_name"),
+            message=content.get("message"),
+            requester_user_id=requester.user.to_string(),
+            block=block,
+        )
+
+        # Purge room
+        if purge:
+            try:
+                await pagination_handler.purge_room(room_id, force=force_purge)
+            except NotFoundError:
+                if block:
+                    # We can block unknown rooms with this endpoint, in which case
+                    # a failed purge is expected.
+                    pass
+                else:
+                    # But otherwise, we expect this purge to have succeeded.
+                    raise
+
+        # Cast safety: cast away the knowledge that this is a TypedDict.
+        # See https://github.com/python/mypy/issues/4976#issuecomment-579883622
+        # for some discussion on why this is necessary. Either way,
+        # `ret` is an opaque dictionary blob as far as the rest of the app cares.
+        return 200, cast(JsonDict, ret)
 
 
 class RoomMembersRestServlet(RestServlet):
@@ -321,7 +448,7 @@ class RoomStateRestServlet(RestServlet):
             now,
             # We don't bother bundling aggregations in when asked for state
             # events, as clients won't use them.
-            bundle_aggregations=False,
+            bundle_relations=False,
         )
         ret = {"state": room_state}
 
@@ -601,6 +728,7 @@ class RoomEventContextServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
+        self._hs = hs
         self.clock = hs.get_clock()
         self.room_context_handler = hs.get_room_context_handler()
         self._event_serializer = hs.get_event_client_serializer()
@@ -618,7 +746,9 @@ class RoomEventContextServlet(RestServlet):
         filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter: Optional[Filter] = Filter(json_decoder.decode(filter_json))
+            event_filter: Optional[Filter] = Filter(
+                self._hs, json_decoder.decode(filter_json)
+            )
         else:
             event_filter = None
 
@@ -648,59 +778,70 @@ class RoomEventContextServlet(RestServlet):
             results["state"],
             time_now,
             # No need to bundle aggregations for state events
-            bundle_aggregations=False,
+            bundle_relations=False,
         )
 
         return 200, results
 
 
-async def _delete_room(
-    request: SynapseRequest,
-    room_id: str,
-    auth: "Auth",
-    room_shutdown_handler: "RoomShutdownHandler",
-    pagination_handler: "PaginationHandler",
-) -> Tuple[int, JsonDict]:
-    requester = await auth.get_user_by_req(request)
-    await assert_user_is_admin(auth, requester.user)
+class BlockRoomRestServlet(RestServlet):
+    """
+    Manage blocking of rooms.
+    On PUT: Add or remove a room from blocking list.
+    On GET: Get blocking status of room and user who has blocked this room.
+    """
 
-    content = parse_json_object_from_request(request)
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/block$")
 
-    block = content.get("block", False)
-    if not isinstance(block, bool):
-        raise SynapseError(
-            HTTPStatus.BAD_REQUEST,
-            "Param 'block' must be a boolean, if given",
-            Codes.BAD_JSON,
-        )
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastore()
 
-    purge = content.get("purge", True)
-    if not isinstance(purge, bool):
-        raise SynapseError(
-            HTTPStatus.BAD_REQUEST,
-            "Param 'purge' must be a boolean, if given",
-            Codes.BAD_JSON,
-        )
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self._auth, request)
 
-    force_purge = content.get("force_purge", False)
-    if not isinstance(force_purge, bool):
-        raise SynapseError(
-            HTTPStatus.BAD_REQUEST,
-            "Param 'force_purge' must be a boolean, if given",
-            Codes.BAD_JSON,
-        )
+        if not RoomID.is_valid(room_id):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "%s is not a legal room ID" % (room_id,)
+            )
 
-    ret = await room_shutdown_handler.shutdown_room(
-        room_id=room_id,
-        new_room_user_id=content.get("new_room_user_id"),
-        new_room_name=content.get("room_name"),
-        message=content.get("message"),
-        requester_user_id=requester.user.to_string(),
-        block=block,
-    )
+        blocked_by = await self._store.room_is_blocked_by(room_id)
+        # Test `not None` if `user_id` is an empty string
+        # if someone add manually an entry in database
+        if blocked_by is not None:
+            response = {"block": True, "user_id": blocked_by}
+        else:
+            response = {"block": False}
 
-    # Purge room
-    if purge:
-        await pagination_handler.purge_room(room_id, force=force_purge)
+        return HTTPStatus.OK, response
 
-    return (200, ret)
+    async def on_PUT(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self._auth.get_user_by_req(request)
+        await assert_user_is_admin(self._auth, requester.user)
+
+        content = parse_json_object_from_request(request)
+
+        if not RoomID.is_valid(room_id):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "%s is not a legal room ID" % (room_id,)
+            )
+
+        assert_params_in_dict(content, ["block"])
+        block = content.get("block")
+        if not isinstance(block, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'block' must be a boolean.",
+                Codes.BAD_JSON,
+            )
+
+        if block:
+            await self._store.block_room(room_id, requester.user.to_string())
+        else:
+            await self._store.unblock_room(room_id)
+
+        return HTTPStatus.OK, {"block": block}

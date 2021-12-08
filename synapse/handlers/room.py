@@ -1,6 +1,4 @@
-# Copyright 2014 - 2016 OpenMarket Ltd
-# Copyright 2018-2019 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2016-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,23 +12,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Contains functions for performing events on rooms."""
-
+"""Contains functions for performing actions on rooms."""
 import itertools
 import logging
 import math
 import random
 import string
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Collection,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+)
+
+from typing_extensions import TypedDict
 
 from synapse.api.constants import (
+    EventContentFields,
     EventTypes,
+    GuestAccess,
     HistoryVisibility,
     JoinRules,
     Membership,
     RoomCreationPreset,
     RoomEncryptionAlgorithms,
+    RoomTypes,
 )
 from synapse.api.errors import (
     AuthError,
@@ -42,10 +53,12 @@ from synapse.api.errors import (
 )
 from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
 from synapse.events.utils import copy_power_levels_contents
 from synapse.rest.admin._base import assert_user_is_admin
 from synapse.storage.state import StateFilter
+from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
     MutableStateMap,
@@ -64,8 +77,6 @@ from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.visibility import filter_events_for_client
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -76,15 +87,18 @@ id_server_scheme = "https://"
 FIVE_MINUTES_IN_MS = 5 * 60 * 1000
 
 
-class RoomCreationHandler(BaseHandler):
+class RoomCreationHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.hs = hs
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
         self.config = hs.config
+        self.request_ratelimiter = hs.get_request_ratelimiter()
 
         # Room state based off defined presets
         self._presets_dict: Dict[str, Dict[str, Any]] = {
@@ -115,7 +129,7 @@ class RoomCreationHandler(BaseHandler):
         for preset_name, preset_config in self._presets_dict.items():
             encrypted = (
                 preset_name
-                in self.config.encryption_enabled_by_default_for_room_presets
+                in self.config.room.encryption_enabled_by_default_for_room_presets
             )
             preset_config["encrypted"] = encrypted
 
@@ -130,7 +144,7 @@ class RoomCreationHandler(BaseHandler):
         self._upgrade_response_cache: ResponseCache[Tuple[str, str]] = ResponseCache(
             hs.get_clock(), "room_upgrade", timeout_ms=FIVE_MINUTES_IN_MS
         )
-        self._server_notices_mxid = hs.config.server_notices_mxid
+        self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
 
@@ -150,7 +164,7 @@ class RoomCreationHandler(BaseHandler):
         Raises:
             ShadowBanError if the requester is shadow-banned.
         """
-        await self.ratelimit(requester)
+        await self.request_ratelimiter.ratelimit(requester)
 
         user_id = requester.user.to_string()
 
@@ -183,7 +197,7 @@ class RoomCreationHandler(BaseHandler):
 
     async def _upgrade_room(
         self, requester: Requester, old_room_id: str, new_version: RoomVersion
-    ):
+    ) -> str:
         """
         Args:
             requester: the user requesting the upgrade
@@ -226,8 +240,9 @@ class RoomCreationHandler(BaseHandler):
                 },
             },
         )
-        old_room_version = await self.store.get_room_version_id(old_room_id)
-        await self._event_auth_handler.check_from_context(
+        old_room_version = await self.store.get_room_version(old_room_id)
+        validate_event_for_room_version(old_room_version, tombstone_event)
+        await self._event_auth_handler.check_auth_rules_from_context(
             old_room_version, tombstone_event, tombstone_context
         )
 
@@ -388,14 +403,14 @@ class RoomCreationHandler(BaseHandler):
         old_room_create_event = await self.store.get_create_event_for_room(old_room_id)
 
         # Check if the create event specified a non-federatable room
-        if not old_room_create_event.content.get("m.federate", True):
+        if not old_room_create_event.content.get(EventContentFields.FEDERATE, True):
             # If so, mark the new room as non-federatable as well
-            creation_content["m.federate"] = False
+            creation_content[EventContentFields.FEDERATE] = False
 
         initial_state = {}
 
         # Replicate relevant room events
-        types_to_copy = (
+        types_to_copy: List[Tuple[str, Optional[str]]] = [
             (EventTypes.JoinRules, ""),
             (EventTypes.Name, ""),
             (EventTypes.Topic, ""),
@@ -406,7 +421,16 @@ class RoomCreationHandler(BaseHandler):
             (EventTypes.ServerACL, ""),
             (EventTypes.RelatedGroups, ""),
             (EventTypes.PowerLevels, ""),
-        )
+        ]
+
+        # If the old room was a space, copy over the room type and the rooms in
+        # the space.
+        if (
+            old_room_create_event.content.get(EventContentFields.ROOM_TYPE)
+            == RoomTypes.SPACE
+        ):
+            creation_content[EventContentFields.ROOM_TYPE] = RoomTypes.SPACE
+            types_to_copy.append((EventTypes.SpaceChild, None))
 
         old_room_state_ids = await self.store.get_filtered_current_state_ids(
             old_room_id, StateFilter.from_types(types_to_copy)
@@ -417,6 +441,11 @@ class RoomCreationHandler(BaseHandler):
         for k, old_event_id in old_room_state_ids.items():
             old_event = old_room_state_events.get(old_event_id)
             if old_event:
+                # If the event is an space child event with empty content, it was
+                # removed from the space and should be ignored.
+                if k[0] == EventTypes.SpaceChild and not old_event.content:
+                    continue
+
                 initial_state[k] = old_event.content
 
         # deep-copy the power-levels event before we start modifying it
@@ -437,17 +466,35 @@ class RoomCreationHandler(BaseHandler):
         # the room has been created
         # Calculate the minimum power level needed to clone the room
         event_power_levels = power_levels.get("events", {})
+        if not isinstance(event_power_levels, dict):
+            event_power_levels = {}
         state_default = power_levels.get("state_default", 50)
+        try:
+            state_default_int = int(state_default)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            state_default_int = 50
         ban = power_levels.get("ban", 50)
-        needed_power_level = max(state_default, ban, max(event_power_levels.values()))
+        try:
+            ban = int(ban)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            ban = 50
+        needed_power_level = max(
+            state_default_int, ban, max(event_power_levels.values())
+        )
 
         # Get the user's current power level, this matches the logic in get_user_power_level,
         # but without the entire state map.
         user_power_levels = power_levels.setdefault("users", {})
+        if not isinstance(user_power_levels, dict):
+            user_power_levels = {}
         users_default = power_levels.get("users_default", 0)
         current_power_level = user_power_levels.get(user_id, users_default)
+        try:
+            current_power_level_int = int(current_power_level)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            current_power_level_int = 0
         # Raise the requester's power level in the new room if necessary
-        if current_power_level < needed_power_level:
+        if current_power_level_int < needed_power_level:
             user_power_levels[user_id] = needed_power_level
 
         await self._send_events_for_new_room(
@@ -479,7 +526,7 @@ class RoomCreationHandler(BaseHandler):
             ):
                 await self.room_member_handler.update_membership(
                     requester,
-                    UserID.from_string(old_event["state_key"]),
+                    UserID.from_string(old_event.state_key),
                     new_room_id,
                     "ban",
                     ratelimit=False,
@@ -495,7 +542,7 @@ class RoomCreationHandler(BaseHandler):
         old_room_id: str,
         new_room_id: str,
         old_room_state: StateMap[str],
-    ):
+    ) -> None:
         # check to see if we have a canonical alias.
         canonical_alias_event = None
         canonical_alias_event_id = old_room_state.get((EventTypes.CanonicalAlias, ""))
@@ -638,10 +685,10 @@ class RoomCreationHandler(BaseHandler):
             raise SynapseError(403, "You are not permitted to create rooms")
 
         if ratelimit:
-            await self.ratelimit(requester)
+            await self.request_ratelimiter.ratelimit(requester)
 
         room_version_id = config.get(
-            "room_version", self.config.default_room_version.identifier
+            "room_version", self.config.server.default_room_version.identifier
         )
 
         if not isinstance(room_version_id, str):
@@ -727,6 +774,18 @@ class RoomCreationHandler(BaseHandler):
         if not allowed_by_third_party_rules:
             raise SynapseError(403, "Room visibility value not allowed.")
 
+        if is_public:
+            room_aliases = []
+            if room_alias:
+                room_aliases.append(room_alias.to_string())
+            if not self.config.roomdirectory.is_publishing_room_allowed(
+                user_id, room_id, room_aliases
+            ):
+                # Let's just return a generic message, as there may be all sorts of
+                # reasons why we said no. TODO: Allow configurable error messages
+                # per alias creation rule?
+                raise SynapseError(403, "Not allowed to publish room")
+
         directory_handler = self.hs.get_directory_handler()
         if room_alias:
             await directory_handler.create_association(
@@ -736,13 +795,6 @@ class RoomCreationHandler(BaseHandler):
                 servers=[self.hs.hostname],
                 check_membership=False,
             )
-
-        if is_public:
-            if not self.config.is_publishing_room_allowed(user_id, room_id, room_alias):
-                # Lets just return a generic message, as there may be all sorts of
-                # reasons why we said no. TODO: Allow configurable error messages
-                # per alias creation rule?
-                raise SynapseError(403, "Not allowed to publish room")
 
         preset_config = config.get(
             "preset",
@@ -892,7 +944,7 @@ class RoomCreationHandler(BaseHandler):
 
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
 
-        def create(etype: str, content: JsonDict, **kwargs) -> JsonDict:
+        def create(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
             e = {"type": etype, "content": content}
 
             e.update(event_keys)
@@ -900,7 +952,7 @@ class RoomCreationHandler(BaseHandler):
 
             return e
 
-        async def send(etype: str, content: JsonDict, **kwargs) -> int:
+        async def send(etype: str, content: JsonDict, **kwargs: Any) -> int:
             event = create(etype, content, **kwargs)
             logger.debug("Sending %s in new room", etype)
             # Allow these events to be sent even if the user is shadow-banned to
@@ -916,7 +968,12 @@ class RoomCreationHandler(BaseHandler):
             )
             return last_stream_id
 
-        config = self._presets_dict[preset_config]
+        try:
+            config = self._presets_dict[preset_config]
+        except KeyError:
+            raise SynapseError(
+                400, f"'{preset_config}' is not a valid preset", errcode=Codes.BAD_JSON
+            )
 
         creation_content.update({"creator": creator_id})
         await send(etype=EventTypes.Create, content=creation_content)
@@ -996,7 +1053,8 @@ class RoomCreationHandler(BaseHandler):
         if config["guest_can_join"]:
             if (EventTypes.GuestAccess, "") not in initial_state:
                 last_sent_stream_id = await send(
-                    etype=EventTypes.GuestAccess, content={"guest_access": "can_join"}
+                    etype=EventTypes.GuestAccess,
+                    content={EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN},
                 )
 
         for (etype, state_key), content in initial_state.items():
@@ -1018,7 +1076,7 @@ class RoomCreationHandler(BaseHandler):
         creator_id: str,
         is_public: bool,
         room_version: RoomVersion,
-    ):
+    ) -> str:
         # autogen room IDs and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.
         attempts = 0
@@ -1082,7 +1140,7 @@ class RoomContextHandler:
         users = await self.store.get_users_in_room(room_id)
         is_peeking = user.to_string() not in users
 
-        async def filter_evts(events):
+        async def filter_evts(events: List[EventBase]) -> List[EventBase]:
             if use_admin_priviledge:
                 return events
             return await filter_events_for_client(
@@ -1104,8 +1162,10 @@ class RoomContextHandler:
         )
 
         if event_filter:
-            results["events_before"] = event_filter.filter(results["events_before"])
-            results["events_after"] = event_filter.filter(results["events_after"])
+            results["events_before"] = await event_filter.filter(
+                results["events_before"]
+            )
+            results["events_after"] = await event_filter.filter(results["events_after"])
 
         results["events_before"] = await filter_evts(results["events_before"])
         results["events_after"] = await filter_evts(results["events_after"])
@@ -1119,7 +1179,7 @@ class RoomContextHandler:
         else:
             last_event_id = event_id
 
-        if event_filter and event_filter.lazy_load_members():
+        if event_filter and event_filter.lazy_load_members:
             state_filter = StateFilter.from_lazy_load_member_list(
                 ev.sender
                 for ev in itertools.chain(
@@ -1141,7 +1201,7 @@ class RoomContextHandler:
 
         state_events = list(state[last_event_id].values())
         if event_filter:
-            state_events = event_filter.filter(state_events)
+            state_events = await event_filter.filter(state_events)
 
         results["state"] = await filter_evts(state_events)
 
@@ -1160,7 +1220,7 @@ class RoomContextHandler:
         return results
 
 
-class RoomEventSource:
+class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
 
@@ -1168,8 +1228,8 @@ class RoomEventSource:
         self,
         user: UserID,
         from_key: RoomStreamToken,
-        limit: int,
-        room_ids: List[str],
+        limit: Optional[int],
+        room_ids: Collection[str],
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
     ) -> Tuple[List[EventBase], RoomStreamToken]:
@@ -1212,7 +1272,7 @@ class RoomEventSource:
             else:
                 end_key = to_key
 
-        return (events, end_key)
+        return events, end_key
 
     def get_current_key(self) -> RoomStreamToken:
         return self.store.get_room_max_token()
@@ -1221,8 +1281,25 @@ class RoomEventSource:
         return self.store.get_room_events_max_id(room_id)
 
 
-class RoomShutdownHandler:
+class ShutdownRoomResponse(TypedDict):
+    """
+    Attributes:
+        kicked_users: An array of users (`user_id`) that were kicked.
+        failed_to_kick_users:
+            An array of users (`user_id`) that that were not kicked.
+        local_aliases:
+            An array of strings representing the local aliases that were
+            migrated from the old room to the new.
+        new_room_id: A string representing the room ID of the new room.
+    """
 
+    kicked_users: List[str]
+    failed_to_kick_users: List[str]
+    local_aliases: List[str]
+    new_room_id: Optional[str]
+
+
+class RoomShutdownHandler:
     DEFAULT_MESSAGE = (
         "Sharing illegal content on this server is not permitted and rooms in"
         " violation will be blocked."
@@ -1235,7 +1312,6 @@ class RoomShutdownHandler:
         self._room_creation_handler = hs.get_room_creation_handler()
         self._replication = hs.get_replication_data_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.state = hs.get_state_handler()
         self.store = hs.get_datastore()
 
     async def shutdown_room(
@@ -1246,7 +1322,7 @@ class RoomShutdownHandler:
         new_room_name: Optional[str] = None,
         message: Optional[str] = None,
         block: bool = False,
-    ) -> dict:
+    ) -> ShutdownRoomResponse:
         """
         Shuts down a room. Moves all local users and room aliases automatically
         to a new room if `new_room_user_id` is set. Otherwise local users only
@@ -1280,8 +1356,13 @@ class RoomShutdownHandler:
                 Defaults to `Sharing illegal content on this server is not
                 permitted and rooms in violation will be blocked.`
             block:
-                If set to `true`, this room will be added to a blocking list,
-                preventing future attempts to join the room. Defaults to `false`.
+                If set to `True`, users will be prevented from joining the old
+                room. This option can also be used to pre-emptively block a room,
+                even if it's unknown to this homeserver. In this case, the room
+                will be blocked, and no further action will be taken. If `False`,
+                attempting to delete an unknown room is invalid.
+
+                Defaults to `False`.
 
         Returns: a dict containing the following keys:
             kicked_users: An array of users (`user_id`) that were kicked.
@@ -1290,7 +1371,9 @@ class RoomShutdownHandler:
             local_aliases:
                 An array of strings representing the local aliases that were
                 migrated from the old room to the new.
-            new_room_id: A string representing the room ID of the new room.
+            new_room_id:
+                A string representing the room ID of the new room, or None if
+                no such room was created.
         """
 
         if not new_room_name:
@@ -1301,13 +1384,27 @@ class RoomShutdownHandler:
         if not RoomID.is_valid(room_id):
             raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
 
-        if not await self.store.get_room(room_id):
-            raise NotFoundError("Unknown room id %s" % (room_id,))
-
-        # This will work even if the room is already blocked, but that is
-        # desirable in case the first attempt at blocking the room failed below.
+        # Action the block first (even if the room doesn't exist yet)
         if block:
+            # This will work even if the room is already blocked, but that is
+            # desirable in case the first attempt at blocking the room failed below.
             await self.store.block_room(room_id, requester_user_id)
+
+        if not await self.store.get_room(room_id):
+            if block:
+                # We allow you to block an unknown room.
+                return {
+                    "kicked_users": [],
+                    "failed_to_kick_users": [],
+                    "local_aliases": [],
+                    "new_room_id": None,
+                }
+            else:
+                # But if you don't want to preventatively block another room,
+                # this function can't do anything useful.
+                raise NotFoundError(
+                    "Cannot shut down room: unknown room id %s" % (room_id,)
+                )
 
         if new_room_user_id is not None:
             if not self.hs.is_mine_id(new_room_user_id):

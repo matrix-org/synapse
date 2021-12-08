@@ -17,6 +17,7 @@ import logging
 import os
 import sys
 import tempfile
+from typing import List, Optional
 
 from twisted.internet import defer, task
 
@@ -25,6 +26,7 @@ from synapse.app import _base
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
+from synapse.events import EventBase
 from synapse.handlers.admin import ExfiltrationWriter
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
@@ -39,6 +41,8 @@ from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.server import HomeServer
+from synapse.storage.databases.main.room import RoomWorkerStore
+from synapse.types import StateMap
 from synapse.util.logcontext import LoggingContext
 from synapse.util.versionstring import get_version_string
 
@@ -58,21 +62,17 @@ class AdminCmdSlavedStore(
     SlavedEventStore,
     SlavedClientIpStore,
     BaseSlavedStore,
+    RoomWorkerStore,
 ):
     pass
 
 
 class AdminCmdServer(HomeServer):
-    DATASTORE_CLASS = AdminCmdSlavedStore
+    DATASTORE_CLASS = AdminCmdSlavedStore  # type: ignore
 
 
-async def export_data_command(hs, args):
-    """Export data for a user.
-
-    Args:
-        hs (HomeServer)
-        args (argparse.Namespace)
-    """
+async def export_data_command(hs: HomeServer, args: argparse.Namespace) -> None:
+    """Export data for a user."""
 
     user_id = args.user_id
     directory = args.output_directory
@@ -90,12 +90,12 @@ class FileExfiltrationWriter(ExfiltrationWriter):
     Note: This writes to disk on the main reactor thread.
 
     Args:
-        user_id (str): The user whose data is being exfiltrated.
-        directory (str|None): The directory to write the data to, if None then
-            will write to a temporary directory.
+        user_id: The user whose data is being exfiltrated.
+        directory: The directory to write the data to, if None then will write
+            to a temporary directory.
     """
 
-    def __init__(self, user_id, directory=None):
+    def __init__(self, user_id: str, directory: Optional[str] = None):
         self.user_id = user_id
 
         if directory:
@@ -109,7 +109,7 @@ class FileExfiltrationWriter(ExfiltrationWriter):
         if list(os.listdir(self.base_directory)):
             raise Exception("Directory must be empty")
 
-    def write_events(self, room_id, events):
+    def write_events(self, room_id: str, events: List[EventBase]) -> None:
         room_directory = os.path.join(self.base_directory, "rooms", room_id)
         os.makedirs(room_directory, exist_ok=True)
         events_file = os.path.join(room_directory, "events")
@@ -118,7 +118,9 @@ class FileExfiltrationWriter(ExfiltrationWriter):
             for event in events:
                 print(json.dumps(event.get_pdu_json()), file=f)
 
-    def write_state(self, room_id, event_id, state):
+    def write_state(
+        self, room_id: str, event_id: str, state: StateMap[EventBase]
+    ) -> None:
         room_directory = os.path.join(self.base_directory, "rooms", room_id)
         state_directory = os.path.join(room_directory, "state")
         os.makedirs(state_directory, exist_ok=True)
@@ -129,7 +131,9 @@ class FileExfiltrationWriter(ExfiltrationWriter):
             for event in state.values():
                 print(json.dumps(event.get_pdu_json()), file=f)
 
-    def write_invite(self, room_id, event, state):
+    def write_invite(
+        self, room_id: str, event: EventBase, state: StateMap[EventBase]
+    ) -> None:
         self.write_events(room_id, [event])
 
         # We write the invite state somewhere else as they aren't full events
@@ -143,11 +147,27 @@ class FileExfiltrationWriter(ExfiltrationWriter):
             for event in state.values():
                 print(json.dumps(event), file=f)
 
-    def finished(self):
+    def write_knock(
+        self, room_id: str, event: EventBase, state: StateMap[EventBase]
+    ) -> None:
+        self.write_events(room_id, [event])
+
+        # We write the knock state somewhere else as they aren't full events
+        # and are only a subset of the state at the event.
+        room_directory = os.path.join(self.base_directory, "rooms", room_id)
+        os.makedirs(room_directory, exist_ok=True)
+
+        knock_state = os.path.join(room_directory, "knock_state")
+
+        with open(knock_state, "a") as f:
+            for event in state.values():
+                print(json.dumps(event), file=f)
+
+    def finished(self) -> str:
         return self.base_directory
 
 
-def start(config_options):
+def start(config_options: List[str]) -> None:
     parser = argparse.ArgumentParser(description="Synapse Admin Command")
     HomeServerConfig.add_arguments_to_parser(parser)
 
@@ -178,34 +198,30 @@ def start(config_options):
         sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
 
-    if config.worker_app is not None:
-        assert config.worker_app == "synapse.app.admin_cmd"
+    if config.worker.worker_app is not None:
+        assert config.worker.worker_app == "synapse.app.admin_cmd"
 
     # Update the config with some basic overrides so that don't have to specify
     # a full worker config.
-    config.worker_app = "synapse.app.admin_cmd"
+    config.worker.worker_app = "synapse.app.admin_cmd"
 
-    if (
-        not config.worker_daemonize
-        and not config.worker_log_file
-        and not config.worker_log_config
-    ):
+    if not config.worker.worker_daemonize and not config.worker.worker_log_config:
         # Since we're meant to be run as a "command" let's not redirect stdio
         # unless we've actually set log config.
-        config.no_redirect_stdio = True
+        config.logging.no_redirect_stdio = True
 
     # Explicitly disable background processes
-    config.update_user_directory = False
-    config.run_background_tasks = False
-    config.start_pushers = False
-    config.pusher_shard_config.instances = []
-    config.send_federation = False
-    config.federation_shard_config.instances = []
+    config.server.update_user_directory = False
+    config.worker.run_background_tasks = False
+    config.worker.start_pushers = False
+    config.worker.pusher_shard_config.instances = []
+    config.worker.send_federation = False
+    config.worker.federation_shard_config.instances = []
 
-    synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
+    synapse.events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
 
     ss = AdminCmdServer(
-        config.server_name,
+        config.server.server_name,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
     )
@@ -219,9 +235,9 @@ def start(config_options):
     # We also make sure that `_base.start` gets run before we actually run the
     # command.
 
-    async def run():
+    async def run() -> None:
         with LoggingContext("command"):
-            _base.start(ss)
+            await _base.start(ss)
             await args.func(ss, args)
 
     _base.start_worker_reactor(

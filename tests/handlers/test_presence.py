@@ -885,7 +885,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.federation_sender = hs.get_federation_sender()
         self.event_builder_factory = hs.get_event_builder_factory()
-        self.federation_handler = hs.get_federation_handler()
+        self.federation_event_handler = hs.get_federation_event_handler()
         self.presence_handler = hs.get_presence_handler()
 
         # self.event_builder_for_2 = EventBuilderFactory(hs)
@@ -1026,7 +1026,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             builder.build(prev_event_ids=prev_event_ids, auth_event_ids=None)
         )
 
-        self.get_success(self.federation_handler.on_receive_pdu(hostname, event))
+        self.get_success(self.federation_event_handler.on_receive_pdu(hostname, event))
 
         # Check that it was successfully persisted.
         self.get_success(self.store.get_event(event.event_id))

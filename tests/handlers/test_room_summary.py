@@ -14,6 +14,8 @@
 from typing import Any, Iterable, List, Optional, Tuple
 from unittest import mock
 
+from twisted.internet.defer import ensureDeferred
+
 from synapse.api.constants import (
     EventContentFields,
     EventTypes,
@@ -35,10 +37,11 @@ from synapse.types import JsonDict, UserID
 from tests import unittest
 
 
-def _create_event(room_id: str, order: Optional[Any] = None):
-    result = mock.Mock()
+def _create_event(room_id: str, order: Optional[Any] = None, origin_server_ts: int = 0):
+    result = mock.Mock(name=room_id)
     result.room_id = room_id
     result.content = {}
+    result.origin_server_ts = origin_server_ts
     if order is not None:
         result.content["order"] = order
     return result
@@ -63,10 +66,17 @@ class TestSpaceSummarySort(unittest.TestCase):
 
         self.assertEqual([ev2, ev1], _order(ev1, ev2))
 
+    def test_order_origin_server_ts(self):
+        """Origin server  is a tie-breaker for ordering."""
+        ev1 = _create_event("!abc:test", origin_server_ts=10)
+        ev2 = _create_event("!xyz:test", origin_server_ts=30)
+
+        self.assertEqual([ev1, ev2], _order(ev1, ev2))
+
     def test_order_room_id(self):
-        """Room ID is a tie-breaker for ordering."""
-        ev1 = _create_event("!abc:test", "abc")
-        ev2 = _create_event("!xyz:test", "abc")
+        """Room ID is a final tie-breaker for ordering."""
+        ev1 = _create_event("!abc:test")
+        ev2 = _create_event("!xyz:test")
 
         self.assertEqual([ev1, ev2], _order(ev1, ev2))
 
@@ -307,6 +317,59 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             self.handler.get_room_hierarchy(user2, "#not-a-space:" + self.hs.hostname),
             AuthError,
         )
+
+    def test_room_hierarchy_cache(self) -> None:
+        """In-flight room hierarchy requests are deduplicated."""
+        # Run two `get_room_hierarchy` calls up until they block.
+        deferred1 = ensureDeferred(
+            self.handler.get_room_hierarchy(self.user, self.space)
+        )
+        deferred2 = ensureDeferred(
+            self.handler.get_room_hierarchy(self.user, self.space)
+        )
+
+        # Complete the two calls.
+        result1 = self.get_success(deferred1)
+        result2 = self.get_success(deferred2)
+
+        # Both `get_room_hierarchy` calls should return the same result.
+        expected = [(self.space, [self.room]), (self.room, ())]
+        self._assert_hierarchy(result1, expected)
+        self._assert_hierarchy(result2, expected)
+        self.assertIs(result1, result2)
+
+        # A subsequent `get_room_hierarchy` call should not reuse the result.
+        result3 = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space)
+        )
+        self._assert_hierarchy(result3, expected)
+        self.assertIsNot(result1, result3)
+
+    def test_room_hierarchy_cache_sharing(self) -> None:
+        """Room hierarchy responses for different users are not shared."""
+        user2 = self.register_user("user2", "pass")
+
+        # Make the room within the space invite-only.
+        self.helper.send_state(
+            self.room,
+            event_type=EventTypes.JoinRules,
+            body={"join_rule": JoinRules.INVITE},
+            tok=self.token,
+        )
+
+        # Run two `get_room_hierarchy` calls for different users up until they block.
+        deferred1 = ensureDeferred(
+            self.handler.get_room_hierarchy(self.user, self.space)
+        )
+        deferred2 = ensureDeferred(self.handler.get_room_hierarchy(user2, self.space))
+
+        # Complete the two calls.
+        result1 = self.get_success(deferred1)
+        result2 = self.get_success(deferred2)
+
+        # The `get_room_hierarchy` calls should return different results.
+        self._assert_hierarchy(result1, [(self.space, [self.room]), (self.room, ())])
+        self._assert_hierarchy(result2, [(self.space, [self.room])])
 
     def _create_room_with_join_rule(
         self, join_rule: str, room_version: Optional[str] = None, **extra_content
@@ -571,6 +634,31 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             (rooms[2], ()),
             (spaces[3], [rooms[3], spaces[4]]),
         ]
+        self._assert_hierarchy(result, expected)
+
+    def test_unknown_room_version(self):
+        """
+        If an room with an unknown room version is encountered it should not cause
+        the entire summary to skip.
+        """
+        # Poke the database and update the room version to an unknown one.
+        self.get_success(
+            self.hs.get_datastores().main.db_pool.simple_update(
+                "rooms",
+                keyvalues={"room_id": self.room},
+                updatevalues={"room_version": "unknown-room-version"},
+                desc="updated-room-version",
+            )
+        )
+
+        result = self.get_success(self.handler.get_space_summary(self.user, self.space))
+        # The result should have only the space, along with a link from space -> room.
+        expected = [(self.space, [self.room])]
+        self._assert_rooms(result, expected)
+
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space)
+        )
         self._assert_hierarchy(result, expected)
 
     def test_fed_complex(self):

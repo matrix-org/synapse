@@ -120,7 +120,7 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
 
         self.assertEqual(
             channel.json_body["room_version"],
-            self.hs.config.default_room_version.identifier,
+            self.hs.config.server.default_room_version.identifier,
         )
 
         members = set(

@@ -40,6 +40,9 @@ class RegistrationConfig(Config):
         self.disable_3pid_changes = config.get("disable_3pid_changes", False)
 
         self.enable_3pid_lookup = config.get("enable_3pid_lookup", True)
+        self.registration_requires_token = config.get(
+            "registration_requires_token", False
+        )
         self.registration_shared_secret = config.get("registration_shared_secret")
         self.register_mxid_from_3pid = config.get("register_mxid_from_3pid")
         self.register_just_use_email_for_display_name = config.get(
@@ -47,9 +50,7 @@ class RegistrationConfig(Config):
         )
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
-        self.trusted_third_party_id_servers = config.get(
-            "trusted_third_party_id_servers", ["matrix.org", "vector.im"]
-        )
+
         account_threepid_delegates = config.get("account_threepid_delegates") or {}
         self.account_threepid_delegate_email = account_threepid_delegates.get("email")
         if (
@@ -60,21 +61,6 @@ class RegistrationConfig(Config):
                 "account_threepid_delegates.email must begin with http:// or https://"
             )
         self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
-        if (
-            self.account_threepid_delegate_msisdn
-            and not self.account_threepid_delegate_msisdn.startswith("http")
-        ):
-            raise ConfigError(
-                "account_threepid_delegates.msisdn must begin with http:// or https://"
-            )
-        if self.account_threepid_delegate_msisdn and not self.public_baseurl:
-            raise ConfigError(
-                "The configuration option `public_baseurl` is required if "
-                "`account_threepid_delegate.msisdn` is set, such that "
-                "clients know where to submit validation tokens to. Please "
-                "configure `public_baseurl`."
-            )
-
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
@@ -107,7 +93,7 @@ class RegistrationConfig(Config):
         if mxid_localpart:
             # Convert the localpart to a full mxid.
             self.auto_join_user_id = UserID(
-                mxid_localpart, self.server_name
+                mxid_localpart, self.root.server.server_name
             ).to_string()
 
         if self.autocreate_auto_join_rooms:
@@ -152,26 +138,36 @@ class RegistrationConfig(Config):
             session_lifetime = self.parse_duration(session_lifetime)
         self.session_lifetime = session_lifetime
 
-        # The `access_token_lifetime` applies for tokens that can be renewed
+        # The `refreshable_access_token_lifetime` applies for tokens that can be renewed
         # using a refresh token, as per MSC2918. If it is `None`, the refresh
         # token mechanism is disabled.
         #
         # Since it is incompatible with the `session_lifetime` mechanism, it is set to
         # `None` by default if a `session_lifetime` is set.
-        access_token_lifetime = config.get(
-            "access_token_lifetime", "5m" if session_lifetime is None else None
+        refreshable_access_token_lifetime = config.get(
+            "refreshable_access_token_lifetime",
+            "5m" if session_lifetime is None else None,
         )
-        if access_token_lifetime is not None:
-            access_token_lifetime = self.parse_duration(access_token_lifetime)
-        self.access_token_lifetime = access_token_lifetime
+        if refreshable_access_token_lifetime is not None:
+            refreshable_access_token_lifetime = self.parse_duration(
+                refreshable_access_token_lifetime
+            )
+        self.refreshable_access_token_lifetime = refreshable_access_token_lifetime
 
-        if session_lifetime is not None and access_token_lifetime is not None:
+        if (
+            session_lifetime is not None
+            and refreshable_access_token_lifetime is not None
+        ):
             raise ConfigError(
                 "The refresh token mechanism is incompatible with the "
                 "`session_lifetime` option. Consider disabling the "
                 "`session_lifetime` option or disabling the refresh token "
-                "mechanism by removing the `access_token_lifetime` option."
+                "mechanism by removing the `refreshable_access_token_lifetime` "
+                "option."
             )
+
+        # The fallback template used for authenticating using a registration token
+        self.registration_token_template = self.read_template("registration_token.html")
 
         # The success template used during fallback auth.
         self.fallback_success_template = self.read_template("auth_success.html")
@@ -277,6 +273,15 @@ class RegistrationConfig(Config):
         #
         #enable_3pid_lookup: true
 
+        # Require users to submit a token during registration.
+        # Tokens can be managed using the admin API:
+        # https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/registration_tokens.html
+        # Note that `enable_registration` must be set to `true`.
+        # Disabling this option will not delete any tokens previously generated.
+        # Defaults to false. Uncomment the following to require tokens:
+        #
+        #registration_requires_token: true
+
         # If set, allows registration of standard or admin accounts by anyone who
         # has the shared secret, even if registration is otherwise disabled.
         #
@@ -300,7 +305,7 @@ class RegistrationConfig(Config):
         # in on this server.
         #
         # (By default, no suggestion is made, so it is left up to the client.
-        # This setting is ignored unless public_baseurl is also set.)
+        # This setting is ignored unless public_baseurl is also explicitly set.)
         #
         #default_identity_server: https://matrix.org
 
@@ -339,8 +344,6 @@ class RegistrationConfig(Config):
         # Servers handling the these requests must answer the `/requestToken` endpoints defined
         # by the Matrix Identity Service API specification:
         # https://matrix.org/docs/spec/identity_service/latest
-        #
-        # If a delegate is specified, the config option public_baseurl must also be filled out.
         #
         account_threepid_delegates:
             #email: https://example.com     # Delegate email sending to example.com

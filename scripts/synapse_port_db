@@ -43,9 +43,11 @@ from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyBackground
 from synapse.storage.databases.main.events_bg_updates import (
     EventsBackgroundUpdatesStore,
 )
+from synapse.storage.databases.main.group_server import GroupServerWorkerStore
 from synapse.storage.databases.main.media_repository import (
     MediaRepositoryBackgroundUpdateStore,
 )
+from synapse.storage.databases.main.presence import PresenceBackgroundUpdateStore
 from synapse.storage.databases.main.profile import ProfileStore
 from synapse.storage.databases.main.pusher import PusherWorkerStore
 from synapse.storage.databases.main.registration import (
@@ -181,6 +183,8 @@ class Store(
     EndToEndKeyBackgroundStore,
     StatsStore,
     PusherWorkerStore,
+    PresenceBackgroundUpdateStore,
+    GroupServerWorkerStore,
 ):
     def execute(self, f, *args, **kwargs):
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
@@ -215,7 +219,7 @@ class MockHomeserver:
     def __init__(self, config):
         self.clock = Clock(reactor)
         self.config = config
-        self.hostname = config.server_name
+        self.hostname = config.server.server_name
         self.version_string = "Synapse/" + get_version_string(synapse)
 
     def get_clock(self):
@@ -583,7 +587,7 @@ class Porter(object):
                 return
 
             self.postgres_store = self.build_db_store(
-                self.hs_config.get_single_database()
+                self.hs_config.database.get_single_database()
             )
 
             await self.run_background_updates_on_postgres()
@@ -1069,7 +1073,7 @@ class CursesProgress(Progress):
 
         self.stdscr.addstr(0, 0, status, curses.A_BOLD)
 
-        max_len = max([len(t) for t in self.tables.keys()])
+        max_len = max(len(t) for t in self.tables.keys())
 
         left_margin = 5
         middle_space = 1

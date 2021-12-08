@@ -36,9 +36,11 @@ class ConsentServerNotices:
 
         self._users_in_progress: Set[str] = set()
 
-        self._current_consent_version = hs.config.user_consent_version
-        self._server_notice_content = hs.config.user_consent_server_notice_content
-        self._send_to_guests = hs.config.user_consent_server_notice_to_guests
+        self._current_consent_version = hs.config.consent.user_consent_version
+        self._server_notice_content = (
+            hs.config.consent.user_consent_server_notice_content
+        )
+        self._send_to_guests = hs.config.consent.user_consent_server_notice_to_guests
 
         if self._server_notice_content is not None:
             if not self._server_notices_manager.is_enabled():
@@ -62,6 +64,9 @@ class ConsentServerNotices:
         if self._server_notice_content is None:
             # not enabled
             return
+
+        # A consent version must be given.
+        assert self._current_consent_version is not None
 
         # make sure we don't send two messages to the same user at once
         if user_id in self._users_in_progress:

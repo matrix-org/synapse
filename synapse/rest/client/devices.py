@@ -14,16 +14,22 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING, Tuple
 
 from synapse.api import errors
+from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
 )
 from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict
 
 from ._base import client_patterns, interactive_auth_handler
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -31,17 +37,13 @@ logger = logging.getLogger(__name__)
 class DevicesRestServlet(RestServlet):
     PATTERNS = client_patterns("/devices$")
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
 
-    async def on_GET(self, request):
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         devices = await self.device_handler.get_devices_by_user(
             requester.user.to_string()
@@ -57,7 +59,7 @@ class DeleteDevicesRestServlet(RestServlet):
 
     PATTERNS = client_patterns("/delete_devices")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
@@ -65,7 +67,7 @@ class DeleteDevicesRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
 
     @interactive_auth_handler
-    async def on_POST(self, request):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
         try:
@@ -100,18 +102,16 @@ class DeleteDevicesRestServlet(RestServlet):
 class DeviceRestServlet(RestServlet):
     PATTERNS = client_patterns("/devices/(?P<device_id>[^/]*)$")
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
         self.auth_handler = hs.get_auth_handler()
 
-    async def on_GET(self, request, device_id):
+    async def on_GET(
+        self, request: SynapseRequest, device_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         device = await self.device_handler.get_device(
             requester.user.to_string(), device_id
@@ -119,7 +119,9 @@ class DeviceRestServlet(RestServlet):
         return 200, device
 
     @interactive_auth_handler
-    async def on_DELETE(self, request, device_id):
+    async def on_DELETE(
+        self, request: SynapseRequest, device_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
         try:
@@ -146,7 +148,9 @@ class DeviceRestServlet(RestServlet):
         await self.device_handler.delete_device(requester.user.to_string(), device_id)
         return 200, {}
 
-    async def on_PUT(self, request, device_id):
+    async def on_PUT(
+        self, request: SynapseRequest, device_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         body = parse_json_object_from_request(request)
@@ -193,13 +197,13 @@ class DehydratedDeviceServlet(RestServlet):
 
     PATTERNS = client_patterns("/org.matrix.msc2697.v2/dehydrated_device", releases=())
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
 
-    async def on_GET(self, request: SynapseRequest):
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         dehydrated_device = await self.device_handler.get_dehydrated_device(
             requester.user.to_string()
@@ -207,11 +211,11 @@ class DehydratedDeviceServlet(RestServlet):
         if dehydrated_device is not None:
             (device_id, device_data) = dehydrated_device
             result = {"device_id": device_id, "device_data": device_data}
-            return (200, result)
+            return 200, result
         else:
             raise errors.NotFoundError("No dehydrated device available")
 
-    async def on_PUT(self, request: SynapseRequest):
+    async def on_PUT(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         submission = parse_json_object_from_request(request)
         requester = await self.auth.get_user_by_req(request)
 
@@ -259,13 +263,13 @@ class ClaimDehydratedDeviceServlet(RestServlet):
         "/org.matrix.msc2697.v2/dehydrated_device/claim", releases=()
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
 
-    async def on_POST(self, request: SynapseRequest):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
         submission = parse_json_object_from_request(request)
@@ -289,10 +293,10 @@ class ClaimDehydratedDeviceServlet(RestServlet):
             submission["device_id"],
         )
 
-        return (200, result)
+        return 200, result
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     DeleteDevicesRestServlet(hs).register(http_server)
     DevicesRestServlet(hs).register(http_server)
     DeviceRestServlet(hs).register(http_server)

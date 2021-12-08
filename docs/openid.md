@@ -21,6 +21,8 @@ such as [Github][github-idp].
 
 [google-idp]: https://developers.google.com/identity/protocols/oauth2/openid-connect
 [auth0]: https://auth0.com/
+[authentik]: https://goauthentik.io/
+[lemonldap]: https://lemonldap-ng.org/
 [okta]: https://www.okta.com/
 [dex-idp]: https://github.com/dexidp/dex
 [keycloak-idp]: https://www.keycloak.org/docs/latest/server_admin/#sso-protocols
@@ -79,7 +81,7 @@ oidc_providers:
         display_name_template: "{{ user.name }}"
 ```
 
-### [Dex][dex-idp]
+### Dex
 
 [Dex][dex-idp] is a simple, open-source, certified OpenID Connect Provider.
 Although it is designed to help building a full-blown provider with an
@@ -117,7 +119,7 @@ oidc_providers:
         localpart_template: "{{ user.name }}"
         display_name_template: "{{ user.name|capitalize }}"
 ```
-### [Keycloak][keycloak-idp]
+### Keycloak
 
 [Keycloak][keycloak-idp] is an opensource IdP maintained by Red Hat.
 
@@ -166,7 +168,9 @@ oidc_providers:
         localpart_template: "{{ user.preferred_username }}"
         display_name_template: "{{ user.name }}"
 ```
-### [Auth0][auth0]
+### Auth0
+
+[Auth0][auth0] is a hosted SaaS IdP solution.
 
 1. Create a regular web application for Synapse
 2. Set the Allowed Callback URLs to `[synapse public baseurl]/_synapse/client/oidc/callback`
@@ -207,9 +211,79 @@ oidc_providers:
         display_name_template: "{{ user.name }}"
 ```
 
+### Authentik
+
+[Authentik][authentik] is an open-source IdP solution.
+
+1. Create a provider in Authentik, with type OAuth2/OpenID.
+2. The parameters are:
+- Client Type: Confidential
+- JWT Algorithm: RS256
+- Scopes: OpenID, Email and Profile
+- RSA Key: Select any available key
+- Redirect URIs: `[synapse public baseurl]/_synapse/client/oidc/callback`
+3. Create an application for synapse in Authentik and link it to the provider.
+4. Note the slug of your application, Client ID and Client Secret.
+
+Synapse config:
+```yaml
+oidc_providers:
+  - idp_id: authentik
+    idp_name: authentik
+    discover: true
+    issuer: "https://your.authentik.example.org/application/o/your-app-slug/" # TO BE FILLED: domain and slug
+    client_id: "your client id" # TO BE FILLED
+    client_secret: "your client secret" # TO BE FILLED
+    scopes:
+      - "openid"
+      - "profile"
+      - "email"
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.preferred_username }}}"
+        display_name_template: "{{ user.preferred_username|capitalize }}" # TO BE FILLED: If your users have names in Authentik and you want those in Synapse, this should be replaced with user.name|capitalize.
+```
+
+### LemonLDAP
+
+[LemonLDAP::NG][lemonldap] is an open-source IdP solution.
+
+1. Create an OpenID Connect Relying Parties in LemonLDAP::NG
+2. The parameters are:
+- Client ID under the basic menu of the new Relying Parties (`Options > Basic >
+  Client ID`)
+- Client secret (`Options > Basic > Client secret`)
+- JWT Algorithm: RS256 within the security menu of the new Relying Parties
+  (`Options > Security > ID Token signature algorithm` and `Options > Security >
+  Access Token signature algorithm`)
+- Scopes: OpenID, Email and Profile
+- Allowed redirection addresses for login (`Options > Basic > Allowed
+  redirection addresses for login` ) :
+  `[synapse public baseurl]/_synapse/client/oidc/callback`
+
+Synapse config:
+```yaml
+oidc_providers:
+  - idp_id: lemonldap
+    idp_name: lemonldap
+    discover: true
+    issuer: "https://auth.example.org/" # TO BE FILLED: replace with your domain
+    client_id: "your client id" # TO BE FILLED
+    client_secret: "your client secret" # TO BE FILLED
+    scopes:
+      - "openid"
+      - "profile"
+      - "email"
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.preferred_username }}}"
+        # TO BE FILLED: If your users have names in LemonLDAP::NG and you want those in Synapse, this should be replaced with user.name|capitalize or any valid filter.
+        display_name_template: "{{ user.preferred_username|capitalize }}"
+```
+
 ### GitHub
 
-GitHub is a bit special as it is not an OpenID Connect compliant provider, but
+[GitHub][github-idp] is a bit special as it is not an OpenID Connect compliant provider, but
 just a regular OAuth2 provider.
 
 The [`/user` API endpoint](https://developer.github.com/v3/users/#get-the-authenticated-user)
@@ -242,11 +316,13 @@ oidc_providers:
         display_name_template: "{{ user.name }}"
 ```
 
-### [Google][google-idp]
+### Google
+
+[Google][google-idp] is an OpenID certified authentication and authorisation provider.
 
 1. Set up a project in the Google API Console (see
    https://developers.google.com/identity/protocols/oauth2/openid-connect#appsetup).
-2. add an "OAuth Client ID" for a Web Application under "Credentials".
+2. Add an "OAuth Client ID" for a Web Application under "Credentials".
 3. Copy the Client ID and Client Secret, and add the following to your synapse config:
    ```yaml
    oidc_providers:
@@ -444,5 +520,53 @@ The synapse config will look like this:
     authorization_endpoint: https://appleid.apple.com/auth/authorize?response_mode=form_post
     user_mapping_provider:
       config:
+        email_template: "{{ user.email }}"
+```
+
+## Django OAuth Toolkit
+
+[django-oauth-toolkit](https://github.com/jazzband/django-oauth-toolkit) is a
+Django application providing out of the box all the endpoints, data and logic
+needed to add OAuth2 capabilities to your Django projects. It supports
+[OpenID Connect too](https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html).
+
+Configuration on Django's side:
+
+1. Add an application: https://example.com/admin/oauth2_provider/application/add/ and choose parameters like this:
+* `Redirect uris`: https://synapse.example.com/_synapse/client/oidc/callback
+* `Client type`: `Confidential`
+* `Authorization grant type`: `Authorization code`
+* `Algorithm`: `HMAC with SHA-2 256`
+2. You can [customize the claims](https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html#customizing-the-oidc-responses) Django gives to synapse (optional):
+   <details>
+    <summary>Code sample</summary>
+
+    ```python
+    class CustomOAuth2Validator(OAuth2Validator):
+
+        def get_additional_claims(self, request):
+            return {
+                "sub": request.user.email,
+                "email": request.user.email,
+                "first_name": request.user.first_name,
+                "last_name": request.user.last_name,
+            }
+    ```
+   </details>
+Your synapse config is then:
+
+```yaml
+oidc_providers:
+  - idp_id: django_example
+    idp_name: "Django Example"
+    issuer: "https://example.com/o/"
+    client_id: "your-client-id"  # CHANGE ME
+    client_secret: "your-client-secret"  # CHANGE ME
+    scopes: ["openid"]
+    user_profile_method: "userinfo_endpoint"  # needed because oauth-toolkit does not include user information in the authorization response
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.email.split('@')[0] }}"
+        display_name_template: "{{ user.first_name }} {{ user.last_name }}"
         email_template: "{{ user.email }}"
 ```

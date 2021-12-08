@@ -67,7 +67,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         v.satisfy_general(verify_type)
         v.satisfy_general(verify_nonce)
         v.satisfy_general(verify_guest)
-        v.verify(macaroon, self.hs.config.macaroon_secret_key)
+        v.verify(macaroon, self.hs.config.key.macaroon_secret_key)
 
     def test_short_term_login_token_gives_user_id(self):
         token = self.macaroon_generator.generate_short_term_login_token(
@@ -116,7 +116,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.auth_blocking._limit_usage_by_mau = False
         # Ensure does not throw exception
         self.get_success(
-            self.auth_handler.get_access_token_for_user_id(
+            self.auth_handler.create_access_token_for_user_id(
                 self.user1, device_id=None, valid_until_ms=None
             )
         )
@@ -134,7 +134,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
 
         self.get_failure(
-            self.auth_handler.get_access_token_for_user_id(
+            self.auth_handler.create_access_token_for_user_id(
                 self.user1, device_id=None, valid_until_ms=None
             ),
             ResourceLimitError,
@@ -162,7 +162,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         # If not in monthly active cohort
         self.get_failure(
-            self.auth_handler.get_access_token_for_user_id(
+            self.auth_handler.create_access_token_for_user_id(
                 self.user1, device_id=None, valid_until_ms=None
             ),
             ResourceLimitError,
@@ -179,7 +179,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             return_value=make_awaitable(self.clock.time_msec())
         )
         self.get_success(
-            self.auth_handler.get_access_token_for_user_id(
+            self.auth_handler.create_access_token_for_user_id(
                 self.user1, device_id=None, valid_until_ms=None
             )
         )
@@ -197,7 +197,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
         # Ensure does not raise exception
         self.get_success(
-            self.auth_handler.get_access_token_for_user_id(
+            self.auth_handler.create_access_token_for_user_id(
                 self.user1, device_id=None, valid_until_ms=None
             )
         )

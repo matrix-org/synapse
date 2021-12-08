@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from twisted.internet.protocol import Protocol
 from twisted.web.resource import Resource
 
 from synapse.app.generic_worker import GenericWorkerServer
-from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.replication.http import ReplicationRestResource
 from synapse.replication.tcp.client import ReplicationDataHandler
@@ -70,8 +69,16 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         # databases objects are the same.
         self.worker_hs.get_datastore().db_pool = hs.get_datastore().db_pool
 
+        # Normally we'd pass in the handler to `setup_test_homeserver`, which would
+        # eventually hit "Install @cache_in_self attributes" in tests/utils.py.
+        # Unfortunately our handler wants a reference to the homeserver. That leaves
+        # us with a chicken-and-egg problem.
+        # We can workaround this: create the homeserver first, create the handler
+        # and bodge it in after the fact. The bodging requires us to know the
+        # dirty details of how `cache_in_self` works. We politely ask mypy to
+        # ignore our dirty dealings.
         self.test_handler = self._build_replication_data_handler()
-        self.worker_hs._replication_data_handler = self.test_handler
+        self.worker_hs._replication_data_handler = self.test_handler  # type: ignore[attr-defined]
 
         repl_handler = ReplicationCommandHandler(self.worker_hs)
         self.client = ClientReplicationStreamProtocol(
@@ -212,8 +219,6 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
     unlike `BaseStreamTestCase`.
     """
 
-    servlets: List[Callable[[HomeServer, JsonResource], None]] = []
-
     def setUp(self):
         super().setUp()
 
@@ -240,7 +245,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         if self.hs.config.redis.redis_enabled:
             # Handle attempts to connect to fake redis server.
             self.reactor.add_tcp_client_callback(
-                b"localhost",
+                "localhost",
                 6379,
                 self.connect_any_redis_attempts,
             )
@@ -315,12 +320,15 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
                     )
                 )
 
+            # Copy the port into a new, non-Optional variable so mypy knows we're
+            # not going to reset `instance_loc` to `None` under its feet. See
+            # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
+            port = instance_loc.port
+
             self.reactor.add_tcp_client_callback(
                 self.reactor.lookups[instance_loc.host],
                 instance_loc.port,
-                lambda: self._handle_http_replication_attempt(
-                    worker_hs, instance_loc.port
-                ),
+                lambda: self._handle_http_replication_attempt(worker_hs, port),
             )
 
         store = worker_hs.get_datastore()
@@ -328,7 +336,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
 
         # Set up TCP replication between master and the new worker if we don't
         # have Redis support enabled.
-        if not worker_hs.config.redis_enabled:
+        if not worker_hs.config.redis.redis_enabled:
             repl_handler = ReplicationCommandHandler(worker_hs)
             client = ClientReplicationStreamProtocol(
                 worker_hs,
@@ -424,7 +432,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         clients = self.reactor.tcpClients
         while clients:
             (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
-            self.assertEqual(host, b"localhost")
+            self.assertEqual(host, "localhost")
             self.assertEqual(port, 6379)
 
             client_protocol = client_factory.buildProtocol(None)

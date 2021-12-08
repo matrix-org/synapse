@@ -16,16 +16,20 @@
 
 import logging
 import random
+from typing import TYPE_CHECKING
 
 from prometheus_client import Counter
 
-from twisted.internet.protocol import Factory
+from twisted.internet.protocol import ServerFactory
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.tcp.commands import PositionCommand
 from synapse.replication.tcp.protocol import ServerReplicationStreamProtocol
 from synapse.replication.tcp.streams import EventsStream
 from synapse.util.metrics import Measure
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 stream_updates_counter = Counter(
     "synapse_replication_tcp_resource_stream_updates", "", ["stream_name"]
@@ -34,13 +38,13 @@ stream_updates_counter = Counter(
 logger = logging.getLogger(__name__)
 
 
-class ReplicationStreamProtocolFactory(Factory):
+class ReplicationStreamProtocolFactory(ServerFactory):
     """Factory for new replication connections."""
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.command_handler = hs.get_tcp_replication()
         self.clock = hs.get_clock()
-        self.server_name = hs.config.server_name
+        self.server_name = hs.config.server.server_name
 
         # If we've created a `ReplicationStreamProtocolFactory` then we're
         # almost certainly registering a replication listener, so let's ensure
@@ -65,13 +69,13 @@ class ReplicationStreamer:
     data is available it will propagate to all connected clients.
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self._instance_name = hs.get_instance_name()
 
-        self._replication_torture_level = hs.config.replication_torture_level
+        self._replication_torture_level = hs.config.server.replication_torture_level
 
         self.notifier.add_replication_callback(self.on_notifier_poke)
 

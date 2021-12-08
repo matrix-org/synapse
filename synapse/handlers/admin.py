@@ -21,18 +21,15 @@ from synapse.events import EventBase
 from synapse.types import JsonDict, RoomStreamToken, StateMap, UserID
 from synapse.visibility import filter_events_for_client
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class AdminHandler(BaseHandler):
+class AdminHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.store = hs.get_datastore()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
 
@@ -93,6 +90,7 @@ class AdminHandler(BaseHandler):
                 Membership.LEAVE,
                 Membership.BAN,
                 Membership.INVITE,
+                Membership.KNOCK,
             ),
         )
 
@@ -124,6 +122,13 @@ class AdminHandler(BaseHandler):
                     if invite:
                         invited_state = invite.unsigned["invite_room_state"]
                         writer.write_invite(room_id, invite, invited_state)
+
+                if room.membership == Membership.KNOCK:
+                    event_id = room.event_id
+                    knock = await self.store.get_event(event_id, allow_none=True)
+                    if knock:
+                        knock_state = knock.unsigned["knock_room_state"]
+                        writer.write_knock(room_id, knock, knock_state)
 
                 continue
 
@@ -229,7 +234,7 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def write_invite(
-        self, room_id: str, event: EventBase, state: StateMap[dict]
+        self, room_id: str, event: EventBase, state: StateMap[EventBase]
     ) -> None:
         """Write an invite for the room, with associated invite state.
 
@@ -237,6 +242,20 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
             room_id: The room ID the invite is for.
             event: The invite event.
             state: A subset of the state at the invite, with a subset of the
+                event keys (type, state_key content and sender).
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def write_knock(
+        self, room_id: str, event: EventBase, state: StateMap[EventBase]
+    ) -> None:
+        """Write a knock for the room, with associated knock state.
+
+        Args:
+            room_id: The room ID the knock is for.
+            event: The knock event.
+            state: A subset of the state at the knock, with a subset of the
                 event keys (type, state_key content and sender).
         """
         raise NotImplementedError()

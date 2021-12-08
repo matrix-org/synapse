@@ -15,12 +15,18 @@
 """ This module contains REST servlets to do with presence: /presence/<paths>
 """
 import logging
+from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import AuthError, SynapseError
 from synapse.handlers.presence import format_user_presence_state
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +34,7 @@ logger = logging.getLogger(__name__)
 class PresenceStatusRestServlet(RestServlet):
     PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status", v1=True)
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.presence_handler = hs.get_presence_handler()
@@ -37,7 +43,9 @@ class PresenceStatusRestServlet(RestServlet):
 
         self._use_presence = hs.config.server.use_presence
 
-    async def on_GET(self, request, user_id):
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
@@ -53,11 +61,15 @@ class PresenceStatusRestServlet(RestServlet):
                 raise AuthError(403, "You are not allowed to see their presence.")
 
         state = await self.presence_handler.get_state(target_user=user)
-        state = format_user_presence_state(state, self.clock.time_msec())
+        result = format_user_presence_state(
+            state, self.clock.time_msec(), include_user_id=False
+        )
 
-        return 200, state
+        return 200, result
 
-    async def on_PUT(self, request, user_id):
+    async def on_PUT(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
@@ -89,5 +101,5 @@ class PresenceStatusRestServlet(RestServlet):
         return 200, {}
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     PresenceStatusRestServlet(hs).register(http_server)

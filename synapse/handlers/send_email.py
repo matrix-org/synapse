@@ -17,7 +17,7 @@ import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from io import BytesIO
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from pkg_resources import parse_version
 
@@ -79,7 +79,7 @@ async def _sendmail(
     msg = BytesIO(msg_bytes)
     d: "Deferred[object]" = Deferred()
 
-    def build_sender_factory(**kwargs) -> ESMTPSenderFactory:
+    def build_sender_factory(**kwargs: Any) -> ESMTPSenderFactory:
         return ESMTPSenderFactory(
             username,
             password,
@@ -105,8 +105,13 @@ async def _sendmail(
         # set to enable TLS.
         factory = build_sender_factory(hostname=smtphost if enable_tls else None)
 
-    # the IReactorTCP interface claims host has to be a bytes, which seems to be wrong
-    reactor.connectTCP(smtphost, smtpport, factory, timeout=30, bindAddress=None)  # type: ignore[arg-type]
+    reactor.connectTCP(
+        smtphost,  # type: ignore[arg-type]
+        smtpport,
+        factory,
+        timeout=30,
+        bindAddress=None,
+    )
 
     await make_deferred_yieldable(d)
 

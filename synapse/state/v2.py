@@ -481,7 +481,7 @@ async def _reverse_topological_power_sort(
         if idx % _AWAIT_AFTER_ITERATIONS == 0:
             await clock.sleep(0)
 
-    def _get_power_order(event_id):
+    def _get_power_order(event_id: str) -> Tuple[int, int, str]:
         ev = event_map[event_id]
         pl = event_to_pl[event_id]
 
@@ -546,12 +546,10 @@ async def _iterative_auth_checks(
                     auth_events[key] = event_map[ev_id]
 
         try:
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 room_version,
                 event,
-                auth_events,
-                do_sig_check=False,
-                do_size_check=False,
+                auth_events.values(),
             )
 
             resolved_state[(event.type, event.state_key)] = event_id

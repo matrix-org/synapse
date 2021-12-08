@@ -21,11 +21,15 @@ It returns a JSON body like the following:
     "threepids": [
         {
             "medium": "email",
-            "address": "<user_mail_1>"
+            "address": "<user_mail_1>",
+            "added_at": 1586458409743,
+            "validated_at": 1586458409743
         },
         {
             "medium": "email",
-            "address": "<user_mail_2>"
+            "address": "<user_mail_2>",
+            "added_at": 1586458409743,
+            "validated_at": 1586458409743
         }
     ],
     "avatar_url": "<avatar_url>",
@@ -46,7 +50,8 @@ It returns a JSON body like the following:
             "auth_provider": "<provider2>",
             "external_id": "<user_id_provider_2>"
         }
-    ]
+    ],
+    "user_type": null
 }
 ```
 
@@ -93,7 +98,8 @@ with a body of:
     ],
     "avatar_url": "<avatar_url>",
     "admin": false,
-    "deactivated": false
+    "deactivated": false,
+    "user_type": null
 }
 ```
 
@@ -131,6 +137,9 @@ Body parameters:
   unchanged on existing accounts and set to `false` for new accounts.
   A user cannot be erased by deactivating with this API. For details on
   deactivating users see [Deactivate Account](#deactivate-account).
+- `user_type` - string or null, optional. If provided, the user type will be
+  adjusted. If `null` given, the user type will be cleared. Other 
+  allowed options are: `bot` and `support`.
 
 If the user already exists then optional parameters default to the current value.
 
@@ -337,6 +346,7 @@ The following actions are performed when deactivating an user:
 - Remove all 3PIDs from the homeserver
 - Delete all devices and E2EE keys
 - Delete all access tokens
+- Delete all pushers
 - Delete the password hash
 - Removal from all rooms the user is a member of
 - Remove the user from the user directory
@@ -350,6 +360,15 @@ is set to `true`:
 - Remove the user's avatar URL
 - Mark the user as erased
 
+The following actions are **NOT** performed. The list may be incomplete.
+
+- Remove mappings of SSO IDs
+- [Delete media uploaded](#delete-media-uploaded-by-a-user) by user (included avatar images)
+- Delete sent and received messages
+- Delete E2E cross-signing keys
+- Remove the user's creation (registration) timestamp
+- [Remove rate limit overrides](#override-ratelimiting-for-users)
+- Remove from monthly active users
 
 ## Reset password
 
@@ -929,7 +948,7 @@ The following fields are returned in the JSON response body:
 See also the
 [Client-Server API Spec on pushers](https://matrix.org/docs/spec/client_server/latest#get-matrix-client-r0-pushers).
 
-## Shadow-banning users
+## Controlling whether a user is shadow-banned
 
 Shadow-banning is a useful tool for moderating malicious or egregiously abusive users.
 A shadow-banned users receives successful responses to their client-server API requests,
@@ -942,16 +961,22 @@ or broken behaviour for the client. A shadow-banned user will not receive any
 notification and it is generally more appropriate to ban or kick abusive users.
 A shadow-banned user will be unable to contact anyone on the server.
 
-The API is:
+To shadow-ban a user the API is:
 
 ```
 POST /_synapse/admin/v1/users/<user_id>/shadow_ban
 ```
 
+To un-shadow-ban a user the API is:
+
+```
+DELETE /_synapse/admin/v1/users/<user_id>/shadow_ban
+```
+
 To use it, you will need to authenticate by providing an `access_token` for a
 server admin: [Admin API](../usage/administration/admin_api)
 
-An empty JSON dict is returned.
+An empty JSON dict is returned in both cases.
 
 **Parameters**
 
@@ -1088,7 +1113,7 @@ This endpoint will work even if registration is disabled on the server, unlike
 The API is:
 
 ```
-POST /_synapse/admin/v1/username_availabile?username=$localpart
+GET /_synapse/admin/v1/username_available?username=$localpart
 ```
 
 The request and response format is the same as the [/_matrix/client/r0/register/available](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available) API.

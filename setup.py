@@ -17,6 +17,7 @@
 # limitations under the License.
 import glob
 import os
+from typing import Any, Dict
 
 from setuptools import Command, find_packages, setup
 
@@ -49,8 +50,6 @@ here = os.path.abspath(os.path.dirname(__file__))
 # [1]: http://tox.readthedocs.io/en/2.5.0/example/basic.html#integration-with-setup-py-test-command
 # [2]: https://pypi.python.org/pypi/setuptools_trial
 class TestCommand(Command):
-    user_options = []
-
     def initialize_options(self):
         pass
 
@@ -75,7 +74,7 @@ def read_file(path_segments):
 
 def exec_file(path_segments):
     """Execute a single python file to get the variables defined in it"""
-    result = {}
+    result: Dict[str, Any] = {}
     code = read_file(path_segments)
     exec(code, result)
     return result
@@ -103,16 +102,17 @@ CONDITIONAL_REQUIREMENTS["lint"] = [
     "flake8",
 ]
 
-CONDITIONAL_REQUIREMENTS["dev"] = CONDITIONAL_REQUIREMENTS["lint"] + [
-    # The following are used by the release script
-    "click==7.1.2",
-    "redbaron==0.9.2",
-    "GitPython==3.1.14",
-    "commonmark==0.9.1",
-    "pygithub==1.55",
+CONDITIONAL_REQUIREMENTS["mypy"] = [
+    "mypy==0.910",
+    "mypy-zope==0.3.2",
+    "types-bleach>=4.1.0",
+    "types-jsonschema>=3.2.0",
+    "types-Pillow>=8.3.4",
+    "types-pyOpenSSL>=20.0.7",
+    "types-PyYAML>=5.4.10",
+    "types-requests>=2.26.0",
+    "types-setuptools>=57.4.0",
 ]
-
-CONDITIONAL_REQUIREMENTS["mypy"] = ["mypy==0.812", "mypy-zope==0.2.13"]
 
 # Dependencies which are exclusively required by unit test code. This is
 # NOT a list of all modules that are necessary to run the unit tests.
@@ -120,6 +120,23 @@ CONDITIONAL_REQUIREMENTS["mypy"] = ["mypy==0.812", "mypy-zope==0.2.13"]
 #
 # parameterized_class decorator was introduced in parameterized 0.7.0
 CONDITIONAL_REQUIREMENTS["test"] = ["parameterized>=0.7.0"]
+
+CONDITIONAL_REQUIREMENTS["dev"] = (
+    CONDITIONAL_REQUIREMENTS["lint"]
+    + CONDITIONAL_REQUIREMENTS["mypy"]
+    + CONDITIONAL_REQUIREMENTS["test"]
+    + [
+        # The following are used by the release script
+        "click==7.1.2",
+        "redbaron==0.9.2",
+        "GitPython==3.1.14",
+        "commonmark==0.9.1",
+        "pygithub==1.55",
+        # The following are executed as commands by the release script.
+        "twine",
+        "towncrier",
+    ]
+)
 
 setup(
     name="matrix-synapse",

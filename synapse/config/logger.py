@@ -18,6 +18,7 @@ import os
 import sys
 import threading
 from string import Template
+from typing import TYPE_CHECKING, Any, Dict
 
 import yaml
 from zope.interface import implementer
@@ -37,6 +38,9 @@ from synapse.logging.filter import MetadataFilter
 from synapse.util.versionstring import get_version_string
 
 from ._base import Config, ConfigError
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 DEFAULT_LOG_CONFIG = Template(
     """\
@@ -181,7 +185,7 @@ class LoggingConfig(Config):
             help=argparse.SUPPRESS,
         )
 
-    def generate_files(self, config, config_dir_path):
+    def generate_files(self, config: Dict[str, Any], config_dir_path: str) -> None:
         log_config = config.get("log_config")
         if log_config and not os.path.exists(log_config):
             log_file = self.abspath("homeserver.log")
@@ -223,7 +227,7 @@ def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> 
     # writes.
 
     log_context_filter = LoggingContextFilter()
-    log_metadata_filter = MetadataFilter({"server_name": config.server_name})
+    log_metadata_filter = MetadataFilter({"server_name": config.server.server_name})
     old_factory = logging.getLogRecordFactory()
 
     def factory(*args, **kwargs):
@@ -306,7 +310,10 @@ def _reload_logging_config(log_config_path):
 
 
 def setup_logging(
-    hs, config, use_worker_options=False, logBeginner: LogBeginner = globalLogBeginner
+    hs: "HomeServer",
+    config,
+    use_worker_options=False,
+    logBeginner: LogBeginner = globalLogBeginner,
 ) -> None:
     """
     Set up the logging subsystem.
@@ -322,7 +329,9 @@ def setup_logging(
 
     """
     log_config_path = (
-        config.worker_log_config if use_worker_options else config.log_config
+        config.worker.worker_log_config
+        if use_worker_options
+        else config.logging.log_config
     )
 
     # Perform one-time logging configuration.
@@ -335,5 +344,5 @@ def setup_logging(
     # Log immediately so we can grep backwards.
     logging.warning("***** STARTING SERVER *****")
     logging.warning("Server %s version %s", sys.argv[0], get_version_string(synapse))
-    logging.info("Server hostname: %s", config.server_name)
+    logging.info("Server hostname: %s", config.server.server_name)
     logging.info("Instance name: %s", hs.get_instance_name())

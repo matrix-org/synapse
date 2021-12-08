@@ -13,12 +13,18 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import AuthError, NotFoundError, SynapseError
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.types import UserID
+from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict, UserID
 
 from ._base import client_patterns
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -33,16 +39,18 @@ class AccountDataServlet(RestServlet):
         "/user/(?P<user_id>[^/]*)/account_data/(?P<account_data_type>[^/]*)"
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.handler = hs.get_account_data_handler()
         self.notifier = hs.get_notifier()
-        self._is_worker = hs.config.worker_app is not None
+        self._is_worker = hs.config.worker.worker_app is not None
         self._profile_handler = hs.get_profile_handler()
 
-    async def on_PUT(self, request, user_id, account_data_type):
+    async def on_PUT(
+        self, request: SynapseRequest, user_id: str, account_data_type: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
@@ -61,7 +69,9 @@ class AccountDataServlet(RestServlet):
 
         return 200, {}
 
-    async def on_GET(self, request, user_id, account_data_type):
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str, account_data_type: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot get account data for other users.")
@@ -88,13 +98,19 @@ class RoomAccountDataServlet(RestServlet):
         "/account_data/(?P<account_data_type>[^/]*)"
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.handler = hs.get_account_data_handler()
 
-    async def on_PUT(self, request, user_id, room_id, account_data_type):
+    async def on_PUT(
+        self,
+        request: SynapseRequest,
+        user_id: str,
+        room_id: str,
+        account_data_type: str,
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
@@ -114,7 +130,13 @@ class RoomAccountDataServlet(RestServlet):
 
         return 200, {}
 
-    async def on_GET(self, request, user_id, room_id, account_data_type):
+    async def on_GET(
+        self,
+        request: SynapseRequest,
+        user_id: str,
+        room_id: str,
+        account_data_type: str,
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot get account data for other users.")
@@ -129,6 +151,6 @@ class RoomAccountDataServlet(RestServlet):
         return 200, event
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     AccountDataServlet(hs).register(http_server)
     RoomAccountDataServlet(hs).register(http_server)

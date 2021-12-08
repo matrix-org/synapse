@@ -15,14 +15,18 @@
 import logging
 import os
 import subprocess
+from types import ModuleType
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
+version_cache: Dict[ModuleType, str] = {}
 
-def get_version_string(module):
+
+def get_version_string(module: ModuleType) -> str:
     """Given a module calculate a git-aware version string for it.
 
-    If called on a module not in a git checkout will return `__verison__`.
+    If called on a module not in a git checkout will return `__version__`.
 
     Args:
         module (module)
@@ -31,11 +35,13 @@ def get_version_string(module):
         str
     """
 
-    cached_version = getattr(module, "_synapse_version_string_cache", None)
-    if cached_version:
+    cached_version = version_cache.get(module)
+    if cached_version is not None:
         return cached_version
 
-    version_string = module.__version__
+    # We want this to fail loudly with an AttributeError. Type-ignore this so
+    # mypy only considers the happy path.
+    version_string = module.__version__  # type: ignore[attr-defined]
 
     try:
         null = open(os.devnull, "w")
@@ -97,10 +103,15 @@ def get_version_string(module):
                 s for s in (git_branch, git_tag, git_commit, git_dirty) if s
             )
 
-            version_string = "%s (%s)" % (module.__version__, git_version)
+            version_string = "%s (%s)" % (
+                # If the __version__ attribute doesn't exist, we'll have failed
+                # loudly above.
+                module.__version__,  # type: ignore[attr-defined]
+                git_version,
+            )
     except Exception as e:
         logger.info("Failed to check for git repository: %s", e)
 
-    module._synapse_version_string_cache = version_string
+    version_cache[module] = version_string
 
     return version_string

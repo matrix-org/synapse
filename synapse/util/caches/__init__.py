@@ -12,10 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import collections
 import logging
+import typing
+from enum import Enum, auto
 from sys import intern
-from typing import Callable, Dict, Optional, Sized
+from typing import Any, Callable, Dict, List, Optional, Sized
 
 import attr
 from prometheus_client.core import Gauge
@@ -34,7 +36,7 @@ collectors_by_name: Dict[str, "CacheMetric"] = {}
 
 cache_size = Gauge("synapse_util_caches_cache:size", "", ["name"])
 cache_hits = Gauge("synapse_util_caches_cache:hits", "", ["name"])
-cache_evicted = Gauge("synapse_util_caches_cache:evicted_size", "", ["name"])
+cache_evicted = Gauge("synapse_util_caches_cache:evicted_size", "", ["name", "reason"])
 cache_total = Gauge("synapse_util_caches_cache:total", "", ["name"])
 cache_max_size = Gauge("synapse_util_caches_cache_max_size", "", ["name"])
 cache_memory_usage = Gauge(
@@ -46,65 +48,80 @@ cache_memory_usage = Gauge(
 response_cache_size = Gauge("synapse_util_caches_response_cache:size", "", ["name"])
 response_cache_hits = Gauge("synapse_util_caches_response_cache:hits", "", ["name"])
 response_cache_evicted = Gauge(
-    "synapse_util_caches_response_cache:evicted_size", "", ["name"]
+    "synapse_util_caches_response_cache:evicted_size", "", ["name", "reason"]
 )
 response_cache_total = Gauge("synapse_util_caches_response_cache:total", "", ["name"])
 
 
-@attr.s(slots=True)
+class EvictionReason(Enum):
+    size = auto()
+    time = auto()
+
+
+@attr.s(slots=True, auto_attribs=True)
 class CacheMetric:
 
-    _cache = attr.ib()
-    _cache_type = attr.ib(type=str)
-    _cache_name = attr.ib(type=str)
-    _collect_callback = attr.ib(type=Optional[Callable])
+    _cache: Sized
+    _cache_type: str
+    _cache_name: str
+    _collect_callback: Optional[Callable]
 
-    hits = attr.ib(default=0)
-    misses = attr.ib(default=0)
-    evicted_size = attr.ib(default=0)
-    memory_usage = attr.ib(default=None)
+    hits: int = 0
+    misses: int = 0
+    eviction_size_by_reason: typing.Counter[EvictionReason] = attr.ib(
+        factory=collections.Counter
+    )
+    memory_usage: Optional[int] = None
 
-    def inc_hits(self):
+    def inc_hits(self) -> None:
         self.hits += 1
 
-    def inc_misses(self):
+    def inc_misses(self) -> None:
         self.misses += 1
 
-    def inc_evictions(self, size=1):
-        self.evicted_size += size
+    def inc_evictions(self, reason: EvictionReason, size: int = 1) -> None:
+        self.eviction_size_by_reason[reason] += size
 
-    def inc_memory_usage(self, memory: int):
+    def inc_memory_usage(self, memory: int) -> None:
         if self.memory_usage is None:
             self.memory_usage = 0
 
         self.memory_usage += memory
 
-    def dec_memory_usage(self, memory: int):
+    def dec_memory_usage(self, memory: int) -> None:
+        assert self.memory_usage is not None
         self.memory_usage -= memory
 
-    def clear_memory_usage(self):
+    def clear_memory_usage(self) -> None:
         if self.memory_usage is not None:
             self.memory_usage = 0
 
-    def describe(self):
+    def describe(self) -> List[str]:
         return []
 
-    def collect(self):
+    def collect(self) -> None:
         try:
             if self._cache_type == "response_cache":
                 response_cache_size.labels(self._cache_name).set(len(self._cache))
                 response_cache_hits.labels(self._cache_name).set(self.hits)
-                response_cache_evicted.labels(self._cache_name).set(self.evicted_size)
+                for reason in EvictionReason:
+                    response_cache_evicted.labels(self._cache_name, reason.name).set(
+                        self.eviction_size_by_reason[reason]
+                    )
                 response_cache_total.labels(self._cache_name).set(
                     self.hits + self.misses
                 )
             else:
                 cache_size.labels(self._cache_name).set(len(self._cache))
                 cache_hits.labels(self._cache_name).set(self.hits)
-                cache_evicted.labels(self._cache_name).set(self.evicted_size)
+                for reason in EvictionReason:
+                    cache_evicted.labels(self._cache_name, reason.name).set(
+                        self.eviction_size_by_reason[reason]
+                    )
                 cache_total.labels(self._cache_name).set(self.hits + self.misses)
-                if getattr(self._cache, "max_size", None):
-                    cache_max_size.labels(self._cache_name).set(self._cache.max_size)
+                max_size = getattr(self._cache, "max_size", None)
+                if max_size:
+                    cache_max_size.labels(self._cache_name).set(max_size)
 
                 if TRACK_MEMORY_USAGE:
                     # self.memory_usage can be None if nothing has been inserted
@@ -178,7 +195,7 @@ KNOWN_KEYS = {
 }
 
 
-def intern_string(string):
+def intern_string(string: Optional[str]) -> Optional[str]:
     """Takes a (potentially) unicode string and interns it if it's ascii"""
     if string is None:
         return None
@@ -189,7 +206,7 @@ def intern_string(string):
         return string
 
 
-def intern_dict(dictionary):
+def intern_dict(dictionary: Dict[str, Any]) -> Dict[str, Any]:
     """Takes a dictionary and interns well known keys and their values"""
     return {
         KNOWN_KEYS.get(key, key): _intern_known_values(key, value)
@@ -197,7 +214,7 @@ def intern_dict(dictionary):
     }
 
 
-def _intern_known_values(key, value):
+def _intern_known_values(key: str, value: Any) -> Any:
     intern_keys = ("event_id", "room_id", "sender", "user_id", "type", "state_key")
 
     if key in intern_keys:

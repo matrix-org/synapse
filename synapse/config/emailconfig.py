@@ -16,13 +16,15 @@
 
 # This file can't be called email.py because if it is, we cannot:
 import email.utils
+import logging
 import os
 from enum import Enum
-from typing import Optional
 
 import attr
 
 from ._base import Config, ConfigError
+
+logger = logging.getLogger(__name__)
 
 MISSING_PASSWORD_RESET_CONFIG_ERROR = """\
 Password reset emails are enabled on this homeserver due to a partial
@@ -43,6 +45,14 @@ DEFAULT_SUBJECTS = {
     "password_reset": "[%(server_name)s] Password reset",
     "email_validation": "[%(server_name)s] Validate your email",
 }
+
+LEGACY_TEMPLATE_DIR_WARNING = """
+This server's configuration file is using the deprecated 'template_dir' setting in the
+'email' section. Support for this setting has been deprecated and will be removed in a
+future version of Synapse. Server admins should instead use the new
+'custom_templates_directory' setting documented here:
+https://matrix-org.github.io/synapse/latest/templates.html
+---------------------------------------------------------------------------------------"""
 
 
 @attr.s(slots=True, frozen=True)
@@ -105,6 +115,9 @@ class EmailConfig(Config):
 
         # A user-configurable template directory
         template_dir = email_config.get("template_dir")
+        if template_dir is not None:
+            logger.warning(LEGACY_TEMPLATE_DIR_WARNING)
+
         if isinstance(template_dir, str):
             # We need an absolute path, because we change directory after starting (and
             # we don't yet know what auxiliary templates like mail.css we will need).
@@ -121,36 +134,17 @@ class EmailConfig(Config):
             # msisdn is currently always remote while Synapse does not support any method of
             # sending SMS messages
             ThreepidBehaviour.REMOTE
-            if self.account_threepid_delegate_email
+            if self.root.registration.account_threepid_delegate_email
             else ThreepidBehaviour.LOCAL
         )
-        # Prior to Synapse v1.4.0, there was another option that defined whether Synapse would
-        # use an identity server to password reset tokens on its behalf. We now warn the user
-        # if they have this set and tell them to use the updated option, while using a default
-        # identity server in the process.
-        self.using_identity_server_from_trusted_list = False
-        if (
-            not self.account_threepid_delegate_email
-            and config.get("trust_identity_server_for_password_resets", False) is True
-        ):
-            # Use the first entry in self.trusted_third_party_id_servers instead
-            if self.trusted_third_party_id_servers:
-                # XXX: It's a little confusing that account_threepid_delegate_email is modified
-                # both in RegistrationConfig and here. We should factor this bit out
 
-                first_trusted_identity_server = self.trusted_third_party_id_servers[0]
-
-                # trusted_third_party_id_servers does not contain a scheme whereas
-                # account_threepid_delegate_email is expected to. Presume https
-                self.account_threepid_delegate_email: Optional[str] = (
-                    "https://" + first_trusted_identity_server
-                )
-                self.using_identity_server_from_trusted_list = True
-            else:
-                raise ConfigError(
-                    "Attempted to use an identity server from"
-                    '"trusted_third_party_id_servers" but it is empty.'
-                )
+        if config.get("trust_identity_server_for_password_resets"):
+            raise ConfigError(
+                'The config option "trust_identity_server_for_password_resets" '
+                'has been replaced by "account_threepid_delegate". '
+                "Please consult the sample config at docs/sample_config.yaml for "
+                "details and update your config file."
+            )
 
         self.local_threepid_handling_disabled_due_to_email_config = False
         if (
@@ -172,11 +166,6 @@ class EmailConfig(Config):
             missing = []
             if not self.email_notif_from:
                 missing.append("email.notif_from")
-
-            # public_baseurl is required to build password reset and validation links that
-            # will be emailed to users
-            if config.get("public_baseurl") is None:
-                missing.append("public_baseurl")
 
             if missing:
                 raise ConfigError(
@@ -283,9 +272,6 @@ class EmailConfig(Config):
             if not self.email_notif_from:
                 missing.append("email.notif_from")
 
-            if config.get("public_baseurl") is None:
-                missing.append("public_baseurl")
-
             if missing:
                 raise ConfigError(
                     "email.enable_notifs is True but required keys are missing: %s"
@@ -321,7 +307,7 @@ class EmailConfig(Config):
                 "client_base_url", email_config.get("riot_base_url", None)
             )
 
-        if self.account_validity_renew_by_email_enabled:
+        if self.root.account_validity.account_validity_renew_by_email_enabled:
             expiry_template_html = email_config.get(
                 "expiry_template_html", "notice_expiry.html"
             )

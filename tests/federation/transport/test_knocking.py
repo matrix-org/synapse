@@ -208,7 +208,7 @@ class FederationKnockingTestCase(
         async def _check_event_auth(origin, event, context, *args, **kwargs):
             return context
 
-        homeserver.get_federation_handler()._check_event_auth = _check_event_auth
+        homeserver.get_federation_event_handler()._check_event_auth = _check_event_auth
 
         return super().prepare(reactor, clock, homeserver)
 

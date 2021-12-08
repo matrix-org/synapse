@@ -109,12 +109,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         # Do the initial population of the stats via the background update
         self._add_background_updates()
 
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
     def test_initial_room(self):
         """
@@ -124,7 +119,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertEqual(len(r), 0)
 
         # Disable stats
-        self.hs.config.stats_enabled = False
+        self.hs.config.stats.stats_enabled = False
         self.handler.stats_enabled = False
 
         u1 = self.register_user("u1", "pass")
@@ -140,18 +135,13 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertEqual(len(r), 0)
 
         # Enable stats
-        self.hs.config.stats_enabled = True
+        self.hs.config.stats.stats_enabled = True
         self.handler.stats_enabled = True
 
         # Do the initial population of the user directory via the background update
         self._add_background_updates()
 
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         r = self.get_success(self.get_all_room_state())
 
@@ -475,7 +465,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         behaviour eventually to still keep current rows.
         """
 
-        self.hs.config.stats_enabled = False
+        self.hs.config.stats.stats_enabled = False
         self.handler.stats_enabled = False
 
         u1 = self.register_user("u1", "pass")
@@ -487,7 +477,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertIsNone(self._get_current_stats("room", r1))
         self.assertIsNone(self._get_current_stats("user", u1))
 
-        self.hs.config.stats_enabled = True
+        self.hs.config.stats.stats_enabled = True
         self.handler.stats_enabled = True
 
         self._perform_background_initial_update()
@@ -574,12 +564,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
 
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
+        self.wait_for_background_updates()
 
         r1stats_complete = self._get_current_stats("room", r1)
         u1stats_complete = self._get_current_stats("user", u1)

@@ -11,17 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 import attr
 from frozendict import frozendict
 
+from twisted.internet.defer import Deferred
+
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
 from synapse.logging.context import make_deferred_yieldable, run_in_background
-from synapse.types import StateMap
+from synapse.types import JsonDict, StateMap
 
 if TYPE_CHECKING:
+    from synapse.storage import Storage
     from synapse.storage.databases.main import DataStore
 
 
@@ -80,9 +83,7 @@ class EventContext:
 
             (type, state_key) -> event_id
 
-            FIXME: what is this for an outlier? it seems ill-defined. It seems like
-            it could be either {}, or the state we were given by the remote
-            server, depending on $THINGS
+            For an outlier, this is {}
 
             Note that this is a private attribute: it should be accessed via
             ``get_current_state_ids``. _AsyncEventContext impl calculates this
@@ -96,7 +97,7 @@ class EventContext:
 
             (type, state_key) -> event_id
 
-            FIXME: again, what is this for an outlier?
+            For an outlier, this is {}
 
             As with _current_state_ids, this is a private attribute. It should be
             accessed via get_prev_state_ids.
@@ -114,13 +115,13 @@ class EventContext:
 
     @staticmethod
     def with_state(
-        state_group,
-        state_group_before_event,
-        current_state_ids,
-        prev_state_ids,
-        prev_group=None,
-        delta_ids=None,
-    ):
+        state_group: Optional[int],
+        state_group_before_event: Optional[int],
+        current_state_ids: Optional[StateMap[str]],
+        prev_state_ids: Optional[StateMap[str]],
+        prev_group: Optional[int] = None,
+        delta_ids: Optional[StateMap[str]] = None,
+    ) -> "EventContext":
         return EventContext(
             current_state_ids=current_state_ids,
             prev_state_ids=prev_state_ids,
@@ -130,15 +131,23 @@ class EventContext:
             delta_ids=delta_ids,
         )
 
-    async def serialize(self, event: EventBase, store: "DataStore") -> dict:
+    @staticmethod
+    def for_outlier() -> "EventContext":
+        """Return an EventContext instance suitable for persisting an outlier event"""
+        return EventContext(
+            current_state_ids={},
+            prev_state_ids={},
+        )
+
+    async def serialize(self, event: EventBase, store: "DataStore") -> JsonDict:
         """Converts self to a type that can be serialized as JSON, and then
         deserialized by `deserialize`
 
         Args:
-            event (FrozenEvent): The event that this context relates to
+            event: The event that this context relates to
 
         Returns:
-            dict
+            The serialized event.
         """
 
         # We don't serialize the full state dicts, instead they get pulled out
@@ -164,17 +173,16 @@ class EventContext:
         }
 
     @staticmethod
-    def deserialize(storage, input):
+    def deserialize(storage: "Storage", input: JsonDict) -> "EventContext":
         """Converts a dict that was produced by `serialize` back into a
         EventContext.
 
         Args:
-            storage (Storage): Used to convert AS ID to AS object and fetch
-                state.
-            input (dict): A dict produced by `serialize`
+            storage: Used to convert AS ID to AS object and fetch state.
+            input: A dict produced by `serialize`
 
         Returns:
-            EventContext
+            The event context.
         """
         context = _AsyncEventContextImpl(
             # We use the state_group and prev_state_id stuff to pull the
@@ -235,22 +243,25 @@ class EventContext:
         await self._ensure_fetched()
         return self._current_state_ids
 
-    async def get_prev_state_ids(self):
+    async def get_prev_state_ids(self) -> StateMap[str]:
         """
         Gets the room state map, excluding this event.
 
         For a non-state event, this will be the same as get_current_state_ids().
 
         Returns:
-            dict[(str, str), str]|None: Returns None if state_group
-                is None, which happens when the associated event is an outlier.
-                Maps a (type, state_key) to the event ID of the state event matching
-                this tuple.
+            Returns {} if state_group is None, which happens when the associated
+            event is an outlier.
+
+            Maps a (type, state_key) to the event ID of the state event matching
+            this tuple.
         """
         await self._ensure_fetched()
+        # There *should* be previous state IDs now.
+        assert self._prev_state_ids is not None
         return self._prev_state_ids
 
-    def get_cached_current_state_ids(self):
+    def get_cached_current_state_ids(self) -> Optional[StateMap[str]]:
         """Gets the current state IDs if we have them already cached.
 
         It is an error to access this for a rejected event, since rejected state should
@@ -258,16 +269,17 @@ class EventContext:
         ``rejected`` is set.
 
         Returns:
-            dict[(str, str), str]|None: Returns None if we haven't cached the
-            state or if state_group is None, which happens when the associated
-            event is an outlier.
+            Returns None if we haven't cached the state or if state_group is None
+            (which happens when the associated event is an outlier).
+
+            Otherwise, returns the the current state IDs.
         """
         if self.rejected:
             raise RuntimeError("Attempt to access state_ids of rejected event")
 
         return self._current_state_ids
 
-    async def _ensure_fetched(self):
+    async def _ensure_fetched(self) -> None:
         return None
 
 
@@ -279,46 +291,46 @@ class _AsyncEventContextImpl(EventContext):
 
     Attributes:
 
-        _storage (Storage)
+        _storage
 
-        _fetching_state_deferred (Deferred|None): Resolves when *_state_ids have
-            been calculated. None if we haven't started calculating yet
+        _fetching_state_deferred: Resolves when *_state_ids have been calculated.
+            None if we haven't started calculating yet
 
-        _event_type (str): The type of the event the context is associated with.
+        _event_type: The type of the event the context is associated with.
 
-        _event_state_key (str): The state_key of the event the context is
-            associated with.
+        _event_state_key: The state_key of the event the context is associated with.
 
-        _prev_state_id (str|None): If the event associated with the context is
-            a state event, then `_prev_state_id` is the event_id of the state
-            that was replaced.
+        _prev_state_id: If the event associated with the context is a state event,
+            then `_prev_state_id` is the event_id of the state that was replaced.
     """
 
     # This needs to have a default as we're inheriting
-    _storage = attr.ib(default=None)
-    _prev_state_id = attr.ib(default=None)
-    _event_type = attr.ib(default=None)
-    _event_state_key = attr.ib(default=None)
-    _fetching_state_deferred = attr.ib(default=None)
+    _storage: "Storage" = attr.ib(default=None)
+    _prev_state_id: Optional[str] = attr.ib(default=None)
+    _event_type: str = attr.ib(default=None)
+    _event_state_key: Optional[str] = attr.ib(default=None)
+    _fetching_state_deferred: Optional["Deferred[None]"] = attr.ib(default=None)
 
-    async def _ensure_fetched(self):
+    async def _ensure_fetched(self) -> None:
         if not self._fetching_state_deferred:
             self._fetching_state_deferred = run_in_background(self._fill_out_state)
 
-        return await make_deferred_yieldable(self._fetching_state_deferred)
+        await make_deferred_yieldable(self._fetching_state_deferred)
 
-    async def _fill_out_state(self):
+    async def _fill_out_state(self) -> None:
         """Called to populate the _current_state_ids and _prev_state_ids
         attributes by loading from the database.
         """
         if self.state_group is None:
             return
 
-        self._current_state_ids = await self._storage.state.get_state_ids_for_group(
+        current_state_ids = await self._storage.state.get_state_ids_for_group(
             self.state_group
         )
+        # Set this separately so mypy knows current_state_ids is not None.
+        self._current_state_ids = current_state_ids
         if self._event_state_key is not None:
-            self._prev_state_ids = dict(self._current_state_ids)
+            self._prev_state_ids = dict(current_state_ids)
 
             key = (self._event_type, self._event_state_key)
             if self._prev_state_id:
@@ -326,10 +338,12 @@ class _AsyncEventContextImpl(EventContext):
             else:
                 self._prev_state_ids.pop(key, None)
         else:
-            self._prev_state_ids = self._current_state_ids
+            self._prev_state_ids = current_state_ids
 
 
-def _encode_state_dict(state_dict):
+def _encode_state_dict(
+    state_dict: Optional[StateMap[str]],
+) -> Optional[List[Tuple[str, str, str]]]:
     """Since dicts of (type, state_key) -> event_id cannot be serialized in
     JSON we need to convert them to a form that can.
     """
@@ -339,7 +353,9 @@ def _encode_state_dict(state_dict):
     return [(etype, state_key, v) for (etype, state_key), v in state_dict.items()]
 
 
-def _decode_state_dict(input):
+def _decode_state_dict(
+    input: Optional[List[Tuple[str, str, str]]]
+) -> Optional[StateMap[str]]:
     """Decodes a state dict encoded using `_encode_state_dict` above"""
     if input is None:
         return None

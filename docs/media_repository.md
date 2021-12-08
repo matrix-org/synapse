@@ -27,4 +27,4 @@ Remote content is cached under `"remote_content"` directory. Each item of
 remote content is assigned a local `"filesystem_id"` to ensure that the
 directory structure `"remote_content/server_name/aa/bb/ccccccccdddddddddddd"`
 is appropriate. Thumbnails for remote content are stored under
-`"remote_thumbnails/server_name/..."`
+`"remote_thumbnail/server_name/..."`

@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.config.homeserver import HomeServerConfig
 from synapse.storage.database import DatabasePool
@@ -61,8 +61,10 @@ from .registration import RegistrationStore
 from .rejections import RejectionsStore
 from .relations import RelationsStore
 from .room import RoomStore
+from .room_batch import RoomBatchStore
 from .roommember import RoomMemberStore
 from .search import SearchStore
+from .session import SessionStore
 from .signatures import SignatureStore
 from .state import StateStore
 from .stats import StatsStore
@@ -73,6 +75,9 @@ from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
 from .user_erasure_store import UserErasureStore
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
@@ -80,6 +85,7 @@ class DataStore(
     EventsBackgroundUpdatesStore,
     RoomMemberStore,
     RoomStore,
+    RoomBatchStore,
     RegistrationStore,
     StreamStore,
     ProfileStore,
@@ -117,12 +123,13 @@ class DataStore(
     RelationsStore,
     CensorEventsStore,
     UIAuthStore,
+    EventForwardExtremitiesStore,
     CacheInvalidationWorkerStore,
     ServerMetricsStore,
-    EventForwardExtremitiesStore,
     LockStore,
+    SessionStore,
 ):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         self.hs = hs
         self._clock = hs.get_clock()
         self.database_engine = database.engine
@@ -147,6 +154,7 @@ class DataStore(
             db_conn, "local_group_updates", "stream_id"
         )
 
+        self._cache_id_gen: Optional[MultiWriterIdGenerator]
         if isinstance(self.database_engine, PostgresEngine):
             # We set the `writers` to an empty list here as we don't care about
             # missing updates over restarts, as we'll not have anything in our
@@ -269,7 +277,7 @@ class DataStore(
 
         def get_users_paginate_txn(txn):
             filters = []
-            args = [self.hs.config.server_name]
+            args = [self.hs.config.server.server_name]
 
             # Set ordering
             order_by_column = UserSortOrder(order_by).value
@@ -354,13 +362,13 @@ def check_database_before_upgrade(cur, database_engine, config: HomeServerConfig
         return
 
     user_domain = get_domain_from_id(rows[0][0])
-    if user_domain == config.server_name:
+    if user_domain == config.server.server_name:
         return
 
     raise Exception(
         "Found users in database not native to %s!\n"
         "You cannot change a synapse server_name after it's been configured"
-        % (config.server_name,)
+        % (config.server.server_name,)
     )
 
 

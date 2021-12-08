@@ -13,19 +13,24 @@
 # limitations under the License.
 
 import logging
-from typing import Dict
+from typing import TYPE_CHECKING, Dict, Tuple
 
 from signedjson.sign import sign_json
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
 )
-from synapse.types import UserID
+from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict, UserID
 
 from ._base import client_patterns
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -33,18 +38,14 @@ logger = logging.getLogger(__name__)
 class UserDirectorySearchRestServlet(RestServlet):
     PATTERNS = client_patterns("/user_directory/search$")
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.user_directory_handler = hs.get_user_directory_handler()
         self.http_client = hs.get_simple_http_client()
 
-    async def on_POST(self, request):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         """Searches for users in directory
 
         Returns:
@@ -64,17 +65,17 @@ class UserDirectorySearchRestServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
 
-        if not self.hs.config.user_directory_search_enabled:
+        if not self.hs.config.userdirectory.user_directory_search_enabled:
             return 200, {"limited": False, "results": []}
 
         body = parse_json_object_from_request(request)
 
-        if self.hs.config.user_directory_defer_to_id_server:
+        if self.hs.config.userdirectory.user_directory_defer_to_id_server:
             signed_body = sign_json(
-                body, self.hs.hostname, self.hs.config.signing_key[0]
+                body, self.hs.hostname, self.hs.config.key.signing_key[0]
             )
             url = "%s/_matrix/identity/api/v1/user_directory/search" % (
-                self.hs.config.user_directory_defer_to_id_server,
+                self.hs.config.userdirectory.user_directory_defer_to_id_server,
             )
             resp = await self.http_client.post_json_get_json(url, signed_body)
             return 200, resp
@@ -103,7 +104,7 @@ class SingleUserInfoServlet(RestServlet):
 
     PATTERNS = client_patterns("/user/(?P<user_id>[^/]*)/info$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer") -> None:
         super(SingleUserInfoServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
@@ -114,7 +115,9 @@ class SingleUserInfoServlet(RestServlet):
         if not registry.query_handlers.get("user_info"):
             registry.register_query_handler("user_info", self._on_federation_query)
 
-    async def on_GET(self, request, user_id):
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         # Ensure the user is authenticated
         await self.auth.get_user_by_req(request)
 
@@ -130,14 +133,14 @@ class SingleUserInfoServlet(RestServlet):
         user_id_to_info = await self.store.get_info_for_users([user_id])
         return 200, user_id_to_info[user_id]
 
-    async def _on_federation_query(self, args):
+    async def _on_federation_query(self, args: JsonDict) -> JsonDict:
         """Called when a request for user information appears over federation
 
         Args:
-            args (dict): Dictionary of query arguments provided by the request
+            args: Dictionary of query arguments provided by the request
 
         Returns:
-            Deferred[dict]: Deactivation and expiration information for a given user
+            Deactivation and expiration information for a given user
         """
         user_id = args.get("user_id")
         if not user_id:
@@ -161,14 +164,14 @@ class UserInfoServlet(RestServlet):
 
     PATTERNS = client_patterns("/users/info$", unstable=True, releases=())
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer") -> None:
         super(UserInfoServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.transport_layer = hs.get_federation_transport_client()
 
-    async def on_POST(self, request):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         # Ensure the user is authenticated
         await self.auth.get_user_by_req(request)
 
@@ -211,7 +214,7 @@ class UserInfoServlet(RestServlet):
         return 200, user_id_to_info_dict
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     UserDirectorySearchRestServlet(hs).register(http_server)
     SingleUserInfoServlet(hs).register(http_server)
     UserInfoServlet(hs).register(http_server)

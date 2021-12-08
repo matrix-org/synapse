@@ -21,7 +21,13 @@ from prometheus_client import Counter
 from typing_extensions import TypedDict
 
 from synapse import types
-from synapse.api.constants import MAX_USERID_LENGTH, EventTypes, JoinRules, LoginType
+from synapse.api.constants import (
+    MAX_USERID_LENGTH,
+    EventContentFields,
+    EventTypes,
+    JoinRules,
+    LoginType,
+)
 from synapse.api.errors import AuthError, Codes, ConsentNotGivenError, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.config.server import is_threepid_reserved
@@ -34,8 +40,6 @@ from synapse.replication.http.register import (
 from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, UserID, create_requester
-
-from ._base import BaseHandler
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -56,6 +60,22 @@ login_counter = Counter(
 )
 
 
+def init_counters_for_auth_provider(auth_provider_id: str) -> None:
+    """Ensure the prometheus counters for the given auth provider are initialised
+
+    This fixes a problem where the counters are not reported for a given auth provider
+    until the user first logs in/registers.
+    """
+    for is_guest in (True, False):
+        login_counter.labels(guest=is_guest, auth_provider=auth_provider_id)
+        for shadow_banned in (True, False):
+            registration_counter.labels(
+                guest=is_guest,
+                shadow_banned=shadow_banned,
+                auth_provider=auth_provider_id,
+            )
+
+
 class LoginDict(TypedDict):
     device_id: str
     access_token: str
@@ -63,9 +83,10 @@ class LoginDict(TypedDict):
     refresh_token: Optional[str]
 
 
-class RegistrationHandler(BaseHandler):
+class RegistrationHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastore()
+        self.clock = hs.get_clock()
         self.hs = hs
         self.auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
@@ -76,14 +97,17 @@ class RegistrationHandler(BaseHandler):
         self.ratelimiter = hs.get_registration_ratelimiter()
         self.macaroon_gen = hs.get_macaroon_generator()
         self._account_validity_handler = hs.get_account_validity_handler()
-        self._server_notices_mxid = hs.config.server_notices_mxid
+        self._user_consent_version = self.hs.config.consent.user_consent_version
+        self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self._server_name = hs.hostname
 
         self.spam_checker = hs.get_spam_checker()
 
-        self._show_in_user_directory = self.hs.config.show_users_in_user_directory
+        self._show_in_user_directory = (
+            self.hs.config.server.show_users_in_user_directory
+        )
 
-        if hs.config.worker_app:
+        if hs.config.worker.worker_app:
             self._register_client = ReplicationRegisterServlet.make_client(hs)
             self._register_device_client = RegisterDeviceReplicationServlet.make_client(
                 hs
@@ -96,25 +120,19 @@ class RegistrationHandler(BaseHandler):
             self._register_device_client = self.register_device_inner
             self.pusher_pool = hs.get_pusherpool()
 
-        self.session_lifetime = hs.config.session_lifetime
-        self.access_token_lifetime = hs.config.access_token_lifetime
+        self.session_lifetime = hs.config.registration.session_lifetime
+        self.refreshable_access_token_lifetime = (
+            hs.config.registration.refreshable_access_token_lifetime
+        )
+
+        init_counters_for_auth_provider("")
 
     async def check_username(
         self,
         localpart: str,
         guest_access_token: Optional[str] = None,
         assigned_user_id: Optional[str] = None,
-    ):
-        """
-
-        Args:
-            localpart (str|None): The user's localpart
-            guest_access_token (str|None): A guest's access token
-            assigned_user_id (str|None): An existing User ID for this user if pre-calculated
-
-        Returns:
-            Deferred
-        """
+    ) -> None:
         if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
                 400,
@@ -296,11 +314,10 @@ class RegistrationHandler(BaseHandler):
                     user, requester, default_display_name, by_admin=True
                 )
 
-            if self.hs.config.user_directory_search_all_users:
-                profile = await self.store.get_profileinfo(localpart)
-                await self.user_directory_handler.handle_local_profile_change(
-                    user_id, profile
-                )
+            profile = await self.store.get_profileinfo(localpart)
+            await self.user_directory_handler.handle_local_profile_change(
+                user_id, profile
+            )
 
         else:
             # autogen a sequential user ID
@@ -344,8 +361,13 @@ class RegistrationHandler(BaseHandler):
             auth_provider=(auth_provider_id or ""),
         ).inc()
 
-        if not self.hs.config.user_consent_at_registration:
-            if not self.hs.config.auto_join_rooms_for_guests and make_guest:
+        # If the user does not need to consent at registration, auto-join any
+        # configured rooms.
+        if not self.hs.config.consent.user_consent_at_registration:
+            if (
+                not self.hs.config.registration.auto_join_rooms_for_guests
+                and make_guest
+            ):
                 logger.info(
                     "Skipping auto-join for %s because auto-join for guests is disabled",
                     user_id,
@@ -399,7 +421,7 @@ class RegistrationHandler(BaseHandler):
             "preset": self.hs.config.registration.autocreate_auto_join_room_preset,
         }
 
-        # If the configuration providers a user ID to create rooms with, use
+        # If the configuration provides a user ID to create rooms with, use
         # that instead of the first user registered.
         requires_join = False
         if self.hs.config.registration.auto_join_user_id:
@@ -423,7 +445,7 @@ class RegistrationHandler(BaseHandler):
 
         # Choose whether to federate the new room.
         if not self.hs.config.registration.autocreate_auto_join_rooms_federated:
-            stub_config["creation_content"] = {"m.federate": False}
+            stub_config["creation_content"] = {EventContentFields.FEDERATE: False}
 
         for r in self.hs.config.registration.auto_join_rooms:
             logger.info("Auto-joining %s to %s", user_id, r)
@@ -522,7 +544,7 @@ class RegistrationHandler(BaseHandler):
                 # we don't have a local user in the room to craft up an invite with.
                 requires_invite = await self.store.is_host_joined(
                     room_id,
-                    self.server_name,
+                    self._server_name,
                 )
 
                 if requires_invite:
@@ -610,7 +632,7 @@ class RegistrationHandler(BaseHandler):
         """
         await self._auto_join_rooms(user_id)
 
-    async def appservice_register(self, user_localpart: str, as_token: str):
+    async def appservice_register(self, user_localpart: str, as_token: str) -> str:
         # FIXME: this should be factored out and merged with normal register()
         user = UserID(user_localpart, self.hs.hostname)
         user_id = user.to_string()
@@ -709,7 +731,7 @@ class RegistrationHandler(BaseHandler):
             address: the IP address used to perform the registration.
             shadow_banned: Whether to shadow-ban the user
         """
-        if self.hs.config.worker_app:
+        if self.hs.config.worker.worker_app:
             await self._register_client(
                 user_id=user_id,
                 password_hash=password_hash,
@@ -799,7 +821,7 @@ class RegistrationHandler(BaseHandler):
         Does the bits that need doing on the main process. Not for use outside this
         class and RegisterDeviceReplicationServlet.
         """
-        assert not self.hs.config.worker_app
+        assert not self.hs.config.worker.worker_app
         valid_until_ms = None
         if self.session_lifetime is not None:
             if is_guest:
@@ -822,13 +844,15 @@ class RegistrationHandler(BaseHandler):
                 (
                     refresh_token,
                     refresh_token_id,
-                ) = await self._auth_handler.get_refresh_token_for_user_id(
+                ) = await self._auth_handler.create_refresh_token_for_user_id(
                     user_id,
                     device_id=registered_device_id,
                 )
-                valid_until_ms = self.clock.time_msec() + self.access_token_lifetime
+                valid_until_ms = (
+                    self.clock.time_msec() + self.refreshable_access_token_lifetime
+                )
 
-            access_token = await self._auth_handler.get_access_token_for_user_id(
+            access_token = await self._auth_handler.create_access_token_for_user_id(
                 user_id,
                 device_id=registered_device_id,
                 valid_until_ms=valid_until_ms,
@@ -856,7 +880,7 @@ class RegistrationHandler(BaseHandler):
         """
         # TODO: 3pid registration can actually happen on the workers. Consider
         # refactoring it.
-        if self.hs.config.worker_app:
+        if self.hs.config.worker.worker_app:
             await self._post_registration_client(
                 user_id=user_id, auth_result=auth_result, access_token=access_token
             )
@@ -868,22 +892,24 @@ class RegistrationHandler(BaseHandler):
             # Necessary due to auth checks prior to the threepid being
             # written to the db
             if is_threepid_reserved(
-                self.hs.config.mau_limits_reserved_threepids, threepid
+                self.hs.config.server.mau_limits_reserved_threepids, threepid
             ):
                 await self.store.upsert_monthly_active_user(user_id)
 
             await self.register_email_threepid(user_id, threepid, access_token)
 
-            if self.hs.config.bind_new_user_emails_to_sydent:
+            if self.hs.config.registration.bind_new_user_emails_to_sydent:
                 # Attempt to call Sydent's internal bind API on the given identity server
                 # to bind this threepid
-                id_server_url = self.hs.config.bind_new_user_emails_to_sydent
+                id_server_url = (
+                    self.hs.config.registration.bind_new_user_emails_to_sydent
+                )
 
                 logger.debug(
                     "Attempting the bind email of %s to identity server: %s using "
                     "internal Sydent bind API.",
                     user_id,
-                    self.hs.config.bind_new_user_emails_to_sydent,
+                    self.hs.config.registration.bind_new_user_emails_to_sydent,
                 )
 
                 try:
@@ -904,7 +930,9 @@ class RegistrationHandler(BaseHandler):
             await self._register_msisdn_threepid(user_id, threepid)
 
         if auth_result and LoginType.TERMS in auth_result:
-            await self._on_user_consented(user_id, self.hs.config.user_consent_version)
+            # The terms type should only exist if consent is enabled.
+            assert self._user_consent_version is not None
+            await self._on_user_consented(user_id, self._user_consent_version)
 
     async def _on_user_consented(self, user_id: str, consent_version: str) -> None:
         """A user consented to the terms on registration
@@ -950,8 +978,8 @@ class RegistrationHandler(BaseHandler):
         # getting mail spam where they weren't before if email
         # notifs are set up on a homeserver)
         if (
-            self.hs.config.email_enable_notifs
-            and self.hs.config.email_notif_for_new_users
+            self.hs.config.email.email_enable_notifs
+            and self.hs.config.email.email_notif_for_new_users
             and token
         ):
             # Pull the ID of the access token back out of the db

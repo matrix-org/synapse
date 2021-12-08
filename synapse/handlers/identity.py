@@ -41,31 +41,32 @@ from synapse.util.stringutils import (
     valid_id_server_location,
 )
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class IdentityHandler(BaseHandler):
+class IdentityHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.store = hs.get_datastore()
         # An HTTP client for contacting trusted URLs.
         self.http_client = SimpleHttpClient(hs)
         # An HTTP client for contacting identity servers specified by clients.
         self.blacklisting_http_client = SimpleHttpClient(
-            hs, ip_blacklist=hs.config.federation_ip_range_blacklist
+            hs,
+            ip_blacklist=hs.config.server.federation_ip_range_blacklist,
+            ip_whitelist=hs.config.server.federation_ip_range_whitelist,
         )
         self.federation_http_client = hs.get_federation_http_client()
         self.hs = hs
 
-        self.rewrite_identity_server_urls = hs.config.rewrite_identity_server_urls
-        self._enable_lookup = hs.config.enable_3pid_lookup
+        self.rewrite_identity_server_urls = (
+            hs.config.registration.rewrite_identity_server_urls
+        )
+        self._enable_lookup = hs.config.registration.enable_3pid_lookup
 
-        self._web_client_location = hs.config.invite_client_location
+        self._web_client_location = hs.config.email.invite_client_location
 
         # Ratelimiters for `/requestToken` endpoints.
         self._3pid_validation_ratelimiter_ip = Ratelimiter(
@@ -344,8 +345,8 @@ class IdentityHandler(BaseHandler):
         # the server we connect to.
         id_server_url = self.rewrite_id_server_url(id_server, add_https=True)
 
-        if self.hs.config.bind_new_user_emails_to_sydent:
-            id_server_url = self.hs.config.bind_new_user_emails_to_sydent
+        if self.hs.config.registration.bind_new_user_emails_to_sydent:
+            id_server_url = self.hs.config.registration.bind_new_user_emails_to_sydent
 
         url = "%s/_matrix/identity/api/v1/3pid/unbind" % (id_server_url,)
 
@@ -447,7 +448,7 @@ class IdentityHandler(BaseHandler):
 
         token_expires = (
             self.hs.get_clock().time_msec()
-            + self.hs.config.email_validation_token_lifetime
+            + self.hs.config.email.email_validation_token_lifetime
         )
 
         await self.store.start_or_continue_validation_session(
@@ -463,7 +464,7 @@ class IdentityHandler(BaseHandler):
 
         return session_id
 
-    def rewrite_id_server_url(self, url: str, add_https=False) -> str:
+    def rewrite_id_server_url(self, url: str, add_https: bool = False) -> str:
         """Given an identity server URL, optionally add a protocol scheme
         before rewriting it according to the rewrite_identity_server_urls
         config option
@@ -517,15 +518,6 @@ class IdentityHandler(BaseHandler):
         if next_link:
             params["next_link"] = next_link
 
-        if self.hs.config.using_identity_server_from_trusted_list:
-            # Warn that a deprecated config option is in use
-            logger.warning(
-                'The config option "trust_identity_server_for_password_resets" '
-                'has been replaced by "account_threepid_delegate". '
-                "Please consult the sample config at docs/sample_config.yaml for "
-                "details and update your config file."
-            )
-
         try:
             data = await self.http_client.post_json_get_json(
                 "%s/_matrix/identity/api/v1/validate/email/requestToken"
@@ -571,15 +563,6 @@ class IdentityHandler(BaseHandler):
         if next_link:
             params["next_link"] = next_link
 
-        if self.hs.config.using_identity_server_from_trusted_list:
-            # Warn that a deprecated config option is in use
-            logger.warning(
-                'The config option "trust_identity_server_for_password_resets" '
-                'has been replaced by "account_threepid_delegate". '
-                "Please consult the sample config at docs/sample_config.yaml for "
-                "details and update your config file."
-            )
-
         # if we have a rewrite rule set for the identity server,
         # apply it now.
         id_server_url = self.rewrite_id_server_url(id_server_url)
@@ -595,15 +578,11 @@ class IdentityHandler(BaseHandler):
         except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
 
-        # It is already checked that public_baseurl is configured since this code
-        # should only be used if account_threepid_delegate_msisdn is true.
-        assert self.hs.config.public_baseurl
-
         # we need to tell the client to send the token back to us, since it doesn't
         # otherwise know where to send it, so add submit_url response parameter
         # (see also MSC2078)
         data["submit_url"] = (
-            self.hs.config.public_baseurl
+            self.hs.config.server.public_baseurl
             + "_matrix/client/unstable/add_threepid/msisdn/submit_token"
         )
         return data
@@ -629,12 +608,18 @@ class IdentityHandler(BaseHandler):
         validation_session = None
 
         # Try to validate as email
-        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+        if self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            # Remote emails will only be used if a valid identity server is provided.
+            assert (
+                self.hs.config.registration.account_threepid_delegate_email is not None
+            )
+
             # Ask our delegated email identity server
             validation_session = await self.threepid_from_creds(
-                self.hs.config.account_threepid_delegate_email, threepid_creds
+                self.hs.config.registration.account_threepid_delegate_email,
+                threepid_creds,
             )
-        elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        elif self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             # Get a validated session matching these details
             validation_session = await self.store.get_threepid_validation_session(
                 "email", client_secret, sid=sid, validated=True
@@ -644,10 +629,11 @@ class IdentityHandler(BaseHandler):
             return validation_session
 
         # Try to validate as msisdn
-        if self.hs.config.account_threepid_delegate_msisdn:
+        if self.hs.config.registration.account_threepid_delegate_msisdn:
             # Ask our delegated msisdn identity server
             validation_session = await self.threepid_from_creds(
-                self.hs.config.account_threepid_delegate_msisdn, threepid_creds
+                self.hs.config.registration.account_threepid_delegate_msisdn,
+                threepid_creds,
             )
 
         return validation_session
@@ -1012,6 +998,8 @@ class IdentityHandler(BaseHandler):
         }
 
         if room_type is not None:
+            invite_config["room_type"] = room_type
+            # TODO The unstable field is deprecated and should be removed in the future.
             invite_config["org.matrix.msc3288.room_type"] = room_type
 
         # If a custom web client location is available, include it in the request.
@@ -1103,7 +1091,7 @@ class IdentityHandler(BaseHandler):
         id_server_url: str,
         email: str,
         user_id: str,
-    ):
+    ) -> None:
         """Bind an email to a fully qualified user ID using the internal API of an
         instance of Sydent.
 

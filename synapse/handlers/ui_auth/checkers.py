@@ -49,7 +49,7 @@ class UserInteractiveAuthChecker:
             clientip: The IP address of the client.
 
         Raises:
-            SynapseError if authentication failed
+            LoginError if authentication failed.
 
         Returns:
             The result of authentication (to pass back to the client?)
@@ -70,7 +70,7 @@ class DummyAuthChecker(UserInteractiveAuthChecker):
 class TermsAuthChecker(UserInteractiveAuthChecker):
     AUTH_TYPE = LoginType.TERMS
 
-    def is_enabled(self):
+    def is_enabled(self) -> bool:
         return True
 
     async def check_auth(self, authdict: dict, clientip: str) -> Any:
@@ -82,10 +82,10 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
-        self._enabled = bool(hs.config.recaptcha_private_key)
+        self._enabled = bool(hs.config.captcha.recaptcha_private_key)
         self._http_client = hs.get_proxied_http_client()
-        self._url = hs.config.recaptcha_siteverify_api
-        self._secret = hs.config.recaptcha_private_key
+        self._url = hs.config.captcha.recaptcha_siteverify_api
+        self._secret = hs.config.captcha.recaptcha_private_key
 
     def is_enabled(self) -> bool:
         return self._enabled
@@ -131,7 +131,9 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
             )
             if resp_body["success"]:
                 return True
-        raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
+        raise LoginError(
+            401, "Captcha authentication failed", errcode=Codes.UNAUTHORIZED
+        )
 
 
 class _BaseThreepidAuthChecker:
@@ -151,20 +153,27 @@ class _BaseThreepidAuthChecker:
 
         # msisdns are currently always ThreepidBehaviour.REMOTE
         if medium == "msisdn":
-            if not self.hs.config.account_threepid_delegate_msisdn:
+            if not self.hs.config.registration.account_threepid_delegate_msisdn:
                 raise SynapseError(
                     400, "Phone number verification is not enabled on this homeserver"
                 )
             threepid = await identity_handler.threepid_from_creds(
-                self.hs.config.account_threepid_delegate_msisdn, threepid_creds
+                self.hs.config.registration.account_threepid_delegate_msisdn,
+                threepid_creds,
             )
         elif medium == "email":
-            if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-                assert self.hs.config.account_threepid_delegate_email
+            if (
+                self.hs.config.email.threepid_behaviour_email
+                == ThreepidBehaviour.REMOTE
+            ):
+                assert self.hs.config.registration.account_threepid_delegate_email
                 threepid = await identity_handler.threepid_from_creds(
-                    self.hs.config.account_threepid_delegate_email, threepid_creds
+                    self.hs.config.registration.account_threepid_delegate_email,
+                    threepid_creds,
                 )
-            elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            elif (
+                self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL
+            ):
                 threepid = None
                 row = await self.store.get_threepid_validation_session(
                     medium,
@@ -191,7 +200,9 @@ class _BaseThreepidAuthChecker:
             raise AssertionError("Unrecognized threepid medium: %s" % (medium,))
 
         if not threepid:
-            raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
+            raise LoginError(
+                401, "Unable to get validated threepid", errcode=Codes.UNAUTHORIZED
+            )
 
         if threepid["medium"] != medium:
             raise LoginError(
@@ -214,7 +225,7 @@ class EmailIdentityAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChec
         _BaseThreepidAuthChecker.__init__(self, hs)
 
     def is_enabled(self) -> bool:
-        return self.hs.config.threepid_behaviour_email in (
+        return self.hs.config.email.threepid_behaviour_email in (
             ThreepidBehaviour.REMOTE,
             ThreepidBehaviour.LOCAL,
         )
@@ -231,10 +242,74 @@ class MsisdnAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChecker):
         _BaseThreepidAuthChecker.__init__(self, hs)
 
     def is_enabled(self) -> bool:
-        return bool(self.hs.config.account_threepid_delegate_msisdn)
+        return bool(self.hs.config.registration.account_threepid_delegate_msisdn)
 
     async def check_auth(self, authdict: dict, clientip: str) -> Any:
         return await self._check_threepid("msisdn", authdict)
+
+
+class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
+    AUTH_TYPE = LoginType.REGISTRATION_TOKEN
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
+        self.hs = hs
+        self._enabled = bool(hs.config.registration.registration_requires_token)
+        self.store = hs.get_datastore()
+
+    def is_enabled(self) -> bool:
+        return self._enabled
+
+    async def check_auth(self, authdict: dict, clientip: str) -> Any:
+        if "token" not in authdict:
+            raise LoginError(400, "Missing registration token", Codes.MISSING_PARAM)
+        if not isinstance(authdict["token"], str):
+            raise LoginError(
+                400, "Registration token must be a string", Codes.INVALID_PARAM
+            )
+        if "session" not in authdict:
+            raise LoginError(400, "Missing UIA session", Codes.MISSING_PARAM)
+
+        # Get these here to avoid cyclic dependencies
+        from synapse.handlers.ui_auth import UIAuthSessionDataConstants
+
+        auth_handler = self.hs.get_auth_handler()
+
+        session = authdict["session"]
+        token = authdict["token"]
+
+        # If the LoginType.REGISTRATION_TOKEN stage has already been completed,
+        # return early to avoid incrementing `pending` again.
+        stored_token = await auth_handler.get_session_data(
+            session, UIAuthSessionDataConstants.REGISTRATION_TOKEN
+        )
+        if stored_token:
+            if token != stored_token:
+                raise LoginError(
+                    400, "Registration token has changed", Codes.INVALID_PARAM
+                )
+            else:
+                return token
+
+        if await self.store.registration_token_is_valid(token):
+            # Increment pending counter, so that if token has limited uses it
+            # can't be used up by someone else in the meantime.
+            await self.store.set_registration_token_pending(token)
+            # Store the token in the UIA session, so that once registration
+            # is complete `completed` can be incremented.
+            await auth_handler.set_session_data(
+                session,
+                UIAuthSessionDataConstants.REGISTRATION_TOKEN,
+                token,
+            )
+            # The token will be stored as the result of the authentication stage
+            # in ui_auth_sessions_credentials. This allows the pending counter
+            # for tokens to be decremented when expired sessions are deleted.
+            return token
+        else:
+            raise LoginError(
+                401, "Invalid registration token", errcode=Codes.UNAUTHORIZED
+            )
 
 
 INTERACTIVE_AUTH_CHECKERS = [
@@ -243,5 +318,6 @@ INTERACTIVE_AUTH_CHECKERS = [
     RecaptchaAuthChecker,
     EmailIdentityAuthChecker,
     MsisdnAuthChecker,
+    RegistrationTokenAuthChecker,
 ]
 """A list of UserInteractiveAuthChecker classes"""

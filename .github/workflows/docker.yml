@@ -5,7 +5,7 @@ name: Build docker images
 on:
   push:
     tags: ["v*"]
-    branches: [ master, main ]
+    branches: [ master, main, develop ]
   workflow_dispatch:
 
 permissions:
@@ -38,6 +38,9 @@ jobs:
         id: set-tag
         run: |
           case "${GITHUB_REF}" in
+              refs/heads/develop)
+                  tag=develop
+                  ;;
               refs/heads/master|refs/heads/main)
                   tag=latest
                   ;;

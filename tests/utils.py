@@ -119,7 +119,6 @@ def default_config(name, parse=False):
         "enable_registration": True,
         "enable_registration_captcha": False,
         "macaroon_secret_key": "not even a little secret",
-        "trusted_third_party_id_servers": [],
         "password_providers": [],
         "worker_replication_url": "",
         "worker_app": None,
@@ -436,7 +435,7 @@ class MockHttpResource:
                     )
                     return code, response
                 except CodeMessageException as e:
-                    return (e.code, cs_error(e.msg, code=e.errcode))
+                    return e.code, cs_error(e.msg, code=e.errcode)
 
         raise KeyError("No event can handle %s" % path)
 

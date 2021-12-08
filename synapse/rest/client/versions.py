@@ -17,9 +17,17 @@
 
 import logging
 import re
+from typing import TYPE_CHECKING, Tuple
+
+from twisted.web.server import Request
 
 from synapse.api.constants import RoomCreationPreset
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
+from synapse.types import JsonDict
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -27,25 +35,25 @@ logger = logging.getLogger(__name__)
 class VersionsRestServlet(RestServlet):
     PATTERNS = [re.compile("^/_matrix/client/versions$")]
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.config = hs.config
 
         # Calculate these once since they shouldn't change after start-up.
         self.e2ee_forced_public = (
             RoomCreationPreset.PUBLIC_CHAT
-            in self.config.encryption_enabled_by_default_for_room_presets
+            in self.config.room.encryption_enabled_by_default_for_room_presets
         )
         self.e2ee_forced_private = (
             RoomCreationPreset.PRIVATE_CHAT
-            in self.config.encryption_enabled_by_default_for_room_presets
+            in self.config.room.encryption_enabled_by_default_for_room_presets
         )
         self.e2ee_forced_trusted_private = (
             RoomCreationPreset.TRUSTED_PRIVATE_CHAT
-            in self.config.encryption_enabled_by_default_for_room_presets
+            in self.config.room.encryption_enabled_by_default_for_room_presets
         )
 
-    def on_GET(self, request):
+    def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
         return (
             200,
             {
@@ -64,6 +72,7 @@ class VersionsRestServlet(RestServlet):
                     "r0.4.0",
                     "r0.5.0",
                     "r0.6.0",
+                    "r0.6.1",
                 ],
                 # as per MSC1497:
                 "unstable_features": {
@@ -92,5 +101,5 @@ class VersionsRestServlet(RestServlet):
         )
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     VersionsRestServlet(hs).register(http_server)

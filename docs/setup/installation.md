@@ -1,44 +1,5 @@
 # Installation Instructions
 
-There are 3 steps to follow under **Installation Instructions**.
-
-- [Installation Instructions](#installation-instructions)
-  - [Choosing your server name](#choosing-your-server-name)
-  - [Installing Synapse](#installing-synapse)
-    - [Installing from source](#installing-from-source)
-      - [Platform-specific prerequisites](#platform-specific-prerequisites)
-        - [Debian/Ubuntu/Raspbian](#debianubunturaspbian)
-        - [ArchLinux](#archlinux)
-        - [CentOS/Fedora](#centosfedora)
-        - [macOS](#macos)
-        - [OpenSUSE](#opensuse)
-        - [OpenBSD](#openbsd)
-        - [Windows](#windows)
-    - [Prebuilt packages](#prebuilt-packages)
-      - [Docker images and Ansible playbooks](#docker-images-and-ansible-playbooks)
-      - [Debian/Ubuntu](#debianubuntu)
-        - [Matrix.org packages](#matrixorg-packages)
-        - [Downstream Debian packages](#downstream-debian-packages)
-        - [Downstream Ubuntu packages](#downstream-ubuntu-packages)
-      - [Fedora](#fedora)
-      - [OpenSUSE](#opensuse-1)
-      - [SUSE Linux Enterprise Server](#suse-linux-enterprise-server)
-      - [ArchLinux](#archlinux-1)
-      - [Void Linux](#void-linux)
-      - [FreeBSD](#freebsd)
-      - [OpenBSD](#openbsd-1)
-      - [NixOS](#nixos)
-  - [Setting up Synapse](#setting-up-synapse)
-    - [Using PostgreSQL](#using-postgresql)
-    - [TLS certificates](#tls-certificates)
-    - [Client Well-Known URI](#client-well-known-uri)
-    - [Email](#email)
-    - [Registering a user](#registering-a-user)
-    - [Setting up a TURN server](#setting-up-a-turn-server)
-    - [URL previews](#url-previews)
-    - [Troubleshooting Installation](#troubleshooting-installation)
-
-
 ## Choosing your server name
 
 It is important to choose the name for your server before you install Synapse,
@@ -57,18 +18,184 @@ that your email address is probably `user@example.com` rather than
 
 ## Installing Synapse
 
-### Installing from source
+### Prebuilt packages
 
-(Prebuilt packages are available for some platforms - see [Prebuilt packages](#prebuilt-packages).)
+Prebuilt packages are available for a number of platforms. These are recommended
+for most users.
 
-When installing from source please make sure that the [Platform-specific prerequisites](#platform-specific-prerequisites) are already installed.
+#### Docker images and Ansible playbooks
+
+There is an official synapse image available at
+<https://hub.docker.com/r/matrixdotorg/synapse> which can be used with
+the docker-compose file available at
+[contrib/docker](https://github.com/matrix-org/synapse/tree/develop/contrib/docker).
+Further information on this including configuration options is available in the README
+on hub.docker.com.
+
+Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
+Dockerfile to automate a synapse server in a single Docker image, at
+<https://hub.docker.com/r/avhost/docker-matrix/tags/>
+
+Slavi Pantaleev has created an Ansible playbook,
+which installs the offical Docker image of Matrix Synapse
+along with many other Matrix-related services (Postgres database, Element, coturn,
+ma1sd, SSL support, etc.).
+For more details, see
+<https://github.com/spantaleev/matrix-docker-ansible-deploy>
+
+#### Debian/Ubuntu
+
+##### Matrix.org packages
+
+Matrix.org provides Debian/Ubuntu packages of Synapse, for the amd64
+architecture via <https://packages.matrix.org/debian/>.  
+
+To install the latest release:
+
+```sh
+sudo apt install -y lsb-release wget apt-transport-https
+sudo wget -O /usr/share/keyrings/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] https://packages.matrix.org/debian/ $(lsb_release -cs) main" |
+    sudo tee /etc/apt/sources.list.d/matrix-org.list
+sudo apt update
+sudo apt install matrix-synapse-py3
+```
+
+Packages are also published for release candidates. To enable the prerelease
+channel, add `prerelease` to the `sources.list` line. For example:
+
+```sh
+sudo wget -O /usr/share/keyrings/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] https://packages.matrix.org/debian/ $(lsb_release -cs) main prerelease" |
+    sudo tee /etc/apt/sources.list.d/matrix-org.list
+sudo apt update
+sudo apt install matrix-synapse-py3
+```
+
+The fingerprint of the repository signing key (as shown by `gpg
+/usr/share/keyrings/matrix-org-archive-keyring.gpg`) is
+`AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058`.
+
+When installing with Debian packages, you might prefer to place files in
+`/etc/matrix-synapse/conf.d/` to override your configuration without editing
+the main configuration file at `/etc/matrix-synapse/homeserver.yaml`.
+By doing that, you won't be asked if you want to replace your configuration
+file when you upgrade the Debian package to a later version.
+
+##### Downstream Debian packages
+
+We do not recommend using the packages from the default Debian `buster`
+repository at this time, as they are old and suffer from known security
+vulnerabilities. You can install the latest version of Synapse from
+[our repository](#matrixorg-packages) or from `buster-backports`. Please
+see the [Debian documentation](https://backports.debian.org/Instructions/)
+for information on how to use backports.
+
+If you are using Debian `sid` or testing, Synapse is available in the default
+repositories and it should be possible to install it simply with:
+
+```sh
+sudo apt install matrix-synapse
+```
+
+##### Downstream Ubuntu packages
+
+We do not recommend using the packages in the default Ubuntu repository
+at this time, as they are old and suffer from known security vulnerabilities.
+The latest version of Synapse can be installed from [our repository](#matrixorg-packages).
+
+#### Fedora
+
+Synapse is in the Fedora repositories as `matrix-synapse`:
+
+```sh
+sudo dnf install matrix-synapse
+```
+
+Oleg Girko provides Fedora RPMs at
+<https://obs.infoserver.lv/project/monitor/matrix-synapse>
+
+#### OpenSUSE
+
+Synapse is in the OpenSUSE repositories as `matrix-synapse`:
+
+```sh
+sudo zypper install matrix-synapse
+```
+
+#### SUSE Linux Enterprise Server
+
+Unofficial package are built for SLES 15 in the openSUSE:Backports:SLE-15 repository at
+<https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15/standard/>
+
+#### ArchLinux
+
+The quickest way to get up and running with ArchLinux is probably with the community package
+<https://www.archlinux.org/packages/community/any/matrix-synapse/>, which should pull in most of
+the necessary dependencies.
+
+pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 ):
+
+```sh
+sudo pip install --upgrade pip
+```
+
+If you encounter an error with lib bcrypt causing an Wrong ELF Class:
+ELFCLASS32 (x64 Systems), you may need to reinstall py-bcrypt to correctly
+compile it under the right architecture. (This should not be needed if
+installing under virtualenv):
+
+```sh
+sudo pip uninstall py-bcrypt
+sudo pip install py-bcrypt
+```
+
+#### Void Linux
+
+Synapse can be found in the void repositories as 'synapse':
+
+```sh
+xbps-install -Su
+xbps-install -S synapse
+```
+
+#### FreeBSD
+
+Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
+
+- Ports: `cd /usr/ports/net-im/py-matrix-synapse && make install clean`
+- Packages: `pkg install py37-matrix-synapse`
+
+#### OpenBSD
+
+As of OpenBSD 6.7 Synapse is available as a pre-compiled binary. The filesystem
+underlying the homeserver directory (defaults to `/var/synapse`) has to be
+mounted with `wxallowed` (cf. `mount(8)`), so creating a separate filesystem
+and mounting it to `/var/synapse` should be taken into consideration.
+
+Installing Synapse:
+
+```sh
+doas pkg_add synapse
+```
+
+#### NixOS
+
+Robin Lambertz has packaged Synapse for NixOS at:
+<https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-synapse.nix>
+
+
+### Installing as a Python module from PyPI
+
+It's also possible to install Synapse as a Python module from PyPI.
+
+When following this route please make sure that the [Platform-specific prerequisites](#platform-specific-prerequisites) are already installed.
 
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.5.2 or later, up to Python 3.9.
+- Python 3.6 or later, up to Python 3.9.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
-
 
 To install the Synapse homeserver run:
 
@@ -235,170 +362,14 @@ make install
 
 ##### Windows
 
-If you wish to run or develop Synapse on Windows, the Windows Subsystem For
-Linux provides a Linux environment on Windows 10 which is capable of using the
-Debian, Fedora, or source installation methods. More information about WSL can
-be found at <https://docs.microsoft.com/en-us/windows/wsl/install-win10> for
-Windows 10 and <https://docs.microsoft.com/en-us/windows/wsl/install-on-server>
-for Windows Server.
+Running Synapse natively on Windows is not officially supported.
 
-### Prebuilt packages
-
-As an alternative to installing from source, prebuilt packages are available
-for a number of platforms.
-
-#### Docker images and Ansible playbooks
-
-There is an official synapse image available at
-<https://hub.docker.com/r/matrixdotorg/synapse> which can be used with
-the docker-compose file available at
-[contrib/docker](https://github.com/matrix-org/synapse/tree/develop/contrib/docker).
-Further information on this including configuration options is available in the README
-on hub.docker.com.
-
-Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
-Dockerfile to automate a synapse server in a single Docker image, at
-<https://hub.docker.com/r/avhost/docker-matrix/tags/>
-
-Slavi Pantaleev has created an Ansible playbook,
-which installs the offical Docker image of Matrix Synapse
-along with many other Matrix-related services (Postgres database, Element, coturn,
-ma1sd, SSL support, etc.).
-For more details, see
-<https://github.com/spantaleev/matrix-docker-ansible-deploy>
-
-#### Debian/Ubuntu
-
-##### Matrix.org packages
-
-Matrix.org provides Debian/Ubuntu packages of Synapse via
-<https://packages.matrix.org/debian/>.  To install the latest release:
-
-```sh
-sudo apt install -y lsb-release wget apt-transport-https
-sudo wget -O /usr/share/keyrings/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] https://packages.matrix.org/debian/ $(lsb_release -cs) main" |
-    sudo tee /etc/apt/sources.list.d/matrix-org.list
-sudo apt update
-sudo apt install matrix-synapse-py3
-```
-
-Packages are also published for release candidates. To enable the prerelease
-channel, add `prerelease` to the `sources.list` line. For example:
-
-```sh
-sudo wget -O /usr/share/keyrings/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] https://packages.matrix.org/debian/ $(lsb_release -cs) main prerelease" |
-    sudo tee /etc/apt/sources.list.d/matrix-org.list
-sudo apt update
-sudo apt install matrix-synapse-py3
-```
-
-The fingerprint of the repository signing key (as shown by `gpg
-/usr/share/keyrings/matrix-org-archive-keyring.gpg`) is
-`AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058`.
-
-##### Downstream Debian packages
-
-We do not recommend using the packages from the default Debian `buster`
-repository at this time, as they are old and suffer from known security
-vulnerabilities. You can install the latest version of Synapse from
-[our repository](#matrixorg-packages) or from `buster-backports`. Please
-see the [Debian documentation](https://backports.debian.org/Instructions/)
-for information on how to use backports.
-
-If you are using Debian `sid` or testing, Synapse is available in the default
-repositories and it should be possible to install it simply with:
-
-```sh
-sudo apt install matrix-synapse
-```
-
-##### Downstream Ubuntu packages
-
-We do not recommend using the packages in the default Ubuntu repository
-at this time, as they are old and suffer from known security vulnerabilities.
-The latest version of Synapse can be installed from [our repository](#matrixorg-packages).
-
-#### Fedora
-
-Synapse is in the Fedora repositories as `matrix-synapse`:
-
-```sh
-sudo dnf install matrix-synapse
-```
-
-Oleg Girko provides Fedora RPMs at
-<https://obs.infoserver.lv/project/monitor/matrix-synapse>
-
-#### OpenSUSE
-
-Synapse is in the OpenSUSE repositories as `matrix-synapse`:
-
-```sh
-sudo zypper install matrix-synapse
-```
-
-#### SUSE Linux Enterprise Server
-
-Unofficial package are built for SLES 15 in the openSUSE:Backports:SLE-15 repository at
-<https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15/standard/>
-
-#### ArchLinux
-
-The quickest way to get up and running with ArchLinux is probably with the community package
-<https://www.archlinux.org/packages/community/any/matrix-synapse/>, which should pull in most of
-the necessary dependencies.
-
-pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 ):
-
-```sh
-sudo pip install --upgrade pip
-```
-
-If you encounter an error with lib bcrypt causing an Wrong ELF Class:
-ELFCLASS32 (x64 Systems), you may need to reinstall py-bcrypt to correctly
-compile it under the right architecture. (This should not be needed if
-installing under virtualenv):
-
-```sh
-sudo pip uninstall py-bcrypt
-sudo pip install py-bcrypt
-```
-
-#### Void Linux
-
-Synapse can be found in the void repositories as 'synapse':
-
-```sh
-xbps-install -Su
-xbps-install -S synapse
-```
-
-#### FreeBSD
-
-Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
-
-- Ports: `cd /usr/ports/net-im/py-matrix-synapse && make install clean`
-- Packages: `pkg install py37-matrix-synapse`
-
-#### OpenBSD
-
-As of OpenBSD 6.7 Synapse is available as a pre-compiled binary. The filesystem
-underlying the homeserver directory (defaults to `/var/synapse`) has to be
-mounted with `wxallowed` (cf. `mount(8)`), so creating a separate filesystem
-and mounting it to `/var/synapse` should be taken into consideration.
-
-Installing Synapse:
-
-```sh
-doas pkg_add synapse
-```
-
-#### NixOS
-
-Robin Lambertz has packaged Synapse for NixOS at:
-<https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-synapse.nix>
+If you wish to run or develop Synapse on Windows, the Windows Subsystem for
+Linux provides a Linux environment which is capable of using the Debian, Fedora,
+or source installation methods. More information about WSL can be found at
+<https://docs.microsoft.com/en-us/windows/wsl/install> for Windows 10/11 and
+<https://docs.microsoft.com/en-us/windows/wsl/install-on-server> for
+Windows Server.
 
 ## Setting up Synapse
 

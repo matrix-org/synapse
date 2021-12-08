@@ -17,8 +17,9 @@ from unittest.mock import Mock
 
 import synapse.rest.admin
 import synapse.storage
-from synapse.api.constants import EventTypes
-from synapse.rest.client import login, room
+from synapse.api.constants import EventTypes, JoinRules
+from synapse.api.room_versions import RoomVersions
+from synapse.rest.client import knock, login, room
 
 from tests import unittest
 
@@ -28,6 +29,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         room.register_servlets,
+        knock.register_servlets,
     ]
 
     def prepare(self, reactor, clock, hs):
@@ -200,4 +202,33 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         args = writer.write_invite.call_args[0]
         self.assertEqual(args[0], room_id)
         self.assertEqual(args[1].content["membership"], "invite")
+        self.assertTrue(args[2])  # Assert there is at least one bit of state
+
+    def test_knock(self):
+        """Tests that knock get handled correctly."""
+        # create a knockable v7 room
+        room_id = self.helper.create_room_as(
+            self.user1, room_version=RoomVersions.V7.identifier, tok=self.token1
+        )
+        self.helper.send_state(
+            room_id,
+            EventTypes.JoinRules,
+            {"join_rule": JoinRules.KNOCK},
+            tok=self.token1,
+        )
+
+        self.helper.send(room_id, body="Hello!", tok=self.token1)
+        self.helper.knock(room_id, self.user2, tok=self.token2)
+
+        writer = Mock()
+
+        self.get_success(self.admin_handler.export_user_data(self.user2, writer))
+
+        writer.write_events.assert_not_called()
+        writer.write_state.assert_not_called()
+        writer.write_knock.assert_called_once()
+
+        args = writer.write_knock.call_args[0]
+        self.assertEqual(args[0], room_id)
+        self.assertEqual(args[1].content["membership"], "knock")
         self.assertTrue(args[2])  # Assert there is at least one bit of state

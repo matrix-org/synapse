@@ -573,6 +573,25 @@ def parse_string_from_args(
     return strings[0]
 
 
+@overload
+def parse_json_value_from_request(request: Request) -> JsonDict:
+    ...
+
+
+@overload
+def parse_json_value_from_request(
+    request: Request, allow_empty_body: Literal[False]
+) -> JsonDict:
+    ...
+
+
+@overload
+def parse_json_value_from_request(
+    request: Request, allow_empty_body: bool = False
+) -> Optional[JsonDict]:
+    ...
+
+
 def parse_json_value_from_request(
     request: Request, allow_empty_body: bool = False
 ) -> Optional[JsonDict]:

@@ -182,9 +182,13 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
         # a logcontext which we use for processing incoming commands. We declare it as a
         # background process so that the CPU stats get reported to prometheus.
-        self._logging_context = BackgroundProcessLoggingContext(
-            "replication-conn", self.conn_id
-        )
+        with PreserveLoggingContext():
+            # thanks to `PreserveLoggingContext()`, the new logcontext is guaranteed to
+            # capture the sentinel context as its containing context and won't prevent
+            # GC of / unintentionally reactivate what would be the current context.
+            self._logging_context = BackgroundProcessLoggingContext(
+                "replication-conn", self.conn_id
+            )
 
     def connectionMade(self):
         logger.info("[%s] Connection established", self.id())
@@ -434,8 +438,12 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         if self.transport:
             self.transport.unregisterProducer()
 
-        # mark the logging context as finished
-        self._logging_context.__exit__(None, None, None)
+        # mark the logging context as finished by triggering `__exit__()`
+        with PreserveLoggingContext():
+            with self._logging_context:
+                pass
+            # the sentinel context is now active, which may not be correct.
+            # PreserveLoggingContext() will restore the correct logging context.
 
     def __str__(self):
         addr = None

@@ -15,6 +15,7 @@ import logging
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, MSC3244_CAPABILITIES
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict
@@ -43,10 +44,10 @@ class CapabilitiesRestServlet(RestServlet):
         await self.auth.get_user_by_req(request, allow_guest=True)
         change_password = self.auth_handler.can_change_password()
 
-        response = {
+        response: JsonDict = {
             "capabilities": {
                 "m.room_versions": {
-                    "default": self.config.default_room_version.identifier,
+                    "default": self.config.server.default_room_version.identifier,
                     "available": {
                         v.identifier: v.disposition
                         for v in KNOWN_ROOM_VERSIONS.values()
@@ -61,8 +62,19 @@ class CapabilitiesRestServlet(RestServlet):
                 "org.matrix.msc3244.room_capabilities"
             ] = MSC3244_CAPABILITIES
 
+        if self.config.experimental.msc3283_enabled:
+            response["capabilities"]["org.matrix.msc3283.set_displayname"] = {
+                "enabled": self.config.registration.enable_set_displayname
+            }
+            response["capabilities"]["org.matrix.msc3283.set_avatar_url"] = {
+                "enabled": self.config.registration.enable_set_avatar_url
+            }
+            response["capabilities"]["org.matrix.msc3283.3pid_changes"] = {
+                "enabled": self.config.registration.enable_3pid_changes
+            }
+
         return 200, response
 
 
-def register_servlets(hs: "HomeServer", http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     CapabilitiesRestServlet(hs).register(http_server)

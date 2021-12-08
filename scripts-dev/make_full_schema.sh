@@ -147,7 +147,7 @@ python -m synapse.app.homeserver --generate-keys -c "$SQLITE_CONFIG"
 
 # Make sure the SQLite3 database is using the latest schema and has no pending background update.
 echo "Running db background jobs..."
-scripts-dev/update_database --database-config "$SQLITE_CONFIG"
+scripts/update_synapse_database --database-config --run-background-updates "$SQLITE_CONFIG"
 
 # Create the PostgreSQL database.
 echo "Creating postgres database..."

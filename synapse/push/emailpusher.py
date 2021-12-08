@@ -184,7 +184,7 @@ class EmailPusher(Pusher):
 
             should_notify_at = max(notif_ready_at, room_ready_at)
 
-            if should_notify_at < self.clock.time_msec():
+            if should_notify_at <= self.clock.time_msec():
                 # one of our notifications is ready for sending, so we send
                 # *one* email updating the user on their notifications,
                 # we then consider all previously outstanding notifications

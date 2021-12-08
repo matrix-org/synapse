@@ -52,7 +52,7 @@ to proxied traffic.)
 
 ### nginx
 
-```
+```nginx
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
@@ -64,6 +64,9 @@ server {
     server_name matrix.example.com;
 
     location ~* ^(\/_matrix|\/_synapse\/client) {
+        # note: do not add a path (even a single /) after the port in `proxy_pass`,
+        # otherwise nginx will canonicalise the URI and cause signature verification
+        # errors.
         proxy_pass http://localhost:8008;
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -76,10 +79,7 @@ server {
 }
 ```
 
-**NOTE**: Do not add a path after the port in `proxy_pass`, otherwise nginx will
-canonicalise/normalise the URI.
-
-### Caddy 1
+### Caddy v1
 
 ```
 matrix.example.com {
@@ -99,7 +99,7 @@ example.com:8448 {
 }
 ```
 
-### Caddy 2
+### Caddy v2
 
 ```
 matrix.example.com {
@@ -141,7 +141,7 @@ matrix.example.com {
 
 ### Apache
 
-```
+```apache
 <VirtualHost *:443>
     SSLEngine on
     ServerName matrix.example.com
@@ -170,7 +170,7 @@ matrix.example.com {
 
 **NOTE 2**: It appears that Synapse is currently incompatible with the ModSecurity module for Apache (`mod_security2`). If you need it enabled for other services on your web server, you can disable it for Synapse's two VirtualHosts by including the following lines before each of the two `</VirtualHost>` above:
 
-```
+```apache
 <IfModule security2_module>
     SecRuleEngine off
 </IfModule>
@@ -188,7 +188,7 @@ frontend https
   http-request set-header X-Forwarded-For %[src]
 
   # Matrix client traffic
-  acl matrix-host hdr(host) -i matrix.example.com
+  acl matrix-host hdr(host) -i matrix.example.com matrix.example.com:443
   acl matrix-path path_beg /_matrix
   acl matrix-path path_beg /_synapse/client
 

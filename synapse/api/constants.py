@@ -79,6 +79,7 @@ class LoginType:
     TERMS = "m.login.terms"
     SSO = "m.login.sso"
     DUMMY = "m.login.dummy"
+    REGISTRATION_TOKEN = "org.matrix.msc3231.login.registration_token"
 
 
 # This is used in the `type` parameter for /register when called by
@@ -120,7 +121,7 @@ class EventTypes:
     SpaceParent = "m.space.parent"
 
     MSC2716_INSERTION = "org.matrix.msc2716.insertion"
-    MSC2716_CHUNK = "org.matrix.msc2716.chunk"
+    MSC2716_BATCH = "org.matrix.msc2716.batch"
     MSC2716_MARKER = "org.matrix.msc2716.marker"
 
 
@@ -175,6 +176,7 @@ class RelationTypes:
     ANNOTATION = "m.annotation"
     REPLACE = "m.replace"
     REFERENCE = "m.reference"
+    THREAD = "io.element.thread"
 
 
 class LimitBlockingTypes:
@@ -197,15 +199,27 @@ class EventContentFields:
     # cf https://github.com/matrix-org/matrix-doc/pull/1772
     ROOM_TYPE = "type"
 
+    # Whether a room can federate.
+    FEDERATE = "m.federate"
+
+    # The creator of the room, as used in `m.room.create` events.
+    ROOM_CREATOR = "creator"
+
+    # Used in m.room.guest_access events.
+    GUEST_ACCESS = "guest_access"
+
     # Used on normal messages to indicate they were historically imported after the fact
     MSC2716_HISTORICAL = "org.matrix.msc2716.historical"
-    # For "insertion" events to indicate what the next chunk ID should be in
+    # For "insertion" events to indicate what the next batch ID should be in
     # order to connect to it
-    MSC2716_NEXT_CHUNK_ID = "org.matrix.msc2716.next_chunk_id"
-    # Used on "chunk" events to indicate which insertion event it connects to
-    MSC2716_CHUNK_ID = "org.matrix.msc2716.chunk_id"
+    MSC2716_NEXT_BATCH_ID = "org.matrix.msc2716.next_batch_id"
+    # Used on "batch" events to indicate which insertion event it connects to
+    MSC2716_BATCH_ID = "org.matrix.msc2716.batch_id"
     # For "marker" events
     MSC2716_MARKER_INSERTION = "org.matrix.msc2716.marker.insertion"
+
+    # The authorising user for joining a restricted room.
+    AUTHORISING_USER = "join_authorised_via_users_server"
 
 
 class RoomTypes:
@@ -229,6 +243,12 @@ class HistoryVisibility:
     JOINED = "joined"
     SHARED = "shared"
     WORLD_READABLE = "world_readable"
+
+
+class GuestAccess:
+    CAN_JOIN = "can_join"
+    # anything that is not "can_join" is considered "forbidden", but for completeness:
+    FORBIDDEN = "forbidden"
 
 
 class ReadReceiptEventFields:

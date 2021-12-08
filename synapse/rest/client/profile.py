@@ -14,25 +14,34 @@
 
 """ This module contains REST servlets to do with profile: /profile/<paths> """
 
+from typing import TYPE_CHECKING, Tuple
+
 from synapse.api.errors import Codes, SynapseError
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class ProfileDisplaynameRestServlet(RestServlet):
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/displayname", v1=True)
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.profile_handler = hs.get_profile_handler()
         self.auth = hs.get_auth()
 
-    async def on_GET(self, request, user_id):
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         requester_user = None
 
-        if self.hs.config.require_auth_for_profile_requests:
+        if self.hs.config.server.require_auth_for_profile_requests:
             requester = await self.auth.get_user_by_req(request)
             requester_user = requester.user
 
@@ -48,7 +57,9 @@ class ProfileDisplaynameRestServlet(RestServlet):
 
         return 200, ret
 
-    async def on_PUT(self, request, user_id):
+    async def on_PUT(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         user = UserID.from_string(user_id)
         is_admin = await self.auth.is_server_admin(requester.user)
@@ -68,23 +79,25 @@ class ProfileDisplaynameRestServlet(RestServlet):
 
         return 200, {}
 
-    def on_OPTIONS(self, request, user_id):
+    def on_OPTIONS(self, request: SynapseRequest, user_id: str) -> Tuple[int, JsonDict]:
         return 200, {}
 
 
 class ProfileAvatarURLRestServlet(RestServlet):
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/avatar_url", v1=True)
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.profile_handler = hs.get_profile_handler()
         self.auth = hs.get_auth()
 
-    async def on_GET(self, request, user_id):
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         requester_user = None
 
-        if self.hs.config.require_auth_for_profile_requests:
+        if self.hs.config.server.require_auth_for_profile_requests:
             requester = await self.auth.get_user_by_req(request)
             requester_user = requester.user
 
@@ -100,7 +113,9 @@ class ProfileAvatarURLRestServlet(RestServlet):
 
         return 200, ret
 
-    async def on_PUT(self, request, user_id):
+    async def on_PUT(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
         is_admin = await self.auth.is_server_admin(requester.user)
@@ -119,23 +134,25 @@ class ProfileAvatarURLRestServlet(RestServlet):
 
         return 200, {}
 
-    def on_OPTIONS(self, request, user_id):
+    def on_OPTIONS(self, request: SynapseRequest, user_id: str) -> Tuple[int, JsonDict]:
         return 200, {}
 
 
 class ProfileRestServlet(RestServlet):
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)", v1=True)
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.profile_handler = hs.get_profile_handler()
         self.auth = hs.get_auth()
 
-    async def on_GET(self, request, user_id):
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
         requester_user = None
 
-        if self.hs.config.require_auth_for_profile_requests:
+        if self.hs.config.server.require_auth_for_profile_requests:
             requester = await self.auth.get_user_by_req(request)
             requester_user = requester.user
 
@@ -155,7 +172,7 @@ class ProfileRestServlet(RestServlet):
         return 200, ret
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ProfileDisplaynameRestServlet(hs).register(http_server)
     ProfileAvatarURLRestServlet(hs).register(http_server)
     ProfileRestServlet(hs).register(http_server)

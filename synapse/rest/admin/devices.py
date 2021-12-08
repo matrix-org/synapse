@@ -47,7 +47,7 @@ class DeviceRestServlet(RestServlet):
         self.store = hs.get_datastore()
 
     async def on_GET(
-        self, request: SynapseRequest, user_id, device_id: str
+        self, request: SynapseRequest, user_id: str, device_id: str
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
@@ -110,7 +110,7 @@ class DevicesRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         """
         Args:
-            hs (synapse.server.HomeServer): server
+            hs: server
         """
         self.hs = hs
         self.auth = hs.get_auth()

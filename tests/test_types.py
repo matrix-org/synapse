@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from six import string_types
-
 from synapse.api.errors import SynapseError
 from synapse.types import (
     GroupID,
@@ -118,8 +116,8 @@ class StripInvalidMxidCharactersTestCase(unittest.TestCase):
         unstripped = strip_invalid_mxid_characters("test")
         stripped = strip_invalid_mxid_characters("test@")
 
-        self.assertTrue(isinstance(unstripped, string_types), type(unstripped))
-        self.assertTrue(isinstance(stripped, string_types), type(stripped))
+        self.assertTrue(isinstance(unstripped, str), type(unstripped))
+        self.assertTrue(isinstance(stripped, str), type(stripped))
 
     def test_strip(self):
         stripped = strip_invalid_mxid_characters("test@")

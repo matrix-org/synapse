@@ -339,6 +339,7 @@ def ensure_active_span(message, ret=None):
                     "There was no active span when trying to %s."
                     " Did you forget to start one or did a context slip?",
                     message,
+                    stack_info=True,
                 )
 
                 return ret
@@ -363,7 +364,7 @@ def noop_context_manager(*args, **kwargs):
 def init_tracer(hs: "HomeServer"):
     """Set the whitelists and initialise the JaegerClient tracer"""
     global opentracing
-    if not hs.config.opentracer_enabled:
+    if not hs.config.tracing.opentracer_enabled:
         # We don't have a tracer
         opentracing = None
         return
@@ -377,13 +378,13 @@ def init_tracer(hs: "HomeServer"):
     # Pull out the jaeger config if it was given. Otherwise set it to something sensible.
     # See https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/config.py
 
-    set_homeserver_whitelist(hs.config.opentracer_whitelist)
+    set_homeserver_whitelist(hs.config.tracing.opentracer_whitelist)
 
     from jaeger_client.metrics.prometheus import PrometheusMetricsFactory
 
     config = JaegerConfig(
-        config=hs.config.jaeger_config,
-        service_name=f"{hs.config.server_name} {hs.get_instance_name()}",
+        config=hs.config.tracing.jaeger_config,
+        service_name=f"{hs.config.server.server_name} {hs.get_instance_name()}",
         scope_manager=LogContextScopeManager(hs.config),
         metrics_factory=PrometheusMetricsFactory(),
     )
@@ -806,6 +807,14 @@ def trace(func=None, opname=None):
                         result.addCallbacks(call_back, err_back)
 
                     else:
+                        if inspect.isawaitable(result):
+                            logger.error(
+                                "@trace may not have wrapped %s correctly! "
+                                "The function is not async but returned a %s.",
+                                func.__qualname__,
+                                type(result).__name__,
+                            )
+
                         scope.__exit__(None, None, None)
 
                     return result

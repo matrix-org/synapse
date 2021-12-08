@@ -7,7 +7,7 @@
 
 ## Server to Server Stack
 
-To use the server to server stack, home servers should only need to
+To use the server to server stack, homeservers should only need to
 interact with the Messaging layer.
 
 The server to server side of things is designed into 4 distinct layers:
@@ -23,7 +23,7 @@ Server with a domain specific API.
 
 1. **Messaging Layer**
 
-    This is what the rest of the Home Server hits to send messages, join rooms,
+    This is what the rest of the homeserver hits to send messages, join rooms,
     etc. It also allows you to register callbacks for when it get's notified by
     lower levels that e.g. a new message has been received.
 
@@ -45,7 +45,7 @@ Server with a domain specific API.
 
     For incoming PDUs, it has to check the PDUs it references to see
     if we have missed any. If we have go and ask someone (another
-    home server) for it.
+    homeserver) for it.
 
 3. **Transaction Layer**
 

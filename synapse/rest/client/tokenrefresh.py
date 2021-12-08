@@ -12,10 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import TYPE_CHECKING
+
+from twisted.web.server import Request
+
 from synapse.api.errors import AuthError
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
 
 from ._base import client_patterns
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class TokenRefreshRestServlet(RestServlet):
@@ -26,12 +34,12 @@ class TokenRefreshRestServlet(RestServlet):
 
     PATTERNS = client_patterns("/tokenrefresh")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
 
-    async def on_POST(self, request):
+    async def on_POST(self, request: Request) -> None:
         raise AuthError(403, "tokenrefresh is no longer supported.")
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     TokenRefreshRestServlet(hs).register(http_server)

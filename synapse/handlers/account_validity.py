@@ -50,7 +50,7 @@ class AccountValidityHandler:
         self.send_email_handler = self.hs.get_send_email_handler()
         self.clock = self.hs.get_clock()
 
-        self._app_name = self.hs.config.email_app_name
+        self._app_name = self.hs.config.email.email_app_name
 
         self._account_validity_enabled = (
             hs.config.account_validity.account_validity_enabled
@@ -59,7 +59,9 @@ class AccountValidityHandler:
             hs.config.account_validity.account_validity_renew_by_email_enabled
         )
 
-        self._show_users_in_user_directory = self.hs.config.show_users_in_user_directory
+        self._show_users_in_user_directory = (
+            self.hs.config.server.show_users_in_user_directory
+        )
 
         self._account_validity_period = None
         if self._account_validity_enabled:
@@ -72,24 +74,20 @@ class AccountValidityHandler:
             and self._account_validity_renew_by_email_enabled
         ):
             # Don't do email-specific configuration if renewal by email is disabled.
-            self._template_html = (
-                hs.config.account_validity.account_validity_template_html
-            )
-            self._template_text = (
-                hs.config.account_validity.account_validity_template_text
-            )
+            self._template_html = hs.config.email.account_validity_template_html
+            self._template_text = hs.config.email.account_validity_template_text
             self._renew_email_subject = (
                 hs.config.account_validity.account_validity_renew_email_subject
             )
 
             # Check the renewal emails to send and send them every 30min.
-            if hs.config.run_background_tasks:
+            if hs.config.worker.run_background_tasks:
                 self.clock.looping_call(self._send_renewal_emails, 30 * 60 * 1000)
 
         # Mark users as inactive when they expired. Check once every hour
         if self._account_validity_enabled:
 
-            def mark_expired_users_as_inactive():
+            def mark_expired_users_as_inactive() -> Awaitable:
                 # run as a background process to allow async functions to work
                 return run_as_background_process(
                     "_mark_expired_users_as_inactive",
@@ -116,7 +114,7 @@ class AccountValidityHandler:
         on_legacy_send_mail: Optional[ON_LEGACY_SEND_MAIL_CALLBACK] = None,
         on_legacy_renew: Optional[ON_LEGACY_RENEW_CALLBACK] = None,
         on_legacy_admin_request: Optional[ON_LEGACY_ADMIN_REQUEST] = None,
-    ):
+    ) -> None:
         """Register callbacks from module for each hook."""
         if is_user_expired is not None:
             self._is_user_expired_callbacks.append(is_user_expired)
@@ -182,7 +180,7 @@ class AccountValidityHandler:
 
         return False
 
-    async def on_user_registration(self, user_id: str):
+    async def on_user_registration(self, user_id: str) -> None:
         """Tell third-party modules about a user's registration.
 
         Args:
@@ -266,7 +264,7 @@ class AccountValidityHandler:
 
         renewal_token = await self._get_renewal_token(user_id)
         url = "%s_matrix/client/unstable/account_validity/renew?token=%s" % (
-            self.hs.config.public_baseurl,
+            self.hs.config.server.public_baseurl,
             renewal_token,
         )
 
@@ -415,6 +413,7 @@ class AccountValidityHandler:
         """
         now = self.clock.time_msec()
         if expiration_ts is None:
+            assert self._account_validity_period is not None
             expiration_ts = now + self._account_validity_period
 
         await self.store.set_account_validity_for_user(
@@ -439,12 +438,9 @@ class AccountValidityHandler:
 
         return expiration_ts
 
-    async def _mark_expired_users_as_inactive(self):
+    async def _mark_expired_users_as_inactive(self) -> None:
         """Iterate over active, expired users. Mark them as inactive in order to hide them
         from the user directory.
-
-        Returns:
-            Deferred
         """
         # Get active, expired users
         active_expired_users = await self.store.get_expired_users()

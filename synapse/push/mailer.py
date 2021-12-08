@@ -110,7 +110,7 @@ class Mailer:
         self.state_handler = self.hs.get_state_handler()
         self.storage = hs.get_storage()
         self.app_name = app_name
-        self.email_subjects: EmailSubjectConfig = hs.config.email_subjects
+        self.email_subjects: EmailSubjectConfig = hs.config.email.email_subjects
 
         logger.info("Created Mailer for app_name %s" % app_name)
 
@@ -130,7 +130,7 @@ class Mailer:
         """
         params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
-            self.hs.config.public_baseurl
+            self.hs.config.server.public_baseurl
             + "_synapse/client/password_reset/email/submit_token?%s"
             % urllib.parse.urlencode(params)
         )
@@ -140,7 +140,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.password_reset
-            % {"server_name": self.hs.config.server_name},
+            % {"server_name": self.hs.config.server.server_name},
             template_vars,
         )
 
@@ -160,7 +160,7 @@ class Mailer:
         """
         params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
-            self.hs.config.public_baseurl
+            self.hs.config.server.public_baseurl
             + "_matrix/client/unstable/registration/email/submit_token?%s"
             % urllib.parse.urlencode(params)
         )
@@ -170,7 +170,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
-            % {"server_name": self.hs.config.server_name},
+            % {"server_name": self.hs.config.server.server_name},
             template_vars,
         )
 
@@ -191,7 +191,7 @@ class Mailer:
         """
         params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
-            self.hs.config.public_baseurl
+            self.hs.config.server.public_baseurl
             + "_matrix/client/unstable/add_threepid/email/submit_token?%s"
             % urllib.parse.urlencode(params)
         )
@@ -201,7 +201,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
-            % {"server_name": self.hs.config.server_name},
+            % {"server_name": self.hs.config.server.server_name},
             template_vars,
         )
 
@@ -258,7 +258,7 @@ class Mailer:
         # actually sort our so-called rooms_in_order list, most recent room first
         rooms_in_order.sort(key=lambda r: -(notifs_by_room[r][-1]["received_ts"] or 0))
 
-        rooms = []
+        rooms: List[Dict[str, Any]] = []
 
         for r in rooms_in_order:
             roomvars = await self._get_room_vars(
@@ -362,6 +362,7 @@ class Mailer:
             "notifs": [],
             "invite": is_invite,
             "link": self._make_room_link(room_id),
+            "avatar_url": await self._get_room_avatar(room_state_ids),
         }
 
         if not is_invite:
@@ -392,6 +393,27 @@ class Mailer:
                     room_vars["notifs"].append(notifvars)
 
         return room_vars
+
+    async def _get_room_avatar(
+        self,
+        room_state_ids: StateMap[str],
+    ) -> Optional[str]:
+        """
+        Retrieve the avatar url for this room---if it exists.
+
+        Args:
+            room_state_ids: The event IDs of the current room state.
+
+        Returns:
+             room's avatar url if it's present and a string; otherwise None.
+        """
+        event_id = room_state_ids.get((EventTypes.RoomAvatar, ""))
+        if event_id:
+            ev = await self.store.get_event(event_id)
+            url = ev.content.get("url")
+            if isinstance(url, str):
+                return url
+        return None
 
     async def _get_notif_vars(
         self,
@@ -774,8 +796,8 @@ class Mailer:
         Returns:
              A link to open a room in the web client.
         """
-        if self.hs.config.email_riot_base_url:
-            base_url = "%s/#/room" % (self.hs.config.email_riot_base_url)
+        if self.hs.config.email.email_riot_base_url:
+            base_url = "%s/#/room" % (self.hs.config.email.email_riot_base_url)
         elif self.app_name == "Vector":
             # need /beta for Universal Links to work on iOS
             base_url = "https://vector.im/beta/#/room"
@@ -793,9 +815,9 @@ class Mailer:
         Returns:
              A link to open the notification in the web client.
         """
-        if self.hs.config.email_riot_base_url:
+        if self.hs.config.email.email_riot_base_url:
             return "%s/#/room/%s/%s" % (
-                self.hs.config.email_riot_base_url,
+                self.hs.config.email.email_riot_base_url,
                 notif["room_id"],
                 notif["event_id"],
             )
@@ -830,7 +852,7 @@ class Mailer:
 
         # XXX: make r0 once API is stable
         return "%s_matrix/client/unstable/pushers/remove?%s" % (
-            self.hs.config.public_baseurl,
+            self.hs.config.server.public_baseurl,
             urllib.parse.urlencode(params),
         )
 
@@ -870,7 +892,7 @@ def safe_text(raw_text: str) -> jinja2.Markup:
         A Markup object ready to safely use in a Jinja template.
     """
     return jinja2.Markup(
-        bleach.linkify(bleach.clean(raw_text, tags=[], attributes={}, strip=False))
+        bleach.linkify(bleach.clean(raw_text, tags=[], attributes=[], strip=False))
     )
 
 
