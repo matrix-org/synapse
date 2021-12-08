@@ -155,7 +155,9 @@ class Auth:
 
             access_token = self.get_access_token_from_request(request)
 
-            user_id, app_service = await self._get_appservice_user_id(request)
+            user_id, _, app_service = await self._get_appservice_user_id_and_device_id(
+                request
+            )
             if user_id and app_service:
                 if ip_addr and self._track_appservice_user_ips:
                     await self.store.insert_client_ip(
@@ -274,33 +276,59 @@ class Auth:
                 403, "Application service has not registered this user (%s)" % user_id
             )
 
-    async def _get_appservice_user_id(
+    async def _get_appservice_user_id_and_device_id(
         self, request: Request
-    ) -> Tuple[Optional[str], Optional[ApplicationService]]:
+    ) -> Tuple[Optional[str], Optional[str], Optional[ApplicationService]]:
+        """
+        Given a request, reads the request parameters to determine:
+        - whether it's an application service that's making this request
+        - what user the application service should be treated as controlling
+          (the user_id URI parameter allows an application service to masquerade
+          any applicable user in its namespace)
+        - what device the application service should be treated as controlling
+          (the device_id[^1] URI parameter allows an application service to masquerade
+          as any device that exists for the relevant user)
+
+        [^1] Unstable and provided by MSC3202.
+             Must use `org.matrix.msc3202.device_id` in place of `device_id` for now.
+
+        Returns:
+            3-tuple of
+            (user ID?, device ID?, application service?)
+
+        Postconditions:
+        - If an application service is returned, so is a user ID
+        - A user ID is never returned without an application service
+        - A device ID is never returned without a user ID or an application service
+        - The returned application service, if present, is permitted to control the
+          returned user ID.
+        - The returned device ID, if present, has been checked to be a valid device ID
+          for the returned user ID.
+        """
         app_service = self.store.get_app_service_by_token(
             self.get_access_token_from_request(request)
         )
         if app_service is None:
-            return None, None
+            return None, None, None
 
         if app_service.ip_range_whitelist:
             ip_address = IPAddress(request.getClientIP())
             if ip_address not in app_service.ip_range_whitelist:
-                return None, None
+                return None, None, None
 
         # This will always be set by the time Twisted calls us.
         assert request.args is not None
 
         if b"user_id" not in request.args:
-            return app_service.sender, app_service
+            return app_service.sender, None, app_service
 
         user_id = request.args[b"user_id"][0].decode("utf8")
         await self.validate_appservice_can_control_user_id(app_service, user_id)
 
         if app_service.sender == user_id:
-            return app_service.sender, app_service
+            return app_service.sender, None, app_service
 
-        return user_id, app_service
+        return user_id, None, app_service
 
     async def get_user_by_access_token(
         self,
