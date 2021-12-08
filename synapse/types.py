@@ -20,6 +20,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
+    Collection,
     Dict,
     Mapping,
     MutableMapping,
@@ -749,6 +750,21 @@ class ReadReceipt:
     user_id = attr.ib()
     event_ids = attr.ib()
     data = attr.ib()
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class DeviceLists:
+    """
+    Attributes:
+        changed: List of user_ids whose devices may have changed
+        left: List of user_ids whose devices we no longer track
+    """
+
+    changed: Collection[str]
+    left: Collection[str]
+
+    def __bool__(self) -> bool:
+        return bool(self.changed or self.left)
 
 
 def get_verify_key_from_cross_signing_key(key_info):
