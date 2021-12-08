@@ -222,6 +222,7 @@ class _RoomChanges:
     join        leave     join
     invite      join      leave
     """
+
     newly_left_rooms: List[str]
     """Rooms we are not joined to at the `now_token` and left between `since` and `now`.
 
