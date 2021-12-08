@@ -333,8 +333,6 @@ class Auth:
         user_id = request.args[b"user_id"][0].decode("utf8")
         await self.validate_appservice_can_control_user_id(app_service, user_id)
 
-        if app_service.sender == user_id:
-            return app_service.sender, None, app_service
 
         return user_id, None, app_service
 
