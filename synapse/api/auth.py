@@ -155,9 +155,11 @@ class Auth:
 
             access_token = self.get_access_token_from_request(request)
 
-            user_id, _, app_service = await self._get_appservice_user_id_and_device_id(
-                request
-            )
+            (
+                user_id,
+                device_id,
+                app_service,
+            ) = await self._get_appservice_user_id_and_device_id(request)
             if user_id and app_service:
                 if ip_addr and self._track_appservice_user_ips:
                     await self.store.insert_client_ip(
@@ -165,16 +167,22 @@ class Auth:
                         access_token=access_token,
                         ip=ip_addr,
                         user_agent=user_agent,
-                        device_id="dummy-device",  # stubbed
+                        device_id="dummy-device"
+                        if device_id is None
+                        else device_id,  # stubbed
                     )
 
-                requester = create_requester(user_id, app_service=app_service)
+                requester = create_requester(
+                    user_id, app_service=app_service, device_id=device_id
+                )
 
                 request.requester = user_id
                 if user_id in self._force_tracing_for_users:
                     opentracing.force_tracing()
                 opentracing.set_tag("authenticated_entity", user_id)
                 opentracing.set_tag("user_id", user_id)
+                if device_id is not None:
+                    opentracing.set_tag("device_id", device_id)
                 opentracing.set_tag("appservice_id", app_service.id)
 
                 return requester
