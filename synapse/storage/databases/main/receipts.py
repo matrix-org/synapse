@@ -90,8 +90,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         )
 
     def get_max_receipt_stream_id(self) -> int:
-        """Get the current max stream ID for receipts stream
-        """
+        """Get the current max stream ID for receipts stream"""
         return self._receipts_id_gen.get_current_token()
 
     @cached()
