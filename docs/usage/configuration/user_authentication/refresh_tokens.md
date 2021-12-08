@@ -85,15 +85,19 @@ The following configuration options, in the `registration` section, are related:
   by clients which don't support refresh tokens.
   Make this short if you want to effectively force use of refresh tokens.
   Make this long if you don't want to inconvenience users of clients which don't
-  support refresh tokens.
+  support refresh tokens (by forcing them to frequently re-authenticate using
+  login credentials).
 * `refresh_token_lifetime`: lifetime of refresh tokens.
   In other words, the client must refresh within this time period to maintain its session.
   Unless you want to log inactive sessions out, it is often fine to use a long
   value here or even leave it unset (infinite).
   Beware that making it too short will inconvenience clients that do not connect
-  very often, including mobile clients and clients of infrequent users.
+  very often, including mobile clients and clients of infrequent users (by making
+  it more difficult for them to refresh in time, which may force them to need to
+  re-authenticate using login credentials).
 
-**Note:** All four options above only apply when tokens are created (by logging in or refreshing). Changes to these settings do not apply retroactively.
+**Note:** All four options above only apply when tokens are created (by logging in or refreshing).
+Changes to these settings do not apply retroactively.
 
 
 ### Using refresh token expiry to log out inactive sessions
