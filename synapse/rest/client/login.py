@@ -72,7 +72,7 @@ class LoginRestServlet(RestServlet):
     JWT_TYPE_DEPRECATED = "m.login.jwt"
     APPSERVICE_TYPE = "m.login.application_service"
     APPSERVICE_TYPE_UNSTABLE = "uk.half-shot.msc2778.login.application_service"
-    REFRESH_TOKEN_PARAM = "org.matrix.msc2918.refresh_token"
+    REFRESH_TOKEN_PARAM = "refresh_token"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -90,7 +90,7 @@ class LoginRestServlet(RestServlet):
         self.saml2_enabled = hs.config.saml2.saml2_enabled
         self.cas_enabled = hs.config.cas.cas_enabled
         self.oidc_enabled = hs.config.oidc.oidc_enabled
-        self._msc2918_enabled = (
+        self._refresh_tokens_enabled = (
             hs.config.registration.refreshable_access_token_lifetime is not None
         )
 
@@ -163,17 +163,16 @@ class LoginRestServlet(RestServlet):
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, LoginResponse]:
         login_submission = parse_json_object_from_request(request)
 
-        if self._msc2918_enabled:
-            # Check if this login should also issue a refresh token, as per MSC2918
-            should_issue_refresh_token = login_submission.get(
-                "org.matrix.msc2918.refresh_token", False
-            )
-            if not isinstance(should_issue_refresh_token, bool):
-                raise SynapseError(
-                    400, "`org.matrix.msc2918.refresh_token` should be true or false."
-                )
-        else:
-            should_issue_refresh_token = False
+        # Check to see if the client requested a refresh token.
+        client_requested_refresh_token = login_submission.get(
+            LoginRestServlet.REFRESH_TOKEN_PARAM, False
+        )
+        if not isinstance(client_requested_refresh_token, bool):
+            raise SynapseError(400, "`refresh_token` should be true or false.")
+
+        should_issue_refresh_token = (
+            self._refresh_tokens_enabled and client_requested_refresh_token
+        )
 
         try:
             if login_submission["type"] in (
@@ -463,9 +462,7 @@ def _get_auth_flow_dict_for_idp(idp: SsoIdentityProvider) -> JsonDict:
 
 
 class RefreshTokenServlet(RestServlet):
-    PATTERNS = client_patterns(
-        "/org.matrix.msc2918.refresh_token/refresh$", releases=(), unstable=True
-    )
+    PATTERNS = (re.compile("^/_matrix/client/v1/refresh$"),)
 
     def __init__(self, hs: "HomeServer"):
         self._auth_handler = hs.get_auth_handler()

@@ -1,1 +1,0 @@
-Update `Dockerfile-workers` to healthcheck all workers in container.

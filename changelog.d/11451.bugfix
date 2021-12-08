@@ -1,1 +1,0 @@
-Add support for the `/_matrix/client/v3/login/sso/redirect/{idpId}` API from Matrix v1.1. This endpoint was overlooked when support for v3 endpoints was added in v1.48.0rc1.

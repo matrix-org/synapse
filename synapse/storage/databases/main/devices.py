@@ -274,7 +274,9 @@ class DeviceWorkerStore(SQLBaseStore):
         # add the updated cross-signing keys to the results list
         for user_id, result in cross_signing_keys_by_user.items():
             result["user_id"] = user_id
-            # FIXME: switch to m.signing_key_update when MSC1756 is merged into the spec
+            results.append(("m.signing_key_update", result))
+            # also send the unstable version
+            # FIXME: remove this when enough servers have upgraded
             results.append(("org.matrix.signing_key_update", result))
 
         return now_stream_id, results
