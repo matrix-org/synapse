@@ -24,6 +24,7 @@ from synapse.rest.client import login, register, relations, room, sync
 
 from tests import unittest
 from tests.server import FakeChannel
+from tests.test_utils import make_awaitable
 from tests.test_utils.event_injection import inject_event
 
 
@@ -663,7 +664,8 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         # Disable the validation to pretend this came over federation.
         with patch(
-            "synapse.handlers.message.EventCreationHandler._validate_event_relation"
+            "synapse.handlers.message.EventCreationHandler._validate_event_relation",
+            new=lambda self, event: make_awaitable(None),
         ):
             # Generate a various relations from a different room.
             self.get_success(
