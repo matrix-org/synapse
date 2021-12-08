@@ -88,8 +88,6 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.clock = clock
         self.storage = hs.get_storage()
-        # self.user_id = self.register_user("tester", "foobar")
-        # self.access_token = self.login("tester", "foobar")
 
         self.virtual_user_id = self.register_appservice_user(
             "as_user_potato", self.appservice.token
