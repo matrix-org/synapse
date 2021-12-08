@@ -1535,20 +1535,13 @@ class RoomShutdownHandler:
             await self.store.block_room(room_id, requester_user_id)
 
         if not await self.store.get_room(room_id):
-            if block:
-                # We allow you to block an unknown room.
-                return {
-                    "kicked_users": [],
-                    "failed_to_kick_users": [],
-                    "local_aliases": [],
-                    "new_room_id": None,
-                }
-            else:
-                # But if you don't want to preventatively block another room,
-                # this function can't do anything useful.
-                raise NotFoundError(
-                    "Cannot shut down room: unknown room id %s" % (room_id,)
-                )
+            # if we don't know about the room, there is nothing left to do.
+            return {
+                "kicked_users": [],
+                "failed_to_kick_users": [],
+                "local_aliases": [],
+                "new_room_id": None,
+            }
 
         if new_room_user_id is not None:
             if not self.hs.is_mine_id(new_room_user_id):

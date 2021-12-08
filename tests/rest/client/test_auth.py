@@ -733,7 +733,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         login_response1 = self.make_request(
             "POST",
             "/_matrix/client/r0/login",
-            {"org.matrix.msc2918.refresh_token": True, **body},
+            {"refresh_token": True, **body},
         )
         self.assertEqual(login_response1.code, HTTPStatus.OK, login_response1.result)
         self.assertApproximates(
