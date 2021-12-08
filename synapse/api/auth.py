@@ -327,14 +327,15 @@ class Auth:
         # This will always be set by the time Twisted calls us.
         assert request.args is not None
 
-        if b"user_id" not in request.args:
-            return app_service.sender, None, app_service
+        if b"user_id" in request.args:
+            effective_user_id = request.args[b"user_id"][0].decode("utf8")
+            await self.validate_appservice_can_control_user_id(
+                app_service, effective_user_id
+            )
+        else:
+            effective_user_id = app_service.sender
 
-        user_id = request.args[b"user_id"][0].decode("utf8")
-        await self.validate_appservice_can_control_user_id(app_service, user_id)
-
-
-        return user_id, None, app_service
+        return effective_user_id, None, app_service
 
     async def get_user_by_access_token(
         self,
