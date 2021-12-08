@@ -13,17 +13,7 @@
 # limitations under the License.
 import itertools
 import logging
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Collection,
-    Dict,
-    FrozenSet,
-    List,
-    Optional,
-    Set,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Set, Tuple
 
 import attr
 from prometheus_client import Counter
@@ -41,6 +31,7 @@ from synapse.storage.databases.main.relations import BundledAggregations
 from synapse.storage.roommember import MemberSummary
 from synapse.storage.state import StateFilter
 from synapse.types import (
+    DeviceLists,
     JsonDict,
     MutableStateMap,
     Requester,
@@ -182,21 +173,6 @@ class GroupsSyncResult:
 
     def __bool__(self) -> bool:
         return bool(self.join or self.invite or self.leave)
-
-
-@attr.s(slots=True, frozen=True, auto_attribs=True)
-class DeviceLists:
-    """
-    Attributes:
-        changed: List of user_ids whose devices may have changed
-        left: List of user_ids whose devices we no longer track
-    """
-
-    changed: Collection[str]
-    left: Collection[str]
-
-    def __bool__(self) -> bool:
-        return bool(self.changed or self.left)
 
 
 @attr.s(slots=True, auto_attribs=True)
