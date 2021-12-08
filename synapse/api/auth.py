@@ -313,6 +313,8 @@ class Auth:
         - The returned device ID, if present, has been checked to be a valid device ID
           for the returned user ID.
         """
+        DEVICE_ID_ARG_NAME = b"org.matrix.msc3202.device_id"
+
         app_service = self.store.get_app_service_by_token(
             self.get_access_token_from_request(request)
         )
@@ -335,7 +337,22 @@ class Auth:
         else:
             effective_user_id = app_service.sender
 
-        return effective_user_id, None, app_service
+        effective_device_id: Optional[str] = None
+
+        if DEVICE_ID_ARG_NAME in request.args:
+            effective_device_id = request.args[DEVICE_ID_ARG_NAME][0].decode("utf8")
+            # We only just set this so it can't be None!
+            assert effective_device_id is not None
+            device_opt = await self.store.get_device_opt(
+                effective_user_id, effective_device_id
+            )
+            if device_opt is None:
+                raise AuthError(
+                    403,
+                    f"Application service trying to use a device that doesn't exist ('{effective_device_id}' for {effective_user_id})",
+                )
+
+        return effective_user_id, effective_device_id, app_service
 
     async def get_user_by_access_token(
         self,
