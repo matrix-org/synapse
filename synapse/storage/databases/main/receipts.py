@@ -91,9 +91,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     def get_max_receipt_stream_id(self) -> int:
         """Get the current max stream ID for receipts stream
-
-        Returns:
-            int
         """
         return self._receipts_id_gen.get_current_token()
 
@@ -514,7 +511,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     ) -> Optional[int]:
         """Inserts a read-receipt into the database if it's newer than the current RR
 
-        Returns: int|None
+        Returns:
             None if the RR is older than the current RR
             otherwise, the rx timestamp of the event that the RR corresponds to
                 (or 0 if the event is unknown)
