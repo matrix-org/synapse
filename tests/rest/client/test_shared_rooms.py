@@ -32,7 +32,7 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
-        config["worker_to_update_user_directory"] = None
+        config["update_user_directory_on"] = None
         return self.setup_test_homeserver(config=config)
 
     def prepare(self, reactor, clock, hs):

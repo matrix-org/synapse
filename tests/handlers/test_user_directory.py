@@ -56,7 +56,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
-        config["worker_to_update_user_directory"] = None
+        config["update_user_directory_on"] = None
 
         self.appservice = ApplicationService(
             token="i_am_an_app_service",
@@ -1014,7 +1014,7 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
-        config["worker_to_update_user_directory"] = None
+        config["update_user_directory_on"] = None
         hs = self.setup_test_homeserver(config=config)
 
         self.config = hs.config

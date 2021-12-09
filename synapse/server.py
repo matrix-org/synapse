@@ -44,7 +44,7 @@ from synapse.api.ratelimiting import Ratelimiter, RequestRatelimiter
 from synapse.appservice.api import ApplicationServiceApi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
 from synapse.config.homeserver import HomeServerConfig
-from synapse.config.server import ANY_USER_DIRECTORY_WORKER
+from synapse.config.workers import ANY_USER_DIRECTORY_WORKER
 from synapse.crypto import context_factory
 from synapse.crypto.context_factory import RegularPolicyForHTTPS
 from synapse.crypto.keyring import Keyring
@@ -839,16 +839,13 @@ class HomeServer(metaclass=abc.ABCMeta):
         "Should this process be updating the user directory?"
 
         if self.config.worker.worker_app is None:  # we're the main process
-            return self.config.server.worker_to_update_user_directory is None
-        elif (
-            self.config.server.worker_to_update_user_directory
-            is ANY_USER_DIRECTORY_WORKER
-        ):
+            return self.config.worker.update_user_directory_on is None
+        elif self.config.worker.update_user_directory_on is ANY_USER_DIRECTORY_WORKER:
             # A special backwards-compatible case for if update_user_directory is False
             return self.config.worker.worker_app == "synapse.app.user_dir"
         else:
             return (
-                self.config.server.worker_to_update_user_directory
+                self.config.worker.update_user_directory_on
                 == self.config.worker.worker_name
             )
 

@@ -40,7 +40,7 @@ from synapse.app._base import (
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
-from synapse.config.server import ANY_USER_DIRECTORY_WORKER, ListenerConfig
+from synapse.config.workers import ANY_USER_DIRECTORY_WORKER, ListenerConfig
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.server import JsonResource, OptionsResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -459,16 +459,15 @@ def start(config_options: List[str]) -> None:
 
     if config.worker.worker_app == "synapse.app.user_dir":
         if (
-            config.worker.worker_name != config.server.worker_to_update_user_directory
-            and config.server.worker_to_update_user_directory
-            is not ANY_USER_DIRECTORY_WORKER
+            config.worker.worker_name != config.worker.update_user_directory_on
+            and config.worker.update_user_directory_on is not ANY_USER_DIRECTORY_WORKER
         ):
             sys.stderr.write(
-                "\nThe worker_to_update_user_directory config variable must point to this worker's name"
+                "\nThe update_user_directory_on config variable must point to this worker's name"
                 "\nto give this worker exclusive access to run it. (It is currently pointed at "
-                f"{config.server.worker_to_update_user_directory!r})"
+                f"{config.worker.update_user_directory_on!r})"
                 "\nPlease add or edit "
-                f'``worker_to_update_user_directory: "{config.worker.worker_name}"`` in the main config\n'
+                f'``update_user_directory_on: "{config.worker.worker_name}"`` in the main config\n'
             )
             sys.exit(1)
 

@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Union
+import logging
+from typing import Any, List, Union
 
 import attr
 
@@ -23,6 +24,16 @@ from ._base import (
     ShardedWorkerHandlingConfig,
 )
 from .server import ListenerConfig, parse_listener_def
+
+logger = logging.Logger(__name__)
+
+# an object to pass to the "default" parameter, with which we can
+# `is` against to be sure we have an undefined config option.
+UNDEFINED = object()
+
+# an object to pass to self.worker_to_update_user_directory if
+# update_user_directory was defined, is used to compare with 'is'.
+ANY_USER_DIRECTORY_WORKER = object()
 
 _FEDERATION_SENDER_WITH_SEND_FEDERATION_ENABLED_ERROR = """
 The send_federation config option must be disabled in the main
@@ -36,6 +47,13 @@ The start_pushers config option must be disabled in the main
 synapse process before they can be run in a separate worker.
 
 Please add ``start_pushers: false`` to the main config
+"""
+
+USER_UPDATE_DIRECTORY_DEPRECATION_WARNING = """
+Synapse now uses 'worker_to_update_user_directory' over 'update_user_directory',
+you have set 'update_user_directory', and while synapse will work in a backwards
+compatible manner, it is suggested to change this value to use
+'worker_to_update_user_directory' instead.
 """
 
 
@@ -294,6 +312,37 @@ class WorkerConfig(Config):
             self.worker_name is None and background_tasks_instance == "master"
         ) or self.worker_name == background_tasks_instance
 
+        # Which worker is responsible for updating the user directory,
+        # None means the main process handles this.
+        # Eventually this is expected to hold None, a `str`, or ANY_USER_DIRECTORY_WORKER
+        # Consider this an `Any`, only match positively with '== worker_name', 'is None' or
+        # 'is ANY_USER_DIRECTORY_WORKER' to determine if the local process should be updating the directory.
+        self.update_user_directory_on: Any = config.get(
+            "update_user_directory_on", UNDEFINED
+        )
+
+        update_user_directory = config.get("update_user_directory", UNDEFINED)
+
+        # Resolve backwards compat between update_user_directory (UUD) and
+        # worker_to_update_user_directory (WTUUD):
+        # - if WTUUD is defined, just use it
+        # - if UUD and WTUUD are undefined, assume WTUUD is None
+        # - if UUD is defined (and True), assume WTUUD is None
+        # - if UUD is defined (and False), set sentinel object so that user_dir
+        #    workers will work normally.
+        if self.update_user_directory_on is UNDEFINED:
+            if update_user_directory is UNDEFINED:
+                self.update_user_directory_on = None
+            else:
+                logger.warning(USER_UPDATE_DIRECTORY_DEPRECATION_WARNING)
+                if update_user_directory:
+                    self.update_user_directory_on = None
+                else:
+                    self.update_user_directory_on = ANY_USER_DIRECTORY_WORKER
+
+        # Via all branches, this value is defined
+        assert self.update_user_directory_on is not UNDEFINED
+
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
         ## Workers ##
@@ -334,6 +383,12 @@ class WorkerConfig(Config):
         # data). If not provided this defaults to the main process.
         #
         #run_background_tasks_on: worker1
+
+        # The worker that is used to run user directory update tasks
+        # (e.g. users in public rooms, shared rooms between users.).
+        #
+        # If not provided, or null, this defaults to the main process.
+        #update_user_directory_on: null
 
         # A shared secret used by the replication APIs to authenticate HTTP requests
         # from workers.

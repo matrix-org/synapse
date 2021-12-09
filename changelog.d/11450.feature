@@ -1,1 +1,1 @@
-Introduce `worker_to_update_user_directory` config variable.
+Introduce `update_user_directory_on` config variable.

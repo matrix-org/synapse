@@ -35,14 +35,6 @@ from ._util import validate_config
 
 logger = logging.Logger(__name__)
 
-# an object to pass to the "default" parameter, with which we can
-# `is` against to be sure we have an undefined config option.
-UNDEFINED = object()
-
-# an object to pass to self.worker_to_update_user_directory if
-# update_user_directory was defined, is used to compare with 'is'.
-ANY_USER_DIRECTORY_WORKER = object()
-
 # by default, we attempt to listen on both '::' *and* '0.0.0.0' because some OSes
 # (Windows, macOS, other BSD/Linux where net.ipv6.bindv6only is set) will only listen
 # on IPv6 when '::' is set.
@@ -328,39 +320,6 @@ class ServerConfig(Config):
                 self.presence_router_module_class,
                 self.presence_router_config,
             ) = load_module(presence_router_config, ("presence", "presence_router"))
-
-        # Which worker is responsible for updating the user directory,
-        # None means the main process handles this.
-        # Eventually this is expected to hold None, a `str`, or ANY_USER_DIRECTORY_WORKER
-        # But it is possible for a user to pass a non-string value here as well, such as False,
-        # in which case that'll not match with anything.
-        # Consider this an `Any`, only match positively with '== worker_name', 'is None' or
-        # 'is ANY_USER_DIRECTORY_WORKER' to determine if the local process should be updating the directory.
-        self.worker_to_update_user_directory: Any = config.get(
-            "worker_to_update_user_directory", UNDEFINED
-        )
-
-        update_user_directory = config.get("update_user_directory", UNDEFINED)
-
-        # Resolve backwards compat between update_user_directory (UUD) and
-        # worker_to_update_user_directory (WTUUD):
-        # - if WTUUD is defined, just use it
-        # - if UUD and WTUUD are undefined, assume WTUUD is None
-        # - if UUD is defined (and True), assume WTUUD is None
-        # - if UUD is defined (and False), set sentinel object so that user_dir
-        #    workers will work normally.
-        if self.worker_to_update_user_directory is UNDEFINED:
-            if update_user_directory is UNDEFINED:
-                self.worker_to_update_user_directory = None
-            else:
-                logger.warning(USER_UPDATE_DIRECTORY_DEPRECATION_WARNING)
-                if update_user_directory:
-                    self.worker_to_update_user_directory = None
-                else:
-                    self.worker_to_update_user_directory = ANY_USER_DIRECTORY_WORKER
-
-        # Via all branches, this value is defined
-        assert self.worker_to_update_user_directory is not UNDEFINED
 
         # whether to enable the media repository endpoints. This should be set
         # to false if the media repository is running as a separate endpoint;
@@ -896,17 +855,6 @@ class ServerConfig(Config):
         #
         #limit_profile_requests_to_users_who_share_rooms: true
 
-        # User Directory Updates
-        #
-        # If specified, a worker with that name will be the only one able to update
-        # the user directory. Important for querying shared rooms. If the worker is
-        # specified, but not running, the user directory may become outdated.
-        #
-        # Defaults to null, meaning the main process will handle this.
-        #
-        # Set to false to make sure no process will handle the user_directory.
-        #worker_to_update_user_directory: null
-
         # Uncomment to prevent a user's profile data from being retrieved and
         # displayed in a room until they have joined it. By default, a user's
         # profile data is included in an invite event, regardless of the values
@@ -1395,13 +1343,6 @@ NO_MORE_WEB_CLIENT_WARNING = """
 Synapse no longer includes a web client. To enable a web client, configure
 web_client_location. To remove this warning, remove 'webclient' from the 'listeners'
 configuration.
-"""
-
-USER_UPDATE_DIRECTORY_DEPRECATION_WARNING = """
-Synapse now uses 'worker_to_update_user_directory' over 'update_user_directory',
-you have set 'update_user_directory', and while synapse will work in a backwards
-compatible manner, it is suggested to change this value to use
-'worker_to_update_user_directory' instead.
 """
 
 

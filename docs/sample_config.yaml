@@ -142,17 +142,6 @@ presence:
 #
 #limit_profile_requests_to_users_who_share_rooms: true
 
-# User Directory Updates
-#
-# If specified, a worker with that name will be the only one able to update
-# the user directory. Important for querying shared rooms. If the worker is
-# specified, but not running, the user directory may become outdated.
-#
-# Defaults to null, meaning the main process will handle this.
-#
-# Set to false to make sure no process will handle the user_directory.
-#worker_to_update_user_directory: null
-
 # Uncomment to prevent a user's profile data from being retrieved and
 # displayed in a room until they have joined it. By default, a user's
 # profile data is included in an invite event, regardless of the values
@@ -2629,6 +2618,12 @@ opentracing:
 # data). If not provided this defaults to the main process.
 #
 #run_background_tasks_on: worker1
+
+# The worker that is used to run user directory update tasks
+# (e.g. users in public rooms, shared rooms between users.).
+#
+# If not provided, or null, this defaults to the main process.
+#update_user_directory_on: null
 
 # A shared secret used by the replication APIs to authenticate HTTP requests
 # from workers.

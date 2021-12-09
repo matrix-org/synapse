@@ -374,7 +374,7 @@ the shared configuration would include:
 run_background_tasks_on: background_worker
 ```
 
-You might also wish to investigate the `worker_to_update_user_directory` and
+You might also wish to investigate the `update_user_directory_on` and
 `media_instance_running_background_jobs` settings.
 
 ### `synapse.app.pusher`
@@ -467,7 +467,7 @@ the following regular expressions:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/user_directory/search$
 
-When using this worker you must also set `worker_to_update_user_directory` in the
+When using this worker you must also set `update_user_directory_on` in the
 shared configuration file to the user directory worker's name to stop the main 
 synapse running background jobs related to updating the user directory, and give
 the user directory worker the exclusive right to update it instead.
