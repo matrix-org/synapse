@@ -471,6 +471,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             to_device_messages,
             _otks,
             _fbks,
+            _device_list_summary,
         ) = self.send_mock.call_args[0]
 
         # Assert that this was the same to-device message that local_user sent
@@ -583,7 +584,15 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         service_id_to_message_count: Dict[str, int] = {}
 
         for call in self.send_mock.call_args_list:
-            service, _events, _ephemeral, to_device_messages, _otks, _fbks = call[0]
+            (
+                service,
+                _events,
+                _ephemeral,
+                to_device_messages,
+                _otks,
+                _fbks,
+                _device_list_summary,
+            ) = call[0]
 
             # Check that this was made to an interested service
             self.assertIn(service, interested_appservices)
