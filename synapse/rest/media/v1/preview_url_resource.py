@@ -43,7 +43,11 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
 from synapse.rest.media.v1.media_storage import MediaStorage
 from synapse.rest.media.v1.oembed import OEmbedProvider
-from synapse.rest.media.v1.preview_html import _calc_og, _rebase_url, decode_body
+from synapse.rest.media.v1.preview_html import (
+    decode_body,
+    parse_html_to_open_graph,
+    rebase_url,
+)
 from synapse.types import JsonDict, UserID
 from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
@@ -300,7 +304,7 @@ class PreviewUrlResource(DirectServeJsonResource):
                 # If there was no oEmbed URL (or oEmbed parsing failed), attempt
                 # to generate the Open Graph information from the HTML.
                 if not oembed_url or not og:
-                    og = _calc_og(tree, media_info.uri)
+                    og = parse_html_to_open_graph(tree, media_info.uri)
 
                 await self._precache_image_url(user, media_info, og)
             else:
@@ -457,7 +461,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         # request itself and benefit from the same caching etc.  But for now we
         # just rely on the caching on the master request to speed things up.
         image_info = await self._download_url(
-            _rebase_url(og["og:image"], media_info.uri), user
+            rebase_url(og["og:image"], media_info.uri), user
         )
 
         if _is_media(image_info.media_type):

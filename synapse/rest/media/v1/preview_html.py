@@ -40,7 +40,9 @@ def _normalise_encoding(encoding: str) -> Optional[str]:
         return None
 
 
-def get_html_media_encodings(body: bytes, content_type: Optional[str]) -> Iterable[str]:
+def _get_html_media_encodings(
+    body: bytes, content_type: Optional[str]
+) -> Iterable[str]:
     """
     Get potential encoding of the body based on the (presumably) HTML body or the content-type header.
 
@@ -121,7 +123,7 @@ def decode_body(
     # The idea here is that multiple encodings are tried until one works.
     # Unfortunately the result is never used and then LXML will decode the string
     # again with the found encoding.
-    for encoding in get_html_media_encodings(body, content_type):
+    for encoding in _get_html_media_encodings(body, content_type):
         try:
             body.decode(encoding)
         except Exception:
@@ -142,11 +144,14 @@ def decode_body(
     return etree.fromstring(body, parser)
 
 
-def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
+def parse_html_to_open_graph(
+    tree: "etree.Element", media_uri: str
+) -> Dict[str, Optional[str]]:
     """
-    Calculate metadata for an HTML document.
+    Parse the HTML document into an Open Graph response.
 
-    This uses lxml to search the HTML document for Open Graph data.
+    This uses lxml to search the HTML document for Open Graph data (or
+    synthesizes it from the document).
 
     Args:
         tree: The parsed HTML document.
@@ -204,7 +209,7 @@ def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
             "//*/meta[translate(@itemprop, 'IMAGE', 'image')='image']/@content"
         )
         if meta_image:
-            og["og:image"] = _rebase_url(meta_image[0], media_uri)
+            og["og:image"] = rebase_url(meta_image[0], media_uri)
         else:
             # TODO: consider inlined CSS styles as well as width & height attribs
             images = tree.xpath("//img[@src][number(@width)>10][number(@height)>10]")
@@ -228,7 +233,7 @@ def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
         if meta_description:
             og["og:description"] = meta_description[0]
         else:
-            og["og:description"] = _calc_description(tree)
+            og["og:description"] = parse_html_description(tree)
     elif og["og:description"]:
         # This must be a non-empty string at this point.
         assert isinstance(og["og:description"], str)
@@ -239,7 +244,7 @@ def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
     return og
 
 
-def _calc_description(tree: "etree.Element") -> Optional[str]:
+def parse_html_description(tree: "etree.Element") -> Optional[str]:
     """
     Calculate a text description based on an HTML document.
 
@@ -315,7 +320,7 @@ def _iterate_over_text(
             )
 
 
-def _rebase_url(url: str, base: str) -> str:
+def rebase_url(url: str, base: str) -> str:
     base_parts = list(urlparse.urlparse(base))
     url_parts = list(urlparse.urlparse(url))
     if not url_parts[0]:  # fix up schema
