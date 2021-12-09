@@ -31,6 +31,7 @@ from synapse.types import Requester
 
 from tests import unittest
 from tests.test_utils import simple_async_mock
+from tests.unittest import override_config
 from tests.utils import mock_getRawHeaders
 
 
@@ -210,6 +211,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         self.get_failure(self.auth.get_user_by_req(request), AuthError)
 
+    @override_config({"experimental_features": {"msc3202_device_masquerading": True}})
     def test_get_user_by_req_appservice_valid_token_valid_device_id(self):
         """
         Tests that when an application service passes the device_id URL parameter
@@ -241,6 +243,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
         self.assertEquals(requester.device_id, masquerading_device_id.decode("utf8"))
 
+    @override_config({"experimental_features": {"msc3202_device_masquerading": True}})
     def test_get_user_by_req_appservice_valid_token_invalid_device_id(self):
         """
         Tests that when an application service passes the device_id URL parameter
