@@ -33,9 +33,8 @@ from synapse.metrics.background_process_metrics import (
     wrap_as_background_process,
 )
 from synapse.storage.databases.main.directory import RoomAliasMapping
-from synapse.types import JsonDict, RoomAlias, RoomStreamToken, UserID
+from synapse.types import DeviceLists, JsonDict, RoomAlias, RoomStreamToken, UserID
 from synapse.util.async_helpers import Linearizer
-from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -344,22 +343,16 @@ class ApplicationServicesHandler:
                         )
 
                     elif stream_key == "device_list_key":
-                        users_whose_device_lists_changed = await self._get_device_list_changes(
+                        device_list_summary = await self._get_device_list_summary(
                             service, new_token
                         )
-                        if users_whose_device_lists_changed:
-                            # TODO: Have a way of including things in an outgoing appservice
-                            #   transaction that's not "events" or "ephemeral"
-                            payload = [{
-                                "changed": users_whose_device_lists_changed,
-                                "left": [],
-                            }]
-                            self.scheduler.submit_ephemeral_events_for_as(
-                                service, payload
+                        if device_list_summary:
+                            self.scheduler.enqueue_for_appservice(
+                                service, device_list_summary=device_list_summary
                             )
 
                         # Persist the latest handled stream token for this appservice
-                        await self.store.set_type_stream_id_for_appservice(
+                        await self.store.set_appservice_stream_type_pos(
                             service, "device_list", new_token
                         )
 
@@ -568,11 +561,11 @@ class ApplicationServicesHandler:
 
         return message_payload
 
-    async def _get_device_list_changes(
+    async def _get_device_list_summary(
         self,
         appservice: ApplicationService,
         new_key: int,
-    ) -> List[str]:
+    ) -> DeviceLists:
         """
         Retrieve a list of users who have changed their device lists.
 
@@ -581,8 +574,9 @@ class ApplicationServicesHandler:
             new_key: The stream key of the device list change that triggered this method call.
 
         Returns:
-            A list of users whose device lists have changed and need to be resynced by the
-            appservice.
+            A set of device list updates, comprised of users that the appservices needs to:
+                * resync the device list of, and
+                * stop tracking the device list of.
         """
         # Fetch the last successfully processed device list update stream ID
         # for this appservice.
@@ -591,21 +585,31 @@ class ApplicationServicesHandler:
         )
 
         # Fetch the users who have modified their device list since then.
-        users_with_changed_device_lists = await self.store.get_users_whose_devices_changed(
-            from_key, filter_user_ids=None, to_key=new_key
+        users_with_changed_device_lists = (
+            await self.store.get_users_whose_devices_changed(
+                from_key, filter_user_ids=None, to_key=new_key
+            )
         )
 
         # Filter out any users the application service is not interested in
         #
         # For each user who changed their device list, we want to check whether this
-        # appservice would be interested in the change
-        filtered_users_with_changed_device_lists = [
+        # appservice would be interested in the change.
+        filtered_users_with_changed_device_lists = {
             user_id
             for user_id in users_with_changed_device_lists
-            if self._is_appservice_interested_in_device_lists_of_user(appservice, user_id)
-        ]
+            if self._is_appservice_interested_in_device_lists_of_user(
+                appservice, user_id
+            )
+        }
 
-        return filtered_users_with_changed_device_lists
+        # Create a summary of "changed" and "left" users.
+        # TODO: Calculate "left" users.
+        device_list_summary = DeviceLists(
+            changed=filtered_users_with_changed_device_lists
+        )
+
+        return device_list_summary
 
     async def _is_appservice_interested_in_device_lists_of_user(
         self,
@@ -641,9 +645,7 @@ class ApplicationServicesHandler:
         for room_id in room_ids:
             # This method covers checking room members for appservice interest as well as
             # room ID and alias checks.
-            if await appservice.is_interested_in_room(
-                room_id, self.store
-            ):
+            if await appservice.is_interested_in_room(room_id, self.store):
                 return True
 
         return False

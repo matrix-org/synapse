@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Iterable, List, Match, Optional
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.types import GroupID, JsonDict, UserID, get_domain_from_id
+from synapse.types import DeviceLists, GroupID, JsonDict, UserID, get_domain_from_id
 from synapse.util.caches.descriptors import _CacheContext, cached
 
 if TYPE_CHECKING:
@@ -305,10 +305,7 @@ class ApplicationService:
         return False
 
     def is_user_in_namespace(self, user_id: str) -> bool:
-        return (
-            bool(self._matches_regex(user_id, ApplicationService.NS_USERS))
-            or user_id == self.sender
-        )
+        return bool(self._matches_regex(user_id, ApplicationService.NS_USERS))
 
     def is_room_alias_in_namespace(self, alias: str) -> bool:
         return bool(self._matches_regex(alias, ApplicationService.NS_ALIASES))
@@ -377,12 +374,14 @@ class AppServiceTransaction:
         events: List[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
+        device_list_summary: DeviceLists,
     ):
         self.service = service
         self.id = id
         self.events = events
         self.ephemeral = ephemeral
         self.to_device_messages = to_device_messages
+        self.device_list_summary = device_list_summary
 
     async def send(self, as_api: "ApplicationServiceApi") -> bool:
         """Sends this transaction using the provided AS API interface.
@@ -397,6 +396,7 @@ class AppServiceTransaction:
             events=self.events,
             ephemeral=self.ephemeral,
             to_device_messages=self.to_device_messages,
+            device_list_summary=self.device_list_summary,
             txn_id=self.id,
         )
 

@@ -555,7 +555,10 @@ class DeviceWorkerStore(SQLBaseStore):
         }
 
     async def get_users_whose_devices_changed(
-        self, from_key: int, filter_user_ids: Optional[Iterable[str]] = None, to_key: Optional[int] = None
+        self,
+        from_key: int,
+        filter_user_ids: Optional[Iterable[str]] = None,
+        to_key: Optional[int] = None,
     ) -> Set[str]:
         """Get set of users whose devices have changed since `from_key` that
         are in the given list of user_ids.

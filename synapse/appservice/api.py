@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +14,7 @@
 # limitations under the License.
 import logging
 import urllib
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 from prometheus_client import Counter
 
@@ -22,7 +23,7 @@ from synapse.api.errors import CodeMessageException
 from synapse.events import EventBase
 from synapse.events.utils import serialize_event
 from synapse.http.client import SimpleHttpClient
-from synapse.types import JsonDict, ThirdPartyInstanceID
+from synapse.types import DeviceLists, JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
 
 if TYPE_CHECKING:
@@ -205,6 +206,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         events: List[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
+        device_list_summary: DeviceLists,
         txn_id: Optional[int] = None,
     ) -> bool:
         """
@@ -233,13 +235,26 @@ class ApplicationServiceApi(SimpleHttpClient):
         uri = service.url + ("/transactions/%s" % urllib.parse.quote(str(txn_id)))
 
         # Never send ephemeral events to appservices that do not support it
-        body: Dict[str, List[JsonDict]] = {"events": serialized_events}
+        body: Dict[str, Union[JsonDict, List[JsonDict]]] = {"events": serialized_events}
         if service.supports_ephemeral:
             body.update(
                 {
                     # TODO: Update to stable prefixes once MSC2409 completes FCP merge.
                     "de.sorunome.msc2409.ephemeral": ephemeral,
                     "de.sorunome.msc2409.to_device": to_device_messages,
+                }
+            )
+
+        # Send device list summaries if needed
+        if device_list_summary:
+            logger.info("Sending device list summary: %s", device_list_summary)
+            body.update(
+                {
+                    # TODO: Update to stable prefix once MSC3202 completes FCP merge
+                    "org.matrix.msc3202.device_lists": {
+                        "changed": list(device_list_summary.changed),
+                        "left": list(device_list_summary.left),
+                    }
                 }
             )
 
