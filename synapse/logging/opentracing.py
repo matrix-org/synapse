@@ -168,9 +168,10 @@ import inspect
 import logging
 import re
 from functools import wraps
-from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Pattern, Type
+from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Pattern, Type, Union
 
 import attr
+from mypy.typeshed.stdlib.modulefinder import Module
 
 from twisted.internet import defer
 from twisted.web.http_headers import Headers
@@ -216,14 +217,13 @@ class _DummyTagNames:
     SPAN_KIND_RPC_CLIENT = INVALID_TAG
     SPAN_KIND_RPC_SERVER = INVALID_TAG
 
-
 try:
     import opentracing
 
     tags = opentracing.tags
 except ImportError:
-    opentracing = None
-    tags = _DummyTagNames
+    opentracing = None  # type: ignore[assignment]
+    tags = _DummyTagNames  # type: ignore[assignment]
 try:
     from jaeger_client import Config as JaegerConfig
 
@@ -366,7 +366,7 @@ def init_tracer(hs: "HomeServer"):
     global opentracing
     if not hs.config.tracing.opentracer_enabled:
         # We don't have a tracer
-        opentracing = None
+        opentracing = None  # type: ignore[assignment]
         return
 
     if not opentracing or not JaegerConfig:
@@ -452,7 +452,7 @@ def start_active_span(
     """
 
     if opentracing is None:
-        return noop_context_manager()
+        return noop_context_manager()  # type: ignore[unreachable]
 
     return opentracing.tracer.start_active_span(
         operation_name,
@@ -477,7 +477,7 @@ def start_active_span_follows_from(
            forced, the new span will also have tracing forced.
     """
     if opentracing is None:
-        return noop_context_manager()
+        return noop_context_manager()  # type: ignore[unreachable]
 
     references = [opentracing.follows_from(context) for context in contexts]
     scope = start_active_span(operation_name, references=references)
@@ -514,7 +514,7 @@ def start_active_span_from_request(
     # Also, twisted uses byte arrays while opentracing expects strings.
 
     if opentracing is None:
-        return noop_context_manager()
+        return noop_context_manager()  # type: ignore[unreachable]
 
     header_dict = {
         k.decode(): v[0].decode() for k, v in request.requestHeaders.getAllRawHeaders()
@@ -553,7 +553,7 @@ def start_active_span_from_edu(
     references = references or []
 
     if opentracing is None:
-        return noop_context_manager()
+        return noop_context_manager() # type: ignore[unreachable]
 
     carrier = json_decoder.decode(edu_content.get("context", "{}")).get(
         "opentracing", {}
@@ -594,18 +594,21 @@ def active_span():
 @ensure_active_span("set a tag")
 def set_tag(key, value):
     """Sets a tag on the active span"""
+    assert opentracing.tracer.active_span is not None
     opentracing.tracer.active_span.set_tag(key, value)
 
 
 @ensure_active_span("log")
 def log_kv(key_values, timestamp=None):
     """Log to the active span"""
+    assert opentracing.tracer.active_span is not None
     opentracing.tracer.active_span.log_kv(key_values, timestamp)
 
 
 @ensure_active_span("set the traces operation name")
 def set_operation_name(operation_name):
     """Sets the operation name of the active span"""
+    assert opentracing.tracer.active_span is not None
     opentracing.tracer.active_span.set_operation_name(operation_name)
 
 
@@ -674,6 +677,7 @@ def inject_header_dict(
     span = opentracing.tracer.active_span
 
     carrier: Dict[str, str] = {}
+    assert span is not None
     opentracing.tracer.inject(span.context, opentracing.Format.HTTP_HEADERS, carrier)
 
     for key, value in carrier.items():
@@ -716,6 +720,7 @@ def get_active_span_text_map(destination=None):
         return {}
 
     carrier: Dict[str, str] = {}
+    assert opentracing.tracer.active_span is not None
     opentracing.tracer.inject(
         opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
     )
@@ -731,6 +736,7 @@ def active_span_context_as_string():
     """
     carrier: Dict[str, str] = {}
     if opentracing:
+        assert opentracing.tracer.active_span is not None
         opentracing.tracer.inject(
             opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
         )
@@ -773,7 +779,7 @@ def trace(func=None, opname=None):
 
     def decorator(func):
         if opentracing is None:
-            return func
+            return func  # type: ignore[unreachable]
 
         _opname = opname if opname else func.__name__
 
@@ -864,7 +870,7 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
     """
 
     if opentracing is None:
-        yield
+        yield  # type: ignore[unreachable]
         return
 
     request_tags = {
