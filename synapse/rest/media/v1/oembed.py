@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, List, Optional
 
 import attr
 
+from synapse.rest.media.v1.preview_html import _calc_description
 from synapse.types import JsonDict
 from synapse.util import json_decoder
 
@@ -244,8 +245,6 @@ def calc_description_and_urls(open_graph_response: JsonDict, html_body: str) -> 
     video_urls = _fetch_urls(tree, "video") + _fetch_urls(tree, "embed")
     if video_urls:
         open_graph_response["og:video"] = video_urls[0]
-
-    from synapse.rest.media.v1.preview_url_resource import _calc_description
 
     description = _calc_description(tree)
     if description:

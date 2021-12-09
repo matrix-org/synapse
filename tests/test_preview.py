@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.rest.media.v1.preview_url_resource import (
+from synapse.rest.media.v1.preview_html import (
     _calc_og,
     decode_body,
     get_html_media_encodings,
