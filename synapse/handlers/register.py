@@ -615,7 +615,7 @@ class RegistrationHandler:
         service = self.store.get_app_service_by_token(as_token)
         if not service:
             raise AuthError(403, "Invalid application service token.")
-        if not service.is_user_in_namespace(user_id):
+        if not service.is_interested_in_user(user_id):
             raise SynapseError(
                 400,
                 "Invalid user localpart for this application service.",
@@ -650,7 +650,7 @@ class RegistrationHandler:
         interested_services = [
             s
             for s in services
-            if s.is_user_in_namespace(user_id) and s != allowed_appservice
+            if s.is_interested_in_user(user_id) and s != allowed_appservice
         ]
         for service in interested_services:
             if service.is_exclusive_user(user_id):

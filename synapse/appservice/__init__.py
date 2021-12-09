@@ -167,7 +167,7 @@ class ApplicationService:
 
         # check joined member events
         for user_id in member_list:
-            if self.is_user_in_namespace(user_id):
+            if self.is_interested_in_user(user_id):
                 return True
         return False
 
@@ -193,7 +193,7 @@ class ApplicationService:
             # User is the appservice's sender_localpart user
             user_id == self.sender
             # User is in a defined namespace
-            or self.is_user_in_namespace(user_id)
+            or self.is_interested_in_user(user_id)
         )
 
     @cached(num_args=1, cache_context=True)
@@ -259,11 +259,11 @@ class ApplicationService:
 
         # Check if we're interested in this user by namespace (or if they're the
         # sender_localpart user)
-        if self.is_user_in_namespace(event.sender):
+        if self.is_interested_in_user(event.sender):
             return True
 
         # or, if this is a membership event, the user it references by namespace
-        if event.type == EventTypes.Member and self.is_user_in_namespace(
+        if event.type == EventTypes.Member and self.is_interested_in_user(
             event.state_key
         ):
             return True
@@ -292,7 +292,7 @@ class ApplicationService:
             True if this service would like to know about presence for this user.
         """
         # Find all the rooms the sender is in
-        if self.is_user_in_namespace(user_id.to_string()):
+        if self.is_interested_in_user(user_id.to_string()):
             return True
         room_ids = await store.get_rooms_for_user(user_id.to_string())
 

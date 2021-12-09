@@ -522,7 +522,7 @@ class ApplicationServicesHandler:
             if isinstance(user, UserID):
                 user = user.to_string()
 
-            if service.is_user_in_namespace(user):
+            if service.is_interested_in_user(user):
                 users_appservice_is_interested_in.append(user)
 
         if not users_appservice_is_interested_in:
@@ -636,7 +636,7 @@ class ApplicationServicesHandler:
             True if the application service is interested in the user's device lists, False
             otherwise.
         """
-        if appservice.is_user_in_namespace(user_id):
+        if appservice.is_interested_in_user(user_id):
             return True
 
         # FIXME: This is quite an expensive check. This method is called per device
@@ -775,7 +775,7 @@ class ApplicationServicesHandler:
 
     def _get_services_for_user(self, user_id: str) -> List[ApplicationService]:
         services = self.store.get_app_services()
-        return [s for s in services if (s.is_user_in_namespace(user_id))]
+        return [s for s in services if (s.is_interested_in_user(user_id))]
 
     def _get_services_for_3pn(self, protocol: str) -> List[ApplicationService]:
         services = self.store.get_app_services()
