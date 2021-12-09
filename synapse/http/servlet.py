@@ -246,7 +246,7 @@ def parse_boolean_from_args(
             message = (
                 "Boolean query parameter %r must be one of ['true', 'false']"
             ) % (name,)
-            raise SynapseError(400, message)
+            raise SynapseError(400, message, errcode=Codes.INVALID_PARAM)
     else:
         if required:
             message = "Missing boolean query parameter %r" % (name,)
@@ -414,7 +414,7 @@ def _parse_string_value(
             name,
             ", ".join(repr(v) for v in allowed_values),
         )
-        raise SynapseError(400, message)
+        raise SynapseError(400, message, errcode=Codes.INVALID_PARAM)
     else:
         return value_str
 

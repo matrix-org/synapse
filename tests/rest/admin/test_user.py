@@ -608,7 +608,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
-        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # invalid deactivated
         channel = self.make_request(
@@ -618,7 +618,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
-        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # unkown order_by
         channel = self.make_request(
@@ -628,7 +628,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
-        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # invalid search order
         channel = self.make_request(
@@ -638,7 +638,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
-        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
     def test_limit(self):
         """
@@ -2896,7 +2896,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
-        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # invalid search order
         channel = self.make_request(
@@ -2906,7 +2906,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
-        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # negative limit
         channel = self.make_request(

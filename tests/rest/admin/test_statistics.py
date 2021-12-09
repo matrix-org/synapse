@@ -92,7 +92,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             channel.code,
             msg=channel.json_body,
         )
-        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # negative from
         channel = self.make_request(
