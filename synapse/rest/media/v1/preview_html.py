@@ -15,10 +15,11 @@ import codecs
 import itertools
 import logging
 import re
-from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Set, Union
+from typing import TYPE_CHECKING, Dict, Generator, Iterable, Iterator, Optional, Set
 
 if TYPE_CHECKING:
-    from lxml import etree
+    from bs4 import BeautifulSoup
+    from bs4.element import PageElement, Tag
 
 logger = logging.getLogger(__name__)
 
@@ -103,9 +104,9 @@ def _get_html_media_encodings(
 
 def decode_body(
     body: bytes, uri: str, content_type: Optional[str] = None
-) -> Optional["etree.Element"]:
+) -> Optional["BeautifulSoup"]:
     """
-    This uses lxml to parse the HTML document.
+    This uses BeautifulSoup to parse the HTML document.
 
     Args:
         body: The HTML document, as bytes.
@@ -119,36 +120,25 @@ def decode_body(
     if not body:
         return None
 
-    # The idea here is that multiple encodings are tried until one works.
-    # Unfortunately the result is never used and then LXML will decode the string
-    # again with the found encoding.
-    for encoding in _get_html_media_encodings(body, content_type):
-        try:
-            body.decode(encoding)
-        except Exception:
-            pass
-        else:
-            break
-    else:
+    from bs4 import BeautifulSoup
+    from bs4.builder import ParserRejectedMarkup
+
+    try:
+        soup = BeautifulSoup(body, "lxml")
+        # If an empty document is returned, convert to None.
+        if not len(soup):
+            return None
+        return soup
+    except ParserRejectedMarkup:
         logger.warning("Unable to decode HTML body for %s", uri)
         return None
 
-    from lxml import etree
 
-    # Create an HTML parser.
-    parser = etree.HTMLParser(recover=True, encoding=encoding)
-
-    # Attempt to parse the body. Returns None if the body was successfully
-    # parsed, but no tree was found.
-    return etree.fromstring(body, parser)
-
-
-def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
+def parse_html_to_open_graph(tree: "BeautifulSoup") -> Dict[str, Optional[str]]:
     """
-    Parse the HTML document into an Open Graph response.
+    Calculate metadata for an HTML document.
 
-    This uses lxml to search the HTML document for Open Graph data (or
-    synthesizes it from the document).
+    This uses BeautifulSoup to search the HTML document for Open Graph data.
 
     Args:
         tree: The parsed HTML document.
@@ -174,13 +164,12 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     # "og:video:secure_url": "https://www.youtube.com/v/LXDBoHyjmtw?version=3",
 
     og: Dict[str, Optional[str]] = {}
-    for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
-        if "content" in tag.attrib:
-            # if we've got more than 50 tags, someone is taking the piss
-            if len(og) >= 50:
-                logger.warning("Skipping OG for page with too many 'og:' tags")
-                return {}
-            og[tag.attrib["property"]] = tag.attrib["content"]
+    for tag in tree.find_all("meta", property=re.compile(r"^og:"), content=True):
+        # if we've got more than 50 tags, someone is taking the piss
+        if len(og) >= 50:
+            logger.warning("Skipping OG for page with too many 'og:' tags")
+            return {}
+        og[tag["property"]] = tag["content"]
 
     # TODO: grab article: meta tags too, e.g.:
 
@@ -193,41 +182,41 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
 
     if "og:title" not in og:
         # do some basic spidering of the HTML
-        title = tree.xpath("(//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1]")
-        if title and title[0].text is not None:
-            og["og:title"] = title[0].text.strip()
+        title = tree.find(("title", "h1", "h2", "h3"))
+        if title and title.string:
+            og["og:title"] = title.string.strip()
         else:
             og["og:title"] = None
 
     if "og:image" not in og:
         # TODO: extract a favicon failing all else
-        meta_image = tree.xpath(
-            "//*/meta[translate(@itemprop, 'IMAGE', 'image')='image']/@content"
-        )
+        meta_image = tree.find("meta", image="image")
         if meta_image:
-            og["og:image"] = meta_image[0]
+            og["og:image"] = meta_image["content"]
         else:
             # TODO: consider inlined CSS styles as well as width & height attribs
-            images = tree.xpath("//img[@src][number(@width)>10][number(@height)>10]")
+            def greater_than(tag: "Tag") -> bool:
+                if "width" not in tag or "height" not in tag:
+                    return False
+                try:
+                    return int(tag["width"]) > 10 and int(tag["height"]) > 10
+                except ValueError:
+                    return False
+
+            images = tree.find_all("img", src=True, width=greater_than)
             images = sorted(
                 images,
-                key=lambda i: (
-                    -1 * float(i.attrib["width"]) * float(i.attrib["height"])
-                ),
+                key=lambda i: (-1 * float(i["width"]) * float(i["height"])),
             )
             if not images:
-                images = tree.xpath("//img[@src]")
+                images = tree.find_all("img", src=True)
             if images:
-                og["og:image"] = images[0].attrib["src"]
+                og["og:image"] = images[0]["src"]
 
     if "og:description" not in og:
-        meta_description = tree.xpath(
-            "//*/meta"
-            "[translate(@name, 'DESCRIPTION', 'description')='description']"
-            "/@content"
-        )
+        meta_description = tree.find("meta", description="description")
         if meta_description:
-            og["og:description"] = meta_description[0]
+            og["og:description"] = meta_description["content"]
         else:
             og["og:description"] = parse_html_description(tree)
     elif og["og:description"]:
@@ -240,7 +229,7 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     return og
 
 
-def parse_html_description(tree: "etree.Element") -> Optional[str]:
+def parse_html_description(tree: "BeautifulSoup") -> Optional[str]:
     """
     Calculate a text description based on an HTML document.
 
@@ -256,9 +245,6 @@ def parse_html_description(tree: "etree.Element") -> Optional[str]:
     Returns:
         The plain text description, or None if one cannot be generated.
     """
-    # We don't just use XPATH here as that is slow on some machines.
-
-    from lxml import etree
 
     TAGS_TO_REMOVE = (
         "header",
@@ -268,7 +254,6 @@ def parse_html_description(tree: "etree.Element") -> Optional[str]:
         "script",
         "noscript",
         "style",
-        etree.Comment,
     )
 
     # Split all the text nodes into paragraphs (by splitting on new
@@ -281,39 +266,32 @@ def parse_html_description(tree: "etree.Element") -> Optional[str]:
 
 
 def _iterate_over_text(
-    tree: "etree.Element", *tags_to_ignore: Iterable[Union[str, "etree.Comment"]]
+    tree: Optional["Tag"], *tags_to_ignore: Iterable[str]
 ) -> Generator[str, None, None]:
     """Iterate over the tree returning text nodes in a depth first fashion,
     skipping text nodes inside certain tags.
     """
+    if not tree:
+        return
+
+    from bs4.element import NavigableString, Tag
+
     # This is basically a stack that we extend using itertools.chain.
     # This will either consist of an element to iterate over *or* a string
     # to be returned.
-    elements = iter([tree])
+    elements: Iterator["PageElement"] = iter([tree])
     while True:
         el = next(elements, None)
         if el is None:
             return
 
-        if isinstance(el, str):
-            yield el
-        elif el.tag not in tags_to_ignore:
-            # el.text is the text before the first child, so we can immediately
-            # return it if the text exists.
-            if el.text:
-                yield el.text
-
-            # We add to the stack all the elements children, interspersed with
-            # each child's tail text (if it exists). The tail text of a node
-            # is text that comes *after* the node, so we always include it even
-            # if we ignore the child node.
-            elements = itertools.chain(
-                itertools.chain.from_iterable(  # Basically a flatmap
-                    [child, child.tail] if child.tail else [child]
-                    for child in el.iterchildren()
-                ),
-                elements,
-            )
+        # Do not consider sub-classes of NavigableString since those represent
+        # comments, etc.
+        if type(el) == NavigableString:
+            yield str(el)
+        elif isinstance(el, Tag) and el.name not in tags_to_ignore:
+            # We add to the stack all the elements children.
+            elements = itertools.chain(el.contents, elements)
 
 
 def summarize_paragraphs(

@@ -22,7 +22,7 @@ from synapse.types import JsonDict
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
-    from lxml import etree
+    from bs4 import BeautifulSoup
 
     from synapse.server import HomeServer
 
@@ -97,7 +97,7 @@ class OEmbedProvider:
         # No match.
         return None
 
-    def autodiscover_from_html(self, tree: "etree.Element") -> Optional[str]:
+    def autodiscover_from_html(self, tree: "BeautifulSoup") -> Optional[str]:
         """
         Search an HTML document for oEmbed autodiscovery information.
 
@@ -108,18 +108,14 @@ class OEmbedProvider:
             The URL to use for oEmbed information, or None if no URL was found.
         """
         # Search for link elements with the proper rel and type attributes.
-        for tag in tree.xpath(
-            "//link[@rel='alternate'][@type='application/json+oembed']"
-        ):
-            if "href" in tag.attrib:
-                return tag.attrib["href"]
-
         # Some providers (e.g. Flickr) use alternative instead of alternate.
-        for tag in tree.xpath(
-            "//link[@rel='alternative'][@type='application/json+oembed']"
+        for tag in tree.find_all(
+            "link",
+            rel=("alternate", "alternative"),
+            type="application/json+oembed",
+            href=True,
         ):
-            if "href" in tag.attrib:
-                return tag.attrib["href"]
+            return tag["href"]
 
         return None
 
@@ -202,19 +198,15 @@ class OEmbedProvider:
         return OEmbedResult(open_graph_response, author_name, cache_age)
 
 
-def _fetch_urls(tree: "etree.Element", tag_name: str) -> List[str]:
-    results = []
-    for tag in tree.xpath("//*/" + tag_name):
-        if "src" in tag.attrib:
-            results.append(tag.attrib["src"])
-    return results
+def _fetch_urls(tree: "BeautifulSoup", tag_name: str) -> List[str]:
+    return [tag["src"] for tag in tree.find_all(tag_name, src=True)]
 
 
 def calc_description_and_urls(open_graph_response: JsonDict, html_body: str) -> None:
     """
     Calculate description for an HTML document.
 
-    This uses lxml to convert the HTML document into plaintext. If errors
+    This uses BeautifulSoup to convert the HTML document into plaintext. If errors
     occur during processing of the document, an empty response is returned.
 
     Args:
@@ -228,16 +220,16 @@ def calc_description_and_urls(open_graph_response: JsonDict, html_body: str) -> 
     if not html_body:
         return
 
-    from lxml import etree
+    from bs4 import BeautifulSoup
+    from bs4.builder import ParserRejectedMarkup
 
-    # Create an HTML parser. If this fails, log and return no metadata.
-    parser = etree.HTMLParser(recover=True, encoding="utf-8")
-
-    # Attempt to parse the body. If this fails, log and return no metadata.
-    tree = etree.fromstring(html_body, parser)
-
-    # The data was successfully parsed, but no tree was found.
-    if tree is None:
+    try:
+        tree = BeautifulSoup(html_body, "lxml")
+        # If an empty document is returned, convert to None.
+        if not len(tree):
+            return
+    except ParserRejectedMarkup:
+        logger.warning("Unable to decode HTML body")
         return
 
     # Attempt to find interesting URLs (images, videos, embeds).

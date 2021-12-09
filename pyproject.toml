@@ -173,6 +173,7 @@ authlib = { version = ">=0.14.0", optional = true }
 # Note: systemd-python 231 appears to have been yanked from pypi
 systemd-python = { version = ">=231", optional = true }
 lxml = { version = ">=4.2.0", optional = true }
+beautifulsoup4 = { version = ">=4.10.0", optional = true }
 sentry-sdk = { version = ">=0.7.2", optional = true }
 opentracing = { version = ">=2.2.0", optional = true }
 jaeger-client = { version = ">=4.0.0", optional = true }
@@ -194,7 +195,7 @@ oidc = ["authlib"]
 # `systemd.journal.JournalHandler`, as is documented in
 # `contrib/systemd/log_config.yaml`.
 systemd = ["systemd-python"]
-url_preview = ["lxml"]
+url_preview = ["lxml", "beautifulsoup4"]
 sentry = ["sentry-sdk"]
 opentracing = ["jaeger-client", "opentracing"]
 jwt = ["pyjwt"]
