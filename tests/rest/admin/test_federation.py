@@ -95,7 +95,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
-        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # invalid search order
         channel = self.make_request(
@@ -105,7 +105,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
-        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
         # invalid destination
         channel = self.make_request(
