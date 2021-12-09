@@ -257,7 +257,8 @@ class ApplicationService:
         """
         # Do cheap checks first
 
-        # Check if we're interested in this user by namespace
+        # Check if we're interested in this user by namespace (or if they're the
+        # sender_localpart user)
         if self.is_user_in_namespace(event.sender):
             return True
 
