@@ -1,1 +1,0 @@
-Blacklist new SyTest that checks that key uploads are valid pending the validation being implemented in Synapse.

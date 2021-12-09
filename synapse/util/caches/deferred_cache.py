@@ -22,6 +22,7 @@ from typing import (
     Iterable,
     MutableMapping,
     Optional,
+    Sized,
     TypeVar,
     Union,
     cast,
@@ -104,7 +105,13 @@ class DeferredCache(Generic[KT, VT]):
             max_size=max_entries,
             cache_name=name,
             cache_type=cache_type,
-            size_callback=(lambda d: len(d) or 1) if iterable else None,
+            size_callback=(
+                (lambda d: len(cast(Sized, d)) or 1)
+                # Argument 1 to "len" has incompatible type "VT"; expected "Sized"
+                # We trust that `VT` is `Sized` when `iterable` is `True`
+                if iterable
+                else None
+            ),
             metrics_collection_callback=metrics_cb,
             apply_cache_factor_from_config=apply_cache_factor_from_config,
             prune_unread_entries=prune_unread_entries,
@@ -289,7 +296,7 @@ class DeferredCache(Generic[KT, VT]):
         callbacks = [callback] if callback else []
         self.cache.set(key, value, callbacks=callbacks)
 
-    def invalidate(self, key) -> None:
+    def invalidate(self, key: KT) -> None:
         """Delete a key, or tree of entries
 
         If the cache is backed by a regular dict, then "key" must be of

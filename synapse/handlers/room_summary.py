@@ -36,8 +36,9 @@ from synapse.api.errors import (
     SynapseError,
     UnsupportedRoomVersionError,
 )
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.events import EventBase
-from synapse.types import JsonDict
+from synapse.types import JsonDict, Requester
 from synapse.util.caches.response_cache import ResponseCache
 
 if TYPE_CHECKING:
@@ -93,11 +94,14 @@ class RoomSummaryHandler:
         self._event_serializer = hs.get_event_client_serializer()
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()
+        self._ratelimiter = Ratelimiter(
+            store=self._store, clock=hs.get_clock(), rate_hz=5, burst_count=10
+        )
 
         # If a user tries to fetch the same page multiple times in quick succession,
         # only process the first attempt and return its result to subsequent requests.
         self._pagination_response_cache: ResponseCache[
-            Tuple[str, bool, Optional[int], Optional[int], Optional[str]]
+            Tuple[str, str, bool, Optional[int], Optional[int], Optional[str]]
         ] = ResponseCache(
             hs.get_clock(),
             "get_room_hierarchy",
@@ -249,7 +253,7 @@ class RoomSummaryHandler:
 
     async def get_room_hierarchy(
         self,
-        requester: str,
+        requester: Requester,
         requested_room_id: str,
         suggested_only: bool = False,
         max_depth: Optional[int] = None,
@@ -276,15 +280,24 @@ class RoomSummaryHandler:
         Returns:
             The JSON hierarchy dictionary.
         """
+        await self._ratelimiter.ratelimit(requester)
+
         # If a user tries to fetch the same page multiple times in quick succession,
         # only process the first attempt and return its result to subsequent requests.
         #
         # This is due to the pagination process mutating internal state, attempting
         # to process multiple requests for the same page will result in errors.
         return await self._pagination_response_cache.wrap(
-            (requested_room_id, suggested_only, max_depth, limit, from_token),
+            (
+                requester.user.to_string(),
+                requested_room_id,
+                suggested_only,
+                max_depth,
+                limit,
+                from_token,
+            ),
             self._get_room_hierarchy,
-            requester,
+            requester.user.to_string(),
             requested_room_id,
             suggested_only,
             max_depth,

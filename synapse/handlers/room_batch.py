@@ -217,6 +217,7 @@ class RoomBatchHandler:
                     action=membership,
                     content=event_dict["content"],
                     outlier=True,
+                    historical=True,
                     prev_event_ids=prev_event_ids_for_state_chain,
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
@@ -236,6 +237,7 @@ class RoomBatchHandler:
                     ),
                     event_dict,
                     outlier=True,
+                    historical=True,
                     prev_event_ids=prev_event_ids_for_state_chain,
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same

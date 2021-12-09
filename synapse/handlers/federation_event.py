@@ -998,8 +998,6 @@ class FederationEventHandler:
                 origin,
                 event,
                 context,
-                state=state,
-                backfilled=backfilled,
             )
         except AuthError as e:
             # FIXME richvdh 2021/10/07 I don't think this is reachable. Let's log it
@@ -1356,8 +1354,6 @@ class FederationEventHandler:
         origin: str,
         event: EventBase,
         context: EventContext,
-        state: Optional[Iterable[EventBase]] = None,
-        backfilled: bool = False,
     ) -> EventContext:
         """
         Checks whether an event should be rejected (for failing auth checks).
@@ -1367,12 +1363,6 @@ class FederationEventHandler:
             event: The event itself.
             context:
                 The event context.
-
-            state:
-                The state events used to check the event for soft-fail. If this is
-                not provided the current state events will be used.
-
-            backfilled: True if the event was backfilled.
 
         Returns:
             The updated context object.

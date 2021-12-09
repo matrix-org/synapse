@@ -42,7 +42,6 @@ For each update:
 `average_items_per_ms` how many items are processed per millisecond based on an exponential average.
 
 
-
 ## Enabled
 
 This API allow pausing background updates.
@@ -82,3 +81,29 @@ The API returns the `enabled` param.
 ```
 
 There is also a `GET` version which returns the `enabled` state.
+
+
+## Run
+
+This API schedules a specific background update to run. The job starts immediately after calling the API.
+
+
+The API is:
+
+```
+POST /_synapse/admin/v1/background_updates/start_job
+```
+
+with the following body:
+
+```json
+{
+    "job_name": "populate_stats_process_rooms"
+}
+```
+
+The following JSON body parameters are available:
+
+- `job_name` - A string which job to run. Valid values are:
+  - `populate_stats_process_rooms` - Recalculate the stats for all rooms.
+  - `regenerate_directory` - Recalculate the [user directory](../../../user_directory.md) if it is stale or out of sync.

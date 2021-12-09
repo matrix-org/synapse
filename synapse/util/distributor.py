@@ -18,12 +18,13 @@ from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.types import UserID
 from synapse.util.async_helpers import maybe_awaitable
 
 logger = logging.getLogger(__name__)
 
 
-def user_left_room(distributor, user, room_id):
+def user_left_room(distributor: "Distributor", user: UserID, room_id: str) -> None:
     distributor.fire("user_left_room", user=user, room_id=room_id)
 
 
@@ -63,7 +64,7 @@ class Distributor:
                 self.pre_registration[name] = []
             self.pre_registration[name].append(observer)
 
-    def fire(self, name: str, *args, **kwargs) -> None:
+    def fire(self, name: str, *args: Any, **kwargs: Any) -> None:
         """Dispatches the given signal to the registered observers.
 
         Runs the observers as a background process. Does not return a deferred.
@@ -95,7 +96,7 @@ class Signal:
         Each observer callable may return a Deferred."""
         self.observers.append(observer)
 
-    def fire(self, *args, **kwargs) -> "defer.Deferred[List[Any]]":
+    def fire(self, *args: Any, **kwargs: Any) -> "defer.Deferred[List[Any]]":
         """Invokes every callable in the observer list, passing in the args and
         kwargs. Exceptions thrown by observers are logged but ignored. It is
         not an error to fire a signal with no observers.
@@ -103,7 +104,7 @@ class Signal:
         Returns a Deferred that will complete when all the observers have
         completed."""
 
-        async def do(observer):
+        async def do(observer: Callable[..., Any]) -> Any:
             try:
                 return await maybe_awaitable(observer(*args, **kwargs))
             except Exception as e:
@@ -120,5 +121,5 @@ class Signal:
             defer.gatherResults(deferreds, consumeErrors=True)
         )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<Signal name=%r>" % (self.name,)

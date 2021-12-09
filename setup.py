@@ -110,6 +110,7 @@ CONDITIONAL_REQUIREMENTS["mypy"] = [
     "types-Pillow>=8.3.4",
     "types-pyOpenSSL>=20.0.7",
     "types-PyYAML>=5.4.10",
+    "types-requests>=2.26.0",
     "types-setuptools>=57.4.0",
 ]
 
@@ -118,7 +119,9 @@ CONDITIONAL_REQUIREMENTS["mypy"] = [
 # Tests assume that all optional dependencies are installed.
 #
 # parameterized_class decorator was introduced in parameterized 0.7.0
-CONDITIONAL_REQUIREMENTS["test"] = ["parameterized>=0.7.0"]
+#
+# We use `mock` library as that backports `AsyncMock` to Python 3.6
+CONDITIONAL_REQUIREMENTS["test"] = ["parameterized>=0.7.0", "mock>=4.0.0"]
 
 CONDITIONAL_REQUIREMENTS["dev"] = (
     CONDITIONAL_REQUIREMENTS["lint"]
@@ -149,6 +152,12 @@ setup(
     long_description=long_description,
     long_description_content_type="text/x-rst",
     python_requires="~=3.6",
+    entry_points={
+        "console_scripts": [
+            "synapse_homeserver = synapse.app.homeserver:main",
+            "synapse_worker = synapse.app.generic_worker:main",
+        ]
+    },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Topic :: Communications :: Chat",
