@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from synapse.rest.media.v1.preview_html import (
-    _get_html_media_encodings,
     decode_body,
     parse_html_to_open_graph,
     summarize_paragraphs,
@@ -292,20 +291,6 @@ class CalcOgTestCase(unittest.TestCase):
         og = parse_html_to_open_graph(tree)
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
-    def test_invalid_encoding(self) -> None:
-        """An invalid character encoding should be ignored and treated as UTF-8, if possible."""
-        html = b"""
-        <html>
-        <head><title>Foo</title></head>
-        <body>
-        Some text.
-        </body>
-        </html>
-        """
-        tree = decode_body(html, "http://example.com/test.html", "invalid-encoding")
-        og = parse_html_to_open_graph(tree)
-        self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
-
     def test_invalid_encoding2(self) -> None:
         """A body which doesn't match the sent character encoding."""
         # Note that this contains an invalid UTF-8 sequence in the title.
@@ -334,116 +319,3 @@ class CalcOgTestCase(unittest.TestCase):
         tree = decode_body(html, "http://example.com/test.html")
         og = parse_html_to_open_graph(tree)
         self.assertEqual(og, {"og:title": "ó", "og:description": "Some text."})
-
-
-class MediaEncodingTestCase(unittest.TestCase):
-    def test_meta_charset(self) -> None:
-        """A character encoding is found via the meta tag."""
-        encodings = _get_html_media_encodings(
-            b"""
-        <html>
-        <head><meta charset="ascii">
-        </head>
-        </html>
-        """,
-            "text/html",
-        )
-        self.assertEqual(list(encodings), ["ascii", "utf-8", "cp1252"])
-
-        # A less well-formed version.
-        encodings = _get_html_media_encodings(
-            b"""
-        <html>
-        <head>< meta charset = ascii>
-        </head>
-        </html>
-        """,
-            "text/html",
-        )
-        self.assertEqual(list(encodings), ["ascii", "utf-8", "cp1252"])
-
-    def test_meta_charset_underscores(self) -> None:
-        """A character encoding contains underscore."""
-        encodings = _get_html_media_encodings(
-            b"""
-        <html>
-        <head><meta charset="Shift_JIS">
-        </head>
-        </html>
-        """,
-            "text/html",
-        )
-        self.assertEqual(list(encodings), ["shift_jis", "utf-8", "cp1252"])
-
-    def test_xml_encoding(self) -> None:
-        """A character encoding is found via the meta tag."""
-        encodings = _get_html_media_encodings(
-            b"""
-        <?xml version="1.0" encoding="ascii"?>
-        <html>
-        </html>
-        """,
-            "text/html",
-        )
-        self.assertEqual(list(encodings), ["ascii", "utf-8", "cp1252"])
-
-    def test_meta_xml_encoding(self) -> None:
-        """Meta tags take precedence over XML encoding."""
-        encodings = _get_html_media_encodings(
-            b"""
-        <?xml version="1.0" encoding="ascii"?>
-        <html>
-        <head><meta charset="UTF-16">
-        </head>
-        </html>
-        """,
-            "text/html",
-        )
-        self.assertEqual(list(encodings), ["utf-16", "ascii", "utf-8", "cp1252"])
-
-    def test_content_type(self) -> None:
-        """A character encoding is found via the Content-Type header."""
-        # Test a few variations of the header.
-        headers = (
-            'text/html; charset="ascii";',
-            "text/html;charset=ascii;",
-            'text/html;  charset="ascii"',
-            "text/html; charset=ascii",
-            'text/html; charset="ascii;',
-            'text/html; charset=ascii";',
-        )
-        for header in headers:
-            encodings = _get_html_media_encodings(b"", header)
-            self.assertEqual(list(encodings), ["ascii", "utf-8", "cp1252"])
-
-    def test_fallback(self) -> None:
-        """A character encoding cannot be found in the body or header."""
-        encodings = _get_html_media_encodings(b"", "text/html")
-        self.assertEqual(list(encodings), ["utf-8", "cp1252"])
-
-    def test_duplicates(self) -> None:
-        """Ensure each encoding is only attempted once."""
-        encodings = _get_html_media_encodings(
-            b"""
-        <?xml version="1.0" encoding="utf8"?>
-        <html>
-        <head><meta charset="UTF-8">
-        </head>
-        </html>
-        """,
-            'text/html; charset="UTF_8"',
-        )
-        self.assertEqual(list(encodings), ["utf-8", "cp1252"])
-
-    def test_unknown_invalid(self) -> None:
-        """A character encoding should be ignored if it is unknown or invalid."""
-        encodings = _get_html_media_encodings(
-            b"""
-        <html>
-        <head><meta charset="invalid">
-        </head>
-        </html>
-        """,
-            'text/html; charset="invalid"',
-        )
-        self.assertEqual(list(encodings), ["utf-8", "cp1252"])

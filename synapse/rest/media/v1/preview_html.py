@@ -11,11 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import codecs
 import itertools
 import logging
 import re
-from typing import TYPE_CHECKING, Dict, Generator, Iterable, Iterator, Optional, Set
+from typing import TYPE_CHECKING, Dict, Generator, Iterable, Iterator, Optional
 
 if TYPE_CHECKING:
     from bs4 import BeautifulSoup
@@ -23,88 +22,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_charset_match = re.compile(
-    rb'<\s*meta[^>]*charset\s*=\s*"?([a-z0-9_-]+)"?', flags=re.I
-)
-_xml_encoding_match = re.compile(
-    rb'\s*<\s*\?\s*xml[^>]*encoding="([a-z0-9_-]+)"', flags=re.I
-)
 _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 
 
-def _normalise_encoding(encoding: str) -> Optional[str]:
-    """Use the Python codec's name as the normalised entry."""
-    try:
-        return codecs.lookup(encoding).name
-    except LookupError:
-        return None
-
-
-def _get_html_media_encodings(
-    body: bytes, content_type: Optional[str]
-) -> Iterable[str]:
-    """
-    Get potential encoding of the body based on the (presumably) HTML body or the content-type header.
-
-    The precedence used for finding a character encoding is:
-
-    1. <meta> tag with a charset declared.
-    2. The XML document's character encoding attribute.
-    3. The Content-Type header.
-    4. Fallback to utf-8.
-    5. Fallback to windows-1252.
-
-    This roughly follows the algorithm used by BeautifulSoup's bs4.dammit.EncodingDetector.
-
-    Args:
-        body: The HTML document, as bytes.
-        content_type: The Content-Type header.
-
-    Returns:
-        The character encoding of the body, as a string.
-    """
-    # There's no point in returning an encoding more than once.
-    attempted_encodings: Set[str] = set()
-
-    # Limit searches to the first 1kb, since it ought to be at the top.
-    body_start = body[:1024]
-
-    # Check if it has an encoding set in a meta tag.
-    match = _charset_match.search(body_start)
-    if match:
-        encoding = _normalise_encoding(match.group(1).decode("ascii"))
-        if encoding:
-            attempted_encodings.add(encoding)
-            yield encoding
-
-    # TODO Support <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-
-    # Check if it has an XML document with an encoding.
-    match = _xml_encoding_match.match(body_start)
-    if match:
-        encoding = _normalise_encoding(match.group(1).decode("ascii"))
-        if encoding and encoding not in attempted_encodings:
-            attempted_encodings.add(encoding)
-            yield encoding
-
-    # Check the HTTP Content-Type header for a character set.
-    if content_type:
-        content_match = _content_type_match.match(content_type)
-        if content_match:
-            encoding = _normalise_encoding(content_match.group(1))
-            if encoding and encoding not in attempted_encodings:
-                attempted_encodings.add(encoding)
-                yield encoding
-
-    # Finally, fallback to UTF-8, then windows-1252.
-    for fallback in ("utf-8", "cp1252"):
-        if fallback not in attempted_encodings:
-            yield fallback
-
-
-def decode_body(
-    body: bytes, uri: str, content_type: Optional[str] = None
-) -> Optional["BeautifulSoup"]:
+def decode_body(body: bytes, uri: str) -> Optional["BeautifulSoup"]:
     """
     This uses BeautifulSoup to parse the HTML document.
 

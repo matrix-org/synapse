@@ -303,7 +303,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             with open(media_info.filename, "rb") as file:
                 body = file.read()
 
-            tree = decode_body(body, media_info.uri, media_info.media_type)
+            tree = decode_body(body, media_info.uri)
             if tree is not None:
                 # Check if this HTML document points to oEmbed information and
                 # defer to that.
