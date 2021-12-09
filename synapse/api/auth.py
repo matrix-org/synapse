@@ -347,9 +347,12 @@ class Auth:
                 effective_user_id, effective_device_id
             )
             if device_opt is None:
+                # For now, use 400 M_EXCLUSIVE if the device doesn't exist.
+                # This is an open thread of discussion on MSC3202 as of 2021-12-09.
                 raise AuthError(
-                    403,
+                    400,
                     f"Application service trying to use a device that doesn't exist ('{effective_device_id}' for {effective_user_id})",
+                    Codes.EXCLUSIVE,
                 )
 
         return effective_user_id, effective_device_id, app_service
