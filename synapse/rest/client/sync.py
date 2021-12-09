@@ -293,6 +293,9 @@ class SyncRestServlet(RestServlet):
         response[
             "org.matrix.msc2732.device_unused_fallback_key_types"
         ] = sync_result.device_unused_fallback_key_types
+        response[
+            "device_unused_fallback_key_types"
+        ] = sync_result.device_unused_fallback_key_types
 
         if joined:
             response["rooms"][Membership.JOIN] = joined
