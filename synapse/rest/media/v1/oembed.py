@@ -97,19 +97,19 @@ class OEmbedProvider:
         # No match.
         return None
 
-    def autodiscover_from_html(self, tree: "BeautifulSoup") -> Optional[str]:
+    def autodiscover_from_html(self, soup: "BeautifulSoup") -> Optional[str]:
         """
         Search an HTML document for oEmbed autodiscovery information.
 
         Args:
-            tree: The parsed HTML body.
+            soup: The parsed HTML body.
 
         Returns:
             The URL to use for oEmbed information, or None if no URL was found.
         """
         # Search for link elements with the proper rel and type attributes.
         # Some providers (e.g. Flickr) use alternative instead of alternate.
-        for tag in tree.find_all(
+        for tag in soup.find_all(
             "link",
             rel=("alternate", "alternative"),
             type="application/json+oembed",
@@ -198,8 +198,8 @@ class OEmbedProvider:
         return OEmbedResult(open_graph_response, author_name, cache_age)
 
 
-def _fetch_urls(tree: "BeautifulSoup", tag_name: str) -> List[str]:
-    return [tag["src"] for tag in tree.find_all(tag_name, src=True)]
+def _fetch_urls(soup: "BeautifulSoup", tag_name: str) -> List[str]:
+    return [tag["src"] for tag in soup.find_all(tag_name, src=True)]
 
 
 def calc_description_and_urls(
@@ -216,22 +216,22 @@ def calc_description_and_urls(
         html_body: The HTML document, as bytes.
         url: The URL which is being previewed (not the one which was requested).
     """
-    tree = decode_body(html_body, url)
+    soup = decode_body(html_body, url)
 
     # If there's no body, nothing useful is going to be found.
-    if not tree:
+    if not soup:
         return
 
     # Attempt to find interesting URLs (images, videos, embeds).
     if "og:image" not in open_graph_response:
-        image_urls = _fetch_urls(tree, "img")
+        image_urls = _fetch_urls(soup, "img")
         if image_urls:
             open_graph_response["og:image"] = image_urls[0]
 
-    video_urls = _fetch_urls(tree, "video") + _fetch_urls(tree, "embed")
+    video_urls = _fetch_urls(soup, "video") + _fetch_urls(soup, "embed")
     if video_urls:
         open_graph_response["og:video"] = video_urls[0]
 
-    description = parse_html_description(tree)
+    description = parse_html_description(soup)
     if description:
         open_graph_response["og:description"] = description

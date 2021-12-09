@@ -158,8 +158,8 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        tree = decode_body(html, "http://example.com/test.html")
-        og = parse_html_to_open_graph(tree)
+        soup = decode_body(html, "http://example.com/test.html")
+        og = parse_html_to_open_graph(soup)
 
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
@@ -174,8 +174,8 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        tree = decode_body(html, "http://example.com/test.html")
-        og = parse_html_to_open_graph(tree)
+        soup = decode_body(html, "http://example.com/test.html")
+        og = parse_html_to_open_graph(soup)
 
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
@@ -193,8 +193,8 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        tree = decode_body(html, "http://example.com/test.html")
-        og = parse_html_to_open_graph(tree)
+        soup = decode_body(html, "http://example.com/test.html")
+        og = parse_html_to_open_graph(soup)
 
         self.assertEqual(
             og,
@@ -215,8 +215,8 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        tree = decode_body(html, "http://example.com/test.html")
-        og = parse_html_to_open_graph(tree)
+        soup = decode_body(html, "http://example.com/test.html")
+        og = parse_html_to_open_graph(soup)
 
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
@@ -229,8 +229,8 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        tree = decode_body(html, "http://example.com/test.html")
-        og = parse_html_to_open_graph(tree)
+        soup = decode_body(html, "http://example.com/test.html")
+        og = parse_html_to_open_graph(soup)
 
         self.assertEqual(og, {"og:title": None, "og:description": "Some text."})
 
@@ -244,8 +244,8 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        tree = decode_body(html, "http://example.com/test.html")
-        og = parse_html_to_open_graph(tree)
+        soup = decode_body(html, "http://example.com/test.html")
+        og = parse_html_to_open_graph(soup)
 
         self.assertEqual(og, {"og:title": "Title", "og:description": "Some text."})
 
@@ -259,22 +259,22 @@ class CalcOgTestCase(unittest.TestCase):
         </html>
         """
 
-        tree = decode_body(html, "http://example.com/test.html")
-        og = parse_html_to_open_graph(tree)
+        soup = decode_body(html, "http://example.com/test.html")
+        og = parse_html_to_open_graph(soup)
 
         self.assertEqual(og, {"og:title": None, "og:description": "Some text."})
 
     def test_empty(self) -> None:
         """Test a body with no data in it."""
         html = b""
-        tree = decode_body(html, "http://example.com/test.html")
-        self.assertIsNone(tree)
+        soup = decode_body(html, "http://example.com/test.html")
+        self.assertIsNone(soup)
 
-    def test_no_tree(self) -> None:
-        """A valid body with no tree in it."""
+    def test_no_soup(self):
+        """A valid body with no soup in it."""
         html = b"\x00"
-        tree = decode_body(html, "http://example.com/test.html")
-        self.assertIsNone(tree)
+        soup = decode_body(html, "http://example.com/test.html")
+        self.assertIsNone(soup)
 
     def test_xml(self) -> None:
         """Test decoding XML and ensure it works properly."""
@@ -287,8 +287,8 @@ class CalcOgTestCase(unittest.TestCase):
         <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
         <head><title>Foo</title></head><body>Some text.</body></html>
         """.strip()
-        tree = decode_body(html, "http://example.com/test.html")
-        og = parse_html_to_open_graph(tree)
+        soup = decode_body(html, "http://example.com/test.html")
+        og = parse_html_to_open_graph(soup)
         self.assertEqual(og, {"og:title": "Foo", "og:description": "Some text."})
 
     def test_invalid_encoding2(self) -> None:
@@ -302,8 +302,8 @@ class CalcOgTestCase(unittest.TestCase):
         </body>
         </html>
         """
-        tree = decode_body(html, "http://example.com/test.html")
-        og = parse_html_to_open_graph(tree)
+        soup = decode_body(html, "http://example.com/test.html")
+        og = parse_html_to_open_graph(soup)
         self.assertEqual(og, {"og:title": "ÿÿ Foo", "og:description": "Some text."})
 
     def test_windows_1252(self) -> None:
@@ -316,6 +316,6 @@ class CalcOgTestCase(unittest.TestCase):
         </body>
         </html>
         """
-        tree = decode_body(html, "http://example.com/test.html")
-        og = parse_html_to_open_graph(tree)
+        soup = decode_body(html, "http://example.com/test.html")
+        og = parse_html_to_open_graph(soup)
         self.assertEqual(og, {"og:title": "ó", "og:description": "Some text."})

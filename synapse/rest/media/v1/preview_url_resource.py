@@ -298,16 +298,16 @@ class PreviewUrlResource(DirectServeJsonResource):
 
             # define our OG response for this media
         elif _is_html(media_info.media_type):
-            # TODO: somehow stop a big HTML tree from exploding synapse's RAM
+            # TODO: somehow stop a big HTML document from exploding synapse's RAM
 
             with open(media_info.filename, "rb") as file:
                 body = file.read()
 
-            tree = decode_body(body, media_info.uri)
-            if tree is not None:
+            soup = decode_body(body, media_info.uri)
+            if soup is not None:
                 # Check if this HTML document points to oEmbed information and
                 # defer to that.
-                oembed_url = self._oembed.autodiscover_from_html(tree)
+                oembed_url = self._oembed.autodiscover_from_html(soup)
                 og_from_oembed: JsonDict = {}
                 if oembed_url:
                     oembed_info = await self._handle_url(
@@ -323,7 +323,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
                 # Parse Open Graph information from the HTML in case the oEmbed
                 # response failed or is incomplete.
-                og_from_html = parse_html_to_open_graph(tree)
+                og_from_html = parse_html_to_open_graph(soup)
 
                 # Compile the Open Graph response by using the scraped
                 # information from the HTML and overlaying any information

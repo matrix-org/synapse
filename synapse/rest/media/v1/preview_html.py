@@ -55,14 +55,14 @@ def decode_body(body: Union[bytes, str], uri: str) -> Optional["BeautifulSoup"]:
         return None
 
 
-def parse_html_to_open_graph(tree: "BeautifulSoup") -> Dict[str, Optional[str]]:
+def parse_html_to_open_graph(soup: "BeautifulSoup") -> Dict[str, Optional[str]]:
     """
     Calculate metadata for an HTML document.
 
     This uses BeautifulSoup to search the HTML document for Open Graph data.
 
     Args:
-        tree: The parsed HTML document.
+        soup: The parsed HTML document.
 
     Returns:
         The Open Graph response as a dictionary.
@@ -85,7 +85,7 @@ def parse_html_to_open_graph(tree: "BeautifulSoup") -> Dict[str, Optional[str]]:
     # "og:video:secure_url": "https://www.youtube.com/v/LXDBoHyjmtw?version=3",
 
     og: Dict[str, Optional[str]] = {}
-    for tag in tree.find_all("meta", property=re.compile(r"^og:"), content=True):
+    for tag in soup.find_all("meta", property=re.compile(r"^og:"), content=True):
         # if we've got more than 50 tags, someone is taking the piss
         if len(og) >= 50:
             logger.warning("Skipping OG for page with too many 'og:' tags")
@@ -103,7 +103,7 @@ def parse_html_to_open_graph(tree: "BeautifulSoup") -> Dict[str, Optional[str]]:
 
     if "og:title" not in og:
         # do some basic spidering of the HTML
-        title = tree.find(("title", "h1", "h2", "h3"))
+        title = soup.find(("title", "h1", "h2", "h3"))
         if title and title.string:
             og["og:title"] = title.string.strip()
         else:
@@ -111,7 +111,7 @@ def parse_html_to_open_graph(tree: "BeautifulSoup") -> Dict[str, Optional[str]]:
 
     if "og:image" not in og:
         # TODO: extract a favicon failing all else
-        meta_image = tree.find("meta", image="image")
+        meta_image = soup.find("meta", image="image")
         if meta_image:
             og["og:image"] = meta_image["content"]
         else:
@@ -124,22 +124,22 @@ def parse_html_to_open_graph(tree: "BeautifulSoup") -> Dict[str, Optional[str]]:
                 except ValueError:
                     return False
 
-            images = tree.find_all("img", src=True, width=greater_than)
+            images = soup.find_all("img", src=True, width=greater_than)
             images = sorted(
                 images,
                 key=lambda i: (-1 * float(i["width"]) * float(i["height"])),
             )
             if not images:
-                images = tree.find_all("img", src=True)
+                images = soup.find_all("img", src=True)
             if images:
                 og["og:image"] = images[0]["src"]
 
     if "og:description" not in og:
-        meta_description = tree.find("meta", description="description")
+        meta_description = soup.find("meta", description="description")
         if meta_description:
             og["og:description"] = meta_description["content"]
         else:
-            og["og:description"] = parse_html_description(tree)
+            og["og:description"] = parse_html_description(soup)
     elif og["og:description"]:
         # This must be a non-empty string at this point.
         assert isinstance(og["og:description"], str)
@@ -150,7 +150,7 @@ def parse_html_to_open_graph(tree: "BeautifulSoup") -> Dict[str, Optional[str]]:
     return og
 
 
-def parse_html_description(tree: "BeautifulSoup") -> Optional[str]:
+def parse_html_description(soup: "BeautifulSoup") -> Optional[str]:
     """
     Calculate a text description based on an HTML document.
 
@@ -161,7 +161,7 @@ def parse_html_description(tree: "BeautifulSoup") -> Optional[str]:
     This is a very very very coarse approximation to a plain text render of the page.
 
     Args:
-        tree: The parsed HTML document.
+        soup: The parsed HTML document.
 
     Returns:
         The plain text description, or None if one cannot be generated.
@@ -181,18 +181,18 @@ def parse_html_description(tree: "BeautifulSoup") -> Optional[str]:
     # lines)
     text_nodes = (
         re.sub(r"\s+", "\n", el).strip()
-        for el in _iterate_over_text(tree.find("body"), *TAGS_TO_REMOVE)
+        for el in _iterate_over_text(soup.find("body"), *TAGS_TO_REMOVE)
     )
     return summarize_paragraphs(text_nodes)
 
 
 def _iterate_over_text(
-    tree: Optional["Tag"], *tags_to_ignore: Iterable[str]
+    soup: Optional["Tag"], *tags_to_ignore: Iterable[str]
 ) -> Generator[str, None, None]:
-    """Iterate over the tree returning text nodes in a depth first fashion,
+    """Iterate over the document returning text nodes in a depth first fashion,
     skipping text nodes inside certain tags.
     """
-    if not tree:
+    if not soup:
         return
 
     from bs4.element import NavigableString, Tag
@@ -200,7 +200,7 @@ def _iterate_over_text(
     # This is basically a stack that we extend using itertools.chain.
     # This will either consist of an element to iterate over *or* a string
     # to be returned.
-    elements: Iterator["PageElement"] = iter([tree])
+    elements: Iterator["PageElement"] = iter([soup])
     while True:
         el = next(elements, None)
         if el is None:
