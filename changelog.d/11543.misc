@@ -1,0 +1,1 @@
+Use HTTPStatus constants in place of literals in `synapse.http`.

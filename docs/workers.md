@@ -210,7 +210,7 @@ expressions:
     ^/_matrix/federation/v1/get_groups_publicised$
     ^/_matrix/key/v2/query
     ^/_matrix/federation/unstable/org.matrix.msc2946/spaces/
-    ^/_matrix/federation/unstable/org.matrix.msc2946/hierarchy/
+    ^/_matrix/federation/(v1|unstable/org.matrix.msc2946)/hierarchy/
 
     # Inbound federation transaction request
     ^/_matrix/federation/v1/send/
@@ -223,7 +223,7 @@ expressions:
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/members$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state$
     ^/_matrix/client/unstable/org.matrix.msc2946/rooms/.*/spaces$
-    ^/_matrix/client/unstable/org.matrix.msc2946/rooms/.*/hierarchy$
+    ^/_matrix/client/(v1|unstable/org.matrix.msc2946)/rooms/.*/hierarchy$
     ^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/account/3pid$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/devices$

@@ -503,6 +503,10 @@ def start(config_options: List[str]) -> None:
     _base.start_worker_reactor("synapse-generic-worker", config)
 
 
-if __name__ == "__main__":
+def main() -> None:
     with LoggingContext("main"):
         start(sys.argv[1:])
+
+
+if __name__ == "__main__":
+    main()
