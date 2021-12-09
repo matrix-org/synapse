@@ -24,6 +24,7 @@ from synapse.appservice.scheduler import (
 )
 from synapse.logging.context import make_deferred_yieldable
 from synapse.server import HomeServer
+from synapse.types import DeviceLists
 from synapse.util import Clock
 
 from tests import unittest
@@ -60,11 +61,13 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         # actual call
         self.successResultOf(defer.ensureDeferred(self.txnctrl.send(service, events)))
 
+        # txn made and saved
         self.store.create_appservice_txn.assert_called_once_with(
             service=service,
             events=events,
             ephemeral=[],
-            to_device_messages=[],  # txn made and saved
+            to_device_messages=[],
+            device_list_summary=DeviceLists(),
         )
         self.assertEquals(0, len(self.txnctrl.recoverers))  # no recoverer made
         txn.complete.assert_called_once_with(self.store)  # txn completed
@@ -84,11 +87,13 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         # actual call
         self.successResultOf(defer.ensureDeferred(self.txnctrl.send(service, events)))
 
+        # txn made and saved
         self.store.create_appservice_txn.assert_called_once_with(
             service=service,
             events=events,
             ephemeral=[],
-            to_device_messages=[],  # txn made and saved
+            to_device_messages=[],
+            device_list_summary=DeviceLists(),
         )
         self.assertEquals(0, txn.send.call_count)  # txn not sent though
         self.assertEquals(0, txn.complete.call_count)  # or completed
@@ -111,7 +116,11 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         self.successResultOf(defer.ensureDeferred(self.txnctrl.send(service, events)))
 
         self.store.create_appservice_txn.assert_called_once_with(
-            service=service, events=events, ephemeral=[], to_device_messages=[]
+            service=service,
+            events=events,
+            ephemeral=[],
+            to_device_messages=[],
+            device_list_summary=DeviceLists(),
         )
         self.assertEquals(1, self.recoverer_fn.call_count)  # recoverer made
         self.assertEquals(1, self.recoverer.recover.call_count)  # and invoked
@@ -213,7 +222,9 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.HomeserverTestCase):
         service = Mock(id=4)
         event = Mock()
         self.scheduler.enqueue_for_appservice(service, events=[event])
-        self.txn_ctrl.send.assert_called_once_with(service, [event], [], [])
+        self.txn_ctrl.send.assert_called_once_with(
+            service, [event], [], [], DeviceLists()
+        )
 
     def test_send_single_event_with_queue(self):
         d = defer.Deferred()
@@ -228,11 +239,13 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.HomeserverTestCase):
         # (call enqueue_for_appservice multiple times deliberately)
         self.scheduler.enqueue_for_appservice(service, events=[event2])
         self.scheduler.enqueue_for_appservice(service, events=[event3])
-        self.txn_ctrl.send.assert_called_with(service, [event], [], [])
+        self.txn_ctrl.send.assert_called_with(service, [event], [], [], DeviceLists())
         self.assertEquals(1, self.txn_ctrl.send.call_count)
         # Resolve the send event: expect the queued events to be sent
         d.callback(service)
-        self.txn_ctrl.send.assert_called_with(service, [event2, event3], [], [])
+        self.txn_ctrl.send.assert_called_with(
+            service, [event2, event3], [], [], DeviceLists()
+        )
         self.assertEquals(2, self.txn_ctrl.send.call_count)
 
     def test_multiple_service_queues(self):
@@ -258,15 +271,21 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.HomeserverTestCase):
         # send events for different ASes and make sure they are sent
         self.scheduler.enqueue_for_appservice(srv1, events=[srv_1_event])
         self.scheduler.enqueue_for_appservice(srv1, events=[srv_1_event2])
-        self.txn_ctrl.send.assert_called_with(srv1, [srv_1_event], [], [])
+        self.txn_ctrl.send.assert_called_with(
+            srv1, [srv_1_event], [], [], DeviceLists()
+        )
         self.scheduler.enqueue_for_appservice(srv2, events=[srv_2_event])
         self.scheduler.enqueue_for_appservice(srv2, events=[srv_2_event2])
-        self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event], [], [])
+        self.txn_ctrl.send.assert_called_with(
+            srv2, [srv_2_event], [], [], DeviceLists()
+        )
 
         # make sure callbacks for a service only send queued events for THAT
         # service
         srv_2_defer.callback(srv2)
-        self.txn_ctrl.send.assert_called_with(srv2, [srv_2_event2], [], [])
+        self.txn_ctrl.send.assert_called_with(
+            srv2, [srv_2_event2], [], [], DeviceLists()
+        )
         self.assertEquals(3, self.txn_ctrl.send.call_count)
 
     def test_send_large_txns(self):
@@ -285,13 +304,19 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.HomeserverTestCase):
             self.scheduler.enqueue_for_appservice(service, [event], [])
 
         # Expect the first event to be sent immediately.
-        self.txn_ctrl.send.assert_called_with(service, [event_list[0]], [], [])
+        self.txn_ctrl.send.assert_called_with(
+            service, [event_list[0]], [], [], DeviceLists()
+        )
         srv_1_defer.callback(service)
         # Then send the next 100 events
-        self.txn_ctrl.send.assert_called_with(service, event_list[1:101], [], [])
+        self.txn_ctrl.send.assert_called_with(
+            service, event_list[1:101], [], [], DeviceLists()
+        )
         srv_2_defer.callback(service)
         # Then the final 99 events
-        self.txn_ctrl.send.assert_called_with(service, event_list[101:], [], [])
+        self.txn_ctrl.send.assert_called_with(
+            service, event_list[101:], [], [], DeviceLists()
+        )
         self.assertEquals(3, self.txn_ctrl.send.call_count)
 
     def test_send_single_ephemeral_no_queue(self):
@@ -299,14 +324,18 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.HomeserverTestCase):
         service = Mock(id=4, name="service")
         event_list = [Mock(name="event")]
         self.scheduler.enqueue_for_appservice(service, ephemeral=event_list)
-        self.txn_ctrl.send.assert_called_once_with(service, [], event_list, [])
+        self.txn_ctrl.send.assert_called_once_with(
+            service, [], event_list, [], DeviceLists()
+        )
 
     def test_send_multiple_ephemeral_no_queue(self):
         # Expect the event to be sent immediately.
         service = Mock(id=4, name="service")
         event_list = [Mock(name="event1"), Mock(name="event2"), Mock(name="event3")]
         self.scheduler.enqueue_for_appservice(service, ephemeral=event_list)
-        self.txn_ctrl.send.assert_called_once_with(service, [], event_list, [])
+        self.txn_ctrl.send.assert_called_once_with(
+            service, [], event_list, [], DeviceLists()
+        )
 
     def test_send_single_ephemeral_with_queue(self):
         d = defer.Deferred()
@@ -321,13 +350,15 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.HomeserverTestCase):
         # Send more events: expect send() to NOT be called multiple times.
         self.scheduler.enqueue_for_appservice(service, ephemeral=event_list_2)
         self.scheduler.enqueue_for_appservice(service, ephemeral=event_list_3)
-        self.txn_ctrl.send.assert_called_with(service, [], event_list_1, [])
+        self.txn_ctrl.send.assert_called_with(
+            service, [], event_list_1, [], DeviceLists()
+        )
         self.assertEquals(1, self.txn_ctrl.send.call_count)
         # Resolve txn_ctrl.send
         d.callback(service)
         # Expect the queued events to be sent
         self.txn_ctrl.send.assert_called_with(
-            service, [], event_list_2 + event_list_3, []
+            service, [], event_list_2 + event_list_3, [], DeviceLists()
         )
         self.assertEquals(2, self.txn_ctrl.send.call_count)
 
@@ -340,7 +371,11 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.HomeserverTestCase):
         second_chunk = [Mock(name="event%i" % (i + 101)) for i in range(50)]
         event_list = first_chunk + second_chunk
         self.scheduler.enqueue_for_appservice(service, ephemeral=event_list)
-        self.txn_ctrl.send.assert_called_once_with(service, [], first_chunk, [])
+        self.txn_ctrl.send.assert_called_once_with(
+            service, [], first_chunk, [], DeviceLists()
+        )
         d.callback(service)
-        self.txn_ctrl.send.assert_called_with(service, [], second_chunk, [])
+        self.txn_ctrl.send.assert_called_with(
+            service, [], second_chunk, [], DeviceLists()
+        )
         self.assertEquals(2, self.txn_ctrl.send.call_count)

@@ -178,7 +178,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         app_service = Mock(
             token="foobar", url="a_url", sender=self.test_user, ip_range_whitelist=None
         )
-        app_service.is_interested_in_user = Mock(return_value=True)
+        app_service.is_user_in_namespace = Mock(return_value=True)
         self.store.get_app_service_by_token = Mock(return_value=app_service)
         # This just needs to return a truth-y value.
         self.store.get_user_by_id = simple_async_mock({"is_guest": False})
@@ -199,7 +199,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         app_service = Mock(
             token="foobar", url="a_url", sender=self.test_user, ip_range_whitelist=None
         )
-        app_service.is_interested_in_user = Mock(return_value=False)
+        app_service.is_user_in_namespace = Mock(return_value=False)
         self.store.get_app_service_by_token = Mock(return_value=app_service)
         self.store.get_user_by_access_token = simple_async_mock(None)
 
