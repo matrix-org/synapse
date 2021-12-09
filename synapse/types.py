@@ -759,6 +759,7 @@ class DeviceLists:
         changed: List of user_ids whose devices may have changed
         left: List of user_ids whose devices we no longer track
     """
+
     # We need to use a factory here, otherwise `set` is not evaluated at
     # object instantiation, but instead at class definition instantiation.
     # The latter happening only once, thus always giving you the same sets
