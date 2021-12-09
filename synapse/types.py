@@ -59,9 +59,11 @@ StateKey = Tuple[str, str]
 StateMap = Mapping[StateKey, T]
 MutableStateMap = MutableMapping[StateKey, T]
 
-# the type of a JSON-serialisable dict. This could be made stronger, but it will
-# do for now.
+# JSON types. These could be made stronger, but will do for now.
+# A JSON-serialisable dict.
 JsonDict = Dict[str, Any]
+# A JSON-serialisable object.
+JsonObject = object
 
 
 # Note that this seems to require inheriting *directly* from Interface in order
