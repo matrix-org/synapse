@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Awaitable, Optional, Tuple
 
 from synapse.api.constants import EventTypes
@@ -51,11 +52,11 @@ class SendServerNoticeServlet(RestServlet):
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
         self.auth = hs.get_auth()
         self.server_notices_manager = hs.get_server_notices_manager()
         self.admin_handler = hs.get_admin_handler()
         self.txns = HttpTransactionCache(hs)
+        self.is_mine = hs.is_mine
 
     def register(self, json_resource: HttpServer) -> None:
         PATTERN = "/send_server_notice"
@@ -82,11 +83,15 @@ class SendServerNoticeServlet(RestServlet):
         # but worker processes still need to initialise SendServerNoticeServlet (as it is part of the
         # admin api).
         if not self.server_notices_manager.is_enabled():
-            raise SynapseError(400, "Server notices are not enabled on this server")
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "Server notices are not enabled on this server"
+            )
 
         target_user = UserID.from_string(body["user_id"])
-        if not self.hs.is_mine(target_user):
-            raise SynapseError(400, "Server notices can only be sent to local users")
+        if not self.is_mine(target_user):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "Server notices can only be sent to local users"
+            )
 
         if not await self.admin_handler.get_user(target_user):
             raise NotFoundError("User not found")
@@ -99,7 +104,7 @@ class SendServerNoticeServlet(RestServlet):
             txn_id=txn_id,
         )
 
-        return 200, {"event_id": event.event_id}
+        return HTTPStatus.OK, {"event_id": event.event_id}
 
     def on_PUT(
         self, request: SynapseRequest, txn_id: str

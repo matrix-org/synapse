@@ -374,7 +374,7 @@ jobs:
         working-directory: complement/dockerfiles
 
       # Run Complement
-      - run: go test -v -tags synapse_blacklist,msc2403,msc2946 ./tests/...
+      - run: go test -v -tags synapse_blacklist,msc2403 ./tests/...
         env:
           COMPLEMENT_BASE_IMAGE: complement-synapse:latest
         working-directory: complement

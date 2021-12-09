@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import logging
 import re
+from enum import Enum
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Pattern
 
 import attr
@@ -30,7 +32,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ApplicationServiceState:
+class ApplicationServiceState(Enum):
     DOWN = "down"
     UP = "up"
 

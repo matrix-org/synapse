@@ -1,1 +1,0 @@
-Remove unused parameters on `FederationEventHandler._check_event_auth`.
