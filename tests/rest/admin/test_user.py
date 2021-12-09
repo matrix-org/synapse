@@ -1550,7 +1550,8 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # Create user
         body = {
             "password": "abc123",
-            "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+            # Note that the given email is not in canonical form.
+            "threepids": [{"medium": "email", "address": "Bob@bob.bob"}],
         }
 
         channel = self.make_request(
