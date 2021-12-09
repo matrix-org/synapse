@@ -14,6 +14,7 @@
 
 """ This module contains base REST classes for constructing REST servlets. """
 import logging
+from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Iterable,
@@ -79,6 +80,35 @@ def parse_integer(
     return parse_integer_from_args(args, name, default, required)
 
 
+@overload
+def parse_integer_from_args(
+    args: Mapping[bytes, Sequence[bytes]],
+    name: str,
+    default: Optional[int] = None,
+) -> Optional[int]:
+    ...
+
+
+@overload
+def parse_integer_from_args(
+    args: Mapping[bytes, Sequence[bytes]],
+    name: str,
+    *,
+    required: Literal[True],
+) -> int:
+    ...
+
+
+@overload
+def parse_integer_from_args(
+    args: Mapping[bytes, Sequence[bytes]],
+    name: str,
+    default: Optional[int] = None,
+    required: bool = False,
+) -> Optional[int]:
+    ...
+
+
 def parse_integer_from_args(
     args: Mapping[bytes, Sequence[bytes]],
     name: str,
@@ -108,11 +138,15 @@ def parse_integer_from_args(
             return int(args[name_bytes][0])
         except Exception:
             message = "Query parameter %r must be an integer" % (name,)
-            raise SynapseError(400, message, errcode=Codes.INVALID_PARAM)
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, message, errcode=Codes.INVALID_PARAM
+            )
     else:
         if required:
             message = "Missing integer query parameter %r" % (name,)
-            raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, message, errcode=Codes.MISSING_PARAM
+            )
         else:
             return default
 
@@ -217,11 +251,15 @@ def parse_boolean_from_args(
             message = (
                 "Boolean query parameter %r must be one of ['true', 'false']"
             ) % (name,)
-            raise SynapseError(400, message)
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, message, errcode=Codes.INVALID_PARAM
+            )
     else:
         if required:
             message = "Missing boolean query parameter %r" % (name,)
-            raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, message, errcode=Codes.MISSING_PARAM
+            )
         else:
             return default
 
@@ -284,7 +322,7 @@ def parse_bytes_from_args(
         return args[name_bytes][0]
     elif required:
         message = "Missing string query parameter %s" % (name,)
-        raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
+        raise SynapseError(HTTPStatus.BAD_REQUEST, message, errcode=Codes.MISSING_PARAM)
 
     return default
 
@@ -378,14 +416,16 @@ def _parse_string_value(
     try:
         value_str = value.decode(encoding)
     except ValueError:
-        raise SynapseError(400, "Query parameter %r must be %s" % (name, encoding))
+        raise SynapseError(
+            HTTPStatus.BAD_REQUEST, "Query parameter %r must be %s" % (name, encoding)
+        )
 
     if allowed_values is not None and value_str not in allowed_values:
         message = "Query parameter %r must be one of [%s]" % (
             name,
             ", ".join(repr(v) for v in allowed_values),
         )
-        raise SynapseError(400, message)
+        raise SynapseError(HTTPStatus.BAD_REQUEST, message, errcode=Codes.INVALID_PARAM)
     else:
         return value_str
 
@@ -481,7 +521,9 @@ def parse_strings_from_args(
     else:
         if required:
             message = "Missing string query parameter %r" % (name,)
-            raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, message, errcode=Codes.MISSING_PARAM
+            )
 
         return default
 
@@ -609,7 +651,7 @@ def parse_json_value_from_request(
     try:
         content_bytes = request.content.read()  # type: ignore
     except Exception:
-        raise SynapseError(400, "Error reading JSON content.")
+        raise SynapseError(HTTPStatus.BAD_REQUEST, "Error reading JSON content.")
 
     if not content_bytes and allow_empty_body:
         return None
@@ -618,7 +660,9 @@ def parse_json_value_from_request(
         content = json_decoder.decode(content_bytes.decode("utf-8"))
     except Exception as e:
         logger.warning("Unable to parse JSON: %s (%s)", e, content_bytes)
-        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
+        raise SynapseError(
+            HTTPStatus.BAD_REQUEST, "Content not JSON.", errcode=Codes.NOT_JSON
+        )
 
     return content
 
@@ -644,7 +688,7 @@ def parse_json_object_from_request(
 
     if not isinstance(content, dict):
         message = "Content must be a JSON object."
-        raise SynapseError(400, message, errcode=Codes.BAD_JSON)
+        raise SynapseError(HTTPStatus.BAD_REQUEST, message, errcode=Codes.BAD_JSON)
 
     return content
 
@@ -656,7 +700,9 @@ def assert_params_in_dict(body: JsonDict, required: Iterable[str]) -> None:
             absent.append(k)
 
     if len(absent) > 0:
-        raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+        raise SynapseError(
+            HTTPStatus.BAD_REQUEST, "Missing params: %r" % absent, Codes.MISSING_PARAM
+        )
 
 
 class RestServlet:
@@ -729,10 +775,12 @@ class ResolveRoomIdMixin:
             resolved_room_id = room_id.to_string()
         else:
             raise SynapseError(
-                400, "%s was not legal room ID or room alias" % (room_identifier,)
+                HTTPStatus.BAD_REQUEST,
+                "%s was not legal room ID or room alias" % (room_identifier,),
             )
         if not resolved_room_id:
             raise SynapseError(
-                400, "Unknown room ID or room alias %s" % room_identifier
+                HTTPStatus.BAD_REQUEST,
+                "Unknown room ID or room alias %s" % room_identifier,
             )
         return resolved_room_id, remote_room_hosts

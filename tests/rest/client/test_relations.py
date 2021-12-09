@@ -19,7 +19,7 @@ from typing import Dict, List, Optional, Tuple
 
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.rest import admin
-from synapse.rest.client import login, register, relations, room
+from synapse.rest.client import login, register, relations, room, sync
 
 from tests import unittest
 from tests.server import FakeChannel
@@ -29,6 +29,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
     servlets = [
         relations.register_servlets,
         room.register_servlets,
+        sync.register_servlets,
         login.register_servlets,
         register.register_servlets,
         admin.register_servlets_for_client_rest_resource,
@@ -454,11 +455,9 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(400, channel.code, channel.json_body)
 
     @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
-    def test_aggregation_get_event(self):
-        """Test that annotations, references, and threads get correctly bundled when
-        getting the parent event.
-        """
-
+    def test_bundled_aggregations(self):
+        """Test that annotations, references, and threads get correctly bundled."""
+        # Setup by sending a variety of relations.
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
         self.assertEquals(200, channel.code, channel.json_body)
 
@@ -485,49 +484,107 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.json_body)
         thread_2 = channel.json_body["event_id"]
 
-        channel = self.make_request(
-            "GET",
-            "/rooms/%s/event/%s" % (self.room, self.parent_id),
-            access_token=self.user_token,
-        )
-        self.assertEquals(200, channel.code, channel.json_body)
+        def assert_bundle(actual):
+            """Assert the expected values of the bundled aggregations."""
 
-        self.assertEquals(
-            channel.json_body["unsigned"].get("m.relations"),
-            {
-                RelationTypes.ANNOTATION: {
+            # Ensure the fields are as expected.
+            self.assertCountEqual(
+                actual.keys(),
+                (
+                    RelationTypes.ANNOTATION,
+                    RelationTypes.REFERENCE,
+                    RelationTypes.THREAD,
+                ),
+            )
+
+            # Check the values of each field.
+            self.assertEquals(
+                {
                     "chunk": [
                         {"type": "m.reaction", "key": "a", "count": 2},
                         {"type": "m.reaction", "key": "b", "count": 1},
                     ]
                 },
-                RelationTypes.REFERENCE: {
-                    "chunk": [{"event_id": reply_1}, {"event_id": reply_2}]
-                },
-                RelationTypes.THREAD: {
-                    "count": 2,
-                    "latest_event": {
-                        "age": 100,
-                        "content": {
-                            "m.relates_to": {
-                                "event_id": self.parent_id,
-                                "rel_type": RelationTypes.THREAD,
-                            }
-                        },
-                        "event_id": thread_2,
-                        "origin_server_ts": 1600,
-                        "room_id": self.room,
-                        "sender": self.user_id,
-                        "type": "m.room.test",
-                        "unsigned": {"age": 100},
-                        "user_id": self.user_id,
+                actual[RelationTypes.ANNOTATION],
+            )
+
+            self.assertEquals(
+                {"chunk": [{"event_id": reply_1}, {"event_id": reply_2}]},
+                actual[RelationTypes.REFERENCE],
+            )
+
+            self.assertEquals(
+                2,
+                actual[RelationTypes.THREAD].get("count"),
+            )
+            # The latest thread event has some fields that don't matter.
+            self.assert_dict(
+                {
+                    "content": {
+                        "m.relates_to": {
+                            "event_id": self.parent_id,
+                            "rel_type": RelationTypes.THREAD,
+                        }
                     },
+                    "event_id": thread_2,
+                    "room_id": self.room,
+                    "sender": self.user_id,
+                    "type": "m.room.test",
+                    "user_id": self.user_id,
                 },
-            },
+                actual[RelationTypes.THREAD].get("latest_event"),
+            )
+
+        def _find_and_assert_event(events):
+            """
+            Find the parent event in a chunk of events and assert that it has the proper bundled aggregations.
+            """
+            for event in events:
+                if event["event_id"] == self.parent_id:
+                    break
+            else:
+                raise AssertionError(f"Event {self.parent_id} not found in chunk")
+            assert_bundle(event["unsigned"].get("m.relations"))
+
+        # Request the event directly.
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/event/{self.parent_id}",
+            access_token=self.user_token,
         )
+        self.assertEquals(200, channel.code, channel.json_body)
+        assert_bundle(channel.json_body["unsigned"].get("m.relations"))
+
+        # Request the room messages.
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/messages?dir=b",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        _find_and_assert_event(channel.json_body["chunk"])
+
+        # Request the room context.
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/context/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        assert_bundle(channel.json_body["event"]["unsigned"].get("m.relations"))
+
+        # Request sync.
+        channel = self.make_request("GET", "/sync", access_token=self.user_token)
+        self.assertEquals(200, channel.code, channel.json_body)
+        room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
+        self.assertTrue(room_timeline["limited"])
+        _find_and_assert_event(room_timeline["events"])
+
+        # Note that /relations is tested separately in test_aggregation_get_event_for_thread
+        # since it needs different data configured.
 
     def test_aggregation_get_event_for_annotation(self):
-        """Test that annotations do not get bundled relations included
+        """Test that annotations do not get bundled aggregations included
         when directly requested.
         """
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
@@ -549,7 +606,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertIsNone(channel.json_body["unsigned"].get("m.relations"))
 
     def test_aggregation_get_event_for_thread(self):
-        """Test that threads get bundled relations included when directly requested."""
+        """Test that threads get bundled aggregations included when directly requested."""
         channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
         self.assertEquals(200, channel.code, channel.json_body)
         thread_id = channel.json_body["event_id"]

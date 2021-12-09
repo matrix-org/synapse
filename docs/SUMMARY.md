@@ -30,6 +30,7 @@
         - [SSO Mapping Providers](sso_mapping_providers.md)
       - [Password Auth Providers](password_auth_providers.md)
       - [JSON Web Tokens](jwt.md)
+      - [Refresh Tokens](usage/configuration/user_authentication/refresh_tokens.md)
     - [Registration Captcha](CAPTCHA_SETUP.md)
     - [Application Services](application_services.md)
     - [Server Notices](server_notices.md)
@@ -65,9 +66,15 @@
       - [Statistics](admin_api/statistics.md)
       - [Users](admin_api/user_admin_api.md)
       - [Server Version](admin_api/version_api.md)
+      - [Federation](usage/administration/admin_api/federation.md)
     - [Manhole](manhole.md)
     - [Monitoring](metrics-howto.md)
+    - [Understanding Synapse Through Grafana Graphs](usage/administration/understanding_synapse_through_grafana_graphs.md)
+    - [Useful SQL for Admins](usage/administration/useful_sql_for_admins.md)
+    - [Database Maintenance Tools](usage/administration/database_maintenance_tools.md)
+    - [State Groups](usage/administration/state_groups.md) 
     - [Request log format](usage/administration/request_log.md)
+    - [Admin FAQ](usage/administration/admin_faq.md)
     - [Scripts]()
 
 # Development
@@ -95,3 +102,4 @@
 
 # Other
   - [Dependency Deprecation Policy](deprecation_policy.md)
+  - [Running Synapse on a Single-Board Computer](other/running_synapse_on_single_board_computers.md)
