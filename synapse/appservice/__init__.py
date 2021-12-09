@@ -171,8 +171,8 @@ class ApplicationService:
                 return True
         return False
 
-    @cached
-    async def is_interested_in_user(
+    @cached()
+    def is_interested_in_user(
         self,
         user_id: str,
     ) -> bool:
@@ -193,7 +193,7 @@ class ApplicationService:
             # User is the appservice's sender_localpart user
             user_id == self.sender
             # User is in a defined namespace
-            or self.is_interested_in_user(user_id)
+            or self.is_user_in_namespace(user_id)
         )
 
     @cached(num_args=1, cache_context=True)
