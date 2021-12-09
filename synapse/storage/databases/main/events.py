@@ -40,10 +40,13 @@ from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.logging.utils import log_function
 from synapse.storage._base import db_to_json, make_in_list_sql_clause
-from synapse.storage.database import DatabasePool, LoggingTransaction
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.storage.databases.main.events_worker import EventCacheEntry
 from synapse.storage.databases.main.search import SearchEntry
-from synapse.storage.types import Connection
 from synapse.storage.util.id_generators import AbstractStreamIdGenerator
 from synapse.storage.util.sequence import SequenceGenerator
 from synapse.types import StateMap, get_domain_from_id
@@ -94,7 +97,7 @@ class PersistEventsStore:
         hs: "HomeServer",
         db: DatabasePool,
         main_data_store: "DataStore",
-        db_conn: Connection,
+        db_conn: LoggingDatabaseConnection,
     ):
         self.hs = hs
         self.db_pool = db

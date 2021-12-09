@@ -175,7 +175,7 @@ class LoggingDatabaseConnection:
     def rollback(self) -> None:
         self.conn.rollback()
 
-    def __enter__(self) -> "Connection":
+    def __enter__(self) -> "LoggingDatabaseConnection":
         self.conn.__enter__()
         return self
 
