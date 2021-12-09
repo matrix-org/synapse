@@ -168,10 +168,9 @@ import inspect
 import logging
 import re
 from functools import wraps
-from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Pattern, Type, Union
+from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Pattern, Type
 
 import attr
-from mypy.typeshed.stdlib.modulefinder import Module
 
 from twisted.internet import defer
 from twisted.web.http_headers import Headers
@@ -216,6 +215,7 @@ class _DummyTagNames:
     SPAN_KIND_PRODUCER = INVALID_TAG
     SPAN_KIND_RPC_CLIENT = INVALID_TAG
     SPAN_KIND_RPC_SERVER = INVALID_TAG
+
 
 try:
     import opentracing
@@ -553,7 +553,7 @@ def start_active_span_from_edu(
     references = references or []
 
     if opentracing is None:
-        return noop_context_manager() # type: ignore[unreachable]
+        return noop_context_manager()  # type: ignore[unreachable]
 
     carrier = json_decoder.decode(edu_content.get("context", "{}")).get(
         "opentracing", {}
