@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, List, Optional
 
 import attr
 
-from synapse.rest.media.v1.preview_html import parse_html_description
+from synapse.rest.media.v1.preview_html import decode_body, parse_html_description
 from synapse.types import JsonDict
 from synapse.util import json_decoder
 
@@ -170,7 +170,7 @@ class OEmbedProvider:
             # Process each type separately.
             oembed_type = oembed["type"]
             if oembed_type == "rich":
-                calc_description_and_urls(open_graph_response, oembed["html"])
+                calc_description_and_urls(open_graph_response, oembed["html"], url)
 
             elif oembed_type == "photo":
                 # If this is a photo, use the full image, not the thumbnail.
@@ -178,7 +178,7 @@ class OEmbedProvider:
 
             elif oembed_type == "video":
                 open_graph_response["og:type"] = "video.other"
-                calc_description_and_urls(open_graph_response, oembed["html"])
+                calc_description_and_urls(open_graph_response, oembed["html"], url)
                 open_graph_response["og:video:width"] = oembed["width"]
                 open_graph_response["og:video:height"] = oembed["height"]
 
@@ -202,7 +202,9 @@ def _fetch_urls(tree: "BeautifulSoup", tag_name: str) -> List[str]:
     return [tag["src"] for tag in tree.find_all(tag_name, src=True)]
 
 
-def calc_description_and_urls(open_graph_response: JsonDict, html_body: str) -> None:
+def calc_description_and_urls(
+    open_graph_response: JsonDict, html_body: str, url: str
+) -> None:
     """
     Calculate description for an HTML document.
 
@@ -212,24 +214,12 @@ def calc_description_and_urls(open_graph_response: JsonDict, html_body: str) -> 
     Args:
         open_graph_response: The current Open Graph summary. This is updated with additional fields.
         html_body: The HTML document, as bytes.
-
-    Returns:
-        The summary
+        url: The URL which is being previewed (not the one which was requested).
     """
+    tree = decode_body(html_body, url)
+
     # If there's no body, nothing useful is going to be found.
-    if not html_body:
-        return
-
-    from bs4 import BeautifulSoup
-    from bs4.builder import ParserRejectedMarkup
-
-    try:
-        tree = BeautifulSoup(html_body, "lxml")
-        # If an empty document is returned, convert to None.
-        if not len(tree):
-            return
-    except ParserRejectedMarkup:
-        logger.warning("Unable to decode HTML body")
+    if not tree:
         return
 
     # Attempt to find interesting URLs (images, videos, embeds).

@@ -14,7 +14,7 @@
 import itertools
 import logging
 import re
-from typing import TYPE_CHECKING, Dict, Generator, Iterable, Iterator, Optional
+from typing import TYPE_CHECKING, Dict, Generator, Iterable, Iterator, Optional, Union
 
 if TYPE_CHECKING:
     from bs4 import BeautifulSoup
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 
 
-def decode_body(body: bytes, uri: str) -> Optional["BeautifulSoup"]:
+def decode_body(body: Union[bytes, str], uri: str) -> Optional["BeautifulSoup"]:
     """
     This uses BeautifulSoup to parse the HTML document.
 
