@@ -339,7 +339,10 @@ class Auth:
 
         effective_device_id: Optional[str] = None
 
-        if DEVICE_ID_ARG_NAME in request.args:
+        if (
+            self.hs.config.experimental.msc3202_device_masquerading_enabled
+            and DEVICE_ID_ARG_NAME in request.args
+        ):
             effective_device_id = request.args[DEVICE_ID_ARG_NAME][0].decode("utf8")
             # We only just set this so it can't be None!
             assert effective_device_id is not None
