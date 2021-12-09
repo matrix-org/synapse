@@ -171,6 +171,31 @@ class ApplicationService:
                 return True
         return False
 
+    @cached
+    async def is_interested_in_user(
+        self,
+        user_id: str,
+    ) -> bool:
+        """
+        Returns whether the application is interested in a given user ID.
+
+        The appservice is considered to be interested in a user if either: the
+        user ID is in the appservice's user namespace, or if the user is the
+        appservice's configured sender_localpart.
+
+        Args:
+            user_id: The ID of the user to check.
+
+        Returns:
+            True if the application service is interested in the user, False if not.
+        """
+        return (
+            # User is the appservice's sender_localpart user
+            user_id == self.sender
+            # User is in a defined namespace
+            or self.is_user_in_namespace(user_id)
+        )
+
     @cached(num_args=1, cache_context=True)
     async def is_interested_in_room(
         self,
