@@ -1620,42 +1620,47 @@ saml2_config:
     #
     #accepted_time_diff: 3
 
-    # By default, the user has to go to our login page first. If you'd like
-    # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
-    # 'service.sp' section:
-    #
-    #service:
-    #  sp:
-    #    allow_unsolicited: true
-
-    # The examples below are just used to generate our metadata xml, and you
-    # may well not need them, depending on your setup. Alternatively you
-    # may need a whole lot more detail - see the pysaml2 docs!
-
     #description: ["My awesome SP", "en"]
     #name: ["Test SP", "en"]
 
-    #ui_info:
-    #  display_name:
-    #    - lang: en
-    #      text: "Display Name is the descriptive name of your service."
-    #  description:
-    #    - lang: en
-    #      text: "Description should be a short paragraph explaining the purpose of the service."
-    #  information_url:
-    #    - lang: en
-    #      text: "https://example.com/terms-of-service"
-    #  privacy_statement_url:
-    #    - lang: en
-    #      text: "https://example.com/privacy-policy"
-    #  keywords:
-    #    - lang: en
-    #      text: ["Matrix", "Element"]
-    #  logo:
-    #    - lang: en
-    #      text: "https://example.com/logo.svg"
-    #      width: "200"
-    #      height: "80"
+    # The service section is needed to configure saml2 extensions like `ui_info`,
+    # if this might not be enough for your usecase, try looking at the pysaml2 documentation.
+    # The documentation is wrong in some places, so if it doesn't work, try shuffeling things around,
+    # and ask others for advice, it's probably not your fault.
+    #
+    #service:
+    #  sp:
+    #
+    # By default, the user has to go to our login page first. If you'd like
+    # to allow IdP-initiated login, set 'allow_unsolicited: "true"' 
+    # pysaml2 implements the booleans wrong here, the quotes are NEEDED
+    #
+    #    allow_unsolicited: "true"
+    #
+    #     The section below is used to configure what will be visible on the IdP's page.
+    #     Note: shiboleth needs the logo to be defined for every language you use or it won't show up.
+    #
+    #     ui_info:
+    #       display_name:
+    #         - lang: en
+    #           text: "Display Name is the descriptive name of your service."
+    #       description:
+    #         - lang: en
+    #           text: "Description should be a short paragraph explaining the purpose of the service."
+    #       information_url:
+    #         - lang: en
+    #           text: "https://example.com/terms-of-service"
+    #       privacy_statement_url:
+    #         - lang: en
+    #           text: "https://example.com/privacy-policy"
+    #       keywords:
+    #         - lang: en
+    #           text: ["Matrix", "Element"]
+    #       logo:
+    #         - lang: en
+    #           text: "https://example.com/logo.svg"
+    #           width: "200"
+    #           height: "80"
 
     #organization:
     #  name: Example com
