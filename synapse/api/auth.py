@@ -155,7 +155,11 @@ class Auth:
 
             access_token = self.get_access_token_from_request(request)
 
-            user_id, app_service = await self._get_appservice_user_id(request)
+            (
+                user_id,
+                device_id,
+                app_service,
+            ) = await self._get_appservice_user_id_and_device_id(request)
             if user_id and app_service:
                 if ip_addr and self._track_appservice_user_ips:
                     await self.store.insert_client_ip(
@@ -163,16 +167,22 @@ class Auth:
                         access_token=access_token,
                         ip=ip_addr,
                         user_agent=user_agent,
-                        device_id="dummy-device",  # stubbed
+                        device_id="dummy-device"
+                        if device_id is None
+                        else device_id,  # stubbed
                     )
 
-                requester = create_requester(user_id, app_service=app_service)
+                requester = create_requester(
+                    user_id, app_service=app_service, device_id=device_id
+                )
 
                 request.requester = user_id
                 if user_id in self._force_tracing_for_users:
                     opentracing.force_tracing()
                 opentracing.set_tag("authenticated_entity", user_id)
                 opentracing.set_tag("user_id", user_id)
+                if device_id is not None:
+                    opentracing.set_tag("device_id", device_id)
                 opentracing.set_tag("appservice_id", app_service.id)
 
                 return requester
@@ -274,33 +284,81 @@ class Auth:
                 403, "Application service has not registered this user (%s)" % user_id
             )
 
-    async def _get_appservice_user_id(
+    async def _get_appservice_user_id_and_device_id(
         self, request: Request
-    ) -> Tuple[Optional[str], Optional[ApplicationService]]:
+    ) -> Tuple[Optional[str], Optional[str], Optional[ApplicationService]]:
+        """
+        Given a request, reads the request parameters to determine:
+        - whether it's an application service that's making this request
+        - what user the application service should be treated as controlling
+          (the user_id URI parameter allows an application service to masquerade
+          any applicable user in its namespace)
+        - what device the application service should be treated as controlling
+          (the device_id[^1] URI parameter allows an application service to masquerade
+          as any device that exists for the relevant user)
+
+        [^1] Unstable and provided by MSC3202.
+             Must use `org.matrix.msc3202.device_id` in place of `device_id` for now.
+
+        Returns:
+            3-tuple of
+            (user ID?, device ID?, application service?)
+
+        Postconditions:
+        - If an application service is returned, so is a user ID
+        - A user ID is never returned without an application service
+        - A device ID is never returned without a user ID or an application service
+        - The returned application service, if present, is permitted to control the
+          returned user ID.
+        - The returned device ID, if present, has been checked to be a valid device ID
+          for the returned user ID.
+        """
+        DEVICE_ID_ARG_NAME = b"org.matrix.msc3202.device_id"
+
         app_service = self.store.get_app_service_by_token(
             self.get_access_token_from_request(request)
         )
         if app_service is None:
-            return None, None
+            return None, None, None
 
         if app_service.ip_range_whitelist:
             ip_address = IPAddress(request.getClientIP())
             if ip_address not in app_service.ip_range_whitelist:
-                return None, None
+                return None, None, None
 
         # This will always be set by the time Twisted calls us.
         assert request.args is not None
 
-        if b"user_id" not in request.args:
-            return app_service.sender, app_service
+        if b"user_id" in request.args:
+            effective_user_id = request.args[b"user_id"][0].decode("utf8")
+            await self.validate_appservice_can_control_user_id(
+                app_service, effective_user_id
+            )
+        else:
+            effective_user_id = app_service.sender
 
-        user_id = request.args[b"user_id"][0].decode("utf8")
-        await self.validate_appservice_can_control_user_id(app_service, user_id)
+        effective_device_id: Optional[str] = None
 
-        if app_service.sender == user_id:
-            return app_service.sender, app_service
+        if (
+            self.hs.config.experimental.msc3202_device_masquerading_enabled
+            and DEVICE_ID_ARG_NAME in request.args
+        ):
+            effective_device_id = request.args[DEVICE_ID_ARG_NAME][0].decode("utf8")
+            # We only just set this so it can't be None!
+            assert effective_device_id is not None
+            device_opt = await self.store.get_device_opt(
+                effective_user_id, effective_device_id
+            )
+            if device_opt is None:
+                # For now, use 400 M_EXCLUSIVE if the device doesn't exist.
+                # This is an open thread of discussion on MSC3202 as of 2021-12-09.
+                raise AuthError(
+                    400,
+                    f"Application service trying to use a device that doesn't exist ('{effective_device_id}' for {effective_user_id})",
+                    Codes.EXCLUSIVE,
+                )
 
-        return user_id, app_service
+        return effective_user_id, effective_device_id, app_service
 
     async def get_user_by_access_token(
         self,

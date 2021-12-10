@@ -61,3 +61,8 @@ class ExperimentalConfig(Config):
         # MSC3202 (device list updates and OTK counts / fallback keys to appservices).
         # Only device lists are supported currently.
         self.msc3202_enabled: bool = experimental.get("msc3202_enabled", False)
+
+        # The portion of MSC3202 which is related to device masquerading.
+        self.msc3202_device_masquerading_enabled: bool = experimental.get(
+            "msc3202_device_masquerading", False
+        )

@@ -1,1 +1,0 @@
-Support configuring the lifetime of non-refreshable access tokens separately to refreshable access tokens.
