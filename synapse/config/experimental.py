@@ -62,3 +62,9 @@ class ExperimentalConfig(Config):
         self.msc2409_to_device_messages_enabled: bool = experimental.get(
             "msc2409_to_device_messages_enabled", False
         )
+
+        # Portion of MSC3202 related to transaction extensions:
+        # sending one-time key counts and fallback key usage to application services.
+        self.msc3202_transaction_extensions: bool = experimental.get(
+            "msc3202_transaction_extensions", False
+        )
