@@ -44,6 +44,8 @@ from typing_extensions import Literal
 
 from twisted.internet import defer, threads
 
+from synapse.types import ISynapseReactor
+
 if TYPE_CHECKING:
     from synapse.logging.scopecontextmanager import _LogContextScope
 
@@ -865,7 +867,9 @@ def _set_context_cb(result: ResultT, context: LoggingContext) -> ResultT:
     return result
 
 
-def defer_to_thread(reactor, f, *args, **kwargs):
+def defer_to_thread(
+    reactor: ISynapseReactor, f: Callable[..., R], *args: Any, **kwargs: Any
+) -> "defer.Deferred[R]":
     """
     Calls the function `f` using a thread from the reactor's default threadpool and
     returns the result as a Deferred.
@@ -897,7 +901,9 @@ def defer_to_thread(reactor, f, *args, **kwargs):
     return defer_to_threadpool(reactor, reactor.getThreadPool(), f, *args, **kwargs)
 
 
-def defer_to_threadpool(reactor, threadpool, f, *args, **kwargs):
+def defer_to_threadpool(
+    reactor: ISynapseReactor, threadpool, f: Callable[..., R], *args: Any, **kwargs: Any
+) -> "defer.Deferred[R]":
     """
     A wrapper for twisted.internet.threads.deferToThreadpool, which handles
     logcontexts correctly.
@@ -939,7 +945,7 @@ def defer_to_threadpool(reactor, threadpool, f, *args, **kwargs):
         assert isinstance(curr_context, LoggingContext)
         parent_context = curr_context
 
-    def g():
+    def g() -> R:
         with LoggingContext(str(curr_context), parent_context=parent_context):
             return f(*args, **kwargs)
 
