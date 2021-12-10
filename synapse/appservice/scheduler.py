@@ -54,6 +54,7 @@ from typing import (
     Callable,
     Collection,
     Dict,
+    Iterable,
     List,
     Optional,
     Set,
@@ -101,7 +102,7 @@ class ApplicationServiceScheduler:
         self.as_api = hs.get_application_service_api()
 
         self.txn_ctrl = _TransactionController(self.clock, self.store, self.as_api)
-        self.queuer = _ServiceQueuer(self.txn_ctrl, self.clock)
+        self.queuer = _ServiceQueuer(self.txn_ctrl, self.clock, hs)
 
     async def start(self) -> None:
         logger.info("Starting appservice scheduler")
@@ -158,7 +159,7 @@ class _ServiceQueuer:
     appservice at a given time.
     """
 
-    def __init__(self, txn_ctrl: "_TransactionController", clock: Clock):
+    def __init__(self, txn_ctrl: "_TransactionController", clock: Clock, hs: "HomeServer"):
         # dict of {service_id: [events]}
         self.queued_events: Dict[str, List[EventBase]] = {}
         # dict of {service_id: [events]}
@@ -170,6 +171,9 @@ class _ServiceQueuer:
         self.requests_in_flight: Set[str] = set()
         self.txn_ctrl = txn_ctrl
         self.clock = clock
+        self._msc3202_transaction_extensions_enabled: bool = (
+            hs.config.experimental.msc3202_transaction_extensions
+        )
 
     def start_background_request(self, service: ApplicationService) -> None:
         # start a sender for this appservice if we don't already have one
