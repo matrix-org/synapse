@@ -51,6 +51,8 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         db_conn: LoggingDatabaseConnection,
         hs: "HomeServer",
     ):
+        super().__init__(database, db_conn, hs)
+
         # `_can_write_to_account_data` indicates whether the current worker is allowed
         # to write account data. A value of `True` implies that `_account_data_id_gen`
         # is an `AbstractStreamIdGenerator` and not just a tracker.
@@ -102,8 +104,6 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         self._account_data_stream_cache = StreamChangeCache(
             "AccountDataAndTagsChangeCache", account_max
         )
-
-        super().__init__(database, db_conn, hs)
 
     def get_max_account_data_stream_id(self) -> int:
         """Get the current max stream ID for account data stream
