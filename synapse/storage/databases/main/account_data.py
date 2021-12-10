@@ -55,8 +55,6 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         db_conn: LoggingDatabaseConnection,
         hs: "HomeServer",
     ):
-        self._instance_name = hs.get_instance_name()
-
         # `_can_write_to_account_data` indicates whether the current worker is allowed
         # to write account data. A value of `True` implies that `_account_data_id_gen`
         # is an `AbstractStreamIdGenerator` and not just a tracker.
@@ -88,7 +86,7 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
             # `StreamIdGenerator`, otherwise we use `SlavedIdTracker` which gets
             # updated over replication. (Multiple writers are not supported for
             # SQLite).
-            if hs.get_instance_name() in hs.config.worker.writers.account_data:
+            if self._instance_name in hs.config.worker.writers.account_data:
                 self._can_write_to_account_data = True
                 self._account_data_id_gen = StreamIdGenerator(
                     db_conn,
