@@ -50,7 +50,12 @@ components.
 import logging
 from typing import Dict, Iterable, List, Optional
 
-from synapse.appservice import ApplicationService, ApplicationServiceState
+from synapse.appservice import (
+    ApplicationService,
+    ApplicationServiceState,
+    TransactionOneTimeKeyCounts,
+    TransactionUnusedFallbackKeys,
+)
 from synapse.events import EventBase
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -186,9 +191,17 @@ class _ServiceQueuer:
                 if not events and not ephemeral and not to_device_messages_to_send:
                     return
 
+                one_time_key_counts: Optional[TransactionOneTimeKeyCounts] = None
+                unused_fallback_keys: Optional[TransactionUnusedFallbackKeys] = None
+
                 try:
                     await self.txn_ctrl.send(
-                        service, events, ephemeral, to_device_messages_to_send
+                        service,
+                        events,
+                        ephemeral,
+                        to_device_messages_to_send,
+                        one_time_key_counts,
+                        unused_fallback_keys,
                     )
                 except Exception:
                     logger.exception("AS request failed")
@@ -227,6 +240,8 @@ class _TransactionController:
         events: List[EventBase],
         ephemeral: Optional[List[JsonDict]] = None,
         to_device_messages: Optional[List[JsonDict]] = None,
+        one_time_key_counts: Optional[TransactionOneTimeKeyCounts] = None,
+        unused_fallback_keys: Optional[TransactionUnusedFallbackKeys] = None,
     ) -> None:
         """
         Create a transaction with the given data and send to the provided
@@ -237,6 +252,10 @@ class _TransactionController:
             events: The persistent events to include in the transaction.
             ephemeral: The ephemeral events to include in the transaction.
             to_device_messages: The to-device messages to include in the transaction.
+            one_time_key_counts: Counts of remaining one-time keys for relevant
+                appservice devices in the transaction.
+            unused_fallback_keys: Lists of unused fallback keys for relevant
+                appservice devices in the transaction.
         """
         try:
             txn = await self.store.create_appservice_txn(
@@ -244,6 +263,8 @@ class _TransactionController:
                 events=events,
                 ephemeral=ephemeral or [],
                 to_device_messages=to_device_messages or [],
+                one_time_key_counts=one_time_key_counts or {},
+                unused_fallback_keys=unused_fallback_keys or {},
             )
             service_is_up = await self._is_service_up(service)
             if service_is_up:
