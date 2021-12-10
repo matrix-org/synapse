@@ -45,10 +45,6 @@ logger = logging.getLogger(__name__)
 
 
 class AccountDataWorkerStore(CacheInvalidationWorkerStore):
-    """This is an abstract base class where subclasses must implement
-    `get_max_account_data_stream_id` which can be called in the initializer.
-    """
-
     def __init__(
         self,
         database: DatabasePool,
