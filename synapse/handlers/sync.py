@@ -1999,6 +1999,23 @@ class SyncHandler:
         """Populates the `joined` and `archived` section of `sync_result_builder`
         based on the `room_builder`.
 
+        Ideally, we want to report all events whose stream ordering `s` lies in the
+        range `since_token < s <= now_token`, where the two tokens are read from the
+        sync_result_builder.
+
+        If there are too many events in that range to report, things get complicated.
+        In this situation we return a truncated list of the most recent events, and
+        indicate in the response that there is a "gap" of omitted events. Lots of this
+        is handled in `_load_filtered_recents`, but some of is handled in this method.
+
+        Additionally:
+        - we include a "state_delta", to describe the changes in state over the gap,
+        - we include all membership events applying to the user making the request,
+          even those in the gap.
+
+        See the spec for the rationale:
+            https://spec.matrix.org/v1.1/client-server-api/#syncing
+
         Args:
             sync_result_builder
             ignored_users: Set of users ignored by user.
