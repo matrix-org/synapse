@@ -119,11 +119,11 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         room_id = "!alpha:bet"
         servers = ["aperture"]
-        interested_service = self._mkservice_alias(is_interested_in_alias=True)
+        interested_service = self._mkservice_alias(is_room_alias_in_namespace=True)
         services = [
-            self._mkservice_alias(is_interested_in_alias=False),
+            self._mkservice_alias(is_room_alias_in_namespace=False),
             interested_service,
-            self._mkservice_alias(is_interested_in_alias=False),
+            self._mkservice_alias(is_room_alias_in_namespace=False),
         ]
 
         self.mock_as_api.query_alias.return_value = make_awaitable(True)
@@ -327,9 +327,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         service.protocols = protocols
         return service
 
-    def _mkservice_alias(self, is_interested_in_alias):
+    def _mkservice_alias(self, is_room_alias_in_namespace):
         service = Mock()
-        service.is_interested_in_alias.return_value = is_interested_in_alias
+        service.is_room_alias_in_namespace.return_value = is_room_alias_in_namespace
         service.token = "mock_service_token"
         service.url = "mock_service_url"
         return service
