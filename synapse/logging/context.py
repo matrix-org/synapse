@@ -806,7 +806,8 @@ def run_in_background(
     # At this point we should have a Deferred, if not then f was a synchronous
     # function, wrap it in a Deferred for consistency.
     if not isinstance(res, defer.Deferred):
-        # All `Awaitable`s in Synapse are either coroutines or `Deferred`s
+        # `res` is not a `Deferred` and not a `Coroutine`.
+        # There are no other types of `Awaitable`s we expect to encounter in Synapse.
         assert not isinstance(res, Awaitable)
 
         return defer.succeed(res)
