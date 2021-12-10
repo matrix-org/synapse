@@ -22,7 +22,6 @@ them.
 
 See doc/log_contexts.rst for details on how this works.
 """
-import inspect
 import logging
 import threading
 import typing
@@ -841,12 +840,10 @@ T = TypeVar("T")
 
 
 def make_deferred_yieldable(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]":
-    """Given a deferred (or coroutine), make it follow the Synapse logcontext
-    rules:
+    """Given a deferred, make it follow the Synapse logcontext rules:
 
-    If the deferred has completed (or is not actually a Deferred), essentially
-    does nothing (just returns another completed deferred with the
-    result/failure).
+    If the deferred has completed, essentially does nothing (just returns another
+    completed deferred with the result/failure).
 
     If the deferred has not yet completed, resets the logcontext before
     returning a deferred. Then, when the deferred completes, restores the
@@ -854,16 +851,6 @@ def make_deferred_yieldable(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]
 
     (This is more-or-less the opposite operation to run_in_background.)
     """
-    if inspect.isawaitable(deferred):
-        # If we're given a coroutine we convert it to a deferred so that we
-        # run it and find out if it immediately finishes, it it does then we
-        # don't need to fiddle with log contexts at all and can return
-        # immediately.
-        deferred = defer.ensureDeferred(deferred)
-
-    if not isinstance(deferred, defer.Deferred):
-        return deferred
-
     if deferred.called and not deferred.paused:
         # it looks like this deferred is ready to run any callbacks we give it
         # immediately. We may as well optimise out the logcontext faffery.
