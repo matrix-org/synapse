@@ -373,6 +373,9 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             "exclusive_as_user", "password", self.exclusive_as_user_device_id
         )
 
+        # Ensure that the mock is reset after creating devices (and thus updating device lists)
+        self.send_mock.reset_mock()
+
     @unittest.override_config(
         {"experimental_features": {"msc2409_to_device_messages_enabled": True}}
     )
