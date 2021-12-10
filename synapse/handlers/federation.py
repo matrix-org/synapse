@@ -366,25 +366,28 @@ class FederationHandler:
             )
         )
 
-        # dict[str, dict[tuple, str]], a map from event_id to state map of
-        # event_ids.
-        states = dict(zip(event_ids, [s.state for s in states_list]))
+        # A map from event_id to state map of event_ids.
+        state_ids: Dict[str, StateMap[str]] = dict(
+            zip(event_ids, [s.state for s in states_list])
+        )
 
         state_map = await self.store.get_events(
-            [e_id for ids in states.values() for e_id in ids.values()],
+            [e_id for ids in state_ids.values() for e_id in ids.values()],
             get_prev_content=False,
         )
-        states = {
+
+        # A map from event_id to state map of events.
+        state_events: Dict[str, StateMap[EventBase]] = {
             key: {
                 k: state_map[e_id]
                 for k, e_id in state_dict.items()
                 if e_id in state_map
             }
-            for key, state_dict in states.items()
+            for key, state_dict in state_ids.items()
         }
 
         for e_id in event_ids:
-            likely_extremeties_domains = get_domains_from_state(states[e_id])
+            likely_extremeties_domains = get_domains_from_state(state_events[e_id])
 
             success = await try_backfill(
                 [
