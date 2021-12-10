@@ -1410,10 +1410,6 @@ class PersistEventsStore:
                 "state_key": event.state_key,
             }
 
-            # TODO: How does this work with backfilling?
-            if hasattr(event, "replaces_state"):
-                vals["prev_state"] = event.replaces_state
-
             state_values.append(vals)
 
         self.db_pool.simple_insert_many_txn(
