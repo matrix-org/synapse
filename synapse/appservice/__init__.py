@@ -238,8 +238,8 @@ class ApplicationService:
     async def is_interested_in_event(
         self,
         event: EventBase,
+        store: "DataStore",
         cache_context: _CacheContext,
-        store: Optional["DataStore"] = None,
     ) -> bool:
         """Check if this service is interested in this event.
 
@@ -267,10 +267,7 @@ class ApplicationService:
         ):
             return True
 
-        # TODO: The store is only optional here to aid testing this function. We should
-        #  instead convert the tests to use HomeServerTestCase in order to get a working
-        #  database instance.
-        if store is not None and await self.is_interested_in_room(
+        if await self.is_interested_in_room(
             event.room_id, store, on_invalidate=cache_context.invalidate
         ):
             return True

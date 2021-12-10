@@ -19,6 +19,7 @@ from twisted.internet import defer
 from synapse.appservice import ApplicationService
 
 from tests import unittest
+from tests.test_utils import simple_async_mock
 
 
 def _regex(regex, exclusive=True):
@@ -44,6 +45,8 @@ class ApplicationServiceTestCase(unittest.TestCase):
         )
 
         self.store = Mock()
+        self.store.get_aliases_for_room = simple_async_mock(return_value=[])
+        self.store.get_users_in_room = simple_async_mock(return_value=[])
 
     @defer.inlineCallbacks
     def test_regex_user_id_prefix_match(self):
@@ -52,7 +55,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.assertTrue(
             (
                 yield defer.ensureDeferred(
-                    self.service.is_interested_in_event(self.event)
+                    self.service.is_interested_in_event(self.event, self.store)
                 )
             )
         )
@@ -64,7 +67,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.assertFalse(
             (
                 yield defer.ensureDeferred(
-                    self.service.is_interested_in_event(self.event)
+                    self.service.is_interested_in_event(self.event, self.store)
                 )
             )
         )
@@ -78,7 +81,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.assertTrue(
             (
                 yield defer.ensureDeferred(
-                    self.service.is_interested_in_event(self.event)
+                    self.service.is_interested_in_event(self.event, self.store)
                 )
             )
         )
@@ -107,7 +110,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.assertFalse(
             (
                 yield defer.ensureDeferred(
-                    self.service.is_interested_in_event(self.event)
+                    self.service.is_interested_in_event(self.event, self.store)
                 )
             )
         )
@@ -212,7 +215,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.assertTrue(
             (
                 yield defer.ensureDeferred(
-                    self.service.is_interested_in_event(self.event)
+                    self.service.is_interested_in_event(self.event, self.store)
                 )
             )
         )
