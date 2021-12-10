@@ -726,10 +726,29 @@ def nested_logging_context(suffix: str) -> LoggingContext:
 R = TypeVar("R")
 
 
-def preserve_fn(f):
+@overload
+def preserve_fn(  # type: ignore[misc]
+    f: Callable[..., Awaitable[R]],
+) -> Callable[..., "defer.Deferred[R]"]:
+    # The `type: ignore[misc]` above suppresses
+    # "Overloaded function signatures 1 and 2 overlap with incompatible return types"
+    ...
+
+
+@overload
+def preserve_fn(f: Callable[..., R]) -> Callable[..., "defer.Deferred[R]"]:
+    ...
+
+
+def preserve_fn(
+    f: Union[
+        Callable[..., R],
+        Callable[..., Awaitable[R]],
+    ]
+) -> Callable[..., "defer.Deferred[R]"]:
     """Function decorator which wraps the function with run_in_background"""
 
-    def g(*args, **kwargs):
+    def g(*args: Any, **kwargs: Any) -> "defer.Deferred[R]":
         return run_in_background(f, *args, **kwargs)
 
     return g
