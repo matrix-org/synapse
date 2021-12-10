@@ -15,8 +15,6 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
-from twisted.internet import defer
-
 from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events.validator import EventValidator
@@ -27,7 +25,7 @@ from synapse.storage.roommember import RoomsForUser
 from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, Requester, RoomStreamToken, StreamToken, UserID
 from synapse.util import unwrapFirstError
-from synapse.util.async_helpers import concurrently_execute
+from synapse.util.async_helpers import concurrently_execute, gather_results
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.visibility import filter_events_for_client
 
@@ -196,8 +194,8 @@ class InitialSyncHandler:
                     )
 
                 (messages, token), current_state = await make_deferred_yieldable(
-                    defer.gatherResults(
-                        [
+                    gather_results(
+                        (
                             run_in_background(
                                 self.store.get_recent_events_for_room,
                                 event.room_id,
@@ -205,7 +203,7 @@ class InitialSyncHandler:
                                 end_token=room_end_token,
                             ),
                             deferred_room_state,
-                        ]
+                        )
                     )
                 ).addErrback(unwrapFirstError)
 
@@ -454,8 +452,8 @@ class InitialSyncHandler:
             return receipts
 
         presence, receipts, (messages, token) = await make_deferred_yieldable(
-            defer.gatherResults(
-                [
+            gather_results(
+                (
                     run_in_background(get_presence),
                     run_in_background(get_receipts),
                     run_in_background(
@@ -464,7 +462,7 @@ class InitialSyncHandler:
                         limit=limit,
                         end_token=now_token.room_key,
                     ),
-                ],
+                ),
                 consumeErrors=True,
             ).addErrback(unwrapFirstError)
         )

@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
 
-from twisted.internet import defer
 from twisted.internet.interfaces import IDelayedCall
 
 from synapse import event_auth
@@ -57,7 +56,7 @@ from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import Requester, RoomAlias, StreamToken, UserID, create_requester
 from synapse.util import json_decoder, json_encoder, log_failure
-from synapse.util.async_helpers import Linearizer, unwrapFirstError
+from synapse.util.async_helpers import Linearizer, gather_results, unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_events_for_client
@@ -1156,9 +1155,9 @@ class EventCreationHandler:
 
         # We now persist the event (and update the cache in parallel, since we
         # don't want to block on it).
-        result = await make_deferred_yieldable(
-            defer.gatherResults(
-                [
+        result, _ = await make_deferred_yieldable(
+            gather_results(
+                (
                     run_in_background(
                         self._persist_event,
                         requester=requester,
@@ -1170,12 +1169,12 @@ class EventCreationHandler:
                     run_in_background(
                         self.cache_joined_hosts_for_event, event, context
                     ).addErrback(log_failure, "cache_joined_hosts_for_event failed"),
-                ],
+                ),
                 consumeErrors=True,
             )
         ).addErrback(unwrapFirstError)
 
-        return result[0]
+        return result
 
     async def _persist_event(
         self,
