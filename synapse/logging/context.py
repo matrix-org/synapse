@@ -44,10 +44,9 @@ from typing_extensions import Literal
 
 from twisted.internet import defer, threads
 
-from synapse.types import ISynapseReactor
-
 if TYPE_CHECKING:
     from synapse.logging.scopecontextmanager import _LogContextScope
+    from synapse.types import ISynapseReactor
 
 logger = logging.getLogger(__name__)
 
@@ -887,7 +886,7 @@ def _set_context_cb(result: ResultT, context: LoggingContext) -> ResultT:
 
 
 def defer_to_thread(
-    reactor: ISynapseReactor, f: Callable[..., R], *args: Any, **kwargs: Any
+    reactor: "ISynapseReactor", f: Callable[..., R], *args: Any, **kwargs: Any
 ) -> "defer.Deferred[R]":
     """
     Calls the function `f` using a thread from the reactor's default threadpool and
@@ -921,7 +920,11 @@ def defer_to_thread(
 
 
 def defer_to_threadpool(
-    reactor: ISynapseReactor, threadpool, f: Callable[..., R], *args: Any, **kwargs: Any
+    reactor: "ISynapseReactor",
+    threadpool,
+    f: Callable[..., R],
+    *args: Any,
+    **kwargs: Any,
 ) -> "defer.Deferred[R]":
     """
     A wrapper for twisted.internet.threads.deferToThreadpool, which handles
