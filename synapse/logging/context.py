@@ -778,7 +778,10 @@ def run_in_background(f, *args, **kwargs) -> defer.Deferred:
     return res
 
 
-def make_deferred_yieldable(deferred):
+T = TypeVar("T")
+
+
+def make_deferred_yieldable(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]":
     """Given a deferred (or coroutine), make it follow the Synapse logcontext
     rules:
 
