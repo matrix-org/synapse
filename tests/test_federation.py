@@ -279,10 +279,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
 
 
 class StripUnsignedFromEventsTestCase(MessageAcceptTests):
-    def setUp(self):
-        super().setUp()
-
-    def strip_unauthorized_unsigned_values(self):
+    def test_strip_unauthorized_unsigned_values(self):
         most_recent = self.get_success(
             self.homeserver.get_datastore().get_latest_event_ids_in_room(self.room_id)
         )[0]
@@ -309,9 +306,9 @@ class StripUnsignedFromEventsTestCase(MessageAcceptTests):
         event = self.get_success(self.store.get_event("$event1:test.serv"))
         event_dict = event.get_dict()
         # Make sure unauthorized fields are stripped from unsigned
-        self.assertNotIn("hackz", event_dict["unsigned"])
+        self.assertNotIn("more warez", event_dict["unsigned"])
 
-    def strip_event_maintains_allowed_fields(self):
+    def test_strip_event_maintains_allowed_fields(self):
         most_recent = self.get_success(
             self.homeserver.get_datastore().get_latest_event_ids_in_room(self.room_id)
         )[0]
@@ -345,11 +342,13 @@ class StripUnsignedFromEventsTestCase(MessageAcceptTests):
         event = self.get_success(self.store.get_event("$event2:test.serv"))
         event_dict = event.get_dict()
         self.assertIn("age", event_dict["unsigned"])
-        self.assertNotIn("hackz", event_dict["unsigned"])
+        self.assertEqual(14, event_dict["unsigned"]["age"])
+        self.assertNotIn("more warez", event_dict["unsigned"])
         # Invite_room_state is allowed in events of type m.room.member
         self.assertIn("invite_room_state", event_dict["unsigned"])
+        self.assertEqual([], event_dict["unsigned"]["invite_room_state"])
 
-    def strip_event_removes_fields_based_on_event_type(self):
+    def test_strip_event_removes_fields_based_on_event_type(self):
         most_recent = self.get_success(
             self.homeserver.get_datastore().get_latest_event_ids_in_room(self.room_id)
         )[0]
@@ -381,6 +380,6 @@ class StripUnsignedFromEventsTestCase(MessageAcceptTests):
         event = self.get_success(self.store.get_event("$event3:test.serv"))
         event_dict = event.get_dict()
         self.assertIn("age", event_dict["unsigned"])
-        # Invite_room_state field is only associated with event type m.room.member
+        # Invite_room_state field is only permitted in event type m.room.member
         self.assertNotIn("invite_room_state", event_dict["unsigned"])
         self.assertNotIn("more warez", event_dict["unsigned"])
