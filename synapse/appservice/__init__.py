@@ -171,7 +171,6 @@ class ApplicationService:
                 return True
         return False
 
-    @cached()
     def is_interested_in_user(
         self,
         user_id: str,
