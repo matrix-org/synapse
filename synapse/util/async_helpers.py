@@ -407,7 +407,7 @@ class Linearizer:
 
         logger.debug("Waiting to acquire linearizer lock %r for key %r", self.name, key)
 
-        new_defer = make_deferred_yieldable(defer.Deferred())
+        new_defer: "defer.Deferred[None]" = make_deferred_yieldable(defer.Deferred())
         entry.deferreds[new_defer] = 1
 
         def cb(_r: None) -> "defer.Deferred[None]":

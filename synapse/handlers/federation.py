@@ -360,7 +360,7 @@ class FederationHandler:
 
         logger.debug("calling resolve_state_groups in _maybe_backfill")
         resolve = preserve_fn(self.state_handler.resolve_state_groups_for_events)
-        states = await make_deferred_yieldable(
+        states_list = await make_deferred_yieldable(
             defer.gatherResults(
                 [resolve(room_id, [e]) for e in event_ids], consumeErrors=True
             )
@@ -368,7 +368,7 @@ class FederationHandler:
 
         # dict[str, dict[tuple, str]], a map from event_id to state map of
         # event_ids.
-        states = dict(zip(event_ids, [s.state for s in states]))
+        states = dict(zip(event_ids, [s.state for s in states_list]))
 
         state_map = await self.store.get_events(
             [e_id for ids in states.values() for e_id in ids.values()],
