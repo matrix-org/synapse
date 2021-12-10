@@ -13,7 +13,7 @@
 # limitations under the License.
 import logging
 import urllib
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 from prometheus_client import Counter
 
@@ -239,7 +239,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         uri = service.url + ("/transactions/%s" % urllib.parse.quote(str(txn_id)))
 
         # Never send ephemeral events to appservices that do not support it
-        body: Dict[str, List[JsonDict]] = {"events": serialized_events}
+        body: Dict[str, Union[JsonDict, List[JsonDict]]] = {"events": serialized_events}
         if service.supports_ephemeral:
             body.update(
                 {
