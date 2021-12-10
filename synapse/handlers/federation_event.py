@@ -28,6 +28,7 @@ from typing import (
     Tuple,
 )
 
+from mypy.build import Any
 from prometheus_client import Counter
 
 from synapse.api.constants import (
@@ -183,7 +184,7 @@ class FederationEventHandler:
 
         # Strip any unauthorized unsigned values if they exist
         event_dict = pdu.get_dict()
-        if pdu.unsigned and event_dict["unsigned"] != {}:
+        if pdu.unsigned and "unsigned" in event_dict and event_dict["unsigned"] != {}:
             pdu = self.strip_unsigned_values(pdu, event_dict)
 
         # If we are currently in the process of joining this room, then we
@@ -332,7 +333,7 @@ class FederationEventHandler:
 
         # Strip any unauthorized unsigned values if they exist
         event_dict = event.get_dict()
-        if event.unsigned and event_dict["unsigned"] != {}:
+        if event.unsigned and "unsigned" in event_dict and event_dict["unsigned"] != {}:
             event = self.strip_unsigned_values(event, event_dict)
 
         # Send this event on behalf of the other server.
@@ -1950,14 +1951,22 @@ class FederationEventHandler:
             )
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Too many auth_events")
 
-    def strip_unsigned_values(self, pdu: EventBase, event_dict: Dict) -> EventBase:
+    def strip_unsigned_values(
+        self, pdu: EventBase, event_dict: Dict[str, Any]
+    ) -> EventBase:
         """
         Strip any unsigned values unless specifically allowed, as defined by the whitelist.
 
         pdu: the event to strip values from
         event_dict: a dict of values derived from the pdu
         """
-        unsigned = event_dict.get("unsigned")
+        unsigned = event_dict["unsigned"]
+
+        if not isinstance(unsigned, dict):
+            event_dict["unsigned"] = {}
+            return make_event_from_dict(
+                event_dict, pdu.room_version, pdu.internal_metadata.get_dict()
+            )
 
         if pdu.type == EventTypes.Member:
             whitelist = ["knock_room_state", "invite_room_state", "age"]
@@ -1966,8 +1975,6 @@ class FederationEventHandler:
 
         filtered_unsigned = {}
 
-        # Unsigned should never be None by the time we are here but mypy doesn't know that
-        assert unsigned is not None
         for k, v in unsigned.items():
             if k in whitelist:
                 filtered_unsigned[k] = v
