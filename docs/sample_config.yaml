@@ -439,6 +439,11 @@ manhole_settings:
 #  - medium: 'email'
 #    address: 'reserved_user@example.com'
 
+# If enabled, puppeted users can also be tracked. By default when
+# puppeting another user, the user who has created the access token
+# for puppeting is tracked. If this is enabled, both requests are tracked.
+#mau_track_puppeted_users: false
+
 # Used by phonehome stats to group together related servers.
 #server_context: context
 

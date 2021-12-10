@@ -210,6 +210,39 @@ class AuthTestCase(unittest.HomeserverTestCase):
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         self.get_failure(self.auth.get_user_by_req(request), AuthError)
 
+    def test_get_user_by_req__puppeted_token__not_tracking_puppeted_mau(self):
+        self.store.get_user_by_access_token = simple_async_mock(
+            TokenLookupResult(
+                user_id="@baldrick:matrix.org",
+                device_id="device",
+                token_owner="@admin:matrix.org",
+            )
+        )
+        self.store.insert_client_ip = simple_async_mock(None)
+        request = Mock(args={})
+        request.getClientIP.return_value = "127.0.0.1"
+        request.args[b"access_token"] = [self.test_token]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+        self.get_success(self.auth.get_user_by_req(request))
+        self.store.insert_client_ip.assert_called_once()
+
+    def test_get_user_by_req__puppeted_token__tracking_puppeted_mau(self):
+        self.auth._mau_track_puppeted_users = True
+        self.store.get_user_by_access_token = simple_async_mock(
+            TokenLookupResult(
+                user_id="@baldrick:matrix.org",
+                device_id="device",
+                token_owner="@admin:matrix.org",
+            )
+        )
+        self.store.insert_client_ip = simple_async_mock(None)
+        request = Mock(args={})
+        request.getClientIP.return_value = "127.0.0.1"
+        request.args[b"access_token"] = [self.test_token]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+        self.get_success(self.auth.get_user_by_req(request))
+        self.assertEquals(self.store.insert_client_ip.call_count, 2)
+
     def test_get_user_from_macaroon(self):
         self.store.get_user_by_access_token = simple_async_mock(
             TokenLookupResult(user_id="@baldrick:matrix.org", device_id="device")
