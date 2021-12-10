@@ -15,8 +15,8 @@ The following sections describe how to install [coturn](<https://github.com/cotu
 
 For TURN relaying with `coturn` to work, it must be hosted on a server/endpoint with a public IP.
 
-Hosting TURN behind a NAT (even with appropriate port forwarding) is known to cause issues
-and to often not work.
+Hosting TURN behind a NAT requires port forwaring and for the NAT gateway to have a public IP.
+However, even with appropriate configuration, NAT is known to cause issues and to often not work.
 
 ## `coturn` setup
 
@@ -103,6 +103,21 @@ This will install and start a systemd service called `coturn`.
     denied-peer-ip=192.168.0.0-192.168.255.255
     denied-peer-ip=172.16.0.0-172.31.255.255
 
+    # recommended additional local peers to block, to mitigate external access to internal services.
+    # https://www.rtcsec.com/article/slack-webrtc-turn-compromise-and-bug-bounty/#how-to-fix-an-open-turn-relay-to-address-this-vulnerability
+    no-multicast-peers
+    denied-peer-ip=0.0.0.0-0.255.255.255
+    denied-peer-ip=100.64.0.0-100.127.255.255
+    denied-peer-ip=127.0.0.0-127.255.255.255
+    denied-peer-ip=169.254.0.0-169.254.255.255
+    denied-peer-ip=192.0.0.0-192.0.0.255
+    denied-peer-ip=192.0.2.0-192.0.2.255
+    denied-peer-ip=192.88.99.0-192.88.99.255
+    denied-peer-ip=198.18.0.0-198.19.255.255
+    denied-peer-ip=198.51.100.0-198.51.100.255
+    denied-peer-ip=203.0.113.0-203.0.113.255
+    denied-peer-ip=240.0.0.0-255.255.255.255
+
     # special case the turn server itself so that client->TURN->TURN->client flows work
     allowed-peer-ip=10.0.0.1
 
@@ -129,26 +144,84 @@ This will install and start a systemd service called `coturn`.
     We recommend that you only try to set up TLS/DTLS once you have set up a
     basic installation and got it working.
 
+    NB: If your TLS certificate was provided by Let's Encrypt, TLS/DTLS will
+    not work with any Matrix client that uses Chromium's WebRTC library (such
+    as Element Android). See [this case](https://github.com/vector-im/element-android/issues/1533) for more details.
+
 1.  Ensure your firewall allows traffic into the TURN server on the ports
     you've configured it to listen on (By default: 3478 and 5349 for TURN
     traffic (remember to allow both TCP and UDP traffic), and ports 49152-65535
     for the UDP relay.)
 
-1.  We do not recommend running a TURN server behind NAT, and are not aware of
-    anyone doing so successfully.
-
-    If you want to try it anyway, you will at least need to tell coturn its
-    external IP address:
+1.  If your TURN server is behind a NAT, the NAT gateway must have an external,
+    publicly-reachable IP address. You must configure coturn to advertise that
+    address to connecting clients:
 
     ```
-    external-ip=192.88.99.1
+    external-ip=YOUR_NAT_IP
     ```
 
-    ... and your NAT gateway must forward all of the relayed ports directly
-    (eg, port 56789 on the external IP must be always be forwarded to port
-    56789 on the internal IP).
+    If your NAT gateway's external addresses include both an IPv4 and IPv6
+    address, it is recommended to configure coturn to advertise all of them. In
+    this case, each configuration line must also specify the internal IPs of
+    your TURN server (i.e. the addresses assigned to them within the NAT):
 
-    If you get this working, let us know!
+    ```
+    external-ip=EXTERNAL_NAT_IPv4_ADDRESS/INTERNAL_TURNSERVER_IPv4_ADDRESS
+    external-ip=EXTERNAL_NAT_IPv6_ADDRESS/INTERNAL_TURNSERVER_IPv6_ADDRESS
+    ```
+
+    When advertising an external IPv6 address, ensure that the firewall and
+    network settings of the system running your TURN server are configured to
+    accept IPv6 traffic.
+
+    Your NAT gateway must forward all of the relayed ports directly (eg, port
+    56789 on the external IP must always be forwarded to port 56789 on the
+    internal IP). If your NAT server runs Linux (and you have administrative
+    rights to it), port forwarding may be applied with the following `iptables`
+    rules:
+
+    ```sh
+    # Enable forwarding from the NAT gateway to your subnet
+    # Based on https://wiki.debian.org/OpenVPN#Forward_traffic_to_provide_access_to_the_Internet
+    iptables -A FORWARD -i $EXTERNAL_INTERFACE_NAME -o $INTERNAL_INTERFACE_NAME -m state --state ESTABLISHED,RELATED -j ACCEPT
+    iptables  -A FORWARD -s $INTERNAL_INTERFACE_IPv4_SUBNET -o $EXTERNAL_INTERFACE_NAME -j ACCEPT
+    ip6tables -A FORWARD -s $INTERNAL_INTERFACE_IPv6_SUBNET -o $EXTERNAL_INTERFACE_NAME -j ACCEPT
+    iptables  -t nat -A POSTROUTING -s $INTERNAL_INTERFACE_IPv4_SUBNET -o $EXTERNAL_INTERFACE_NAME -j SNAT --to-source $EXTERNAL_NAT_IPv4_ADDRESS
+    ip6tables -t nat -A POSTROUTING -s $INTERNAL_INTERFACE_IPv6_SUBNET -o $EXTERNAL_INTERFACE_NAME -j SNAT --to-source $EXTERNAL_NAT_IPv6_ADDRESS
+
+    # forward coturn ports
+    iptables  -t nat -A PREROUTING -i $EXTERNAL_INTERFACE_NAME -p tcp -m multiport --dports 3478,3479,5349,5350 -j DNAT --to-destination $INTERNAL_TURNSERVER_IPv4_ADDRESS
+    iptables  -t nat -A PREROUTING -i $EXTERNAL_INTERFACE_NAME -p udp -m multiport --dports 3478,3479,5349,5350,49152:65535 -j DNAT --to-destination $INTERNAL_TURNSERVER_IPv4_ADDRESS
+    iptables  -t nat -A PREROUTING -i $EXTERNAL_INTERFACE_NAME -p tcp -m multiport --dports 5222,5269 -j DNAT --to-destination $INTERNAL_TURNSERVER_IPv4_ADDRESS
+
+    # same, but for ipv6
+    ip6tables -t nat -A PREROUTING -i $EXTERNAL_INTERFACE_NAME -p tcp -m multiport --dports 3478,3479,5349,5350 -j DNAT --to-destination $INTERNAL_TURNSERVER_IPv6_ADDRESS
+    ip6tables -t nat -A PREROUTING -i $EXTERNAL_INTERFACE_NAME -p udp -m multiport --dports 3478,3479,5349,5350,49152:65535 -j DNAT --to-destination $INTERNAL_TURNSERVER_IPv6_ADDRESS
+    ip6tables -t nat -A PREROUTING -i $EXTERNAL_INTERFACE_NAME -p tcp -m multiport --dports 5222,5269 -j DNAT --to-destination $INTERNAL_TURNSERVER_IPv6_ADDRESS
+    ```
+
+    For this to work, the NAT server must be configured to forward IPv4/IPv6
+    traffic. To check if forwarding is enabled, run
+    `cat /proc/sys/net/ipv4/ip_forward` and `cat /proc/sys/net/ipv6/conf/all/forwarding`
+    and confirm they both print `1`. If not, they may be set at runtime like so:
+
+    ```sh
+    echo 1 > /proc/sys/net/ipv4/ip_forward
+    echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
+    ```
+
+    To apply these settings persistently, add/uncomment these lines in
+    `/etc/sysctl.conf`, then run `sysctl -p`:
+
+    ```
+    net.ipv4.ip_forward=1
+    net.ipv6.conf.all.forwarding=1
+    ```
+
+    (The `all` in any of the the IPv6 paths/settings mentioned above may be
+    substituted for the name of any specific network interface that must
+    forward traffic.)
 
 1.  (Re)start the turn server:
 
