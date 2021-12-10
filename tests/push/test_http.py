@@ -19,7 +19,7 @@ from unittest.mock import Mock
 import unpaddedbase64
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
-from donna25519 import PrivateKey, PublicKey  # type: ignore
+from donna25519 import PrivateKey, PublicKey
 
 from twisted.internet.defer import Deferred
 

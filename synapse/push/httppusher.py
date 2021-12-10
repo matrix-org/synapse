@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Union
 import unpaddedbase64
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
-from donna25519 import PrivateKey, PublicKey  # type: ignore
+from donna25519 import PrivateKey, PublicKey
 from prometheus_client import Counter
 
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
@@ -132,7 +132,7 @@ class HttpPusher(Pusher):
             self.algorithm = self.data["algorithm"]
 
         if self.algorithm == "com.famedly.curve25519-aes-sha2":
-            base64_public_key = self.data["public_key"]
+            base64_public_key = self.data.get("public_key")
             if not isinstance(base64_public_key, str):
                 raise PusherConfigException("'public_key' must be a string")
             try:
