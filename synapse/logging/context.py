@@ -27,7 +27,17 @@ import logging
 import threading
 import typing
 import warnings
-from typing import TYPE_CHECKING, Optional, Tuple, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+    overload,
+)
 
 import attr
 from typing_extensions import Literal
@@ -711,6 +721,9 @@ def nested_logging_context(suffix: str) -> LoggingContext:
     )
 
 
+R = TypeVar("R")
+
+
 def preserve_fn(f):
     """Function decorator which wraps the function with run_in_background"""
 
@@ -720,7 +733,30 @@ def preserve_fn(f):
     return g
 
 
-def run_in_background(f, *args, **kwargs) -> defer.Deferred:
+@overload
+def run_in_background(  # type: ignore[misc]
+    f: Callable[..., Awaitable[R]], *args: Any, **kwargs: Any
+) -> "defer.Deferred[R]":
+    # The `type: ignore[misc]` above suppresses
+    # "Overloaded function signatures 1 and 2 overlap with incompatible return types"
+    ...
+
+
+@overload
+def run_in_background(
+    f: Callable[..., R], *args: Any, **kwargs: Any
+) -> "defer.Deferred[R]":
+    ...
+
+
+def run_in_background(
+    f: Union[
+        Callable[..., R],
+        Callable[..., Awaitable[R]],
+    ],
+    *args: Any,
+    **kwargs: Any,
+) -> "defer.Deferred[R]":
     """Calls a function, ensuring that the current context is restored after
     return from the function, and that the sentinel context is set once the
     deferred returned by the function completes.
@@ -751,6 +787,9 @@ def run_in_background(f, *args, **kwargs) -> defer.Deferred:
     # At this point we should have a Deferred, if not then f was a synchronous
     # function, wrap it in a Deferred for consistency.
     if not isinstance(res, defer.Deferred):
+        # All `Awaitable`s in Synapse are either coroutines or `Deferred`s
+        assert not isinstance(res, Awaitable)
+
         return defer.succeed(res)
 
     if res.called and not res.paused:
