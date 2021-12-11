@@ -14,9 +14,10 @@
 # limitations under the License.
 
 import logging
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
@@ -40,9 +41,9 @@ class QuarantineMediaInRoom(RestServlet):
     """
 
     PATTERNS = [
-        *admin_patterns("/room/(?P<room_id>[^/]+)/media/quarantine$"),
+        *admin_patterns("/room/(?P<room_id>[^/]*)/media/quarantine$"),
         # This path kept around for legacy reasons
-        *admin_patterns("/quarantine_media/(?P<room_id>[^/]+)"),
+        *admin_patterns("/quarantine_media/(?P<room_id>[^/]*)$"),
     ]
 
     def __init__(self, hs: "HomeServer"):
@@ -62,7 +63,7 @@ class QuarantineMediaInRoom(RestServlet):
             room_id, requester.user.to_string()
         )
 
-        return 200, {"num_quarantined": num_quarantined}
+        return HTTPStatus.OK, {"num_quarantined": num_quarantined}
 
 
 class QuarantineMediaByUser(RestServlet):
@@ -70,7 +71,7 @@ class QuarantineMediaByUser(RestServlet):
     this server.
     """
 
-    PATTERNS = admin_patterns("/user/(?P<user_id>[^/]+)/media/quarantine$")
+    PATTERNS = admin_patterns("/user/(?P<user_id>[^/]*)/media/quarantine$")
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
@@ -89,7 +90,7 @@ class QuarantineMediaByUser(RestServlet):
             user_id, requester.user.to_string()
         )
 
-        return 200, {"num_quarantined": num_quarantined}
+        return HTTPStatus.OK, {"num_quarantined": num_quarantined}
 
 
 class QuarantineMediaByID(RestServlet):
@@ -98,7 +99,7 @@ class QuarantineMediaByID(RestServlet):
     """
 
     PATTERNS = admin_patterns(
-        "/media/quarantine/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)"
+        "/media/quarantine/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)$"
     )
 
     def __init__(self, hs: "HomeServer"):
@@ -118,7 +119,7 @@ class QuarantineMediaByID(RestServlet):
             server_name, media_id, requester.user.to_string()
         )
 
-        return 200, {}
+        return HTTPStatus.OK, {}
 
 
 class UnquarantineMediaByID(RestServlet):
@@ -127,7 +128,7 @@ class UnquarantineMediaByID(RestServlet):
     """
 
     PATTERNS = admin_patterns(
-        "/media/unquarantine/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)"
+        "/media/unquarantine/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)$"
     )
 
     def __init__(self, hs: "HomeServer"):
@@ -137,8 +138,7 @@ class UnquarantineMediaByID(RestServlet):
     async def on_POST(
         self, request: SynapseRequest, server_name: str, media_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_requester_is_admin(self.auth, request)
 
         logging.info(
             "Remove from quarantine local media by ID: %s/%s", server_name, media_id
@@ -147,13 +147,13 @@ class UnquarantineMediaByID(RestServlet):
         # Remove from quarantine this media id
         await self.store.quarantine_media_by_id(server_name, media_id, None)
 
-        return 200, {}
+        return HTTPStatus.OK, {}
 
 
 class ProtectMediaByID(RestServlet):
     """Protect local media from being quarantined."""
 
-    PATTERNS = admin_patterns("/media/protect/(?P<media_id>[^/]+)")
+    PATTERNS = admin_patterns("/media/protect/(?P<media_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
@@ -162,21 +162,20 @@ class ProtectMediaByID(RestServlet):
     async def on_POST(
         self, request: SynapseRequest, media_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_requester_is_admin(self.auth, request)
 
         logging.info("Protecting local media by ID: %s", media_id)
 
         # Protect this media id
         await self.store.mark_local_media_as_safe(media_id, safe=True)
 
-        return 200, {}
+        return HTTPStatus.OK, {}
 
 
 class UnprotectMediaByID(RestServlet):
     """Unprotect local media from being quarantined."""
 
-    PATTERNS = admin_patterns("/media/unprotect/(?P<media_id>[^/]+)")
+    PATTERNS = admin_patterns("/media/unprotect/(?P<media_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
@@ -185,21 +184,20 @@ class UnprotectMediaByID(RestServlet):
     async def on_POST(
         self, request: SynapseRequest, media_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_requester_is_admin(self.auth, request)
 
         logging.info("Unprotecting local media by ID: %s", media_id)
 
         # Unprotect this media id
         await self.store.mark_local_media_as_safe(media_id, safe=False)
 
-        return 200, {}
+        return HTTPStatus.OK, {}
 
 
 class ListMediaInRoom(RestServlet):
     """Lists all of the media in a given room."""
 
-    PATTERNS = admin_patterns("/room/(?P<room_id>[^/]+)/media$")
+    PATTERNS = admin_patterns("/room/(?P<room_id>[^/]*)/media$")
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
@@ -208,14 +206,11 @@ class ListMediaInRoom(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        is_admin = await self.auth.is_server_admin(requester.user)
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        await assert_requester_is_admin(self.auth, request)
 
         local_mxcs, remote_mxcs = await self.store.get_media_mxcs_in_room(room_id)
 
-        return 200, {"local": local_mxcs, "remote": remote_mxcs}
+        return HTTPStatus.OK, {"local": local_mxcs, "remote": remote_mxcs}
 
 
 class PurgeMediaCacheRestServlet(RestServlet):
@@ -233,13 +228,13 @@ class PurgeMediaCacheRestServlet(RestServlet):
 
         if before_ts < 0:
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "Query parameter before_ts must be a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
         elif before_ts < 30000000000:  # Dec 1970 in milliseconds, Aug 2920 in seconds
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "Query parameter before_ts you provided is from the year 1970. "
                 + "Double check that you are providing a timestamp in milliseconds.",
                 errcode=Codes.INVALID_PARAM,
@@ -247,13 +242,13 @@ class PurgeMediaCacheRestServlet(RestServlet):
 
         ret = await self.media_repository.delete_old_remote_media(before_ts)
 
-        return 200, ret
+        return HTTPStatus.OK, ret
 
 
 class DeleteMediaByID(RestServlet):
     """Delete local media by a given ID. Removes it from this server."""
 
-    PATTERNS = admin_patterns("/media/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)")
+    PATTERNS = admin_patterns("/media/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
@@ -267,7 +262,7 @@ class DeleteMediaByID(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if self.server_name != server_name:
-            raise SynapseError(400, "Can only delete local media")
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only delete local media")
 
         if await self.store.get_local_media(media_id) is None:
             raise NotFoundError("Unknown media")
@@ -277,7 +272,7 @@ class DeleteMediaByID(RestServlet):
         deleted_media, total = await self.media_repository.delete_local_media_ids(
             [media_id]
         )
-        return 200, {"deleted_media": deleted_media, "total": total}
+        return HTTPStatus.OK, {"deleted_media": deleted_media, "total": total}
 
 
 class DeleteMediaByDateSize(RestServlet):
@@ -285,7 +280,7 @@ class DeleteMediaByDateSize(RestServlet):
     timestamp and size.
     """
 
-    PATTERNS = admin_patterns("/media/(?P<server_name>[^/]+)/delete$")
+    PATTERNS = admin_patterns("/media/(?P<server_name>[^/]*)/delete$")
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
@@ -304,26 +299,26 @@ class DeleteMediaByDateSize(RestServlet):
 
         if before_ts < 0:
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "Query parameter before_ts must be a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
         elif before_ts < 30000000000:  # Dec 1970 in milliseconds, Aug 2920 in seconds
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "Query parameter before_ts you provided is from the year 1970. "
                 + "Double check that you are providing a timestamp in milliseconds.",
                 errcode=Codes.INVALID_PARAM,
             )
         if size_gt < 0:
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "Query parameter size_gt must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
 
         if self.server_name != server_name:
-            raise SynapseError(400, "Can only delete local media")
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only delete local media")
 
         logging.info(
             "Deleting local media by timestamp: %s, size larger than: %s, keep profile media: %s"
@@ -333,7 +328,7 @@ class DeleteMediaByDateSize(RestServlet):
         deleted_media, total = await self.media_repository.delete_old_local_media(
             before_ts, size_gt, keep_profiles
         )
-        return 200, {"deleted_media": deleted_media, "total": total}
+        return HTTPStatus.OK, {"deleted_media": deleted_media, "total": total}
 
 
 class UserMediaRestServlet(RestServlet):
@@ -352,7 +347,7 @@ class UserMediaRestServlet(RestServlet):
         media that exist given for this user
     """
 
-    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]+)/media$")
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/media$")
 
     def __init__(self, hs: "HomeServer"):
         self.is_mine = hs.is_mine
@@ -369,7 +364,7 @@ class UserMediaRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if not self.is_mine(UserID.from_string(user_id)):
-            raise SynapseError(400, "Can only look up local users")
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only look up local users")
 
         user = await self.store.get_user_by_id(user_id)
         if user is None:
@@ -380,14 +375,14 @@ class UserMediaRestServlet(RestServlet):
 
         if start < 0:
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "Query parameter from must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
 
         if limit < 0:
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "Query parameter limit must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
@@ -402,16 +397,7 @@ class UserMediaRestServlet(RestServlet):
                 request,
                 "order_by",
                 default=MediaSortOrder.CREATED_TS.value,
-                allowed_values=(
-                    MediaSortOrder.MEDIA_ID.value,
-                    MediaSortOrder.UPLOAD_NAME.value,
-                    MediaSortOrder.CREATED_TS.value,
-                    MediaSortOrder.LAST_ACCESS_TS.value,
-                    MediaSortOrder.MEDIA_LENGTH.value,
-                    MediaSortOrder.MEDIA_TYPE.value,
-                    MediaSortOrder.QUARANTINED_BY.value,
-                    MediaSortOrder.SAFE_FROM_QUARANTINE.value,
-                ),
+                allowed_values=[sort_order.value for sort_order in MediaSortOrder],
             )
             direction = parse_string(
                 request, "dir", default="f", allowed_values=("f", "b")
@@ -425,7 +411,7 @@ class UserMediaRestServlet(RestServlet):
         if (start + limit) < total:
             ret["next_token"] = start + len(media)
 
-        return 200, ret
+        return HTTPStatus.OK, ret
 
     async def on_DELETE(
         self, request: SynapseRequest, user_id: str
@@ -436,7 +422,7 @@ class UserMediaRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if not self.is_mine(UserID.from_string(user_id)):
-            raise SynapseError(400, "Can only look up local users")
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only look up local users")
 
         user = await self.store.get_user_by_id(user_id)
         if user is None:
@@ -447,14 +433,14 @@ class UserMediaRestServlet(RestServlet):
 
         if start < 0:
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "Query parameter from must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
 
         if limit < 0:
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "Query parameter limit must be a string representing a positive integer.",
                 errcode=Codes.INVALID_PARAM,
             )
@@ -469,16 +455,7 @@ class UserMediaRestServlet(RestServlet):
                 request,
                 "order_by",
                 default=MediaSortOrder.CREATED_TS.value,
-                allowed_values=(
-                    MediaSortOrder.MEDIA_ID.value,
-                    MediaSortOrder.UPLOAD_NAME.value,
-                    MediaSortOrder.CREATED_TS.value,
-                    MediaSortOrder.LAST_ACCESS_TS.value,
-                    MediaSortOrder.MEDIA_LENGTH.value,
-                    MediaSortOrder.MEDIA_TYPE.value,
-                    MediaSortOrder.QUARANTINED_BY.value,
-                    MediaSortOrder.SAFE_FROM_QUARANTINE.value,
-                ),
+                allowed_values=[sort_order.value for sort_order in MediaSortOrder],
             )
             direction = parse_string(
                 request, "dir", default="f", allowed_values=("f", "b")
@@ -492,7 +469,7 @@ class UserMediaRestServlet(RestServlet):
             ([row["media_id"] for row in media])
         )
 
-        return 200, {"deleted_media": deleted_media, "total": total}
+        return HTTPStatus.OK, {"deleted_media": deleted_media, "total": total}
 
 
 def register_servlets_for_media_repo(hs: "HomeServer", http_server: HttpServer) -> None:

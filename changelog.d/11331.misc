@@ -1,0 +1,1 @@
+A test helper (`wait_for_background_updates`) no longer depends on classes defining a `store` property.

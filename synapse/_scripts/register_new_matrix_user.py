@@ -1,5 +1,6 @@
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018 New Vector
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,22 +20,23 @@ import hashlib
 import hmac
 import logging
 import sys
+from typing import Callable, Optional
 
 import requests as _requests
 import yaml
 
 
 def request_registration(
-    user,
-    password,
-    server_location,
-    shared_secret,
-    admin=False,
-    user_type=None,
+    user: str,
+    password: str,
+    server_location: str,
+    shared_secret: str,
+    admin: bool = False,
+    user_type: Optional[str] = None,
     requests=_requests,
-    _print=print,
-    exit=sys.exit,
-):
+    _print: Callable[[str], None] = print,
+    exit: Callable[[int], None] = sys.exit,
+) -> None:
 
     url = "%s/_synapse/admin/v1/register" % (server_location.rstrip("/"),)
 
@@ -65,13 +67,13 @@ def request_registration(
         mac.update(b"\x00")
         mac.update(user_type.encode("utf8"))
 
-    mac = mac.hexdigest()
+    hex_mac = mac.hexdigest()
 
     data = {
         "nonce": nonce,
         "username": user,
         "password": password,
-        "mac": mac,
+        "mac": hex_mac,
         "admin": admin,
         "user_type": user_type,
     }
@@ -91,10 +93,17 @@ def request_registration(
     _print("Success!")
 
 
-def register_new_user(user, password, server_location, shared_secret, admin, user_type):
+def register_new_user(
+    user: str,
+    password: str,
+    server_location: str,
+    shared_secret: str,
+    admin: Optional[bool],
+    user_type: Optional[str],
+) -> None:
     if not user:
         try:
-            default_user = getpass.getuser()
+            default_user: Optional[str] = getpass.getuser()
         except Exception:
             default_user = None
 
@@ -123,8 +132,8 @@ def register_new_user(user, password, server_location, shared_secret, admin, use
             sys.exit(1)
 
     if admin is None:
-        admin = input("Make admin [no]: ")
-        if admin in ("y", "yes", "true"):
+        admin_inp = input("Make admin [no]: ")
+        if admin_inp in ("y", "yes", "true"):
             admin = True
         else:
             admin = False
@@ -134,7 +143,7 @@ def register_new_user(user, password, server_location, shared_secret, admin, use
     )
 
 
-def main():
+def main() -> None:
 
     logging.captureWarnings(True)
 

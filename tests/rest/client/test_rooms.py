@@ -25,7 +25,12 @@ from urllib import parse as urlparse
 from twisted.internet import defer
 
 import synapse.rest.admin
-from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    Membership,
+    RelationTypes,
+)
 from synapse.api.errors import Codes, HttpResponseException
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest import admin
@@ -2155,6 +2160,153 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         )
 
         return event_id
+
+
+class RelationsTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def default_config(self):
+        config = super().default_config()
+        config["experimental_features"] = {"msc3440_enabled": True}
+        return config
+
+    def prepare(self, reactor, clock, homeserver):
+        self.user_id = self.register_user("test", "test")
+        self.tok = self.login("test", "test")
+        self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
+
+        self.second_user_id = self.register_user("second", "test")
+        self.second_tok = self.login("second", "test")
+        self.helper.join(
+            room=self.room_id, user=self.second_user_id, tok=self.second_tok
+        )
+
+        self.third_user_id = self.register_user("third", "test")
+        self.third_tok = self.login("third", "test")
+        self.helper.join(room=self.room_id, user=self.third_user_id, tok=self.third_tok)
+
+        # An initial event with a relation from second user.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={"msgtype": "m.text", "body": "Message 1"},
+            tok=self.tok,
+        )
+        self.event_id_1 = res["event_id"]
+        self.helper.send_event(
+            room_id=self.room_id,
+            type="m.reaction",
+            content={
+                "m.relates_to": {
+                    "rel_type": RelationTypes.ANNOTATION,
+                    "event_id": self.event_id_1,
+                    "key": "👍",
+                }
+            },
+            tok=self.second_tok,
+        )
+
+        # Another event with a relation from third user.
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={"msgtype": "m.text", "body": "Message 2"},
+            tok=self.tok,
+        )
+        self.event_id_2 = res["event_id"]
+        self.helper.send_event(
+            room_id=self.room_id,
+            type="m.reaction",
+            content={
+                "m.relates_to": {
+                    "rel_type": RelationTypes.REFERENCE,
+                    "event_id": self.event_id_2,
+                }
+            },
+            tok=self.third_tok,
+        )
+
+        # An event with no relations.
+        self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={"msgtype": "m.text", "body": "No relations"},
+            tok=self.tok,
+        )
+
+    def _filter_messages(self, filter: JsonDict) -> List[JsonDict]:
+        """Make a request to /messages with a filter, returns the chunk of events."""
+        channel = self.make_request(
+            "GET",
+            "/rooms/%s/messages?filter=%s&dir=b" % (self.room_id, json.dumps(filter)),
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+        return channel.json_body["chunk"]
+
+    def test_filter_relation_senders(self):
+        # Messages which second user reacted to.
+        filter = {"io.element.relation_senders": [self.second_user_id]}
+        chunk = self._filter_messages(filter)
+        self.assertEqual(len(chunk), 1, chunk)
+        self.assertEqual(chunk[0]["event_id"], self.event_id_1)
+
+        # Messages which third user reacted to.
+        filter = {"io.element.relation_senders": [self.third_user_id]}
+        chunk = self._filter_messages(filter)
+        self.assertEqual(len(chunk), 1, chunk)
+        self.assertEqual(chunk[0]["event_id"], self.event_id_2)
+
+        # Messages which either user reacted to.
+        filter = {
+            "io.element.relation_senders": [self.second_user_id, self.third_user_id]
+        }
+        chunk = self._filter_messages(filter)
+        self.assertEqual(len(chunk), 2, chunk)
+        self.assertCountEqual(
+            [c["event_id"] for c in chunk], [self.event_id_1, self.event_id_2]
+        )
+
+    def test_filter_relation_type(self):
+        # Messages which have annotations.
+        filter = {"io.element.relation_types": [RelationTypes.ANNOTATION]}
+        chunk = self._filter_messages(filter)
+        self.assertEqual(len(chunk), 1, chunk)
+        self.assertEqual(chunk[0]["event_id"], self.event_id_1)
+
+        # Messages which have references.
+        filter = {"io.element.relation_types": [RelationTypes.REFERENCE]}
+        chunk = self._filter_messages(filter)
+        self.assertEqual(len(chunk), 1, chunk)
+        self.assertEqual(chunk[0]["event_id"], self.event_id_2)
+
+        # Messages which have either annotations or references.
+        filter = {
+            "io.element.relation_types": [
+                RelationTypes.ANNOTATION,
+                RelationTypes.REFERENCE,
+            ]
+        }
+        chunk = self._filter_messages(filter)
+        self.assertEqual(len(chunk), 2, chunk)
+        self.assertCountEqual(
+            [c["event_id"] for c in chunk], [self.event_id_1, self.event_id_2]
+        )
+
+    def test_filter_relation_senders_and_type(self):
+        # Messages which second user reacted to.
+        filter = {
+            "io.element.relation_senders": [self.second_user_id],
+            "io.element.relation_types": [RelationTypes.ANNOTATION],
+        }
+        chunk = self._filter_messages(filter)
+        self.assertEqual(len(chunk), 1, chunk)
+        self.assertEqual(chunk[0]["event_id"], self.event_id_1)
 
 
 class ContextTestCase(unittest.HomeserverTestCase):

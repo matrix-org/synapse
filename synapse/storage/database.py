@@ -188,7 +188,7 @@ class LoggingDatabaseConnection:
 
 
 # The type of entry which goes on our after_callbacks and exception_callbacks lists.
-_CallbackListEntry = Tuple[Callable[..., None], Iterable[Any], Dict[str, Any]]
+_CallbackListEntry = Tuple[Callable[..., object], Iterable[Any], Dict[str, Any]]
 
 
 R = TypeVar("R")
@@ -235,7 +235,7 @@ class LoggingTransaction:
         self.after_callbacks = after_callbacks
         self.exception_callbacks = exception_callbacks
 
-    def call_after(self, callback: Callable[..., None], *args: Any, **kwargs: Any):
+    def call_after(self, callback: Callable[..., object], *args: Any, **kwargs: Any):
         """Call the given callback on the main twisted thread after the
         transaction has finished. Used to invalidate the caches on the
         correct thread.
@@ -247,7 +247,7 @@ class LoggingTransaction:
         self.after_callbacks.append((callback, args, kwargs))
 
     def call_on_exception(
-        self, callback: Callable[..., None], *args: Any, **kwargs: Any
+        self, callback: Callable[..., object], *args: Any, **kwargs: Any
     ):
         # if self.exception_callbacks is None, that means that whatever constructed the
         # LoggingTransaction isn't expecting there to be any callbacks; assert that
@@ -445,6 +445,10 @@ class DatabasePool:
                 "upsert_safety_check",
                 self._check_safe_to_upsert,
             )
+
+    def name(self) -> str:
+        "Return the name of this database"
+        return self._database_config.name
 
     def is_running(self) -> bool:
         """Is the database pool currently running"""
@@ -892,6 +896,9 @@ class DatabasePool:
     ) -> None:
         """Executes an INSERT query on the named table.
 
+        The input is given as a list of dicts, with one dict per row.
+        Generally simple_insert_many_values should be preferred for new code.
+
         Args:
             table: string giving the table name
             values: dict of new column names and values for them
@@ -904,6 +911,9 @@ class DatabasePool:
         txn: LoggingTransaction, table: str, values: List[Dict[str, Any]]
     ) -> None:
         """Executes an INSERT query on the named table.
+
+        The input is given as a list of dicts, with one dict per row.
+        Generally simple_insert_many_values_txn should be preferred for new code.
 
         Args:
             txn: The transaction to use.
@@ -929,23 +939,66 @@ class DatabasePool:
             if k != keys[0]:
                 raise RuntimeError("All items must have the same keys")
 
+        return DatabasePool.simple_insert_many_values_txn(txn, table, keys[0], vals)
+
+    async def simple_insert_many_values(
+        self,
+        table: str,
+        keys: Collection[str],
+        values: Iterable[Iterable[Any]],
+        desc: str,
+    ) -> None:
+        """Executes an INSERT query on the named table.
+
+        The input is given as a list of rows, where each row is a list of values.
+        (Actually any iterable is fine.)
+
+        Args:
+            table: string giving the table name
+            keys: list of column names
+            values: for each row, a list of values in the same order as `keys`
+            desc: description of the transaction, for logging and metrics
+        """
+        await self.runInteraction(
+            desc, self.simple_insert_many_values_txn, table, keys, values
+        )
+
+    @staticmethod
+    def simple_insert_many_values_txn(
+        txn: LoggingTransaction,
+        table: str,
+        keys: Collection[str],
+        values: Iterable[Iterable[Any]],
+    ) -> None:
+        """Executes an INSERT query on the named table.
+
+        The input is given as a list of rows, where each row is a list of values.
+        (Actually any iterable is fine.)
+
+        Args:
+            txn: The transaction to use.
+            table: string giving the table name
+            keys: list of column names
+            values: for each row, a list of values in the same order as `keys`
+        """
+
         if isinstance(txn.database_engine, PostgresEngine):
             # We use `execute_values` as it can be a lot faster than `execute_batch`,
             # but it's only available on postgres.
             sql = "INSERT INTO %s (%s) VALUES ?" % (
                 table,
-                ", ".join(k for k in keys[0]),
+                ", ".join(k for k in keys),
             )
 
-            txn.execute_values(sql, vals, fetch=False)
+            txn.execute_values(sql, values, fetch=False)
         else:
             sql = "INSERT INTO %s (%s) VALUES(%s)" % (
                 table,
-                ", ".join(k for k in keys[0]),
-                ", ".join("?" for _ in keys[0]),
+                ", ".join(k for k in keys),
+                ", ".join("?" for _ in keys),
             )
 
-            txn.execute_batch(sql, vals)
+            txn.execute_batch(sql, values)
 
     async def simple_upsert(
         self,

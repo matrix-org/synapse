@@ -1,4 +1,5 @@
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 from typing import List, Union
 
 import attr
@@ -63,7 +65,8 @@ class WriterLocations:
 
     Attributes:
         events: The instances that write to the event and backfill streams.
-        typing: The instance that writes to the typing stream.
+        typing: The instances that write to the typing stream. Currently
+            can only be a single instance.
         to_device: The instances that write to the to_device stream. Currently
             can only be a single instance.
         account_data: The instances that write to the account data streams. Currently
@@ -75,9 +78,15 @@ class WriterLocations:
     """
 
     events = attr.ib(
-        default=["master"], type=List[str], converter=_instance_to_list_converter
+        default=["master"],
+        type=List[str],
+        converter=_instance_to_list_converter,
     )
-    typing = attr.ib(default="master", type=str)
+    typing = attr.ib(
+        default=["master"],
+        type=List[str],
+        converter=_instance_to_list_converter,
+    )
     to_device = attr.ib(
         default=["master"],
         type=List[str],
@@ -217,6 +226,11 @@ class WorkerConfig(Config):
                         % (instance, stream)
                     )
 
+        if len(self.writers.typing) != 1:
+            raise ConfigError(
+                "Must only specify one instance to handle `typing` messages."
+            )
+
         if len(self.writers.to_device) != 1:
             raise ConfigError(
                 "Must only specify one instance to handle `to_device` messages."
@@ -331,7 +345,7 @@ class WorkerConfig(Config):
         #worker_replication_secret: ""
         """
 
-    def read_arguments(self, args):
+    def read_arguments(self, args: argparse.Namespace) -> None:
         # We support a bunch of command line arguments that override options in
         # the config. A lot of these options have a worker_* prefix when running
         # on workers so we also have to override them when command line options

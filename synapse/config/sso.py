@@ -1,4 +1,4 @@
-# Copyright 2020 The Matrix.org Foundation C.I.C.
+# Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,13 +29,13 @@ https://matrix-org.github.io/synapse/latest/templates.html
 ---------------------------------------------------------------------------------------"""
 
 
-@attr.s(frozen=True)
+@attr.s(frozen=True, auto_attribs=True)
 class SsoAttributeRequirement:
     """Object describing a single requirement for SSO attributes."""
 
-    attribute = attr.ib(type=str)
+    attribute: str
     # If a value is not given, than the attribute must simply exist.
-    value = attr.ib(type=Optional[str])
+    value: Optional[str]
 
     JSON_SCHEMA = {
         "type": "object",
@@ -49,7 +49,7 @@ class SSOConfig(Config):
 
     section = "sso"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config, **kwargs) -> None:
         sso_config: Dict[str, Any] = config.get("sso") or {}
 
         # The sso-specific template_dir
@@ -101,15 +101,12 @@ class SSOConfig(Config):
         # gracefully to the client). This would make it pointless to ask the user for
         # confirmation, since the URL the confirmation page would be showing wouldn't be
         # the client's.
-        # public_baseurl is an optional setting, so we only add the fallback's URL to the
-        # list if it's provided (because we can't figure out what that URL is otherwise).
-        if self.root.server.public_baseurl:
-            login_fallback_url = (
-                self.root.server.public_baseurl + "_matrix/static/client/login"
-            )
-            self.sso_client_whitelist.append(login_fallback_url)
+        login_fallback_url = (
+            self.root.server.public_baseurl + "_matrix/static/client/login"
+        )
+        self.sso_client_whitelist.append(login_fallback_url)
 
-    def generate_config_section(self, **kwargs):
+    def generate_config_section(self, **kwargs) -> str:
         return """\
         # Additional settings to use with single-sign on systems such as OpenID Connect,
         # SAML2 and CAS.
@@ -128,11 +125,10 @@ class SSOConfig(Config):
             # phishing attacks from evil.site. To avoid this, include a slash after the
             # hostname: "https://my.client/".
             #
-            # If public_baseurl is set, then the login fallback page (used by clients
-            # that don't natively support the required login flows) is whitelisted in
-            # addition to any URLs in this list.
+            # The login fallback page (used by clients that don't natively support the
+            # required login flows) is whitelisted in addition to any URLs in this list.
             #
-            # By default, this list is empty.
+            # By default, this list contains only the login fallback page.
             #
             #client_whitelist:
             #  - https://riot.im/develop

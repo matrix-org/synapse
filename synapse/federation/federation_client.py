@@ -128,7 +128,7 @@ class FederationClient(FederationBase):
             reset_expiry_on_get=False,
         )
 
-    def _clear_tried_cache(self):
+    def _clear_tried_cache(self) -> None:
         """Clear pdu_destination_tried cache"""
         now = self._clock.time_msec()
 
@@ -277,6 +277,58 @@ class FederationClient(FederationBase):
 
         return pdus
 
+    async def get_pdu_from_destination_raw(
+        self,
+        destination: str,
+        event_id: str,
+        room_version: RoomVersion,
+        outlier: bool = False,
+        timeout: Optional[int] = None,
+    ) -> Optional[EventBase]:
+        """Requests the PDU with given origin and ID from the remote home
+        server. Does not have any caching or rate limiting!
+
+        Args:
+            destination: Which homeserver to query
+            event_id: event to fetch
+            room_version: version of the room
+            outlier: Indicates whether the PDU is an `outlier`, i.e. if
+                it's from an arbitrary point in the context as opposed to part
+                of the current block of PDUs. Defaults to `False`
+            timeout: How long to try (in ms) each destination for before
+                moving to the next destination. None indicates no timeout.
+
+        Returns:
+            The requested PDU, or None if we were unable to find it.
+
+        Raises:
+            SynapseError, NotRetryingDestination, FederationDeniedError
+        """
+        transaction_data = await self.transport_layer.get_event(
+            destination, event_id, timeout=timeout
+        )
+
+        logger.debug(
+            "retrieved event id %s from %s: %r",
+            event_id,
+            destination,
+            transaction_data,
+        )
+
+        pdu_list: List[EventBase] = [
+            event_from_pdu_json(p, room_version, outlier=outlier)
+            for p in transaction_data["pdus"]
+        ]
+
+        if pdu_list and pdu_list[0]:
+            pdu = pdu_list[0]
+
+            # Check signatures are correct.
+            signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
+            return signed_pdu
+
+        return None
+
     async def get_pdu(
         self,
         destinations: Iterable[str],
@@ -321,29 +373,13 @@ class FederationClient(FederationBase):
                 continue
 
             try:
-                transaction_data = await self.transport_layer.get_event(
-                    destination, event_id, timeout=timeout
+                signed_pdu = await self.get_pdu_from_destination_raw(
+                    destination=destination,
+                    event_id=event_id,
+                    room_version=room_version,
+                    outlier=outlier,
+                    timeout=timeout,
                 )
-
-                logger.debug(
-                    "retrieved event id %s from %s: %r",
-                    event_id,
-                    destination,
-                    transaction_data,
-                )
-
-                pdu_list: List[EventBase] = [
-                    event_from_pdu_json(p, room_version, outlier=outlier)
-                    for p in transaction_data["pdus"]
-                ]
-
-                if pdu_list and pdu_list[0]:
-                    pdu = pdu_list[0]
-
-                    # Check signatures are correct.
-                    signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
-
-                    break
 
                 pdu_attempts[destination] = now
 
@@ -764,7 +800,7 @@ class FederationClient(FederationBase):
                 no servers successfully handle the request.
         """
 
-        async def send_request(destination) -> SendJoinResult:
+        async def send_request(destination: str) -> SendJoinResult:
             response = await self._do_send_join(room_version, destination, pdu)
 
             # If an event was returned (and expected to be returned):
@@ -1359,11 +1395,28 @@ class FederationClient(FederationBase):
         async def send_request(
             destination: str,
         ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]:
-            res = await self.transport_layer.get_room_hierarchy(
-                destination=destination,
-                room_id=room_id,
-                suggested_only=suggested_only,
-            )
+            try:
+                res = await self.transport_layer.get_room_hierarchy(
+                    destination=destination,
+                    room_id=room_id,
+                    suggested_only=suggested_only,
+                )
+            except HttpResponseException as e:
+                # If an error is received that is due to an unrecognised endpoint,
+                # fallback to the unstable endpoint. Otherwise consider it a
+                # legitmate error and raise.
+                if not self._is_unknown_endpoint(e):
+                    raise
+
+                logger.debug(
+                    "Couldn't fetch room hierarchy with the v1 API, falling back to the unstable API"
+                )
+
+                res = await self.transport_layer.get_room_hierarchy_unstable(
+                    destination=destination,
+                    room_id=room_id,
+                    suggested_only=suggested_only,
+                )
 
             room = res.get("room")
             if not isinstance(room, dict):
@@ -1413,6 +1466,10 @@ class FederationClient(FederationBase):
             if e.code != 502:
                 raise
 
+            logger.debug(
+                "Couldn't fetch room hierarchy, falling back to the spaces API"
+            )
+
             # Fallback to the old federation API and translate the results if
             # no servers implement the new API.
             #
@@ -1459,6 +1516,83 @@ class FederationClient(FederationBase):
         # Cache the result to avoid fetching data over federation every time.
         self._get_room_hierarchy_cache[(room_id, suggested_only)] = result
         return result
+
+    async def timestamp_to_event(
+        self, destination: str, room_id: str, timestamp: int, direction: str
+    ) -> "TimestampToEventResponse":
+        """
+        Calls a remote federating server at `destination` asking for their
+        closest event to the given timestamp in the given direction. Also
+        validates the response to always return the expected keys or raises an
+        error.
+
+        Args:
+            destination: Domain name of the remote homeserver
+            room_id: Room to fetch the event from
+            timestamp: The point in time (inclusive) we should navigate from in
+                the given direction to find the closest event.
+            direction: ["f"|"b"] to indicate whether we should navigate forward
+                or backward from the given timestamp to find the closest event.
+
+        Returns:
+            A parsed TimestampToEventResponse including the closest event_id
+            and origin_server_ts
+
+        Raises:
+            Various exceptions when the request fails
+            InvalidResponseError when the response does not have the correct
+            keys or wrong types
+        """
+        remote_response = await self.transport_layer.timestamp_to_event(
+            destination, room_id, timestamp, direction
+        )
+
+        if not isinstance(remote_response, dict):
+            raise InvalidResponseError(
+                "Response must be a JSON dictionary but received %r" % remote_response
+            )
+
+        try:
+            return TimestampToEventResponse.from_json_dict(remote_response)
+        except ValueError as e:
+            raise InvalidResponseError(str(e))
+
+
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class TimestampToEventResponse:
+    """Typed response dictionary for the federation /timestamp_to_event endpoint"""
+
+    event_id: str
+    origin_server_ts: int
+
+    # the raw data, including the above keys
+    data: JsonDict
+
+    @classmethod
+    def from_json_dict(cls, d: JsonDict) -> "TimestampToEventResponse":
+        """Parsed response from the federation /timestamp_to_event endpoint
+
+        Args:
+            d: JSON object response to be parsed
+
+        Raises:
+            ValueError if d does not the correct keys or they are the wrong types
+        """
+
+        event_id = d.get("event_id")
+        if not isinstance(event_id, str):
+            raise ValueError(
+                "Invalid response: 'event_id' must be a str but received %r" % event_id
+            )
+
+        origin_server_ts = d.get("origin_server_ts")
+        if not isinstance(origin_server_ts, int):
+            raise ValueError(
+                "Invalid response: 'origin_server_ts' must be a int but received %r"
+                % origin_server_ts
+            )
+
+        return cls(event_id, origin_server_ts, d)
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)

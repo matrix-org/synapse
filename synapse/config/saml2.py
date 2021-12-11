@@ -1,5 +1,5 @@
 # Copyright 2018 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,10 +14,11 @@
 # limitations under the License.
 
 import logging
-from typing import Any, List
+from typing import Any, List, Set
 
 from synapse.config.sso import SsoAttributeRequirement
 from synapse.python_dependencies import DependencyException, check_requirements
+from synapse.types import JsonDict
 from synapse.util.module_loader import load_module, load_python_module
 
 from ._base import Config, ConfigError
@@ -33,7 +34,7 @@ LEGACY_USER_MAPPING_PROVIDER = (
 )
 
 
-def _dict_merge(merge_dict, into_dict):
+def _dict_merge(merge_dict: dict, into_dict: dict) -> None:
     """Do a deep merge of two dicts
 
     Recursively merges `merge_dict` into `into_dict`:
@@ -43,8 +44,8 @@ def _dict_merge(merge_dict, into_dict):
         the value from `merge_dict`.
 
     Args:
-        merge_dict (dict): dict to merge
-        into_dict (dict): target dict
+        merge_dict: dict to merge
+        into_dict: target dict to be modified
     """
     for k, v in merge_dict.items():
         if k not in into_dict:
@@ -64,7 +65,7 @@ def _dict_merge(merge_dict, into_dict):
 class SAML2Config(Config):
     section = "saml2"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config, **kwargs) -> None:
         self.saml2_enabled = False
 
         saml2_config = config.get("saml2_config")
@@ -183,8 +184,8 @@ class SAML2Config(Config):
         )
 
     def _default_saml_config_dict(
-        self, required_attributes: set, optional_attributes: set
-    ):
+        self, required_attributes: Set[str], optional_attributes: Set[str]
+    ) -> JsonDict:
         """Generate a configuration dictionary with required and optional attributes that
         will be needed to process new user registration
 
@@ -195,18 +196,15 @@ class SAML2Config(Config):
                 additional information to Synapse user accounts, but are not required
 
         Returns:
-            dict: A SAML configuration dictionary
+            A SAML configuration dictionary
         """
         import saml2
-
-        public_baseurl = self.root.server.public_baseurl
-        if public_baseurl is None:
-            raise ConfigError("saml2_config requires a public_baseurl to be set")
 
         if self.saml2_grandfathered_mxid_source_attribute:
             optional_attributes.add(self.saml2_grandfathered_mxid_source_attribute)
         optional_attributes -= required_attributes
 
+        public_baseurl = self.root.server.public_baseurl
         metadata_url = public_baseurl + "_synapse/client/saml2/metadata.xml"
         response_url = public_baseurl + "_synapse/client/saml2/authn_response"
         return {
@@ -225,7 +223,7 @@ class SAML2Config(Config):
             },
         }
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, config_dir_path, server_name, **kwargs) -> str:
         return """\
         ## Single sign-on integration ##
 

@@ -65,7 +65,7 @@ class EmailPusherTests(HomeserverTestCase):
             "notif_from": "test@example.com",
             "riot_base_url": None,
         }
-        config["public_baseurl"] = "aaa"
+        config["public_baseurl"] = "http://aaa"
         config["start_pushers"] = True
 
         hs = self.setup_test_homeserver(config=config)
@@ -128,6 +128,7 @@ class EmailPusherTests(HomeserverTestCase):
         )
 
         self.auth_handler = hs.get_auth_handler()
+        self.store = hs.get_datastore()
 
     def test_need_validated_email(self):
         """Test that we can only add an email pusher if the user has validated
@@ -408,13 +409,7 @@ class EmailPusherTests(HomeserverTestCase):
         self.hs.get_datastore().db_pool.updates._all_done = False
 
         # Now let's actually drive the updates to completion
-        while not self.get_success(
-            self.hs.get_datastore().db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.hs.get_datastore().db_pool.updates.do_next_background_update(100),
-                by=0.1,
-            )
+        self.wait_for_background_updates()
 
         # Check that all pushers with unlinked addresses were deleted
         pushers = self.get_success(

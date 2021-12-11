@@ -29,7 +29,7 @@ from typing import (
 
 from synapse.api.constants import Membership, PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError
-from synapse.api.filtering import DEFAULT_FILTER_COLLECTION, FilterCollection
+from synapse.api.filtering import FilterCollection
 from synapse.api.presence import UserPresenceState
 from synapse.events import EventBase
 from synapse.events.utils import (
@@ -150,7 +150,7 @@ class SyncRestServlet(RestServlet):
         request_key = (user, timeout, since, filter_id, full_state, device_id)
 
         if filter_id is None:
-            filter_collection = DEFAULT_FILTER_COLLECTION
+            filter_collection = self.filtering.DEFAULT_FILTER_COLLECTION
         elif filter_id.startswith("{"):
             try:
                 filter_object = json_decoder.decode(filter_id)
@@ -160,7 +160,7 @@ class SyncRestServlet(RestServlet):
             except Exception:
                 raise SynapseError(400, "Invalid filter JSON")
             self.filtering.check_valid_filter(filter_object)
-            filter_collection = FilterCollection(filter_object)
+            filter_collection = FilterCollection(self.hs, filter_object)
         else:
             try:
                 filter_collection = await self.filtering.get_user_filter(
@@ -292,6 +292,9 @@ class SyncRestServlet(RestServlet):
         # states that this field should always be included, as long as the server supports the feature.
         response[
             "org.matrix.msc2732.device_unused_fallback_key_types"
+        ] = sync_result.device_unused_fallback_key_types
+        response[
+            "device_unused_fallback_key_types"
         ] = sync_result.device_unused_fallback_key_types
 
         if joined:
@@ -520,9 +523,9 @@ class SyncRestServlet(RestServlet):
             return self._event_serializer.serialize_events(
                 events,
                 time_now=time_now,
-                # We don't bundle "live" events, as otherwise clients
-                # will end up double counting annotations.
-                bundle_aggregations=False,
+                # Don't bother to bundle aggregations if the timeline is unlimited,
+                # as clients will have all the necessary information.
+                bundle_aggregations=room.timeline.limited,
                 token_id=token_id,
                 event_format=event_formatter,
                 only_event_fields=only_fields,

@@ -30,7 +30,8 @@ FEDERATION_UNSTABLE_PREFIX = FEDERATION_PREFIX + "/unstable"
 STATIC_PREFIX = "/_matrix/static"
 WEB_CLIENT_PREFIX = "/_matrix/client"
 SERVER_KEY_V2_PREFIX = "/_matrix/key/v2"
-MEDIA_PREFIX = "/_matrix/media/r0"
+MEDIA_R0_PREFIX = "/_matrix/media/r0"
+MEDIA_V3_PREFIX = "/_matrix/media/v3"
 LEGACY_MEDIA_PREFIX = "/_matrix/media/v1"
 
 
@@ -38,9 +39,6 @@ class ConsentURIBuilder:
     def __init__(self, hs_config: HomeServerConfig):
         if hs_config.key.form_secret is None:
             raise ConfigError("form_secret not set in config")
-        if hs_config.server.public_baseurl is None:
-            raise ConfigError("public_baseurl not set in config")
-
         self._hmac_secret = hs_config.key.form_secret.encode("utf-8")
         self._public_baseurl = hs_config.server.public_baseurl
 

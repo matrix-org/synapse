@@ -464,15 +464,6 @@ class IdentityHandler:
         if next_link:
             params["next_link"] = next_link
 
-        if self.hs.config.email.using_identity_server_from_trusted_list:
-            # Warn that a deprecated config option is in use
-            logger.warning(
-                'The config option "trust_identity_server_for_password_resets" '
-                'has been replaced by "account_threepid_delegate". '
-                "Please consult the sample config at docs/sample_config.yaml for "
-                "details and update your config file."
-            )
-
         try:
             data = await self.http_client.post_json_get_json(
                 id_server + "/_matrix/identity/api/v1/validate/email/requestToken",
@@ -517,15 +508,6 @@ class IdentityHandler:
         if next_link:
             params["next_link"] = next_link
 
-        if self.hs.config.email.using_identity_server_from_trusted_list:
-            # Warn that a deprecated config option is in use
-            logger.warning(
-                'The config option "trust_identity_server_for_password_resets" '
-                'has been replaced by "account_threepid_delegate". '
-                "Please consult the sample config at docs/sample_config.yaml for "
-                "details and update your config file."
-            )
-
         try:
             data = await self.http_client.post_json_get_json(
                 id_server + "/_matrix/identity/api/v1/validate/msisdn/requestToken",
@@ -536,10 +518,6 @@ class IdentityHandler:
             raise e.to_synapse_error()
         except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
-
-        # It is already checked that public_baseurl is configured since this code
-        # should only be used if account_threepid_delegate_msisdn is true.
-        assert self.hs.config.server.public_baseurl
 
         # we need to tell the client to send the token back to us, since it doesn't
         # otherwise know where to send it, so add submit_url response parameter

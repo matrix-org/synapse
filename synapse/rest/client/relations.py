@@ -212,6 +212,7 @@ class RelationPaginationServlet(RestServlet):
 
             pagination_chunk = await self.store.get_relations_for_event(
                 event_id=parent_id,
+                room_id=room_id,
                 relation_type=relation_type,
                 event_type=event_type,
                 limit=limit,
@@ -224,18 +225,14 @@ class RelationPaginationServlet(RestServlet):
         )
 
         now = self.clock.time_msec()
-        # We set bundle_aggregations to False when retrieving the original
-        # event because we want the content before relations were applied to
-        # it.
+        # Do not bundle aggregations when retrieving the original event because
+        # we want the content before relations are applied to it.
         original_event = await self._event_serializer.serialize_event(
             event, now, bundle_aggregations=False
         )
-        # Similarly, we don't allow relations to be applied to relations, so we
-        # return the original relations without any aggregations on top of them
-        # here.
-        serialized_events = await self._event_serializer.serialize_events(
-            events, now, bundle_aggregations=False
-        )
+        # The relations returned for the requested event do include their
+        # bundled aggregations.
+        serialized_events = await self._event_serializer.serialize_events(events, now)
 
         return_value = pagination_chunk.to_dict()
         return_value["chunk"] = serialized_events
@@ -298,7 +295,9 @@ class RelationAggregationPaginationServlet(RestServlet):
             raise SynapseError(404, "Unknown parent event.")
 
         if relation_type not in (RelationTypes.ANNOTATION, None):
-            raise SynapseError(400, "Relation type must be 'annotation'")
+            raise SynapseError(
+                400, f"Relation type must be '{RelationTypes.ANNOTATION}'"
+            )
 
         limit = parse_integer(request, "limit", default=5)
         from_token_str = parse_string(request, "from")
@@ -319,6 +318,7 @@ class RelationAggregationPaginationServlet(RestServlet):
 
             pagination_chunk = await self.store.get_aggregation_groups_for_event(
                 event_id=parent_id,
+                room_id=room_id,
                 event_type=event_type,
                 limit=limit,
                 from_token=from_token,
@@ -385,7 +385,9 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
 
         # This checks that a) the event exists and b) the user is allowed to
         # view it.
-        await self.event_handler.get_event(requester.user, room_id, parent_id)
+        event = await self.event_handler.get_event(requester.user, room_id, parent_id)
+        if event is None:
+            raise SynapseError(404, "Unknown parent event.")
 
         if relation_type != RelationTypes.ANNOTATION:
             raise SynapseError(400, "Relation type must be 'annotation'")
@@ -404,6 +406,7 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
 
         result = await self.store.get_relations_for_event(
             event_id=parent_id,
+            room_id=room_id,
             relation_type=relation_type,
             event_type=event_type,
             aggregation_key=key,

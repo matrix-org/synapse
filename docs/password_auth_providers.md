@@ -1,7 +1,7 @@
 <h2 style="color:red">
 This page of the Synapse documentation is now deprecated. For up to date
 documentation on setting up or writing a password auth provider module, please see
-<a href="modules.md">this page</a>.
+<a href="modules/index.md">this page</a>.
 </h2>
 
 # Password auth provider modules
