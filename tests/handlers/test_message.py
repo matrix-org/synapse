@@ -15,7 +15,6 @@ import logging
 from typing import Tuple
 
 from synapse.api.constants import EventTypes
-from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.rest import admin
