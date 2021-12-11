@@ -960,7 +960,6 @@ class EventCreationHandler:
             # We allow events with no `prev_events` but it better have some `auth_events`
             assert (
                 builder.type == EventTypes.Create
-                or prev_event_ids
                 # Allow an event to have empty list of prev_event_ids
                 # only if it has auth_event_ids.
                 or auth_event_ids
