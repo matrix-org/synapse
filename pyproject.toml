@@ -264,6 +264,7 @@ types-pyOpenSSL = ">=20.0.7"
 types-PyYAML = ">=5.4.10"
 types-requests = ">=2.26.0"
 types-setuptools = ">=57.4.0"
+types-beautifulsoup4 = ">=4.10.5"
 
 # Dependencies which are exclusively required by unit test code. This is
 # NOT a list of all modules that are necessary to run the unit tests.
