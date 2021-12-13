@@ -346,7 +346,7 @@ class Auth:
             effective_device_id = request.args[DEVICE_ID_ARG_NAME][0].decode("utf8")
             # We only just set this so it can't be None!
             assert effective_device_id is not None
-            device_opt = await self.store.get_device(
+            device_opt = await self.store.get_device_opt(
                 effective_user_id, effective_device_id
             )
             if device_opt is None:
