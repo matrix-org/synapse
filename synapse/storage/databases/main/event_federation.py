@@ -1485,9 +1485,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         """Update the prometheus metrics for the inbound federation staging area."""
 
         def _get_stats_for_federation_staging_txn(txn):
-            txn.execute(
-                "SELECT count(*) FROM federation_inbound_events_staging"
-            )
+            txn.execute("SELECT count(*) FROM federation_inbound_events_staging")
             (count,) = txn.fetchone()
 
             txn.execute(
