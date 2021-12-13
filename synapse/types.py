@@ -63,7 +63,7 @@ MutableStateMap = MutableMapping[StateKey, T]
 # A JSON-serialisable dict.
 JsonDict = Dict[str, Any]
 # A JSON-serialisable object.
-JsonObject = object
+JsonSerializable = object
 
 
 # Note that this seems to require inheriting *directly* from Interface in order
