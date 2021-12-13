@@ -997,9 +997,7 @@ class AuthHandler:
         # really don't want is active access_tokens without a record of the
         # device, so we double-check it here.
         if device_id is not None:
-            try:
-                await self.store.get_device(user_id, device_id)
-            except StoreError:
+            if await self.store.get_device(user_id, device_id) is None:
                 await self.store.delete_access_token(access_token)
                 raise StoreError(400, "Login raced against device deletion")
 
