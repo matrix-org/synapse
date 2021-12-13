@@ -175,6 +175,7 @@ class _ServiceQueuer:
         self._msc3202_transaction_extensions_enabled: bool = (
             hs.config.experimental.msc3202_transaction_extensions
         )
+        self._store = hs.get_datastore()
 
     def start_background_request(self, service: ApplicationService) -> None:
         # start a sender for this appservice if we don't already have one
@@ -219,7 +220,7 @@ class _ServiceQueuer:
                     # Lazily compute the one-time key counts and fallback key
                     # usage states for the users which are mentioned in this
                     # transaction, as well as the appservice's sender.
-                    interesting_users = self._determine_interesting_users_for_msc3202_otk_counts_and_fallback_keys(
+                    interesting_users = await self._determine_interesting_users_for_msc3202_otk_counts_and_fallback_keys(
                         service, events, ephemeral, to_device_messages_to_send
                     )
                     (
@@ -243,11 +244,11 @@ class _ServiceQueuer:
         finally:
             self.requests_in_flight.discard(service.id)
 
-    def _determine_interesting_users_for_msc3202_otk_counts_and_fallback_keys(
+    async def _determine_interesting_users_for_msc3202_otk_counts_and_fallback_keys(
         self,
         service: ApplicationService,
         events: Iterable[EventBase],
-        ephemeral: Iterable[JsonDict],
+        ephemerals: Iterable[JsonDict],
         to_device_messages: Iterable[JsonDict],
     ) -> Set[str]:
         """
@@ -255,8 +256,34 @@ class _ServiceQueuer:
         compute a list of application services users that may have interesting
         updates to the one-time key counts or fallback key usage.
         """
-        # OSTD implement me!
-        return set()
+        interesting_users: Set[str] = set()
+
+        # The sender is always included
+        interesting_users.add(service.sender)
+
+        # All AS users that would receive the PDUs or EDUs sent to these rooms
+        # are classed as 'interesting'.
+        rooms_of_interesting_users: Set[str] = set()
+        # PDUs
+        rooms_of_interesting_users.update(event.room_id for event in events)
+        # EDUs
+        rooms_of_interesting_users.update(
+            ephemeral["room_id"] for ephemeral in ephemerals
+        )
+
+        # Look up the AS users in those rooms
+        for room_id in rooms_of_interesting_users:
+            interesting_users.update(
+                await self._store.get_app_service_users_in_room(room_id, service)
+            )
+
+        # Add recipients of to-device messages.
+        # device_message["user_id"] is the ID of the recipient.
+        interesting_users.update(
+            device_message["user_id"] for device_message in to_device_messages
+        )
+
+        return interesting_users
 
     async def _compute_msc3202_otk_counts_and_fallback_keys(
         self, users: Set[str]
