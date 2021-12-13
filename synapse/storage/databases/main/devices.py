@@ -101,7 +101,9 @@ class DeviceWorkerStore(SQLBaseStore):
             "count_devices_by_users", count_devices_by_users_txn, user_ids
         )
 
-    async def get_device(self, user_id: str, device_id: str) -> Dict[str, Any]:
+    async def get_device(
+        self, user_id: str, device_id: str
+    ) -> Optional[Dict[str, Any]]:
         """Retrieve a device. Only returns devices that are not marked as
         hidden.
 
@@ -109,17 +111,15 @@ class DeviceWorkerStore(SQLBaseStore):
             user_id: The ID of the user which owns the device
             device_id: The ID of the device to retrieve
         Returns:
-            A dict containing the device information
-        Raises:
-            StoreError: if the device is not found
-        See also:
-            `get_device_opt` which returns None instead if the device is not found
+            A dict containing the device information, or `None` if the device does not
+            exist.
         """
         return await self.db_pool.simple_select_one(
             table="devices",
             keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
             retcols=("user_id", "device_id", "display_name"),
             desc="get_device",
+            allow_none=True,
         )
 
     async def get_device_opt(

@@ -108,7 +108,7 @@ class VersionServlet(RestServlet):
 
 class PurgeHistoryRestServlet(RestServlet):
     PATTERNS = admin_patterns(
-        "/purge_history/(?P<room_id>[^/]*)(/(?P<event_id>[^/]+))?"
+        "/purge_history/(?P<room_id>[^/]*)(/(?P<event_id>[^/]*))?$"
     )
 
     def __init__(self, hs: "HomeServer"):
@@ -195,7 +195,7 @@ class PurgeHistoryRestServlet(RestServlet):
 
 
 class PurgeHistoryStatusRestServlet(RestServlet):
-    PATTERNS = admin_patterns("/purge_history_status/(?P<purge_id>[^/]+)")
+    PATTERNS = admin_patterns("/purge_history_status/(?P<purge_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
         self.pagination_handler = hs.get_pagination_handler()

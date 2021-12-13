@@ -580,7 +580,9 @@ class E2eKeysHandler:
             log_kv(
                 {"message": "Did not update one_time_keys", "reason": "no keys given"}
             )
-        fallback_keys = keys.get("org.matrix.msc2732.fallback_keys", None)
+        fallback_keys = keys.get("fallback_keys") or keys.get(
+            "org.matrix.msc2732.fallback_keys"
+        )
         if fallback_keys and isinstance(fallback_keys, dict):
             log_kv(
                 {
