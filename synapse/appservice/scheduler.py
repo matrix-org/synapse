@@ -283,8 +283,9 @@ class _ServiceQueuer:
         Given a list of application service users that are interesting,
         compute one-time key counts and fallback key usages for the users.
         """
+        otk_counts = await self._store.count_bulk_e2e_one_time_keys_for_as(users)
         # OSTD implement me!
-        return {}, {}
+        return otk_counts, {}
 
 
 class _TransactionController:
