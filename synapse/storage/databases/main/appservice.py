@@ -25,11 +25,13 @@ from synapse.appservice import (
 )
 from synapse.config.appservice import load_appservices
 from synapse.events import EventBase
-from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.storage._base import db_to_json
 from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
+from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
 from synapse.types import JsonDict
 from synapse.util import json_encoder
+from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -58,7 +60,7 @@ def _make_exclusive_regex(
     return exclusive_user_pattern
 
 
-class ApplicationServiceWorkerStore(SQLBaseStore):
+class ApplicationServiceWorkerStore(RoomMemberWorkerStore):
     def __init__(
         self,
         database: DatabasePool,
@@ -125,6 +127,17 @@ class ApplicationServiceWorkerStore(SQLBaseStore):
             if service.id == as_id:
                 return service
         return None
+
+    # OSTD cache invalidation
+    @cached(iterable=True, prune_unread_entries=False)
+    async def get_app_service_users_in_room(
+        self, room_id: str, app_service: "ApplicationService"
+    ) -> List[str]:
+        return list(
+            filter(
+                app_service.is_interested_in_user, await self.get_users_in_room(room_id)
+            )
+        )
 
 
 class ApplicationServiceStore(ApplicationServiceWorkerStore):
