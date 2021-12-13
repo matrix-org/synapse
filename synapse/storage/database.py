@@ -13,8 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
 import logging
 import time
+import types
 from collections import defaultdict
 from sys import intern
 from time import monotonic as monotonic_time
@@ -535,6 +537,29 @@ class DatabasePool:
             *args
             **kwargs
         """
+
+        # Robustness check: ensure that none of the arguments are generators, since that
+        # will fail if we have to repeat the transaction.
+        # For now, we just log an error, and hope that it works on the first attempt.
+        # TODO: raise an exception.
+        for arg in args:
+            if inspect.isgenerator(arg):
+                logger.error("Programming error: generator passed to new_transaction")
+        for name, val in kwargs.items():
+            if inspect.isgenerator(val):
+                logger.error(
+                    "Programming error: generator passed to new_transaction as argument %s",
+                    name,
+                )
+        # also check variables referenced in func's closure
+        if inspect.isfunction(func) and func.__closure__:
+            for i, cell in enumerate(func.__closure__):
+                if inspect.isgenerator(cell.cell_contents):
+                    logger.error(
+                        "Programming error: function %s references generator %s via its closure",
+                        func,
+                        func.__code__.co_freevars[i],
+                    )
 
         start = monotonic_time()
         txn_id = self._TXN_ID
@@ -1226,9 +1251,9 @@ class DatabasePool:
         self,
         table: str,
         key_names: Collection[str],
-        key_values: Collection[Iterable[Any]],
+        key_values: Collection[Collection[Any]],
         value_names: Collection[str],
-        value_values: Iterable[Iterable[Any]],
+        value_values: Collection[Collection[Any]],
         desc: str,
     ) -> None:
         """
@@ -1920,7 +1945,7 @@ class DatabasePool:
         self,
         table: str,
         column: str,
-        iterable: Iterable[Any],
+        iterable: Collection[Any],
         keyvalues: Dict[str, Any],
         desc: str,
     ) -> int:
@@ -1931,7 +1956,8 @@ class DatabasePool:
         Args:
             table: string giving the table name
             column: column name to test for inclusion against `iterable`
-            iterable: list
+            iterable: list of values to match against `column`. NB cannot be a generator
+                as it may be evaluated multiple times.
             keyvalues: dict of column names and values to select the rows with
             desc: description of the transaction, for logging and metrics
 
