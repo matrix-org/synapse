@@ -856,7 +856,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         Args:
             medium: threepid medium e.g. email
-            address: threepid address e.g. me@example.com
+            address: threepid address e.g. me@example.com. This must already be
+                in canonical form.
 
         Returns:
             The user ID or None if no user id/threepid mapping exists

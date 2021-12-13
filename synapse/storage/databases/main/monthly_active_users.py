@@ -22,6 +22,7 @@ from synapse.storage.database import (
     make_in_list_sql_clause,
 )
 from synapse.util.caches.descriptors import cached
+from synapse.util.threepids import canonicalise_email
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -112,7 +113,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
             : self.hs.config.server.max_mau_value
         ]:
             user_id = await self.hs.get_datastore().get_user_id_by_threepid(
-                tp["medium"], tp["address"]
+                tp["medium"], canonicalise_email(tp["address"])
             )
             if user_id:
                 users.append(user_id)
