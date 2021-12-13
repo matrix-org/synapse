@@ -48,7 +48,7 @@ This is all tied together by the AppServiceScheduler which DIs the required
 components.
 """
 import logging
-from typing import TYPE_CHECKING, Awaitable, Callable, Dict, Iterable, List, Optional, Set
+from typing import TYPE_CHECKING, Awaitable, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 from synapse.appservice import (
     ApplicationService,
@@ -203,6 +203,20 @@ class _ServiceQueuer:
                 one_time_key_counts: Optional[TransactionOneTimeKeyCounts] = None
                 unused_fallback_keys: Optional[TransactionUnusedFallbackKeys] = None
 
+                if service.msc3202_transaction_extensions:
+                    # Lazily compute the one-time key counts and fallback key
+                    # usage states for the users which are mentioned in this
+                    # transaction, as well as the appservice's sender.
+                    interesting_users = self._determine_interesting_users_for_msc3202_otk_counts_and_fallback_keys(
+                        service, events, ephemeral, to_device_messages_to_send
+                    )
+                    (
+                        one_time_key_counts,
+                        unused_fallback_keys,
+                    ) = await self._compute_msc3202_otk_counts_and_fallback_keys(
+                        interesting_users
+                    )
+
                 try:
                     await self.txn_ctrl.send(
                         service,
@@ -216,6 +230,30 @@ class _ServiceQueuer:
                     logger.exception("AS request failed")
         finally:
             self.requests_in_flight.discard(service.id)
+
+    def _determine_interesting_users_for_msc3202_otk_counts_and_fallback_keys(
+        self,
+        service: ApplicationService,
+        events: Iterable[EventBase],
+        ephemeral: Iterable[JsonDict],
+        to_device_messages: Iterable[JsonDict],
+    ) -> Set[str]:
+        """
+        Given a list of the events, ephemeral messages and to-device messaeges,
+        compute a list of application services users that may have interesting
+        updates to the one-time key counts or fallback key usage.
+        """
+        # OSTD implement me!
+        return set()
+    async def _compute_msc3202_otk_counts_and_fallback_keys(
+        self, users: Set[str]
+    ) -> Tuple[TransactionOneTimeKeyCounts, TransactionUnusedFallbackKeys]:
+        """
+        Given a list of application service users that are interesting,
+        compute one-time key counts and fallback key usages for the users.
+        """
+        # OSTD implement me!
+        return {}, {}
 
 
 class _TransactionController:
