@@ -38,6 +38,15 @@ class RoomKey(TypedDict):
 
 
 class EndToEndRoomKeyStore(SQLBaseStore):
+    """The store for end to end room key backups.
+
+    See https://spec.matrix.org/v1.1/client-server-api/#server-side-key-backups
+
+    As per the spec, backups are identified by an opaque version string. Internally,
+    version identifiers are assigned using incrementing integers. Non-numeric version
+    strings are treated as if they do not exist, since we would have never issued them.
+    """
+
     async def update_e2e_room_key(
         self,
         user_id: str,
