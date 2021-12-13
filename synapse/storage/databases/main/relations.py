@@ -390,7 +390,7 @@ class RelationsWorkerStore(SQLBaseStore):
             latest_event_id = row[0]
 
             sql = """
-                SELECT COALESCE(COUNT(event_id), 0)
+                SELECT COUNT(event_id)
                 FROM event_relations
                 INNER JOIN events USING (event_id)
                 WHERE

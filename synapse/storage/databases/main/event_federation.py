@@ -1393,7 +1393,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         count = await self.db_pool.simple_select_one_onecol(
             table="federation_inbound_events_staging",
             keyvalues={"room_id": room_id},
-            retcol="COALESCE(COUNT(*), 0)",
+            retcol="COUNT(*)",
             desc="prune_staged_events_in_room_count",
         )
 
@@ -1486,7 +1486,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         def _get_stats_for_federation_staging_txn(txn):
             txn.execute(
-                "SELECT coalesce(count(*), 0) FROM federation_inbound_events_staging"
+                "SELECT count(*) FROM federation_inbound_events_staging"
             )
             (count,) = txn.fetchone()
 

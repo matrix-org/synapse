@@ -217,7 +217,7 @@ class RoomWorkerStore(SQLBaseStore):
 
             sql = """
                 SELECT
-                    COALESCE(COUNT(*), 0)
+                    COUNT(*)
                 FROM (
                     %(published_sql)s
                 ) published
