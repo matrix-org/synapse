@@ -53,12 +53,6 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
     ):
         super().__init__(database, db_conn, hs)
 
-    def __init__(
-        self,
-        database: DatabasePool,
-        db_conn: LoggingDatabaseConnection,
-        hs: "HomeServer",
-    ):
         # `_can_write_to_account_data` indicates whether the current worker is allowed
         # to write account data. A value of `True` implies that `_account_data_id_gen`
         # is an `AbstractStreamIdGenerator` and not just a tracker.
