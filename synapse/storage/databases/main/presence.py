@@ -269,6 +269,7 @@ class PresenceStore(PresenceBackgroundUpdateStore):
         """
         # Add user entries to the table, updating the presence_stream_id column if the user already
         # exists in the table.
+        presence_stream_id = self._presence_id_gen.get_current_token()
         await self.db_pool.simple_upsert_many(
             table="users_to_send_full_presence_to",
             key_names=("user_id",),
@@ -279,9 +280,7 @@ class PresenceStore(PresenceBackgroundUpdateStore):
             # devices at different times, each device will receive full presence once - when
             # the presence stream ID in their sync token is less than the one in the table
             # for their user ID.
-            value_values=(
-                (self._presence_id_gen.get_current_token(),) for _ in user_ids
-            ),
+            value_values=[(presence_stream_id,) for _ in user_ids],
             desc="add_users_to_send_full_presence_to",
         )
 
