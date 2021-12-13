@@ -21,7 +21,7 @@ from synapse.api.errors import StoreError
 from synapse.logging.opentracing import log_kv, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import LoggingTransaction
-from synapse.types import JsonDict, JsonObject
+from synapse.types import JsonDict, JsonSerializable
 from synapse.util import json_encoder
 
 
@@ -34,7 +34,7 @@ class RoomKey(TypedDict):
     first_message_index: int
     forwarded_count: int
     is_verified: bool
-    session_data: JsonObject
+    session_data: JsonSerializable
 
 
 class EndToEndRoomKeyStore(SQLBaseStore):
