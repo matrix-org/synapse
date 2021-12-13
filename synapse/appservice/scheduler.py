@@ -281,8 +281,8 @@ class _ServiceQueuer:
         compute one-time key counts and fallback key usages for the users.
         """
         otk_counts = await self._store.count_bulk_e2e_one_time_keys_for_as(users)
-        # OSTD implement me!
-        return otk_counts, {}
+        unused_fbks = await self._store.get_e2e_bulk_unused_fallback_key_types(users)
+        return otk_counts, unused_fbks
 
 
 class _TransactionController:
