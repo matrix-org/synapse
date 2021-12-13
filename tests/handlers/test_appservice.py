@@ -426,7 +426,14 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         #
         # The uninterested application service should not have been notified at all.
         self.send_mock.assert_called_once()
-        service, _events, _ephemeral, to_device_messages = self.send_mock.call_args[0]
+        (
+            service,
+            _events,
+            _ephemeral,
+            to_device_messages,
+            _otks,
+            _fbks,
+        ) = self.send_mock.call_args[0]
 
         # Assert that this was the same to-device message that local_user sent
         self.assertEqual(service, interested_appservice)
@@ -537,7 +544,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         service_id_to_message_count: Dict[str, int] = {}
 
         for call in self.send_mock.call_args_list:
-            service, _events, _ephemeral, to_device_messages = call[0]
+            service, _events, _ephemeral, to_device_messages, _otks, _fbks = call[0]
 
             # Check that this was made to an interested service
             self.assertIn(service, interested_appservices)
