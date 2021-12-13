@@ -548,14 +548,21 @@ class DatabasePool:
         # will fail if we have to repeat the transaction.
         # For now, we just log an error, and hope that it works on the first attempt.
         # TODO: raise an exception.
-        for arg in args:
+        for i, arg in enumerate(args):
             if inspect.isgenerator(arg):
-                logger.error("Programming error: generator passed to new_transaction")
+                logger.error(
+                    "Programming error: generator passed to new_transaction as "
+                    "argument %i to function %s",
+                    i,
+                    func,
+                )
         for name, val in kwargs.items():
             if inspect.isgenerator(val):
                 logger.error(
-                    "Programming error: generator passed to new_transaction as argument %s",
+                    "Programming error: generator passed to new_transaction as "
+                    "argument %s to function %s",
                     name,
+                    func,
                 )
         # also check variables referenced in func's closure
         if inspect.isfunction(func):
@@ -564,7 +571,8 @@ class DatabasePool:
                 for i, cell in enumerate(f.__closure__):
                     if inspect.isgenerator(cell.cell_contents):
                         logger.error(
-                            "Programming error: function %s references generator %s via its closure",
+                            "Programming error: function %s references generator %s "
+                            "via its closure",
                             f,
                             f.__code__.co_freevars[i],
                         )
