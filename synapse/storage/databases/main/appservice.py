@@ -24,9 +24,8 @@ from synapse.appservice import (
 from synapse.config.appservice import load_appservices
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
-from synapse.storage.types import Connection
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 
@@ -58,7 +57,12 @@ def _make_exclusive_regex(
 
 
 class ApplicationServiceWorkerStore(SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         self.services_cache = load_appservices(
             hs.hostname, hs.config.appservice.app_service_config_files
         )
