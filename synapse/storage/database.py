@@ -552,14 +552,16 @@ class DatabasePool:
                     name,
                 )
         # also check variables referenced in func's closure
-        if inspect.isfunction(func) and func.__closure__:
-            for i, cell in enumerate(func.__closure__):
-                if inspect.isgenerator(cell.cell_contents):
-                    logger.error(
-                        "Programming error: function %s references generator %s via its closure",
-                        func,
-                        func.__code__.co_freevars[i],
-                    )
+        if inspect.isfunction(func):
+            f = cast(types.FunctionType, func)
+            if f.__closure__:
+                for i, cell in enumerate(f.__closure__):
+                    if inspect.isgenerator(cell.cell_contents):
+                        logger.error(
+                            "Programming error: function %s references generator %s via its closure",
+                            f,
+                            f.__code__.co_freevars[i],
+                        )
 
         start = monotonic_time()
         txn_id = self._TXN_ID
