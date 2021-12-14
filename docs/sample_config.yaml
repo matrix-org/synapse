@@ -1624,8 +1624,9 @@ saml2_config:
     #name: ["Test SP", "en"]
 
     # The service section is needed to configure saml2 extensions like `ui_info`,
-    # if this might not be enough for your usecase, try looking at the pysaml2 documentation.
-    # The documentation is wrong in some places, so if it doesn't work, try shuffeling things around,
+    # if this might not be enough for your usecase, try looking at the pysaml2 documentation:
+    https://pysaml2.readthedocs.io/en/latest/howto/config.html
+    # The documentation is wrong in some places, so if it doesn't work, try shuffling things around,
     # and ask others for advice, it's probably not your fault.
     #
     #service:
@@ -1637,7 +1638,7 @@ saml2_config:
     #    allow_unsolicited: true
     #
     #     The section below is used to configure what will be visible on the IdP's page.
-    #     Note: shiboleth needs the logo to be defined for every language you use or it won't show up.
+    #     Note: Shibboleth needs the logo to be defined for every language you use, or it won't show up.
     #
     #     ui_info:
     #       display_name:
