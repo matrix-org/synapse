@@ -1257,7 +1257,7 @@ class ServerConfig(Config):
             help="Turn on the twisted telnet manhole service on the given port.",
         )
 
-    def read_gc_intervals(self, durations) -> Optional[Tuple[float, float, float]]:
+    def read_gc_intervals(self, durations: Any) -> Optional[Tuple[float, float, float]]:
         """Reads the three durations for the GC min interval option, returning seconds."""
         if durations is None:
             return None

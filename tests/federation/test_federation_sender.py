@@ -266,7 +266,8 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         )
 
         # expect signing key update edu
-        self.assertEqual(len(self.edus), 1)
+        self.assertEqual(len(self.edus), 2)
+        self.assertEqual(self.edus.pop(0)["edu_type"], "m.signing_key_update")
         self.assertEqual(self.edus.pop(0)["edu_type"], "org.matrix.signing_key_update")
 
         # sign the devices
@@ -491,7 +492,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
     ) -> None:
         """Check that the txn has an EDU with a signing key update."""
         edus = txn["edus"]
-        self.assertEqual(len(edus), 1)
+        self.assertEqual(len(edus), 2)
 
     def generate_and_upload_device_signing_key(
         self, user_id: str, device_id: str

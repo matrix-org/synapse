@@ -16,13 +16,13 @@ from unittest.mock import Mock
 
 from twisted.internet import defer
 
-from synapse.appservice import ApplicationService
+from synapse.appservice import ApplicationService, Namespace
 
 from tests import unittest
 
 
-def _regex(regex, exclusive=True):
-    return {"regex": re.compile(regex), "exclusive": exclusive}
+def _regex(regex: str, exclusive: bool = True) -> Namespace:
+    return Namespace(exclusive, None, re.compile(regex))
 
 
 class ApplicationServiceTestCase(unittest.TestCase):
@@ -33,11 +33,6 @@ class ApplicationServiceTestCase(unittest.TestCase):
             url="some_url",
             token="some_token",
             hostname="matrix.org",  # only used by get_groups_for_user
-            namespaces={
-                ApplicationService.NS_USERS: [],
-                ApplicationService.NS_ROOMS: [],
-                ApplicationService.NS_ALIASES: [],
-            },
         )
         self.event = Mock(
             type="m.something", room_id="!foo:bar", sender="@someone:somewhere"

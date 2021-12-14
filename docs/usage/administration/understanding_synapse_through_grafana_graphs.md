@@ -1,6 +1,12 @@
 ## Understanding Synapse through Grafana graphs
 
-It is possible monitor much of the internal state of Synapse using [Prometheus](https://prometheus.io) metrics and [Grafana](https://grafana.com/). A guide for configuring Synapse to provide metrics is available [here](../../metrics-howto.md) and information on setting up Grafana is [here](https://github.com/matrix-org/synapse/tree/master/contrib/grafana). In this setup, Prometheus will periodically scrape the information Synapse provides and store a record of it over time. Grafana is then used as an interface to query and present this information through a series of pretty graphs.
+It is possible to monitor much of the internal state of Synapse using [Prometheus](https://prometheus.io) 
+metrics and [Grafana](https://grafana.com/). 
+A guide for configuring Synapse to provide metrics is available [here](../../metrics-howto.md) 
+and information on setting up Grafana is [here](https://github.com/matrix-org/synapse/tree/master/contrib/grafana).
+In this setup, Prometheus will periodically scrape the information Synapse provides and
+store a record of it over time. Grafana is then used as an interface to query and
+present this information through a series of pretty graphs.
 
 Once you have grafana set up, and assuming you're using [our grafana dashboard template](https://github.com/matrix-org/synapse/blob/master/contrib/grafana/synapse.json), look for the following graphs when debugging a slow/overloaded Synapse:
 
@@ -57,7 +63,7 @@ we should probably consider raising the size of that cache by raising its cache 
 
 ![image](https://user-images.githubusercontent.com/1342360/82241440-13566680-9934-11ea-8b88-ba468db937ed.png)
 
-Forward extremities are the leaf events at the end of a DAG in a room, aka events that have no children. The more exist in a room, the more [state resolution](https://matrix.org/docs/spec/server_server/r0.1.3#room-state-resolution) that Synapse needs to perform (hint: it's an expensive operation). While Synapse has code to prevent too many of these existing at one time in a room, bugs can sometimes make them crop up again.
+Forward extremities are the leaf events at the end of a DAG in a room, aka events that have no children. The more that exist in a room, the more [state resolution](https://spec.matrix.org/v1.1/server-server-api/#room-state-resolution) that Synapse needs to perform (hint: it's an expensive operation). While Synapse has code to prevent too many of these existing at one time in a room, bugs can sometimes make them crop up again.
 
 If a room has >10 forward extremities, it's worth checking which room is the culprit and potentially removing them using the SQL queries mentioned in [#1760](https://github.com/matrix-org/synapse/issues/1760).
 
@@ -65,8 +71,14 @@ If a room has >10 forward extremities, it's worth checking which room is the cul
 
 ![image](https://user-images.githubusercontent.com/1342360/82241911-da6ac180-9934-11ea-9a0d-a311fe22acd0.png)
 
-Large spikes in garbage collection times (bigger than shown here, I'm talking in the multiple seconds range), can cause lots of problems in Synapse performance. It's more an indicator of problems, and a symptom of other problems though, so check other graphs for what might be causing it.
+Large spikes in garbage collection times (bigger than shown here, I'm talking in the 
+multiple seconds range), can cause lots of problems in Synapse performance. It's more an 
+indicator of problems, and a symptom of other problems though, so check other graphs for what might be causing it.
 
 ## Final Thoughts
 
-If you're still having performance problems with your Synapse instance and you've tried everything you can, it may just be a lack of system resources. Consider adding more CPU and RAM, and make use of [worker mode](../../workers.md) to make use of multiple CPU cores / multiple machines for your homeserver.
+If you're still having performance problems with your Synapse instance and you've 
+tried everything you can, it may just be a lack of system resources. Consider adding
+more CPU and RAM, and make use of [worker mode](../../workers.md) 
+to make use of multiple CPU cores / multiple machines for your homeserver.
+

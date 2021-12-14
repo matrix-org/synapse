@@ -1,1 +1,0 @@
-Add `Final` annotation to string constants in `synapse.api.constants` so that they get typed as `Literal`s.

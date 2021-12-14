@@ -40,6 +40,10 @@ from synapse.rest.admin.event_reports import (
     EventReportDetailRestServlet,
     EventReportsRestServlet,
 )
+from synapse.rest.admin.federation import (
+    DestinationsRestServlet,
+    ListDestinationsRestServlet,
+)
 from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
 from synapse.rest.admin.registration_tokens import (
@@ -104,7 +108,7 @@ class VersionServlet(RestServlet):
 
 class PurgeHistoryRestServlet(RestServlet):
     PATTERNS = admin_patterns(
-        "/purge_history/(?P<room_id>[^/]*)(/(?P<event_id>[^/]+))?"
+        "/purge_history/(?P<room_id>[^/]*)(/(?P<event_id>[^/]*))?$"
     )
 
     def __init__(self, hs: "HomeServer"):
@@ -191,7 +195,7 @@ class PurgeHistoryRestServlet(RestServlet):
 
 
 class PurgeHistoryStatusRestServlet(RestServlet):
-    PATTERNS = admin_patterns("/purge_history_status/(?P<purge_id>[^/]+)")
+    PATTERNS = admin_patterns("/purge_history_status/(?P<purge_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
         self.pagination_handler = hs.get_pagination_handler()
@@ -261,6 +265,8 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ListRegistrationTokensRestServlet(hs).register(http_server)
     NewRegistrationTokenRestServlet(hs).register(http_server)
     RegistrationTokenRestServlet(hs).register(http_server)
+    DestinationsRestServlet(hs).register(http_server)
+    ListDestinationsRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
     if hs.config.worker.worker_app is None:

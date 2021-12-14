@@ -293,6 +293,9 @@ class SyncRestServlet(RestServlet):
         response[
             "org.matrix.msc2732.device_unused_fallback_key_types"
         ] = sync_result.device_unused_fallback_key_types
+        response[
+            "device_unused_fallback_key_types"
+        ] = sync_result.device_unused_fallback_key_types
 
         if joined:
             response["rooms"][Membership.JOIN] = joined
@@ -520,9 +523,9 @@ class SyncRestServlet(RestServlet):
             return self._event_serializer.serialize_events(
                 events,
                 time_now=time_now,
-                # We don't bundle "live" events, as otherwise clients
-                # will end up double counting annotations.
-                bundle_relations=False,
+                # Don't bother to bundle aggregations if the timeline is unlimited,
+                # as clients will have all the necessary information.
+                bundle_aggregations=room.timeline.limited,
                 token_id=token_id,
                 event_format=event_formatter,
                 only_event_fields=only_fields,

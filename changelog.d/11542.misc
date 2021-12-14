@@ -1,0 +1,1 @@
+Add missing `errcode` to `parse_string` and `parse_boolean`.

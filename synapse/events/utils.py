@@ -306,6 +306,7 @@ def format_event_for_client_v2_without_room_id(d: JsonDict) -> JsonDict:
 def serialize_event(
     e: Union[JsonDict, EventBase],
     time_now_ms: int,
+    *,
     as_client_event: bool = True,
     event_format: Callable[[JsonDict], JsonDict] = format_event_for_client_v1,
     token_id: Optional[str] = None,
@@ -393,7 +394,8 @@ class EventClientSerializer:
         self,
         event: Union[JsonDict, EventBase],
         time_now: int,
-        bundle_relations: bool = True,
+        *,
+        bundle_aggregations: bool = True,
         **kwargs: Any,
     ) -> JsonDict:
         """Serializes a single event.
@@ -401,8 +403,9 @@ class EventClientSerializer:
         Args:
             event: The event being serialized.
             time_now: The current time in milliseconds
-            bundle_relations: Whether to include the bundled relations for this
-                event.
+            bundle_aggregations: Whether to include the bundled aggregations for this
+                event. Only applies to non-state events. (State events never include
+                bundled aggregations.)
             **kwargs: Arguments to pass to `serialize_event`
 
         Returns:
@@ -414,20 +417,27 @@ class EventClientSerializer:
 
         serialized_event = serialize_event(event, time_now, **kwargs)
 
-        # If MSC1849 is enabled then we need to look if there are any relations
-        # we need to bundle in with the event.
-        # Do not bundle relations if the event has been redacted
-        if not event.internal_metadata.is_redacted() and (
-            self._msc1849_enabled and bundle_relations
+        # Check if there are any bundled aggregations to include with the event.
+        #
+        # Do not bundle aggregations if any of the following at true:
+        #
+        # * Support is disabled via the configuration or the caller.
+        # * The event is a state event.
+        # * The event has been redacted.
+        if (
+            self._msc1849_enabled
+            and bundle_aggregations
+            and not event.is_state()
+            and not event.internal_metadata.is_redacted()
         ):
-            await self._injected_bundled_relations(event, time_now, serialized_event)
+            await self._injected_bundled_aggregations(event, time_now, serialized_event)
 
         return serialized_event
 
-    async def _injected_bundled_relations(
+    async def _injected_bundled_aggregations(
         self, event: EventBase, time_now: int, serialized_event: JsonDict
     ) -> None:
-        """Potentially injects bundled relations into the unsigned portion of the serialized event.
+        """Potentially injects bundled aggregations into the unsigned portion of the serialized event.
 
         Args:
             event: The event being serialized.
@@ -435,7 +445,7 @@ class EventClientSerializer:
             serialized_event: The serialized event which may be modified.
 
         """
-        # Do not bundle relations for an event which represents an edit or an
+        # Do not bundle aggregations for an event which represents an edit or an
         # annotation. It does not make sense for them to have related events.
         relates_to = event.content.get("m.relates_to")
         if isinstance(relates_to, (dict, frozendict)):
@@ -444,23 +454,26 @@ class EventClientSerializer:
                 return
 
         event_id = event.event_id
+        room_id = event.room_id
 
-        # The bundled relations to include.
-        relations = {}
+        # The bundled aggregations to include.
+        aggregations = {}
 
-        annotations = await self.store.get_aggregation_groups_for_event(event_id)
+        annotations = await self.store.get_aggregation_groups_for_event(
+            event_id, room_id
+        )
         if annotations.chunk:
-            relations[RelationTypes.ANNOTATION] = annotations.to_dict()
+            aggregations[RelationTypes.ANNOTATION] = annotations.to_dict()
 
         references = await self.store.get_relations_for_event(
-            event_id, RelationTypes.REFERENCE, direction="f"
+            event_id, room_id, RelationTypes.REFERENCE, direction="f"
         )
         if references.chunk:
-            relations[RelationTypes.REFERENCE] = references.to_dict()
+            aggregations[RelationTypes.REFERENCE] = references.to_dict()
 
         edit = None
         if event.type == EventTypes.Message:
-            edit = await self.store.get_applicable_edit(event_id)
+            edit = await self.store.get_applicable_edit(event_id, room_id)
 
         if edit:
             # If there is an edit replace the content, preserving existing
@@ -482,7 +495,7 @@ class EventClientSerializer:
             else:
                 serialized_event["content"].pop("m.relates_to", None)
 
-            relations[RelationTypes.REPLACE] = {
+            aggregations[RelationTypes.REPLACE] = {
                 "event_id": edit.event_id,
                 "origin_server_ts": edit.origin_server_ts,
                 "sender": edit.sender,
@@ -493,19 +506,21 @@ class EventClientSerializer:
             (
                 thread_count,
                 latest_thread_event,
-            ) = await self.store.get_thread_summary(event_id)
+            ) = await self.store.get_thread_summary(event_id, room_id)
             if latest_thread_event:
-                relations[RelationTypes.THREAD] = {
-                    # Don't bundle relations as this could recurse forever.
+                aggregations[RelationTypes.THREAD] = {
+                    # Don't bundle aggregations as this could recurse forever.
                     "latest_event": await self.serialize_event(
-                        latest_thread_event, time_now, bundle_relations=False
+                        latest_thread_event, time_now, bundle_aggregations=False
                     ),
                     "count": thread_count,
                 }
 
-        # If any bundled relations were found, include them.
-        if relations:
-            serialized_event["unsigned"].setdefault("m.relations", {}).update(relations)
+        # If any bundled aggregations were found, include them.
+        if aggregations:
+            serialized_event["unsigned"].setdefault("m.relations", {}).update(
+                aggregations
+            )
 
     async def serialize_events(
         self, events: Iterable[Union[JsonDict, EventBase]], time_now: int, **kwargs: Any
