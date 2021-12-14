@@ -17,6 +17,7 @@ import logging
 from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
+    Any,
     Collection,
     Container,
     Dict,
@@ -28,7 +29,6 @@ from typing import (
     Tuple,
 )
 
-from mypy.build import Any
 from prometheus_client import Counter
 
 from synapse.api.constants import (
