@@ -152,7 +152,7 @@ class HttpPusher(Pusher):
                 )
             del self.sanitized_data["public_key"]
 
-    def _process_notification_dict(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _encrypt_notification_dict(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Called to process a payload according to the algorithm the pusher is
         configured with. Namely, if the algorithm is `com.famedly.curve25519-aes-sha2`
         we will encrypt the payload.
@@ -428,7 +428,7 @@ class HttpPusher(Pusher):
                     ],
                 }
             }
-            return self._process_notification_dict(d)
+            return self._encrypt_notification_dict(d)
 
         ctx = await push_tools.get_context_for_event(self.storage, event, self.user_id)
 
@@ -468,7 +468,7 @@ class HttpPusher(Pusher):
         if "name" in ctx and len(ctx["name"]) > 0:
             d["notification"]["room_name"] = ctx["name"]
 
-        return self._process_notification_dict(d)
+        return self._encrypt_notification_dict(d)
 
     async def dispatch_push(
         self, event: EventBase, tweaks: Dict[str, bool], badge: int
@@ -500,7 +500,7 @@ class HttpPusher(Pusher):
             badge: number of unread messages
         """
         logger.debug("Sending updated badge count %d to %s", badge, self.name)
-        d = self._process_notification_dict(
+        d = self._encrypt_notification_dict(
             {
                 "notification": {
                     "id": "",
