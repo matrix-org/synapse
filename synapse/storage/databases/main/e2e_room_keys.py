@@ -71,7 +71,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         except ValueError:
             # Our versions are all ints so if we can't convert it to an integer,
             # it doesn't exist.
-            raise StoreError(404, "No row found")
+            raise StoreError(404, "No backup with that version exists")
 
         await self.db_pool.simple_update_one(
             table="e2e_room_keys",
@@ -105,7 +105,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         except ValueError:
             # Our versions are all ints so if we can't convert it to an integer,
             # it doesn't exist.
-            raise StoreError(404, "No row found")
+            raise StoreError(404, "No backup with that version exists")
 
         values = []
         for (room_id, session_id, room_key) in room_keys:
@@ -394,7 +394,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 except ValueError:
                     # Our versions are all ints so if we can't convert it to an integer,
                     # it isn't there.
-                    raise StoreError(404, "No row found")
+                    raise StoreError(404, "No backup with that version exists")
 
             result = self.db_pool.simple_select_one_txn(
                 txn,
@@ -486,7 +486,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             except ValueError:
                 # Our versions are all ints so if we can't convert it to an integer,
                 # it doesn't exist.
-                raise StoreError(404, "No row found")
+                raise StoreError(404, "No backup with that version exists")
 
             await self.db_pool.simple_update_one(
                 table="e2e_room_keys_versions",
@@ -520,7 +520,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 except ValueError:
                     # Our versions are all ints so if we can't convert it to an integer,
                     # it isn't there.
-                    raise StoreError(404, "No row found")
+                    raise StoreError(404, "No backup with that version exists")
 
             self.db_pool.simple_delete_txn(
                 txn,
