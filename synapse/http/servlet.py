@@ -31,6 +31,7 @@ from typing_extensions import Literal
 from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.http.server import HttpServer
 from synapse.types import JsonDict, RoomAlias, RoomID
 from synapse.util import json_decoder
 
@@ -726,7 +727,7 @@ class RestServlet:
     into the appropriate HTTP response.
     """
 
-    def register(self, http_server):
+    def register(self, http_server: HttpServer) -> None:
         """Register this servlet with the given HTTP server."""
         patterns = getattr(self, "PATTERNS", None)
         if patterns:

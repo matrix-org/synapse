@@ -1,5 +1,20 @@
-Synapse 1.49.0rc1 (2021-12-07)
-==============================
+Synapse 1.49.0 (2021-12-14)
+===========================
+
+No significant changes since version 1.49.0rc1.
+
+
+Support for Ubuntu 21.04 ends next month on the 20th of January
+---------------------------------------------------------------
+
+For users of Ubuntu 21.04 (Hirsute Hippo), please be aware that [upstream support for this version of Ubuntu will end next month][Ubuntu2104EOL].
+We will stop producing packages for Ubuntu 21.04 after upstream support ends.
+
+[Ubuntu2104EOL]: https://lists.ubuntu.com/archives/ubuntu-announce/2021-December/000275.html
+
+
+The wiki has been migrated to the documentation website
+-------------------------------------------------------
 
 We've decided to move the existing, somewhat stagnant pages from the GitHub wiki
 to the [documentation website](https://matrix-org.github.io/synapse/latest/).
@@ -15,6 +30,9 @@ Note that contributions to the documentation website happen through [GitHub pull
 requests](https://github.com/matrix-org/synapse/pulls). Please visit [#synapse-dev:matrix.org](https://matrix.to/#/#synapse-dev:matrix.org)
 if you need help with the process!
 
+
+Synapse 1.49.0rc1 (2021-12-07)
+==============================
 
 Features
 --------
