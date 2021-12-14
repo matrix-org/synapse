@@ -32,11 +32,14 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
-from synapse.storage.database import DatabasePool, LoggingTransaction
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.storage.databases.main.state import StateFilter
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
-from synapse.storage.types import Connection
 from synapse.types import JsonDict, get_domain_from_id, get_localpart_from_id
 from synapse.util.caches.descriptors import cached
 
@@ -53,7 +56,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
     def __init__(
         self,
         database: DatabasePool,
-        db_conn: Connection,
+        db_conn: LoggingDatabaseConnection,
         hs: "HomeServer",
     ):
         super().__init__(database, db_conn, hs)
@@ -592,7 +595,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
     def __init__(
         self,
         database: DatabasePool,
-        db_conn: Connection,
+        db_conn: LoggingDatabaseConnection,
         hs: "HomeServer",
     ) -> None:
         super().__init__(database, db_conn, hs)
