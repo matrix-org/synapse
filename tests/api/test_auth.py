@@ -260,7 +260,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         # This just needs to return a truth-y value.
         self.store.get_user_by_id = simple_async_mock({"is_guest": False})
         self.store.get_user_by_access_token = simple_async_mock(None)
-        # This also needs to just return a truth-y value
+        # This also needs to just return a falsey value
         self.store.get_device_opt = simple_async_mock(None)
 
         request = Mock(args={})
