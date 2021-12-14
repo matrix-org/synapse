@@ -19,7 +19,10 @@ from unittest.mock import Mock
 import unpaddedbase64
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
-from donna25519 import PrivateKey, PublicKey
+from cryptography.hazmat.primitives.asymmetric.x25519 import (
+    X25519PrivateKey,
+    X25519PublicKey,
+)
 
 from twisted.internet.defer import Deferred
 
@@ -282,9 +285,9 @@ class HTTPPusherTests(HomeserverTestCase):
         )
 
         # do the exchange
-        exchanged = PrivateKey.load(
+        exchanged = X25519PrivateKey.from_private_bytes(
             unpaddedbase64.decode_base64(private_key)
-        ).do_exchange(PublicKey(ephemeral))
+        ).exchange(X25519PublicKey.from_public_bytes(ephemeral))
         # expand with HKDF
         zerosalt = bytes([0] * 32)
         prk = hmac.new(zerosalt, exchanged, hashlib.sha256).digest()

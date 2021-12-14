@@ -89,7 +89,6 @@ REQUIREMENTS = [
     "ijson>=3.1",
     # Used for encrypted push
     "pycryptodome>=3",
-    "donna25519>=0.1.1",
 ]
 
 CONDITIONAL_REQUIREMENTS = {

@@ -24,7 +24,11 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Union
 import unpaddedbase64
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
-from donna25519 import PrivateKey, PublicKey
+from cryptography.hazmat.primitives.asymmetric.x25519 import (
+    X25519PrivateKey,
+    X25519PublicKey,
+)
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from prometheus_client import Counter
 
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
@@ -136,7 +140,7 @@ class HttpPusher(Pusher):
             if not isinstance(base64_public_key, str):
                 raise PusherConfigException("'public_key' must be a string")
             try:
-                self.public_key = PublicKey(
+                self.public_key = X25519PublicKey.from_public_bytes(
                     unpaddedbase64.decode_base64(base64_public_key)
                 )
             except Exception as e:
@@ -164,9 +168,9 @@ class HttpPusher(Pusher):
             cleartext = json.dumps(cleartext_notif)
 
             # create an ephemeral curve25519 keypair
-            private_key = PrivateKey()
+            private_key = X25519PrivateKey.generate()
             # do ECDH
-            secret_key = private_key.do_exchange(self.public_key)
+            secret_key = private_key.exchange(self.public_key)
             # expand with HKDF
             zerosalt = bytes([0] * 32)
             prk = hmac.new(zerosalt, secret_key, hashlib.sha256).digest()
@@ -183,7 +187,9 @@ class HttpPusher(Pusher):
             return {
                 "notification": {
                     "ephemeral": unpaddedbase64.encode_base64(
-                        private_key.get_public().public
+                        private_key.public_key().public_bytes(
+                            Encoding.Raw, PublicFormat.Raw
+                        )
                     ),
                     "ciphertext": unpaddedbase64.encode_base64(ciphertext),
                     "mac": unpaddedbase64.encode_base64(mac),
