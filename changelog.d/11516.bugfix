@@ -1,0 +1,1 @@
+Fix a long-standing bug where relations from other rooms could be included in the bundled aggregations of an event.

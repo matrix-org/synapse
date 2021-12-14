@@ -550,7 +550,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             self.store.db_pool.simple_select_one_onecol(
                 table="federation_inbound_events_staging",
                 keyvalues={"room_id": room_id},
-                retcol="COALESCE(COUNT(*), 0)",
+                retcol="COUNT(*)",
                 desc="test_prune_inbound_federation_queue",
             )
         )
