@@ -986,7 +986,7 @@ class DatabasePool:
         self,
         table: str,
         keys: Collection[str],
-        values: Iterable[Iterable[Any]],
+        values: Collection[Collection[Any]],
         desc: str,
     ) -> None:
         """Executes an INSERT query on the named table.
