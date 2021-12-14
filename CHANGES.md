@@ -1,3 +1,14 @@
+Synapse 1.49.0 (2021-12-14)
+===========================
+
+No significant changes since version 1.49.0rc1.
+
+For users of Ubuntu 21.04 (Hirsute Hippo), please be aware that [upstream support for this version of Ubuntu will end next month][Ubuntu2104EOL].
+We will stop producing packages for Ubuntu 21.04 after upstream support ends.
+
+[Ubuntu2104EOL]: https://lists.ubuntu.com/archives/ubuntu-announce/2021-December/000275.html
+
+
 Synapse 1.49.0rc1 (2021-12-07)
 ==============================
 
