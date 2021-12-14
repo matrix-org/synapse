@@ -612,7 +612,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         )
 
     async def get_previous_state_groups(
-        self, state_groups: Iterable[int]
+        self, state_groups: Collection[int]
     ) -> Dict[int, int]:
         """Fetch the previous groups of the given state groups.
 
