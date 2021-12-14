@@ -382,14 +382,15 @@ class RelationsWorkerStore(SQLBaseStore):
 
     @cached()
     async def get_thread_summary(
-        self, event_id: str, room_id: str
-    ) -> Tuple[int, Optional[EventBase]]:
+        self, event_id: str, room_id: str, user_id: str
+    ) -> Tuple[int, Optional[EventBase], bool]:
         """Get the number of threaded replies, the senders of those replies, and
         the latest reply (if any) for the given event.
 
         Args:
             event_id: Summarize the thread related to this event ID.
             room_id: The room the event belongs to.
+            user_id: The user requesting the summary.
 
         Returns:
             The number of items in the thread and the most recent response, if any.
@@ -397,8 +398,8 @@ class RelationsWorkerStore(SQLBaseStore):
 
         def _get_thread_summary_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[int, Optional[str]]:
-            # Fetch the count of threaded events and the latest event ID.
+        ) -> Tuple[int, Optional[str], bool]:
+            # Fetch the latest event ID in the thread.
             # TODO Should this only allow m.room.message events.
             sql = """
                 SELECT event_id
@@ -415,10 +416,11 @@ class RelationsWorkerStore(SQLBaseStore):
             txn.execute(sql, (event_id, room_id, RelationTypes.THREAD))
             row = txn.fetchone()
             if row is None:
-                return 0, None
+                return 0, None, False
 
             latest_event_id = row[0]
 
+            # Fetch the number of threaded replies.
             sql = """
                 SELECT COUNT(event_id)
                 FROM event_relations
@@ -431,9 +433,25 @@ class RelationsWorkerStore(SQLBaseStore):
             txn.execute(sql, (event_id, room_id, RelationTypes.THREAD))
             count = cast(Tuple[int], txn.fetchone())[0]
 
-            return count, latest_event_id
+            # Fetch whether the requester has participated or not.
+            sql = """
+                SELECT 1
+                FROM event_relations
+                INNER JOIN events USING (event_id)
+                WHERE
+                    relates_to_id = ?
+                    AND room_id = ?
+                    AND relation_type = ?
+                    AND sender = ?
+            """
 
-        count, latest_event_id = await self.db_pool.runInteraction(
+            txn.execute(sql, (event_id, room_id, RelationTypes.THREAD, user_id))
+            row = txn.fetchone()
+            participated = bool(txn.fetchone())
+
+            return count, latest_event_id, participated
+
+        count, latest_event_id, participated = await self.db_pool.runInteraction(
             "get_thread_summary", _get_thread_summary_txn
         )
 
@@ -441,7 +459,7 @@ class RelationsWorkerStore(SQLBaseStore):
         if latest_event_id:
             latest_event = await self.get_event(latest_event_id, allow_none=True)  # type: ignore[attr-defined]
 
-        return count, latest_event
+        return count, latest_event, participated
 
     async def events_have_relations(
         self,
@@ -602,12 +620,13 @@ class RelationsWorkerStore(SQLBaseStore):
             (
                 thread_count,
                 latest_thread_event,
-            ) = await self.get_thread_summary(event_id, room_id)
+                participated,
+            ) = await self.get_thread_summary(event_id, room_id, user_id)
             if latest_thread_event:
                 aggregations[RelationTypes.THREAD] = {
-                    # Don't bundle aggregations as this could recurse forever.
                     "latest_event": latest_thread_event,
                     "count": thread_count,
+                    "current_user_participated": participated,
                 }
 
         # Store the bundled aggregations in the event metadata for later use.
