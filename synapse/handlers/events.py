@@ -122,9 +122,8 @@ class EventStreamHandler:
                 events,
                 time_now,
                 as_client_event=as_client_event,
-                # We don't bundle "live" events, as otherwise clients
-                # will end up double counting annotations.
-                bundle_relations=False,
+                # Don't bundle aggregations as this is a deprecated API.
+                bundle_aggregations=False,
             )
 
             chunk = {

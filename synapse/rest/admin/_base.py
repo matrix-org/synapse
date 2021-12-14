@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import re
+from http import HTTPStatus
 from typing import Iterable, Pattern
 
 from synapse.api.auth import Auth
@@ -62,4 +63,4 @@ async def assert_user_is_admin(auth: Auth, user_id: UserID) -> None:
     """
     is_admin = await auth.is_server_admin(user_id)
     if not is_admin:
-        raise AuthError(403, "You are not a server admin")
+        raise AuthError(HTTPStatus.FORBIDDEN, "You are not a server admin")
