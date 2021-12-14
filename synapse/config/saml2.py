@@ -275,6 +275,7 @@ class SAML2Config(Config):
             #description: ["My awesome SP", "en"]
             #name: ["Test SP", "en"]
 
+
             # The service section is needed to configure saml2 extensions like `ui_info`,
             # if this might not be enough for your usecase, try looking at the pysaml2 documentation.
             # The documentation is wrong in some places, so if it doesn't work, try shuffeling things around,
@@ -285,9 +286,8 @@ class SAML2Config(Config):
             #
             # By default, the user has to go to our login page first. If you'd like
             # to allow IdP-initiated login, set 'allow_unsolicited: "true"' 
-            # pysaml2 implements the booleans wrong here, the quotes are NEEDED
             #
-            #    allow_unsolicited: "true"
+            #    allow_unsolicited: true
             #
             #     The section below is used to configure what will be visible on the IdP's page.
             #     Note: shiboleth needs the logo to be defined for every language you use or it won't show up.
