@@ -538,7 +538,7 @@ class StatsStore(StateDeltasStore):
 
             txn.execute(
                 """
-                    SELECT COALESCE(count(*), 0) FROM current_state_events
+                    SELECT COUNT(*) FROM current_state_events
                     WHERE room_id = ?
                 """,
                 (room_id,),
