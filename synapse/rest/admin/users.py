@@ -135,6 +135,8 @@ class UserRestServletV2(RestServlet):
     returns:
         200 OK with user details if success otherwise an error.
 
+    THIS ENDPOINT IS DEPRECATED IN FAVOUR OF ITS V3 VARIANT.
+
     Put request to allow an administrator to add or modify a user.
     This needs user to have administrator access in Synapse.
     We use PUT instead of POST since we already know the id of the user
@@ -403,6 +405,38 @@ class UserRestServletV2(RestServlet):
             assert user is not None
 
             return 201, user
+
+
+class UserRestServletV3(UserRestServletV2):
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)$", "v3")
+
+    """Get request to list or update user details.
+
+    This currently only differs from UserRestServletV2 in that it does not return
+    the 'password_hash' field for users.
+    """
+
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        status_code, response_body = await super().on_GET(request, user_id)
+
+        # Remove "password_hash" from the response in v3 of this API
+        if "password_hash" in response_body:
+            del response_body["password_hash"]
+
+        return status_code, response_body
+
+    async def on_PUT(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        status_code, response_body = await super().on_PUT(request, user_id)
+
+        # Remove "password_hash" from the response in v3 of this API
+        if "password_hash" in response_body:
+            del response_body["password_hash"]
+
+        return status_code, response_body
 
 
 class UserRegisterServlet(RestServlet):

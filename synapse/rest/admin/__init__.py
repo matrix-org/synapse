@@ -80,6 +80,7 @@ from synapse.rest.admin.users import (
     UserMembershipRestServlet,
     UserRegisterServlet,
     UserRestServletV2,
+    UserRestServletV3,
     UsersRestServletV2,
     UserTokenRestServlet,
     WhoisRestServlet,
@@ -247,6 +248,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     UserAdminServlet(hs).register(http_server)
     UserMembershipRestServlet(hs).register(http_server)
     UserTokenRestServlet(hs).register(http_server)
+    UserRestServletV3(hs).register(http_server)
     UserRestServletV2(hs).register(http_server)
     UsersRestServletV2(hs).register(http_server)
     DeviceRestServlet(hs).register(http_server)
