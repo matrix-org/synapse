@@ -537,7 +537,7 @@ class PaginationHandler:
                 state_dict = await self.store.get_events(list(state_ids.values()))
                 state = state_dict.values()
 
-        aggregations = await self.store.get_bundled_aggregations(events)
+        aggregations = await self.store.get_bundled_aggregations(events, user_id)
 
         time_now = self.clock.time_msec()
 

@@ -546,7 +546,7 @@ class RelationsWorkerStore(SQLBaseStore):
         )
 
     async def _get_bundled_aggregation_for_event(
-        self, event: EventBase
+        self, event: EventBase, user_id: str
     ) -> Optional[Dict[str, Any]]:
         """Generate bundled aggregations for an event.
 
@@ -554,6 +554,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
         Args:
             event: The event to calculate bundled aggregations for.
+            user_id: The user requesting the bundled aggregations.
 
         Returns:
             The bundled aggregations for an event, if bundled aggregations are
@@ -613,12 +614,15 @@ class RelationsWorkerStore(SQLBaseStore):
         return aggregations
 
     async def get_bundled_aggregations(
-        self, events: Iterable[EventBase]
+        self,
+        events: Iterable[EventBase],
+        user_id: str,
     ) -> Dict[str, Dict[str, Any]]:
         """Generate bundled aggregations for events.
 
         Args:
             events: The iterable of events to calculate bundled aggregations for.
+            user_id: The user requesting the bundled aggregations.
 
         Returns:
             A map of event ID to the bundled aggregation for the event. Not all
@@ -631,7 +635,7 @@ class RelationsWorkerStore(SQLBaseStore):
         # TODO Parallelize.
         results = {}
         for event in events:
-            event_result = await self._get_bundled_aggregation_for_event(event)
+            event_result = await self._get_bundled_aggregation_for_event(event, user_id)
             if event_result is not None:
                 results[event.event_id] = event_result
 
