@@ -41,7 +41,7 @@ class ApplicationServiceState(Enum):
 class Namespace:
     exclusive: bool
     group_id: Optional[str]
-    regex: Pattern
+    regex: Pattern[str]
 
 
 class ApplicationService:
@@ -306,7 +306,7 @@ class ApplicationService:
     def is_exclusive_room(self, room_id: str) -> bool:
         return self._is_exclusive(ApplicationService.NS_ROOMS, room_id)
 
-    def get_exclusive_user_regexes(self) -> List[Pattern]:
+    def get_exclusive_user_regexes(self) -> List[Pattern[str]]:
         """Get the list of regexes used to determine if a user is exclusively
         registered by the AS
         """
