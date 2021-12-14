@@ -1154,6 +1154,13 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             self.assertFalse(self.get_success(d))
 
 
+# Test both v2 and v3 versions of this API
+# TODO: Remove v2 once it is deprecated. Note that this may need to be
+# changed if v3 of the endpoint diverges from v2 significantly
+@parameterized_class(
+    ("endpoint_version",),
+    [("v2",), ("v3",)],
+)
 class UserRestTestCase(unittest.HomeserverTestCase):
 
     servlets = [
@@ -1181,14 +1188,16 @@ class UserRestTestCase(unittest.HomeserverTestCase):
                 self.other_user, device_id=None, valid_until_ms=None
             )
         )
-        self.url_prefix = "/_synapse/admin/v2/users/%s"
+
+        # self.endpoint_version is set by the @parameterized_class decorator above
+        self.url_prefix = f"/_synapse/admin/{self.endpoint_version}/users/%s"
         self.url_other_user = self.url_prefix % self.other_user
 
     def test_requester_is_no_admin(self):
         """
         If the user is not a server admin, an error is returned.
         """
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         channel = self.make_request(
             "GET",
@@ -1216,7 +1225,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "/_synapse/admin/v2/users/@unknown_person:test",
+            self.url_prefix % "@unknown_person:test",
             access_token=self.admin_user_tok,
         )
 
@@ -1337,7 +1346,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
         Check that a new admin user is created successfully.
         """
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         # Create user (server admin)
         body = {
@@ -1386,7 +1395,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
         Check that a new regular user is created successfully.
         """
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         # Create user
         body = {
@@ -1478,7 +1487,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         # Register new user with admin API
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         # Create user
         channel = self.make_request(
@@ -1515,7 +1524,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         # Register new user with admin API
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         # Create user
         channel = self.make_request(
@@ -1545,7 +1554,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         Check that a new regular user is created successfully and
         got an email pusher.
         """
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         # Create user
         body = {
@@ -1588,7 +1597,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         Check that a new regular user is created successfully and
         got not an email pusher.
         """
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         # Create user
         body = {
@@ -2085,10 +2094,14 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["deactivated"])
-        self.assertIsNone(channel.json_body["password_hash"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
         self.assertEqual("mxc://servername/mediaid", channel.json_body["avatar_url"])
         self.assertEqual("User", channel.json_body["displayname"])
+
+        # This key is removed from v3 of the API
+        if self.endpoint_version == "v2":
+            self.assertIsNone(channel.json_body["password_hash"])
+
         # the user is deactivated, the threepid will be deleted
 
         # Get user
@@ -2101,10 +2114,13 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["deactivated"])
-        self.assertIsNone(channel.json_body["password_hash"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
         self.assertEqual("mxc://servername/mediaid", channel.json_body["avatar_url"])
         self.assertEqual("User", channel.json_body["displayname"])
+
+        # Field 'password_hash' has been removed in v3 of this endpoint
+        if self.endpoint_version == "v2":
+            self.assertIsNone(channel.json_body["password_hash"])
 
     @override_config({"user_directory": {"enabled": True, "search_all_users": True}})
     def test_change_name_deactivate_user_user_directory(self):
@@ -2177,8 +2193,11 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["deactivated"])
-        self.assertIsNotNone(channel.json_body["password_hash"])
         self._is_erased("@user:test", False)
+
+        # This key is removed from v3 of the API
+        if self.endpoint_version == "v2":
+            self.assertIsNotNone(channel.json_body["password_hash"])
 
     @override_config({"password_config": {"localdb_enabled": False}})
     def test_reactivate_user_localdb_disabled(self):
@@ -2209,8 +2228,11 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["deactivated"])
-        self.assertIsNone(channel.json_body["password_hash"])
         self._is_erased("@user:test", False)
+
+        # This key is removed from v3 of the API
+        if self.endpoint_version == "v2":
+            self.assertIsNone(channel.json_body["password_hash"])
 
     @override_config({"password_config": {"enabled": False}})
     def test_reactivate_user_password_disabled(self):
@@ -2241,8 +2263,11 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["deactivated"])
-        self.assertIsNone(channel.json_body["password_hash"])
         self._is_erased("@user:test", False)
+
+        # This key is removed from v3 of the API
+        if self.endpoint_version == "v2":
+            self.assertIsNone(channel.json_body["password_hash"])
 
     def test_set_user_as_admin(self):
         """
@@ -2328,7 +2353,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         Ensure an account can't accidentally be deactivated by using a str value
         for the deactivated body parameter
         """
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         # Create user
         channel = self.make_request(
@@ -2392,17 +2417,20 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # Deactivate the user.
         channel = self.make_request(
             "PUT",
-            "/_synapse/admin/v2/users/%s" % urllib.parse.quote(user_id),
+            self.url_prefix % urllib.parse.quote(user_id),
             access_token=self.admin_user_tok,
             content={"deactivated": True},
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertTrue(channel.json_body["deactivated"])
-        self.assertIsNone(channel.json_body["password_hash"])
         self._is_erased(user_id, False)
         d = self.store.mark_user_erased(user_id)
         self.assertIsNone(self.get_success(d))
         self._is_erased(user_id, True)
+
+        # This key is removed from v3 of the API
+        if self.endpoint_version == "v2":
+            self.assertIsNone(channel.json_body["password_hash"])
 
     def _check_fields(self, content: JsonDict):
         """Checks that the expected user attributes are present in content
@@ -2416,12 +2444,17 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertIn("admin", content)
         self.assertIn("deactivated", content)
         self.assertIn("shadow_banned", content)
-        self.assertIn("password_hash", content)
         self.assertIn("creation_ts", content)
         self.assertIn("appservice_id", content)
         self.assertIn("consent_server_notice_sent", content)
         self.assertIn("consent_version", content)
         self.assertIn("external_ids", content)
+
+        # This key is removed from v3 of the API
+        if self.endpoint_version == "v2":
+            self.assertIn("password_hash", content)
+        else:
+            self.assertNotIn("password_hash", content)
 
 
 class UserMembershipRestTestCase(unittest.HomeserverTestCase):
