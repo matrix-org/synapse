@@ -528,6 +528,8 @@ class SyncRestServlet(RestServlet):
                 # overhead for initialsyncs. We need to figure out a way that the
                 # bundling can be done *before* the events are stored in the
                 # SyncResponseCache so that this part can be synchronous.
+                #
+                # Ensure to re-enable the test at tests/rest/client/test_relations.py::RelationsTestCase.test_bundled_aggregations.
                 bundle_aggregations=False,
                 token_id=token_id,
                 event_format=event_formatter,
