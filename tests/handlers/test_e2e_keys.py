@@ -13,14 +13,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import List
 from unittest import mock
+from unittest.mock import patch
 
+from parameterized import parameterized
 from signedjson import key as key, sign as sign
 
 from twisted.internet import defer
 
 from synapse.api.constants import RoomEncryptionAlgorithms
 from synapse.api.errors import Codes, SynapseError
+from synapse.types import JsonDict
 
 from tests import unittest
 
@@ -765,6 +769,8 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         remote_user_id = "@test:other"
         local_user_id = "@test:test"
 
+        # Pretend we're sharing a room with the user we're querying. If not,
+        # `_query_devices_for_destination` will return early.
         self.store.get_rooms_for_user = mock.Mock(
             return_value=defer.succeed({"some_room_id"})
         )
@@ -831,3 +837,61 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
                 }
             },
         )
+
+    @parameterized.expand([
+        ([],),
+        ([{"device_id": "device_1"}, {"device_id": "device_2"}],)
+    ])
+    def test_query_all_devices_caches_result(self, response_devices: List[JsonDict]):
+        """Test that requests for all of a remote user's devices are cached.
+
+        We do this by asserting that only one call over federation was made.
+        """
+        local_user_id = "@test:test"
+        remote_user_id = "@test:other"
+        request_body = {"device_keys": {remote_user_id: []}}
+        response_body = {
+            "devices": response_devices,
+            "user_id": remote_user_id,
+            "stream_id": "remote_stream_id_1234"
+        }
+
+        e2e_handler = self.hs.get_e2e_keys_handler()
+
+        # Pretend we're sharing a room with the user we're querying. If not,
+        # `_query_devices_for_destination` will return early.
+        mock_get_rooms = patch.object(
+            self.store, "get_rooms_for_user", return_value=["some_room_id"]
+        )
+        mock_request = patch.object(
+            self.hs.get_federation_client(),
+            "query_user_devices",
+            return_value=defer.succeed(response_body)
+        )
+
+        with mock_get_rooms, mock_request as mocked_federation_request:
+            # Make the first query.
+            self.get_success(
+                e2e_handler.query_devices(
+                    request_body,
+                    timeout=10,
+                    from_user_id=local_user_id,
+                    from_device_id="some_device_id",
+                )
+            )
+
+            # We should have made a federation request to do so.
+            mocked_federation_request.assert_called_once()
+
+            # Repeat the query.
+            self.get_success(
+                e2e_handler.query_devices(
+                    request_body,
+                    timeout=10,
+                    from_user_id=local_user_id,
+                    from_device_id="some_device_id",
+                )
+            )
+
+            # We should not have made a second federation request.
+            mocked_federation_request.assert_called_once()
