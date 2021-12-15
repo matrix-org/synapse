@@ -87,8 +87,6 @@ REQUIREMENTS = [
     # with the latest security patches.
     "cryptography>=3.4.7",
     "ijson>=3.1",
-    # Used for encrypted push
-    "pycryptodome>=3",
 ]
 
 CONDITIONAL_REQUIREMENTS = {

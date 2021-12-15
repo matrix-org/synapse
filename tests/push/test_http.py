@@ -17,12 +17,12 @@ import json
 from unittest.mock import Mock
 
 import unpaddedbase64
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import unpad
+from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.asymmetric.x25519 import (
     X25519PrivateKey,
     X25519PublicKey,
 )
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from twisted.internet.defer import Deferred
 
@@ -295,10 +295,13 @@ class HTTPPusherTests(HomeserverTestCase):
         mac_key = hmac.new(prk, aes_key + bytes([2]), hashlib.sha256).digest()
         aes_iv = hmac.new(prk, mac_key + bytes([3]), hashlib.sha256).digest()[0:16]
         # create the cleartext with AES-CBC-256
+        decryptor = Cipher(algorithms.AES(aes_key), modes.CBC(aes_iv)).decryptor()
+        # AES blocksize is always 128 bits
+        unpadder = padding.PKCS7(128).unpadder()
         cleartext = json.loads(
-            unpad(
-                AES.new(aes_key, AES.MODE_CBC, aes_iv).decrypt(ciphertext),
-                AES.block_size,
+            (
+                unpadder.update(decryptor.update(ciphertext) + decryptor.finalize())
+                + unpadder.finalize()
             ).decode("utf-8")
         )
         # create the mac
