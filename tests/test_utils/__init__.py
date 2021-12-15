@@ -87,16 +87,6 @@ def setup_awaitable_errors() -> Callable[[], None]:
     return cleanup
 
 
-def simple_async_mock(return_value=None, raises=None) -> Mock:
-    # AsyncMock is not available in python3.5, this mimics part of its behaviour
-    async def cb(*args, **kwargs):
-        if raises:
-            raise raises
-        return return_value
-
-    return Mock(side_effect=cb)
-
-
 @attr.s
 class FakeResponse:
     """A fake twisted.web.IResponse object

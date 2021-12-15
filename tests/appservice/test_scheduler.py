@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from twisted.internet import defer
 
@@ -24,7 +24,6 @@ from synapse.appservice.scheduler import (
 from synapse.logging.context import make_deferred_yieldable
 
 from tests import unittest
-from tests.test_utils import simple_async_mock
 
 from ..utils import MockClock
 
@@ -49,10 +48,12 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         txn = Mock(id=txn_id, service=service, events=events)
 
         # mock methods
-        self.store.get_appservice_state = simple_async_mock(ApplicationServiceState.UP)
-        txn.send = simple_async_mock(True)
-        txn.complete = simple_async_mock(True)
-        self.store.create_appservice_txn = simple_async_mock(txn)
+        self.store.get_appservice_state = AsyncMock(
+            return_value=ApplicationServiceState.UP
+        )
+        txn.send = AsyncMock(return_value=True)
+        txn.complete = AsyncMock(return_value=True)
+        self.store.create_appservice_txn = AsyncMock(return_value=txn)
 
         # actual call
         self.successResultOf(defer.ensureDeferred(self.txnctrl.send(service, events)))
@@ -70,10 +71,10 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         events = [Mock(), Mock()]
 
         txn = Mock(id="idhere", service=service, events=events)
-        self.store.get_appservice_state = simple_async_mock(
-            ApplicationServiceState.DOWN
+        self.store.get_appservice_state = AsyncMock(
+            return_value=ApplicationServiceState.DOWN
         )
-        self.store.create_appservice_txn = simple_async_mock(txn)
+        self.store.create_appservice_txn = AsyncMock(return_value=txn)
 
         # actual call
         self.successResultOf(defer.ensureDeferred(self.txnctrl.send(service, events)))
@@ -93,10 +94,12 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         txn = Mock(id=txn_id, service=service, events=events)
 
         # mock methods
-        self.store.get_appservice_state = simple_async_mock(ApplicationServiceState.UP)
-        self.store.set_appservice_state = simple_async_mock(True)
-        txn.send = simple_async_mock(False)  # fails to send
-        self.store.create_appservice_txn = simple_async_mock(txn)
+        self.store.get_appservice_state = AsyncMock(
+            return_value=ApplicationServiceState.UP
+        )
+        self.store.set_appservice_state = AsyncMock(return_value=True)
+        txn.send = AsyncMock(return_value=False)  # fails to send
+        self.store.create_appservice_txn = AsyncMock(return_value=txn)
 
         # actual call
         self.successResultOf(defer.ensureDeferred(self.txnctrl.send(service, events)))
@@ -119,7 +122,7 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.as_api = Mock()
         self.store = Mock()
         self.service = Mock()
-        self.callback = simple_async_mock()
+        self.callback = AsyncMock()
         self.recoverer = _Recoverer(
             clock=self.clock,
             as_api=self.as_api,
@@ -141,8 +144,8 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.recoverer.recover()
         # shouldn't have called anything prior to waiting for exp backoff
         self.assertEquals(0, self.store.get_oldest_unsent_txn.call_count)
-        txn.send = simple_async_mock(True)
-        txn.complete = simple_async_mock(None)
+        txn.send = AsyncMock(return_value=True)
+        txn.complete = AsyncMock(return_value=None)
         # wait for exp backoff
         self.clock.advance_time(2)
         self.assertEquals(1, txn.send.call_count)
@@ -167,8 +170,8 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
 
         self.recoverer.recover()
         self.assertEquals(0, self.store.get_oldest_unsent_txn.call_count)
-        txn.send = simple_async_mock(False)
-        txn.complete = simple_async_mock(None)
+        txn.send = AsyncMock(return_value=False)
+        txn.complete = AsyncMock(return_value=None)
         self.clock.advance_time(2)
         self.assertEquals(1, txn.send.call_count)
         self.assertEquals(0, txn.complete.call_count)
@@ -181,7 +184,7 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.assertEquals(3, txn.send.call_count)
         self.assertEquals(0, txn.complete.call_count)
         self.assertEquals(0, self.callback.call_count)
-        txn.send = simple_async_mock(True)  # successfully send the txn
+        txn.send = AsyncMock(return_value=True)  # successfully send the txn
         pop_txn = True  # returns the txn the first time, then no more.
         self.clock.advance_time(16)
         self.assertEquals(1, txn.send.call_count)  # new mock reset call count
@@ -192,7 +195,7 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
 class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
     def setUp(self):
         self.txn_ctrl = Mock()
-        self.txn_ctrl.send = simple_async_mock()
+        self.txn_ctrl.send = AsyncMock()
         self.queuer = _ServiceQueuer(self.txn_ctrl, MockClock())
 
     def test_send_single_event_no_queue(self):
