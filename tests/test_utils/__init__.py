@@ -20,7 +20,6 @@ import warnings
 from asyncio import Future
 from binascii import unhexlify
 from typing import Any, Awaitable, Callable, TypeVar
-from unittest.mock import Mock
 
 import attr
 
