@@ -19,6 +19,10 @@ import attr
 from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.logging.opentracing import (
+    start_active_span,
+    start_active_span_follows_from,
+)
 from synapse.util import Clock
 from synapse.util.async_helpers import AbstractObservableDeferred, ObservableDeferred
 from synapse.util.caches import register_cache
@@ -63,6 +67,9 @@ class ResponseCacheEntry:
     completes (rather than switching to an immediate value), since that makes it
     easier to cache Failure results.
     """
+
+    opentracing_span_context: Any
+    """The opentracing span which generated/is generating the result"""
 
 
 class ResponseCache(Generic[KV]):
@@ -117,7 +124,10 @@ class ResponseCache(Generic[KV]):
             return None
 
     def _set(
-        self, context: ResponseCacheContext[KV], deferred: "defer.Deferred[RV]"
+        self,
+        context: ResponseCacheContext[KV],
+        deferred: "defer.Deferred[RV]",
+        opentracing_span_context: Any,
     ) -> ResponseCacheEntry:
         """Set the entry for the given key to the given deferred.
 
@@ -128,13 +138,14 @@ class ResponseCache(Generic[KV]):
         Args:
             context: Information about the cache miss
             deferred: The deferred which resolves to the result.
+            opentracing_span_context: An opentracing span wrapping the calculation
 
         Returns:
             A new deferred which resolves to the actual result.
         """
         result = ObservableDeferred(deferred, consumeErrors=True)
         key = context.cache_key
-        entry = ResponseCacheEntry(result)
+        entry = ResponseCacheEntry(result, opentracing_span_context)
         self._result_cache[key] = entry
 
         def on_complete(r: RV) -> RV:
@@ -208,8 +219,21 @@ class ResponseCache(Generic[KV]):
             context = ResponseCacheContext(cache_key=key)
             if cache_context:
                 kwargs["cache_context"] = context
-            d = run_in_background(callback, *args, **kwargs)
-            entry = self._set(context, d)
+
+            span_context = None
+
+            async def cb() -> RV:
+                # NB it is important that we do not `await` before setting span_context!
+                nonlocal span_context
+                with start_active_span(
+                    f"ResponseCache[{self._name}].calculate"
+                ) as scope:
+                    if scope:
+                        span_context = scope.span.context
+                    return await callback(*args, **kwargs)
+
+            d = run_in_background(cb)
+            entry = self._set(context, d, span_context)
             return await make_deferred_yieldable(entry.result.observe())
 
         result = entry.result.observe()
@@ -219,4 +243,9 @@ class ResponseCache(Generic[KV]):
             logger.info(
                 "[%s]: using incomplete cached result for [%s]", self._name, key
             )
-        return await make_deferred_yieldable(result)
+
+        with start_active_span_follows_from(
+            f"ResponseCache[{self._name}].wait",
+            contexts=[entry.opentracing_span_context],
+        ):
+            return await make_deferred_yieldable(result)
