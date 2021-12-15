@@ -119,9 +119,7 @@ CONDITIONAL_REQUIREMENTS["mypy"] = [
 # Tests assume that all optional dependencies are installed.
 #
 # parameterized_class decorator was introduced in parameterized 0.7.0
-#
-# We use `mock` library as that backports `AsyncMock` to Python 3.6
-CONDITIONAL_REQUIREMENTS["test"] = ["parameterized>=0.7.0", "mock>=4.0.0"]
+CONDITIONAL_REQUIREMENTS["test"] = ["parameterized>=0.7.0"]
 
 CONDITIONAL_REQUIREMENTS["dev"] = (
     CONDITIONAL_REQUIREMENTS["lint"]
