@@ -229,7 +229,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.store.get_user_by_id = simple_async_mock({"is_guest": False})
         self.store.get_user_by_access_token = simple_async_mock(None)
         # This also needs to just return a truth-y value
-        self.store.get_device_opt = simple_async_mock({"hidden": False})
+        self.store.get_device = simple_async_mock({"hidden": False})
 
         request = Mock(args={})
         request.getClientIP.return_value = "127.0.0.1"
@@ -261,7 +261,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.store.get_user_by_id = simple_async_mock({"is_guest": False})
         self.store.get_user_by_access_token = simple_async_mock(None)
         # This also needs to just return a falsey value
-        self.store.get_device_opt = simple_async_mock(None)
+        self.store.get_device = simple_async_mock(None)
 
         request = Mock(args={})
         request.getClientIP.return_value = "127.0.0.1"
