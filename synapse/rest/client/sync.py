@@ -525,21 +525,14 @@ class SyncRestServlet(RestServlet):
             The room, encoded in our response format
         """
 
-        def serialize(events: Iterable[EventBase]) -> Awaitable[List[JsonDict]]:
+        def serialize(
+            events: Iterable[EventBase],
+            aggregations: Optional[Dict[str, Dict[str, Any]]] = None,
+        ) -> Awaitable[List[JsonDict]]:
             return self._event_serializer.serialize_events(
                 events,
                 time_now=time_now,
-                # Don't bother to bundle aggregations if the timeline is unlimited,
-                # as clients will have all the necessary information.
-                # bundle_aggregations=room.timeline.limited,
-                #
-                # richvdh 2021-12-15: disable this temporarily as it has too high an
-                # overhead for initialsyncs. We need to figure out a way that the
-                # bundling can be done *before* the events are stored in the
-                # SyncResponseCache so that this part can be synchronous.
-                #
-                # Ensure to re-enable the test at tests/rest/client/test_relations.py::RelationsTestCase.test_bundled_aggregations.
-                bundle_aggregations=False,
+                bundle_aggregations=aggregations,
                 token_id=token_id,
                 event_format=event_formatter,
                 only_event_fields=only_fields,
@@ -562,7 +555,20 @@ class SyncRestServlet(RestServlet):
                 )
 
         serialized_state = await serialize(state_events)
-        serialized_timeline = await serialize(timeline_events)
+        # Don't bother to bundle aggregations if the timeline is unlimited,
+        # as clients will have all the necessary information.
+        # bundle_aggregations=room.timeline.limited,
+        #
+        # richvdh 2021-12-15: disable this temporarily as it has too high an
+        # overhead for initialsyncs. We need to figure out a way that the
+        # bundling can be done *before* the events are stored in the
+        # SyncResponseCache so that this part can be synchronous.
+        #
+        # Ensure to re-enable the test at tests/rest/client/test_relations.py::RelationsTestCase.test_bundled_aggregations.
+        # if room.timeline.limited:
+        #    aggregations = await self.store.get_bundled_aggregations(timeline_events)
+        aggregations = None
+        serialized_timeline = await serialize(timeline_events, aggregations)
 
         account_data = room.account_data
 
