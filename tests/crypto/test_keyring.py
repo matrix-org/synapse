@@ -22,6 +22,7 @@ import signedjson.sign
 from nacl.signing import SigningKey
 from signedjson.key import encode_verify_key_base64, get_verify_key
 
+from twisted.internet import defer
 from twisted.internet.defer import Deferred, ensureDeferred
 
 from synapse.api.errors import SynapseError
@@ -576,6 +577,76 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             bytes(res["key_json"]), canonicaljson.encode_canonical_json(response)
         )
+
+    def test_get_multiple_keys_from_perspectives(self):
+        """Check that we can correctly request multiple keys for the same server"""
+
+        fetcher = PerspectivesKeyFetcher(self.hs)
+
+        SERVER_NAME = "server2"
+
+        testkey1 = signedjson.key.generate_signing_key("ver1")
+        testverifykey1 = signedjson.key.get_verify_key(testkey1)
+        testverifykey1_id = "ed25519:ver1"
+
+        testkey2 = signedjson.key.generate_signing_key("ver2")
+        testverifykey2 = signedjson.key.get_verify_key(testkey2)
+        testverifykey2_id = "ed25519:ver2"
+
+        VALID_UNTIL_TS = 200 * 1000
+
+        response1 = self.build_perspectives_response(
+            SERVER_NAME,
+            testkey1,
+            VALID_UNTIL_TS,
+        )
+        response2 = self.build_perspectives_response(
+            SERVER_NAME,
+            testkey2,
+            VALID_UNTIL_TS,
+        )
+
+        async def post_json(destination, path, data, **kwargs):
+            self.assertEqual(destination, self.mock_perspective_server.server_name)
+            self.assertEqual(path, "/_matrix/key/v2/query")
+
+            # check that the request is for the expected keys
+            q = data["server_keys"]
+
+            self.assertEqual(
+                list(q[SERVER_NAME].keys()), [testverifykey1_id, testverifykey2_id]
+            )
+            return {"server_keys": [response1, response2]}
+
+        self.http_client.post_json.side_effect = post_json
+
+        # fire off two separate requests; they should get merged together into a
+        # single HTTP hit.
+        request1_d = defer.ensureDeferred(
+            fetcher.get_keys(SERVER_NAME, [testverifykey1_id], 0)
+        )
+        request2_d = defer.ensureDeferred(
+            fetcher.get_keys(SERVER_NAME, [testverifykey2_id], 0)
+        )
+
+        keys1 = self.get_success(request1_d)
+        self.assertIn(testverifykey1_id, keys1)
+        k = keys1[testverifykey1_id]
+        self.assertEqual(k.valid_until_ts, VALID_UNTIL_TS)
+        self.assertEqual(k.verify_key, testverifykey1)
+        self.assertEqual(k.verify_key.alg, "ed25519")
+        self.assertEqual(k.verify_key.version, "ver1")
+
+        keys2 = self.get_success(request2_d)
+        self.assertIn(testverifykey2_id, keys2)
+        k = keys2[testverifykey2_id]
+        self.assertEqual(k.valid_until_ts, VALID_UNTIL_TS)
+        self.assertEqual(k.verify_key, testverifykey2)
+        self.assertEqual(k.verify_key.alg, "ed25519")
+        self.assertEqual(k.verify_key.version, "ver2")
+
+        # finally, ensure that only one request was sent
+        self.assertEqual(self.http_client.post_json.call_count, 1)
 
     def test_get_perspectives_own_key(self):
         """Check that we can get the perspectives server's own keys

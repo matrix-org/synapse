@@ -1,4 +1,5 @@
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +24,7 @@ from typing import Optional, Tuple
 
 from synapse.federation.units import Transaction
 from synapse.logging.utils import log_function
+from synapse.storage.databases.main import DataStore
 from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
@@ -31,7 +33,7 @@ logger = logging.getLogger(__name__)
 class TransactionActions:
     """Defines persistence actions that relate to handling Transactions."""
 
-    def __init__(self, datastore):
+    def __init__(self, datastore: DataStore):
         self.store = datastore
 
     @log_function

@@ -71,7 +71,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
     def test_short_term_login_token_gives_user_id(self):
         token = self.macaroon_generator.generate_short_term_login_token(
-            self.user1, "", 5000
+            self.user1, "", duration_in_ms=5000
         )
         res = self.get_success(self.auth_handler.validate_short_term_login_token(token))
         self.assertEqual(self.user1, res.user_id)
@@ -94,7 +94,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
     def test_short_term_login_token_cannot_replace_user_id(self):
         token = self.macaroon_generator.generate_short_term_login_token(
-            self.user1, "", 5000
+            self.user1, "", duration_in_ms=5000
         )
         macaroon = pymacaroons.Macaroon.deserialize(token)
 
@@ -213,6 +213,6 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
     def _get_macaroon(self):
         token = self.macaroon_generator.generate_short_term_login_token(
-            self.user1, "", 5000
+            self.user1, "", duration_in_ms=5000
         )
         return pymacaroons.Macaroon.deserialize(token)

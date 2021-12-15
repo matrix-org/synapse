@@ -41,7 +41,6 @@ from synapse.http.server import HttpServer, finish_request, respond_with_html
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
-    parse_boolean,
     parse_json_object_from_request,
     parse_string,
 )
@@ -415,7 +414,7 @@ class RegisterRestServlet(RestServlet):
         self.password_policy_handler = hs.get_password_policy_handler()
         self.clock = hs.get_clock()
         self._registration_enabled = self.hs.config.registration.enable_registration
-        self._msc2918_enabled = (
+        self._refresh_tokens_enabled = (
             hs.config.registration.refreshable_access_token_lifetime is not None
         )
 
@@ -441,14 +440,15 @@ class RegisterRestServlet(RestServlet):
                 f"Do not understand membership kind: {kind}",
             )
 
-        if self._msc2918_enabled:
-            # Check if this registration should also issue a refresh token, as
-            # per MSC2918
-            should_issue_refresh_token = parse_boolean(
-                request, name="org.matrix.msc2918.refresh_token", default=False
-            )
-        else:
-            should_issue_refresh_token = False
+        # Check if the clients wishes for this registration to issue a refresh
+        # token.
+        client_requested_refresh_tokens = body.get("refresh_token", False)
+        if not isinstance(client_requested_refresh_tokens, bool):
+            raise SynapseError(400, "`refresh_token` should be true or false.")
+
+        should_issue_refresh_token = (
+            self._refresh_tokens_enabled and client_requested_refresh_tokens
+        )
 
         # Pull out the provided username and do basic sanity checks early since
         # the auth layer will store these in sessions.

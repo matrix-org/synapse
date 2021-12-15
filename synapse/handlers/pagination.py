@@ -412,9 +412,6 @@ class PaginationHandler:
         logger.info(f"[purge room] purging {room_id}, force={force}")
         purge_start = time.time()
         with await self.pagination_lock.write(room_id):
-            # check we know about the room
-            await self.store.get_room_version_id(room_id)
-
             # first check that we have no users in this room
             if not force:
                 joined = await self.store.is_host_joined(room_id, self._server_name)
