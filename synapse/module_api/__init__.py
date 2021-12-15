@@ -882,9 +882,7 @@ class ModuleApi:
 
         # Update the m direct list
         is_direct = content.get("is_direct", None)
-        logger.debug(
-            "InviteAutoAccepter: is_direct is %s", is_direct
-        )
+        logger.debug("InviteAutoAccepter: is_direct is %s", is_direct)
         if is_direct:
             await self._hs.get_room_member_handler().update_m_direct(
                 sender=sender,
