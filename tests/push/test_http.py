@@ -209,6 +209,7 @@ class HTTPPusherTests(HomeserverTestCase):
         self.assertEqual(len(pushers), 1)
         self.assertTrue(pushers[0].last_stream_ordering > last_stream_ordering)
 
+    @override_config({"experimental_features": {"msc3013_enabled": True}})
     def test_sends_encrypted_push(self):
         """
         The HTTP pusher will send an encrypted push message if the pusher

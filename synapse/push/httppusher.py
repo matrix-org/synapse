@@ -123,34 +123,35 @@ class HttpPusher(Pusher):
         self.sanitized_data.update(self.data)
         del self.sanitized_data["url"]
 
-        if "algorithm" not in self.data:
-            self.algorithm = "com.famedly.plain"
-        elif self.data["algorithm"] not in (
-            "com.famedly.plain",
-            "com.famedly.curve25519-aes-sha2",
-        ):
-            raise PusherConfigException(
-                "'algorithm' must be one of 'com.famedly.plain' or 'com.famedly.curve25519-aes-sha2'"
-            )
-        else:
-            self.algorithm = self.data["algorithm"]
-
-        if self.algorithm == "com.famedly.curve25519-aes-sha2":
-            base64_public_key = self.data.get("public_key")
-            if not isinstance(base64_public_key, str):
-                raise PusherConfigException("'public_key' must be a string")
-            try:
-                self.public_key = X25519PublicKey.from_public_bytes(
-                    unpaddedbase64.decode_base64(base64_public_key)
-                )
-            except Exception as e:
-                logger.warning(
-                    "Failed to unpack public key: %s: %s", type(e).__name__, e
-                )
+        if self.hs.config.experimental.msc3013_enabled:
+            if "algorithm" not in self.data:
+                self.algorithm = "com.famedly.plain"
+            elif self.data["algorithm"] not in (
+                "com.famedly.plain",
+                "com.famedly.curve25519-aes-sha2",
+            ):
                 raise PusherConfigException(
-                    "'public_key' must be a valid base64-encoded curve25519 public key"
+                    "'algorithm' must be one of 'com.famedly.plain' or 'com.famedly.curve25519-aes-sha2'"
                 )
-            del self.sanitized_data["public_key"]
+            else:
+                self.algorithm = self.data["algorithm"]
+
+            if self.algorithm == "com.famedly.curve25519-aes-sha2":
+                base64_public_key = self.data.get("public_key")
+                if not isinstance(base64_public_key, str):
+                    raise PusherConfigException("'public_key' must be a string")
+                try:
+                    self.public_key = X25519PublicKey.from_public_bytes(
+                        unpaddedbase64.decode_base64(base64_public_key)
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to unpack public key: %s: %s", type(e).__name__, e
+                    )
+                    raise PusherConfigException(
+                        "'public_key' must be a valid base64-encoded curve25519 public key"
+                    )
+                del self.sanitized_data["public_key"]
 
     def _encrypt_notification_dict(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Called to process a payload according to the algorithm the pusher is
@@ -160,7 +161,10 @@ class HttpPusher(Pusher):
         Args:
             payload: The payload that should be processed
         """
-        if self.algorithm == "com.famedly.curve25519-aes-sha2":
+        if (
+            self.hs.config.experimental.msc3013_enabled
+            and self.algorithm == "com.famedly.curve25519-aes-sha2"
+        ):
             # we have an encrypted pusher, encrypt the payload
             cleartext_notif = payload["notification"]
             devices = cleartext_notif["devices"]
