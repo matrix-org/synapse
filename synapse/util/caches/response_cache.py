@@ -20,7 +20,7 @@ from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.util import Clock
-from synapse.util.async_helpers import ObservableDeferred
+from synapse.util.async_helpers import AbstractObservableDeferred, ObservableDeferred
 from synapse.util.caches import register_cache
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,17 @@ class ResponseCacheContext(Generic[KV]):
     """
 
 
+@attr.s(auto_attribs=True)
+class ResponseCacheEntry:
+    result: AbstractObservableDeferred
+    """The (possibly incomplete) result of the operation.
+
+    Note that we continue to store an ObservableDeferred even after the operation
+    completes (rather than switching to an immediate value), since that makes it
+    easier to cache Failure results.
+    """
+
+
 class ResponseCache(Generic[KV]):
     """
     This caches a deferred response. Until the deferred completes it will be
@@ -63,10 +74,7 @@ class ResponseCache(Generic[KV]):
     """
 
     def __init__(self, clock: Clock, name: str, timeout_ms: float = 0):
-        # This is poorly-named: it includes both complete and incomplete results.
-        # We keep complete results rather than switching to absolute values because
-        # that makes it easier to cache Failure results.
-        self.pending_result_cache: Dict[KV, ObservableDeferred] = {}
+        self._result_cache: Dict[KV, ResponseCacheEntry] = {}
 
         self.clock = clock
         self.timeout_sec = timeout_ms / 1000.0
@@ -75,7 +83,7 @@ class ResponseCache(Generic[KV]):
         self._metrics = register_cache("response_cache", name, self, resizable=False)
 
     def size(self) -> int:
-        return len(self.pending_result_cache)
+        return len(self._result_cache)
 
     def __len__(self) -> int:
         return self.size()
@@ -89,42 +97,33 @@ class ResponseCache(Generic[KV]):
         Note that the returned iterator is not safe in the face of concurrent execution:
         behaviour is undefined if `wrap` is called during iteration.
         """
-        return self.pending_result_cache.keys()
+        return self._result_cache.keys()
 
-    def get(self, key: KV) -> Optional[defer.Deferred]:
+    def _get(self, key: KV) -> Optional[ResponseCacheEntry]:
         """Look up the given key.
 
-        Returns a new Deferred (which also doesn't follow the synapse
-        logcontext rules). You will probably want to make_deferred_yieldable the result.
-
-        If there is no entry for the key, returns None.
-
         Args:
-            key: key to get/set in the cache
+            key: key to get in the cache
 
         Returns:
-            None if there is no entry for this key; otherwise a deferred which
-            resolves to the result.
+            The entry for this key, if any; else None.
         """
-        result = self.pending_result_cache.get(key)
-        if result is not None:
+        entry = self._result_cache.get(key)
+        if entry is not None:
             self._metrics.inc_hits()
-            return result.observe()
+            return entry
         else:
             self._metrics.inc_misses()
             return None
 
     def _set(
         self, context: ResponseCacheContext[KV], deferred: "defer.Deferred[RV]"
-    ) -> "defer.Deferred[RV]":
+    ) -> ResponseCacheEntry:
         """Set the entry for the given key to the given deferred.
 
         *deferred* should run its callbacks in the sentinel logcontext (ie,
         you should wrap normal synapse deferreds with
         synapse.logging.context.run_in_background).
-
-        Returns a new Deferred (which also doesn't follow the synapse logcontext rules).
-        You will probably want to make_deferred_yieldable the result.
 
         Args:
             context: Information about the cache miss
@@ -135,7 +134,8 @@ class ResponseCache(Generic[KV]):
         """
         result = ObservableDeferred(deferred, consumeErrors=True)
         key = context.cache_key
-        self.pending_result_cache[key] = result
+        entry = ResponseCacheEntry(result)
+        self._result_cache[key] = entry
 
         def on_complete(r: RV) -> RV:
             # if this cache has a non-zero timeout, and the callback has not cleared
@@ -143,18 +143,18 @@ class ResponseCache(Generic[KV]):
             # its removal later.
             if self.timeout_sec and context.should_cache:
                 self.clock.call_later(
-                    self.timeout_sec, self.pending_result_cache.pop, key, None
+                    self.timeout_sec, self._result_cache.pop, key, None
                 )
             else:
                 # otherwise, remove the result immediately.
-                self.pending_result_cache.pop(key, None)
+                self._result_cache.pop(key, None)
             return r
 
-        # make sure we do this *after* adding the entry to pending_result_cache,
+        # make sure we do this *after* adding the entry to result_cache,
         # in case the result is already complete (in which case flipping the order would
         # leave us with a stuck entry in the cache).
         result.addBoth(on_complete)
-        return result.observe()
+        return entry
 
     async def wrap(
         self,
@@ -200,8 +200,8 @@ class ResponseCache(Generic[KV]):
         Returns:
             The result of the callback (from the cache, or otherwise)
         """
-        result = self.get(key)
-        if not result:
+        entry = self._get(key)
+        if not entry:
             logger.debug(
                 "[%s]: no cached result for [%s], calculating new one", self._name, key
             )
@@ -209,8 +209,11 @@ class ResponseCache(Generic[KV]):
             if cache_context:
                 kwargs["cache_context"] = context
             d = run_in_background(callback, *args, **kwargs)
-            result = self._set(context, d)
-        elif not isinstance(result, defer.Deferred) or result.called:
+            entry = self._set(context, d)
+            return await make_deferred_yieldable(entry.result.observe())
+
+        result = entry.result.observe()
+        if result.called:
             logger.info("[%s]: using completed cached result for [%s]", self._name, key)
         else:
             logger.info(
