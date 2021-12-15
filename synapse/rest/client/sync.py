@@ -17,7 +17,6 @@ from collections import defaultdict
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
     Callable,
     Dict,
     Iterable,
@@ -395,7 +394,7 @@ class SyncRestServlet(RestServlet):
         """
         invited = {}
         for room in rooms:
-            invite = await self._event_serializer.serialize_event(
+            invite = self._event_serializer.serialize_event(
                 room.invite,
                 time_now,
                 token_id=token_id,
@@ -432,7 +431,7 @@ class SyncRestServlet(RestServlet):
         """
         knocked = {}
         for room in rooms:
-            knock = await self._event_serializer.serialize_event(
+            knock = self._event_serializer.serialize_event(
                 room.knock,
                 time_now,
                 token_id=token_id,
@@ -528,7 +527,7 @@ class SyncRestServlet(RestServlet):
         def serialize(
             events: Iterable[EventBase],
             aggregations: Optional[Dict[str, Dict[str, Any]]] = None,
-        ) -> Awaitable[List[JsonDict]]:
+        ) -> List[JsonDict]:
             return self._event_serializer.serialize_events(
                 events,
                 time_now=time_now,
@@ -554,7 +553,7 @@ class SyncRestServlet(RestServlet):
                     event.room_id,
                 )
 
-        serialized_state = await serialize(state_events)
+        serialized_state = serialize(state_events)
         # Don't bother to bundle aggregations if the timeline is unlimited,
         # as clients will have all the necessary information.
         # bundle_aggregations=room.timeline.limited,
@@ -568,7 +567,7 @@ class SyncRestServlet(RestServlet):
         # if room.timeline.limited:
         #    aggregations = await self.store.get_bundled_aggregations(timeline_events)
         aggregations = None
-        serialized_timeline = await serialize(timeline_events, aggregations)
+        serialized_timeline = serialize(timeline_events, aggregations)
 
         account_data = room.account_data
 
