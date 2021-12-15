@@ -55,6 +55,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.types import Connection, Cursor
+from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -1680,7 +1681,7 @@ class DatabasePool:
         self,
         table: str,
         column: str,
-        iterable: Collection[Any],
+        iterable: Iterable[Any],
         retcols: Collection[str],
         keyvalues: Optional[Dict[str, Any]] = None,
         desc: str = "simple_select_many_batch",
@@ -1704,16 +1705,7 @@ class DatabasePool:
 
         results: List[Dict[str, Any]] = []
 
-        if not iterable:
-            return results
-
-        # iterables can not be sliced, so convert it to a list first
-        it_list = list(iterable)
-
-        chunks = [
-            it_list[i : i + batch_size] for i in range(0, len(it_list), batch_size)
-        ]
-        for chunk in chunks:
+        for chunk in batch_iter(iterable, batch_size):
             rows = await self.runInteraction(
                 desc,
                 self.simple_select_many_txn,

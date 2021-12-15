@@ -96,7 +96,7 @@ async def filter_events_for_client(
         if isinstance(ignored_users_dict, dict):
             ignore_list = frozenset(ignored_users_dict.keys())
 
-    erased_senders = await storage.main.are_users_erased([e.sender for e in events])
+    erased_senders = await storage.main.are_users_erased(e.sender for e in events)
 
     if filter_send_to_client:
         room_ids = {e.room_id for e in events}
