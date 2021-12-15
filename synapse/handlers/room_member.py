@@ -505,37 +505,47 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
     async def update_m_direct(
         self,
-        target: UserID,
+        sender: str,
+        target: str,
         room_id: str,
     ) -> None:
         """Update a user's m_direct list.
 
         Params:
+            sender: The user who sent the invite, used as the key to update the list.
             target: The user whose user's m_direct list is being updated.
             room_id: The room ID which is being added to the list.
         """
+
         logger.debug(
-            "InviteAutoAccepter: update_m_direct is triggered %s", room_id
+            "InviteAutoAccepter: update_m_direct is triggered with room id: %s, sender user id: %s, target user id: %s",
+            room_id,
+            sender,
+            target,
         )
 
         # Retrieve user account data
-        user_account_data, _ = await self.store.get_account_data_for_user(target.to_string())
+        user_account_data, _ = await self.store.get_account_data_for_user(target)
 
         # Retrieve m direct list
         direct_rooms = user_account_data.get(AccountDataTypes.DIRECT, {})
 
         # Check which key this room is under
         if isinstance(direct_rooms, dict):
-            for key, room_id_list in direct_rooms.items():
-                if room_id not in room_id_list:
+            m_list_changed = False
+            if sender in direct_rooms:
+                if room_id not in direct_rooms[sender]:
                     # Add new room_id to this key
-                    direct_rooms[key].append(room_id)
-
-                    # Save back to user's m.direct account data
-                    await self.account_data_handler.add_account_data_for_user(
-                        target.to_string(), AccountDataTypes.DIRECT, direct_rooms
-                    )
-                    break
+                    direct_rooms[sender].append(room_id)
+                    m_list_changed = True
+            else:
+                direct_rooms[sender] = [room_id]
+                m_list_changed = True
+            if m_list_changed:
+                # Save back to user's m.direct account data
+                await self.account_data_handler.add_account_data_for_user(
+                    target, AccountDataTypes.DIRECT, direct_rooms
+                )
 
     async def update_membership_locked(
         self,

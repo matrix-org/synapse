@@ -887,7 +887,8 @@ class ModuleApi:
         )
         if is_direct:
             await self._hs.get_room_member_handler().update_m_direct(
-                target=target_user_id,
+                sender=sender,
+                target=target,
                 room_id=room_id,
             )
 
