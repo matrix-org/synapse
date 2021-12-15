@@ -25,6 +25,7 @@ from zope.interface import implementer
 from twisted.internet import defer
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
 from twisted.internet.interfaces import (
+    IProtocol,
     IProtocolFactory,
     IReactorCore,
     IStreamClientEndpoint,
@@ -309,12 +310,14 @@ class MatrixHostnameEndpoint:
 
         self._srv_resolver = srv_resolver
 
-    def connect(self, protocol_factory: IProtocolFactory) -> defer.Deferred:
+    def connect(
+        self, protocol_factory: IProtocolFactory
+    ) -> "defer.Deferred[IProtocol]":
         """Implements IStreamClientEndpoint interface"""
 
         return run_in_background(self._do_connect, protocol_factory)
 
-    async def _do_connect(self, protocol_factory: IProtocolFactory) -> None:
+    async def _do_connect(self, protocol_factory: IProtocolFactory) -> IProtocol:
         first_exception = None
 
         server_list = await self._resolve_server()
