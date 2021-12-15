@@ -93,8 +93,8 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc3026.busy_presence": self.config.experimental.msc3026_enabled,
                     # Supports receiving hidden read receipts as per MSC2285
                     "org.matrix.msc2285": self.config.experimental.msc2285_enabled,
-                    # Adds support for encrypted push
-                    "com.famedly.msc3013": True,
+                    # Adds support for encrypted push as per MSC3013
+                    "com.famedly.msc3013": self.config.experimental.msc3013_enabled,
                 },
             },
         )
