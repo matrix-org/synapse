@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 import attr
 
@@ -55,6 +55,13 @@ class HttpPushAction:
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class EmailPushAction(HttpPushAction):
     received_ts: Optional[int]
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class UserPushAction(EmailPushAction):
+    topological_ordering: int
+    highlight: bool
+    profile_tag: str
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -973,8 +980,10 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         before: Optional[str] = None,
         limit: int = 50,
         only_highlight: bool = False,
-    ) -> List[Dict[str, Any]]:
-        def f(txn: LoggingTransaction) -> List[Dict[str, Any]]:
+    ) -> List[UserPushAction]:
+        def f(
+            txn: LoggingTransaction,
+        ) -> List[Tuple[str, str, int, int, str, bool, str, int]]:
             before_clause = ""
             if before:
                 before_clause = "AND epa.stream_ordering < ?"
@@ -1001,12 +1010,22 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
                 " LIMIT ?" % (before_clause,)
             )
             txn.execute(sql, args)
-            return self.db_pool.cursor_to_dict(txn)
+            return txn.fetchall()  # type: ignore[return-value]
 
         push_actions = await self.db_pool.runInteraction("get_push_actions_for_user", f)
-        for pa in push_actions:
-            pa["actions"] = _deserialize_action(pa["actions"], pa["highlight"])
-        return push_actions
+        return [
+            UserPushAction(
+                event_id=row[0],
+                room_id=row[1],
+                stream_ordering=row[2],
+                actions=_deserialize_action(row[4], row[5]),
+                received_ts=row[7],
+                topological_ordering=row[3],
+                highlight=row[5],
+                profile_tag=row[6],
+            )
+            for row in push_actions
+        ]
 
 
 def _action_has_highlight(actions: List[Union[dict, str]]) -> bool:
