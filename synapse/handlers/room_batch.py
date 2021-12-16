@@ -182,7 +182,7 @@ class RoomBatchHandler:
         # bunch of `@mxid joined the room` noise between each batch
         prev_event_ids_for_state_chain: List[str] = []
 
-        for state_event in state_events_at_start:
+        for index, state_event in enumerate(state_events_at_start):
             assert_params_in_dict(
                 state_event, ["type", "origin_server_ts", "content", "sender"]
             )
@@ -218,6 +218,9 @@ class RoomBatchHandler:
                     content=event_dict["content"],
                     outlier=True,
                     historical=True,
+                    # Only the first even in the chain should be floating.
+                    # The rest should hang off each other in a chain.
+                    allow_no_prev_events=index == 0,
                     prev_event_ids=prev_event_ids_for_state_chain,
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
@@ -238,6 +241,9 @@ class RoomBatchHandler:
                     event_dict,
                     outlier=True,
                     historical=True,
+                    # Only the first even in the chain should be floating.
+                    # The rest should hang off each other in a chain.
+                    allow_no_prev_events=index == 0,
                     prev_event_ids=prev_event_ids_for_state_chain,
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
