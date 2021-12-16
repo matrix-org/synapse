@@ -184,8 +184,8 @@ class FederationEventHandler:
 
         # Strip any unauthorized unsigned values if they exist
         event_dict = pdu.get_dict()
-        if pdu.unsigned and "unsigned" in event_dict and event_dict["unsigned"] != {}:
-            pdu = self.strip_unsigned_values(pdu, event_dict)
+        if "unsigned" in event_dict and event_dict["unsigned"] != {}:
+            pdu = self._strip_unsigned_values(pdu, event_dict)
 
         # If we are currently in the process of joining this room, then we
         # queue up events for later processing.
@@ -333,8 +333,8 @@ class FederationEventHandler:
 
         # Strip any unauthorized unsigned values if they exist
         event_dict = event.get_dict()
-        if event.unsigned and "unsigned" in event_dict and event_dict["unsigned"] != {}:
-            event = self.strip_unsigned_values(event, event_dict)
+        if "unsigned" in event_dict and event_dict["unsigned"] != {}:
+            event = self._strip_unsigned_values(event, event_dict)
 
         # Send this event on behalf of the other server.
         #
@@ -1951,14 +1951,15 @@ class FederationEventHandler:
             )
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Too many auth_events")
 
-    def strip_unsigned_values(
+    def _strip_unsigned_values(
         self, pdu: EventBase, event_dict: Dict[str, Any]
     ) -> EventBase:
         """
         Strip any unsigned values unless specifically allowed, as defined by the whitelist.
 
         pdu: the event to strip values from
-        event_dict: a dict of values derived from the pdu
+        event_dict: a dict of values derived from the pdu (note that this dict is mutated
+        by this function)
         """
         unsigned = event_dict["unsigned"]
 
