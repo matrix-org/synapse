@@ -59,7 +59,8 @@ class EmailPushAction(HttpPushAction):
     received_ts: Optional[int]
 
 
-class NotifCounts(TypedDict):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class NotifCounts:
     notify_count: int
     unread_count: int
     highlight_count: int
@@ -230,11 +231,11 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 # for this row.
                 unread_count += row[1]
 
-        return {
-            "notify_count": notif_count,
-            "unread_count": unread_count,
-            "highlight_count": highlight_count,
-        }
+        return NotifCounts(
+            notify_count=notif_count,
+            unread_count=unread_count,
+            highlight_count=highlight_count,
+        )
 
     async def get_push_action_users_in_range(
         self, min_stream_ordering: int, max_stream_ordering: int
