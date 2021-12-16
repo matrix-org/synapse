@@ -87,7 +87,7 @@ jobs:
           # Oldest Python with PostgreSQL
           - python-version: "3.7"
             database: "postgres"
-            postgres-version: "9.10"
+            postgres-version: "10"
             toxenv: "py"
 
           # Newest Python with newest PostgreSQL
@@ -292,7 +292,7 @@ jobs:
       matrix:
         include:
           - python-version: "3.7"
-            postgres-version: "9.10"
+            postgres-version: "10"
 
           - python-version: "3.10"
             postgres-version: "14"
