@@ -218,7 +218,7 @@ class RoomBatchHandler:
                     content=event_dict["content"],
                     outlier=True,
                     historical=True,
-                    # Only the first even in the chain should be floating.
+                    # Only the first event in the chain should be floating.
                     # The rest should hang off each other in a chain.
                     allow_no_prev_events=index == 0,
                     prev_event_ids=prev_event_ids_for_state_chain,
@@ -241,7 +241,7 @@ class RoomBatchHandler:
                     event_dict,
                     outlier=True,
                     historical=True,
-                    # Only the first even in the chain should be floating.
+                    # Only the first event in the chain should be floating.
                     # The rest should hang off each other in a chain.
                     allow_no_prev_events=index == 0,
                     prev_event_ids=prev_event_ids_for_state_chain,
@@ -263,7 +263,6 @@ class RoomBatchHandler:
         self,
         events_to_create: List[JsonDict],
         room_id: str,
-        initial_prev_event_ids: List[str],
         inherited_depth: int,
         auth_event_ids: List[str],
         app_service_requester: Requester,
@@ -279,9 +278,6 @@ class RoomBatchHandler:
             events_to_create: List of historical events to create in JSON
                 dictionary format.
             room_id: Room where you want the events persisted in.
-            initial_prev_event_ids: These will be the prev_events for the first
-                event created. Each event created afterwards will point to the
-                previous event created.
             inherited_depth: The depth to create the events at (you will
                 probably by calling inherit_depth_from_prev_ids(...)).
             auth_event_ids: Define which events allow you to create the given
@@ -293,11 +289,13 @@ class RoomBatchHandler:
         """
         assert app_service_requester.app_service
 
-        prev_event_ids = initial_prev_event_ids.copy()
+        # Make the historical event chain float off on its own which causes the
+        # HS to ask for the state at the start of the batch later.
+        prev_event_ids: List[str] = []
 
         event_ids = []
         events_to_persist = []
-        for ev in events_to_create:
+        for index, ev in enumerate(events_to_create):
             assert_params_in_dict(ev, ["type", "origin_server_ts", "content", "sender"])
 
             assert self.hs.is_mine_id(ev["sender"]), "User must be our own: %s" % (
@@ -321,6 +319,9 @@ class RoomBatchHandler:
                     ev["sender"], app_service_requester.app_service
                 ),
                 event_dict,
+                # Only the first event in the chain should be floating.
+                # The rest should hang off each other in a chain.
+                allow_no_prev_events=index == 0,
                 prev_event_ids=event_dict.get("prev_events"),
                 auth_event_ids=auth_event_ids,
                 historical=True,
@@ -372,7 +373,6 @@ class RoomBatchHandler:
         events_to_create: List[JsonDict],
         room_id: str,
         batch_id_to_connect_to: str,
-        initial_prev_event_ids: List[str],
         inherited_depth: int,
         auth_event_ids: List[str],
         app_service_requester: Requester,
@@ -387,9 +387,6 @@ class RoomBatchHandler:
             room_id: Room where you want the events created in.
             batch_id_to_connect_to: The batch_id from the insertion event you
                 want this batch to connect to.
-            initial_prev_event_ids: These will be the prev_events for the first
-                event created. Each event created afterwards will point to the
-                previous event created.
             inherited_depth: The depth to create the events at (you will
                 probably by calling inherit_depth_from_prev_ids(...)).
             auth_event_ids: Define which events allow you to create the given
@@ -438,7 +435,6 @@ class RoomBatchHandler:
         event_ids = await self.persist_historical_events(
             events_to_create=events_to_create,
             room_id=room_id,
-            initial_prev_event_ids=initial_prev_event_ids,
             inherited_depth=inherited_depth,
             auth_event_ids=auth_event_ids,
             app_service_requester=app_service_requester,
