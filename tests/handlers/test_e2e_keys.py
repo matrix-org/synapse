@@ -838,10 +838,9 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             },
         )
 
-    @parameterized.expand([
-        ([],),
-        ([{"device_id": "device_1"}, {"device_id": "device_2"}],)
-    ])
+    @parameterized.expand(
+        [([],), ([{"device_id": "device_1"}, {"device_id": "device_2"}],)]
+    )
     def test_query_all_devices_caches_result(self, response_devices: List[JsonDict]):
         """Test that requests for all of a remote user's devices are cached.
 
@@ -853,7 +852,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         response_body = {
             "devices": response_devices,
             "user_id": remote_user_id,
-            "stream_id": "remote_stream_id_1234"
+            "stream_id": "remote_stream_id_1234",
         }
 
         e2e_handler = self.hs.get_e2e_keys_handler()
@@ -866,7 +865,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         mock_request = patch.object(
             self.hs.get_federation_client(),
             "query_user_devices",
-            return_value=defer.succeed(response_body)
+            return_value=defer.succeed(response_body),
         )
 
         with mock_get_rooms, mock_request as mocked_federation_request:
