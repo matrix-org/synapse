@@ -860,7 +860,9 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         # Pretend we're sharing a room with the user we're querying. If not,
         # `_query_devices_for_destination` will return early.
         mock_get_rooms = patch.object(
-            self.store, "get_rooms_for_user", return_value=["some_room_id"]
+            self.store,
+            "get_rooms_for_user",
+            return_value=defer.succeed(["some_room_id"]),
         )
         mock_request = patch.object(
             self.hs.get_federation_client(),
