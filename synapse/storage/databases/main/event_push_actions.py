@@ -13,10 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import attr
-from typing_extensions import TypedDict
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -45,16 +44,15 @@ DEFAULT_HIGHLIGHT_ACTION: List[Union[dict, str]] = [
 ]
 
 
-class BasePushAction(TypedDict):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class HttpPushAction:
     event_id: str
+    room_id: str
+    stream_ordering: int
     actions: List[Union[dict, str]]
 
 
-class HttpPushAction(BasePushAction):
-    room_id: str
-    stream_ordering: int
-
-
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class EmailPushAction(HttpPushAction):
     received_ts: Optional[int]
 
@@ -340,14 +338,11 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         )
 
         notifs = [
-            cast(
-                HttpPushAction,
-                {
-                    "event_id": row[0],
-                    "room_id": row[1],
-                    "stream_ordering": row[2],
-                    "actions": _deserialize_action(row[3], row[4]),
-                },
+            HttpPushAction(
+                event_id=row[0],
+                room_id=row[1],
+                stream_ordering=row[2],
+                actions=_deserialize_action(row[3], row[4]),
             )
             for row in after_read_receipt + no_read_receipt
         ]
@@ -356,7 +351,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         # contain results from the first query, correctly ordered, followed
         # by results from the second query, but we want them all ordered
         # by stream_ordering, oldest first.
-        notifs.sort(key=lambda r: r["stream_ordering"])
+        notifs.sort(key=lambda r: r.stream_ordering)
 
         # Take only up to the limit. We have to stop at the limit because
         # one of the subqueries may have hit the limit.
@@ -452,15 +447,12 @@ class EventPushActionsWorkerStore(SQLBaseStore):
 
         # Make a list of dicts from the two sets of results.
         notifs = [
-            cast(
-                EmailPushAction,
-                {
-                    "event_id": row[0],
-                    "room_id": row[1],
-                    "stream_ordering": row[2],
-                    "actions": _deserialize_action(row[3], row[4]),
-                    "received_ts": row[5],
-                },
+            EmailPushAction(
+                event_id=row[0],
+                room_id=row[1],
+                stream_ordering=row[2],
+                actions=_deserialize_action(row[3], row[4]),
+                received_ts=row[5],
             )
             for row in after_read_receipt + no_read_receipt
         ]
@@ -469,7 +461,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         # contain results from the first query, correctly ordered, followed
         # by results from the second query, but we want them all ordered
         # by received_ts (most recent first)
-        notifs.sort(key=lambda r: -(r["received_ts"] or 0))
+        notifs.sort(key=lambda r: -(r.received_ts or 0))
 
         # Now return the first `limit`
         return notifs[:limit]
