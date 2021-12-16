@@ -184,9 +184,13 @@ class DeviceMessageHandler:
             )
             return
 
-        # If we are tracking check that we know about the sending
-        # devices.
+        # If we are tracking, check that we know about the sending devices.
         cached_devices = await self.store.get_cached_devices_for_user(sender_user_id)
+        if cached_devices is None:
+            # This means we've never requested details of the remote user's devices.
+            # Odd, given that we're processing an update for the devices---but carry on
+            # as if we've not heard of the device.
+            cached_devices = {}
 
         unknown_devices = requesting_device_ids - set(cached_devices)
         if unknown_devices:
