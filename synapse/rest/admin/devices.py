@@ -63,6 +63,8 @@ class DeviceRestServlet(RestServlet):
         device = await self.device_handler.get_device(
             target_user.to_string(), device_id
         )
+        if device is None:
+            raise NotFoundError("No device found")
         return HTTPStatus.OK, device
 
     async def on_DELETE(

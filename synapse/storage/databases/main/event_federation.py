@@ -34,7 +34,11 @@ from synapse.api.room_versions import EventFormatVersions, RoomVersion
 from synapse.events import EventBase, make_event_from_dict
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
-from synapse.storage.database import DatabasePool, LoggingTransaction
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
 from synapse.storage.engines import PostgresEngine
@@ -80,7 +84,12 @@ class _NoChainCoverIndex(Exception):
 
 
 class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
         self.hs = hs
@@ -1504,7 +1513,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         count = await self.db_pool.simple_select_one_onecol(
             table="federation_inbound_events_staging",
             keyvalues={"room_id": room_id},
-            retcol="COALESCE(COUNT(*), 0)",
+            retcol="COUNT(*)",
             desc="prune_staged_events_in_room_count",
         )
 
@@ -1596,9 +1605,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         """Update the prometheus metrics for the inbound federation staging area."""
 
         def _get_stats_for_federation_staging_txn(txn):
-            txn.execute(
-                "SELECT coalesce(count(*), 0) FROM federation_inbound_events_staging"
-            )
+            txn.execute("SELECT count(*) FROM federation_inbound_events_staging")
             (count,) = txn.fetchone()
 
             txn.execute(
@@ -1634,7 +1641,12 @@ class EventFederationStore(EventFederationWorkerStore):
 
     EVENT_AUTH_STATE_ONLY = "event_auth_state_only"
 
-    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
         self.db_pool.updates.register_background_update_handler(
