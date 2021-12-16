@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import logging
-from collections import namedtuple
 from enum import Enum
 from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple, cast
 
