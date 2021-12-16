@@ -1,0 +1,1 @@
+Drop EOL python 3.6 and postgres 9.6 from CI.
