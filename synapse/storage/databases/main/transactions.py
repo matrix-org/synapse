@@ -559,3 +559,13 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
         return await self.db_pool.runInteraction(
             "get_destinations_paginate_txn", get_destinations_paginate_txn
         )
+
+    async def is_destination(self, destination: str) -> Optional[bool]:
+        """Function to check if a destination is a destination of this server."""
+        return await self.db_pool.simple_select_one_onecol(
+            table="destinations",
+            keyvalues={"destination": destination},
+            retcol="1",
+            allow_none=True,
+            desc="is_destination",
+        )

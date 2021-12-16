@@ -19,7 +19,10 @@ from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
-from synapse.storage.databases.main.transactions import DestinationSortOrder
+from synapse.storage.databases.main.transactions import (
+    DestinationRetryTimings,
+    DestinationSortOrder,
+)
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -111,12 +114,17 @@ class DestinationsRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self._auth, request)
 
+        if not await self._store.is_destination(destination):
+            raise NotFoundError("Unknown destination")
+
         destination_retry_timings = await self._store.get_destination_retry_timings(
             destination
         )
 
-        if not destination_retry_timings:
-            raise NotFoundError("Unknown destination")
+        if destination_retry_timings is None:
+            destination_retry_timings = DestinationRetryTimings(
+                failure_ts=None, retry_last_ts=0, retry_interval=0
+            )
 
         last_successful_stream_ordering = (
             await self._store.get_destination_last_successful_stream_ordering(
