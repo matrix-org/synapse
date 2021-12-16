@@ -1,0 +1,1 @@
+Fix an error to get federation status of a destination server even if no error has occurred.
