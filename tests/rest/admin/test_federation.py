@@ -464,11 +464,12 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 destination, failure_ts, retry_last_ts, retry_interval
             )
         )
-        self.get_success(
-            self.store.set_destination_last_successful_stream_ordering(
-                destination, last_successful_stream_ordering
+        if last_successful_stream_ordering is not None:
+            self.get_success(
+                self.store.set_destination_last_successful_stream_ordering(
+                    destination, last_successful_stream_ordering
+                )
             )
-        )
 
     def _create_destinations(self, number_destinations: int) -> None:
         """Create a number of destinations

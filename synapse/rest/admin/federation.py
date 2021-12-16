@@ -19,10 +19,7 @@ from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
-from synapse.storage.databases.main.transactions import (
-    DestinationRetryTimings,
-    DestinationSortOrder,
-)
+from synapse.storage.databases.main.transactions import DestinationSortOrder
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -121,10 +118,19 @@ class DestinationsRestServlet(RestServlet):
             destination
         )
 
-        if destination_retry_timings is None:
-            destination_retry_timings = DestinationRetryTimings(
-                failure_ts=None, retry_last_ts=0, retry_interval=0
-            )
+        retry_timing_respone: JsonDict = {}
+        if destination_retry_timings:
+            retry_timing_respone = {
+                "failure_ts": destination_retry_timings.failure_ts,
+                "retry_last_ts": destination_retry_timings.retry_last_ts,
+                "retry_interval": destination_retry_timings.retry_interval,
+            }
+        else:
+            retry_timing_respone = {
+                "failure_ts": None,
+                "retry_last_ts": 0,
+                "retry_interval": 0,
+            }
 
         last_successful_stream_ordering = (
             await self._store.get_destination_last_successful_stream_ordering(
@@ -134,10 +140,8 @@ class DestinationsRestServlet(RestServlet):
 
         response = {
             "destination": destination,
-            "failure_ts": destination_retry_timings.failure_ts,
-            "retry_last_ts": destination_retry_timings.retry_last_ts,
-            "retry_interval": destination_retry_timings.retry_interval,
             "last_successful_stream_ordering": last_successful_stream_ordering,
+            **retry_timing_respone,
         }
 
         return HTTPStatus.OK, response
