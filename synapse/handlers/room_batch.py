@@ -178,8 +178,9 @@ class RoomBatchHandler:
         state_event_ids_at_start = []
         auth_event_ids = initial_auth_event_ids.copy()
 
-        # Make the state events float off on their own so we don't have a
-        # bunch of `@mxid joined the room` noise between each batch
+        # Make the state events float off on their own by specifying no
+        # prev_events for the first one in the chain so we don't have a bunch of
+        # `@mxid joined the room` noise between each batch.
         prev_event_ids_for_state_chain: List[str] = []
 
         for index, state_event in enumerate(state_events_at_start):
@@ -289,8 +290,9 @@ class RoomBatchHandler:
         """
         assert app_service_requester.app_service
 
-        # Make the historical event chain float off on its own which causes the
-        # HS to ask for the state at the start of the batch later.
+        # Make the historical event chain float off on its own by specifying no
+        # prev_events for the first event in the chain which causes the HS to
+        # ask for the state at the start of the batch later.
         prev_event_ids: List[str] = []
 
         event_ids = []
