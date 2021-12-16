@@ -1165,24 +1165,25 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 allow_none=True,
             )
 
-            logger.debug(
-                "_get_backfill_events(room_id=%s): seed_event_id=%s depth=%s stream_ordering=%s type=%s",
-                room_id,
-                seed_event_id,
-                event_lookup_result["depth"],
-                event_lookup_result["stream_ordering"],
-                event_lookup_result["type"],
-            )
-
-            if event_lookup_result["depth"]:
-                queue.put(
-                    (
-                        -event_lookup_result["depth"],
-                        -event_lookup_result["stream_ordering"],
-                        seed_event_id,
-                        event_lookup_result["type"],
-                    )
+            if event_lookup_result is not None:
+                logger.debug(
+                    "_get_backfill_events(room_id=%s): seed_event_id=%s depth=%s stream_ordering=%s type=%s",
+                    room_id,
+                    seed_event_id,
+                    event_lookup_result["depth"],
+                    event_lookup_result["stream_ordering"],
+                    event_lookup_result["type"],
                 )
+
+                if event_lookup_result["depth"]:
+                    queue.put(
+                        (
+                            -event_lookup_result["depth"],
+                            -event_lookup_result["stream_ordering"],
+                            seed_event_id,
+                            event_lookup_result["type"],
+                        )
+                    )
 
         while not queue.empty() and len(event_id_results) < limit:
             try:
