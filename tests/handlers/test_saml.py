@@ -13,12 +13,13 @@
 #  limitations under the License.
 
 from typing import Optional
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock
 
 import attr
 
 from synapse.api.errors import RedirectException
 
+from tests.test_utils import simple_async_mock
 from tests.unittest import HomeserverTestCase, override_config
 
 # Check if we have the dependencies to run the tests.
@@ -118,7 +119,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()
+        auth_handler.complete_sso_login = simple_async_mock()
 
         # send a mocked-up SAML response to the callback
         saml_response = FakeAuthnResponse({"uid": "test_user", "username": "test_user"})
@@ -148,7 +149,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()
+        auth_handler.complete_sso_login = simple_async_mock()
 
         # Map a user via SSO.
         saml_response = FakeAuthnResponse(
@@ -190,7 +191,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()
+        auth_handler.complete_sso_login = simple_async_mock()
 
         # mock out the error renderer too
         sso_handler = self.hs.get_sso_handler()
@@ -211,7 +212,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler and error renderer
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()
+        auth_handler.complete_sso_login = simple_async_mock()
         sso_handler = self.hs.get_sso_handler()
         sso_handler.render_error = Mock(return_value=None)
 
@@ -296,7 +297,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
 
         # stub out the auth handler
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()
+        auth_handler.complete_sso_login = simple_async_mock()
 
         # The response doesn't have the proper userGroup or department.
         saml_response = FakeAuthnResponse({"uid": "test_user", "username": "test_user"})

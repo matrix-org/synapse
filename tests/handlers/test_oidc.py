@@ -13,7 +13,7 @@
 # limitations under the License.
 import json
 import os
-from unittest.mock import ANY, AsyncMock, Mock, patch
+from unittest.mock import ANY, Mock, patch
 from urllib.parse import parse_qs, urlparse
 
 import pymacaroons
@@ -23,7 +23,7 @@ from synapse.server import HomeServer
 from synapse.types import UserID
 from synapse.util.macaroons import get_value_from_macaroon
 
-from tests.test_utils import FakeResponse, get_awaitable_result
+from tests.test_utils import FakeResponse, get_awaitable_result, simple_async_mock
 from tests.unittest import HomeserverTestCase, override_config
 
 try:
@@ -428,11 +428,11 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "username": username,
         }
         expected_user_id = "@%s:%s" % (username, self.hs.hostname)
-        self.provider._exchange_code = AsyncMock(return_value=token)
-        self.provider._parse_id_token = AsyncMock(return_value=userinfo)
-        self.provider._fetch_userinfo = AsyncMock(return_value=userinfo)
+        self.provider._exchange_code = simple_async_mock(return_value=token)
+        self.provider._parse_id_token = simple_async_mock(return_value=userinfo)
+        self.provider._fetch_userinfo = simple_async_mock(return_value=userinfo)
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()
+        auth_handler.complete_sso_login = simple_async_mock()
 
         code = "code"
         state = "state"
@@ -471,7 +471,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             self.assertRenderedError("mapping_error")
 
         # Handle ID token errors
-        self.provider._parse_id_token = AsyncMock(side_effect=Exception)
+        self.provider._parse_id_token = simple_async_mock(raises=Exception())
         self.get_success(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("invalid_token")
 
@@ -486,7 +486,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "type": "bearer",
             "access_token": "access_token",
         }
-        self.provider._exchange_code = AsyncMock(return_value=token)
+        self.provider._exchange_code = simple_async_mock(return_value=token)
         self.get_success(self.handler.handle_oidc_callback(request))
 
         auth_handler.complete_sso_login.assert_called_once_with(
@@ -513,8 +513,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
         id_token = {
             "sid": "abcdefgh",
         }
-        self.provider._parse_id_token = AsyncMock(return_value=id_token)
-        self.provider._exchange_code = AsyncMock(return_value=token)
+        self.provider._parse_id_token = simple_async_mock(return_value=id_token)
+        self.provider._exchange_code = simple_async_mock(return_value=token)
         auth_handler.complete_sso_login.reset_mock()
         self.provider._fetch_userinfo.reset_mock()
         self.get_success(self.handler.handle_oidc_callback(request))
@@ -534,15 +534,15 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.render_error.assert_not_called()
 
         # Handle userinfo fetching error
-        self.provider._fetch_userinfo = AsyncMock(side_effect=Exception)
+        self.provider._fetch_userinfo = simple_async_mock(raises=Exception())
         self.get_success(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("fetch_error")
 
         # Handle code exchange failure
         from synapse.handlers.oidc import OidcError
 
-        self.provider._exchange_code = AsyncMock(
-            side_effect=OidcError("invalid_request")
+        self.provider._exchange_code = simple_async_mock(
+            raises=OidcError("invalid_request")
         )
         self.get_success(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("invalid_request")
@@ -597,7 +597,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         """Code exchange behaves correctly and handles various error scenarios."""
         token = {"type": "bearer"}
         token_json = json.dumps(token).encode("utf-8")
-        self.http_client.request = AsyncMock(
+        self.http_client.request = simple_async_mock(
             return_value=FakeResponse(code=200, phrase=b"OK", body=token_json)
         )
         code = "code"
@@ -616,7 +616,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(args["redirect_uri"], [CALLBACK_URL])
 
         # Test error handling
-        self.http_client.request = AsyncMock(
+        self.http_client.request = simple_async_mock(
             return_value=FakeResponse(
                 code=400,
                 phrase=b"Bad Request",
@@ -630,7 +630,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(exc.value.error_description, "bar")
 
         # Internal server error with no JSON body
-        self.http_client.request = AsyncMock(
+        self.http_client.request = simple_async_mock(
             return_value=FakeResponse(
                 code=500,
                 phrase=b"Internal Server Error",
@@ -641,7 +641,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(exc.value.error, "server_error")
 
         # Internal server error with JSON body
-        self.http_client.request = AsyncMock(
+        self.http_client.request = simple_async_mock(
             return_value=FakeResponse(
                 code=500,
                 phrase=b"Internal Server Error",
@@ -653,7 +653,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(exc.value.error, "internal_server_error")
 
         # 4xx error without "error" field
-        self.http_client.request = AsyncMock(
+        self.http_client.request = simple_async_mock(
             return_value=FakeResponse(
                 code=400,
                 phrase=b"Bad request",
@@ -664,7 +664,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(exc.value.error, "server_error")
 
         # 2xx error with "error" field
-        self.http_client.request = AsyncMock(
+        self.http_client.request = simple_async_mock(
             return_value=FakeResponse(
                 code=200,
                 phrase=b"OK",
@@ -694,7 +694,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         from authlib.jose import jwt
 
         token = {"type": "bearer"}
-        self.http_client.request = AsyncMock(
+        self.http_client.request = simple_async_mock(
             return_value=FakeResponse(
                 code=200, phrase=b"OK", body=json.dumps(token).encode("utf-8")
             )
@@ -747,7 +747,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
     def test_exchange_code_no_auth(self):
         """Test that code exchange works with no client secret."""
         token = {"type": "bearer"}
-        self.http_client.request = AsyncMock(
+        self.http_client.request = simple_async_mock(
             return_value=FakeResponse(
                 code=200, phrase=b"OK", body=json.dumps(token).encode("utf-8")
             )
@@ -793,10 +793,10 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "username": "foo",
             "phone": "1234567",
         }
-        self.provider._exchange_code = AsyncMock(return_value=token)
-        self.provider._parse_id_token = AsyncMock(return_value=userinfo)
+        self.provider._exchange_code = simple_async_mock(return_value=token)
+        self.provider._parse_id_token = simple_async_mock(return_value=userinfo)
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()
+        auth_handler.complete_sso_login = simple_async_mock()
 
         state = "state"
         client_redirect_url = "http://client/redirect"
@@ -823,7 +823,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
     def test_map_userinfo_to_user(self):
         """Ensure that mapping the userinfo returned from a provider to an MXID works properly."""
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()
+        auth_handler.complete_sso_login = simple_async_mock()
 
         userinfo = {
             "sub": "test_user",
@@ -882,7 +882,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         )
 
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()
+        auth_handler.complete_sso_login = simple_async_mock()
 
         # Map a user via SSO.
         userinfo = {
@@ -997,7 +997,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
     def test_map_userinfo_to_user_retries(self):
         """The mapping provider can retry generating an MXID if the MXID is already in use."""
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()
+        auth_handler.complete_sso_login = simple_async_mock()
 
         store = self.hs.get_datastore()
         self.get_success(
@@ -1081,7 +1081,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
     def test_attribute_requirements(self):
         """The required attributes must be met from the OIDC userinfo response."""
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()
+        auth_handler.complete_sso_login = simple_async_mock()
 
         # userinfo lacking "test": "foobar" attribute should fail.
         userinfo = {
@@ -1121,7 +1121,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
     def test_attribute_requirements_contains(self):
         """Test that auth succeeds if userinfo attribute CONTAINS required value"""
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()
+        auth_handler.complete_sso_login = simple_async_mock()
         # userinfo with "test": ["foobar", "foo", "bar"] attribute should succeed.
         userinfo = {
             "sub": "tester",
@@ -1155,7 +1155,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         or are non-string values.
         """
         auth_handler = self.hs.get_auth_handler()
-        auth_handler.complete_sso_login = AsyncMock()
+        auth_handler.complete_sso_login = simple_async_mock()
         # userinfo with "test": "not_foobar" attribute should fail
         userinfo = {
             "sub": "tester",
@@ -1251,9 +1251,9 @@ async def _make_callback_with_userinfo(
 
     handler = hs.get_oidc_handler()
     provider = handler._providers["oidc"]
-    provider._exchange_code = AsyncMock(return_value={"id_token": ""})
-    provider._parse_id_token = AsyncMock(return_value=userinfo)
-    provider._fetch_userinfo = AsyncMock(return_value=userinfo)
+    provider._exchange_code = simple_async_mock(return_value={"id_token": ""})
+    provider._parse_id_token = simple_async_mock(return_value=userinfo)
+    provider._fetch_userinfo = simple_async_mock(return_value=userinfo)
 
     state = "state"
     session = handler._token_generator.generate_oidc_session_token(

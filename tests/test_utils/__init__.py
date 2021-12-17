@@ -20,6 +20,7 @@ import warnings
 from asyncio import Future
 from binascii import unhexlify
 from typing import Any, Awaitable, Callable, TypeVar
+from unittest.mock import Mock
 
 import attr
 
@@ -84,6 +85,16 @@ def setup_awaitable_errors() -> Callable[[], None]:
     sys.unraisablehook = unraisablehook  # type: ignore
 
     return cleanup
+
+
+def simple_async_mock(return_value=None, raises=None) -> Mock:
+    # AsyncMock is not available in python3.5, this mimics part of its behaviour
+    async def cb(*args, **kwargs):
+        if raises:
+            raise raises
+        return return_value
+
+    return Mock(side_effect=cb)
 
 
 @attr.s
