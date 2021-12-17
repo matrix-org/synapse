@@ -147,12 +147,20 @@ class RestHelper:
             expect_code=expect_code,
         )
 
-    def join(self, room=None, user=None, expect_code=200, tok=None):
+    def join(
+        self,
+        room=None,
+        user=None,
+        expect_code=200,
+        tok=None,
+        appservice_user_id: Optional[str] = None,
+    ):
         self.change_membership(
             room=room,
             src=user,
             targ=user,
             tok=tok,
+            appservice_user_id=appservice_user_id,
             membership=Membership.JOIN,
             expect_code=expect_code,
         )
@@ -204,6 +212,7 @@ class RestHelper:
         membership: str,
         extra_data: Optional[dict] = None,
         tok: Optional[str] = None,
+        appservice_user_id: Optional[str] = None,
         expect_code: int = 200,
         expect_errcode: Optional[str] = None,
     ) -> None:
@@ -217,6 +226,9 @@ class RestHelper:
             membership: The type of membership event
             extra_data: Extra information to include in the content of the event
             tok: The user access token to use
+            appservice_user_id: The `user_id` URL parameter to pass.
+                This allows driving an application service user
+                using an application service access token in `tok`.
             expect_code: The expected HTTP response code
             expect_errcode: The expected Matrix error code
         """
@@ -224,8 +236,14 @@ class RestHelper:
         self.auth_user_id = src
 
         path = "/_matrix/client/r0/rooms/%s/state/m.room.member/%s" % (room, targ)
+        next_arg_char = "?"
+
         if tok:
-            path = path + "?access_token=%s" % tok
+            path += "?access_token=%s" % tok
+            next_arg_char = "&"
+
+        if appservice_user_id:
+            path += f"{next_arg_char}user_id={appservice_user_id}"
 
         data = {"membership": membership}
         data.update(extra_data or {})
