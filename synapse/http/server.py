@@ -58,12 +58,14 @@ from synapse.api.errors import (
 )
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread, preserve_fn, run_in_background
-from synapse.logging.opentracing import trace_servlet
+from synapse.logging.opentracing import active_span, start_active_span, trace_servlet
 from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
 from synapse.util.iterutils import chunk_seq
 
 if TYPE_CHECKING:
+    import opentracing
+
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -759,7 +761,20 @@ async def _async_write_json_to_request_in_thread(
     expensive.
     """
 
-    json_str = await defer_to_thread(request.reactor, json_encoder, json_object)
+    def encode(opentracing_span: "Optional[opentracing.Span]") -> bytes:
+        # it might take a while for the threadpool to schedule us, so we write
+        # opentracing logs once we actually get scheduled, so that we can see how
+        # much that contributed.
+        if opentracing_span:
+            opentracing_span.log_kv({"event": "scheduled"})
+        res = json_encoder(json_object)
+        if opentracing_span:
+            opentracing_span.log_kv({"event": "encoded"})
+        return res
+
+    with start_active_span("encode_json_response"):
+        span = active_span()
+        json_str = await defer_to_thread(request.reactor, encode, span)
 
     _write_bytes_to_request(request, json_str)
 
