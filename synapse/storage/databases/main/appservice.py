@@ -133,11 +133,8 @@ class ApplicationServiceWorkerStore(RoomMemberWorkerStore):
     async def get_app_service_users_in_room(
         self, room_id: str, app_service: "ApplicationService"
     ) -> List[str]:
-        return list(
-            filter(
-                app_service.is_interested_in_user, await self.get_users_in_room(room_id)
-            )
-        )
+        users_in_room = await self.get_users_in_room(room_id)
+        return list(filter(app_service.is_interested_in_user, users_in_room))
 
 
 class ApplicationServiceStore(ApplicationServiceWorkerStore):
