@@ -272,6 +272,9 @@ worker.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/receipt
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/read_markers
 
+    # Presence requests (for the presence stream writer)
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/.*/status$
+
 
 Additionally, the following REST endpoints can be handled for GET requests:
 
@@ -358,6 +361,7 @@ Currently supported streams are:
 * `to_device`
 * `account_data`
 * `receipts`
+* `presence`
 
 To enable this, the worker must have a HTTP replication listener configured,
 have a `worker_name` and be listed in the `instance_map` config. The same worker
