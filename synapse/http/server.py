@@ -559,6 +559,17 @@ class OptionsResource(resource.Resource):
         return super().getChildWithDefault(path, request)
 
 
+class MissingResource(resource.Resource):
+    """Similar to resource.NoResource, but returns a JSON error with proper CORS headers."""
+
+    def render(self, request: SynapseRequest) -> int:
+        return_json_error(failure.Failure(UnrecognizedRequestError()), request)
+        return NOT_DONE_YET
+
+    def getChild(self, name: str, request: Request) -> resource.Resource:
+        return self
+
+
 class RootOptionsRedirectResource(OptionsResource, RootRedirect):
     pass
 
