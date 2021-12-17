@@ -530,7 +530,7 @@ class RootRedirect(resource.Resource):
     """Redirects the root '/' path to another path."""
 
     def __init__(self, path: str):
-        resource.Resource.__init__(self)
+        super().__init__()
         self.url = path
 
     def render_GET(self, request: Request) -> bytes:
@@ -539,7 +539,7 @@ class RootRedirect(resource.Resource):
     def getChild(self, name: str, request: Request) -> resource.Resource:
         if len(name) == 0:
             return self  # select ourselves as the child to render
-        return resource.Resource.getChild(self, name, request)
+        return super().getChild(name, request)
 
 
 class OptionsResource(resource.Resource):
@@ -556,7 +556,7 @@ class OptionsResource(resource.Resource):
     def getChildWithDefault(self, path: str, request: Request) -> resource.Resource:
         if request.method == b"OPTIONS":
             return self  # select ourselves as the child to render
-        return resource.Resource.getChildWithDefault(self, path, request)
+        return super().getChildWithDefault(path, request)
 
 
 class RootOptionsRedirectResource(OptionsResource, RootRedirect):
