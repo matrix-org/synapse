@@ -239,29 +239,33 @@ class SyncRestServlet(RestServlet):
         else:
             raise Exception("Unknown event format %s" % (filter.event_format,))
 
-        joined = await self.encode_joined(
-            sync_result.joined,
-            time_now,
-            access_token_id,
-            filter.event_fields,
-            event_formatter,
-        )
+        with start_active_span("sync.encode_joined"):
+            joined = await self.encode_joined(
+                sync_result.joined,
+                time_now,
+                access_token_id,
+                filter.event_fields,
+                event_formatter,
+            )
 
-        invited = await self.encode_invited(
-            sync_result.invited, time_now, access_token_id, event_formatter
-        )
+        with start_active_span("sync.encode_invited"):
+            invited = await self.encode_invited(
+                sync_result.invited, time_now, access_token_id, event_formatter
+            )
 
-        knocked = await self.encode_knocked(
-            sync_result.knocked, time_now, access_token_id, event_formatter
-        )
+        with start_active_span("sync.encode_knocked"):
+            knocked = await self.encode_knocked(
+                sync_result.knocked, time_now, access_token_id, event_formatter
+            )
 
-        archived = await self.encode_archived(
-            sync_result.archived,
-            time_now,
-            access_token_id,
-            filter.event_fields,
-            event_formatter,
-        )
+        with start_active_span("sync.encode_archived"):
+            archived = await self.encode_archived(
+                sync_result.archived,
+                time_now,
+                access_token_id,
+                filter.event_fields,
+                event_formatter,
+            )
 
         logger.debug("building sync response dict")
 
