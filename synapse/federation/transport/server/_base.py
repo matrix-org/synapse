@@ -26,8 +26,8 @@ from synapse.logging import opentracing
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
     SynapseTags,
+    span_context_from_request,
     start_active_span,
-    start_active_span_from_request,
     tags,
     whitelisted_homeserver,
 )
@@ -291,14 +291,13 @@ class BaseFederationServlet:
 
             # Only accept the span context if the origin is authenticated
             # and whitelisted
+            context = None
             if origin and whitelisted_homeserver(origin):
-                scope = start_active_span_from_request(
-                    request, "incoming-federation-request", tags=request_tags
-                )
-            else:
-                scope = start_active_span(
-                    "incoming-federation-request", tags=request_tags
-                )
+                context = span_context_from_request(request)
+
+            scope = start_active_span(
+                "incoming-federation-request", child_of=context, tags=request_tags
+            )
 
             with scope:
                 opentracing.inject_response_headers(request.responseHeaders)
