@@ -178,8 +178,11 @@ recommend the use of `systemd` where available: for information on setting up
 
 ### `synapse.app.generic_worker`
 
-This worker can handle API requests matching the following regular
-expressions:
+This worker can handle API requests matching the following regular expressions.
+
+Note that stream writers should have their endpoints routed directly to them for
+efficiency. If this is not done, the requests will be proxied to the proper
+worker.
 
     # Sync requests
     ^/_matrix/client/(v2_alpha|r0|v3)/sync$
@@ -357,9 +360,9 @@ Currently supported streams are:
 * `receipts`
 
 To enable this, the worker must have a HTTP replication listener configured,
-have a `worker_name` and be listed in the `instance_map` config. For example to
-move event persistence off to a dedicated worker, the shared configuration would
-include:
+have a `worker_name` and be listed in the `instance_map` config. The same worker
+can handle multiple streams. For example, to move event persistence off to a
+dedicated worker, the shared configuration would include:
 
 ```yaml
 instance_map:
@@ -382,6 +385,9 @@ stream_writers:
         - event_persister1
         - event_persister2
 ```
+
+Each of the streams have associated endpoints which should be routed to the worker
+see the end regular expression map above to properly route requests.
 
 #### Background tasks
 
