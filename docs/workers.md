@@ -238,18 +238,36 @@ expressions:
     ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 
+    # Encryption requests
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/claim
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/room_keys
+
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/login$
     ^/_matrix/client/(r0|v3|unstable)/register$
     ^/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity$
 
-    # Event sending requests
+    # Event sending requests (for the event stream writer)
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/redact
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/send
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/join/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/profile/
+
+    # Typing requests (for the typing stream writer)
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing
+
+    # Device requests (for the to_device stream writer)
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/sendToDevice/
+
+    # Account data requests (for the account_data stream writer)
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/tags
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/account_data
+
+    # Receipts requests (for the receipts stream writer)
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/receipt
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/read_markers
 
 
 Additionally, the following REST endpoints can be handled for GET requests:
@@ -330,7 +348,13 @@ Additionally, there is *experimental* support for moving writing of specific
 streams (such as events) off of the main process to a particular worker. (This
 is only supported with Redis-based replication.)
 
-Currently supported streams are `events` and `typing`.
+Currently supported streams are:
+
+* `events`
+* `typing`
+* `to_device`
+* `account_data`
+* `receipts`
 
 To enable this, the worker must have a HTTP replication listener configured,
 have a `worker_name` and be listed in the `instance_map` config. For example to
