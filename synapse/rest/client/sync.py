@@ -48,6 +48,7 @@ from synapse.handlers.sync import (
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
+from synapse.logging.opentracing import start_active_span
 from synapse.types import JsonDict, StreamToken
 from synapse.util import json_decoder
 
@@ -212,12 +213,13 @@ class SyncRestServlet(RestServlet):
             logger.info("Client has disconnected; not serializing response.")
             return 200, {}
 
-        time_now = self.clock.time_msec()
-        # We know that the the requester has an access token since appservices
-        # cannot use sync.
-        response_content = await self.encode_response(
-            time_now, sync_result, requester.access_token_id, filter_collection
-        )
+        with start_active_span("sync.encode_response"):
+            time_now = self.clock.time_msec()
+            # We know that the the requester has an access token since appservices
+            # cannot use sync.
+            response_content = await self.encode_response(
+                time_now, sync_result, requester.access_token_id, filter_collection
+            )
 
         logger.debug("Event formatting complete")
         return 200, response_content
