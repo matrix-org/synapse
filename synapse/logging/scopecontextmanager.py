@@ -71,7 +71,7 @@ class LogContextScopeManager(ScopeManager):
         if not ctx:
             # We don't want this scope to affect.
             logger.error("Tried to activate scope outside of loggingcontext")
-            return Scope(None, span)
+            return Scope(None, span)  # type: ignore[arg-type]
         elif ctx.scope is not None:
             # We want the logging scope to look exactly the same so we give it
             # a blank suffix
