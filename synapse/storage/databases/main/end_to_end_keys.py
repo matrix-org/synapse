@@ -494,20 +494,31 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         Return structure is of the shape:
           user_id -> device_id -> algorithms
         """
+        if len(user_ids) == 0:
+            return {}
 
         def _get_bulk_e2e_unused_fallback_keys_txn(
             txn: LoggingTransaction,
         ) -> TransactionUnusedFallbackKeys:
             user_in_where_clause, user_parameters = make_in_list_sql_clause(
-                self.database_engine, "user_id", user_ids
+                self.database_engine, "devices.user_id", user_ids
             )
+            # We can't use USING here because we require the `.used` condition
+            # to be part of the JOIN condition so that we generate empty lists
+            # when all keys are used (as opposed to just when there are no keys at all).
             sql = f"""
-                SELECT user_id, device_id, algorithm
+                SELECT devices.user_id, devices.device_id, algorithm
                 FROM devices
-                LEFT JOIN e2e_fallback_keys_json USING (user_id, device_id)
+                LEFT JOIN e2e_fallback_keys_json AS fallback_keys
+                    /* We can't use USING here because we require the `.used`
+                       condition to be part of the JOIN condition so that we
+                       generate empty lists when all keys are used (as opposed
+                       to just when there are no keys at all). */
+                    ON devices.user_id = fallback_keys.user_id
+                    AND devices.device_id = fallback_keys.device_id
+                    AND NOT fallback_keys.used
                 WHERE
                     {user_in_where_clause}
-                    AND NOT used
             """
             txn.execute(sql, user_parameters)
 
