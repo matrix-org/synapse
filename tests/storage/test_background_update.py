@@ -116,11 +116,10 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
 
         # Mock out the AsyncContextManager
         class MockCM:
-            pass
+            __aenter__ = simple_async_mock(return_value=None)
+            __aexit__ = simple_async_mock(return_value=None)
 
         self._update_ctx_manager = MockCM
-        self._update_ctx_manager.__aenter__ = simple_async_mock(return_value=None)
-        self._update_ctx_manager.__aexit__ = simple_async_mock(return_value=None)
 
         # Mock out the `update_handler` callback
         self._on_update = Mock(return_value=self._update_ctx_manager())
