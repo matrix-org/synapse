@@ -1,0 +1,1 @@
+Fix a long-standing bug that some unknown endpoints would return HTML 404 errors instead of JSON 400 errors.
