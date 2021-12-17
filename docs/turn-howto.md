@@ -119,6 +119,7 @@ This will install and start a systemd service called `coturn`.
     denied-peer-ip=240.0.0.0-255.255.255.255
 
     # special case the turn server itself so that client->TURN->TURN->client flows work
+    # this should be one of the turn server's listening IPs
     allowed-peer-ip=10.0.0.1
 
     # consider whether you want to limit the quota of relayed streams per user (or total) to avoid risk of DoS.
@@ -138,15 +139,11 @@ This will install and start a systemd service called `coturn`.
     pkey=/path/to/privkey.pem
     ```
 
-    In this case, replace the `turn:` schemes in the `turn_uri` settings below
+    In this case, replace the `turn:` schemes in the `turn_uris` settings below
     with `turns:`.
 
     We recommend that you only try to set up TLS/DTLS once you have set up a
     basic installation and got it working.
-
-    NB: If your TLS certificate was provided by Let's Encrypt, TLS/DTLS will
-    not work with any Matrix client that uses Chromium's WebRTC library (such
-    as Element Android). See [this case](https://github.com/vector-im/element-android/issues/1533) for more details.
 
 1.  Ensure your firewall allows traffic into the TURN server on the ports
     you've configured it to listen on (By default: 3478 and 5349 for TURN
@@ -158,13 +155,21 @@ This will install and start a systemd service called `coturn`.
     address to connecting clients:
 
     ```
-    external-ip=YOUR_NAT_IP
+    external-ip=EXTERNAL_NAT_IPv4_ADDRESS
     ```
 
-    If your NAT gateway's external addresses include both an IPv4 and IPv6
-    address, it is recommended to configure coturn to advertise all of them. In
-    this case, each configuration line must also specify the internal IPs of
-    your TURN server (i.e. the addresses assigned to them within the NAT):
+    You may optionally limit the TURN server to listen only on the local
+    address that is mapped by NAT to the external address:
+
+    ```
+    listening-ip=INTERNAL_TURNSERVER_IPv4_ADDRESS
+    external-ip=EXTERNAL_NAT_IPv4_ADDRESS/INTERNAL_TURNSERVER_IPv4_ADDRESS
+    ```
+
+    If your NAT gateway is reachable over both IPv4 and IPv6, you may
+    configure coturn to advertise each available address. When doing so,
+    each configuration line must also specify the internal IPs of your
+    TURN server (i.e. the addresses assigned to them within the NAT):
 
     ```
     external-ip=EXTERNAL_NAT_IPv4_ADDRESS/INTERNAL_TURNSERVER_IPv4_ADDRESS
@@ -174,54 +179,6 @@ This will install and start a systemd service called `coturn`.
     When advertising an external IPv6 address, ensure that the firewall and
     network settings of the system running your TURN server are configured to
     accept IPv6 traffic.
-
-    Your NAT gateway must forward all of the relayed ports directly (eg, port
-    56789 on the external IP must always be forwarded to port 56789 on the
-    internal IP). If your NAT server runs Linux (and you have administrative
-    rights to it), port forwarding may be applied with the following `iptables`
-    rules:
-
-    ```sh
-    # Enable forwarding from the NAT gateway to your subnet
-    # Based on https://wiki.debian.org/OpenVPN#Forward_traffic_to_provide_access_to_the_Internet
-    iptables -A FORWARD -i $EXTERNAL_INTERFACE_NAME -o $INTERNAL_INTERFACE_NAME -m state --state ESTABLISHED,RELATED -j ACCEPT
-    iptables  -A FORWARD -s $INTERNAL_INTERFACE_IPv4_SUBNET -o $EXTERNAL_INTERFACE_NAME -j ACCEPT
-    ip6tables -A FORWARD -s $INTERNAL_INTERFACE_IPv6_SUBNET -o $EXTERNAL_INTERFACE_NAME -j ACCEPT
-    iptables  -t nat -A POSTROUTING -s $INTERNAL_INTERFACE_IPv4_SUBNET -o $EXTERNAL_INTERFACE_NAME -j SNAT --to-source $EXTERNAL_NAT_IPv4_ADDRESS
-    ip6tables -t nat -A POSTROUTING -s $INTERNAL_INTERFACE_IPv6_SUBNET -o $EXTERNAL_INTERFACE_NAME -j SNAT --to-source $EXTERNAL_NAT_IPv6_ADDRESS
-
-    # forward coturn ports
-    iptables  -t nat -A PREROUTING -i $EXTERNAL_INTERFACE_NAME -p tcp -m multiport --dports 3478,3479,5349,5350 -j DNAT --to-destination $INTERNAL_TURNSERVER_IPv4_ADDRESS
-    iptables  -t nat -A PREROUTING -i $EXTERNAL_INTERFACE_NAME -p udp -m multiport --dports 3478,3479,5349,5350,49152:65535 -j DNAT --to-destination $INTERNAL_TURNSERVER_IPv4_ADDRESS
-    iptables  -t nat -A PREROUTING -i $EXTERNAL_INTERFACE_NAME -p tcp -m multiport --dports 5222,5269 -j DNAT --to-destination $INTERNAL_TURNSERVER_IPv4_ADDRESS
-
-    # same, but for ipv6
-    ip6tables -t nat -A PREROUTING -i $EXTERNAL_INTERFACE_NAME -p tcp -m multiport --dports 3478,3479,5349,5350 -j DNAT --to-destination $INTERNAL_TURNSERVER_IPv6_ADDRESS
-    ip6tables -t nat -A PREROUTING -i $EXTERNAL_INTERFACE_NAME -p udp -m multiport --dports 3478,3479,5349,5350,49152:65535 -j DNAT --to-destination $INTERNAL_TURNSERVER_IPv6_ADDRESS
-    ip6tables -t nat -A PREROUTING -i $EXTERNAL_INTERFACE_NAME -p tcp -m multiport --dports 5222,5269 -j DNAT --to-destination $INTERNAL_TURNSERVER_IPv6_ADDRESS
-    ```
-
-    For this to work, the NAT server must be configured to forward IPv4/IPv6
-    traffic. To check if forwarding is enabled, run
-    `cat /proc/sys/net/ipv4/ip_forward` and `cat /proc/sys/net/ipv6/conf/all/forwarding`
-    and confirm they both print `1`. If not, they may be set at runtime like so:
-
-    ```sh
-    echo 1 > /proc/sys/net/ipv4/ip_forward
-    echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
-    ```
-
-    To apply these settings persistently, add/uncomment these lines in
-    `/etc/sysctl.conf`, then run `sysctl -p`:
-
-    ```
-    net.ipv4.ip_forward=1
-    net.ipv6.conf.all.forwarding=1
-    ```
-
-    (The `all` in any of the the IPv6 paths/settings mentioned above may be
-    substituted for the name of any specific network interface that must
-    forward traffic.)
 
 1.  (Re)start the turn server:
 
@@ -289,9 +246,6 @@ connecting". Unfortunately, troubleshooting this can be tricky.
 
 Here are a few things to try:
 
- * Check that your TURN server is not behind NAT. As above, we're not aware of
-   anyone who has successfully set this up.
-
  * Check that you have opened your firewall to allow TCP and UDP traffic to the
    TURN ports (normally 3478 and 5349).
 
@@ -306,6 +260,17 @@ Here are a few things to try:
 
    Try removing any AAAA records for your TURN server, so that it is only
    reachable over IPv4.
+
+ * If your TURN server is behind a NAT:
+
+    * double-check that your NAT gateway is correctly forwarding all TURN
+      ports to the NAT-internal address of your TURN server. If advertising
+      both IPv4 and IPv6 external addresses, ensure that the NAT is forwarding
+      both IPv4 and IPv6 traffic to the IPv4 and IPv6 internal addresses of your
+      TURN server. When in doubt, remove AAAA records for your TURN server and
+      configure coturn to advertise only IPv4 addresses.
+
+    * ensure that your TURN server uses the NAT gateway as its default route.
 
  * Enable more verbose logging in coturn via the `verbose` setting:
 
