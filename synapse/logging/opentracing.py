@@ -856,7 +856,12 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
 
     request_name = request.request_metrics.name
     context = span_context_from_request(request) if extract_context else None
-    scope = start_active_span(request_name, child_of=context)
+
+    # we configure the scope not to finish the span immediately on exit, and instead
+    # pass the span into the SynapseRequest, which will finish it once we've finished
+    # sending the response to the client.
+    scope = start_active_span(request_name, child_of=context, finish_on_close=False)
+    request.set_opentracing_span(scope.span)
 
     with scope:
         inject_response_headers(request.responseHeaders)

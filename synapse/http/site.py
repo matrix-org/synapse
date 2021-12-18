@@ -14,7 +14,7 @@
 import contextlib
 import logging
 import time
-from typing import Any, Generator, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Generator, Optional, Tuple, Union
 
 import attr
 from zope.interface import implementer
@@ -34,6 +34,9 @@ from synapse.logging.context import (
     PreserveLoggingContext,
 )
 from synapse.types import Requester
+
+if TYPE_CHECKING:
+    import opentracing
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +83,10 @@ class SynapseRequest(Request):
         # The requester, if authenticated. For federation requests this is the
         # server name, for client requests this is the Requester object.
         self._requester: Optional[Union[Requester, str]] = None
+
+        # An opentracing span for this request. Will be closed when the request is
+        # completely processed.
+        self._opentracing_span: "Optional[opentracing.Span]" = None
 
         # we can't yet create the logcontext, as we don't know the method.
         self.logcontext: Optional[LoggingContext] = None
@@ -147,6 +154,13 @@ class SynapseRequest(Request):
         self.logcontext.request.requester = requester
         # If there's no authenticated entity, it was the requester.
         self.logcontext.request.authenticated_entity = authenticated_entity or requester
+
+    def set_opentracing_span(self, span: "opentracing.Span") -> None:
+        """attach an opentracing span to this request
+
+        Doing so will cause the span to be closed when we finish processing the request
+        """
+        self._opentracing_span = span
 
     def get_request_id(self) -> str:
         return "%s-%i" % (self.get_method(), self.request_seq)
@@ -420,6 +434,10 @@ class SynapseRequest(Request):
             user_agent,
             usage.evt_db_fetch_count,
         )
+
+        # complete the opentracing span, if any.
+        if self._opentracing_span:
+            self._opentracing_span.finish()
 
         try:
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
