@@ -300,6 +300,9 @@ class SynapseRequest(Request):
             self._processing_finished_time = time.time()
             self._is_processing = False
 
+            if self._opentracing_span:
+                self._opentracing_span.log_kv({"event": "finished processing"})
+
             # if we've already sent the response, log it now; otherwise, we wait for the
             # response to be sent.
             if self.finish_time is not None:
@@ -313,6 +316,8 @@ class SynapseRequest(Request):
         """
         self.finish_time = time.time()
         Request.finish(self)
+        if self._opentracing_span:
+            self._opentracing_span.log_kv({"event": "response sent"})
         if not self._is_processing:
             assert self.logcontext is not None
             with PreserveLoggingContext(self.logcontext):
@@ -346,6 +351,11 @@ class SynapseRequest(Request):
         # the client disconnects.
         with PreserveLoggingContext(self.logcontext):
             logger.info("Connection from client lost before response was sent")
+
+            if self._opentracing_span:
+                self._opentracing_span.log_kv(
+                    {"event": "client connection lost", "reason": str(reason.value)}
+                )
 
             if not self._is_processing:
                 self._finished_processing()
