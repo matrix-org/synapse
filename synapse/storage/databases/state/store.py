@@ -533,30 +533,32 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         member_filter, non_member_filter = state_filter.get_member_split()
 
         # Now we look them up in the member and non-member caches
-        (
-            non_member_state,
-            incomplete_groups_nm,
-        ) = self._get_state_for_groups_using_cache(
-            groups, self._state_group_cache, state_filter=non_member_filter
-        )
-
-        (member_state, incomplete_groups_m,) = self._get_state_for_groups_using_cache(
-            groups, self._state_group_members_cache, state_filter=member_filter
-        )
-
-        state = dict(non_member_state)
-        for group in groups:
-            state[group].update(member_state[group])
+        # (
+        #     non_member_state,
+        #     incomplete_groups_nm,
+        # ) = self._get_state_for_groups_using_cache(
+        #     groups, self._state_group_cache, state_filter=non_member_filter
+        # )
+        #
+        # (member_state, incomplete_groups_m,) = self._get_state_for_groups_using_cache(
+        #     groups, self._state_group_members_cache, state_filter=member_filter
+        # )
+        state = dict()
+        # state = dict(non_member_state)
+        # for group in groups:
+        #     state[group].update(member_state[group])
 
         # Now fetch any missing groups from the database
 
-        incomplete_groups = incomplete_groups_m | incomplete_groups_nm
+        # incomplete_groups = incomplete_groups_m | incomplete_groups_nm
 
-        if not incomplete_groups:
-            return state
+        # if not incomplete_groups:
+        #     return state
 
-        cache_sequence_nm = self._state_group_cache.sequence
-        cache_sequence_m = self._state_group_members_cache.sequence
+        incomplete_groups = groups
+
+        # cache_sequence_nm = self._state_group_cache.sequence
+        # cache_sequence_m = self._state_group_members_cache.sequence
 
         # Help the cache hit ratio by expanding the filter a bit
         db_state_filter = state_filter.return_expanded()
@@ -566,12 +568,12 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         )
 
         # Now lets update the caches
-        self._insert_into_cache(
-            group_to_state_dict,
-            db_state_filter,
-            cache_seq_num_members=cache_sequence_m,
-            cache_seq_num_non_members=cache_sequence_nm,
-        )
+        # self._insert_into_cache(
+        #     group_to_state_dict,
+        #     db_state_filter,
+        #     cache_seq_num_members=cache_sequence_m,
+        #     cache_seq_num_non_members=cache_sequence_nm,
+        # )
 
         # And finally update the result dict, by filtering out any extra
         # stuff we pulled out of the database.
