@@ -149,12 +149,12 @@ class RestHelper:
 
     def join(
         self,
-        room=None,
-        user=None,
-        expect_code=200,
-        tok=None,
+        room: str,
+        user: Optional[str] = None,
+        expect_code: int = 200,
+        tok: Optional[str] = None,
         appservice_user_id: Optional[str] = None,
-    ):
+    ) -> None:
         self.change_membership(
             room=room,
             src=user,
@@ -207,8 +207,8 @@ class RestHelper:
     def change_membership(
         self,
         room: str,
-        src: str,
-        targ: str,
+        src: Optional[str],
+        targ: Optional[str],
         membership: str,
         extra_data: Optional[dict] = None,
         tok: Optional[str] = None,
