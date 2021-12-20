@@ -141,7 +141,7 @@ class ResponseCache(Generic[KV]):
             opentracing_span_context: An opentracing span wrapping the calculation
 
         Returns:
-            A new deferred which resolves to the actual result.
+            The cache entry object.
         """
         result = ObservableDeferred(deferred, consumeErrors=True)
         key = context.cache_key
