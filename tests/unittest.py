@@ -631,7 +631,8 @@ class HomeserverTestCase(TestCase):
 
         Raises: if the request to '/register' does not return 200 OK.
 
-        Returns: the MXID of the new user, the device ID of the new user's first device.
+        Returns:
+            The MXID of the new user, the device ID of the new user's first device.
         """
         channel = self.make_request(
             "POST",
