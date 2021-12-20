@@ -20,6 +20,7 @@ from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import (
+    active_span,
     start_active_span,
     start_active_span_follows_from,
 )
@@ -225,11 +226,10 @@ class ResponseCache(Generic[KV]):
             async def cb() -> RV:
                 # NB it is important that we do not `await` before setting span_context!
                 nonlocal span_context
-                with start_active_span(
-                    f"ResponseCache[{self._name}].calculate"
-                ) as scope:
-                    if scope:
-                        span_context = scope.span.context
+                with start_active_span(f"ResponseCache[{self._name}].calculate"):
+                    span = active_span()
+                    if span:
+                        span_context = span.context
                     return await callback(*args, **kwargs)
 
             d = run_in_background(cb)
@@ -244,8 +244,9 @@ class ResponseCache(Generic[KV]):
                 "[%s]: using incomplete cached result for [%s]", self._name, key
             )
 
+        span_context = entry.opentracing_span_context
         with start_active_span_follows_from(
             f"ResponseCache[{self._name}].wait",
-            contexts=[entry.opentracing_span_context],
+            contexts=(span_context,) if span_context else (),
         ):
             return await make_deferred_yieldable(result)
