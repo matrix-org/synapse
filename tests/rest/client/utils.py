@@ -31,6 +31,7 @@ from typing import (
     overload,
 )
 from unittest.mock import patch
+from urllib.parse import urlencode
 
 import attr
 from typing_extensions import Literal
@@ -235,15 +236,16 @@ class RestHelper:
         temp_id = self.auth_user_id
         self.auth_user_id = src
 
-        path = "/_matrix/client/r0/rooms/%s/state/m.room.member/%s" % (room, targ)
-        next_arg_char = "?"
+        path = f"/_matrix/client/r0/rooms/{room}/state/m.room.member/{targ}"
+        url_params: Dict[str, str] = {}
 
         if tok:
-            path += "?access_token=%s" % tok
-            next_arg_char = "&"
+            url_params["access_token"] = tok
 
         if appservice_user_id:
-            path += f"{next_arg_char}user_id={appservice_user_id}"
+            url_params["user_id"] = appservice_user_id
+
+        path += "?" + urlencode(url_params)
 
         data = {"membership": membership}
         data.update(extra_data or {})
