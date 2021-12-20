@@ -300,7 +300,12 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         # The list of ongoing requests which will help narrow the current request.
         reusable_requests = []
-        for (request_state_filter, request_deferred) in inflight_requests.items():
+
+        # Iterate over existing requests in roughly biggest-first order.
+        # reversed(inflight_requests) has an efficient iterator implementation,
+        # but reversed(inflight_requests.items()) does not, sadly.
+        for request_state_filter in reversed(inflight_requests):
+            request_deferred = inflight_requests[request_state_filter]
             new_state_filter_left_over = state_filter_left_over.approx_difference(
                 request_state_filter
             )
