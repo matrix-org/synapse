@@ -333,7 +333,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         # We don't immediately await the result, so must use run_in_background
         # But we DO await the result before the current log context (request)
         # finishes, so don't need to run it as a background process.
-        request_deferred = run_in_background(_the_request())
+        request_deferred = run_in_background(_the_request)
         observable_deferred = ObservableDeferred(request_deferred)
 
         # Insert the ObservableDeferred into the cache
