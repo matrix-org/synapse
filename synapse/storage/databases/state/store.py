@@ -454,7 +454,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         log_ticker += 1
         validation_logger.info(
-            "Correct: %r. Effective: %r",
+            "LT=%d. Correct: %r. Effective: %r",
             log_ticker,
             validation_counter,
             effectiveness_counter,
