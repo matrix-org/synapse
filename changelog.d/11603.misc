@@ -1,0 +1,1 @@
+Add opentracing type stubs and fix associated mypy errors.

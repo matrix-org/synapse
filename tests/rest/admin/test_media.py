@@ -580,7 +580,9 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         return server_and_media_id
 
-    def _access_media(self, server_and_media_id, expect_success=True) -> None:
+    def _access_media(
+        self, server_and_media_id: str, expect_success: bool = True
+    ) -> None:
         """
         Try to access a media and check the result
         """
