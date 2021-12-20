@@ -441,6 +441,30 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
     async def _get_state_for_groups(
         self, groups: Iterable[int], state_filter: Optional[StateFilter] = None
     ) -> Dict[int, MutableStateMap[str]]:
+        global log_ticker, effectiveness_counter, validation_counter
+        old_result = await self._OLD_get_state_for_groups(groups, state_filter)
+        new_result = await self._NEW_get_state_for_groups(groups, state_filter)
+
+        the_same = old_result == new_result
+        validation_counter[the_same] += 1
+        if not the_same:
+            validation_logger.critical(
+                "NOT THE SAME: for groups %r SF %r", groups, state_filter
+            )
+
+        log_ticker += 1
+        validation_logger.info(
+            "Correct: %r. Effective: %r",
+            log_ticker,
+            validation_counter,
+            effectiveness_counter,
+        )
+
+        return old_result
+
+    async def _NEW_get_state_for_groups(
+        self, groups: Iterable[int], state_filter: Optional[StateFilter] = None
+    ) -> Dict[int, MutableStateMap[str]]:
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key
 
@@ -452,14 +476,6 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         Returns:
             Dict of state group to state map.
         """
-        global log_ticker, effectiveness_counter, validation_counter
-        old_result_for_verification = await self._OLD_get_state_for_groups(
-            groups, state_filter
-        )
-        groups = list(groups)
-        arg_groups = groups.copy()
-        arg_state_filter = state_filter
-
         state_filter = state_filter or StateFilter.all()
 
         member_filter, non_member_filter = state_filter.get_member_split()
@@ -496,22 +512,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         for group, group_result in zip(incomplete_groups, results_from_requests):
             state[group] = group_result
 
-        the_same = state == old_result_for_verification
-        validation_counter[the_same] += 1
-        if not the_same:
-            validation_logger.critical(
-                "NOT THE SAME: for groups %r SF %r", arg_groups, arg_state_filter
-            )
-
-        log_ticker += 1
-        validation_logger.info(
-            "%d. Correct: %r. Effective: %r",
-            log_ticker,
-            validation_counter,
-            effectiveness_counter,
-        )
-
-        return old_result_for_verification
+        return state
 
     async def _OLD_get_state_for_groups(
         self, groups: Iterable[int], state_filter: Optional[StateFilter] = None
