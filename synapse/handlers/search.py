@@ -421,10 +421,10 @@ class SearchHandler:
 
         for context in contexts.values():
             context["events_before"] = await self._event_serializer.serialize_events(
-                context["events_before"], time_now, bundle_aggregations=False
+                context["events_before"], time_now
             )
             context["events_after"] = await self._event_serializer.serialize_events(
-                context["events_after"], time_now, bundle_aggregations=False
+                context["events_after"], time_now
             )
 
         state_results = {}
@@ -442,9 +442,7 @@ class SearchHandler:
                 {
                     "rank": rank_map[e.event_id],
                     "result": (
-                        await self._event_serializer.serialize_event(
-                            e, time_now, bundle_aggregations=False
-                        )
+                        await self._event_serializer.serialize_event(e, time_now)
                     ),
                     "context": contexts.get(e.event_id, {}),
                 }
@@ -460,7 +458,7 @@ class SearchHandler:
             s = {}
             for room_id, state_events in state_results.items():
                 s[room_id] = await self._event_serializer.serialize_events(
-                    state_events, time_now, bundle_aggregations=False
+                    state_events, time_now
                 )
 
             rooms_cat_res["state"] = s

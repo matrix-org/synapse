@@ -745,13 +745,19 @@ class RoomEventContextServlet(RestServlet):
 
         time_now = self.clock.time_msec()
         results["events_before"] = await self._event_serializer.serialize_events(
-            results["events_before"], time_now
+            results["events_before"],
+            time_now,
+            bundle_aggregations=True,
         )
         results["event"] = await self._event_serializer.serialize_event(
-            results["event"], time_now
+            results["event"],
+            time_now,
+            bundle_aggregations=True,
         )
         results["events_after"] = await self._event_serializer.serialize_events(
-            results["events_after"], time_now
+            results["events_after"],
+            time_now,
+            bundle_aggregations=True,
         )
         results["state"] = await self._event_serializer.serialize_events(
             results["state"], time_now
