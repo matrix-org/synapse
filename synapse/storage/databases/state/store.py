@@ -504,13 +504,12 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             )
 
         log_ticker += 1
-        if log_ticker % 1000 == 0:
-            validation_logger.info(
-                "%d. Correct: %r. Effective: %r",
-                log_ticker,
-                validation_counter,
-                effectiveness_counter,
-            )
+        validation_logger.info(
+            "%d. Correct: %r. Effective: %r",
+            log_ticker,
+            validation_counter,
+            effectiveness_counter,
+        )
 
         return old_result_for_verification
 
