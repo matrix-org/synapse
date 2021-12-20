@@ -72,6 +72,26 @@ class _GetStateGroupDelta:
         return len(self.delta_ids) if self.delta_ids else 0
 
 
+# Return type of state_filter_rough_size_comparator. Must be comparable.
+StateFilterRoughSizeComparator = Tuple[int, int]
+
+
+def state_filter_rough_size_comparator(
+    state_filter: StateFilter,
+) -> StateFilterRoughSizeComparator:
+    """
+    Returns a comparable value that roughly indicates the relative size of this
+    state filter compared to others.
+    It should be treated as a rough guide only and should not be interpreted to
+    have any particular meaning. The representation may also change
+
+    The current implementation returns a tuple of the form:
+        * 1 for include_others, 0 otherwise
+        * number of entries in state_filter.types
+    """
+    return int(state_filter.include_others), len(state_filter.types)
+
+
 class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
     """A data store for fetching/storing state groups."""
 
