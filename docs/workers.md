@@ -181,8 +181,8 @@ recommend the use of `systemd` where available: for information on setting up
 This worker can handle API requests matching the following regular expressions.
 
 Note that stream writers should have their endpoints routed directly to them for
-efficiency. If this is not done, the requests will be proxied to the proper
-worker.
+efficiency. If this is not done, then `POST` and `PUT` requests will be proxied
+to the proper worker while `GET` requests will be handled directly.
 
     # Sync requests
     ^/_matrix/client/(v2_alpha|r0|v3)/sync$
