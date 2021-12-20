@@ -25,6 +25,7 @@ from typing import (
 )
 
 import attr
+from sortedcontainers import SortedDict
 
 from twisted.internet import defer
 
@@ -147,7 +148,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         # Current ongoing get_state_for_groups in-flight requests
         # {group ID -> {StateFilter -> ObservableDeferred}}
         self._state_group_inflight_requests: Dict[
-            int, Dict[StateFilter, AbstractObservableDeferred[StateMap[str]]]
+            int, SortedDict[StateFilter, AbstractObservableDeferred[StateMap[str]]]
         ] = {}
 
         def get_max_state_group_txn(txn: Cursor) -> int:
@@ -378,7 +379,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         observable_deferred = ObservableDeferred(request_deferred, consumeErrors=True)
 
         # Insert the ObservableDeferred into the cache
-        group_request_dict = self._state_group_inflight_requests.setdefault(group, {})
+        group_request_dict = self._state_group_inflight_requests.setdefault(
+            group, SortedDict(state_filter_rough_size_comparator)
+        )
         group_request_dict[db_state_filter] = observable_deferred
 
         return await make_deferred_yieldable(observable_deferred.observe())
