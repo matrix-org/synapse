@@ -11,7 +11,7 @@ registered by using the Module API's `register_password_auth_provider_callbacks`
 _First introduced in Synapse v1.46.0_
 
 ```python
- auth_checkers: Dict[Tuple[str,Tuple], Callable]
+auth_checkers: Dict[Tuple[str, Tuple[str, ...]], Callable]
 ```
 
 A dict mapping from tuples of a login type identifier (such as `m.login.password`) and a

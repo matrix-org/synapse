@@ -19,6 +19,7 @@ from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
     Any,
+    ClassVar,
     Dict,
     Mapping,
     MutableMapping,
@@ -38,6 +39,7 @@ from zope.interface import Interface
 from twisted.internet.interfaces import (
     IReactorCore,
     IReactorPluggableNameResolver,
+    IReactorSSL,
     IReactorTCP,
     IReactorThreads,
     IReactorTime,
@@ -57,15 +59,18 @@ StateKey = Tuple[str, str]
 StateMap = Mapping[StateKey, T]
 MutableStateMap = MutableMapping[StateKey, T]
 
-# the type of a JSON-serialisable dict. This could be made stronger, but it will
-# do for now.
+# JSON types. These could be made stronger, but will do for now.
+# A JSON-serialisable dict.
 JsonDict = Dict[str, Any]
+# A JSON-serialisable object.
+JsonSerializable = object
 
 
 # Note that this seems to require inheriting *directly* from Interface in order
 # for mypy-zope to realize it is an interface.
 class ISynapseReactor(
     IReactorTCP,
+    IReactorSSL,
     IReactorPluggableNameResolver,
     IReactorTime,
     IReactorCore,
@@ -217,7 +222,7 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
         'domain' : The domain part of the name
     """
 
-    SIGIL: str = abc.abstractproperty()  # type: ignore
+    SIGIL: ClassVar[str] = abc.abstractproperty()  # type: ignore
 
     localpart = attr.ib(type=str)
     domain = attr.ib(type=str)

@@ -34,8 +34,7 @@ class WellKnownBuilder:
         self._config = hs.config
 
     def get_well_known(self) -> Optional[JsonDict]:
-        # if we don't have a public_baseurl, we can't help much here.
-        if self._config.server.public_baseurl is None:
+        if not self._config.server.serve_client_wellknown:
             return None
 
         result = {"m.homeserver": {"base_url": self._config.server.public_baseurl}}

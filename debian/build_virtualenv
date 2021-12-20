@@ -40,6 +40,7 @@ dh_virtualenv \
     --upgrade-pip \
     --preinstall="lxml" \
     --preinstall="mock" \
+    --preinstall="wheel" \
     --extra-pip-arg="--no-cache-dir" \
     --extra-pip-arg="--compile" \
     --extras="all,systemd,test"

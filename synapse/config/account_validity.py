@@ -75,10 +75,6 @@ class AccountValidityConfig(Config):
                 self.account_validity_period * 10.0 / 100.0
             )
 
-        if self.account_validity_renew_by_email_enabled:
-            if not self.root.server.public_baseurl:
-                raise ConfigError("Can't send renewal emails without 'public_baseurl'")
-
         # Load account validity templates.
         account_validity_template_dir = account_validity_config.get("template_dir")
         if account_validity_template_dir is not None:

@@ -1,5 +1,6 @@
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,10 +15,13 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, List, Tuple
+from typing import Any, Dict, Iterable, List, Tuple, cast
 
+from synapse.replication.tcp.streams import TagAccountDataStream
 from synapse.storage._base import db_to_json
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
+from synapse.storage.util.id_generators import AbstractStreamIdGenerator
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
@@ -50,7 +54,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
 
     async def get_all_updated_tags(
         self, instance_name: str, last_id: int, current_id: int, limit: int
-    ) -> Tuple[List[Tuple[int, tuple]], int, bool]:
+    ) -> Tuple[List[Tuple[int, Tuple[str, str, str]]], int, bool]:
         """Get updates for tags replication stream.
 
         Args:
@@ -75,7 +79,9 @@ class TagsWorkerStore(AccountDataWorkerStore):
         if last_id == current_id:
             return [], current_id, False
 
-        def get_all_updated_tags_txn(txn):
+        def get_all_updated_tags_txn(
+            txn: LoggingTransaction,
+        ) -> List[Tuple[int, str, str]]:
             sql = (
                 "SELECT stream_id, user_id, room_id"
                 " FROM room_tags_revisions as r"
@@ -83,13 +89,16 @@ class TagsWorkerStore(AccountDataWorkerStore):
                 " ORDER BY stream_id ASC LIMIT ?"
             )
             txn.execute(sql, (last_id, current_id, limit))
-            return txn.fetchall()
+            # mypy doesn't understand what the query is selecting.
+            return cast(List[Tuple[int, str, str]], txn.fetchall())
 
         tag_ids = await self.db_pool.runInteraction(
             "get_all_updated_tags", get_all_updated_tags_txn
         )
 
-        def get_tag_content(txn, tag_ids):
+        def get_tag_content(
+            txn: LoggingTransaction, tag_ids
+        ) -> List[Tuple[int, Tuple[str, str, str]]]:
             sql = "SELECT tag, content FROM room_tags WHERE user_id=? AND room_id=?"
             results = []
             for stream_id, user_id, room_id in tag_ids:
@@ -127,15 +136,15 @@ class TagsWorkerStore(AccountDataWorkerStore):
         given version
 
         Args:
-            user_id(str): The user to get the tags for.
-            stream_id(int): The earliest update to get for the user.
+            user_id: The user to get the tags for.
+            stream_id: The earliest update to get for the user.
 
         Returns:
             A mapping from room_id strings to lists of tag strings for all the
             rooms that changed since the stream_id token.
         """
 
-        def get_updated_tags_txn(txn):
+        def get_updated_tags_txn(txn: LoggingTransaction) -> List[str]:
             sql = (
                 "SELECT room_id from room_tags_revisions"
                 " WHERE user_id = ? AND stream_id > ?"
@@ -197,10 +206,11 @@ class TagsWorkerStore(AccountDataWorkerStore):
             The next account data ID.
         """
         assert self._can_write_to_account_data
+        assert isinstance(self._account_data_id_gen, AbstractStreamIdGenerator)
 
         content_json = json_encoder.encode(content)
 
-        def add_tag_txn(txn, next_id):
+        def add_tag_txn(txn: LoggingTransaction, next_id: int) -> None:
             self.db_pool.simple_upsert_txn(
                 txn,
                 table="room_tags",
@@ -223,8 +233,9 @@ class TagsWorkerStore(AccountDataWorkerStore):
             The next account data ID.
         """
         assert self._can_write_to_account_data
+        assert isinstance(self._account_data_id_gen, AbstractStreamIdGenerator)
 
-        def remove_tag_txn(txn, next_id):
+        def remove_tag_txn(txn: LoggingTransaction, next_id: int) -> None:
             sql = (
                 "DELETE FROM room_tags "
                 " WHERE user_id = ? AND room_id = ? AND tag = ?"
@@ -251,6 +262,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
             next_id: The the revision to advance to.
         """
         assert self._can_write_to_account_data
+        assert isinstance(self._account_data_id_gen, AbstractStreamIdGenerator)
 
         txn.call_after(
             self._account_data_stream_cache.entity_has_changed, user_id, next_id
@@ -279,6 +291,21 @@ class TagsWorkerStore(AccountDataWorkerStore):
                 # which stream_id ends up in the table, as long as it is higher
                 # than the id that the client has.
                 pass
+
+    def process_replication_rows(
+        self,
+        stream_name: str,
+        instance_name: str,
+        token: int,
+        rows: Iterable[Any],
+    ) -> None:
+        if stream_name == TagAccountDataStream.NAME:
+            self._account_data_id_gen.advance(instance_name, token)
+            for row in rows:
+                self.get_tags_for_user.invalidate((row.user_id,))
+                self._account_data_stream_cache.entity_has_changed(row.user_id, token)
+
+        super().process_replication_rows(stream_name, instance_name, token, rows)
 
 
 class TagsStore(TagsWorkerStore):

@@ -101,8 +101,8 @@ class Thumbnailer:
         fits within the given rectangle::
 
             (w_in / h_in) = (w_out / h_out)
-            w_out = min(w_max, h_max * (w_in / h_in))
-            h_out = min(h_max, w_max * (h_in / w_in))
+            w_out = max(min(w_max, h_max * (w_in / h_in)), 1)
+            h_out = max(min(h_max, w_max * (h_in / w_in)), 1)
 
         Args:
             max_width: The largest possible width.
@@ -110,9 +110,9 @@ class Thumbnailer:
         """
 
         if max_width * self.height < max_height * self.width:
-            return max_width, (max_width * self.height) // self.width
+            return max_width, max((max_width * self.height) // self.width, 1)
         else:
-            return (max_height * self.width) // self.height, max_height
+            return max((max_height * self.width) // self.height, 1), max_height
 
     def _resize(self, width: int, height: int) -> Image.Image:
         # 1-bit or 8-bit color palette images need converting to RGB

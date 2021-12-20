@@ -24,6 +24,7 @@ from typing import (
     List,
     Optional,
     Tuple,
+    TypeVar,
     Union,
 )
 
@@ -31,11 +32,48 @@ import attr
 import jinja2
 
 from twisted.internet import defer
-from twisted.web.resource import IResource
+from twisted.web.resource import Resource
 
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
-from synapse.events.presence_router import PresenceRouter
+from synapse.events.presence_router import (
+    GET_INTERESTED_USERS_CALLBACK,
+    GET_USERS_FOR_STATES_CALLBACK,
+    PresenceRouter,
+)
+from synapse.events.spamcheck import (
+    CHECK_EVENT_FOR_SPAM_CALLBACK,
+    CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK,
+    CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
+    CHECK_USERNAME_FOR_SPAM_CALLBACK,
+    USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
+    USER_MAY_CREATE_ROOM_CALLBACK,
+    USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK,
+    USER_MAY_INVITE_CALLBACK,
+    USER_MAY_JOIN_ROOM_CALLBACK,
+    USER_MAY_PUBLISH_ROOM_CALLBACK,
+    USER_MAY_SEND_3PID_INVITE_CALLBACK,
+)
+from synapse.events.third_party_rules import (
+    CHECK_EVENT_ALLOWED_CALLBACK,
+    CHECK_THREEPID_CAN_BE_INVITED_CALLBACK,
+    CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK,
+    ON_CREATE_ROOM_CALLBACK,
+    ON_NEW_EVENT_CALLBACK,
+)
+from synapse.handlers.account_validity import (
+    IS_USER_EXPIRED_CALLBACK,
+    ON_LEGACY_ADMIN_REQUEST,
+    ON_LEGACY_RENEW_CALLBACK,
+    ON_LEGACY_SEND_MAIL_CALLBACK,
+    ON_USER_REGISTRATION_CALLBACK,
+)
+from synapse.handlers.auth import (
+    CHECK_3PID_AUTH_CALLBACK,
+    CHECK_AUTH_CALLBACK,
+    ON_LOGGED_OUT_CALLBACK,
+    AuthHandler,
+)
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
     DirectServeHtmlResource,
@@ -44,10 +82,19 @@ from synapse.http.server import (
 )
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
-from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.logging.context import (
+    defer_to_thread,
+    make_deferred_yieldable,
+    run_in_background,
+)
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client.login import LoginResponse
 from synapse.storage import DataStore
+from synapse.storage.background_updates import (
+    DEFAULT_BATCH_SIZE_CALLBACK,
+    MIN_BATCH_SIZE_CALLBACK,
+    ON_UPDATE_CALLBACK,
+)
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
@@ -61,11 +108,15 @@ from synapse.types import (
     create_requester,
 )
 from synapse.util import Clock
+from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
     from synapse.app.generic_worker import GenericWorkerSlavedStore
     from synapse.server import HomeServer
+
+
+T = TypeVar("T")
 
 """
 This package defines the 'stable' API which can be used by extension modules which
@@ -114,7 +165,7 @@ class ModuleApi:
     can register new users etc if necessary.
     """
 
-    def __init__(self, hs: "HomeServer", auth_handler):
+    def __init__(self, hs: "HomeServer", auth_handler: AuthHandler) -> None:
         self._hs = hs
 
         # TODO: Fix this type hint once the types for the data stores have been ironed
@@ -156,47 +207,139 @@ class ModuleApi:
     #################################################################################
     # The following methods should only be called during the module's initialisation.
 
-    @property
-    def register_spam_checker_callbacks(self):
+    def register_spam_checker_callbacks(
+        self,
+        check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
+        user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
+        user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
+        user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
+        user_may_create_room: Optional[USER_MAY_CREATE_ROOM_CALLBACK] = None,
+        user_may_create_room_with_invites: Optional[
+            USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK
+        ] = None,
+        user_may_create_room_alias: Optional[
+            USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
+        ] = None,
+        user_may_publish_room: Optional[USER_MAY_PUBLISH_ROOM_CALLBACK] = None,
+        check_username_for_spam: Optional[CHECK_USERNAME_FOR_SPAM_CALLBACK] = None,
+        check_registration_for_spam: Optional[
+            CHECK_REGISTRATION_FOR_SPAM_CALLBACK
+        ] = None,
+        check_media_file_for_spam: Optional[CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK] = None,
+    ) -> None:
         """Registers callbacks for spam checking capabilities.
 
         Added in Synapse v1.37.0.
         """
-        return self._spam_checker.register_callbacks
+        return self._spam_checker.register_callbacks(
+            check_event_for_spam=check_event_for_spam,
+            user_may_join_room=user_may_join_room,
+            user_may_invite=user_may_invite,
+            user_may_send_3pid_invite=user_may_send_3pid_invite,
+            user_may_create_room=user_may_create_room,
+            user_may_create_room_with_invites=user_may_create_room_with_invites,
+            user_may_create_room_alias=user_may_create_room_alias,
+            user_may_publish_room=user_may_publish_room,
+            check_username_for_spam=check_username_for_spam,
+            check_registration_for_spam=check_registration_for_spam,
+            check_media_file_for_spam=check_media_file_for_spam,
+        )
 
-    @property
-    def register_account_validity_callbacks(self):
+    def register_account_validity_callbacks(
+        self,
+        is_user_expired: Optional[IS_USER_EXPIRED_CALLBACK] = None,
+        on_user_registration: Optional[ON_USER_REGISTRATION_CALLBACK] = None,
+        on_legacy_send_mail: Optional[ON_LEGACY_SEND_MAIL_CALLBACK] = None,
+        on_legacy_renew: Optional[ON_LEGACY_RENEW_CALLBACK] = None,
+        on_legacy_admin_request: Optional[ON_LEGACY_ADMIN_REQUEST] = None,
+    ) -> None:
         """Registers callbacks for account validity capabilities.
 
         Added in Synapse v1.39.0.
         """
-        return self._account_validity_handler.register_account_validity_callbacks
+        return self._account_validity_handler.register_account_validity_callbacks(
+            is_user_expired=is_user_expired,
+            on_user_registration=on_user_registration,
+            on_legacy_send_mail=on_legacy_send_mail,
+            on_legacy_renew=on_legacy_renew,
+            on_legacy_admin_request=on_legacy_admin_request,
+        )
 
-    @property
-    def register_third_party_rules_callbacks(self):
+    def register_third_party_rules_callbacks(
+        self,
+        check_event_allowed: Optional[CHECK_EVENT_ALLOWED_CALLBACK] = None,
+        on_create_room: Optional[ON_CREATE_ROOM_CALLBACK] = None,
+        check_threepid_can_be_invited: Optional[
+            CHECK_THREEPID_CAN_BE_INVITED_CALLBACK
+        ] = None,
+        check_visibility_can_be_modified: Optional[
+            CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
+        ] = None,
+        on_new_event: Optional[ON_NEW_EVENT_CALLBACK] = None,
+    ) -> None:
         """Registers callbacks for third party event rules capabilities.
 
         Added in Synapse v1.39.0.
         """
-        return self._third_party_event_rules.register_third_party_rules_callbacks
+        return self._third_party_event_rules.register_third_party_rules_callbacks(
+            check_event_allowed=check_event_allowed,
+            on_create_room=on_create_room,
+            check_threepid_can_be_invited=check_threepid_can_be_invited,
+            check_visibility_can_be_modified=check_visibility_can_be_modified,
+            on_new_event=on_new_event,
+        )
 
-    @property
-    def register_presence_router_callbacks(self):
+    def register_presence_router_callbacks(
+        self,
+        get_users_for_states: Optional[GET_USERS_FOR_STATES_CALLBACK] = None,
+        get_interested_users: Optional[GET_INTERESTED_USERS_CALLBACK] = None,
+    ) -> None:
         """Registers callbacks for presence router capabilities.
 
         Added in Synapse v1.42.0.
         """
-        return self._presence_router.register_presence_router_callbacks
+        return self._presence_router.register_presence_router_callbacks(
+            get_users_for_states=get_users_for_states,
+            get_interested_users=get_interested_users,
+        )
 
-    @property
-    def register_password_auth_provider_callbacks(self):
+    def register_password_auth_provider_callbacks(
+        self,
+        check_3pid_auth: Optional[CHECK_3PID_AUTH_CALLBACK] = None,
+        on_logged_out: Optional[ON_LOGGED_OUT_CALLBACK] = None,
+        auth_checkers: Optional[
+            Dict[Tuple[str, Tuple[str, ...]], CHECK_AUTH_CALLBACK]
+        ] = None,
+    ) -> None:
         """Registers callbacks for password auth provider capabilities.
 
         Added in Synapse v1.46.0.
         """
-        return self._password_auth_provider.register_password_auth_provider_callbacks
+        return self._password_auth_provider.register_password_auth_provider_callbacks(
+            check_3pid_auth=check_3pid_auth,
+            on_logged_out=on_logged_out,
+            auth_checkers=auth_checkers,
+        )
 
-    def register_web_resource(self, path: str, resource: IResource):
+    def register_background_update_controller_callbacks(
+        self,
+        on_update: ON_UPDATE_CALLBACK,
+        default_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
+        min_batch_size: Optional[MIN_BATCH_SIZE_CALLBACK] = None,
+    ) -> None:
+        """Registers background update controller callbacks.
+
+        Added in Synapse v1.49.0.
+        """
+
+        for db in self._hs.get_datastores().databases:
+            db.updates.register_update_controller_callbacks(
+                on_update=on_update,
+                default_batch_size=default_batch_size,
+                min_batch_size=min_batch_size,
+            )
+
+    def register_web_resource(self, path: str, resource: Resource) -> None:
         """Registers a web resource to be served at the given path.
 
         This function should be called during initialisation of the module.
@@ -216,7 +359,7 @@ class ModuleApi:
     # The following methods can be called by the module at any point in time.
 
     @property
-    def http_client(self):
+    def http_client(self) -> SimpleHttpClient:
         """Allows making outbound HTTP requests to remote resources.
 
         An instance of synapse.http.client.SimpleHttpClient
@@ -226,7 +369,7 @@ class ModuleApi:
         return self._http_client
 
     @property
-    def public_room_list_manager(self):
+    def public_room_list_manager(self) -> "PublicRoomListManager":
         """Allows adding to, removing from and checking the status of rooms in the
         public room list.
 
@@ -309,7 +452,7 @@ class ModuleApi:
         """
         return await self._store.is_server_admin(UserID.from_string(user_id))
 
-    def get_qualified_user_id(self, username):
+    def get_qualified_user_id(self, username: str) -> str:
         """Qualify a user id, if necessary
 
         Takes a user id provided by the user and adds the @ and :domain to
@@ -318,10 +461,10 @@ class ModuleApi:
         Added in Synapse v0.25.0.
 
         Args:
-            username (str): provided user id
+            username: provided user id
 
         Returns:
-            str: qualified @user:id
+            qualified @user:id
         """
         if username.startswith("@"):
             return username
@@ -357,22 +500,27 @@ class ModuleApi:
         """
         return await self._store.user_get_threepids(user_id)
 
-    def check_user_exists(self, user_id):
+    def check_user_exists(self, user_id: str) -> "defer.Deferred[Optional[str]]":
         """Check if user exists.
 
         Added in Synapse v0.25.0.
 
         Args:
-            user_id (str): Complete @user:id
+            user_id: Complete @user:id
 
         Returns:
-            Deferred[str|None]: Canonical (case-corrected) user_id, or None
+            Canonical (case-corrected) user_id, or None
                if the user is not registered.
         """
         return defer.ensureDeferred(self._auth_handler.check_user_exists(user_id))
 
     @defer.inlineCallbacks
-    def register(self, localpart, displayname=None, emails: Optional[List[str]] = None):
+    def register(
+        self,
+        localpart: str,
+        displayname: Optional[str] = None,
+        emails: Optional[List[str]] = None,
+    ) -> Generator["defer.Deferred[Any]", Any, Tuple[str, str]]:
         """Registers a new user with given localpart and optional displayname, emails.
 
         Also returns an access token for the new user.
@@ -384,12 +532,12 @@ class ModuleApi:
         Added in Synapse v0.25.0.
 
         Args:
-            localpart (str): The localpart of the new user.
-            displayname (str|None): The displayname of the new user.
-            emails (List[str]): Emails to bind to the new user.
+            localpart: The localpart of the new user.
+            displayname: The displayname of the new user.
+            emails: Emails to bind to the new user.
 
         Returns:
-            Deferred[tuple[str, str]]: a 2-tuple of (user_id, access_token)
+            a 2-tuple of (user_id, access_token)
         """
         logger.warning(
             "Using deprecated ModuleApi.register which creates a dummy user device."
@@ -399,23 +547,26 @@ class ModuleApi:
         return user_id, access_token
 
     def register_user(
-        self, localpart, displayname=None, emails: Optional[List[str]] = None
-    ):
+        self,
+        localpart: str,
+        displayname: Optional[str] = None,
+        emails: Optional[List[str]] = None,
+    ) -> "defer.Deferred[str]":
         """Registers a new user with given localpart and optional displayname, emails.
 
         Added in Synapse v1.2.0.
 
         Args:
-            localpart (str): The localpart of the new user.
-            displayname (str|None): The displayname of the new user.
-            emails (List[str]): Emails to bind to the new user.
+            localpart: The localpart of the new user.
+            displayname: The displayname of the new user.
+            emails: Emails to bind to the new user.
 
         Raises:
             SynapseError if there is an error performing the registration. Check the
                 'errcode' property for more information on the reason for failure
 
         Returns:
-            defer.Deferred[str]: user_id
+            user_id
         """
         return defer.ensureDeferred(
             self._hs.get_registration_handler().register_user(
@@ -425,20 +576,25 @@ class ModuleApi:
             )
         )
 
-    def register_device(self, user_id, device_id=None, initial_display_name=None):
+    def register_device(
+        self,
+        user_id: str,
+        device_id: Optional[str] = None,
+        initial_display_name: Optional[str] = None,
+    ) -> "defer.Deferred[Tuple[str, str, Optional[int], Optional[str]]]":
         """Register a device for a user and generate an access token.
 
         Added in Synapse v1.2.0.
 
         Args:
-            user_id (str): full canonical @user:id
-            device_id (str|None): The device ID to check, or None to generate
+            user_id: full canonical @user:id
+            device_id: The device ID to check, or None to generate
                 a new one.
-            initial_display_name (str|None): An optional display name for the
+            initial_display_name: An optional display name for the
                 device.
 
         Returns:
-            defer.Deferred[tuple[str, str]]: Tuple of device ID and access token
+            Tuple of device ID, access token, access token expiration time and refresh token
         """
         return defer.ensureDeferred(
             self._hs.get_registration_handler().register_device(
@@ -471,6 +627,7 @@ class ModuleApi:
         user_id: str,
         duration_in_ms: int = (2 * 60 * 1000),
         auth_provider_id: str = "",
+        auth_provider_session_id: Optional[str] = None,
     ) -> str:
         """Generate a login token suitable for m.login.token authentication
 
@@ -488,11 +645,14 @@ class ModuleApi:
         return self._hs.get_macaroon_generator().generate_short_term_login_token(
             user_id,
             auth_provider_id,
+            auth_provider_session_id,
             duration_in_ms,
         )
 
     @defer.inlineCallbacks
-    def invalidate_access_token(self, access_token):
+    def invalidate_access_token(
+        self, access_token: str
+    ) -> Generator["defer.Deferred[Any]", Any, None]:
         """Invalidate an access token for a user
 
         Added in Synapse v0.25.0.
@@ -524,14 +684,20 @@ class ModuleApi:
                 self._auth_handler.delete_access_token(access_token)
             )
 
-    def run_db_interaction(self, desc, func, *args, **kwargs):
+    def run_db_interaction(
+        self,
+        desc: str,
+        func: Callable[..., T],
+        *args: Any,
+        **kwargs: Any,
+    ) -> "defer.Deferred[T]":
         """Run a function with a database connection
 
         Added in Synapse v0.25.0.
 
         Args:
-            desc (str): description for the transaction, for metrics etc
-            func (func): function to be run. Passed a database cursor object
+            desc: description for the transaction, for metrics etc
+            func: function to be run. Passed a database cursor object
                 as well as *args and **kwargs
             *args: positional args to be passed to func
             **kwargs: named args to be passed to func
@@ -545,7 +711,7 @@ class ModuleApi:
 
     def complete_sso_login(
         self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
-    ):
+    ) -> None:
         """Complete a SSO login by redirecting the user to a page to confirm whether they
         want their access token sent to `client_redirect_url`, or redirect them to that
         URL with a token directly if the URL matches with one of the whitelisted clients.
@@ -575,7 +741,7 @@ class ModuleApi:
         client_redirect_url: str,
         new_user: bool = False,
         auth_provider_id: str = "<unknown>",
-    ):
+    ) -> None:
         """Complete a SSO login by redirecting the user to a page to confirm whether they
         want their access token sent to `client_redirect_url`, or redirect them to that
         URL with a token directly if the URL matches with one of the whitelisted clients.
@@ -814,11 +980,11 @@ class ModuleApi:
         self,
         f: Callable,
         msec: float,
-        *args,
+        *args: object,
         desc: Optional[str] = None,
         run_on_all_instances: bool = False,
-        **kwargs,
-    ):
+        **kwargs: object,
+    ) -> None:
         """Wraps a function as a background process and calls it repeatedly.
 
         NOTE: Will only run on the instance that is configured to run
@@ -849,9 +1015,7 @@ class ModuleApi:
                 run_as_background_process,
                 msec,
                 desc,
-                f,
-                *args,
-                **kwargs,
+                lambda: maybe_awaitable(f(*args, **kwargs)),
             )
         else:
             logger.warning(
@@ -859,13 +1023,18 @@ class ModuleApi:
                 f,
             )
 
+    async def sleep(self, seconds: float) -> None:
+        """Sleeps for the given number of seconds."""
+
+        await self._clock.sleep(seconds)
+
     async def send_mail(
         self,
         recipient: str,
         subject: str,
         html: str,
         text: str,
-    ):
+    ) -> None:
         """Send an email on behalf of the homeserver.
 
         Added in Synapse v1.39.0.
@@ -903,7 +1072,7 @@ class ModuleApi:
             A list containing the loaded templates, with the orders matching the one of
             the filenames parameter.
         """
-        return self._hs.config.read_templates(
+        return self._hs.config.server.read_templates(
             filenames,
             (td for td in (self.custom_template_dir, custom_template_directory) if td),
         )
@@ -1012,6 +1181,26 @@ class ModuleApi:
         state_events = await self._store.get_events(state_ids.values())
 
         return {key: state_events[event_id] for key, event_id in state_ids.items()}
+
+    async def defer_to_thread(
+        self,
+        f: Callable[..., T],
+        *args: Any,
+        **kwargs: Any,
+    ) -> T:
+        """Runs the given function in a separate thread from Synapse's thread pool.
+
+        Added in Synapse v1.49.0.
+
+        Args:
+            f: The function to run.
+            args: The function's arguments.
+            kwargs: The function's keyword arguments.
+
+        Returns:
+            The return value of the function once ran in a thread.
+        """
+        return await defer_to_thread(self._hs.get_reactor(), f, *args, **kwargs)
 
 
 class PublicRoomListManager:

@@ -1,6 +1,6 @@
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
-# Copyright 2019 Matrix.org Federation C.I.C
+# Copyright 2019-2021 Matrix.org Federation C.I.C
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@ from typing import (
 
 from prometheus_client import Counter, Gauge, Histogram
 
-from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
@@ -67,7 +66,7 @@ from synapse.replication.http.federation import (
 from synapse.storage.databases.main.lock import Lock
 from synapse.types import JsonDict, get_domain_from_id
 from synapse.util import glob_to_regex, json_decoder, unwrapFirstError
-from synapse.util.async_helpers import Linearizer, concurrently_execute
+from synapse.util.async_helpers import Linearizer, concurrently_execute, gather_results
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_server_name
 
@@ -110,6 +109,7 @@ class FederationServer(FederationBase):
         super().__init__(hs)
 
         self.handler = hs.get_federation_handler()
+        self.storage = hs.get_storage()
         self._federation_event_handler = hs.get_federation_event_handler()
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
@@ -200,6 +200,48 @@ class FederationServer(FederationBase):
 
         return 200, res
 
+    async def on_timestamp_to_event_request(
+        self, origin: str, room_id: str, timestamp: int, direction: str
+    ) -> Tuple[int, Dict[str, Any]]:
+        """When we receive a federated `/timestamp_to_event` request,
+        handle all of the logic for validating and fetching the event.
+
+        Args:
+            origin: The server we received the event from
+            room_id: Room to fetch the event from
+            timestamp: The point in time (inclusive) we should navigate from in
+                the given direction to find the closest event.
+            direction: ["f"|"b"] to indicate whether we should navigate forward
+                or backward from the given timestamp to find the closest event.
+
+        Returns:
+            Tuple indicating the response status code and dictionary response
+            body including `event_id`.
+        """
+        with (await self._server_linearizer.queue((origin, room_id))):
+            origin_host, _ = parse_server_name(origin)
+            await self.check_server_matches_acl(origin_host, room_id)
+
+            # We only try to fetch data from the local database
+            event_id = await self.store.get_event_id_for_timestamp(
+                room_id, timestamp, direction
+            )
+            if event_id:
+                event = await self.store.get_event(
+                    event_id, allow_none=False, allow_rejected=False
+                )
+
+                return 200, {
+                    "event_id": event_id,
+                    "origin_server_ts": event.origin_server_ts,
+                }
+
+        raise SynapseError(
+            404,
+            "Unable to find event from %s in direction %s" % (timestamp, direction),
+            errcode=Codes.NOT_FOUND,
+        )
+
     async def on_incoming_transaction(
         self,
         origin: str,
@@ -212,6 +254,11 @@ class FederationServer(FederationBase):
         if not self._started_handling_of_staged_events:
             self._started_handling_of_staged_events = True
             self._handle_old_staged_events()
+
+            # Start a periodic check for old staged events. This is to handle
+            # the case where locks time out, e.g. if another process gets killed
+            # without dropping its locks.
+            self._clock.looping_call(self._handle_old_staged_events, 60 * 1000)
 
         # keep this as early as possible to make the calculated origin ts as
         # accurate as possible.
@@ -312,13 +359,13 @@ class FederationServer(FederationBase):
         # want to block things like to device messages from reaching clients
         # behind the potentially expensive handling of PDUs.
         pdu_results, _ = await make_deferred_yieldable(
-            defer.gatherResults(
-                [
+            gather_results(
+                (
                     run_in_background(
                         self._handle_pdus_in_txn, origin, transaction, request_time
                     ),
                     run_in_background(self._handle_edus_in_txn, origin, transaction),
-                ],
+                ),
                 consumeErrors=True,
             ).addErrback(unwrapFirstError)
         )
@@ -402,7 +449,7 @@ class FederationServer(FederationBase):
         # require callouts to other servers to fetch missing events), but
         # impose a limit to avoid going too crazy with ram/cpu.
 
-        async def process_pdus_for_room(room_id: str):
+        async def process_pdus_for_room(room_id: str) -> None:
             with nested_logging_context(room_id):
                 logger.debug("Processing PDUs for %s", room_id)
 
@@ -499,7 +546,7 @@ class FederationServer(FederationBase):
 
     async def on_state_ids_request(
         self, origin: str, room_id: str, event_id: str
-    ) -> Tuple[int, Dict[str, Any]]:
+    ) -> Tuple[int, JsonDict]:
         if not event_id:
             raise NotImplementedError("Specify an event")
 
@@ -519,7 +566,9 @@ class FederationServer(FederationBase):
 
         return 200, resp
 
-    async def _on_state_ids_request_compute(self, room_id, event_id):
+    async def _on_state_ids_request_compute(
+        self, room_id: str, event_id: str
+    ) -> JsonDict:
         state_ids = await self.handler.get_state_ids_for_pdu(room_id, event_id)
         auth_chain_ids = await self.store.get_auth_chain_ids(room_id, state_ids)
         return {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids}
@@ -608,8 +657,11 @@ class FederationServer(FederationBase):
         state = await self.store.get_events(state_ids)
 
         time_now = self._clock.time_msec()
+        event_json = event.get_pdu_json()
         return {
-            "org.matrix.msc3083.v2.event": event.get_pdu_json(),
+            # TODO Remove the unstable prefix when servers have updated.
+            "org.matrix.msc3083.v2.event": event_json,
+            "event": event_json,
             "state": [p.get_pdu_json(time_now) for p in state.values()],
             "auth_chain": [p.get_pdu_json(time_now) for p in auth_chain],
         }

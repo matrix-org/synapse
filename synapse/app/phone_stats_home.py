@@ -15,11 +15,12 @@ import logging
 import math
 import resource
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Sized, Tuple
 
 from prometheus_client import Gauge
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
+from synapse.types import JsonDict
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -28,7 +29,7 @@ logger = logging.getLogger("synapse.app.homeserver")
 
 # Contains the list of processes we will be monitoring
 # currently either 0 or 1
-_stats_process = []
+_stats_process: List[Tuple[int, "resource.struct_rusage"]] = []
 
 # Gauges to expose monthly active user control metrics
 current_mau_gauge = Gauge("synapse_admin_mau:current", "Current MAU")
@@ -45,9 +46,15 @@ registered_reserved_users_mau_gauge = Gauge(
 
 
 @wrap_as_background_process("phone_stats_home")
-async def phone_stats_home(hs: "HomeServer", stats, stats_process=_stats_process):
+async def phone_stats_home(
+    hs: "HomeServer",
+    stats: JsonDict,
+    stats_process: List[Tuple[int, "resource.struct_rusage"]] = _stats_process,
+) -> None:
     logger.info("Gathering stats for reporting")
     now = int(hs.get_clock().time())
+    # Ensure the homeserver has started.
+    assert hs.start_time is not None
     uptime = int(now - hs.start_time)
     if uptime < 0:
         uptime = 0
@@ -146,15 +153,15 @@ async def phone_stats_home(hs: "HomeServer", stats, stats_process=_stats_process
         logger.warning("Error reporting stats: %s", e)
 
 
-def start_phone_stats_home(hs: "HomeServer"):
+def start_phone_stats_home(hs: "HomeServer") -> None:
     """
     Start the background tasks which report phone home stats.
     """
     clock = hs.get_clock()
 
-    stats = {}
+    stats: JsonDict = {}
 
-    def performance_stats_init():
+    def performance_stats_init() -> None:
         _stats_process.clear()
         _stats_process.append(
             (int(hs.get_clock().time()), resource.getrusage(resource.RUSAGE_SELF))
@@ -170,10 +177,10 @@ def start_phone_stats_home(hs: "HomeServer"):
     hs.get_datastore().reap_monthly_active_users()
 
     @wrap_as_background_process("generate_monthly_active_users")
-    async def generate_monthly_active_users():
+    async def generate_monthly_active_users() -> None:
         current_mau_count = 0
         current_mau_count_by_service = {}
-        reserved_users = ()
+        reserved_users: Sized = ()
         store = hs.get_datastore()
         if hs.config.server.limit_usage_by_mau or hs.config.server.mau_stats_only:
             current_mau_count = await store.get_monthly_active_count()

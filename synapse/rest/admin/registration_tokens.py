@@ -14,6 +14,7 @@
 
 import logging
 import string
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import Codes, NotFoundError, SynapseError
@@ -69,7 +70,6 @@ class ListRegistrationTokensRestServlet(RestServlet):
     PATTERNS = admin_patterns("/registration_tokens$")
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
 
@@ -77,7 +77,7 @@ class ListRegistrationTokensRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
         valid = parse_boolean(request, "valid")
         token_list = await self.store.get_registration_tokens(valid)
-        return 200, {"registration_tokens": token_list}
+        return HTTPStatus.OK, {"registration_tokens": token_list}
 
 
 class NewRegistrationTokenRestServlet(RestServlet):
@@ -108,7 +108,6 @@ class NewRegistrationTokenRestServlet(RestServlet):
     PATTERNS = admin_patterns("/registration_tokens/new$")
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
@@ -123,16 +122,20 @@ class NewRegistrationTokenRestServlet(RestServlet):
         if "token" in body:
             token = body["token"]
             if not isinstance(token, str):
-                raise SynapseError(400, "token must be a string", Codes.INVALID_PARAM)
+                raise SynapseError(
+                    HTTPStatus.BAD_REQUEST,
+                    "token must be a string",
+                    Codes.INVALID_PARAM,
+                )
             if not (0 < len(token) <= 64):
                 raise SynapseError(
-                    400,
+                    HTTPStatus.BAD_REQUEST,
                     "token must not be empty and must not be longer than 64 characters",
                     Codes.INVALID_PARAM,
                 )
             if not set(token).issubset(self.allowed_chars_set):
                 raise SynapseError(
-                    400,
+                    HTTPStatus.BAD_REQUEST,
                     "token must consist only of characters matched by the regex [A-Za-z0-9-_]",
                     Codes.INVALID_PARAM,
                 )
@@ -142,11 +145,13 @@ class NewRegistrationTokenRestServlet(RestServlet):
             length = body.get("length", 16)
             if not isinstance(length, int):
                 raise SynapseError(
-                    400, "length must be an integer", Codes.INVALID_PARAM
+                    HTTPStatus.BAD_REQUEST,
+                    "length must be an integer",
+                    Codes.INVALID_PARAM,
                 )
             if not (0 < length <= 64):
                 raise SynapseError(
-                    400,
+                    HTTPStatus.BAD_REQUEST,
                     "length must be greater than zero and not greater than 64",
                     Codes.INVALID_PARAM,
                 )
@@ -162,7 +167,7 @@ class NewRegistrationTokenRestServlet(RestServlet):
             or (isinstance(uses_allowed, int) and uses_allowed >= 0)
         ):
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "uses_allowed must be a non-negative integer or null",
                 Codes.INVALID_PARAM,
             )
@@ -170,11 +175,15 @@ class NewRegistrationTokenRestServlet(RestServlet):
         expiry_time = body.get("expiry_time", None)
         if not isinstance(expiry_time, (int, type(None))):
             raise SynapseError(
-                400, "expiry_time must be an integer or null", Codes.INVALID_PARAM
+                HTTPStatus.BAD_REQUEST,
+                "expiry_time must be an integer or null",
+                Codes.INVALID_PARAM,
             )
         if isinstance(expiry_time, int) and expiry_time < self.clock.time_msec():
             raise SynapseError(
-                400, "expiry_time must not be in the past", Codes.INVALID_PARAM
+                HTTPStatus.BAD_REQUEST,
+                "expiry_time must not be in the past",
+                Codes.INVALID_PARAM,
             )
 
         created = await self.store.create_registration_token(
@@ -182,7 +191,9 @@ class NewRegistrationTokenRestServlet(RestServlet):
         )
         if not created:
             raise SynapseError(
-                400, f"Token already exists: {token}", Codes.INVALID_PARAM
+                HTTPStatus.BAD_REQUEST,
+                f"Token already exists: {token}",
+                Codes.INVALID_PARAM,
             )
 
         resp = {
@@ -192,7 +203,7 @@ class NewRegistrationTokenRestServlet(RestServlet):
             "completed": 0,
             "expiry_time": expiry_time,
         }
-        return 200, resp
+        return HTTPStatus.OK, resp
 
 
 class RegistrationTokenRestServlet(RestServlet):
@@ -247,7 +258,6 @@ class RegistrationTokenRestServlet(RestServlet):
     PATTERNS = admin_patterns("/registration_tokens/(?P<token>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
         self.clock = hs.get_clock()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
@@ -261,7 +271,7 @@ class RegistrationTokenRestServlet(RestServlet):
         if token_info is None:
             raise NotFoundError(f"No such registration token: {token}")
 
-        return 200, token_info
+        return HTTPStatus.OK, token_info
 
     async def on_PUT(self, request: SynapseRequest, token: str) -> Tuple[int, JsonDict]:
         """Update a registration token."""
@@ -277,7 +287,7 @@ class RegistrationTokenRestServlet(RestServlet):
                 or (isinstance(uses_allowed, int) and uses_allowed >= 0)
             ):
                 raise SynapseError(
-                    400,
+                    HTTPStatus.BAD_REQUEST,
                     "uses_allowed must be a non-negative integer or null",
                     Codes.INVALID_PARAM,
                 )
@@ -287,11 +297,15 @@ class RegistrationTokenRestServlet(RestServlet):
             expiry_time = body["expiry_time"]
             if not isinstance(expiry_time, (int, type(None))):
                 raise SynapseError(
-                    400, "expiry_time must be an integer or null", Codes.INVALID_PARAM
+                    HTTPStatus.BAD_REQUEST,
+                    "expiry_time must be an integer or null",
+                    Codes.INVALID_PARAM,
                 )
             if isinstance(expiry_time, int) and expiry_time < self.clock.time_msec():
                 raise SynapseError(
-                    400, "expiry_time must not be in the past", Codes.INVALID_PARAM
+                    HTTPStatus.BAD_REQUEST,
+                    "expiry_time must not be in the past",
+                    Codes.INVALID_PARAM,
                 )
             new_attributes["expiry_time"] = expiry_time
 
@@ -307,7 +321,7 @@ class RegistrationTokenRestServlet(RestServlet):
         if token_info is None:
             raise NotFoundError(f"No such registration token: {token}")
 
-        return 200, token_info
+        return HTTPStatus.OK, token_info
 
     async def on_DELETE(
         self, request: SynapseRequest, token: str
@@ -316,6 +330,6 @@ class RegistrationTokenRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if await self.store.delete_registration_token(token):
-            return 200, {}
+            return HTTPStatus.OK, {}
 
         raise NotFoundError(f"No such registration token: {token}")
