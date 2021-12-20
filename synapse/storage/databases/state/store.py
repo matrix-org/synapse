@@ -453,12 +453,22 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             )
 
         log_ticker += 1
-        validation_logger.info(
-            "LT=%d. Correct: %r. Effective: %r",
-            log_ticker,
-            validation_counter,
-            effectiveness_counter,
-        )
+        if log_ticker % 20 == 0:
+            validation_logger.info(
+                "LT=%d. Correct: %r. Effective: %r",
+                log_ticker,
+                validation_counter,
+                effectiveness_counter,
+            )
+
+        if len(set(groups)) != len(groups):
+            try:
+                raise RuntimeError("Inefficient")
+            except RuntimeError:
+                validation_logger.exception(
+                    "Warning (not of bug, but fishy): len(s(g)) != len(g). g=%r.",
+                    groups,
+                )
 
         return old_result
 
@@ -543,7 +553,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         # (member_state, incomplete_groups_m,) = self._get_state_for_groups_using_cache(
         #     groups, self._state_group_members_cache, state_filter=member_filter
         # )
-        state = dict()
+        state = {}
         # state = dict(non_member_state)
         # for group in groups:
         #     state[group].update(member_state[group])
