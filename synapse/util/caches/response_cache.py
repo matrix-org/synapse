@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Any, Awaitable, Callable, Dict, Generic, Iterable, Optional, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Generic,
+    Iterable,
+    Optional,
+    TypeVar,
+)
 
 import attr
 
@@ -29,6 +39,9 @@ from synapse.util.async_helpers import AbstractObservableDeferred, ObservableDef
 from synapse.util.caches import register_cache
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    import opentracing
 
 # the type of the key in the cache
 KV = TypeVar("KV")
@@ -69,7 +82,7 @@ class ResponseCacheEntry:
     easier to cache Failure results.
     """
 
-    opentracing_span_context: Any
+    opentracing_span_context: "Optional[opentracing.SpanContext]"
     """The opentracing span which generated/is generating the result"""
 
 
@@ -128,7 +141,7 @@ class ResponseCache(Generic[KV]):
         self,
         context: ResponseCacheContext[KV],
         deferred: "defer.Deferred[RV]",
-        opentracing_span_context: Any,
+        opentracing_span_context: "Optional[opentracing.SpanContext]",
     ) -> ResponseCacheEntry:
         """Set the entry for the given key to the given deferred.
 
@@ -221,7 +234,7 @@ class ResponseCache(Generic[KV]):
             if cache_context:
                 kwargs["cache_context"] = context
 
-            span_context = None
+            span_context: Optional[opentracing.SpanContext] = None
 
             async def cb() -> RV:
                 # NB it is important that we do not `await` before setting span_context!
