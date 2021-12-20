@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Any, Awaitable, Callable, Dict, Generic, Optional, TypeVar
+from typing import Any, Awaitable, Callable, Dict, Generic, Iterable, Optional, TypeVar
 
 import attr
 
@@ -79,6 +79,17 @@ class ResponseCache(Generic[KV]):
 
     def __len__(self) -> int:
         return self.size()
+
+    def keys(self) -> Iterable[KV]:
+        """Get the keys currently in the result cache
+
+        Returns both incomplete entries, and (if the timeout on this cache is non-zero),
+        complete entries which are still in the cache.
+
+        Note that the returned iterator is not safe in the face of concurrent execution:
+        behaviour is undefined if `wrap` is called during iteration.
+        """
+        return self.pending_result_cache.keys()
 
     def get(self, key: KV) -> Optional[defer.Deferred]:
         """Look up the given key.
