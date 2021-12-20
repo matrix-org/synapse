@@ -168,7 +168,8 @@ import inspect
 import logging
 import re
 from functools import wraps
-from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Pattern, Type
+from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Pattern, Type, Any, Callable, Iterator, Iterable, \
+    Union, Match
 
 import attr
 
@@ -182,6 +183,9 @@ from synapse.util import json_decoder, json_encoder
 if TYPE_CHECKING:
     from synapse.http.site import SynapseRequest
     from synapse.server import HomeServer
+    from opentracing.tracer import Reference
+    from opentracing.span import Span, SpanContext
+    from opentracing.scope import Scope
 
 # Helper class
 
@@ -252,10 +256,10 @@ try:
 
         _reporter = attr.ib(type=Reporter, default=attr.Factory(Reporter))
 
-        def set_process(self, *args, **kwargs):
+        def set_process(self, *args: Any, **kwargs: Any) -> None:
             return self._reporter.set_process(*args, **kwargs)
 
-        def report_span(self, span):
+        def report_span(self, span: 'Span') -> None:
             try:
                 return self._reporter.report_span(span)
             except Exception:
@@ -303,20 +307,20 @@ _homeserver_whitelist: Optional[Pattern[str]] = None
 Sentinel = object()
 
 
-def only_if_tracing(func):
+def only_if_tracing(func: Callable) -> Callable:
     """Executes the function only if we're tracing. Otherwise returns None."""
 
     @wraps(func)
-    def _only_if_tracing_inner(*args, **kwargs):
+    def _only_if_tracing_inner(*args: Any, **kwargs: Any) -> Optional[Callable]:
         if opentracing:
             return func(*args, **kwargs)
         else:
-            return
+            return None
 
     return _only_if_tracing_inner
 
 
-def ensure_active_span(message, ret=None):
+def ensure_active_span(message: str, ret: Optional[object]=None) -> Optional[object]:
     """Executes the operation only if opentracing is enabled and there is an active span.
     If there is no active span it logs message at the error level.
 
@@ -329,9 +333,9 @@ def ensure_active_span(message, ret=None):
         was no active span.
     """
 
-    def ensure_active_span_inner_1(func):
+    def ensure_active_span_inner_1(func: Callable) -> Callable:
         @wraps(func)
-        def ensure_active_span_inner_2(*args, **kwargs):
+        def ensure_active_span_inner_2(*args: Any, **kwargs: Any) -> Union[Callable, Optional[object]]:
             if not opentracing:
                 return ret
 
@@ -353,7 +357,7 @@ def ensure_active_span(message, ret=None):
 
 
 @contextlib.contextmanager
-def noop_context_manager(*args, **kwargs):
+def noop_context_manager(*args: Any, **kwargs: Any) -> Iterator:
     """Does exactly what it says on the tin"""
     # TODO: replace with contextlib.nullcontext once we drop support for Python 3.6
     yield
@@ -362,7 +366,7 @@ def noop_context_manager(*args, **kwargs):
 # Setup
 
 
-def init_tracer(hs: "HomeServer"):
+def init_tracer(hs: "HomeServer") -> None:
     """Set the whitelists and initialise the JaegerClient tracer"""
     global opentracing
     if not hs.config.tracing.opentracer_enabled:
@@ -404,7 +408,7 @@ def init_tracer(hs: "HomeServer"):
 
 
 @only_if_tracing
-def set_homeserver_whitelist(homeserver_whitelist):
+def set_homeserver_whitelist(homeserver_whitelist: Iterable[str]) -> None:
     """Sets the homeserver whitelist
 
     Args:
@@ -419,7 +423,7 @@ def set_homeserver_whitelist(homeserver_whitelist):
 
 
 @only_if_tracing
-def whitelisted_homeserver(destination):
+def whitelisted_homeserver(destination: str) -> Union[bool, Optional[Match[str]]]:
     """Checks if a destination matches the whitelist
 
     Args:
@@ -435,14 +439,14 @@ def whitelisted_homeserver(destination):
 
 # Could use kwargs but I want these to be explicit
 def start_active_span(
-    operation_name,
-    child_of=None,
-    references=None,
-    tags=None,
-    start_time=None,
-    ignore_active_span=False,
-    finish_on_close=True,
-):
+    operation_name: str,
+    child_of: Union['Span', 'SpanContext', None]=None,
+    references: Optional[List['Reference']]=None,
+    tags: Dict['Span', Any]=None,
+    start_time: float=None,
+    ignore_active_span: bool=False,
+    finish_on_close: bool=True,
+) -> Union['Scope', Callable]:
     """Starts an active opentracing span. Note, the scope doesn't become active
     until it has been entered, however, the span starts from the time this
     message is called.
@@ -467,8 +471,8 @@ def start_active_span(
 
 
 def start_active_span_follows_from(
-    operation_name: str, contexts: Collection, inherit_force_tracing=False
-):
+    operation_name: str, contexts: Collection, inherit_force_tracing: bool=False
+) -> Union['Scope', Callable]:
     """Starts an active opentracing span, with additional references to previous spans
 
     Args:
@@ -489,6 +493,48 @@ def start_active_span_follows_from(
         force_tracing(scope.span)
 
     return scope
+
+
+def start_active_span_from_request(
+    request: Request,
+    operation_name,
+    references=None,
+    tags=None,
+    start_time=None,
+    ignore_active_span=False,
+    finish_on_close=True,
+) -> 'SpanContext':
+    """
+    Extracts a span context from a Twisted Request.
+    args:
+        headers (twisted.web.http.Request)
+
+        For the other args see opentracing.tracer
+
+    returns:
+        span_context (opentracing.span.SpanContext)
+    """
+    # Twisted encodes the values as lists whereas opentracing doesn't.
+    # So, we take the first item in the list.
+    # Also, twisted uses byte arrays while opentracing expects strings.
+
+    if opentracing is None:
+        return noop_context_manager()  # type: ignore[unreachable]
+
+    header_dict = {
+        k.decode(): v[0].decode() for k, v in request.requestHeaders.getAllRawHeaders()
+    }
+    context = opentracing.tracer.extract(opentracing.Format.HTTP_HEADERS, header_dict)
+
+    return opentracing.tracer.start_active_span(
+        operation_name,
+        child_of=context,
+        references=references,
+        tags=tags,
+        start_time=start_time,
+        ignore_active_span=ignore_active_span,
+        finish_on_close=finish_on_close,
+    )
 
 
 def start_active_span_from_edu(
