@@ -107,6 +107,7 @@ CONDITIONAL_REQUIREMENTS["mypy"] = [
     "mypy-zope==0.3.2",
     "types-bleach>=4.1.0",
     "types-jsonschema>=3.2.0",
+    "types-opentracing>=2.4.2",
     "types-Pillow>=8.3.4",
     "types-pyOpenSSL>=20.0.7",
     "types-PyYAML>=5.4.10",
