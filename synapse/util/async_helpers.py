@@ -59,6 +59,8 @@ _T = TypeVar("_T")
 class AbstractObservableDeferred(Generic[_T], metaclass=abc.ABCMeta):
     """Abstract base class defining the consumer interface of ObservableDeferred"""
 
+    __slots__ = ()
+
     @abc.abstractmethod
     def observe(self) -> "defer.Deferred[_T]":
         """Add a new observer for this ObservableDeferred
@@ -66,6 +68,9 @@ class AbstractObservableDeferred(Generic[_T], metaclass=abc.ABCMeta):
         This returns a brand new deferred that is resolved when the underlying
         deferred is resolved. Interacting with the returned deferred does not
         effect the underlying deferred.
+
+        Note that the returned Deferred doesn't follow the Synapse logcontext rules -
+        you will probably want to `make_deferred_yieldable` it.
         """
         ...
 
