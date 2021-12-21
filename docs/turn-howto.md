@@ -15,7 +15,7 @@ The following sections describe how to install [coturn](<https://github.com/cotu
 
 For TURN relaying with `coturn` to work, it must be hosted on a server/endpoint with a public IP.
 
-Hosting TURN behind a NAT requires port forwaring and for the NAT gateway to have a public IP.
+Hosting TURN behind NAT requires port forwaring and for the NAT gateway to have a public IP.
 However, even with appropriate configuration, NAT is known to cause issues and to often not work.
 
 ## `coturn` setup
@@ -150,7 +150,7 @@ This will install and start a systemd service called `coturn`.
     traffic (remember to allow both TCP and UDP traffic), and ports 49152-65535
     for the UDP relay.)
 
-1.  If your TURN server is behind a NAT, the NAT gateway must have an external,
+1.  If your TURN server is behind NAT, the NAT gateway must have an external,
     publicly-reachable IP address. You must configure coturn to advertise that
     address to connecting clients:
 
@@ -163,22 +163,20 @@ This will install and start a systemd service called `coturn`.
 
     ```
     listening-ip=INTERNAL_TURNSERVER_IPv4_ADDRESS
-    external-ip=EXTERNAL_NAT_IPv4_ADDRESS/INTERNAL_TURNSERVER_IPv4_ADDRESS
     ```
 
     If your NAT gateway is reachable over both IPv4 and IPv6, you may
-    configure coturn to advertise each available address. When doing so,
-    each configuration line must also specify the internal IPs of your
-    TURN server (i.e. the addresses assigned to them within the NAT):
+    configure coturn to advertise each available address:
 
     ```
-    external-ip=EXTERNAL_NAT_IPv4_ADDRESS/INTERNAL_TURNSERVER_IPv4_ADDRESS
-    external-ip=EXTERNAL_NAT_IPv6_ADDRESS/INTERNAL_TURNSERVER_IPv6_ADDRESS
+    external-ip=EXTERNAL_NAT_IPv4_ADDRESS
+    external-ip=EXTERNAL_NAT_IPv6_ADDRESS
     ```
 
     When advertising an external IPv6 address, ensure that the firewall and
     network settings of the system running your TURN server are configured to
-    accept IPv6 traffic.
+    accept IPv6 traffic, and that the TURN server is listening on the local
+    IPv6 address that is mapped by NAT to the external IPv6 address.
 
 1.  (Re)start the turn server:
 
@@ -261,14 +259,15 @@ Here are a few things to try:
    Try removing any AAAA records for your TURN server, so that it is only
    reachable over IPv4.
 
- * If your TURN server is behind a NAT:
+ * If your TURN server is behind NAT:
 
     * double-check that your NAT gateway is correctly forwarding all TURN
-      ports to the NAT-internal address of your TURN server. If advertising
-      both IPv4 and IPv6 external addresses, ensure that the NAT is forwarding
-      both IPv4 and IPv6 traffic to the IPv4 and IPv6 internal addresses of your
-      TURN server. When in doubt, remove AAAA records for your TURN server and
-      configure coturn to advertise only IPv4 addresses.
+      ports (3478 & 5349 for TCP & UDP TURN traffic, and 49152-65535 for the UDP
+      relay) to the NAT-internal address of your TURN server. If advertising
+      both IPv4 and IPv6 external addresses via the `external-ip` option, ensure
+      that the NAT is forwarding both IPv4 and IPv6 traffic to the IPv4 and IPv6
+      internal addresses of your TURN server. When in doubt, remove AAAA records
+      for your TURN server and specify only an IPv4 address as your `external-ip`.
 
     * ensure that your TURN server uses the NAT gateway as its default route.
 
