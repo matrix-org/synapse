@@ -49,6 +49,7 @@ class ReadMarkerRestServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
         read_event_id = body.get("m.read", None)
+        read_extra = body.get("com.beeper.read.extra", None)
         hidden = body.get(ReadReceiptEventFields.MSC2285_HIDDEN, False)
 
         if not isinstance(hidden, bool):
@@ -66,14 +67,17 @@ class ReadMarkerRestServlet(RestServlet):
                 user_id=requester.user.to_string(),
                 event_id=read_event_id,
                 hidden=hidden,
+                extra_content=read_extra,
             )
 
         read_marker_event_id = body.get("m.fully_read", None)
+        read_marker_extra = body.get("com.beeper.fully_read.extra", None)
         if read_marker_event_id:
             await self.read_marker_handler.received_client_read_marker(
                 room_id,
                 user_id=requester.user.to_string(),
                 event_id=read_marker_event_id,
+                extra_content=read_marker_extra,
             )
 
         return 200, {}
