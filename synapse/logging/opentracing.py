@@ -220,6 +220,7 @@ class _DummyTagNames:
 
 try:
     import opentracing
+    import opentracing.tags
 
     tags = opentracing.tags
 except ImportError:
