@@ -1,4 +1,4 @@
-Synapse 1.49.1 (2021-12-21)
+Synapse 1.49.2 (2021-12-21)
 ===========================
 
 This release fixes a regression introduced in Synapse 1.49.0 which could cause `/sync` requests to take significantly longer. This would particularly affect "initial" syncs for users participating in a large number of rooms, and in extreme cases, could make it impossible for such users to log in on a new client.
@@ -11,6 +11,17 @@ Bugfixes
 --------
 
 - Fix a performance regression in `/sync` handling, introduced in 1.49.0. ([\#11583](https://github.com/matrix-org/synapse/issues/11583))
+
+Internal Changes
+----------------
+
+- Work around a build problem on Debian Buster. ([\#11625](https://github.com/matrix-org/synapse/issues/11625))
+
+
+Synapse 1.49.1 (2021-12-21)
+===========================
+
+Not released due to problems building the debian packages.
 
 
 Synapse 1.49.0 (2021-12-14)
