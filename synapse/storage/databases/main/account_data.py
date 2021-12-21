@@ -577,7 +577,7 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
                 txn, table="push_rules_enable", keyvalues={"user_name": user_id}
             )
             self.db_pool.simple_delete_txn(
-                txn, table="push_rules_stream", keyvalues={"user_name": user_id}
+                txn, table="push_rules_stream", keyvalues={"user_id": user_id}
             )
 
         await self.db_pool.runInteraction(
