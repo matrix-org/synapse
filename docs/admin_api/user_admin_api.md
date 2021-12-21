@@ -352,6 +352,7 @@ The following actions are performed when deactivating an user:
 - Remove the user from the user directory
 - Reject all pending invites
 - Remove all account validity information related to the user
+- Remove the arbitrary data store known as *account data* (list of ignored users, push rules, etc.)
 
 The following additional actions are performed during deactivation if `erase`
 is set to `true`:
