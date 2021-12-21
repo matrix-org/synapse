@@ -1,6 +1,8 @@
 Synapse 1.49.1 (2021-12-21)
 ===========================
 
+This release fixes a regression introduced in Synapse 1.49.0 which could cause `/sync` requests to take significantly longer. This would particularly affect "initial" syncs for users participating in a large number of rooms, and in extreme cases, could make it imposssible for such users to log in on a new client.
+
 Bugfixes
 --------
 
