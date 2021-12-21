@@ -157,6 +157,9 @@ class DeactivateAccountHandler:
         # Mark the user as deactivated.
         await self.store.set_user_deactivated_status(user_id, True)
 
+        # Remove account data (including ignored users and push rules).
+        await self.store.purge_account_data_for_user(user_id)
+
         return identity_server_supports_unbinding
 
     async def _reject_pending_invites_for_user(self, user_id: str) -> None:
