@@ -48,7 +48,7 @@ from synapse.handlers.sync import (
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
-from synapse.logging.opentracing import start_active_span
+from synapse.logging.opentracing import trace
 from synapse.types import JsonDict, StreamToken
 from synapse.util import json_decoder
 
@@ -213,17 +213,17 @@ class SyncRestServlet(RestServlet):
             logger.info("Client has disconnected; not serializing response.")
             return 200, {}
 
-        with start_active_span("sync.encode_response"):
-            time_now = self.clock.time_msec()
-            # We know that the the requester has an access token since appservices
-            # cannot use sync.
-            response_content = await self.encode_response(
-                time_now, sync_result, requester.access_token_id, filter_collection
-            )
+        time_now = self.clock.time_msec()
+        # We know that the the requester has an access token since appservices
+        # cannot use sync.
+        response_content = await self.encode_response(
+            time_now, sync_result, requester.access_token_id, filter_collection
+        )
 
         logger.debug("Event formatting complete")
         return 200, response_content
 
+    @trace(opname="sync.encode_response")
     async def encode_response(
         self,
         time_now: int,
@@ -239,33 +239,29 @@ class SyncRestServlet(RestServlet):
         else:
             raise Exception("Unknown event format %s" % (filter.event_format,))
 
-        with start_active_span("sync.encode_joined"):
-            joined = await self.encode_joined(
-                sync_result.joined,
-                time_now,
-                access_token_id,
-                filter.event_fields,
-                event_formatter,
-            )
+        joined = await self.encode_joined(
+            sync_result.joined,
+            time_now,
+            access_token_id,
+            filter.event_fields,
+            event_formatter,
+        )
 
-        with start_active_span("sync.encode_invited"):
-            invited = await self.encode_invited(
-                sync_result.invited, time_now, access_token_id, event_formatter
-            )
+        invited = await self.encode_invited(
+            sync_result.invited, time_now, access_token_id, event_formatter
+        )
 
-        with start_active_span("sync.encode_knocked"):
-            knocked = await self.encode_knocked(
-                sync_result.knocked, time_now, access_token_id, event_formatter
-            )
+        knocked = await self.encode_knocked(
+            sync_result.knocked, time_now, access_token_id, event_formatter
+        )
 
-        with start_active_span("sync.encode_archived"):
-            archived = await self.encode_archived(
-                sync_result.archived,
-                time_now,
-                access_token_id,
-                filter.event_fields,
-                event_formatter,
-            )
+        archived = await self.encode_archived(
+            sync_result.archived,
+            time_now,
+            access_token_id,
+            filter.event_fields,
+            event_formatter,
+        )
 
         logger.debug("building sync response dict")
 
@@ -338,6 +334,7 @@ class SyncRestServlet(RestServlet):
             ]
         }
 
+    @trace(opname="sync.encode_joined")
     async def encode_joined(
         self,
         rooms: List[JoinedSyncResult],
@@ -374,6 +371,7 @@ class SyncRestServlet(RestServlet):
 
         return joined
 
+    @trace(opname="sync.encode_invited")
     async def encode_invited(
         self,
         rooms: List[InvitedSyncResult],
@@ -412,6 +410,7 @@ class SyncRestServlet(RestServlet):
 
         return invited
 
+    @trace(opname="sync.encode_knocked")
     async def encode_knocked(
         self,
         rooms: List[KnockedSyncResult],
@@ -466,6 +465,7 @@ class SyncRestServlet(RestServlet):
 
         return knocked
 
+    @trace(opname="sync.encode_archived")
     async def encode_archived(
         self,
         rooms: List[ArchivedSyncResult],
