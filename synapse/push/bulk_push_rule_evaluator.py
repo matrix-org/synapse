@@ -24,6 +24,7 @@ from synapse.event_auth import get_user_power_level
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
+from synapse.storage.roommember import ProfileInfo
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import CacheMetric, register_cache
 from synapse.util.caches.descriptors import lru_cache
@@ -54,7 +55,9 @@ push_rules_delta_state_cache_metric = register_cache(
 )
 
 
-def _should_count_as_unread(event: EventBase, context: EventContext) -> bool:
+def _should_count_as_unread(
+    event: EventBase, context: EventContext, room_members: Dict[str, ProfileInfo]
+) -> bool:
     # Exclude rejected and soft-failed events.
     if context.rejected or event.internal_metadata.is_soft_failed():
         return False
@@ -71,6 +74,8 @@ def _should_count_as_unread(event: EventBase, context: EventContext) -> bool:
         elif event.type == EventTypes.Message:
             body = event.content.get("body")
             return isinstance(body, str) and bool(body)
+        elif event.type == "m.reaction":
+            return len(room_members) < 20
 
     return False
 
@@ -170,12 +175,12 @@ class BulkPushRuleEvaluator:
         should increment the unread count, and insert the results into the
         event_push_actions_staging table.
         """
-        count_as_unread = _should_count_as_unread(event, context)
-
         rules_by_user = await self._get_rules_for_event(event, context)
         actions_by_user: Dict[str, List[Union[dict, str]]] = {}
 
         room_members = await self.store.get_joined_users_from_context(event, context)
+
+        count_as_unread = _should_count_as_unread(event, context, room_members)
 
         (
             power_levels,
