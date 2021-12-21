@@ -44,6 +44,7 @@ from synapse.storage.relations import (
     RelationPaginationToken,
 )
 from synapse.util.caches.descriptors import cached
+from synapse.util.caches.lrucache import LruCache
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -62,6 +63,11 @@ class RelationsWorkerStore(SQLBaseStore):
 
         self._msc1849_enabled = hs.config.experimental.msc1849_enabled
         self._msc3440_enabled = hs.config.experimental.msc3440_enabled
+
+        self.get_applicable_edit: LruCache[str, Optional[EventBase]] = LruCache(
+            cache_name="get_applicable_edit",
+            max_size=hs.config.caches.event_cache_size,  # TODO
+        )
 
     @cached(tree=True)
     async def get_relations_for_event(
@@ -325,19 +331,38 @@ class RelationsWorkerStore(SQLBaseStore):
             "get_aggregation_groups_for_event", _get_aggregation_groups_for_event_txn
         )
 
-    @cached()
-    async def get_applicable_edit(self, event_id: str) -> Optional[EventBase]:
+    async def _get_applicable_edits(
+        self, event_ids: Iterable[str]
+    ) -> Dict[str, EventBase]:
         """Get the most recent edit (if any) that has happened for the given
-        event.
+        events.
 
         Correctly handles checking whether edits were allowed to happen.
 
         Args:
-            event_id: The original event ID
+            event_ids: The original event IDs
 
         Returns:
-            The most recent edit, if any.
+            A map of the most recent edit for each event. A missing event implies
+            there is no edits.
         """
+
+        # A map of the original event IDs to the edit events.
+        edits_by_original = {}
+
+        # Check if an edit for this event is currently cached.
+        event_ids_to_check = []
+        for event_id in event_ids:
+            if event_id not in self.get_applicable_edit:
+                event_ids_to_check.append(event_id)
+            else:
+                edit_event = self.get_applicable_edit[event_id]
+                if edit_event:
+                    edits_by_original[event_id] = edit_event
+
+        # If all events were cached, all done.
+        if not event_ids_to_check:
+            return edits_by_original
 
         # We only allow edits for `m.room.message` events that have the same sender
         # and event type. We can't assert these things during regular event auth so
@@ -345,8 +370,10 @@ class RelationsWorkerStore(SQLBaseStore):
 
         # Fetches latest edit that has the same type and sender as the
         # original, and is an `m.room.message`.
+        #
+        # TODO Should this ensure it does not return results for state events / redacted events?
         sql = """
-            SELECT edit.event_id FROM events AS edit
+            SELECT original.event_id, edit.event_id FROM events AS edit
             INNER JOIN event_relations USING (event_id)
             INNER JOIN events AS original ON
                 original.event_id = relates_to_id
@@ -354,28 +381,46 @@ class RelationsWorkerStore(SQLBaseStore):
                 AND edit.sender = original.sender
                 AND edit.room_id = original.room_id
             WHERE
-                relates_to_id = ?
+                %s
                 AND relation_type = ?
                 AND edit.type = 'm.room.message'
             ORDER by edit.origin_server_ts DESC, edit.event_id DESC
-            LIMIT 1
         """
 
-        def _get_applicable_edit_txn(txn: LoggingTransaction) -> Optional[str]:
-            txn.execute(sql, (event_id, RelationTypes.REPLACE))
-            row = txn.fetchone()
-            if row:
-                return row[0]
-            return None
+        def _get_applicable_edit_txn(txn: LoggingTransaction) -> Dict[str, str]:
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "relates_to_id", event_ids_to_check
+            )
+            args.append(RelationTypes.REPLACE)
 
-        edit_id = await self.db_pool.runInteraction(
+            txn.execute(sql % (clause,), args)
+            rows = txn.fetchall()
+            result = {}
+            for original_event_id, edit_event_id in rows:
+                # Only consider the latest edit (by origin server ts).
+                if original_event_id not in result:
+                    result[original_event_id] = edit_event_id
+            return result
+
+        edit_ids = await self.db_pool.runInteraction(
             "get_applicable_edit", _get_applicable_edit_txn
         )
 
-        if not edit_id:
-            return None
+        edits = await self.get_events(edit_ids.values())  # type: ignore[attr-defined]
 
-        return await self.get_event(edit_id, allow_none=True)  # type: ignore[attr-defined]
+        # Add the newly checked events to the cache. If an edit exists, add it to
+        # the results.
+        for original_event_id in event_ids_to_check:
+            # There might not be an edit or the event might not be known. In
+            # either case, cache the None.
+            edit_event_id = edit_ids.get(original_event_id)
+            edit_event = edits.get(edit_event_id)
+
+            self.get_applicable_edit.set(original_event_id, edit_event)
+            if edit_event:
+                edits_by_original[original_event_id] = edit_event
+
+        return edits_by_original
 
     @cached()
     async def get_thread_summary(
@@ -588,7 +633,8 @@ class RelationsWorkerStore(SQLBaseStore):
 
         edit = None
         if event.type == EventTypes.Message:
-            edit = await self.get_applicable_edit(event_id)
+            edits = await self._get_applicable_edits([event_id])
+            edit = edits.get(event_id)
 
         if edit:
             aggregations[RelationTypes.REPLACE] = edit
