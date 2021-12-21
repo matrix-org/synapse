@@ -16,6 +16,7 @@ import logging
 from typing import (
     TYPE_CHECKING,
     Any,
+    Collection,
     Dict,
     Iterable,
     List,
@@ -28,7 +29,7 @@ from typing import (
 import attr
 from frozendict import frozendict
 
-from synapse.api.constants import EventTypes, RelationTypes
+from synapse.api.constants import RelationTypes
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
@@ -631,14 +632,6 @@ class RelationsWorkerStore(SQLBaseStore):
         if references.chunk:
             aggregations[RelationTypes.REFERENCE] = references.to_dict()
 
-        edit = None
-        if event.type == EventTypes.Message:
-            edits = await self._get_applicable_edits([event_id])
-            edit = edits.get(event_id)
-
-        if edit:
-            aggregations[RelationTypes.REPLACE] = edit
-
         # If this event is the start of a thread, include a summary of the replies.
         if self._msc3440_enabled:
             (
@@ -656,7 +649,7 @@ class RelationsWorkerStore(SQLBaseStore):
         return aggregations
 
     async def get_bundled_aggregations(
-        self, events: Iterable[EventBase]
+        self, events: Collection[EventBase]
     ) -> Dict[str, Dict[str, Any]]:
         """Generate bundled aggregations for events.
 
@@ -671,12 +664,21 @@ class RelationsWorkerStore(SQLBaseStore):
         if not self._msc1849_enabled:
             return {}
 
-        # TODO Parallelize.
-        results = {}
+        # event ID -> bundled aggregation in non-serialized form.
+        results: Dict[str, Dict[str, Any]] = {}
+
+        event_ids = [event.event_id for event in events]
+
+        # Fetch any edits.
+        edits = await self._get_applicable_edits(event_ids)
+        for event_id, edit in edits.items():
+            results.setdefault(event_id, {})[RelationTypes.REPLACE] = edit
+
+        # Fetch other relations per event.
         for event in events:
             event_result = await self._get_bundled_aggregation_for_event(event)
             if event_result is not None:
-                results[event.event_id] = event_result
+                results.setdefault(event.event_id, {}).update(event_result)
 
         return results
 
