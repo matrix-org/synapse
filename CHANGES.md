@@ -1,3 +1,12 @@
+Synapse 1.49.1 (2021-12-21)
+===========================
+
+Bugfixes
+--------
+
+- Fix a performance regression in `/sync` handling, introduced in 1.49.0. ([\#11583](https://github.com/matrix-org/synapse/issues/11583))
+
+
 Synapse 1.49.0 (2021-12-14)
 ===========================
 
