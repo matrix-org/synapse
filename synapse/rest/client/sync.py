@@ -522,7 +522,15 @@ class SyncRestServlet(RestServlet):
                 time_now=time_now,
                 # Don't bother to bundle aggregations if the timeline is unlimited,
                 # as clients will have all the necessary information.
-                bundle_aggregations=room.timeline.limited,
+                # bundle_aggregations=room.timeline.limited,
+                #
+                # richvdh 2021-12-15: disable this temporarily as it has too high an
+                # overhead for initialsyncs. We need to figure out a way that the
+                # bundling can be done *before* the events are stored in the
+                # SyncResponseCache so that this part can be synchronous.
+                #
+                # Ensure to re-enable the test at tests/rest/client/test_relations.py::RelationsTestCase.test_bundled_aggregations.
+                bundle_aggregations=False,
                 token_id=token_id,
                 event_format=event_formatter,
                 only_event_fields=only_fields,
