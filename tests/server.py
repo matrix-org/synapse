@@ -14,6 +14,7 @@
 import hashlib
 import json
 import logging
+import os
 import time
 import uuid
 import warnings
@@ -66,7 +67,6 @@ from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests.utils import (
-    LEAVE_DB,
     POSTGRES_BASE_DB,
     POSTGRES_HOST,
     POSTGRES_PASSWORD,
@@ -77,6 +77,9 @@ from tests.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+LEAVE_DB = os.environ.get("SYNAPSE_LEAVE_DB", False)
 
 
 class TimedOutException(Exception):
