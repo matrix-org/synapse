@@ -467,7 +467,7 @@ class ThreadPool:
         return d
 
 
-def make_test_homeserver_synchronous(server: HomeServer) -> None:
+def _make_test_homeserver_synchronous(server: HomeServer) -> None:
     """
     Make the given test homeserver's database interactions synchronous.
     """
@@ -851,6 +851,6 @@ def setup_test_homeserver(
     hs.get_auth_handler().validate_hash = validate_hash
 
     # Make the threadpool and database transactions synchronous for testing.
-    make_test_homeserver_synchronous(hs)
+    _make_test_homeserver_synchronous(hs)
 
     return hs
