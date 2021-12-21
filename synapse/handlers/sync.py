@@ -422,7 +422,7 @@ class SyncHandler:
         span to track the sync. See `generate_sync_result` for the next part of your
         indoctrination.
         """
-        with start_active_span("current_sync_for_user"):
+        with start_active_span("sync.current_sync_for_user"):
             log_kv({"since_token": since_token})
             sync_result = await self.generate_sync_result(
                 sync_config, since_token, full_state
@@ -1585,7 +1585,8 @@ class SyncHandler:
             )
             logger.debug("Generated room entry for %s", room_entry.room_id)
 
-        await concurrently_execute(handle_room_entries, room_entries, 10)
+        with start_active_span("sync.generate_room_entries"):
+            await concurrently_execute(handle_room_entries, room_entries, 10)
 
         sync_result_builder.invited.extend(invited)
         sync_result_builder.knocked.extend(knocked)
@@ -2045,7 +2046,7 @@ class SyncHandler:
         since_token = room_builder.since_token
         upto_token = room_builder.upto_token
 
-        with start_active_span("generate_room_entry"):
+        with start_active_span("sync.generate_room_entry"):
             set_tag("room_id", room_id)
             log_kv({"events": len(events or ())})
 
