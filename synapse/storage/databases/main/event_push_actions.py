@@ -46,6 +46,11 @@ DEFAULT_HIGHLIGHT_ACTION: List[Union[dict, str]] = [
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class HttpPushAction:
+    """
+    HttpPushAction instances include the information used to generate HTTP
+    requests to a push gateway.
+    """
+
     event_id: str
     room_id: str
     stream_ordering: int
@@ -54,11 +59,21 @@ class HttpPushAction:
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class EmailPushAction(HttpPushAction):
+    """
+    EmailPushAction instances include the information used to render an email
+    push notification.
+    """
+
     received_ts: Optional[int]
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class UserPushAction(EmailPushAction):
+    """
+    UserPushAction instances include the necessary information to respond to
+    /notifications requests.
+    """
+
     topological_ordering: int
     highlight: bool
     profile_tag: str
@@ -66,6 +81,10 @@ class UserPushAction(EmailPushAction):
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class NotifCounts:
+    """
+    The per-user, per-room count of notifications. Used by sync and push.
+    """
+
     notify_count: int
     unread_count: int
     highlight_count: int
