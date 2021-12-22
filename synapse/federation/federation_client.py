@@ -479,7 +479,6 @@ class FederationClient(FederationBase):
         pdu: EventBase,
         origin: str,
         room_version: RoomVersion,
-        outlier: bool = False,
     ) -> Optional[EventBase]:
         """Takes a PDU and checks its signatures and hashes. If the PDU fails
         its signature check then we check if we have it in the database and if
@@ -491,9 +490,6 @@ class FederationClient(FederationBase):
             origin
             pdu
             room_version
-            outlier: Whether the events are outliers or not
-            include_none: Whether to include None in the returned list
-                for events that have failed their checks
 
         Returns:
             The PDU (possibly redacted) if it has valid signatures and hashes.
@@ -518,7 +514,6 @@ class FederationClient(FederationBase):
                     destinations=[pdu_origin],
                     event_id=pdu.event_id,
                     room_version=room_version,
-                    outlier=outlier,
                     timeout=10000,
                 )
             except SynapseError:
