@@ -816,7 +816,6 @@ class FederationClient(FederationBase):
                 valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
                     pdu=event,
                     origin=destination,
-                    outlier=True,
                     room_version=room_version,
                 )
 
@@ -864,7 +863,6 @@ class FederationClient(FederationBase):
                 valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
                     pdu=pdu,
                     origin=destination,
-                    outlier=True,
                     room_version=room_version,
                 )
 
