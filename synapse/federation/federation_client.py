@@ -541,13 +541,10 @@ class FederationClient(FederationBase):
 
         room_version = await self.store.get_room_version(room_id)
 
-        auth_chain = [
-            event_from_pdu_json(p, room_version, outlier=True)
-            for p in res["auth_chain"]
-        ]
+        auth_chain = [event_from_pdu_json(p, room_version) for p in res["auth_chain"]]
 
         signed_auth = await self._check_sigs_and_hash_and_fetch(
-            destination, auth_chain, outlier=True, room_version=room_version
+            destination, auth_chain, room_version=room_version
         )
 
         return signed_auth
