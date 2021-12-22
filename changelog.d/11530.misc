@@ -1,1 +1,0 @@
-Add functionality to strip the unsignedData object of unauthorized fields in events arriving over federation.
