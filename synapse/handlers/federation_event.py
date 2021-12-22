@@ -1314,6 +1314,9 @@ class FederationEventHandler:
                         return None
                     auth.append(ae)
 
+                # we're not bothering about room state, so flag the event as an outlier.
+                event.internal_metadata.outlier = True
+
                 context = EventContext.for_outlier()
                 try:
                     validate_event_for_room_version(room_version_obj, event)
