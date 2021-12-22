@@ -1,1 +1,0 @@
-Convert status codes to `HTTPStatus` in `synapse.rest.admin`.

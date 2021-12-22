@@ -14,7 +14,7 @@
 # limitations under the License.
 import copy
 import logging
-from typing import Dict, Iterable, List, Optional, Tuple, Type
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Type
 
 from typing_extensions import Literal
 

@@ -12,13 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from http import HTTPStatus
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
+
+from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
 from synapse.rest.client import login
+from synapse.server import HomeServer
+from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests import unittest
 from tests.test_utils import SMALL_PNG
@@ -30,7 +34,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.media_repo = hs.get_media_repository_resource()
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
@@ -41,7 +45,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
 
         self.url = "/_synapse/admin/v1/statistics/users/media"
 
-    def test_no_auth(self):
+    def test_no_auth(self) -> None:
         """
         Try to list users without authentication.
         """
@@ -54,7 +58,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
-    def test_requester_is_no_admin(self):
+    def test_requester_is_no_admin(self) -> None:
         """
         If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
         """
@@ -72,7 +76,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_invalid_parameter(self):
+    def test_invalid_parameter(self) -> None:
         """
         If parameters are invalid, an error is returned.
         """
@@ -188,7 +192,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
 
-    def test_limit(self):
+    def test_limit(self) -> None:
         """
         Testing list of media with limit
         """
@@ -206,7 +210,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["next_token"], 5)
         self._check_fields(channel.json_body["users"])
 
-    def test_from(self):
+    def test_from(self) -> None:
         """
         Testing list of media with a defined starting point (from)
         """
@@ -224,7 +228,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         self.assertNotIn("next_token", channel.json_body)
         self._check_fields(channel.json_body["users"])
 
-    def test_limit_and_from(self):
+    def test_limit_and_from(self) -> None:
         """
         Testing list of media with a defined starting point and limit
         """
@@ -242,7 +246,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(channel.json_body["users"]), 10)
         self._check_fields(channel.json_body["users"])
 
-    def test_next_token(self):
+    def test_next_token(self) -> None:
         """
         Testing that `next_token` appears at the right place
         """
@@ -302,7 +306,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(channel.json_body["users"]), 1)
         self.assertNotIn("next_token", channel.json_body)
 
-    def test_no_media(self):
+    def test_no_media(self) -> None:
         """
         Tests that a normal lookup for statistics is successfully
         if users have no media created
@@ -318,7 +322,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(0, channel.json_body["total"])
         self.assertEqual(0, len(channel.json_body["users"]))
 
-    def test_order_by(self):
+    def test_order_by(self) -> None:
         """
         Testing order list with parameter `order_by`
         """
@@ -396,7 +400,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             "b",
         )
 
-    def test_from_until_ts(self):
+    def test_from_until_ts(self) -> None:
         """
         Testing filter by time with parameters `from_ts` and `until_ts`
         """
@@ -448,7 +452,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["users"][0]["media_count"], 6)
 
-    def test_search_term(self):
+    def test_search_term(self) -> None:
         self._create_users_with_media(20, 1)
 
         # check without filter get all users
@@ -488,7 +492,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 0)
 
-    def _create_users_with_media(self, number_users: int, media_per_user: int):
+    def _create_users_with_media(self, number_users: int, media_per_user: int) -> None:
         """
         Create a number of users with a number of media
         Args:
@@ -500,7 +504,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             user_tok = self.login("foo_user_%s" % i, "pass")
             self._create_media(user_tok, media_per_user)
 
-    def _create_media(self, user_token: str, number_media: int):
+    def _create_media(self, user_token: str, number_media: int) -> None:
         """
         Create a number of media for a specific user
         Args:
@@ -514,7 +518,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
                 upload_resource, SMALL_PNG, tok=user_token, expect_code=HTTPStatus.OK
             )
 
-    def _check_fields(self, content: List[Dict[str, Any]]):
+    def _check_fields(self, content: List[JsonDict]) -> None:
         """Checks that all attributes are present in content
         Args:
             content: List that is checked for content
@@ -527,7 +531,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
 
     def _order_test(
         self, order_type: str, expected_user_list: List[str], dir: Optional[str] = None
-    ):
+    ) -> None:
         """Request the list of users in a certain order. Assert that order is what
         we expect
         Args:

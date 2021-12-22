@@ -12,16 +12,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import os
 from http import HTTPStatus
 
 from parameterized import parameterized
 
+from twisted.test.proto_helpers import MemoryReactor
+
 import synapse.rest.admin
 from synapse.api.errors import Codes
 from synapse.rest.client import login, profile, room
 from synapse.rest.media.v1.filepath import MediaFilePaths
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 from tests.server import FakeSite, make_request
@@ -39,7 +42,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.media_repo = hs.get_media_repository_resource()
         self.server_name = hs.hostname
 
@@ -48,7 +51,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
 
         self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
 
-    def test_no_auth(self):
+    def test_no_auth(self) -> None:
         """
         Try to delete media without authentication.
         """
@@ -63,7 +66,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
-    def test_requester_is_no_admin(self):
+    def test_requester_is_no_admin(self) -> None:
         """
         If the user is not a server admin, an error is returned.
         """
@@ -85,7 +88,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_media_does_not_exist(self):
+    def test_media_does_not_exist(self) -> None:
         """
         Tests that a lookup for a media that does not exist returns a HTTPStatus.NOT_FOUND
         """
@@ -100,7 +103,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
-    def test_media_is_not_local(self):
+    def test_media_is_not_local(self) -> None:
         """
         Tests that a lookup for a media that is not a local returns a HTTPStatus.BAD_REQUEST
         """
@@ -115,7 +118,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual("Can only delete local media", channel.json_body["error"])
 
-    def test_delete_media(self):
+    def test_delete_media(self) -> None:
         """
         Tests that delete a media is successfully
         """
@@ -208,7 +211,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.media_repo = hs.get_media_repository_resource()
         self.server_name = hs.hostname
 
@@ -221,7 +224,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         # Move clock up to somewhat realistic time
         self.reactor.advance(1000000000)
 
-    def test_no_auth(self):
+    def test_no_auth(self) -> None:
         """
         Try to delete media without authentication.
         """
@@ -235,7 +238,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
-    def test_requester_is_no_admin(self):
+    def test_requester_is_no_admin(self) -> None:
         """
         If the user is not a server admin, an error is returned.
         """
@@ -255,7 +258,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_media_is_not_local(self):
+    def test_media_is_not_local(self) -> None:
         """
         Tests that a lookup for media that is not local returns a HTTPStatus.BAD_REQUEST
         """
@@ -270,7 +273,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual("Can only delete local media", channel.json_body["error"])
 
-    def test_missing_parameter(self):
+    def test_missing_parameter(self) -> None:
         """
         If the parameter `before_ts` is missing, an error is returned.
         """
@@ -290,7 +293,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             "Missing integer query parameter 'before_ts'", channel.json_body["error"]
         )
 
-    def test_invalid_parameter(self):
+    def test_invalid_parameter(self) -> None:
         """
         If parameters are invalid, an error is returned.
         """
@@ -357,13 +360,13 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             channel.code,
             msg=channel.json_body,
         )
-        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
             "Boolean query parameter 'keep_profiles' must be one of ['true', 'false']",
             channel.json_body["error"],
         )
 
-    def test_delete_media_never_accessed(self):
+    def test_delete_media_never_accessed(self) -> None:
         """
         Tests that media deleted if it is older than `before_ts` and never accessed
         `last_access_ts` is `NULL` and `created_ts` < `before_ts`
@@ -394,7 +397,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self._access_media(server_and_media_id, False)
 
-    def test_keep_media_by_date(self):
+    def test_keep_media_by_date(self) -> None:
         """
         Tests that media is not deleted if it is newer than `before_ts`
         """
@@ -431,7 +434,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self._access_media(server_and_media_id, False)
 
-    def test_keep_media_by_size(self):
+    def test_keep_media_by_size(self) -> None:
         """
         Tests that media is not deleted if its size is smaller than or equal
         to `size_gt`
@@ -466,7 +469,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self._access_media(server_and_media_id, False)
 
-    def test_keep_media_by_user_avatar(self):
+    def test_keep_media_by_user_avatar(self) -> None:
         """
         Tests that we do not delete media if is used as a user avatar
         Tests parameter `keep_profiles`
@@ -510,7 +513,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self._access_media(server_and_media_id, False)
 
-    def test_keep_media_by_room_avatar(self):
+    def test_keep_media_by_room_avatar(self) -> None:
         """
         Tests that we do not delete media if it is used as a room avatar
         Tests parameter `keep_profiles`
@@ -555,7 +558,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         self._access_media(server_and_media_id, False)
 
-    def _create_media(self):
+    def _create_media(self) -> str:
         """
         Create a media and return media_id and server_and_media_id
         """
@@ -577,7 +580,9 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         return server_and_media_id
 
-    def _access_media(self, server_and_media_id, expect_success=True):
+    def _access_media(
+        self, server_and_media_id: str, expect_success: bool = True
+    ) -> None:
         """
         Try to access a media and check the result
         """
@@ -627,7 +632,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         media_repo = hs.get_media_repository_resource()
         self.store = hs.get_datastore()
         self.server_name = hs.hostname
@@ -652,7 +657,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         self.url = "/_synapse/admin/v1/media/%s/%s/%s"
 
     @parameterized.expand(["quarantine", "unquarantine"])
-    def test_no_auth(self, action: str):
+    def test_no_auth(self, action: str) -> None:
         """
         Try to protect media without authentication.
         """
@@ -671,7 +676,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     @parameterized.expand(["quarantine", "unquarantine"])
-    def test_requester_is_no_admin(self, action: str):
+    def test_requester_is_no_admin(self, action: str) -> None:
         """
         If the user is not a server admin, an error is returned.
         """
@@ -691,7 +696,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_quarantine_media(self):
+    def test_quarantine_media(self) -> None:
         """
         Tests that quarantining and remove from quarantine a media is successfully
         """
@@ -725,7 +730,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         media_info = self.get_success(self.store.get_local_media(self.media_id))
         self.assertFalse(media_info["quarantined_by"])
 
-    def test_quarantine_protected_media(self):
+    def test_quarantine_protected_media(self) -> None:
         """
         Tests that quarantining from protected media fails
         """
@@ -760,7 +765,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         media_repo = hs.get_media_repository_resource()
         self.store = hs.get_datastore()
 
@@ -784,7 +789,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
         self.url = "/_synapse/admin/v1/media/%s/%s"
 
     @parameterized.expand(["protect", "unprotect"])
-    def test_no_auth(self, action: str):
+    def test_no_auth(self, action: str) -> None:
         """
         Try to protect media without authentication.
         """
@@ -799,7 +804,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     @parameterized.expand(["protect", "unprotect"])
-    def test_requester_is_no_admin(self, action: str):
+    def test_requester_is_no_admin(self, action: str) -> None:
         """
         If the user is not a server admin, an error is returned.
         """
@@ -819,7 +824,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_protect_media(self):
+    def test_protect_media(self) -> None:
         """
         Tests that protect and unprotect a media is successfully
         """
@@ -864,7 +869,7 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.media_repo = hs.get_media_repository_resource()
         self.server_name = hs.hostname
 
@@ -874,7 +879,7 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
         self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
         self.url = "/_synapse/admin/v1/purge_media_cache"
 
-    def test_no_auth(self):
+    def test_no_auth(self) -> None:
         """
         Try to delete media without authentication.
         """
@@ -888,7 +893,7 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
-    def test_requester_is_not_admin(self):
+    def test_requester_is_not_admin(self) -> None:
         """
         If the user is not a server admin, an error is returned.
         """
@@ -908,7 +913,7 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_invalid_parameter(self):
+    def test_invalid_parameter(self) -> None:
         """
         If parameters are invalid, an error is returned.
         """

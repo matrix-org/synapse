@@ -11,15 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import urllib.parse
 from http import HTTPStatus
 
 from parameterized import parameterized
 
+from twisted.test.proto_helpers import MemoryReactor
+
 import synapse.rest.admin
 from synapse.api.errors import Codes
 from synapse.rest.client import login
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -31,7 +34,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.handler = hs.get_device_handler()
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
@@ -48,7 +51,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         )
 
     @parameterized.expand(["GET", "PUT", "DELETE"])
-    def test_no_auth(self, method: str):
+    def test_no_auth(self, method: str) -> None:
         """
         Try to get a device of an user without authentication.
         """
@@ -62,7 +65,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     @parameterized.expand(["GET", "PUT", "DELETE"])
-    def test_requester_is_no_admin(self, method: str):
+    def test_requester_is_no_admin(self, method: str) -> None:
         """
         If the user is not a server admin, an error is returned.
         """
@@ -80,7 +83,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     @parameterized.expand(["GET", "PUT", "DELETE"])
-    def test_user_does_not_exist(self, method: str):
+    def test_user_does_not_exist(self, method: str) -> None:
         """
         Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND
         """
@@ -99,7 +102,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     @parameterized.expand(["GET", "PUT", "DELETE"])
-    def test_user_is_not_local(self, method: str):
+    def test_user_is_not_local(self, method: str) -> None:
         """
         Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST
         """
@@ -117,7 +120,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual("Can only lookup local users", channel.json_body["error"])
 
-    def test_unknown_device(self):
+    def test_unknown_device(self) -> None:
         """
         Tests that a lookup for a device that does not exist returns either HTTPStatus.NOT_FOUND or HTTPStatus.OK.
         """
@@ -151,7 +154,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         # Delete unknown device returns status HTTPStatus.OK
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
-    def test_update_device_too_long_display_name(self):
+    def test_update_device_too_long_display_name(self) -> None:
         """
         Update a device with a display name that is invalid (too long).
         """
@@ -189,7 +192,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual("new display", channel.json_body["display_name"])
 
-    def test_update_no_display_name(self):
+    def test_update_no_display_name(self) -> None:
         """
         Tests that a update for a device without JSON returns a HTTPStatus.OK
         """
@@ -219,7 +222,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual("new display", channel.json_body["display_name"])
 
-    def test_update_display_name(self):
+    def test_update_display_name(self) -> None:
         """
         Tests a normal successful update of display name
         """
@@ -243,7 +246,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual("new displayname", channel.json_body["display_name"])
 
-    def test_get_device(self):
+    def test_get_device(self) -> None:
         """
         Tests that a normal lookup for a device is successfully
         """
@@ -262,7 +265,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         self.assertIn("last_seen_ip", channel.json_body)
         self.assertIn("last_seen_ts", channel.json_body)
 
-    def test_delete_device(self):
+    def test_delete_device(self) -> None:
         """
         Tests that a remove of a device is successfully
         """
@@ -292,7 +295,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
@@ -302,7 +305,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
             self.other_user
         )
 
-    def test_no_auth(self):
+    def test_no_auth(self) -> None:
         """
         Try to list devices of an user without authentication.
         """
@@ -315,7 +318,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
-    def test_requester_is_no_admin(self):
+    def test_requester_is_no_admin(self) -> None:
         """
         If the user is not a server admin, an error is returned.
         """
@@ -334,7 +337,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_user_does_not_exist(self):
+    def test_user_does_not_exist(self) -> None:
         """
         Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND
         """
@@ -348,7 +351,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
-    def test_user_is_not_local(self):
+    def test_user_is_not_local(self) -> None:
         """
         Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST
         """
@@ -363,7 +366,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual("Can only lookup local users", channel.json_body["error"])
 
-    def test_user_has_no_devices(self):
+    def test_user_has_no_devices(self) -> None:
         """
         Tests that a normal lookup for devices is successfully
         if user has no devices
@@ -380,7 +383,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(0, channel.json_body["total"])
         self.assertEqual(0, len(channel.json_body["devices"]))
 
-    def test_get_devices(self):
+    def test_get_devices(self) -> None:
         """
         Tests that a normal lookup for devices is successfully
         """
@@ -416,7 +419,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.handler = hs.get_device_handler()
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
@@ -428,7 +431,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
             self.other_user
         )
 
-    def test_no_auth(self):
+    def test_no_auth(self) -> None:
         """
         Try to delete devices of an user without authentication.
         """
@@ -441,7 +444,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
-    def test_requester_is_no_admin(self):
+    def test_requester_is_no_admin(self) -> None:
         """
         If the user is not a server admin, an error is returned.
         """
@@ -460,7 +463,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_user_does_not_exist(self):
+    def test_user_does_not_exist(self) -> None:
         """
         Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND
         """
@@ -474,7 +477,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
-    def test_user_is_not_local(self):
+    def test_user_is_not_local(self) -> None:
         """
         Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST
         """
@@ -489,7 +492,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual("Can only lookup local users", channel.json_body["error"])
 
-    def test_unknown_devices(self):
+    def test_unknown_devices(self) -> None:
         """
         Tests that a remove of a device that does not exist returns HTTPStatus.OK.
         """
@@ -503,7 +506,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
         # Delete unknown devices returns status HTTPStatus.OK
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
 
-    def test_delete_devices(self):
+    def test_delete_devices(self) -> None:
         """
         Tests that a remove of devices is successfully
         """

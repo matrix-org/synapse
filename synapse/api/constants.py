@@ -253,6 +253,10 @@ class GuestAccess:
     FORBIDDEN: Final = "forbidden"
 
 
+class ReceiptTypes:
+    READ: Final = "m.read"
+
+
 class ReadReceiptEventFields:
     MSC2285_HIDDEN: Final = "org.matrix.msc2285.hidden"
 

@@ -16,11 +16,15 @@ from typing import Collection
 
 from parameterized import parameterized
 
+from twisted.test.proto_helpers import MemoryReactor
+
 import synapse.rest.admin
 from synapse.api.errors import Codes
 from synapse.rest.client import login
 from synapse.server import HomeServer
 from synapse.storage.background_updates import BackgroundUpdater
+from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -31,7 +35,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastore()
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -44,7 +48,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             ("POST", "/_synapse/admin/v1/background_updates/start_job"),
         ]
     )
-    def test_requester_is_no_admin(self, method: str, url: str):
+    def test_requester_is_no_admin(self, method: str, url: str) -> None:
         """
         If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
         """
@@ -62,7 +66,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-    def test_invalid_parameter(self):
+    def test_invalid_parameter(self) -> None:
         """
         If parameters are invalid, an error is returned.
         """
@@ -90,10 +94,10 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
 
-    def _register_bg_update(self):
+    def _register_bg_update(self) -> None:
         "Adds a bg update but doesn't start it"
 
-        async def _fake_update(progress, batch_size) -> int:
+        async def _fake_update(progress: JsonDict, batch_size: int) -> int:
             await self.clock.sleep(0.2)
             return batch_size
 
@@ -112,7 +116,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             )
         )
 
-    def test_status_empty(self):
+    def test_status_empty(self) -> None:
         """Test the status API works."""
 
         channel = self.make_request(
@@ -127,7 +131,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             channel.json_body, {"current_updates": {}, "enabled": True}
         )
 
-    def test_status_bg_update(self):
+    def test_status_bg_update(self) -> None:
         """Test the status API works with a background update."""
 
         # Create a new background update
@@ -162,7 +166,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             },
         )
 
-    def test_enabled(self):
+    def test_enabled(self) -> None:
         """Test the enabled API works."""
 
         # Create a new background update
@@ -299,7 +303,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             ),
         ]
     )
-    def test_start_backround_job(self, job_name: str, updates: Collection[str]):
+    def test_start_backround_job(self, job_name: str, updates: Collection[str]) -> None:
         """
         Test that background updates add to database and be processed.
 
@@ -341,7 +345,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
             )
         )
 
-    def test_start_backround_job_twice(self):
+    def test_start_backround_job_twice(self) -> None:
         """Test that add a background update twice return an error."""
 
         # add job to database
