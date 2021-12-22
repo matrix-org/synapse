@@ -238,6 +238,10 @@ def event_from_pdu_json(
     # origin, etc etc)
     assert_params_in_dict(pdu_json, ("type", "depth"))
 
+    # Strip any unauthorized values from "unsigned" if they exist
+    if "unsigned" in pdu_json and pdu_json["unsigned"] != {}:
+        pdu_json = _strip_unsigned_values(pdu_json)
+
     depth = pdu_json["depth"]
     if not isinstance(depth, int):
         raise SynapseError(400, "Depth %r not an intger" % (depth,), Codes.BAD_JSON)
@@ -255,3 +259,32 @@ def event_from_pdu_json(
     event.internal_metadata.outlier = outlier
 
     return event
+
+
+def _strip_unsigned_values(pdu_dict: JsonDict) -> JsonDict:
+    """
+    Strip any unsigned values unless specifically allowed, as defined by the whitelist.
+
+    pdu: the json dict to strip values from. Note that the dict is mutated by this
+    function
+    """
+    unsigned = pdu_dict["unsigned"]
+
+    if not isinstance(unsigned, dict):
+        pdu_dict["unsigned"] = {}
+        return pdu_dict
+
+    if pdu_dict["type"] == "m.room.member":
+        whitelist = ["knock_room_state", "invite_room_state", "age"]
+    else:
+        whitelist = ["age"]
+
+    filtered_unsigned = {}
+
+    for k, v in unsigned.items():
+        if k in whitelist:
+            filtered_unsigned[k] = v
+
+    pdu_dict["unsigned"] = filtered_unsigned
+
+    return pdu_dict
