@@ -26,7 +26,7 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine, BaseDatabaseEngine
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -388,9 +388,7 @@ class SearchStore(SearchBackgroundUpdateStore):
             list of dicts
         """
         clauses = []
-
-        search_query = _parse_query(self.database_engine, search_term)
-
+        
         args = []
 
         # Make sure we don't explode because the person is in too many rooms.
@@ -411,21 +409,25 @@ class SearchStore(SearchBackgroundUpdateStore):
         count_args = args
         count_clauses = clauses
 
-        if isinstance(self.database_engine, PostgresEngine):
+        if isinstance(self.database_engine, PostgresEngine):            
+            search_query = _parse_query_for_pgsql(search_term)
+            print(search_query)
             sql = (
-                "SELECT ts_rank_cd(vector, to_tsquery('english', ?)) AS rank,"
+                "SELECT ts_rank_cd(vector, websearch_to_tsquery('english', ?)) AS rank,"
                 " room_id, event_id"
                 " FROM event_search"
-                " WHERE vector @@ to_tsquery('english', ?)"
+                " WHERE vector @@ websearch_to_tsquery('english', ?)"
             )
             args = [search_query, search_query] + args
 
             count_sql = (
                 "SELECT room_id, count(*) as count FROM event_search"
-                " WHERE vector @@ to_tsquery('english', ?)"
+                " WHERE vector @@ websearch_to_tsquery('english', ?)"
             )
             count_args = [search_query] + count_args
         elif isinstance(self.database_engine, Sqlite3Engine):
+            search_query = _parse_query_for_sqlite(search_term)
+
             sql = (
                 "SELECT rank(matchinfo(event_search)) as rank, room_id, event_id"
                 " FROM event_search"
@@ -510,9 +512,7 @@ class SearchStore(SearchBackgroundUpdateStore):
             Each match as a dictionary.
         """
         clauses = []
-
-        search_query = _parse_query(self.database_engine, search_term)
-
+        
         args = []
 
         # Make sure we don't explode because the person is in too many rooms.
@@ -550,20 +550,22 @@ class SearchStore(SearchBackgroundUpdateStore):
             args.extend([origin_server_ts, origin_server_ts, stream])
 
         if isinstance(self.database_engine, PostgresEngine):
+            search_query = _parse_query_for_pgsql(search_term)
             sql = (
-                "SELECT ts_rank_cd(vector, to_tsquery('english', ?)) as rank,"
+                "SELECT ts_rank_cd(vector, websearch_to_tsquery('english', ?)) as rank,"
                 " origin_server_ts, stream_ordering, room_id, event_id"
                 " FROM event_search"
-                " WHERE vector @@ to_tsquery('english', ?) AND "
+                " WHERE vector @@ websearch_to_tsquery('english', ?) AND "
             )
             args = [search_query, search_query] + args
 
             count_sql = (
                 "SELECT room_id, count(*) as count FROM event_search"
-                " WHERE vector @@ to_tsquery('english', ?) AND "
+                " WHERE vector @@ websearch_to_tsquery('english', ?) AND "
             )
             count_args = [search_query] + count_args
         elif isinstance(self.database_engine, Sqlite3Engine):
+            
             # We use CROSS JOIN here to ensure we use the right indexes.
             # https://sqlite.org/optoverview.html#crossjoin
             #
@@ -582,6 +584,7 @@ class SearchStore(SearchBackgroundUpdateStore):
                 " CROSS JOIN events USING (event_id)"
                 " WHERE "
             )
+            search_query = _parse_query_for_sqlite(search_term)
             args = [search_query] + args
 
             count_sql = (
@@ -696,7 +699,7 @@ class SearchStore(SearchBackgroundUpdateStore):
                 while stop_sel in value:
                     stop_sel += ">"
 
-                query = "SELECT ts_headline(?, to_tsquery('english', ?), %s)" % (
+                query = "SELECT ts_headline(?, websearch_to_tsquery('english', ?), %s)" % (
                     _to_postgres_options(
                         {
                             "StartSel": start_sel,
@@ -727,20 +730,18 @@ def _to_postgres_options(options_dict):
     return "'%s'" % (",".join("%s=%s" % (k, v) for k, v in options_dict.items()),)
 
 
-def _parse_query(database_engine, search_term):
+def _parse_query_for_sqlite(search_term: str) -> str:
     """Takes a plain unicode string from the user and converts it into a form
-    that can be passed to database.
-    We use this so that we can add prefix matching, which isn't something
-    that is supported by default.
+    that can be passed to sqllite's matchinfo().    
     """
 
     # Pull out the individual words, discarding any non-word characters.
     results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
+    return " & ".join(results)
 
-    if isinstance(database_engine, PostgresEngine):
-        return " & ".join(result + ":*" for result in results)
-    elif isinstance(database_engine, Sqlite3Engine):
-        return " & ".join(result + "*" for result in results)
-    else:
-        # This should be unreachable.
-        raise Exception("Unrecognized database engine")
+
+def _parse_query_for_pgsql(search_term: str) -> str:
+    """Takes a plain unicode string from the user and converts it into a form
+    that can be passed to pgsql's websearch_to_tsquery.
+    """
+    return search_term

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unittest.case import SkipTest
 import synapse.rest.admin
 from synapse.rest.client import login, room
 from synapse.storage.engines import PostgresEngine
@@ -72,3 +73,41 @@ class NullByteInsertionTest(HomeserverTestCase):
         )
         if isinstance(store.database_engine, PostgresEngine):
             self.assertIn("alice", result.get("highlights"))
+
+    def test_web_search_for_phrase(self):
+        """
+        Test searching for phrases using typical web search syntax, as per pgsql's phraseto_tsquery
+        """
+
+        store = self.hs.get_datastore()
+        if isinstance(store.database_engine, PostgresEngine):
+            raise SkipTest("Test only applies when PGSQL is used as the database")
+
+        phrase = "the quick brown fox jumped over the lazy dog"
+        cases = [
+            ("brown", True),
+            ("quick brown", True),            
+            ("brown quick", True),
+            ("\"brown quick\"", False),
+            ("\"quick brown\"", True),
+            ("\"quick fox\"", False),
+            ("furphy OR fox", True),
+            ("nope OR doublenope", False),
+            ("-fox", False),
+            ("-nope", True),
+        ]
+
+        # Register a user and create a room, create some messages
+        self.register_user("alice", "password")
+        access_token = self.login("alice", "password")
+        room_id = self.helper.create_room_as("alice", tok=access_token)
+                
+        # Send the phrase as a message and check it was created
+        response = self.helper.send(room_id, phrase, tok=access_token)
+        self.assertIn("event_id", response)
+        
+        # Run all the test cases        
+        for query, has_results in cases:
+            result = self.get_success(store.search_msgs([room_id], query, ["content.body"]))            
+            self.assertEquals(result.get("count"), 1 if has_results else 0, query)
+        
