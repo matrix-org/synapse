@@ -1191,7 +1191,6 @@ class FederationEventHandler:
                         [destination],
                         event_id,
                         room_version,
-                        outlier=True,
                     )
                     if event is None:
                         logger.warning(
