@@ -1,0 +1,1 @@
+Update the handler for `/event_auth` to avoid redundantly returning the event in the request, as per [MSC3585](https://github.com/matrix-org/matrix-doc/pull/3585).

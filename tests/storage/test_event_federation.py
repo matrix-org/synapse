@@ -283,12 +283,6 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         )
         self.assertCountEqual(auth_chain_ids, ["e", "f", "g", "h", "i", "j", "k"])
 
-        # Test include_given.
-        auth_chain_ids = self.get_success(
-            self.store.get_auth_chain_ids(room_id, ["i"], include_given=True)
-        )
-        self.assertCountEqual(auth_chain_ids, ["i", "j"])
-
     @parameterized.expand([(True,), (False,)])
     def test_auth_difference(self, use_chain_cover_index: bool):
         room_id = self._setup_auth_chain(use_chain_cover_index)

@@ -423,7 +423,7 @@ class FederationHandler:
     async def on_event_auth(self, event_id: str) -> List[EventBase]:
         event = await self.store.get_event(event_id)
         auth = await self.store.get_auth_chain(
-            event.room_id, list(event.auth_event_ids()), include_given=True
+            event.room_id, list(event.auth_event_ids())
         )
         return list(auth)
 

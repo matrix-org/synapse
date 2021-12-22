@@ -87,35 +87,30 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         self._clock.looping_call(self._get_stats_for_federation_staging, 30 * 1000)
 
     async def get_auth_chain(
-        self, room_id: str, event_ids: Collection[str], include_given: bool = False
+        self, room_id: str, event_ids: Collection[str]
     ) -> List[EventBase]:
         """Get auth events for given event_ids. The events *must* be state events.
 
         Args:
             room_id: The room the event is in.
             event_ids: state events
-            include_given: include the given events in result
 
         Returns:
             list of events
         """
-        event_ids = await self.get_auth_chain_ids(
-            room_id, event_ids, include_given=include_given
-        )
+        event_ids = await self.get_auth_chain_ids(room_id, event_ids)
         return await self.get_events_as_list(event_ids)
 
     async def get_auth_chain_ids(
         self,
         room_id: str,
         event_ids: Collection[str],
-        include_given: bool = False,
     ) -> List[str]:
         """Get auth events for given event_ids. The events *must* be state events.
 
         Args:
             room_id: The room the event is in.
             event_ids: state events
-            include_given: include the given events in result
 
         Returns:
             list of event_ids
@@ -131,7 +126,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     self._get_auth_chain_ids_using_cover_index_txn,
                     room_id,
                     event_ids,
-                    include_given,
                 )
             except _NoChainCoverIndex:
                 # For whatever reason we don't actually have a chain cover index
@@ -142,11 +136,10 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             "get_auth_chain_ids",
             self._get_auth_chain_ids_txn,
             event_ids,
-            include_given,
         )
 
     def _get_auth_chain_ids_using_cover_index_txn(
-        self, txn: Cursor, room_id: str, event_ids: Collection[str], include_given: bool
+        self, txn: Cursor, room_id: str, event_ids: Collection[str]
     ) -> List[str]:
         """Calculates the auth chain IDs using the chain index."""
 
@@ -232,10 +225,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # Now for each chain we figure out the maximum sequence number reachable
         # from *any* event ID. Events with a sequence less than that are in the
         # auth chain.
-        if include_given:
-            results = initial_events
-        else:
-            results = set()
+        results = set()
 
         if isinstance(self.database_engine, PostgresEngine):
             # We can use `execute_values` to efficiently fetch the gaps when
@@ -263,16 +253,13 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         return list(results)
 
     def _get_auth_chain_ids_txn(
-        self, txn: LoggingTransaction, event_ids: Collection[str], include_given: bool
+        self, txn: LoggingTransaction, event_ids: Collection[str]
     ) -> List[str]:
         """Calculates the auth chain IDs.
 
         This is used when we don't have a cover index for the room.
         """
-        if include_given:
-            results = set(event_ids)
-        else:
-            results = set()
+        results = set()
 
         # We pull out the depth simply so that we can populate the
         # `_event_auth_cache` cache.
