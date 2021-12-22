@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import copy
 import logging
 from typing import Dict, Iterable, List, Optional, Tuple, Type
 
@@ -305,7 +306,7 @@ class OpenIdUserInfo(BaseFederationServlet):
 
         return 200, userinfo
 
-    async def _get_powerlevels(self, user_id: str) -> Dict[str, int]:
+    async def _get_powerlevels(self, user_id: str) -> Dict[str, Dict[str, Any]]:
         room_list = (
             await self.hs.get_datastore().get_rooms_for_local_user_where_membership_is(
                 user_id=user_id, membership_list=[Membership.JOIN]
@@ -317,21 +318,13 @@ class OpenIdUserInfo(BaseFederationServlet):
             room_state = await self.hs.get_state_handler().get_current_state(
                 room.room_id
             )
-            room_power_level = None
             room_power_levels = room_state.get((EventTypes.PowerLevels, ""))
             if room_power_levels is not None:
-                user_power = room_power_levels.content.get("users", None)
-                if user_power is not None:
-                    try:
-                        room_power_level = user_power[user_id]
-                    except KeyError:
-                        pass
-                if room_power_level is None:
-                    room_power_level = room_power_levels.content.get(
-                        "state_default", None
-                    )
-            if room_power_level is not None:
-                power_levels[room.room_id] = room_power_level
+                stripped_content = copy.deepcopy(room_power_levels.content)
+                stripped_content["users"] = {
+                    k: v for k, v in stripped_content["users"].items() if k == user_id
+                }
+                power_levels[room.room_id] = stripped_content
 
         return power_levels
 
