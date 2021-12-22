@@ -420,7 +420,7 @@ class FederationEventHandler:
             SynapseError if the response is in some way invalid.
         """
         create_event = None
-        for e in auth_events:
+        for e in state:
             if (e.type, e.state_key) == (EventTypes.Create, ""):
                 create_event = e
                 break
