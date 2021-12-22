@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from unittest.case import SkipTest
+from unittest.mock import PropertyMock, patch
 import synapse.rest.admin
 from synapse.rest.client import login, room
 from synapse.storage.engines import PostgresEngine
@@ -74,16 +75,28 @@ class NullByteInsertionTest(HomeserverTestCase):
         if isinstance(store.database_engine, PostgresEngine):
             self.assertIn("alice", result.get("highlights"))
 
+
+class PostgresMessageSearchTest(HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
     def test_web_search_for_phrase(self):
         """
-        Test searching for phrases using typical web search syntax, as per pgsql's phraseto_tsquery
+        Test searching for phrases using typical web search syntax, as per pgsql's websearch_to_tsquery. 
+        This test is skipped unless the PG instance supports websearch_to_tsquery.
         """
 
         store = self.hs.get_datastore()
-        if isinstance(store.database_engine, PostgresEngine):
+        if not isinstance(store.database_engine, PostgresEngine):
             raise SkipTest("Test only applies when PGSQL is used as the database")
+        
+        if not store.database_engine.supports_websearch_to_tsquery:
+            raise SkipTest("Test only applies when PGSQL supporting websearch_to_tsquery is used as the database")
 
-        phrase = "the quick brown fox jumped over the lazy dog"
+        phrase = "the quick brown fox jumps over the lazy dog"
         cases = [
             ("brown", True),
             ("quick brown", True),            
@@ -110,4 +123,44 @@ class NullByteInsertionTest(HomeserverTestCase):
         for query, has_results in cases:
             result = self.get_success(store.search_msgs([room_id], query, ["content.body"]))            
             self.assertEquals(result.get("count"), 1 if has_results else 0, query)
+
+    def test_plain_search_for_phrase(self):
+        """
+        Test searching for phrases using plainto_tsquery, which is used when websearch_to_tsquery isn't 
+        supported by the PG version. 
+        """
+        
+        store = self.hs.get_datastore()
+        if not isinstance(store.database_engine, PostgresEngine):
+            raise SkipTest("Test only applies when PGSQL is used as the database")
+    
+        phrase = "the quick brown fox jumps over the lazy dog"
+        cases = [
+            ("nope", False),
+            ("brown", True),
+            ("quick brown", True),
+            ("brown quick", True),
+            ("brown nope", False),
+            ("furphy OR fox", False), # syntax not supported
+            ("\"quick brown\"", True), # syntax not supported, but strips quotes
+            ("-nope", False), # syntax not supported
+        ]
+
+        # Register a user and create a room, create some messages
+        self.register_user("alice", "password")
+        access_token = self.login("alice", "password")
+        room_id = self.helper.create_room_as("alice", tok=access_token)
+                
+        # Send the phrase as a message and check it was created
+        response = self.helper.send(room_id, phrase, tok=access_token)
+        self.assertIn("event_id", response)
+                
+        with patch("synapse.storage.engines.postgres.PostgresEngine.supports_websearch_to_tsquery", 
+                    new_callable=PropertyMock) as supports_websearch_to_tsquery:
+            supports_websearch_to_tsquery.return_value = False
+
+            # Run all the test cases        
+            for query, has_results in cases:
+                result = self.get_success(store.search_msgs([room_id], query, ["content.body"]))                
+                self.assertEquals(result.get("count"), 1 if has_results else 0, query)
         

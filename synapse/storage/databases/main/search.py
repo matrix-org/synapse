@@ -15,7 +15,7 @@
 import logging
 import re
 from collections import namedtuple
-from typing import TYPE_CHECKING, Collection, Iterable, List, Optional, Set
+from typing import TYPE_CHECKING, Collection, Iterable, List, Optional, Set, Tuple
 
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
@@ -410,21 +410,20 @@ class SearchStore(SearchBackgroundUpdateStore):
         count_clauses = clauses
 
         if isinstance(self.database_engine, PostgresEngine):            
-            search_query = _parse_query_for_pgsql(search_term)
-            print(search_query)
+            search_query, tsquery_func = _parse_query_for_pgsql(search_term, self.database_engine)
             sql = (
-                "SELECT ts_rank_cd(vector, websearch_to_tsquery('english', ?)) AS rank,"
+                f"SELECT ts_rank_cd(vector, {tsquery_func}('english', ?)) AS rank,"
                 " room_id, event_id"
                 " FROM event_search"
-                " WHERE vector @@ websearch_to_tsquery('english', ?)"
+                f" WHERE vector @@  {tsquery_func}('english', ?)"
             )
             args = [search_query, search_query] + args
 
             count_sql = (
                 "SELECT room_id, count(*) as count FROM event_search"
-                " WHERE vector @@ websearch_to_tsquery('english', ?)"
+                f" WHERE vector @@ {tsquery_func}('english', ?)"
             )
-            count_args = [search_query] + count_args
+            count_args = [search_query] + count_args            
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_for_sqlite(search_term)
 
@@ -480,7 +479,7 @@ class SearchStore(SearchBackgroundUpdateStore):
         )
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
-
+        
         return {
             "results": [
                 {"event": event_map[r["event_id"]], "rank": r["rank"]}
@@ -550,18 +549,18 @@ class SearchStore(SearchBackgroundUpdateStore):
             args.extend([origin_server_ts, origin_server_ts, stream])
 
         if isinstance(self.database_engine, PostgresEngine):
-            search_query = _parse_query_for_pgsql(search_term)
+            search_query, tsquery_func = _parse_query_for_pgsql(search_term, self.database_engine)
             sql = (
-                "SELECT ts_rank_cd(vector, websearch_to_tsquery('english', ?)) as rank,"
+                f"SELECT ts_rank_cd(vector, {tsquery_func}('english', ?)) as rank,"
                 " origin_server_ts, stream_ordering, room_id, event_id"
                 " FROM event_search"
-                " WHERE vector @@ websearch_to_tsquery('english', ?) AND "
+                f" WHERE vector @@ {tsquery_func}('english', ?) AND "
             )
             args = [search_query, search_query] + args
 
             count_sql = (
                 "SELECT room_id, count(*) as count FROM event_search"
-                " WHERE vector @@ websearch_to_tsquery('english', ?) AND "
+                f" WHERE vector @@ {tsquery_func}('english', ?) AND "
             )
             count_args = [search_query] + count_args
         elif isinstance(self.database_engine, Sqlite3Engine):
@@ -740,8 +739,14 @@ def _parse_query_for_sqlite(search_term: str) -> str:
     return " & ".join(results)
 
 
-def _parse_query_for_pgsql(search_term: str) -> str:
+def _parse_query_for_pgsql(search_term: str, engine: PostgresEngine) -> Tuple[str, str]:
     """Takes a plain unicode string from the user and converts it into a form
     that can be passed to pgsql's websearch_to_tsquery.
-    """
-    return search_term
+    """    
+    return search_term, _get_tsquery_func(engine)
+
+def _get_tsquery_func(engine: PostgresEngine) -> str:
+    if engine.supports_websearch_to_tsquery:
+        return "websearch_to_tsquery"
+    else:
+        return "plainto_tsquery"

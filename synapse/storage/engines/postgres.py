@@ -138,6 +138,10 @@ class PostgresEngine(BaseDatabaseEngine):
         """Do we support the `RETURNING` clause in insert/update/delete?"""
         return True
 
+    @property
+    def supports_websearch_to_tsquery(self) -> bool:
+        return int(self.server_version.split(".")[0]) >= 11
+
     def is_deadlock(self, error):
         if isinstance(error, self.module.DatabaseError):
             # https://www.postgresql.org/docs/current/static/errcodes-appendix.html
