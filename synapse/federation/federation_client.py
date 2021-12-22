@@ -265,10 +265,7 @@ class FederationClient(FederationBase):
 
         room_version = await self.store.get_room_version(room_id)
 
-        pdus = [
-            event_from_pdu_json(p, room_version, outlier=False)
-            for p in transaction_data_pdus
-        ]
+        pdus = [event_from_pdu_json(p, room_version) for p in transaction_data_pdus]
 
         # Check signatures and hash of pdus, removing any from the list that fail checks
         pdus[:] = await self._check_sigs_and_hash_and_fetch(
