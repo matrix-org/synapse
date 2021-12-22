@@ -666,7 +666,9 @@ class FederationEventHandler:
         logger.info("Processing pulled event %s", event)
 
         # these should not be outliers.
-        assert not event.internal_metadata.is_outlier()
+        assert (
+            not event.internal_metadata.is_outlier()
+        ), "pulled event unexpectedly flagged as outlier"
 
         event_id = event.event_id
 
