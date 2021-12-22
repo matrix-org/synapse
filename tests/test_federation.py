@@ -17,7 +17,9 @@ from unittest.mock import Mock
 from twisted.internet.defer import succeed
 
 from synapse.api.errors import FederationError
+from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
+from synapse.federation.federation_base import event_from_pdu_json
 from synapse.logging.context import LoggingContext
 from synapse.types import UserID, create_requester
 from synapse.util import Clock
@@ -283,103 +285,84 @@ class StripUnsignedFromEventsTestCase(MessageAcceptTests):
         most_recent = self.get_success(
             self.homeserver.get_datastore().get_latest_event_ids_in_room(self.room_id)
         )[0]
-        federation_event_handler = self.homeserver.get_federation_event_handler()
-        event1 = make_event_from_dict(
-            {
-                "room_id": self.room_id,
-                "sender": "@baduser:test.serv",
-                "state_key": "@baduser:test.serv",
-                "event_id": "$event1:test.serv",
-                "depth": 1000,
-                "origin_server_ts": 1,
-                "type": "m.room.member",
-                "origin": "test.servx",
-                "content": {"membership": "join"},
-                "auth_events": [],
-                "prev_state": [(most_recent, {})],
-                "prev_events": [(most_recent, {})],
-                "unsigned": {"malicious garbage": "hackz", "more warez": "more hackz"},
-            }
-        )
-        self.get_success(federation_event_handler.on_receive_pdu("test.serv", event1))
-
-        event = self.get_success(self.store.get_event("$event1:test.serv"))
-        event_dict = event.get_dict()
+        event1 = {
+            "room_id": self.room_id,
+            "sender": "@baduser:test.serv",
+            "state_key": "@baduser:test.serv",
+            "event_id": "$event1:test.serv",
+            "depth": 1000,
+            "origin_server_ts": 1,
+            "type": "m.room.member",
+            "origin": "test.servx",
+            "content": {"membership": "join"},
+            "auth_events": [],
+            "prev_state": [(most_recent, {})],
+            "prev_events": [(most_recent, {})],
+            "unsigned": {"malicious garbage": "hackz", "more warez": "more hackz"},
+        }
+        filtered_event = event_from_pdu_json(event1, RoomVersions.V1)
         # Make sure unauthorized fields are stripped from unsigned
-        self.assertNotIn("more warez", event_dict["unsigned"])
+        self.assertNotIn("more warez", filtered_event.unsigned)
 
     def test_strip_event_maintains_allowed_fields(self):
         most_recent = self.get_success(
             self.homeserver.get_datastore().get_latest_event_ids_in_room(self.room_id)
         )[0]
-        federation_event_handler = self.homeserver.get_federation_event_handler()
-        event2 = make_event_from_dict(
-            {
-                "room_id": self.room_id,
-                "sender": "@baduser:test.serv",
-                "state_key": "@baduser:test.serv",
-                "event_id": "$event2:test.serv",
-                "depth": 1000,
-                "origin_server_ts": 1,
-                "type": "m.room.member",
-                "origin": "test.servx",
-                "auth_events": [],
-                "prev_state": [(most_recent, {})],
-                "prev_events": [(most_recent, {})],
-                "content": {"membership": "join"},
-                "unsigned": {
-                    "malicious garbage": "hackz",
-                    "more warez": "more hackz",
-                    "age": 14,
-                    "invite_room_state": [],
-                },
-            }
-        )
-        self.get_success(
-            federation_event_handler.on_send_membership_event("test.serv", event2)
-        )
+        event2 = {
+            "room_id": self.room_id,
+            "sender": "@baduser:test.serv",
+            "state_key": "@baduser:test.serv",
+            "event_id": "$event2:test.serv",
+            "depth": 1000,
+            "origin_server_ts": 1,
+            "type": "m.room.member",
+            "origin": "test.servx",
+            "auth_events": [],
+            "prev_state": [(most_recent, {})],
+            "prev_events": [(most_recent, {})],
+            "content": {"membership": "join"},
+            "unsigned": {
+                "malicious garbage": "hackz",
+                "more warez": "more hackz",
+                "age": 14,
+                "invite_room_state": [],
+            },
+        }
 
-        event = self.get_success(self.store.get_event("$event2:test.serv"))
-        event_dict = event.get_dict()
-        self.assertIn("age", event_dict["unsigned"])
-        self.assertEqual(14, event_dict["unsigned"]["age"])
-        self.assertNotIn("more warez", event_dict["unsigned"])
+        filtered_event2 = event_from_pdu_json(event2, RoomVersions.V1)
+        self.assertIn("age", filtered_event2.unsigned)
+        self.assertEqual(14, filtered_event2.unsigned["age"])
+        self.assertNotIn("more warez", filtered_event2.unsigned)
         # Invite_room_state is allowed in events of type m.room.member
-        self.assertIn("invite_room_state", event_dict["unsigned"])
-        self.assertEqual([], event_dict["unsigned"]["invite_room_state"])
+        self.assertIn("invite_room_state", filtered_event2.unsigned)
+        self.assertEqual([], filtered_event2.unsigned["invite_room_state"])
 
     def test_strip_event_removes_fields_based_on_event_type(self):
         most_recent = self.get_success(
             self.homeserver.get_datastore().get_latest_event_ids_in_room(self.room_id)
         )[0]
-        federation_event_handler = self.homeserver.get_federation_event_handler()
-        event3 = make_event_from_dict(
-            {
-                "room_id": self.room_id,
-                "sender": "@baduser:test.serv",
-                "state_key": "@baduser:test.serv",
-                "event_id": "$event3:test.serv",
-                "depth": 1000,
-                "origin_server_ts": 1,
-                "type": "m.room.power_levels",
-                "origin": "test.servx",
-                "content": {},
-                "auth_events": [],
-                "prev_state": [(most_recent, {})],
-                "prev_events": [(most_recent, {})],
-                "unsigned": {
-                    "malicious garbage": "hackz",
-                    "more warez": "more hackz",
-                    "age": 14,
-                    "invite_room_state": [],
-                },
-            }
-        )
-        self.get_success(federation_event_handler.on_receive_pdu("test.serv", event3))
-
-        event = self.get_success(self.store.get_event("$event3:test.serv"))
-        event_dict = event.get_dict()
-        self.assertIn("age", event_dict["unsigned"])
+        event3 = {
+            "room_id": self.room_id,
+            "sender": "@baduser:test.serv",
+            "state_key": "@baduser:test.serv",
+            "event_id": "$event3:test.serv",
+            "depth": 1000,
+            "origin_server_ts": 1,
+            "type": "m.room.power_levels",
+            "origin": "test.servx",
+            "content": {},
+            "auth_events": [],
+            "prev_state": [(most_recent, {})],
+            "prev_events": [(most_recent, {})],
+            "unsigned": {
+                "malicious garbage": "hackz",
+                "more warez": "more hackz",
+                "age": 14,
+                "invite_room_state": [],
+            },
+        }
+        filtered_event3 = event_from_pdu_json(event3, RoomVersions.V1)
+        self.assertIn("age", filtered_event3.unsigned)
         # Invite_room_state field is only permitted in event type m.room.member
-        self.assertNotIn("invite_room_state", event_dict["unsigned"])
-        self.assertNotIn("more warez", event_dict["unsigned"])
+        self.assertNotIn("invite_room_state", filtered_event3.unsigned)
+        self.assertNotIn("more warez", filtered_event3.unsigned)
