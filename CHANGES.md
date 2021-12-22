@@ -1,5 +1,46 @@
-Synapse 1.49.0rc1 (2021-12-07)
-==============================
+Synapse 1.49.2 (2021-12-21)
+===========================
+
+This release fixes a regression introduced in Synapse 1.49.0 which could cause `/sync` requests to take significantly longer. This would particularly affect "initial" syncs for users participating in a large number of rooms, and in extreme cases, could make it impossible for such users to log in on a new client.
+
+**Note:** in line with our [deprecation policy](https://matrix-org.github.io/synapse/latest/deprecation_policy.html) for platform dependencies, this will be the last release to support Python 3.6 and PostgreSQL 9.6, both of which have now reached upstream end-of-life. Synapse will require Python 3.7+ and PostgreSQL 10+.
+
+**Note:** We will also stop producing packages for Ubuntu 18.04 (Bionic Beaver) after this release, as it uses Python 3.6.
+
+Bugfixes
+--------
+
+- Fix a performance regression in `/sync` handling, introduced in 1.49.0. ([\#11583](https://github.com/matrix-org/synapse/issues/11583))
+
+Internal Changes
+----------------
+
+- Work around a build problem on Debian Buster. ([\#11625](https://github.com/matrix-org/synapse/issues/11625))
+
+
+Synapse 1.49.1 (2021-12-21)
+===========================
+
+Not released due to problems building the debian packages.
+
+
+Synapse 1.49.0 (2021-12-14)
+===========================
+
+No significant changes since version 1.49.0rc1.
+
+
+Support for Ubuntu 21.04 ends next month on the 20th of January
+---------------------------------------------------------------
+
+For users of Ubuntu 21.04 (Hirsute Hippo), please be aware that [upstream support for this version of Ubuntu will end next month][Ubuntu2104EOL].
+We will stop producing packages for Ubuntu 21.04 after upstream support ends.
+
+[Ubuntu2104EOL]: https://lists.ubuntu.com/archives/ubuntu-announce/2021-December/000275.html
+
+
+The wiki has been migrated to the documentation website
+-------------------------------------------------------
 
 We've decided to move the existing, somewhat stagnant pages from the GitHub wiki
 to the [documentation website](https://matrix-org.github.io/synapse/latest/).
@@ -15,6 +56,9 @@ Note that contributions to the documentation website happen through [GitHub pull
 requests](https://github.com/matrix-org/synapse/pulls). Please visit [#synapse-dev:matrix.org](https://matrix.to/#/#synapse-dev:matrix.org)
 if you need help with the process!
 
+
+Synapse 1.49.0rc1 (2021-12-07)
+==============================
 
 Features
 --------
