@@ -17,7 +17,6 @@ import logging
 from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
-    Any,
     Collection,
     Container,
     Dict,
@@ -53,7 +52,7 @@ from synapse.event_auth import (
     check_auth_rules_for_event,
     validate_event_for_room_version,
 )
-from synapse.events import EventBase, make_event_from_dict
+from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.logging.context import nested_logging_context, run_in_background
@@ -181,11 +180,6 @@ class FederationEventHandler:
         except SynapseError as err:
             logger.warning("Received event failed sanity checks")
             raise FederationError("ERROR", err.code, err.msg, affected=pdu.event_id)
-
-        # Strip any unauthorized unsigned values if they exist
-        event_dict = pdu.get_dict()
-        if "unsigned" in event_dict and event_dict["unsigned"] != {}:
-            pdu = self._strip_unsigned_values(pdu, event_dict)
 
         # If we are currently in the process of joining this room, then we
         # queue up events for later processing.
@@ -330,11 +324,6 @@ class FederationEventHandler:
             raise SynapseError(400, "state_key and sender must match", Codes.BAD_JSON)
 
         assert not event.internal_metadata.outlier
-
-        # Strip any unauthorized unsigned values if they exist
-        event_dict = event.get_dict()
-        if "unsigned" in event_dict and event_dict["unsigned"] != {}:
-            event = self._strip_unsigned_values(event, event_dict)
 
         # Send this event on behalf of the other server.
         #
@@ -1951,39 +1940,4 @@ class FederationEventHandler:
             )
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Too many auth_events")
 
-    def _strip_unsigned_values(
-        self, pdu: EventBase, event_dict: Dict[str, Any]
-    ) -> EventBase:
-        """
-        Strip any unsigned values unless specifically allowed, as defined by the whitelist.
 
-        pdu: the event to strip values from
-        event_dict: a dict of values derived from the pdu (note that this dict is mutated
-        by this function)
-        """
-        unsigned = event_dict["unsigned"]
-
-        if not isinstance(unsigned, dict):
-            event_dict["unsigned"] = {}
-            return make_event_from_dict(
-                event_dict, pdu.room_version, pdu.internal_metadata.get_dict()
-            )
-
-        if pdu.type == EventTypes.Member:
-            whitelist = ["knock_room_state", "invite_room_state", "age"]
-        else:
-            whitelist = ["age"]
-
-        filtered_unsigned = {}
-
-        for k, v in unsigned.items():
-            if k in whitelist:
-                filtered_unsigned[k] = v
-
-        event_dict["unsigned"] = filtered_unsigned
-
-        stripped_event = make_event_from_dict(
-            event_dict, pdu.room_version, pdu.internal_metadata.get_dict()
-        )
-
-        return stripped_event
