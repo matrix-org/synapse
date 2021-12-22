@@ -282,7 +282,6 @@ class FederationClient(FederationBase):
         destination: str,
         event_id: str,
         room_version: RoomVersion,
-        outlier: bool = False,
         timeout: Optional[int] = None,
     ) -> Optional[EventBase]:
         """Requests the PDU with given origin and ID from the remote home
@@ -292,9 +291,6 @@ class FederationClient(FederationBase):
             destination: Which homeserver to query
             event_id: event to fetch
             room_version: version of the room
-            outlier: Indicates whether the PDU is an `outlier`, i.e. if
-                it's from an arbitrary point in the context as opposed to part
-                of the current block of PDUs. Defaults to `False`
             timeout: How long to try (in ms) each destination for before
                 moving to the next destination. None indicates no timeout.
 
@@ -316,8 +312,7 @@ class FederationClient(FederationBase):
         )
 
         pdu_list: List[EventBase] = [
-            event_from_pdu_json(p, room_version, outlier=outlier)
-            for p in transaction_data["pdus"]
+            event_from_pdu_json(p, room_version) for p in transaction_data["pdus"]
         ]
 
         if pdu_list and pdu_list[0]:
@@ -334,7 +329,6 @@ class FederationClient(FederationBase):
         destinations: Iterable[str],
         event_id: str,
         room_version: RoomVersion,
-        outlier: bool = False,
         timeout: Optional[int] = None,
     ) -> Optional[EventBase]:
         """Requests the PDU with given origin and ID from the remote home
@@ -347,9 +341,6 @@ class FederationClient(FederationBase):
             destinations: Which homeservers to query
             event_id: event to fetch
             room_version: version of the room
-            outlier: Indicates whether the PDU is an `outlier`, i.e. if
-                it's from an arbitrary point in the context as opposed to part
-                of the current block of PDUs. Defaults to `False`
             timeout: How long to try (in ms) each destination for before
                 moving to the next destination. None indicates no timeout.
 
@@ -377,7 +368,6 @@ class FederationClient(FederationBase):
                     destination=destination,
                     event_id=event_id,
                     room_version=room_version,
-                    outlier=outlier,
                     timeout=timeout,
                 )
 
