@@ -421,9 +421,6 @@ class FederationEventHandler:
         Raises:
             SynapseError if the response is in some way invalid.
         """
-        for e in itertools.chain(auth_events, state):
-            e.internal_metadata.outlier = True
-
         event_map = {e.event_id: e for e in itertools.chain(auth_events, state)}
 
         create_event = None
