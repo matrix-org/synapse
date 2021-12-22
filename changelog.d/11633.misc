@@ -1,0 +1,2 @@
+Stop building bionic, update dh-virtualenv and update Trove classifiers, tasks all associated with dropping
+EOL Python3.6. 
