@@ -17,6 +17,7 @@
 import copy
 import itertools
 import logging
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Awaitable,
@@ -412,6 +413,74 @@ class FederationClient(FederationBase):
             raise Exception("invalid response from /state_ids")
 
         return state_event_ids, auth_event_ids
+
+    async def get_room_state(
+        self,
+        destination: str,
+        room_id: str,
+        event_id: str,
+        room_version: RoomVersion,
+    ) -> Tuple[List[EventBase], List[EventBase]]:
+        """Calls the /state endpoint to fetch the state at a particular point
+        in the room.
+
+        Returns:
+            a tuple of (state events, auth events)
+        """
+        result = await self.transport_layer.get_room_state(
+            room_version,
+            destination,
+            room_id,
+            event_id,
+        )
+        state_events = result.state
+        auth_events = result.auth_events
+
+        # we may as filter out any duplicates from the response, which avoids some
+        # potential failure modes later.
+        #
+        # We don't rely on the sort order of either of them, which makes it easier
+        state_event_map = {event.event_id: event for event in state_events}
+        auth_event_map = {
+            event.event_id: event
+            for event in auth_events
+            if event.event_id not in state_event_map
+        }
+
+        logger.info(
+            "Processing from /state: %d state events, %d auth events",
+            len(state_event_map),
+            len(auth_event_map),
+        )
+
+        valid_state_events: List[EventBase] = []
+        valid_auth_events: List[EventBase] = []
+
+        async def _append_valid_events_to_list(
+            pdu: EventBase,
+            target_list: List[EventBase],
+        ) -> None:
+            valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
+                pdu=pdu,
+                origin=destination,
+                room_version=room_version,
+            )
+
+            if valid_pdu:
+                target_list.append(valid_pdu)
+
+        await concurrently_execute(
+            partial(_append_valid_events_to_list, target_list=valid_state_events),
+            state_events,
+            10000,
+        )
+        await concurrently_execute(
+            partial(_append_valid_events_to_list, target_list=valid_auth_events),
+            state_events,
+            10000,
+        )
+
+        return valid_state_events, valid_auth_events
 
     async def _check_sigs_and_hash_and_fetch(
         self,
