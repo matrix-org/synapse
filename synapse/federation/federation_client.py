@@ -435,7 +435,6 @@ class FederationClient(FederationBase):
         origin: str,
         pdus: Collection[EventBase],
         room_version: RoomVersion,
-        outlier: bool = False,
     ) -> List[EventBase]:
         """Takes a list of PDUs and checks the signatures and hashes of each
         one. If a PDU fails its signature check then we check if we have it in
@@ -451,7 +450,6 @@ class FederationClient(FederationBase):
             origin
             pdu
             room_version
-            outlier: Whether the events are outliers or not
 
         Returns:
             A list of PDUs that have valid signatures and hashes.
@@ -466,7 +464,6 @@ class FederationClient(FederationBase):
             valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
                 pdu=pdu,
                 origin=origin,
-                outlier=outlier,
                 room_version=room_version,
             )
 
@@ -1230,7 +1227,7 @@ class FederationClient(FederationBase):
             ]
 
             signed_events = await self._check_sigs_and_hash_and_fetch(
-                destination, events, outlier=False, room_version=room_version
+                destination, events, room_version=room_version
             )
         except HttpResponseException as e:
             if not e.code == 400:
