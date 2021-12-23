@@ -191,11 +191,15 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             NotFoundError if the room is unknown
         """
         state_ids = await self.get_current_state_ids(room_id)
+
+        if not state_ids:
+            raise NotFoundError(f"Current state for room {room_id} is empty")
+
         create_id = state_ids.get((EventTypes.Create, ""))
 
         # If we can't find the create event, assume we've hit a dead end
         if not create_id:
-            raise NotFoundError("Unknown room %s" % (room_id,))
+            raise NotFoundError(f"No create event in current state for room {room_id}")
 
         # Retrieve the room's create event and return
         create_event = await self.get_event(create_id)
