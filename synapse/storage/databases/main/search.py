@@ -478,7 +478,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         count_results = await self.db_pool.execute(
             "search_rooms_count", self.db_pool.cursor_to_dict, count_sql, *count_args
-        )
+        )        
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
 

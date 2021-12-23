@@ -107,14 +107,16 @@ class MessageSearchTest(HomeserverTestCase):
             result = self.get_success(
                 store.search_msgs([self.room_id], query, ["content.body"])
             )
-            self.assertEquals(result.get("count"), 1 if has_results else 0, query)
+            self.assertEquals(result["count"], 1 if has_results else 0, query)
+            self.assertEquals(len(result["results"]), 1 if has_results else 0, query)
 
         # Run them again versus search_rooms
         for query, has_results in cases:
             result = self.get_success(
                 store.search_rooms([self.room_id], query, ["content.body"], 10)
             )
-            self.assertEquals(result.get("count"), 1 if has_results else 0, query)
+            self.assertEquals(result["count"], 1 if has_results else 0, query)
+            self.assertEquals(len(result["results"]), 1 if has_results else 0, query)
 
     def test_postgres_web_search_for_phrase(self):
         """
@@ -162,9 +164,9 @@ class MessageSearchTest(HomeserverTestCase):
             ("quick brown", True),
             ("brown quick", True),
             ("brown nope", False),
-            ("furphy OR fox", False),  # syntax not supported
+            ("furphy OR fox", False),  # syntax not supported, quotes will be ignored
             ('"jumps over"', True),  # syntax not supported, but strips quotes
-            ("-nope", False),  # syntax not supported
+            ("-nope", False),  # syntax not supported, - will be ignored
         ]
 
         # Patch supports_websearch_to_tsquery to always return False to ensure we're testing the plainto_tsquery path.
@@ -190,10 +192,9 @@ class MessageSearchTest(HomeserverTestCase):
             ("brown quick", True),
             ("brown nope", False),
             ("furphy OR fox", True),  # sqllite supports OR
-            ('"jumps over"', True),  
-            ('quick fox', True), # syntax supports quotes, but we strip them out
-            ('"quick fox"', True), # syntax supports quotes, but we strip them out            
-            ("-nope", False),  # sqllite supports -, but we strip them out
+            ('"jumps over"', True),              
+            ('"quick fox"', False), # syntax supports quotes
+            ("fox NOT nope", True),  # sqllite supports NOT
         ]
 
         self._check_test_cases(store, cases)
