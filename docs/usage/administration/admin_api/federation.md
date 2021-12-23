@@ -86,7 +86,7 @@ The following fields are returned in the JSON response body:
 - `next_token`: string representing a positive integer - Indication for pagination. See above.
 - `total` - integer - Total number of destinations.
 
-# Destination Details API
+## Destination Details API
 
 This API gets the retry timing info for a specific remote server.
 
@@ -108,7 +108,34 @@ A response body like the following is returned:
 }
 ```
 
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `destination` - Name of the remote server.
+
 **Response**
 
 The response fields are the same like in the `destinations` array in
 [List of destinations](#list-of-destinations) response.
+
+## Reset connection timeout
+
+This API resets the retry timing for a specific remote server and tries to connect
+the remote server again. It does not wait for the next `retry_interval`.
+The connection must have previously run into an error and `retry_last_ts`
+([Destination Details API](#destination-details-api)) must not be equal to `0`.
+
+The API is:
+
+```
+POST /_synapse/admin/v1/federation/destinations/<destination>/reset_connection
+
+{}
+```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `destination` - Name of the remote server.
