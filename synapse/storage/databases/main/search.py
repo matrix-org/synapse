@@ -26,7 +26,7 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine, BaseDatabaseEngine
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer

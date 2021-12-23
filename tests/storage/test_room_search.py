@@ -14,6 +14,7 @@
 
 from unittest.case import SkipTest
 from unittest.mock import PropertyMock, patch
+
 import synapse.rest.admin
 from synapse.rest.client import login, room
 from synapse.storage.engines import PostgresEngine
