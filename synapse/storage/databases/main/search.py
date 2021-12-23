@@ -740,13 +740,18 @@ def _parse_query_for_sqlite(search_term: str) -> str:
 
 
 def _parse_query_for_pgsql(search_term: str, engine: PostgresEngine) -> Tuple[str, str]:
-    """Takes a plain unicode string from the user and converts it into a form
-    that can be passed to pgsql's websearch_to_tsquery.
-    """    
-    return search_term, _get_tsquery_func(engine)
+    """
+    Return a tuple of (parsed search_term, tsquery func to use).
 
-def _get_tsquery_func(engine: PostgresEngine) -> str:
+    The parsed search_term will be transformed into a syntax suitable for passing as an 
+    argument to the tsquery func.
+    """
+
     if engine.supports_websearch_to_tsquery:
-        return "websearch_to_tsquery"
+        return search_term, "websearch_to_tsquery"
     else:
-        return "plainto_tsquery"
+        # Pull out the individual words, discarding any non-word characters.
+        results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
+        # Join words with & (AND), using prefix matching for each word
+        parsed_query = " & ".join(result + ":*" for result in results)
+        return parsed_query, "to_tsquery"
