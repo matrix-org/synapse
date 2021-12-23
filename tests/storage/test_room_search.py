@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Tuple
 from unittest.case import SkipTest
 from unittest.mock import PropertyMock, patch
 
 import synapse.rest.admin
 from synapse.rest.client import login, room
+from synapse.storage.databases.main import DataStore
 from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines.sqlite import Sqlite3Engine
 
 from tests.unittest import HomeserverTestCase
 
@@ -77,14 +80,43 @@ class NullByteInsertionTest(HomeserverTestCase):
             self.assertIn("alice", result.get("highlights"))
 
 
-class PostgresMessageSearchTest(HomeserverTestCase):
+class MessageSearchTest(HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         room.register_servlets,
     ]
 
-    def test_web_search_for_phrase(self):
+    PHRASE = "the quick brown fox jumps over the lazy dog"
+
+    def setUp(self):            
+        super().setUp()
+
+        # Register a user and create a room, create some messages
+        self.register_user("alice", "password")
+        self.access_token = self.login("alice", "password")
+        self.room_id = self.helper.create_room_as("alice", tok=self.access_token)
+
+        # Send the phrase as a message and check it was created
+        response = self.helper.send(self.room_id, self.PHRASE, tok=self.access_token)
+        self.assertIn("event_id", response)
+
+    def _check_test_cases(self, store: DataStore, cases: list[Tuple[str, bool]]) -> None:
+        # Run all the test cases versus search_msgs
+        for query, has_results in cases:
+            result = self.get_success(
+                store.search_msgs([self.room_id], query, ["content.body"])
+            )
+            self.assertEquals(result.get("count"), 1 if has_results else 0, query)
+
+        # Run them again versus search_rooms
+        for query, has_results in cases:
+            result = self.get_success(
+                store.search_rooms([self.room_id], query, ["content.body"], 10)
+            )
+            self.assertEquals(result.get("count"), 1 if has_results else 0, query)
+
+    def test_postgres_web_search_for_phrase(self):
         """
         Test searching for phrases using typical web search syntax, as per postgres' websearch_to_tsquery.
         This test is skipped unless the postgres instance supports websearch_to_tsquery.
@@ -99,13 +131,12 @@ class PostgresMessageSearchTest(HomeserverTestCase):
                 "Test only applies when postgres supporting websearch_to_tsquery is used as the database"
             )
 
-        phrase = "the quick brown fox jumps over the lazy dog"
         cases = [
             ("brown", True),
             ("quick brown", True),
             ("brown quick", True),
             ('"brown quick"', False),
-            ('"quick brown"', True),
+            ('"jumps over"', True),
             ('"quick fox"', False),
             ("furphy OR fox", True),
             ("nope OR doublenope", False),
@@ -113,32 +144,11 @@ class PostgresMessageSearchTest(HomeserverTestCase):
             ("-nope", True),
         ]
 
-        # Register a user and create a room, create some messages
-        self.register_user("alice", "password")
-        access_token = self.login("alice", "password")
-        room_id = self.helper.create_room_as("alice", tok=access_token)
+        self._check_test_cases(store, cases)
 
-        # Send the phrase as a message and check it was created
-        response = self.helper.send(room_id, phrase, tok=access_token)
-        self.assertIn("event_id", response)
-
-        # Run all the test cases versus search_msgs
-        for query, has_results in cases:
-            result = self.get_success(
-                store.search_msgs([room_id], query, ["content.body"])
-            )
-            self.assertEquals(result.get("count"), 1 if has_results else 0, query)
-
-        # Run them again versus search_rooms
-        for query, has_results in cases:
-            result = self.get_success(
-                store.search_rooms([room_id], query, ["content.body"], 10)
-            )
-            self.assertEquals(result.get("count"), 1 if has_results else 0, query)
-
-    def test_non_web_search_for_phrase(self):
+    def test_postgres_non_web_search_for_phrase(self):
         """
-        Test searching for phrases without using web search, which is used when websearch_to_tsquery isn't
+        Test postgres searching for phrases without using web search, which is used when websearch_to_tsquery isn't
         supported by the current postgres version.
         """
 
@@ -146,7 +156,6 @@ class PostgresMessageSearchTest(HomeserverTestCase):
         if not isinstance(store.database_engine, PostgresEngine):
             raise SkipTest("Test only applies when postgres is used as the database")
 
-        phrase = "the quick brown fox jumps over the lazy dog"
         cases = [
             ("nope", False),
             ("brown", True),
@@ -154,18 +163,9 @@ class PostgresMessageSearchTest(HomeserverTestCase):
             ("brown quick", True),
             ("brown nope", False),
             ("furphy OR fox", False),  # syntax not supported
-            ('"quick brown"', True),  # syntax not supported, but strips quotes
+            ('"jumps over"', True),  # syntax not supported, but strips quotes
             ("-nope", False),  # syntax not supported
         ]
-
-        # Register a user and create a room, create some messages
-        self.register_user("alice", "password")
-        access_token = self.login("alice", "password")
-        room_id = self.helper.create_room_as("alice", tok=access_token)
-
-        # Send the phrase as a message and check it was created
-        response = self.helper.send(room_id, phrase, tok=access_token)
-        self.assertIn("event_id", response)
 
         # Patch supports_websearch_to_tsquery to always return False to ensure we're testing the plainto_tsquery path.
         with patch(
@@ -173,17 +173,27 @@ class PostgresMessageSearchTest(HomeserverTestCase):
             new_callable=PropertyMock,
         ) as supports_websearch_to_tsquery:
             supports_websearch_to_tsquery.return_value = False
+            self._check_test_cases(store, cases)            
 
-            # Run all the test cases
-            for query, has_results in cases:
-                result = self.get_success(
-                    store.search_msgs([room_id], query, ["content.body"])
-                )
-                self.assertEquals(result.get("count"), 1 if has_results else 0, query)
+    def test_sqlite_search(self):
+        """
+        Test sqlite searching for phrases.
+        """
+        store = self.hs.get_datastore()
+        if not isinstance(store.database_engine, Sqlite3Engine):
+            raise SkipTest("Test only applies when sqlite is used as the database")
 
-            # Run them again versus search_rooms
-            for query, has_results in cases:
-                result = self.get_success(
-                    store.search_rooms([room_id], query, ["content.body"], 10)
-                )
-                self.assertEquals(result.get("count"), 1 if has_results else 0, query)
+        cases = [
+            ("nope", False),
+            ("brown", True),
+            ("quick brown", True),
+            ("brown quick", True),
+            ("brown nope", False),
+            ("furphy OR fox", True),  # sqllite supports OR
+            ('"jumps over"', True),  
+            ('quick fox', True), # syntax supports quotes, but we strip them out
+            ('"quick fox"', True), # syntax supports quotes, but we strip them out            
+            ("-nope", False),  # sqllite supports -, but we strip them out
+        ]
+
+        self._check_test_cases(store, cases)

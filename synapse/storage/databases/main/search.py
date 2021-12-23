@@ -428,7 +428,7 @@ class SearchStore(SearchBackgroundUpdateStore):
             count_args = [search_query] + count_args
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_for_sqlite(search_term)
-
+            
             sql = (
                 "SELECT rank(matchinfo(event_search)) as rank, room_id, event_id"
                 " FROM event_search"
@@ -440,7 +440,7 @@ class SearchStore(SearchBackgroundUpdateStore):
                 "SELECT room_id, count(*) as count FROM event_search"
                 " WHERE value MATCH ?"
             )
-            count_args = [search_term] + count_args
+            count_args = [search_query] + count_args
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
@@ -454,7 +454,7 @@ class SearchStore(SearchBackgroundUpdateStore):
         # We add an arbitrary limit here to ensure we don't try to pull the
         # entire table from the database.
         sql += " ORDER BY rank DESC LIMIT 500"
-
+        
         results = await self.db_pool.execute(
             "search_msgs", self.db_pool.cursor_to_dict, sql, *args
         )
@@ -594,7 +594,7 @@ class SearchStore(SearchBackgroundUpdateStore):
                 "SELECT room_id, count(*) as count FROM event_search"
                 " WHERE value MATCH ? AND "
             )
-            count_args = [search_term] + count_args
+            count_args = [search_query] + count_args
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
@@ -744,7 +744,7 @@ def _parse_query_for_sqlite(search_term: str) -> str:
 
     # Pull out the individual words, discarding any non-word characters.
     results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
-    return " & ".join(results)
+    return " ".join(results)
 
 
 def _parse_query_for_pgsql(search_term: str, engine: PostgresEngine) -> Tuple[str, str]:
