@@ -758,8 +758,5 @@ def _parse_query_for_pgsql(search_term: str, engine: PostgresEngine) -> Tuple[st
     if engine.supports_websearch_to_tsquery:
         return search_term, "websearch_to_tsquery"
     else:
-        # Pull out the individual words, discarding any non-word characters.
-        results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
-        # Join words with & (AND), using prefix matching for each word
-        parsed_query = " & ".join(result + ":*" for result in results)
-        return parsed_query, "to_tsquery"
+        return search_term, "plainto_tsquery"
+        

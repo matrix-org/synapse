@@ -165,7 +165,7 @@ class MessageSearchTest(HomeserverTestCase):
             ("brown quick", True),
             ("brown nope", False),
             ("furphy OR fox", False),  # syntax not supported, OR will be ignored as it'll be between &
-            ('"jumps over"', True),  # syntax not supported, we strip quotes
+            ('"jumps over"', True),  # syntax not supported, quotes are ignored
             ("-nope", False),  # syntax not supported, - will be ignored
         ]
 
