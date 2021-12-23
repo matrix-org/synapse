@@ -741,10 +741,7 @@ def _parse_query_for_sqlite(search_term: str) -> str:
     """Takes a plain unicode string from the user and converts it into a form
     that can be passed to sqllite's matchinfo().
     """
-
-    # Pull out the individual words, discarding any non-word characters.
-    results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
-    return " ".join(results)
+    return search_term
 
 
 def _parse_query_for_pgsql(search_term: str, engine: PostgresEngine) -> Tuple[str, str]:
