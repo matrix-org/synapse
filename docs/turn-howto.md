@@ -262,7 +262,7 @@ Here are a few things to try:
  * If your TURN server is behind NAT:
 
     * double-check that your NAT gateway is correctly forwarding all TURN
-      ports (3478 & 5349 for TCP & UDP TURN traffic, and 49152-65535 for the UDP
+      ports (normally 3478 & 5349 for TCP & UDP TURN traffic, and 49152-65535 for the UDP
       relay) to the NAT-internal address of your TURN server. If advertising
       both IPv4 and IPv6 external addresses via the `external-ip` option, ensure
       that the NAT is forwarding both IPv4 and IPv6 traffic to the IPv4 and IPv6
