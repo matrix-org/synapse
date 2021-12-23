@@ -85,25 +85,27 @@ class PostgresMessageSearchTest(HomeserverTestCase):
 
     def test_web_search_for_phrase(self):
         """
-        Test searching for phrases using typical web search syntax, as per postgres' websearch_to_tsquery. 
+        Test searching for phrases using typical web search syntax, as per postgres' websearch_to_tsquery.
         This test is skipped unless the postgres instance supports websearch_to_tsquery.
         """
 
         store = self.hs.get_datastore()
         if not isinstance(store.database_engine, PostgresEngine):
             raise SkipTest("Test only applies when postgres is used as the database")
-        
+
         if not store.database_engine.supports_websearch_to_tsquery:
-            raise SkipTest("Test only applies when postgres supporting websearch_to_tsquery is used as the database")
+            raise SkipTest(
+                "Test only applies when postgres supporting websearch_to_tsquery is used as the database"
+            )
 
         phrase = "the quick brown fox jumps over the lazy dog"
         cases = [
             ("brown", True),
-            ("quick brown", True),            
+            ("quick brown", True),
             ("brown quick", True),
-            ("\"brown quick\"", False),
-            ("\"quick brown\"", True),
-            ("\"quick fox\"", False),
+            ('"brown quick"', False),
+            ('"quick brown"', True),
+            ('"quick fox"', False),
             ("furphy OR fox", True),
             ("nope OR doublenope", False),
             ("-fox", False),
@@ -114,26 +116,35 @@ class PostgresMessageSearchTest(HomeserverTestCase):
         self.register_user("alice", "password")
         access_token = self.login("alice", "password")
         room_id = self.helper.create_room_as("alice", tok=access_token)
-                
+
         # Send the phrase as a message and check it was created
         response = self.helper.send(room_id, phrase, tok=access_token)
         self.assertIn("event_id", response)
-        
-        # Run all the test cases        
+
+        # Run all the test cases versus search_msgs
         for query, has_results in cases:
-            result = self.get_success(store.search_msgs([room_id], query, ["content.body"]))            
+            result = self.get_success(
+                store.search_msgs([room_id], query, ["content.body"])
+            )
+            self.assertEquals(result.get("count"), 1 if has_results else 0, query)
+
+        # Run them again versus search_rooms
+        for query, has_results in cases:
+            result = self.get_success(
+                store.search_rooms([room_id], query, ["content.body"], 10)
+            )
             self.assertEquals(result.get("count"), 1 if has_results else 0, query)
 
     def test_non_web_search_for_phrase(self):
         """
-        Test searching for phrases without using web search, which is used when websearch_to_tsquery isn't 
-        supported by the current postgres version. 
+        Test searching for phrases without using web search, which is used when websearch_to_tsquery isn't
+        supported by the current postgres version.
         """
-        
+
         store = self.hs.get_datastore()
         if not isinstance(store.database_engine, PostgresEngine):
             raise SkipTest("Test only applies when postgres is used as the database")
-    
+
         phrase = "the quick brown fox jumps over the lazy dog"
         cases = [
             ("nope", False),
@@ -141,32 +152,37 @@ class PostgresMessageSearchTest(HomeserverTestCase):
             ("quick brown", True),
             ("brown quick", True),
             ("brown nope", False),
-            ("furphy OR fox", False), # syntax not supported
-            ("\"quick brown\"", True), # syntax not supported, but strips quotes
-            ("-nope", False), # syntax not supported
+            ("furphy OR fox", False),  # syntax not supported
+            ('"quick brown"', True),  # syntax not supported, but strips quotes
+            ("-nope", False),  # syntax not supported
         ]
 
         # Register a user and create a room, create some messages
         self.register_user("alice", "password")
         access_token = self.login("alice", "password")
         room_id = self.helper.create_room_as("alice", tok=access_token)
-                
+
         # Send the phrase as a message and check it was created
         response = self.helper.send(room_id, phrase, tok=access_token)
         self.assertIn("event_id", response)
-                
+
         # Patch supports_websearch_to_tsquery to always return False to ensure we're testing the plainto_tsquery path.
-        with patch("synapse.storage.engines.postgres.PostgresEngine.supports_websearch_to_tsquery", 
-                    new_callable=PropertyMock) as supports_websearch_to_tsquery:
+        with patch(
+            "synapse.storage.engines.postgres.PostgresEngine.supports_websearch_to_tsquery",
+            new_callable=PropertyMock,
+        ) as supports_websearch_to_tsquery:
             supports_websearch_to_tsquery.return_value = False
 
-            # Run all the test cases        
+            # Run all the test cases
             for query, has_results in cases:
-                result = self.get_success(store.search_msgs([room_id], query, ["content.body"]))                
+                result = self.get_success(
+                    store.search_msgs([room_id], query, ["content.body"])
+                )
                 self.assertEquals(result.get("count"), 1 if has_results else 0, query)
 
-class PostgresRoomSearchTest(HomeserverTestCase):
-    # Register a user and create a room
-    self.register_user("alice", "password")
-    access_token = self.login("alice", "password")
-    room_id = self.helper.create_room_as("alice", tok=access_token
+            # Run them again versus search_rooms
+            for query, has_results in cases:
+                result = self.get_success(
+                    store.search_rooms([room_id], query, ["content.body"], 10)
+                )
+                self.assertEquals(result.get("count"), 1 if has_results else 0, query)

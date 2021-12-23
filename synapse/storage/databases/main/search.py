@@ -388,7 +388,7 @@ class SearchStore(SearchBackgroundUpdateStore):
             list of dicts
         """
         clauses = []
-        
+
         args = []
 
         # Make sure we don't explode because the person is in too many rooms.
@@ -409,8 +409,10 @@ class SearchStore(SearchBackgroundUpdateStore):
         count_args = args
         count_clauses = clauses
 
-        if isinstance(self.database_engine, PostgresEngine):            
-            search_query, tsquery_func = _parse_query_for_pgsql(search_term, self.database_engine)
+        if isinstance(self.database_engine, PostgresEngine):
+            search_query, tsquery_func = _parse_query_for_pgsql(
+                search_term, self.database_engine
+            )
             sql = (
                 f"SELECT ts_rank_cd(vector, {tsquery_func}('english', ?)) AS rank,"
                 " room_id, event_id"
@@ -423,7 +425,7 @@ class SearchStore(SearchBackgroundUpdateStore):
                 "SELECT room_id, count(*) as count FROM event_search"
                 f" WHERE vector @@ {tsquery_func}('english', ?)"
             )
-            count_args = [search_query] + count_args            
+            count_args = [search_query] + count_args
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_for_sqlite(search_term)
 
@@ -479,7 +481,7 @@ class SearchStore(SearchBackgroundUpdateStore):
         )
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
-        
+
         return {
             "results": [
                 {"event": event_map[r["event_id"]], "rank": r["rank"]}
@@ -511,7 +513,7 @@ class SearchStore(SearchBackgroundUpdateStore):
             Each match as a dictionary.
         """
         clauses = []
-        
+
         args = []
 
         # Make sure we don't explode because the person is in too many rooms.
@@ -549,7 +551,9 @@ class SearchStore(SearchBackgroundUpdateStore):
             args.extend([origin_server_ts, origin_server_ts, stream])
 
         if isinstance(self.database_engine, PostgresEngine):
-            search_query, tsquery_func = _parse_query_for_pgsql(search_term, self.database_engine)
+            search_query, tsquery_func = _parse_query_for_pgsql(
+                search_term, self.database_engine
+            )
             sql = (
                 f"SELECT ts_rank_cd(vector, {tsquery_func}('english', ?)) as rank,"
                 " origin_server_ts, stream_ordering, room_id, event_id"
@@ -564,7 +568,7 @@ class SearchStore(SearchBackgroundUpdateStore):
             )
             count_args = [search_query] + count_args
         elif isinstance(self.database_engine, Sqlite3Engine):
-            
+
             # We use CROSS JOIN here to ensure we use the right indexes.
             # https://sqlite.org/optoverview.html#crossjoin
             #
@@ -698,13 +702,16 @@ class SearchStore(SearchBackgroundUpdateStore):
                 while stop_sel in value:
                     stop_sel += ">"
 
-                query = "SELECT ts_headline(?, websearch_to_tsquery('english', ?), %s)" % (
-                    _to_postgres_options(
-                        {
-                            "StartSel": start_sel,
-                            "StopSel": stop_sel,
-                            "MaxFragments": "50",
-                        }
+                query = (
+                    "SELECT ts_headline(?, websearch_to_tsquery('english', ?), %s)"
+                    % (
+                        _to_postgres_options(
+                            {
+                                "StartSel": start_sel,
+                                "StopSel": stop_sel,
+                                "MaxFragments": "50",
+                            }
+                        )
                     )
                 )
                 txn.execute(query, (value, search_query))
@@ -731,7 +738,7 @@ def _to_postgres_options(options_dict):
 
 def _parse_query_for_sqlite(search_term: str) -> str:
     """Takes a plain unicode string from the user and converts it into a form
-    that can be passed to sqllite's matchinfo().    
+    that can be passed to sqllite's matchinfo().
     """
 
     # Pull out the individual words, discarding any non-word characters.
@@ -743,7 +750,7 @@ def _parse_query_for_pgsql(search_term: str, engine: PostgresEngine) -> Tuple[st
     """
     Return a tuple of (parsed search_term, tsquery func to use).
 
-    The parsed search_term will be transformed into a syntax suitable for passing as an 
+    The parsed search_term will be transformed into a syntax suitable for passing as an
     argument to the tsquery func.
     """
 
