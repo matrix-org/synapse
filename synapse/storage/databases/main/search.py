@@ -472,7 +472,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         highlights = None
         if isinstance(self.database_engine, PostgresEngine):
-            highlights = await self._find_highlights_in_postgres(search_query, events)
+            highlights = await self._find_highlights_in_postgres(search_query, events, tsquery_func)
 
         count_sql += " GROUP BY room_id"
 
@@ -633,7 +633,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         highlights = None
         if isinstance(self.database_engine, PostgresEngine):
-            highlights = await self._find_highlights_in_postgres(search_query, events)
+            highlights = await self._find_highlights_in_postgres(search_query, events, tsquery_func)
 
         count_sql += " GROUP BY room_id"
 
@@ -659,7 +659,7 @@ class SearchStore(SearchBackgroundUpdateStore):
         }
 
     async def _find_highlights_in_postgres(
-        self, search_query: str, events: List[EventBase]
+        self, search_query: str, events: List[EventBase], tsquery_func: str
     ) -> Set[str]:
         """Given a list of events and a search term, return a list of words
         that match from the content of the event.
@@ -670,6 +670,7 @@ class SearchStore(SearchBackgroundUpdateStore):
         Args:
             search_query
             events: A list of events
+            tsquery_func: The tsquery_* function to use when making queries
 
         Returns:
             A set of strings.
@@ -703,7 +704,7 @@ class SearchStore(SearchBackgroundUpdateStore):
                     stop_sel += ">"
 
                 query = (
-                    "SELECT ts_headline(?, websearch_to_tsquery('english', ?), %s)"
+                    f"SELECT ts_headline(?, {tsquery_func}('english', ?), %s)"
                     % (
                         _to_postgres_options(
                             {
