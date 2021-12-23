@@ -428,7 +428,7 @@ class SearchStore(SearchBackgroundUpdateStore):
             count_args = [search_query] + count_args
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_for_sqlite(search_term)
-            
+
             sql = (
                 "SELECT rank(matchinfo(event_search)) as rank, room_id, event_id"
                 " FROM event_search"
@@ -454,7 +454,7 @@ class SearchStore(SearchBackgroundUpdateStore):
         # We add an arbitrary limit here to ensure we don't try to pull the
         # entire table from the database.
         sql += " ORDER BY rank DESC LIMIT 500"
-        
+
         results = await self.db_pool.execute(
             "search_msgs", self.db_pool.cursor_to_dict, sql, *args
         )
@@ -472,13 +472,15 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         highlights = None
         if isinstance(self.database_engine, PostgresEngine):
-            highlights = await self._find_highlights_in_postgres(search_query, events, tsquery_func)
+            highlights = await self._find_highlights_in_postgres(
+                search_query, events, tsquery_func
+            )
 
         count_sql += " GROUP BY room_id"
 
         count_results = await self.db_pool.execute(
             "search_rooms_count", self.db_pool.cursor_to_dict, count_sql, *count_args
-        )        
+        )
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
 
@@ -633,7 +635,9 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         highlights = None
         if isinstance(self.database_engine, PostgresEngine):
-            highlights = await self._find_highlights_in_postgres(search_query, events, tsquery_func)
+            highlights = await self._find_highlights_in_postgres(
+                search_query, events, tsquery_func
+            )
 
         count_sql += " GROUP BY room_id"
 
@@ -703,16 +707,13 @@ class SearchStore(SearchBackgroundUpdateStore):
                 while stop_sel in value:
                     stop_sel += ">"
 
-                query = (
-                    f"SELECT ts_headline(?, {tsquery_func}('english', ?), %s)"
-                    % (
-                        _to_postgres_options(
-                            {
-                                "StartSel": start_sel,
-                                "StopSel": stop_sel,
-                                "MaxFragments": "50",
-                            }
-                        )
+                query = f"SELECT ts_headline(?, {tsquery_func}('english', ?), %s)" % (
+                    _to_postgres_options(
+                        {
+                            "StartSel": start_sel,
+                            "StopSel": stop_sel,
+                            "MaxFragments": "50",
+                        }
                     )
                 )
                 txn.execute(query, (value, search_query))
@@ -746,7 +747,7 @@ def _parse_query_for_sqlite(search_term: str) -> str:
 
 def _parse_query_for_pgsql(search_term: str, engine: PostgresEngine) -> Tuple[str, str]:
     """Selects a tsquery_* func to use and transforms the search_term into syntax appropriate for it.
-    
+
     Args:
         search_term: A user supplied search query.
         engine: The database engine.
@@ -759,4 +760,3 @@ def _parse_query_for_pgsql(search_term: str, engine: PostgresEngine) -> Tuple[st
         return search_term, "websearch_to_tsquery"
     else:
         return search_term, "plainto_tsquery"
-        

@@ -89,7 +89,7 @@ class MessageSearchTest(HomeserverTestCase):
 
     PHRASE = "the quick brown fox jumps over the lazy dog"
 
-    def setUp(self):            
+    def setUp(self):
         super().setUp()
 
         # Register a user and create a room, create some messages
@@ -101,7 +101,9 @@ class MessageSearchTest(HomeserverTestCase):
         response = self.helper.send(self.room_id, self.PHRASE, tok=self.access_token)
         self.assertIn("event_id", response)
 
-    def _check_test_cases(self, store: DataStore, cases: list[Tuple[str, bool]]) -> None:
+    def _check_test_cases(
+        self, store: DataStore, cases: list[Tuple[str, bool]]
+    ) -> None:
         # Run all the test cases versus search_msgs
         for query, has_results in cases:
             result = self.get_success(
@@ -164,7 +166,10 @@ class MessageSearchTest(HomeserverTestCase):
             ("quick brown", True),
             ("brown quick", True),
             ("brown nope", False),
-            ("furphy OR fox", False),  # syntax not supported, OR will be ignored as it'll be between &
+            (
+                "furphy OR fox",
+                False,
+            ),  # syntax not supported, OR will be ignored as it'll be between &
             ('"jumps over"', True),  # syntax not supported, quotes are ignored
             ("-nope", False),  # syntax not supported, - will be ignored
         ]
@@ -175,7 +180,7 @@ class MessageSearchTest(HomeserverTestCase):
             new_callable=PropertyMock,
         ) as supports_websearch_to_tsquery:
             supports_websearch_to_tsquery.return_value = False
-            self._check_test_cases(store, cases)            
+            self._check_test_cases(store, cases)
 
     def test_sqlite_search(self):
         """
@@ -192,8 +197,8 @@ class MessageSearchTest(HomeserverTestCase):
             ("brown quick", True),
             ("brown nope", False),
             ("furphy OR fox", True),  # sqllite supports OR
-            ('"jumps over"', True),              
-            ('"quick fox"', False), # syntax supports quotes
+            ('"jumps over"', True),
+            ('"quick fox"', False),  # syntax supports quotes
             ("fox NOT nope", True),  # sqllite supports NOT
         ]
 
