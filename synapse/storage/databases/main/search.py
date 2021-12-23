@@ -747,11 +747,14 @@ def _parse_query_for_sqlite(search_term: str) -> str:
 
 
 def _parse_query_for_pgsql(search_term: str, engine: PostgresEngine) -> Tuple[str, str]:
-    """
-    Return a tuple of (parsed search_term, tsquery func to use).
+    """Selects a tsquery_* func to use and transforms the search_term into syntax appropriate for it.
+    
+    Args:
+        search_term: A user supplied search query.
+        engine: The database engine.
 
-    The parsed search_term will be transformed into a syntax suitable for passing as an
-    argument to the tsquery func.
+    Returns:
+        A tuple of (parsed search_term, tsquery func to use).
     """
 
     if engine.supports_websearch_to_tsquery:
