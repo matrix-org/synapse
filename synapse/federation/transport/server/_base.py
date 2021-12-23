@@ -22,13 +22,11 @@ from synapse.api.urls import FEDERATION_V1_PREFIX
 from synapse.http.server import HttpServer, ServletCallback
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
-from synapse.logging import opentracing
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
-    SynapseTags,
-    start_active_span,
-    start_active_span_from_request,
-    tags,
+    set_tag,
+    span_context_from_request,
+    start_active_span_follows_from,
     whitelisted_homeserver,
 )
 from synapse.server import HomeServer
@@ -279,30 +277,19 @@ class BaseFederationServlet:
                 logger.warning("authenticate_request failed: %s", e)
                 raise
 
-            request_tags = {
-                SynapseTags.REQUEST_ID: request.get_request_id(),
-                tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
-                tags.HTTP_METHOD: request.get_method(),
-                tags.HTTP_URL: request.get_redacted_uri(),
-                tags.PEER_HOST_IPV6: request.getClientIP(),
-                "authenticated_entity": origin,
-                "servlet_name": request.request_metrics.name,
-            }
+            # update the active opentracing span with the authenticated entity
+            set_tag("authenticated_entity", origin)
 
-            # Only accept the span context if the origin is authenticated
-            # and whitelisted
+            # if the origin is authenticated and whitelisted, link to its span context
+            context = None
             if origin and whitelisted_homeserver(origin):
-                scope = start_active_span_from_request(
-                    request, "incoming-federation-request", tags=request_tags
-                )
-            else:
-                scope = start_active_span(
-                    "incoming-federation-request", tags=request_tags
-                )
+                context = span_context_from_request(request)
+
+            scope = start_active_span_follows_from(
+                "incoming-federation-request", contexts=(context,) if context else ()
+            )
 
             with scope:
-                opentracing.inject_response_headers(request.responseHeaders)
-
                 if origin and self.RATELIMIT:
                     with ratelimiter.ratelimit(origin) as d:
                         await d

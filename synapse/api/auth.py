@@ -32,7 +32,7 @@ from synapse.appservice import ApplicationService
 from synapse.events import EventBase
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
-from synapse.logging import opentracing as opentracing
+from synapse.logging.opentracing import active_span, force_tracing, start_active_span
 from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import Requester, StateMap, UserID, create_requester
 from synapse.util.caches.lrucache import LruCache
@@ -149,6 +149,42 @@ class Auth:
                 is invalid.
             AuthError if access is denied for the user in the access token
         """
+        parent_span = active_span()
+        with start_active_span("get_user_by_req"):
+            requester = await self._wrapped_get_user_by_req(
+                request, allow_guest, rights, allow_expired
+            )
+
+            if parent_span:
+                if requester.authenticated_entity in self._force_tracing_for_users:
+                    # request tracing is enabled for this user, so we need to force it
+                    # tracing on for the parent span (which will be the servlet span).
+                    #
+                    # It's too late for the get_user_by_req span to inherit the setting,
+                    # so we also force it on for that.
+                    force_tracing()
+                    force_tracing(parent_span)
+                parent_span.set_tag(
+                    "authenticated_entity", requester.authenticated_entity
+                )
+                parent_span.set_tag("user_id", requester.user.to_string())
+                if requester.device_id is not None:
+                    parent_span.set_tag("device_id", requester.device_id)
+                if requester.app_service is not None:
+                    parent_span.set_tag("appservice_id", requester.app_service.id)
+            return requester
+
+    async def _wrapped_get_user_by_req(
+        self,
+        request: SynapseRequest,
+        allow_guest: bool,
+        rights: str,
+        allow_expired: bool,
+    ) -> Requester:
+        """Helper for get_user_by_req
+
+        Once get_user_by_req has set up the opentracing span, this does the actual work.
+        """
         try:
             ip_addr = request.getClientIP()
             user_agent = get_request_user_agent(request)
@@ -177,14 +213,6 @@ class Auth:
                 )
 
                 request.requester = user_id
-                if user_id in self._force_tracing_for_users:
-                    opentracing.force_tracing()
-                opentracing.set_tag("authenticated_entity", user_id)
-                opentracing.set_tag("user_id", user_id)
-                if device_id is not None:
-                    opentracing.set_tag("device_id", device_id)
-                opentracing.set_tag("appservice_id", app_service.id)
-
                 return requester
 
             user_info = await self.get_user_by_access_token(
@@ -242,13 +270,6 @@ class Auth:
             )
 
             request.requester = requester
-            if user_info.token_owner in self._force_tracing_for_users:
-                opentracing.force_tracing()
-            opentracing.set_tag("authenticated_entity", user_info.token_owner)
-            opentracing.set_tag("user_id", user_info.user_id)
-            if device_id:
-                opentracing.set_tag("device_id", device_id)
-
             return requester
         except KeyError:
             raise MissingClientTokenError()
