@@ -88,6 +88,14 @@ class MessageSearchTest(HomeserverTestCase):
     ]
 
     PHRASE = "the quick brown fox jumps over the lazy dog"
+    COMMON_CASES = [
+        ("nope", False),
+        ("brown", True),
+        ("quick brown", True),
+        ("brown quick", True),
+        ("jump", True),  # tests stemming
+        ("brown nope", False),
+    ]
 
     def setUp(self):
         super().setUp()
@@ -135,10 +143,7 @@ class MessageSearchTest(HomeserverTestCase):
                 "Test only applies when postgres supporting websearch_to_tsquery is used as the database"
             )
 
-        cases = [
-            ("brown", True),
-            ("quick brown", True),
-            ("brown quick", True),
+        cases = self.COMMON_CASES + [
             ('"brown quick"', False),
             ('"jumps over"', True),
             ('"quick fox"', False),
@@ -160,12 +165,7 @@ class MessageSearchTest(HomeserverTestCase):
         if not isinstance(store.database_engine, PostgresEngine):
             raise SkipTest("Test only applies when postgres is used as the database")
 
-        cases = [
-            ("nope", False),
-            ("brown", True),
-            ("quick brown", True),
-            ("brown quick", True),
-            ("brown nope", False),
+        cases = self.COMMON_CASES + [
             (
                 "furphy OR fox",
                 False,
@@ -190,12 +190,7 @@ class MessageSearchTest(HomeserverTestCase):
         if not isinstance(store.database_engine, Sqlite3Engine):
             raise SkipTest("Test only applies when sqlite is used as the database")
 
-        cases = [
-            ("nope", False),
-            ("brown", True),
-            ("quick brown", True),
-            ("brown quick", True),
-            ("brown nope", False),
+        cases = self.COMMON_CASES + [
             ("furphy OR fox", True),  # sqllite supports OR
             ('"jumps over"', True),
             ('"quick fox"', False),  # syntax supports quotes

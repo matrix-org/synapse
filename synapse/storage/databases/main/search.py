@@ -483,7 +483,6 @@ class SearchStore(SearchBackgroundUpdateStore):
         )
 
         count = sum(row["count"] for row in count_results if row["room_id"] in room_ids)
-
         return {
             "results": [
                 {"event": event_map[r["event_id"]], "rank": r["rank"]}
