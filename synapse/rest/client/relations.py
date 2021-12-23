@@ -232,7 +232,9 @@ class RelationPaginationServlet(RestServlet):
         )
         # The relations returned for the requested event do include their
         # bundled aggregations.
-        serialized_events = await self._event_serializer.serialize_events(events, now)
+        serialized_events = await self._event_serializer.serialize_events(
+            events, now, bundle_aggregations=True
+        )
 
         return_value = pagination_chunk.to_dict()
         return_value["chunk"] = serialized_events

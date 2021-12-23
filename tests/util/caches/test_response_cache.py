@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from unittest.mock import Mock
+
 from parameterized import parameterized
 
 from twisted.internet import defer
@@ -60,10 +63,15 @@ class ResponseCacheTestCase(TestCase):
             self.successResultOf(wrap_d),
             "initial wrap result should be the same",
         )
+
+        # a second call should return the result without a call to the wrapped function
+        unexpected = Mock(spec=())
+        wrap2_d = defer.ensureDeferred(cache.wrap(0, unexpected))
+        unexpected.assert_not_called()
         self.assertEqual(
             expected_result,
-            self.successResultOf(cache.get(0)),
-            "cache should have the result",
+            self.successResultOf(wrap2_d),
+            "cache should still have the result",
         )
 
     def test_cache_miss(self):
@@ -80,7 +88,7 @@ class ResponseCacheTestCase(TestCase):
             self.successResultOf(wrap_d),
             "initial wrap result should be the same",
         )
-        self.assertIsNone(cache.get(0), "cache should not have the result now")
+        self.assertCountEqual([], cache.keys(), "cache should not have the result now")
 
     def test_cache_expire(self):
         cache = self.with_cache("short_cache", ms=1000)
@@ -92,16 +100,20 @@ class ResponseCacheTestCase(TestCase):
         )
 
         self.assertEqual(expected_result, self.successResultOf(wrap_d))
+
+        # a second call should return the result without a call to the wrapped function
+        unexpected = Mock(spec=())
+        wrap2_d = defer.ensureDeferred(cache.wrap(0, unexpected))
+        unexpected.assert_not_called()
         self.assertEqual(
             expected_result,
-            self.successResultOf(cache.get(0)),
+            self.successResultOf(wrap2_d),
             "cache should still have the result",
         )
 
         # cache eviction timer is handled
         self.reactor.pump((2,))
-
-        self.assertIsNone(cache.get(0), "cache should not have the result now")
+        self.assertCountEqual([], cache.keys(), "cache should not have the result now")
 
     def test_cache_wait_hit(self):
         cache = self.with_cache("neutral_cache")
@@ -133,16 +145,21 @@ class ResponseCacheTestCase(TestCase):
         self.reactor.pump((1, 1))
 
         self.assertEqual(expected_result, self.successResultOf(wrap_d))
+
+        # a second call should immediately return the result without a call to the
+        # wrapped function
+        unexpected = Mock(spec=())
+        wrap2_d = defer.ensureDeferred(cache.wrap(0, unexpected))
+        unexpected.assert_not_called()
         self.assertEqual(
             expected_result,
-            self.successResultOf(cache.get(0)),
+            self.successResultOf(wrap2_d),
             "cache should still have the result",
         )
 
         # (1 + 1 + 2) > 3.0, cache eviction timer is handled
         self.reactor.pump((2,))
-
-        self.assertIsNone(cache.get(0), "cache should not have the result now")
+        self.assertCountEqual([], cache.keys(), "cache should not have the result now")
 
     @parameterized.expand([(True,), (False,)])
     def test_cache_context_nocache(self, should_cache: bool):
@@ -183,10 +200,16 @@ class ResponseCacheTestCase(TestCase):
         self.assertEqual(expected_result, self.successResultOf(wrap2_d))
 
         if should_cache:
+            unexpected = Mock(spec=())
+            wrap3_d = defer.ensureDeferred(cache.wrap(0, unexpected))
+            unexpected.assert_not_called()
             self.assertEqual(
                 expected_result,
-                self.successResultOf(cache.get(0)),
+                self.successResultOf(wrap3_d),
                 "cache should still have the result",
             )
+
         else:
-            self.assertIsNone(cache.get(0), "cache should not have the result")
+            self.assertCountEqual(
+                [], cache.keys(), "cache should not have the result now"
+            )
