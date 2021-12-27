@@ -151,9 +151,22 @@ class HttpPusher(Pusher):
                     raise PusherConfigException(
                         "'public_key' must be a valid base64-encoded curve25519 public key"
                     )
+
+                if "counts_only_type" not in self.data:
+                    self.counts_only_type = "none"
+                elif self.data["counts_only_type"] not in ("none", "boolean", "full"):
+                    raise PusherConfigException(
+                        "'counts_only_type' must be one of 'none', 'boolean' or 'full'"
+                    )
+                else:
+                    self.counts_only_type = self.data["counts_only_type"]
+                    del self.sanitized_data["counts_only_type"]
+
                 del self.sanitized_data["public_key"]
 
-    def _encrypt_notification_dict(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _encrypt_notification_dict(
+        self, payload: Dict[str, Any], counts_only: bool = False
+    ) -> Dict[str, Any]:
         """Called to process a payload according to the algorithm the pusher is
         configured with. Namely, if the algorithm is `com.famedly.curve25519-aes-sha2`
         we will encrypt the payload.
@@ -194,17 +207,26 @@ class HttpPusher(Pusher):
             # create the mac
             mac = hmac.new(mac_key, ciphertext, hashlib.sha256).digest()[0:8]
 
+            d = {
+                "ephemeral": unpaddedbase64.encode_base64(
+                    private_key.public_key().public_bytes(
+                        Encoding.Raw, PublicFormat.Raw
+                    )
+                ),
+                "ciphertext": unpaddedbase64.encode_base64(ciphertext),
+                "mac": unpaddedbase64.encode_base64(mac),
+                "devices": devices,
+            }
+
+            # now, if the push frame is a counts only frame, we have to respect the counts_only_type setting
+            if counts_only:
+                if self.counts_only_type == "boolean":
+                    d["is_counts_only"] = True
+                elif self.counts_only_type == "full":
+                    d["counts"] = cleartext_notif["counts"]
+
             return {
-                "notification": {
-                    "ephemeral": unpaddedbase64.encode_base64(
-                        private_key.public_key().public_bytes(
-                            Encoding.Raw, PublicFormat.Raw
-                        )
-                    ),
-                    "ciphertext": unpaddedbase64.encode_base64(ciphertext),
-                    "mac": unpaddedbase64.encode_base64(mac),
-                    "devices": devices,
-                }
+                "notification": d,
             }
 
         # else fall back to just plaintext
@@ -526,7 +548,8 @@ class HttpPusher(Pusher):
                         }
                     ],
                 }
-            }
+            },
+            counts_only=True,
         )
         try:
             await self.http_client.post_json_get_json(self.url, d)
