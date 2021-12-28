@@ -14,8 +14,8 @@ i.e. when a version reaches End of Life Synapse will withdraw support for that
 version in future releases.
 
 Details on the upstream support life cycles for Python and PostgreSQL are
-documented at https://endoflife.date/python and
-https://endoflife.date/postgresql.
+documented at [https://endoflife.date/python](https://endoflife.date/python) and
+[https://endoflife.date/postgresql](https://endoflife.date/postgresql).
 
 
 Context
