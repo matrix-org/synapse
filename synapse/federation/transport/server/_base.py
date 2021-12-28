@@ -114,11 +114,11 @@ class Authenticator:
         # alive
         retry_timings = await self.store.get_destination_retry_timings(origin)
         if retry_timings and retry_timings.retry_last_ts:
-            run_in_background(self.reset_retry_timings, origin)
+            run_in_background(self._reset_retry_timings, origin)
 
         return origin
 
-    async def reset_retry_timings(self, origin: str) -> None:
+    async def _reset_retry_timings(self, origin: str) -> None:
         try:
             logger.info("Marking origin %r as up", origin)
             await self.store.set_destination_retry_timings(origin, None, 0, 0)

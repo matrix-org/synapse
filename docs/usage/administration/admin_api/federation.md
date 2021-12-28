@@ -126,6 +126,9 @@ the remote server again. It does not wait for the next `retry_interval`.
 The connection must have previously run into an error and `retry_last_ts`
 ([Destination Details API](#destination-details-api)) must not be equal to `0`.
 
+The connection attempt is carried out in the background and can take a while
+even if the API already returns the http status 200.
+
 The API is:
 
 ```
