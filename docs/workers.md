@@ -179,10 +179,9 @@ recommend the use of `systemd` where available: for information on setting up
 ### `synapse.app.generic_worker`
 
 This worker can handle API requests matching the following regular expressions.
-
-Note that stream writers should have their endpoints routed directly to them for
-efficiency. If this is not done, then `POST` and `PUT` requests will be proxied
-to the proper worker while `GET` requests will be handled directly.
+`GET` requests will be handled directly while `POST` and `PUT` requests will be
+proxied to the proper worker. See the [stream writers](#stream-writers) section
+below for more  information.
 
     # Sync requests
     ^/_matrix/client/(v2_alpha|r0|v3)/sync$
@@ -250,7 +249,7 @@ to the proper worker while `GET` requests will be handled directly.
     ^/_matrix/client/(r0|v3|unstable)/register$
     ^/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity$
 
-    # Event sending requests (for the event stream writer)
+    # Event sending requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/redact
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/send
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state/
@@ -258,21 +257,21 @@ to the proper worker while `GET` requests will be handled directly.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/join/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/profile/
 
-    # Typing requests (for the typing stream writer)
+    # Typing requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing
 
-    # Device requests (for the to_device stream writer)
+    # Device requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/sendToDevice/
 
-    # Account data requests (for the account_data stream writer)
+    # Account data requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/tags
     ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/account_data
 
-    # Receipts requests (for the receipts stream writer)
+    # Receipts requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/receipt
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/read_markers
 
-    # Presence requests (for the presence stream writer)
+    # Presence requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/.*/status$
 
 
@@ -354,15 +353,6 @@ Additionally, there is *experimental* support for moving writing of specific
 streams (such as events) off of the main process to a particular worker. (This
 is only supported with Redis-based replication.)
 
-Currently supported streams are:
-
-* `events`
-* `typing`
-* `to_device`
-* `account_data`
-* `receipts`
-* `presence`
-
 To enable this, the worker must have a HTTP replication listener configured,
 have a `worker_name` and be listed in the `instance_map` config. The same worker
 can handle multiple streams. For example, to move event persistence off to a
@@ -378,6 +368,25 @@ stream_writers:
     events: event_persister1
 ```
 
+Each of the streams have associated endpoints which should have `POST` and `PUT`
+requests routed to the workers handling that stream. Otherwise, those requests
+will be proxied to the proper worker.
+
+See below for the currently supported streams and the endpoints associated with
+them:
+
+##### The `events` stream
+
+The following endpoints should be routed direclty to the workers configured as
+stream writers for the `events` stream:
+
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/redact
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/send
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state/
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/join/
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/profile/
+
 The `events` stream also experimentally supports having multiple writers, where
 work is sharded between them by room ID. Note that you *must* restart all worker
 instances when adding or removing event persisters. An example `stream_writers`
@@ -390,8 +399,42 @@ stream_writers:
         - event_persister2
 ```
 
-Each of the streams have associated endpoints which should be routed to the worker
-see the end regular expression map above to properly route requests.
+##### The `typing` stream
+
+The following endpoints should be routed direclty to the workers configured as
+stream writers for the `typing` stream:
+
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing
+
+##### The `to_device` stream
+
+The following endpoints should be routed direclty to the workers configured as
+stream writers for the `to_device` stream:
+
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/sendToDevice/
+
+##### The `account_data` stream
+
+The following endpoints should be routed direclty to the workers configured as
+stream writers for the `account_data` stream:
+
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/tags
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/account_data
+
+##### The `receipts` stream
+
+The following endpoints should be routed direclty to the workers configured as
+stream writers for the `receipts` stream:
+
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/receipt
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/read_markers
+
+##### The `presence` stream
+
+The following endpoints should be routed direclty to the workers configured as
+stream writers for the `presence` stream:
+
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/.*/status$
 
 #### Background tasks
 
