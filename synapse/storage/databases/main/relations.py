@@ -724,19 +724,6 @@ class RelationsWorkerStore(SQLBaseStore):
         if references.chunk:
             aggregations.references = references.to_dict()
 
-        # If this event is the start of a thread, include a summary of the replies.
-        if self._msc3440_enabled:
-            summaries = await self._get_thread_summaries([event_id])
-            summary = summaries.get(event_id)
-            if summary:
-                thread_count, latest_thread_event = summary
-                participated = await self._get_threads_participated([event_id], user_id)
-                aggregations.thread = _ThreadAggregation(
-                    latest_event=latest_thread_event,
-                    count=thread_count,
-                    current_user_participated=participated,
-                )
-
         # Store the bundled aggregations in the event metadata for later use.
         return aggregations
 
@@ -784,6 +771,27 @@ class RelationsWorkerStore(SQLBaseStore):
         edits = await self._get_applicable_edits(seen_event_ids)
         for event_id, edit in edits.items():
             results.setdefault(event_id, BundledAggregations()).replace = edit
+
+        # Fetch thread summaries.
+        if self._msc3440_enabled:
+            summaries = await self._get_thread_summaries(seen_event_ids)
+            # Only fetch participated for a limited selection based on what had
+            # summaries.
+            participated = await self._get_threads_participated(
+                summaries.keys(), user_id
+            )
+            for event_id, summary in summaries.items():
+                if summary:
+                    thread_count, latest_thread_event = summary
+                    results.setdefault(
+                        event_id, BundledAggregations()
+                    ).thread = _ThreadAggregation(
+                        latest_event=latest_thread_event,
+                        count=thread_count,
+                        # If there's a thread summary it must also exist in the
+                        # participated dictionary.
+                        current_user_participated=participated[event_id],
+                    )
 
         return results
 
