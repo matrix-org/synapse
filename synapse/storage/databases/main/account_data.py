@@ -105,6 +105,11 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
             "AccountDataAndTagsChangeCache", account_max
         )
 
+        self.db_pool.updates.register_background_update_handler(
+            "delete_account_data_for_deactivated_users",
+            self._delete_account_data_for_deactivated_users,
+        )
+
     def get_max_account_data_stream_id(self) -> int:
         """Get the current max stream ID for account data stream
 
@@ -590,6 +595,53 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         self.db_pool.simple_delete_txn(
             txn, table="push_rules_stream", keyvalues={"user_id": user_id}
         )
+
+    async def _delete_account_data_for_deactivated_users(
+        self, progress: dict, batch_size: int
+    ) -> int:
+        """
+        Retroactively purges account data for users that have already been deactivated.
+        Gets run as a background update caused by a schema delta.
+        """
+
+        last_user: str = progress.get("last_user", "")
+
+        def _delete_account_data_for_deactivated_users_txn(
+            txn: LoggingTransaction,
+        ) -> int:
+            sql = """
+                SELECT name FROM users
+                WHERE deactivated = ? and name > ?
+                ORDER BY name ASC
+                LIMIT ?
+            """
+
+            txn.execute(sql, (1, last_user, batch_size))
+            users = [row[0] for row in txn]
+
+            for user in users:
+                self._purge_account_data_for_user_txn(txn, user_id=user)
+
+            if users:
+                self.db_pool.updates._background_update_progress_txn(
+                    txn,
+                    "delete_account_data_for_deactivated_users",
+                    {"last_user": users[-1]},
+                )
+
+            return len(users)
+
+        number_deleted = await self.db_pool.runInteraction(
+            "_delete_account_data_for_deactivated_users",
+            _delete_account_data_for_deactivated_users_txn,
+        )
+
+        if number_deleted < batch_size:
+            await self.db_pool.updates._end_background_update(
+                "delete_account_data_for_deactivated_users"
+            )
+
+        return number_deleted
 
 
 class AccountDataStore(AccountDataWorkerStore):
