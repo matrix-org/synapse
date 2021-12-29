@@ -555,34 +555,40 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         and the push_rules cache tables.
         """
 
-        def purge_account_data_for_user_txn(txn: LoggingTransaction) -> None:
-            # Purge from the primary account_data table.
-            self.db_pool.simple_delete_txn(
-                txn, table="account_data", keyvalues={"user_id": user_id}
-            )
-
-            # Purge from ignored_users where this user is the ignorer.
-            # N.B. We don't purge where this user is the ignoree, because that
-            #      interferes with other users' account data.
-            #      It's also not this user's data to delete!
-            self.db_pool.simple_delete_txn(
-                txn, table="ignored_users", keyvalues={"ignorer_user_id": user_id}
-            )
-
-            # Remove the push rules
-            self.db_pool.simple_delete_txn(
-                txn, table="push_rules", keyvalues={"user_name": user_id}
-            )
-            self.db_pool.simple_delete_txn(
-                txn, table="push_rules_enable", keyvalues={"user_name": user_id}
-            )
-            self.db_pool.simple_delete_txn(
-                txn, table="push_rules_stream", keyvalues={"user_id": user_id}
-            )
-
         await self.db_pool.runInteraction(
             "purge_account_data_for_user_txn",
-            purge_account_data_for_user_txn,
+            self._purge_account_data_for_user_txn,
+            user_id,
+        )
+
+    def _purge_account_data_for_user_txn(
+        self, txn: LoggingTransaction, user_id: str
+    ) -> None:
+        """
+        See `purge_account_data_for_user`.
+        """
+        # Purge from the primary account_data table.
+        self.db_pool.simple_delete_txn(
+            txn, table="account_data", keyvalues={"user_id": user_id}
+        )
+
+        # Purge from ignored_users where this user is the ignorer.
+        # N.B. We don't purge where this user is the ignoree, because that
+        #      interferes with other users' account data.
+        #      It's also not this user's data to delete!
+        self.db_pool.simple_delete_txn(
+            txn, table="ignored_users", keyvalues={"ignorer_user_id": user_id}
+        )
+
+        # Remove the push rules
+        self.db_pool.simple_delete_txn(
+            txn, table="push_rules", keyvalues={"user_name": user_id}
+        )
+        self.db_pool.simple_delete_txn(
+            txn, table="push_rules_enable", keyvalues={"user_name": user_id}
+        )
+        self.db_pool.simple_delete_txn(
+            txn, table="push_rules_stream", keyvalues={"user_id": user_id}
         )
 
 
