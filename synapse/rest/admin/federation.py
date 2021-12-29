@@ -90,7 +90,7 @@ class ListDestinationsRestServlet(RestServlet):
         return HTTPStatus.OK, response
 
 
-class DestinationsRestServlet(RestServlet):
+class DestinationRestServlet(RestServlet):
     """Get details of a destination.
     This needs user to have administrator access in Synapse.
 
@@ -143,5 +143,61 @@ class DestinationsRestServlet(RestServlet):
             "last_successful_stream_ordering": last_successful_stream_ordering,
             **retry_timing_respone,
         }
+
+        return HTTPStatus.OK, response
+
+
+class DestinationMembershipRestServlet(RestServlet):
+    """Get list of rooms of a destination.
+    This needs user to have administrator access in Synapse.
+
+    GET /_synapse/admin/v1/federation/destinations/<destination>/rooms?from=0&limit=10
+
+    returns:
+        200 OK with a list of rooms if success otherwise an error.
+
+    The parameters `from` and `limit` are required only for pagination.
+    By default, a `limit` of 100 is used.
+    """
+
+    PATTERNS = admin_patterns("/federation/destinations/(?P<destination>[^/]*)/rooms$")
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastore()
+
+    async def on_GET(
+        self, request: SynapseRequest, destination: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self._auth, request)
+
+        if not await self._store.is_destination_known(destination):
+            raise NotFoundError("Unknown destination")
+
+        start = parse_integer(request, "from", default=0)
+        limit = parse_integer(request, "limit", default=100)
+
+        if start < 0:
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Query parameter from must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        if limit < 0:
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Query parameter limit must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        direction = parse_string(request, "dir", default="f", allowed_values=("f", "b"))
+
+        rooms, total = await self._store.get_destination_rooms_paginate(
+            destination, start, limit, direction
+        )
+        response = {"rooms": rooms, "total": total}
+        if (start + limit) < total:
+            response["next_token"] = str(start + len(rooms))
 
         return HTTPStatus.OK, response
