@@ -1,0 +1,1 @@
+Fix a type annotation in `test_account_data.py` and remove it from the Mypy exclusion list.
