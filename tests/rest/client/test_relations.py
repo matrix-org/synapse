@@ -572,11 +572,11 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         assert_bundle(channel.json_body["event"]["unsigned"].get("m.relations"))
 
         # Request sync.
-        # channel = self.make_request("GET", "/sync", access_token=self.user_token)
-        # self.assertEquals(200, channel.code, channel.json_body)
-        # room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
-        # self.assertTrue(room_timeline["limited"])
-        # _find_and_assert_event(room_timeline["events"])
+        channel = self.make_request("GET", "/sync", access_token=self.user_token)
+        self.assertEquals(200, channel.code, channel.json_body)
+        room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
+        self.assertTrue(room_timeline["limited"])
+        _find_and_assert_event(room_timeline["events"])
 
         # Note that /relations is tested separately in test_aggregation_get_event_for_thread
         # since it needs different data configured.
