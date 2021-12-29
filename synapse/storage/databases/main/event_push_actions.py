@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union, cast
 
 import attr
 
@@ -326,7 +326,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             )
             args = [user_id, user_id, min_stream_ordering, max_stream_ordering, limit]
             txn.execute(sql, args)
-            return txn.fetchall()  # type: ignore[return-value]
+            return cast(List[Tuple[str, str, int, str, bool]], txn.fetchall())
 
         after_read_receipt = await self.db_pool.runInteraction(
             "get_unread_push_actions_for_user_in_range_http_arr", get_after_receipt
@@ -357,7 +357,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             )
             args = [user_id, user_id, min_stream_ordering, max_stream_ordering, limit]
             txn.execute(sql, args)
-            return txn.fetchall()  # type: ignore[return-value]
+            return cast(List[Tuple[str, str, int, str, bool]], txn.fetchall())
 
         no_read_receipt = await self.db_pool.runInteraction(
             "get_unread_push_actions_for_user_in_range_http_nrr", get_no_receipt
@@ -434,7 +434,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             )
             args = [user_id, user_id, min_stream_ordering, max_stream_ordering, limit]
             txn.execute(sql, args)
-            return txn.fetchall()  # type: ignore[return-value]
+            return cast(List[Tuple[str, str, int, str, bool, int]], txn.fetchall())
 
         after_read_receipt = await self.db_pool.runInteraction(
             "get_unread_push_actions_for_user_in_range_email_arr", get_after_receipt
@@ -465,7 +465,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             )
             args = [user_id, user_id, min_stream_ordering, max_stream_ordering, limit]
             txn.execute(sql, args)
-            return txn.fetchall()  # type: ignore[return-value]
+            return cast(List[Tuple[str, str, int, str, bool, int]], txn.fetchall())
 
         no_read_receipt = await self.db_pool.runInteraction(
             "get_unread_push_actions_for_user_in_range_email_nrr", get_no_receipt
@@ -662,7 +662,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             The stream ordering
         """
         txn.execute("SELECT MAX(stream_ordering) FROM events")
-        max_stream_ordering = txn.fetchone()[0]  # type: ignore[index]
+        max_stream_ordering = cast(Tuple[Optional[int]], txn.fetchone())[0]
 
         if max_stream_ordering is None:
             return 0
@@ -731,7 +731,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 " LIMIT 1"
             )
             txn.execute(sql, (stream_ordering,))
-            return txn.fetchone()  # type: ignore[return-value]
+            return cast(Optional[Tuple[int]], txn.fetchone())
 
         result = await self.db_pool.runInteraction(
             "get_time_of_last_push_action_before", f
@@ -1029,7 +1029,9 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
                 " LIMIT ?" % (before_clause,)
             )
             txn.execute(sql, args)
-            return txn.fetchall()  # type: ignore[return-value]
+            return cast(
+                List[Tuple[str, str, int, int, str, bool, str, int]], txn.fetchall()
+            )
 
         push_actions = await self.db_pool.runInteraction("get_push_actions_for_user", f)
         return [

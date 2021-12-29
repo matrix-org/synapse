@@ -16,7 +16,7 @@
 import logging
 import random
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
 
 import attr
 
@@ -1357,12 +1357,15 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             # Override type because the return type is only optional if
             # allow_none is True, and we don't want mypy throwing errors
             # about None not being indexable.
-            res: Dict[str, Any] = self.db_pool.simple_select_one_txn(
-                txn,
-                "registration_tokens",
-                keyvalues={"token": token},
-                retcols=["pending", "completed"],
-            )  # type: ignore
+            res = cast(
+                Dict[str, Any],
+                self.db_pool.simple_select_one_txn(
+                    txn,
+                    "registration_tokens",
+                    keyvalues={"token": token},
+                    retcols=["pending", "completed"],
+                ),
+            )
 
             # Decrement pending and increment completed
             self.db_pool.simple_update_one_txn(
