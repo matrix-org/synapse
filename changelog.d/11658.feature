@@ -1,0 +1,1 @@
+Add admin API to get a list of federated rooms.
