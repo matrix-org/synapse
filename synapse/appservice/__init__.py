@@ -14,7 +14,7 @@
 import logging
 import re
 from enum import Enum
-from typing import TYPE_CHECKING, Iterable, List, Match, Optional
+from typing import TYPE_CHECKING, Dict, Iterable, List, Match, Optional
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
@@ -26,6 +26,14 @@ if TYPE_CHECKING:
     from synapse.storage.databases.main import DataStore
 
 logger = logging.getLogger(__name__)
+
+# Type for the `device_one_time_key_counts` field in an appservice transaction
+#   user ID -> {device ID -> {algorithm -> count}}
+TransactionOneTimeKeyCounts = Dict[str, Dict[str, Dict[str, int]]]
+
+# Type for the `device_unused_fallback_keys` field in an appservice transaction
+#   user ID -> {device ID -> [algorithm]}
+TransactionUnusedFallbackKeys = Dict[str, Dict[str, List[str]]]
 
 
 class ApplicationServiceState(Enum):
@@ -61,6 +69,7 @@ class ApplicationService:
         rate_limited=True,
         ip_range_whitelist=None,
         supports_ephemeral=False,
+        msc3202_transaction_extensions: bool = False,
     ):
         self.token = token
         self.url = (
@@ -73,6 +82,7 @@ class ApplicationService:
         self.id = id
         self.ip_range_whitelist = ip_range_whitelist
         self.supports_ephemeral = supports_ephemeral
+        self.msc3202_transaction_extensions = msc3202_transaction_extensions
 
         if "|" in self.id:
             raise Exception("application service ID cannot contain '|' character")
@@ -371,6 +381,8 @@ class AppServiceTransaction:
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
         device_list_summary: DeviceLists,
+        one_time_key_counts: TransactionOneTimeKeyCounts,
+        unused_fallback_keys: TransactionUnusedFallbackKeys,
     ):
         self.service = service
         self.id = id
@@ -378,6 +390,8 @@ class AppServiceTransaction:
         self.ephemeral = ephemeral
         self.to_device_messages = to_device_messages
         self.device_list_summary = device_list_summary
+        self.one_time_key_counts = one_time_key_counts
+        self.unused_fallback_keys = unused_fallback_keys
 
     async def send(self, as_api: "ApplicationServiceApi") -> bool:
         """Sends this transaction using the provided AS API interface.
@@ -393,6 +407,8 @@ class AppServiceTransaction:
             ephemeral=self.ephemeral,
             to_device_messages=self.to_device_messages,
             device_list_summary=self.device_list_summary,
+            one_time_key_counts=self.one_time_key_counts,
+            unused_fallback_keys=self.unused_fallback_keys,
             txn_id=self.id,
         )
 

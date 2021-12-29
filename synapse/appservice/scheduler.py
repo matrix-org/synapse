@@ -48,13 +48,21 @@ This is all tied together by the AppServiceScheduler which DIs the required
 components.
 """
 import logging
-from typing import Dict, Iterable, List, Optional
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
 
-from synapse.appservice import ApplicationService, ApplicationServiceState
+from synapse.appservice import (
+    ApplicationService,
+    ApplicationServiceState,
+    TransactionOneTimeKeyCounts,
+    TransactionUnusedFallbackKeys,
+)
 from synapse.events import EventBase
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import DeviceLists, JsonDict
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +89,7 @@ class ApplicationServiceScheduler:
         self.as_api = hs.get_application_service_api()
 
         self.txn_ctrl = _TransactionController(self.clock, self.store, self.as_api)
-        self.queuer = _ServiceQueuer(self.txn_ctrl, self.clock)
+        self.queuer = _ServiceQueuer(self.txn_ctrl, self.clock, hs)
 
     async def start(self):
         logger.info("Starting appservice scheduler")
@@ -151,7 +159,7 @@ class _ServiceQueuer:
     appservice at a given time.
     """
 
-    def __init__(self, txn_ctrl, clock):
+    def __init__(self, txn_ctrl, clock, hs: "HomeServer"):
         # dict of {service_id: [events]}
         self.queued_events: Dict[str, List[EventBase]] = {}
         # dict of {service_id: [event_json]}
@@ -162,9 +170,13 @@ class _ServiceQueuer:
         self.queued_device_list_summaries: Dict[str, List[DeviceLists]] = {}
 
         # the appservices which currently have a transaction in flight
-        self.requests_in_flight = set()
+        self.requests_in_flight: Set[str] = set()
         self.txn_ctrl = txn_ctrl
         self.clock = clock
+        self._msc3202_transaction_extensions_enabled: bool = (
+            hs.config.experimental.msc3202_transaction_extensions
+        )
+        self._store = hs.get_datastore()
 
     def start_background_request(self, service):
         # start a sender for this appservice if we don't already have one
@@ -235,6 +247,26 @@ class _ServiceQueuer:
                 ):
                     return
 
+                one_time_key_counts: Optional[TransactionOneTimeKeyCounts] = None
+                unused_fallback_keys: Optional[TransactionUnusedFallbackKeys] = None
+
+                if (
+                    self._msc3202_transaction_extensions_enabled
+                    and service.msc3202_transaction_extensions
+                ):
+                    # Lazily compute the one-time key counts and fallback key
+                    # usage states for the users which are mentioned in this
+                    # transaction, as well as the appservice's sender.
+                    interesting_users = await self._determine_interesting_users_for_msc3202_otk_counts_and_fallback_keys(
+                        service, events, ephemeral, to_device_messages_to_send
+                    )
+                    (
+                        one_time_key_counts,
+                        unused_fallback_keys,
+                    ) = await self._compute_msc3202_otk_counts_and_fallback_keys(
+                        interesting_users
+                    )
+
                 try:
                     await self.txn_ctrl.send(
                         service,
@@ -242,11 +274,65 @@ class _ServiceQueuer:
                         ephemeral,
                         to_device_messages_to_send,
                         device_list_summary,
+                        one_time_key_counts,
+                        unused_fallback_keys,
                     )
                 except Exception:
                     logger.exception("AS request failed")
         finally:
             self.requests_in_flight.discard(service.id)
+
+    async def _determine_interesting_users_for_msc3202_otk_counts_and_fallback_keys(
+        self,
+        service: ApplicationService,
+        events: Iterable[EventBase],
+        ephemerals: Iterable[JsonDict],
+        to_device_messages: Iterable[JsonDict],
+    ) -> Set[str]:
+        """
+        Given a list of the events, ephemeral messages and to-device messaeges,
+        compute a list of application services users that may have interesting
+        updates to the one-time key counts or fallback key usage.
+        """
+        interesting_users: Set[str] = set()
+
+        # The sender is always included
+        interesting_users.add(service.sender)
+
+        # All AS users that would receive the PDUs or EDUs sent to these rooms
+        # are classed as 'interesting'.
+        rooms_of_interesting_users: Set[str] = set()
+        # PDUs
+        rooms_of_interesting_users.update(event.room_id for event in events)
+        # EDUs
+        rooms_of_interesting_users.update(
+            ephemeral["room_id"] for ephemeral in ephemerals
+        )
+
+        # Look up the AS users in those rooms
+        for room_id in rooms_of_interesting_users:
+            interesting_users.update(
+                await self._store.get_app_service_users_in_room(room_id, service)
+            )
+
+        # Add recipients of to-device messages.
+        # device_message["user_id"] is the ID of the recipient.
+        interesting_users.update(
+            device_message["user_id"] for device_message in to_device_messages
+        )
+
+        return interesting_users
+
+    async def _compute_msc3202_otk_counts_and_fallback_keys(
+        self, users: Set[str]
+    ) -> Tuple[TransactionOneTimeKeyCounts, TransactionUnusedFallbackKeys]:
+        """
+        Given a list of application service users that are interesting,
+        compute one-time key counts and fallback key usages for the users.
+        """
+        otk_counts = await self._store.count_bulk_e2e_one_time_keys_for_as(users)
+        unused_fbks = await self._store.get_e2e_bulk_unused_fallback_key_types(users)
+        return otk_counts, unused_fbks
 
 
 class _TransactionController:
@@ -281,6 +367,8 @@ class _TransactionController:
         ephemeral: Optional[List[JsonDict]] = None,
         to_device_messages: Optional[List[JsonDict]] = None,
         device_list_summary: Optional[DeviceLists] = None,
+        one_time_key_counts: Optional[TransactionOneTimeKeyCounts] = None,
+        unused_fallback_keys: Optional[TransactionUnusedFallbackKeys] = None,
     ) -> None:
         """
         Create a transaction with the given data and send to the provided
@@ -292,6 +380,10 @@ class _TransactionController:
             ephemeral: The ephemeral events to include in the transaction.
             to_device_messages: The to-device messages to include in the transaction.
             device_list_summary: The device list summary to include in the transaction.
+            one_time_key_counts: Counts of remaining one-time keys for relevant
+                appservice devices in the transaction.
+            unused_fallback_keys: Lists of unused fallback keys for relevant
+                appservice devices in the transaction.
         """
         try:
             txn = await self.store.create_appservice_txn(
@@ -300,6 +392,8 @@ class _TransactionController:
                 ephemeral=ephemeral or [],
                 to_device_messages=to_device_messages or [],
                 device_list_summary=device_list_summary or DeviceLists(),
+                one_time_key_counts=one_time_key_counts or {},
+                unused_fallback_keys=unused_fallback_keys or {},
             )
             service_is_up = await self._is_service_up(service)
             if service_is_up:

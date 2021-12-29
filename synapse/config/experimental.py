@@ -66,3 +66,9 @@ class ExperimentalConfig(Config):
         self.msc3202_device_masquerading_enabled: bool = experimental.get(
             "msc3202_device_masquerading", False
         )
+
+        # Portion of MSC3202 related to transaction extensions:
+        # sending one-time key counts and fallback key usage to application services.
+        self.msc3202_transaction_extensions: bool = experimental.get(
+            "msc3202_transaction_extensions", False
+        )

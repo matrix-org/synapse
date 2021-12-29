@@ -20,15 +20,19 @@ from synapse.appservice import (
     ApplicationService,
     ApplicationServiceState,
     AppServiceTransaction,
+    TransactionOneTimeKeyCounts,
+    TransactionUnusedFallbackKeys,
 )
 from synapse.config.appservice import load_appservices
 from synapse.events import EventBase
-from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import DatabasePool
+from synapse.storage._base import db_to_json
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.types import Connection
 from synapse.types import DeviceLists, JsonDict
+from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
 from synapse.util import json_encoder
+from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -57,8 +61,13 @@ def _make_exclusive_regex(
     return exclusive_user_pattern
 
 
-class ApplicationServiceWorkerStore(SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
+class ApplicationServiceWorkerStore(RoomMemberWorkerStore):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         self.services_cache = load_appservices(
             hs.hostname, hs.config.appservice.app_service_config_files
         )
@@ -119,6 +128,14 @@ class ApplicationServiceWorkerStore(SQLBaseStore):
             if service.id == as_id:
                 return service
         return None
+
+    # OSTD cache invalidation
+    @cached(iterable=True, prune_unread_entries=False)
+    async def get_app_service_users_in_room(
+        self, room_id: str, app_service: "ApplicationService"
+    ) -> List[str]:
+        users_in_room = await self.get_users_in_room(room_id)
+        return list(filter(app_service.is_interested_in_user, users_in_room))
 
 
 class ApplicationServiceStore(ApplicationServiceWorkerStore):
@@ -196,6 +213,8 @@ class ApplicationServiceTransactionWorkerStore(
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
         device_list_summary: DeviceLists,
+        one_time_key_counts: TransactionOneTimeKeyCounts,
+        unused_fallback_keys: TransactionUnusedFallbackKeys,
     ) -> AppServiceTransaction:
         """Atomically creates a new transaction for this application service
         with the given list of events. Ephemeral events are NOT persisted to the
@@ -207,6 +226,10 @@ class ApplicationServiceTransactionWorkerStore(
             ephemeral: A list of ephemeral events to put in the transaction.
             to_device_messages: A list of to-device messages to put in the transaction.
             device_list_summary: The device list summary to include in the transaction.
+            one_time_key_counts: Counts of remaining one-time keys for relevant
+                appservice devices in the transaction.
+            unused_fallback_keys: Lists of unused fallback keys for relevant
+                appservice devices in the transaction.
 
         Returns:
             A new transaction.
@@ -243,6 +266,8 @@ class ApplicationServiceTransactionWorkerStore(
                 ephemeral=ephemeral,
                 to_device_messages=to_device_messages,
                 device_list_summary=device_list_summary,
+                one_time_key_counts=one_time_key_counts,
+                unused_fallback_keys=unused_fallback_keys,
             )
 
         return await self.db_pool.runInteraction(
@@ -334,6 +359,8 @@ class ApplicationServiceTransactionWorkerStore(
 
         events = await self.get_events_as_list(event_ids)
 
+        # TODO: should we recalculate one-time key counts and unused fallback
+        #       key counts here?
         return AppServiceTransaction(
             service=service,
             id=entry["txn_id"],
@@ -341,6 +368,8 @@ class ApplicationServiceTransactionWorkerStore(
             ephemeral=[],
             to_device_messages=[],
             device_list_summary=DeviceLists(),
+            one_time_key_counts={},
+            unused_fallback_keys={},
         )
 
     def _get_last_txn(self, txn, service_id: Optional[str]) -> int:
