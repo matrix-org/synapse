@@ -440,74 +440,99 @@ class RelationsWorkerStore(SQLBaseStore):
         }
 
     @cached()
-    async def get_thread_summary(
-        self, event_id: str
-    ) -> Tuple[int, Optional[EventBase]]:
+    def get_thread_summary(self, event_id: str) -> Optional[Tuple[int, EventBase]]:
+        raise NotImplementedError()
+
+    @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")
+    async def _get_thread_summaries(
+        self, event_ids: Collection[str]
+    ) -> Dict[str, Optional[Tuple[int, EventBase]]]:
         """Get the number of threaded replies and the latest reply (if any) for the given event.
 
         Args:
-            event_id: Summarize the thread related to this event ID.
+            event_ids: Summarize the thread related to this event ID.
 
         Returns:
-            The number of items in the thread and the most recent response, if any.
+            A map of the thread summary each event. A missing event implies there
+            are no threaded replies.
+
+            Each summary includes the number of items in the thread and the most
+            recent response.
         """
 
-        def _get_thread_summary_txn(
+        def _get_thread_summaries_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[int, Optional[str]]:
-            # Fetch the latest event ID in the thread.
+        ) -> Tuple[Dict[str, int], Dict[str, str]]:
+            # Fetch the count of threaded events and the latest event ID.
             # TODO Should this only allow m.room.message events.
             sql = """
-                SELECT child.event_id FROM events AS child
+                SELECT parent.event_id, child.event_id FROM events AS child
                 INNER JOIN event_relations USING (event_id)
                 INNER JOIN events AS parent ON
                     parent.event_id = relates_to_id
                     AND parent.room_id = child.room_id
                 WHERE
-                    relates_to_id = ?
+                    %s
                     AND relation_type = ?
                 ORDER BY child.topological_ordering DESC, child.stream_ordering DESC
-                LIMIT 1
             """
 
-            txn.execute(sql, (event_id, RelationTypes.THREAD))
-            row = txn.fetchone()
-            if row is None:
-                return 0, None
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "relates_to_id", event_ids
+            )
+            args.append(RelationTypes.THREAD)
 
-            latest_event_id = row[0]
+            txn.execute(sql % (clause,), args)
+            latest_event_ids = {}
+            for parent_event_id, child_event_id in txn.fetchall():
+                # Only consider the latest threaded reply (by topological ordering).
+                if parent_event_id not in latest_event_ids:
+                    latest_event_ids[parent_event_id] = child_event_id
 
             # Fetch the number of threaded replies.
             sql = """
-                SELECT COUNT(child.event_id) FROM events AS child
+                SELECT parent.event_id, COUNT(child.event_id) FROM events AS child
                 INNER JOIN event_relations USING (event_id)
                 INNER JOIN events AS parent ON
                     parent.event_id = relates_to_id
                     AND parent.room_id = child.room_id
                 WHERE
-                    relates_to_id = ?
+                    %s
                     AND relation_type = ?
+                GROUP BY parent.event_id
             """
-            txn.execute(sql, (event_id, RelationTypes.THREAD))
-            count = cast(Tuple[int], txn.fetchone())[0]
+            # TODO Re-generate args since we know some events don't have threads now.
+            txn.execute(sql % (clause,), args)
+            counts = dict(cast(List[Tuple[str, int]], txn.fetchall()))
 
-            return count, latest_event_id
+            return counts, latest_event_ids
 
-        count, latest_event_id = await self.db_pool.runInteraction(
-            "get_thread_summary", _get_thread_summary_txn
+        counts, latest_event_ids = await self.db_pool.runInteraction(
+            "get_thread_summaries", _get_thread_summaries_txn
         )
 
-        latest_event = None
-        if latest_event_id:
-            latest_event = await self.get_event(latest_event_id, allow_none=True)  # type: ignore[attr-defined]
+        latest_events = await self.get_events(latest_event_ids.values())  # type: ignore[attr-defined]
 
-        return count, latest_event
+        # Map to the event IDs to the thread summary.
+        #
+        # There might not be a summary due to there not being a thread or
+        # due to the latest event not being known, either case is treated the same.
+        summaries = {}
+        for parent_event_id, latest_event_id in latest_event_ids.items():
+            latest_event = latest_events.get(latest_event_id)
+
+            summary = None
+            if latest_event:
+                summary = (counts[parent_event_id], latest_event)
+            summaries[parent_event_id] = summary
+
+        return summaries
 
     @cached()
     async def get_thread_participated(self, event_id: str, user_id: str) -> bool:
         """Get whether the requesting user participated in a thread.
 
-        This is separate from get_thread_summary since that can be cached across
+        This is separate from get_thread_summaries since that can be cached across
         all users while this value is specific to the requeser.
 
         Args:
@@ -686,9 +711,11 @@ class RelationsWorkerStore(SQLBaseStore):
 
         # If this event is the start of a thread, include a summary of the replies.
         if self._msc3440_enabled:
-            thread_count, latest_thread_event = await self.get_thread_summary(event_id)
-            participated = await self.get_thread_participated(event_id, user_id)
-            if latest_thread_event:
+            summaries = await self._get_thread_summaries([event_id])
+            summary = summaries.get(event_id)
+            if summary:
+                thread_count, latest_thread_event = summary
+                participated = await self.get_thread_participated(event_id, user_id)
                 aggregations.thread = _ThreadAggregation(
                     latest_event=latest_thread_event,
                     count=thread_count,
