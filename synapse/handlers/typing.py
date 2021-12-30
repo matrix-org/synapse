@@ -123,7 +123,7 @@ class FollowerTypingHandler:
         self.wheel_timer.insert(now=now, obj=member, then=now + 60 * 1000)
 
     def is_typing(self, member: RoomMember) -> bool:
-        return member.user_id in self._room_typing.get(member.room_id, [])
+        return member.user_id in self._room_typing.get(member.room_id, set())
 
     async def _push_remote(self, member: RoomMember, typing: bool) -> None:
         if not self.federation:
@@ -170,9 +170,9 @@ class FollowerTypingHandler:
         for row in rows:
             self._room_serials[row.room_id] = token
 
-            prev_typing = set(self._room_typing.get(row.room_id, []))
+            prev_typing = self._room_typing.get(row.room_id, set())
             now_typing = set(row.user_ids)
-            self._room_typing[row.room_id] = row.user_ids
+            self._room_typing[row.room_id] = now_typing
 
             if self.federation:
                 run_as_background_process(
