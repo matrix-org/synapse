@@ -14,7 +14,7 @@
 # limitations under the License.
 import heapq
 import logging
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -67,9 +67,6 @@ state_groups_histogram = Histogram(
     "Number of state groups used when performing a state resolution",
     buckets=(1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"),
 )
-
-
-KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
 
 
 EVICTION_TIMEOUT_SECONDS = 60 * 60

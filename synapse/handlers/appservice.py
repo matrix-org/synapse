@@ -462,9 +462,9 @@ class ApplicationServicesHandler:
 
         Args:
             room_alias: The room alias to query.
+
         Returns:
-            namedtuple: with keys "room_id" and "servers" or None if no
-            association can be found.
+            RoomAliasMapping or None if no association can be found.
         """
         room_alias_str = room_alias.to_string()
         services = self.store.get_app_services()
