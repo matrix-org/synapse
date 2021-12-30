@@ -278,11 +278,13 @@ class DirectoryHandler:
 
         users = await self.store.get_users_in_room(room_id)
         extra_servers = {get_domain_from_id(u) for u in users}
-        servers = set(extra_servers) | set(servers)
+        unique_servers = set(extra_servers) | set(servers)
 
         # If this server is in the list of servers, return it first.
-        if self.server_name in servers:
-            servers = [self.server_name] + [s for s in servers if s != self.server_name]
+        if self.server_name in unique_servers:
+            servers = [self.server_name] + [
+                s for s in unique_servers if s != self.server_name
+            ]
         else:
             servers = list(servers)
 
