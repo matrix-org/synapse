@@ -480,6 +480,81 @@ The following fields are returned in the JSON response body:
 - `joined_rooms` - An array of `room_id`.
 - `total` - Number of rooms.
 
+## Account Data
+Gets information about account data for a specific `user_id`.
+
+The API is:
+
+```
+GET /_synapse/admin/v1/users/<user_id>/accountdata
+```
+
+A response body like the following is returned:
+
+```json
+{
+    "account_data": {
+        "global": {
+            "m.secret_storage.key.LmIGHTg5W": {
+                "algorithm": "m.secret_storage.v1.aes-hmac-sha2",
+                "iv": "fwjNZatxg==",
+                "mac": "eWh9kNnLWZUNOgnc="
+            },
+            "im.vector.hide_profile": {
+                "hide_profile": true
+            },
+            "org.matrix.preview_urls": {
+                "disable": false
+            },
+            "im.vector.riot.breadcrumb_rooms": {
+                "rooms": [
+                    "!LxcBDAsDUVAfJDEo:matrix.org",
+                    "!MAhRxqasbItjOqxu:matrix.org"
+                ]
+            },
+            "m.accepted_terms": {
+                "accepted": [
+                    "https://example.org/somewhere/privacy-1.2-en.html",
+                    "https://example.org/somewhere/terms-2.0-en.html"
+                ]
+            },
+            "im.vector.setting.breadcrumbs": {
+                "recent_rooms": [
+                    "!MAhRxqasbItqxuEt:matrix.org",
+                    "!ZtSaPCawyWtxiImy:matrix.org"
+                ]
+            }
+        },
+        "rooms": {
+            "!GUdfZSHUJibpiVqHYd:matrix.org": {
+                "m.fully_read": {
+                    "event_id": "$156334540fYIhZ:matrix.org"
+                }
+            },
+            "!tOZwOOiqwCYQkLhV:matrix.org": {
+                "m.fully_read": {
+                    "event_id": "$xjsIyp4_NaVl2yPvIZs_k1Jl8tsC_Sp23wjqXPno"
+                }
+            }
+        }
+    }
+}
+```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `user_id` - fully qualified: for example, `@user:server.com`.
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+- `account_data` - An array containing the account data for the user
+  - `global` - An array containing the global account data for the user
+  - `rooms` - An array containing the account data per room for the user
+
 ## User media
 
 ### List media uploaded by a user
