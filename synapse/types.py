@@ -738,10 +738,6 @@ class ThirdPartyInstanceID:
 
     __str__ = to_string
 
-    @classmethod
-    def create(cls, appservice_id, network_id):
-        return cls(appservice_id=appservice_id, network_id=network_id)
-
 
 @attr.s(slots=True)
 class ReadReceipt:
