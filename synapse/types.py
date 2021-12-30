@@ -15,7 +15,6 @@
 import abc
 import re
 import string
-from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -708,9 +707,11 @@ class PersistedEventPosition:
         return RoomStreamToken(None, self.stream)
 
 
-class ThirdPartyInstanceID(
-    namedtuple("ThirdPartyInstanceID", ("appservice_id", "network_id"))
-):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class ThirdPartyInstanceID:
+    appservice_id: Optional[str]
+    network_id: Optional[str]
+
     # Deny iteration because it will bite you if you try to create a singleton
     # set by:
     #    users = set(user)
@@ -725,14 +726,14 @@ class ThirdPartyInstanceID(
         return self
 
     @classmethod
-    def from_string(cls, s):
+    def from_string(cls, s: str) -> "ThirdPartyInstanceID":
         bits = s.split("|", 2)
         if len(bits) != 2:
             raise SynapseError(400, "Invalid ID %r" % (s,))
 
         return cls(appservice_id=bits[0], network_id=bits[1])
 
-    def to_string(self):
+    def to_string(self) -> str:
         return "%s|%s" % (self.appservice_id, self.network_id)
 
     __str__ = to_string
