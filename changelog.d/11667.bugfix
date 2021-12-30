@@ -1,0 +1,1 @@
+Fix `/_matrix/client/v1/room/{roomId}/hierarchy` endpoint returning incorrect fields.
