@@ -1016,6 +1016,8 @@ class RoomSummaryHandler:
                 )
                 if allowed_rooms:
                     entry["allowed_room_ids"] = allowed_rooms
+                    # TODO Remove this key once the API is stable.
+                    entry["allowed_spaces"] = allowed_rooms
 
         # Filter out Nones – rather omit the field altogether
         room_entry = {k: v for k, v in entry.items() if v is not None}
