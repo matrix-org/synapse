@@ -13,8 +13,9 @@
 # limitations under the License.
 import logging
 import random
-from collections import namedtuple
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
+
+import attr
 
 from synapse.api.errors import AuthError, ShadowBanError, SynapseError
 from synapse.appservice import ApplicationService
@@ -37,7 +38,10 @@ logger = logging.getLogger(__name__)
 
 # A tiny object useful for storing a user's membership in a room, as a mapping
 # key
-RoomMember = namedtuple("RoomMember", ("room_id", "user_id"))
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RoomMember:
+    room_id: str
+    user_id: str
 
 
 # How often we expect remote servers to resend us presence.
