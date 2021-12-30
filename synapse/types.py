@@ -226,8 +226,7 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
     localpart = attr.ib(type=str)
     domain = attr.ib(type=str)
 
-    # Because this class is a namedtuple of strings and booleans, it is deeply
-    # immutable.
+    # Because this is a frozen class, it is deeply immutable.
     def __copy__(self):
         return self
 
@@ -718,7 +717,7 @@ class ThirdPartyInstanceID:
     def __iter__(self):
         raise ValueError("Attempted to iterate a %s" % (type(self).__name__,))
 
-    # Because this class is a namedtuple of strings, it is deeply immutable.
+    # Because this class is a frozen class, it is deeply immutable.
     def __copy__(self):
         return self
 
