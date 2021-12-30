@@ -66,12 +66,12 @@ class UsersRestServletV2(RestServlet):
     """
 
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
-        self._auth = hs.get_auth()
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        await assert_requester_is_admin(self._auth, request)
+        await assert_requester_is_admin(self.auth, request)
 
         start = parse_integer(request, "from", default=0)
         limit = parse_integer(request, "limit", default=100)
@@ -114,7 +114,7 @@ class UsersRestServletV2(RestServlet):
 
         direction = parse_string(request, "dir", default="f", allowed_values=("f", "b"))
 
-        users, total = await self._store.get_users_paginate(
+        users, total = await self.store.get_users_paginate(
             start, limit, user_id, name, guests, deactivated, order_by, direction
         )
         ret = {"users": users, "total": total}
@@ -154,10 +154,10 @@ class UserRestServletV2(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self._auth = hs.get_auth()
+        self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
-        self._store = hs.get_datastore()
-        self._auth_handler = hs.get_auth_handler()
+        self.store = hs.get_datastore()
+        self.auth_handler = hs.get_auth_handler()
         self.profile_handler = hs.get_profile_handler()
         self.set_password_handler = hs.get_set_password_handler()
         self.deactivate_account_handler = hs.get_deactivate_account_handler()
@@ -167,7 +167,7 @@ class UserRestServletV2(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-        await assert_requester_is_admin(self._auth, request)
+        await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)
         if not self.hs.is_mine(target_user):
@@ -183,8 +183,8 @@ class UserRestServletV2(RestServlet):
     async def on_PUT(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self._auth.get_user_by_req(request)
-        await assert_user_is_admin(self._auth, requester.user)
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
 
         target_user = UserID.from_string(user_id)
         body = parse_json_object_from_request(request)
@@ -257,7 +257,7 @@ class UserRestServletV2(RestServlet):
                 # convert List[Dict[str, Any]] into Set[Tuple[str, str]]
                 cur_threepids = {
                     (threepid["medium"], threepid["address"])
-                    for threepid in await self._store.user_get_threepids(user_id)
+                    for threepid in await self.store.user_get_threepids(user_id)
                 }
                 add_threepids = new_threepids - cur_threepids
                 del_threepids = cur_threepids - new_threepids
@@ -265,7 +265,7 @@ class UserRestServletV2(RestServlet):
                 # remove old threepids
                 for medium, address in del_threepids:
                     try:
-                        await self._auth_handler.delete_threepid(
+                        await self.auth_handler.delete_threepid(
                             user_id, medium, address, None
                         )
                     except Exception:
@@ -275,13 +275,13 @@ class UserRestServletV2(RestServlet):
                 # add new threepids
                 current_time = self.hs.get_clock().time_msec()
                 for medium, address in add_threepids:
-                    await self._auth_handler.add_threepid(
+                    await self.auth_handler.add_threepid(
                         user_id, medium, address, current_time
                     )
 
             if external_ids is not None:
                 try:
-                    await self._store.replace_user_external_id(
+                    await self.store.replace_user_external_id(
                         new_external_ids,
                         user_id,
                     )
@@ -303,11 +303,11 @@ class UserRestServletV2(RestServlet):
                             HTTPStatus.BAD_REQUEST, "You may not demote yourself."
                         )
 
-                    await self._store.set_server_admin(target_user, set_admin_to)
+                    await self.store.set_server_admin(target_user, set_admin_to)
 
             if password is not None:
                 logout_devices = True
-                new_password_hash = await self._auth_handler.hash(password)
+                new_password_hash = await self.auth_handler.hash(password)
 
                 await self.set_password_handler.set_password(
                     target_user.to_string(),
@@ -324,7 +324,7 @@ class UserRestServletV2(RestServlet):
                 elif not deactivate and user["deactivated"]:
                     if (
                         "password" not in body
-                        and self._auth_handler.can_change_password()
+                        and self.auth_handler.can_change_password()
                     ):
                         raise SynapseError(
                             HTTPStatus.BAD_REQUEST,
@@ -336,7 +336,7 @@ class UserRestServletV2(RestServlet):
                     )
 
             if "user_type" in body:
-                await self._store.set_user_type(target_user, user_type)
+                await self.store.set_user_type(target_user, user_type)
 
             user = await self.admin_handler.get_user(target_user)
             assert user is not None
@@ -348,7 +348,7 @@ class UserRestServletV2(RestServlet):
 
             password_hash = None
             if password is not None:
-                password_hash = await self._auth_handler.hash(password)
+                password_hash = await self.auth_handler.hash(password)
 
             user_id = await self.registration_handler.register_user(
                 localpart=target_user.localpart,
@@ -362,7 +362,7 @@ class UserRestServletV2(RestServlet):
             if threepids is not None:
                 current_time = self.hs.get_clock().time_msec()
                 for medium, address in new_threepids:
-                    await self._auth_handler.add_threepid(
+                    await self.auth_handler.add_threepid(
                         user_id, medium, address, current_time
                     )
                     if (
@@ -384,7 +384,7 @@ class UserRestServletV2(RestServlet):
             if external_ids is not None:
                 try:
                     for auth_provider, external_id in new_external_ids:
-                        await self._store.record_user_external_id(
+                        await self.store.record_user_external_id(
                             auth_provider,
                             external_id,
                             user_id,
@@ -417,7 +417,7 @@ class UserRegisterServlet(RestServlet):
     NONCE_TIMEOUT = 60
 
     def __init__(self, hs: "HomeServer"):
-        self._auth_handler = hs.get_auth_handler()
+        self.auth_handler = hs.get_auth_handler()
         self.reactor = hs.get_reactor()
         self.nonces: Dict[str, int] = {}
         self.hs = hs
@@ -496,7 +496,7 @@ class UserRegisterServlet(RestServlet):
             if b"\x00" in password_bytes:
                 raise SynapseError(HTTPStatus.BAD_REQUEST, "Invalid password")
 
-            password_hash = await self._auth_handler.hash(password)
+            password_hash = await self.auth_handler.hash(password)
 
         admin = body.get("admin", None)
         user_type = body.get("user_type", None)
@@ -560,21 +560,21 @@ class WhoisRestServlet(RestServlet):
     ]
 
     def __init__(self, hs: "HomeServer"):
-        self._auth = hs.get_auth()
+        self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
-        self._is_mine = hs.is_mine
+        self.is_mine = hs.is_mine
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
         target_user = UserID.from_string(user_id)
-        requester = await self._auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request)
         auth_user = requester.user
 
         if target_user != auth_user:
-            await assert_user_is_admin(self._auth, auth_user)
+            await assert_user_is_admin(self.auth, auth_user)
 
-        if not self._is_mine(target_user):
+        if not self.is_mine(target_user):
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only whois a local user")
 
         ret = await self.admin_handler.get_whois(target_user)
@@ -587,22 +587,22 @@ class DeactivateAccountRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self._deactivate_account_handler = hs.get_deactivate_account_handler()
-        self._auth = hs.get_auth()
-        self._is_mine = hs.is_mine
-        self._store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.is_mine = hs.is_mine
+        self.store = hs.get_datastore()
 
     async def on_POST(
         self, request: SynapseRequest, target_user_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self._auth.get_user_by_req(request)
-        await assert_user_is_admin(self._auth, requester.user)
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
 
-        if not self._is_mine(UserID.from_string(target_user_id)):
+        if not self.is_mine(UserID.from_string(target_user_id)):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "Can only deactivate local users"
             )
 
-        if not await self._store.get_user_by_id(target_user_id):
+        if not await self.store.get_user_by_id(target_user_id):
             raise NotFoundError("User not found")
 
         body = parse_json_object_from_request(request, allow_empty_body=True)
@@ -630,10 +630,10 @@ class AccountValidityRenewServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self.account_activity_handler = hs.get_account_validity_handler()
-        self._auth = hs.get_auth()
+        self.auth = hs.get_auth()
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        await assert_requester_is_admin(self._auth, request)
+        await assert_requester_is_admin(self.auth, request)
 
         if self.account_activity_handler.on_legacy_admin_request_callback:
             expiration_ts = await (
@@ -675,9 +675,9 @@ class ResetPasswordRestServlet(RestServlet):
     PATTERNS = admin_patterns("/reset_password/(?P<target_user_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
-        self._auth = hs.get_auth()
-        self._auth_handler = hs.get_auth_handler()
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
         self._set_password_handler = hs.get_set_password_handler()
 
     async def on_POST(
@@ -686,8 +686,8 @@ class ResetPasswordRestServlet(RestServlet):
         """Post request to allow an administrator reset password for a user.
         This needs user to have administrator access in Synapse.
         """
-        requester = await self._auth.get_user_by_req(request)
-        await assert_user_is_admin(self._auth, requester.user)
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
 
         UserID.from_string(target_user_id)
 
@@ -696,7 +696,7 @@ class ResetPasswordRestServlet(RestServlet):
         new_password = params["new_password"]
         logout_devices = params.get("logout_devices", True)
 
-        new_password_hash = await self._auth_handler.hash(new_password)
+        new_password_hash = await self.auth_handler.hash(new_password)
 
         await self._set_password_handler.set_password(
             target_user_id, new_password_hash, logout_devices, requester
@@ -718,9 +718,9 @@ class SearchUsersRestServlet(RestServlet):
     PATTERNS = admin_patterns("/search_users/(?P<target_user_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
-        self._auth = hs.get_auth()
-        self._is_mine = hs.is_mine
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.is_mine = hs.is_mine
 
     async def on_GET(
         self, request: SynapseRequest, target_user_id: str
@@ -729,7 +729,7 @@ class SearchUsersRestServlet(RestServlet):
         search term.
         This needs user to have a administrator access in Synapse.
         """
-        await assert_requester_is_admin(self._auth, request)
+        await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(target_user_id)
 
@@ -737,13 +737,13 @@ class SearchUsersRestServlet(RestServlet):
         # if not is_admin and target_user != auth_user:
         #     raise AuthError(HTTPStatus.FORBIDDEN, "You are not a server admin")
 
-        if not self._is_mine(target_user):
+        if not self.is_mine(target_user):
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only users a local user")
 
         term = parse_string(request, "term", required=True)
         logger.info("term: %s ", term)
 
-        ret = await self._store.search_users(term)
+        ret = await self.store.search_users(term)
         return HTTPStatus.OK, ret
 
 
@@ -776,32 +776,32 @@ class UserAdminServlet(RestServlet):
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/admin$")
 
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
-        self._auth = hs.get_auth()
-        self._is_mine = hs.is_mine
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.is_mine = hs.is_mine
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-        await assert_requester_is_admin(self._auth, request)
+        await assert_requester_is_admin(self.auth, request)
 
         target_user = UserID.from_string(user_id)
 
-        if not self._is_mine(target_user):
+        if not self.is_mine(target_user):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "Only local users can be admins of this homeserver",
             )
 
-        is_admin = await self._store.is_server_admin(target_user)
+        is_admin = await self.store.is_server_admin(target_user)
 
         return HTTPStatus.OK, {"admin": is_admin}
 
     async def on_PUT(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self._auth.get_user_by_req(request)
-        await assert_user_is_admin(self._auth, requester.user)
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
         auth_user = requester.user
 
         target_user = UserID.from_string(user_id)
@@ -810,7 +810,7 @@ class UserAdminServlet(RestServlet):
 
         assert_params_in_dict(body, ["admin"])
 
-        if not self._is_mine(target_user):
+        if not self.is_mine(target_user):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "Only local users can be admins of this homeserver",
@@ -821,7 +821,7 @@ class UserAdminServlet(RestServlet):
         if target_user == auth_user and not set_admin_to:
             raise SynapseError(HTTPStatus.BAD_REQUEST, "You may not demote yourself.")
 
-        await self._store.set_server_admin(target_user, set_admin_to)
+        await self.store.set_server_admin(target_user, set_admin_to)
 
         return HTTPStatus.OK, {}
 
@@ -834,16 +834,16 @@ class UserMembershipRestServlet(RestServlet):
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/joined_rooms$")
 
     def __init__(self, hs: "HomeServer"):
-        self._is_mine = hs.is_mine
-        self._auth = hs.get_auth()
-        self._store = hs.get_datastore()
+        self.is_mine = hs.is_mine
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-        await assert_requester_is_admin(self._auth, request)
+        await assert_requester_is_admin(self.auth, request)
 
-        room_ids = await self._store.get_rooms_for_user(user_id)
+        room_ids = await self.store.get_rooms_for_user(user_id)
         ret = {"joined_rooms": list(room_ids), "total": len(room_ids)}
         return HTTPStatus.OK, ret
 
@@ -864,22 +864,22 @@ class PushersRestServlet(RestServlet):
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/pushers$")
 
     def __init__(self, hs: "HomeServer"):
-        self._is_mine = hs.is_mine
-        self._store = hs.get_datastore()
-        self._auth = hs.get_auth()
+        self.is_mine = hs.is_mine
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-        await assert_requester_is_admin(self._auth, request)
+        await assert_requester_is_admin(self.auth, request)
 
-        if not self._is_mine(UserID.from_string(user_id)):
+        if not self.is_mine(UserID.from_string(user_id)):
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only look up local users")
 
-        if not await self._store.get_user_by_id(user_id):
+        if not await self.store.get_user_by_id(user_id):
             raise NotFoundError("User not found")
 
-        pushers = await self._store.get_pushers_by_user_id(user_id)
+        pushers = await self.store.get_pushers_by_user_id(user_id)
 
         filtered_pushers = [p.as_dict() for p in pushers]
 
@@ -906,19 +906,19 @@ class UserTokenRestServlet(RestServlet):
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/login$")
 
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
-        self._auth = hs.get_auth()
-        self._auth_handler = hs.get_auth_handler()
-        self._is_mine_id = hs.is_mine_id
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
+        self.is_mine_id = hs.is_mine_id
 
     async def on_POST(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self._auth.get_user_by_req(request)
-        await assert_user_is_admin(self._auth, requester.user)
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
         auth_user = requester.user
 
-        if not self._is_mine_id(user_id):
+        if not self.is_mine_id(user_id):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "Only local users can be logged in as"
             )
@@ -936,7 +936,7 @@ class UserTokenRestServlet(RestServlet):
                 HTTPStatus.BAD_REQUEST, "Cannot use admin API to login as self"
             )
 
-        token = await self._auth_handler.create_access_token_for_user_id(
+        token = await self.auth_handler.create_access_token_for_user_id(
             user_id=auth_user.to_string(),
             device_id=None,
             valid_until_ms=valid_until_ms,
@@ -975,35 +975,35 @@ class ShadowBanRestServlet(RestServlet):
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/shadow_ban$")
 
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
-        self._auth = hs.get_auth()
-        self._is_mine_id = hs.is_mine_id
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.is_mine_id = hs.is_mine_id
 
     async def on_POST(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-        await assert_requester_is_admin(self._auth, request)
+        await assert_requester_is_admin(self.auth, request)
 
-        if not self._is_mine_id(user_id):
+        if not self.is_mine_id(user_id):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "Only local users can be shadow-banned"
             )
 
-        await self._store.set_shadow_banned(UserID.from_string(user_id), True)
+        await self.store.set_shadow_banned(UserID.from_string(user_id), True)
 
         return HTTPStatus.OK, {}
 
     async def on_DELETE(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-        await assert_requester_is_admin(self._auth, request)
+        await assert_requester_is_admin(self.auth, request)
 
-        if not self._is_mine_id(user_id):
+        if not self.is_mine_id(user_id):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "Only local users can be shadow-banned"
             )
 
-        await self._store.set_shadow_banned(UserID.from_string(user_id), False)
+        await self.store.set_shadow_banned(UserID.from_string(user_id), False)
 
         return HTTPStatus.OK, {}
 
@@ -1027,22 +1027,22 @@ class RateLimitRestServlet(RestServlet):
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/override_ratelimit$")
 
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
-        self._auth = hs.get_auth()
-        self._is_mine_id = hs.is_mine_id
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.is_mine_id = hs.is_mine_id
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-        await assert_requester_is_admin(self._auth, request)
+        await assert_requester_is_admin(self.auth, request)
 
-        if not self._is_mine_id(user_id):
+        if not self.is_mine_id(user_id):
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only look up local users")
 
-        if not await self._store.get_user_by_id(user_id):
+        if not await self.store.get_user_by_id(user_id):
             raise NotFoundError("User not found")
 
-        ratelimit = await self._store.get_ratelimit_for_user(user_id)
+        ratelimit = await self.store.get_ratelimit_for_user(user_id)
 
         if ratelimit:
             # convert `null` to `0` for consistency
@@ -1063,14 +1063,14 @@ class RateLimitRestServlet(RestServlet):
     async def on_POST(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-        await assert_requester_is_admin(self._auth, request)
+        await assert_requester_is_admin(self.auth, request)
 
-        if not self._is_mine_id(user_id):
+        if not self.is_mine_id(user_id):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "Only local users can be ratelimited"
             )
 
-        if not await self._store.get_user_by_id(user_id):
+        if not await self.store.get_user_by_id(user_id):
             raise NotFoundError("User not found")
 
         body = parse_json_object_from_request(request, allow_empty_body=True)
@@ -1092,10 +1092,10 @@ class RateLimitRestServlet(RestServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
-        await self._store.set_ratelimit_for_user(
+        await self.store.set_ratelimit_for_user(
             user_id, messages_per_second, burst_count
         )
-        ratelimit = await self._store.get_ratelimit_for_user(user_id)
+        ratelimit = await self.store.get_ratelimit_for_user(user_id)
         assert ratelimit is not None
 
         ret = {
@@ -1108,17 +1108,17 @@ class RateLimitRestServlet(RestServlet):
     async def on_DELETE(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-        await assert_requester_is_admin(self._auth, request)
+        await assert_requester_is_admin(self.auth, request)
 
-        if not self._is_mine_id(user_id):
+        if not self.is_mine_id(user_id):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "Only local users can be ratelimited"
             )
 
-        if not await self._store.get_user_by_id(user_id):
+        if not await self.store.get_user_by_id(user_id):
             raise NotFoundError("User not found")
 
-        await self._store.delete_ratelimit_for_user(user_id)
+        await self.store.delete_ratelimit_for_user(user_id)
 
         return HTTPStatus.OK, {}
 
