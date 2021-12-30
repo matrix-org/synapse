@@ -3936,7 +3936,7 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
 
     def test_user_is_not_local(self) -> None:
         """Tests that a lookup for a user that is not a local returns a 400"""
-        url = f"/_synapse/admin/v1/users/@unknown_person:unknown_domain/accountdata"
+        url = "/_synapse/admin/v1/users/@unknown_person:unknown_domain/accountdata"
 
         channel = self.make_request(
             "GET",
