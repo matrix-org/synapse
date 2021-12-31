@@ -1381,6 +1381,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if room_create_event:
             room_type = room_create_event.content.get(EventContentFields.ROOM_TYPE)
 
+        # TODO: Use is_join_rule utility
         room_join_rules = ""
         join_rules_event = room_state.get((EventTypes.JoinRules, ""))
         if join_rules_event:

@@ -41,6 +41,7 @@ from synapse.replication.http.register import (
 from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, UserID, create_requester
+from synapse.util.join_rules import is_join_rule
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -536,6 +537,7 @@ class RegistrationHandler:
                             event_id, allow_none=True
                         )
                         if join_rules_event:
+                            # TODO: Use is_join_rule utility
                             join_rule = join_rules_event.content.get("join_rule", None)
                             requires_invite = (
                                 join_rule and join_rule != JoinRules.PUBLIC

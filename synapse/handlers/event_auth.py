@@ -28,6 +28,7 @@ from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
 from synapse.types import StateMap, get_domain_from_id
+from synapse.util.join_rules import is_join_rule, get_all_allow_lists
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -198,7 +199,7 @@ class EventAuthHandler:
 
         # Get the rooms which allow access to this room and check if the user is
         # in any of them.
-        allowed_rooms = await self.get_rooms_that_allow_join(state_ids)
+        allowed_rooms = await self.get_rooms_that_allow_join(state_ids, room_version)
         if not await self.is_user_in_rooms(allowed_rooms, user_id):
 
             # If this is a remote request, the user might be in an allowed room
@@ -241,16 +242,17 @@ class EventAuthHandler:
 
         # If the join rule is not restricted, this doesn't apply.
         join_rules_event = await self._store.get_event(join_rules_event_id)
-        return join_rules_event.content.get("join_rule") == JoinRules.RESTRICTED
+        return is_join_rule(room_version, join_rules_event, JoinRules.RESTRICTED)
 
     async def get_rooms_that_allow_join(
-        self, state_ids: StateMap[str]
+        self, state_ids: StateMap[str], room_version: RoomVersion,
     ) -> Collection[str]:
         """
         Generate a list of rooms in which membership allows access to a room.
 
         Args:
             state_ids: The current state of the room the user wishes to join
+            room_version: The version of the room
 
         Returns:
             A collection of room IDs. Membership in any of the rooms in the list grants the ability to join the target room.
@@ -264,7 +266,7 @@ class EventAuthHandler:
         join_rules_event = await self._store.get_event(join_rules_event_id)
 
         # If allowed is of the wrong form, then only allow invited users.
-        allow_list = join_rules_event.content.get("allow", [])
+        allow_list = get_all_allow_lists(room_version, join_rules_event)
         if not isinstance(allow_list, list):
             return ()
 

@@ -589,6 +589,7 @@ class StatsStore(StateDeltasStore):
 
         for event in state_event_map.values():
             if event.type == EventTypes.JoinRules:
+                # TODO: Use is_join_rule utility?
                 room_state["join_rules"] = event.content.get("join_rule")
             elif event.type == EventTypes.RoomHistoryVisibility:
                 room_state["history_visibility"] = event.content.get(

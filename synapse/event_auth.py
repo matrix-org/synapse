@@ -37,6 +37,7 @@ from synapse.api.room_versions import (
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.types import StateMap, UserID, get_domain_from_id
+from synapse.util.join_rules import is_join_rule as is_join_rule_in_version
 
 logger = logging.getLogger(__name__)
 
@@ -225,6 +226,29 @@ def check_auth_rules_for_event(
 
     _check_event_sender_in_room(event, auth_dict)
 
+    # MSC3613: Combination join rules
+    if event.type == EventTypes.JoinRules and room_version_obj.msc3613_simplified_join_rules:
+        if not event.is_state():
+            raise AuthError(403, "Join rules event must be a state event")
+        if event.state_key != "":
+            raise AuthError(403, "Join rules event must have empty state_key")
+
+        # TODO: Function-ize this?
+
+        if not event.content.get("join_rule", None):
+            raise AuthError(403, "A join_rule must be specified")
+
+        arr = event.content.get("join_rules", [])
+        if arr and not isinstance(arr, list):
+            raise AuthError(403, "join_rules must be an array")
+        if arr:
+            for rule in arr:
+                if not rule.get("join_rule"):
+                    raise AuthError(403, "A join_rule must be specified for each rule")
+
+        # pass
+        return
+
     # Special case to allow m.room.third_party_invite events wherever
     # a user is allowed to issue invites.  Fixes
     # https://github.com/vector-im/vector-web/issues/1208 hopefully
@@ -333,11 +357,10 @@ def _is_membership_change_allowed(
     target_banned = target and target.membership == Membership.BAN
 
     key = (EventTypes.JoinRules, "")
-    join_rule_event = auth_events.get(key)
-    if join_rule_event:
-        join_rule = join_rule_event.content.get("join_rule", JoinRules.INVITE)
-    else:
-        join_rule = JoinRules.INVITE
+    join_rule_event: EventBase = auth_events.get(key)
+
+    def is_join_rule(rule: JoinRules) -> bool:
+        return is_join_rule_in_version(room_version, join_rule_event, rule)
 
     user_level = get_user_power_level(event.user_id, auth_events)
     target_level = get_user_power_level(target_user_id, auth_events)
@@ -354,7 +377,7 @@ def _is_membership_change_allowed(
             "target_banned": target_banned,
             "target_in_room": target_in_room,
             "membership": membership,
-            "join_rule": join_rule,
+            "join_rules": join_rule_event.content if join_rule_event else "unset",
             "target_user_id": target_user_id,
             "event.user_id": event.user_id,
         },
@@ -369,7 +392,7 @@ def _is_membership_change_allowed(
 
     # Require the user to be in the room for membership changes other than join/knock.
     if Membership.JOIN != membership and (
-        RoomVersion.msc2403_knocking and Membership.KNOCK != membership
+        room_version.msc2403_knocking and Membership.KNOCK != membership
     ):
         # If the user has been invited or has knocked, they are allowed to change their
         # membership event to leave
@@ -406,9 +429,9 @@ def _is_membership_change_allowed(
             raise AuthError(403, "Cannot force another user to join.")
         elif target_banned:
             raise AuthError(403, "You are banned from this room")
-        elif join_rule == JoinRules.PUBLIC:
+        elif is_join_rule(JoinRules.PUBLIC):
             pass
-        elif room_version.msc3083_join_rules and join_rule == JoinRules.RESTRICTED:
+        elif room_version.msc3083_join_rules and is_join_rule(JoinRules.RESTRICTED):
             # This is the same as public, but the event must contain a reference
             # to the server who authorised the join. If the event does not contain
             # the proper content it is rejected.
@@ -434,8 +457,8 @@ def _is_membership_change_allowed(
                 if authorising_user_level < invite_level:
                     raise AuthError(403, "Join event authorised by invalid server.")
 
-        elif join_rule == JoinRules.INVITE or (
-            room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
+        elif is_join_rule(JoinRules.INVITE) or (
+            room_version.msc2403_knocking and is_join_rule(JoinRules.KNOCK)
         ):
             if not caller_in_room and not caller_invited:
                 raise AuthError(403, "You are not invited to this room.")
@@ -456,7 +479,7 @@ def _is_membership_change_allowed(
         if user_level < ban_level or user_level <= target_level:
             raise AuthError(403, "You don't have permission to ban")
     elif room_version.msc2403_knocking and Membership.KNOCK == membership:
-        if join_rule != JoinRules.KNOCK:
+        if not is_join_rule(JoinRules.KNOCK):
             raise AuthError(403, "You don't have permission to knock")
         elif target_user_id != event.user_id:
             raise AuthError(403, "You cannot knock for other users")

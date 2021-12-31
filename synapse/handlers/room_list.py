@@ -35,6 +35,7 @@ from synapse.api.errors import (
 from synapse.types import JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.caches.response_cache import ResponseCache
+from synapse.util.join_rules import is_join_rule
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -306,6 +307,7 @@ class RoomListHandler:
 
         join_rules_event = current_state.get((EventTypes.JoinRules, ""))
         if join_rules_event:
+            # TODO: Use is_join_rule utility
             join_rule = join_rules_event.content.get("join_rule", None)
             if not allow_private and join_rule and join_rule != JoinRules.PUBLIC:
                 return None

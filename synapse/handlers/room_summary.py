@@ -40,6 +40,7 @@ from synapse.api.ratelimiting import Ratelimiter
 from synapse.events import EventBase
 from synapse.types import JsonDict, Requester
 from synapse.util.caches.response_cache import ResponseCache
+from synapse.util.join_rules import is_join_rule
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -843,10 +844,9 @@ class RoomSummaryHandler:
         join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""))
         if join_rules_event_id:
             join_rules_event = await self._store.get_event(join_rules_event_id)
-            join_rule = join_rules_event.content.get("join_rule")
-            if join_rule == JoinRules.PUBLIC or (
-                room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
-            ):
+            is_public = is_join_rule(room_version, join_rules_event, JoinRules.PUBLIC)
+            is_knock = is_join_rule(room_version, join_rules_event, JoinRules.KNOCK)
+            if is_public or (room_version.msc2403_knocking and is_knock):
                 return True
 
         # Include the room if it is peekable.
@@ -875,7 +875,7 @@ class RoomSummaryHandler:
                 state_ids, room_version
             ):
                 allowed_rooms = (
-                    await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
+                    await self._event_auth_handler.get_rooms_that_allow_join(state_ids, room_version)
                 )
                 if await self._event_auth_handler.is_user_in_rooms(
                     allowed_rooms, requester
@@ -897,7 +897,7 @@ class RoomSummaryHandler:
                 state_ids, room_version
             ):
                 allowed_rooms = (
-                    await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
+                    await self._event_auth_handler.get_rooms_that_allow_join(state_ids, room_version)
                 )
                 for space_id in allowed_rooms:
                     if await self._event_auth_handler.check_host_in_room(
@@ -938,6 +938,7 @@ class RoomSummaryHandler:
         # The API doesn't return the room version so assume that a
         # join rule of knock is valid.
         if (
+            # TODO: Use is_join_rule utility
             room.get("join_rules") in (JoinRules.PUBLIC, JoinRules.KNOCK)
             or room.get("world_readable") is True
         ):
@@ -1006,7 +1007,8 @@ class RoomSummaryHandler:
             ):
                 allowed_rooms = (
                     await self._event_auth_handler.get_rooms_that_allow_join(
-                        current_state_ids
+                        current_state_ids,
+                        room_version
                     )
                 )
                 if allowed_rooms:

@@ -481,6 +481,7 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
 
         # send invite if room has "JoinRules.INVITE"
         room_state = await self.state_handler.get_current_state(room_id)
+        # TODO: Use is_join_rule utility
         join_rules_event = room_state.get((EventTypes.JoinRules, ""))
         if join_rules_event:
             if not (join_rules_event.content.get("join_rule") == JoinRules.PUBLIC):
@@ -635,6 +636,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         if is_joined:
             return HTTPStatus.OK, {}
 
+        # TODO: Use is_join_rule utility
         join_rules = room_state.get((EventTypes.JoinRules, ""))
         is_public = False
         if join_rules:
