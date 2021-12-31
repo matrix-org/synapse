@@ -276,7 +276,7 @@ class RoomVersions:
     MSC3613 = RoomVersion(
         # v9 + MSC3613
         "org.matrix.msc3613",
-        RoomDisposition.STABLE,
+        RoomDisposition.UNSTABLE,
         EventFormatVersions.V3,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
