@@ -551,9 +551,9 @@ The following parameters should be set in the URL:
 
 The following fields are returned in the JSON response body:
 
-- `account_data` - An array containing the account data for the user
-  - `global` - An array containing the global account data for the user
-  - `rooms` - An array containing the account data per room for the user
+- `account_data` - A map containing the account data for the user
+  - `global` - A map containing the global account data for the user
+  - `rooms` - A map containing the account data per room for the user
 
 ## User media
 
