@@ -393,7 +393,9 @@ class RoomCreationHandler:
         user_id = requester.user.to_string()
 
         if not await self.spam_checker.user_may_create_room(user_id):
-            raise SynapseError(403, "You are not permitted to create rooms")
+            raise SynapseError(
+                403, "You are not permitted to create rooms", Codes.FORBIDDEN
+            )
 
         creation_content: JsonDict = {
             "room_version": new_room_version.identifier,
@@ -685,7 +687,9 @@ class RoomCreationHandler:
                 invite_3pid_list,
             )
         ):
-            raise SynapseError(403, "You are not permitted to create rooms")
+            raise SynapseError(
+                403, "You are not permitted to create rooms", Codes.FORBIDDEN
+            )
 
         if ratelimit:
             await self.request_ratelimiter.ratelimit(requester)
