@@ -395,7 +395,7 @@ class EventClientSerializer:
         event: Union[JsonDict, EventBase],
         time_now: int,
         *,
-        bundle_aggregations: bool = True,
+        bundle_aggregations: bool = False,
         **kwargs: Any,
     ) -> JsonDict:
         """Serializes a single event.
@@ -454,23 +454,26 @@ class EventClientSerializer:
                 return
 
         event_id = event.event_id
+        room_id = event.room_id
 
         # The bundled aggregations to include.
         aggregations = {}
 
-        annotations = await self.store.get_aggregation_groups_for_event(event_id)
+        annotations = await self.store.get_aggregation_groups_for_event(
+            event_id, room_id
+        )
         if annotations.chunk:
             aggregations[RelationTypes.ANNOTATION] = annotations.to_dict()
 
         references = await self.store.get_relations_for_event(
-            event_id, RelationTypes.REFERENCE, direction="f"
+            event_id, room_id, RelationTypes.REFERENCE, direction="f"
         )
         if references.chunk:
             aggregations[RelationTypes.REFERENCE] = references.to_dict()
 
         edit = None
         if event.type == EventTypes.Message:
-            edit = await self.store.get_applicable_edit(event_id)
+            edit = await self.store.get_applicable_edit(event_id, room_id)
 
         if edit:
             # If there is an edit replace the content, preserving existing
@@ -503,7 +506,7 @@ class EventClientSerializer:
             (
                 thread_count,
                 latest_thread_event,
-            ) = await self.store.get_thread_summary(event_id)
+            ) = await self.store.get_thread_summary(event_id, room_id)
             if latest_thread_event:
                 aggregations[RelationTypes.THREAD] = {
                     # Don't bundle aggregations as this could recurse forever.

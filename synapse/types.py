@@ -15,7 +15,6 @@
 import abc
 import re
 import string
-from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -59,9 +58,11 @@ StateKey = Tuple[str, str]
 StateMap = Mapping[StateKey, T]
 MutableStateMap = MutableMapping[StateKey, T]
 
-# the type of a JSON-serialisable dict. This could be made stronger, but it will
-# do for now.
+# JSON types. These could be made stronger, but will do for now.
+# A JSON-serialisable dict.
 JsonDict = Dict[str, Any]
+# A JSON-serialisable object.
+JsonSerializable = object
 
 
 # Note that this seems to require inheriting *directly* from Interface in order
@@ -225,8 +226,7 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
     localpart = attr.ib(type=str)
     domain = attr.ib(type=str)
 
-    # Because this class is a namedtuple of strings and booleans, it is deeply
-    # immutable.
+    # Because this is a frozen class, it is deeply immutable.
     def __copy__(self):
         return self
 
@@ -706,16 +706,18 @@ class PersistedEventPosition:
         return RoomStreamToken(None, self.stream)
 
 
-class ThirdPartyInstanceID(
-    namedtuple("ThirdPartyInstanceID", ("appservice_id", "network_id"))
-):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class ThirdPartyInstanceID:
+    appservice_id: Optional[str]
+    network_id: Optional[str]
+
     # Deny iteration because it will bite you if you try to create a singleton
     # set by:
     #    users = set(user)
     def __iter__(self):
         raise ValueError("Attempted to iterate a %s" % (type(self).__name__,))
 
-    # Because this class is a namedtuple of strings, it is deeply immutable.
+    # Because this class is a frozen class, it is deeply immutable.
     def __copy__(self):
         return self
 
@@ -723,21 +725,17 @@ class ThirdPartyInstanceID(
         return self
 
     @classmethod
-    def from_string(cls, s):
+    def from_string(cls, s: str) -> "ThirdPartyInstanceID":
         bits = s.split("|", 2)
         if len(bits) != 2:
             raise SynapseError(400, "Invalid ID %r" % (s,))
 
         return cls(appservice_id=bits[0], network_id=bits[1])
 
-    def to_string(self):
+    def to_string(self) -> str:
         return "%s|%s" % (self.appservice_id, self.network_id)
 
     __str__ = to_string
-
-    @classmethod
-    def create(cls, appservice_id, network_id):
-        return cls(appservice_id=appservice_id, network_id=network_id)
 
 
 @attr.s(slots=True)

@@ -739,14 +739,21 @@ class MediaRepository:
         # We deduplicate the thumbnail sizes by ignoring the cropped versions if
         # they have the same dimensions of a scaled one.
         thumbnails: Dict[Tuple[int, int, str], str] = {}
-        for r_width, r_height, r_method, r_type in requirements:
-            if r_method == "crop":
-                thumbnails.setdefault((r_width, r_height, r_type), r_method)
-            elif r_method == "scale":
-                t_width, t_height = thumbnailer.aspect(r_width, r_height)
+        for requirement in requirements:
+            if requirement.method == "crop":
+                thumbnails.setdefault(
+                    (requirement.width, requirement.height, requirement.media_type),
+                    requirement.method,
+                )
+            elif requirement.method == "scale":
+                t_width, t_height = thumbnailer.aspect(
+                    requirement.width, requirement.height
+                )
                 t_width = min(m_width, t_width)
                 t_height = min(m_height, t_height)
-                thumbnails[(t_width, t_height, r_type)] = r_method
+                thumbnails[
+                    (t_width, t_height, requirement.media_type)
+                ] = requirement.method
 
         # Now we generate the thumbnails for each dimension, store it
         for (t_width, t_height, t_type), t_method in thumbnails.items():

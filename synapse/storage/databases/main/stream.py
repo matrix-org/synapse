@@ -36,9 +36,9 @@ what sort order was used:
 """
 import abc
 import logging
-from collections import namedtuple
 from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Set, Tuple
 
+import attr
 from frozendict import frozendict
 
 from twisted.internet import defer
@@ -49,6 +49,7 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
+    LoggingDatabaseConnection,
     LoggingTransaction,
     make_in_list_sql_clause,
 )
@@ -73,9 +74,11 @@ _TOPOLOGICAL_TOKEN = "topological"
 
 
 # Used as return values for pagination APIs
-_EventDictReturn = namedtuple(
-    "_EventDictReturn", ("event_id", "topological_ordering", "stream_ordering")
-)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _EventDictReturn:
+    event_id: str
+    topological_ordering: Optional[int]
+    stream_ordering: int
 
 
 def generate_pagination_where_clause(
@@ -339,7 +342,12 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
     which can be called in the initializer.
     """
 
-    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
         self._instance_name = hs.get_instance_name()
@@ -819,7 +827,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
         for event, row in zip(events, rows):
             stream = row.stream_ordering
             if topo_order and row.topological_ordering:
-                topo = row.topological_ordering
+                topo: Optional[int] = row.topological_ordering
             else:
                 topo = None
             internal = event.internal_metadata

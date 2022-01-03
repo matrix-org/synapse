@@ -1,0 +1,1 @@
+Make `get_device` return `None` if the device doesn't exist rather than raising an exception.
