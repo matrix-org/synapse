@@ -391,7 +391,7 @@ def _is_membership_change_allowed(
         if target_banned:
             raise AuthError(403, "%s is banned from the room" % (target_user_id,))
         elif target_in_room:  # the target is already in the room.
-            raise AuthError(403, "%s is already in the room." % target_user_id)
+            raise AuthError(400, "%s is already in the room." % target_user_id)
         else:
             if user_level < invite_level:
                 raise AuthError(403, "You don't have permission to invite users")
