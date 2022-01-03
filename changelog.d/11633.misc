@@ -1,2 +1,1 @@
-Stop building bionic, update dh-virtualenv and update Trove classifiers, tasks all associated with dropping
-Python 3.6, which is EOL.
+Drop support for Python 3.6 and Ubuntu 18.04.
