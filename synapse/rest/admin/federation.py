@@ -118,15 +118,15 @@ class DestinationsRestServlet(RestServlet):
             destination
         )
 
-        retry_timing_respone: JsonDict = {}
+        retry_timing_response: JsonDict = {}
         if destination_retry_timings:
-            retry_timing_respone = {
+            retry_timing_response = {
                 "failure_ts": destination_retry_timings.failure_ts,
                 "retry_last_ts": destination_retry_timings.retry_last_ts,
                 "retry_interval": destination_retry_timings.retry_interval,
             }
         else:
-            retry_timing_respone = {
+            retry_timing_response = {
                 "failure_ts": None,
                 "retry_last_ts": 0,
                 "retry_interval": 0,
@@ -141,7 +141,7 @@ class DestinationsRestServlet(RestServlet):
         response = {
             "destination": destination,
             "last_successful_stream_ordering": last_successful_stream_ordering,
-            **retry_timing_respone,
+            **retry_timing_response,
         }
 
         return HTTPStatus.OK, response
