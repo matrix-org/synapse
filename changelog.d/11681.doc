@@ -1,0 +1,1 @@
+Clarify SSO mapping provider documentation by writing `def` or `async def` before the names of methods, as appropriate.
