@@ -339,7 +339,7 @@ class ApplicationService:
         dict_copy = self.__dict__.copy()
         dict_copy["token"] = "<redacted>"
         dict_copy["hs_token"] = "<redacted>"
-        return "ApplicationService: %s" % (dict_copy,)
+        return f"ApplicationService: {dict_copy}"
 
 
 class AppServiceTransaction:

@@ -143,7 +143,7 @@ async def phone_stats_home(
     stats["log_level"] = logging.getLevelName(log_level)
 
     logger.info(
-        "Reporting stats to %s: %s" % (hs.config.metrics.report_stats_endpoint, stats)
+        f"Reporting stats to {hs.config.metrics.report_stats_endpoint}: {stats}"
     )
     try:
         await hs.get_proxied_http_client().put_json(

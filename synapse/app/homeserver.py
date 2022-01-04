@@ -114,7 +114,7 @@ class SynapseHomeServer(HomeServer):
         for path, resmodule in additional_resources.items():
             handler_cls, config = load_module(
                 resmodule,
-                ("listeners", site_tag, "additional_resources", "<%s>" % (path,)),
+                ("listeners", site_tag, "additional_resources", f"<{path}>"),
             )
             handler = handler_cls(config, module_api)
             if isinstance(handler, Resource):
@@ -141,7 +141,7 @@ class SynapseHomeServer(HomeServer):
             root_resource = OptionsResource()
 
         site = SynapseSite(
-            "synapse.access.%s.%s" % ("https" if tls else "http", site_tag),
+            "synapse.access.{}.{}".format("https" if tls else "http", site_tag),
             site_tag,
             listener_config,
             create_resource_tree(resources, root_resource),
@@ -417,15 +417,15 @@ def format_config_error(e: ConfigError) -> Iterator[str]:
     yield "Error in configuration"
 
     if e.path:
-        yield " at '%s'" % (".".join(e.path),)
+        yield " at '{}'".format(".".join(e.path))
 
-    yield ":\n  %s" % (e.msg,)
+    yield f":\n  {e.msg}"
 
     parent_e = e.__cause__
     indent = 1
     while parent_e:
         indent += 1
-        yield ":\n%s%s" % ("  " * indent, str(parent_e))
+        yield ":\n{}{}".format("  " * indent, str(parent_e))
         parent_e = parent_e.__cause__
 
 

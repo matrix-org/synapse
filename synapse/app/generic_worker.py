@@ -381,7 +381,7 @@ class GenericWorkerServer(HomeServer):
             bind_addresses,
             port,
             SynapseSite(
-                "synapse.access.http.%s" % (site_tag,),
+                f"synapse.access.http.{site_tag}",
                 site_tag,
                 listener_config,
                 root_resource,

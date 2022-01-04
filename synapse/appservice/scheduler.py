@@ -133,7 +133,7 @@ class _ServiceQueuer:
             return
 
         run_as_background_process(
-            "as-sender-%s" % (service.id,), self._send_request, service
+            f"as-sender-{service.id}", self._send_request, service
         )
 
     def enqueue_event(self, service: ApplicationService, event: EventBase) -> None:
@@ -282,7 +282,7 @@ class _Recoverer:
     def recover(self) -> None:
         def _retry() -> None:
             run_as_background_process(
-                "as-recoverer-%s" % (self.service.id,), self.retry
+                f"as-recoverer-{self.service.id}", self.retry
             )
 
         delay = 2 ** self.backoff_counter

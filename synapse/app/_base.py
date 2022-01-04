@@ -183,7 +183,7 @@ def quit_with_error(error_string: str) -> NoReturn:
     line_length = min(max(len(line) for line in message_lines), 80) + 2
     sys.stderr.write("*" * line_length + "\n")
     for line in message_lines:
-        sys.stderr.write(" %s\n" % (line.rstrip(),))
+        sys.stderr.write(f" {line.rstrip()}\n")
     sys.stderr.write("*" * line_length + "\n")
     sys.exit(1)
 

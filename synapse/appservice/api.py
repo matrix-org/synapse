@@ -149,7 +149,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         if service.url is None:
             return []
 
-        uri = "%s%s/thirdparty/%s/%s" % (
+        uri = "{}{}/thirdparty/{}/{}".format(
             service.url,
             APP_SERVICE_PREFIX,
             kind,
@@ -184,7 +184,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             return {}
 
         async def _get() -> Optional[JsonDict]:
-            uri = "%s%s/thirdparty/protocol/%s" % (
+            uri = "{}{}/thirdparty/protocol/{}".format(
                 service.url,
                 APP_SERVICE_PREFIX,
                 urllib.parse.quote(protocol),
