@@ -55,7 +55,7 @@ class ConsentURIBuilder:
         mac = hmac.new(
             key=self._hmac_secret, msg=user_id.encode("ascii"), digestmod=sha256
         ).hexdigest()
-        consent_uri = "%s_matrix/consent?%s" % (
+        consent_uri = "{}_matrix/consent?{}".format(
             self._public_baseurl,
             urlencode({"u": user_id, "h": mac}),
         )

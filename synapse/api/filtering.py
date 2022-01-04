@@ -218,7 +218,7 @@ class FilterCollection:
         self.event_format = filter_json.get("event_format", "client")
 
     def __repr__(self) -> str:
-        return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
+        return "<FilterCollection {}>".format(json.dumps(self._filter_json))
 
     def get_filter_json(self) -> JsonDict:
         return self._filter_json
@@ -418,7 +418,7 @@ class Filter:
 
         for name, match_func in field_matchers.items():
             # If the event matches one of the disallowed values, reject it.
-            not_name = "not_%s" % (name,)
+            not_name = f"not_{name}"
             disallowed_values = getattr(self, not_name)
             if any(map(match_func, disallowed_values)):
                 return False

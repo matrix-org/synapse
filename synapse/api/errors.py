@@ -117,7 +117,7 @@ class RedirectException(CodeMessageException):
             location: the URI to redirect to
             http_code: the HTTP response code
         """
-        msg = "Redirect to %s" % (location.decode("utf-8"),)
+        msg = "Redirect to {}".format(location.decode("utf-8"))
         super().__init__(code=http_code, msg=msg)
         self.location = location
 
@@ -237,7 +237,7 @@ class FederationDeniedError(SynapseError):
 
         super().__init__(
             code=403,
-            msg="Federation denied with %s." % (self.destination,),
+            msg=f"Federation denied with {self.destination}.",
             errcode=Codes.FORBIDDEN,
         )
 
@@ -518,14 +518,14 @@ class FederationError(RuntimeError):
         source: Optional[str] = None,
     ):
         if level not in ["FATAL", "ERROR", "WARN"]:
-            raise ValueError("Level is not valid: %s" % (level,))
+            raise ValueError(f"Level is not valid: {level}")
         self.level = level
         self.code = code
         self.reason = reason
         self.affected = affected
         self.source = source
 
-        msg = "%s %s: %s" % (level, code, reason)
+        msg = f"{level} {code}: {reason}"
         super().__init__(msg)
 
     def get_dict(self) -> "JsonDict":

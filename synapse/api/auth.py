@@ -122,7 +122,7 @@ class Auth:
                 if not forgot:
                     return member
 
-        raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
+        raise AuthError(403, f"User {user_id} not in room {room_id}")
 
     async def get_user_by_req(
         self,
