@@ -466,7 +466,7 @@ class UserMediaRestServlet(RestServlet):
         )
 
         deleted_media, total = await self.media_repository.delete_local_media_ids(
-            ([row["media_id"] for row in media])
+            [row["media_id"] for row in media]
         )
 
         return HTTPStatus.OK, {"deleted_media": deleted_media, "total": total}
