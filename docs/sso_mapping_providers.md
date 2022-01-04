@@ -125,15 +125,15 @@ comment these options out and use those specified by the module instead.
 
 A custom mapping provider must specify the following methods:
 
-* `__init__(self, parsed_config, module_api)`
+* `def __init__(self, parsed_config, module_api)`
    - Arguments:
      - `parsed_config` - A configuration object that is the return value of the
        `parse_config` method. You should set any configuration options needed by
        the module here.
      - `module_api` - a `synapse.module_api.ModuleApi` object which provides the
        stable API available for extension modules.
-* `parse_config(config)`
-    - This method should have the `@staticmethod` decoration.
+* `def parse_config(config)`
+    - **This method should have the `@staticmethod` decoration.**
     - Arguments:
         - `config` - A `dict` representing the parsed content of the
           `saml_config.user_mapping_provider.config` homeserver config option.
@@ -141,15 +141,15 @@ A custom mapping provider must specify the following methods:
            any option values they need here.
     - Whatever is returned will be passed back to the user mapping provider module's
       `__init__` method during construction.
-* `get_saml_attributes(config)`
-    - This method should have the `@staticmethod` decoration.
+* `def get_saml_attributes(config)`
+    - **This method should have the `@staticmethod` decoration.**
     - Arguments:
         - `config` - A object resulting from a call to `parse_config`.
     - Returns a tuple of two sets. The first set equates to the SAML auth
       response attributes that are required for the module to function, whereas
       the second set consists of those attributes which can be used if available,
       but are not necessary.
-* `get_remote_user_id(self, saml_response, client_redirect_url)`
+* `def get_remote_user_id(self, saml_response, client_redirect_url)`
     - Arguments:
       - `saml_response` - A `saml2.response.AuthnResponse` object to extract user
                           information from.
@@ -157,7 +157,7 @@ A custom mapping provider must specify the following methods:
                                 redirected to.
     - This method must return a string, which is the unique, immutable identifier
       for the user. Commonly the `uid` claim of the response.
-* `saml_response_to_user_attributes(self, saml_response, failures, client_redirect_url)`
+* `def saml_response_to_user_attributes(self, saml_response, failures, client_redirect_url)`
     - Arguments:
       - `saml_response` - A `saml2.response.AuthnResponse` object to extract user
                           information from.
