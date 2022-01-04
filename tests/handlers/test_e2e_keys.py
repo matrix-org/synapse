@@ -838,9 +838,12 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             },
         )
 
-    @parameterized.expand(
-        [([],), ([{"device_id": "device_1"}, {"device_id": "device_2"}],)]
-    )
+    @parameterized.expand([
+        # The remote homeserver's response indicates that this user has 0/1/2 devices.
+        ([],),
+        ([{"device_id": "device_1"}]),
+        ([{"device_id": "device_1"}, {"device_id": "device_2"}],)
+    ])
     def test_query_all_devices_caches_result(self, response_devices: List[JsonDict]):
         """Test that requests for all of a remote user's devices are cached.
 

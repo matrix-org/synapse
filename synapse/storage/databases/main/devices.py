@@ -1376,7 +1376,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
     def _update_remote_device_list_cache_txn(
         self, txn: LoggingTransaction, user_id: str, devices: List[dict], stream_id: int
     ) -> None:
-        """Replace all cached devices for this user with the given list of devices."""
+        """Replace the list of cached devices for this user with the given list."""
         self.db_pool.simple_delete_txn(
             txn, table="device_lists_remote_cache", keyvalues={"user_id": user_id}
         )
