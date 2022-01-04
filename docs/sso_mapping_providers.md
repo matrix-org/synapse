@@ -49,12 +49,12 @@ comment these options out and use those specified by the module instead.
 
 A custom mapping provider must specify the following methods:
 
-* `__init__(self, parsed_config)`
+* `def __init__(self, parsed_config)`
    - Arguments:
      - `parsed_config` - A configuration object that is the return value of the
        `parse_config` method. You should set any configuration options needed by
        the module here.
-* `parse_config(config)`
+* `def parse_config(config)`
     - This method should have the `@staticmethod` decoration.
     - Arguments:
         - `config` - A `dict` representing the parsed content of the
@@ -63,13 +63,13 @@ A custom mapping provider must specify the following methods:
            any option values they need here.
     - Whatever is returned will be passed back to the user mapping provider module's
       `__init__` method during construction.
-* `get_remote_user_id(self, userinfo)`
+* `def get_remote_user_id(self, userinfo)`
     - Arguments:
       - `userinfo` - A `authlib.oidc.core.claims.UserInfo` object to extract user
                      information from.
     - This method must return a string, which is the unique, immutable identifier
       for the user. Commonly the `sub` claim of the response.
-* `map_user_attributes(self, userinfo, token, failures)`
+* `async def map_user_attributes(self, userinfo, token, failures)`
     - This method must be async.
     - Arguments:
       - `userinfo` - A `authlib.oidc.core.claims.UserInfo` object to extract user
@@ -91,7 +91,7 @@ A custom mapping provider must specify the following methods:
         during a user's first login. Once a localpart has been associated with a
         remote user ID (see `get_remote_user_id`) it cannot be updated.
       - `displayname`: An optional string, the display name for the user.
-* `get_extra_attributes(self, userinfo, token)`
+* `async def get_extra_attributes(self, userinfo, token)`
     - This method must be async.
     - Arguments:
       - `userinfo` - A `authlib.oidc.core.claims.UserInfo` object to extract user
