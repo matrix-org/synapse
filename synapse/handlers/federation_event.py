@@ -1008,8 +1008,6 @@ class FederationEventHandler:
             sender_key = event.content.get("sender_key")
 
             cached_devices = await self._store.get_cached_devices_for_user(event.sender)
-            if cached_devices is None:
-                cached_devices = {}
 
             resync = False  # Whether we should resync device lists.
 

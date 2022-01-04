@@ -525,7 +525,7 @@ class DeviceWorkerStore(SQLBaseStore):
         """Get the devices (and keys if any) for remote users from the cache.
 
         Args:
-            query_list: List of (user_id, device_ids) pairs. If device_ids is
+            query_list: List of (user_id, device_ids), if device_ids is
                 falsey then return all device ids for that user.
 
         Returns:
@@ -555,10 +555,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 device = await self._get_cached_user_device(user_id, device_id)
                 results.setdefault(user_id, {})[device_id] = device
             else:
-                user_devices = await self.get_cached_devices_for_user(user_id)
-                if user_devices is None:
-                    user_devices = {}
-                results[user_id] = user_devices
+                results[user_id] = await self.get_cached_devices_for_user(user_id)
 
         set_tag("in_cache", results)
         set_tag("not_in_cache", user_ids_not_in_cache)
@@ -576,53 +573,16 @@ class DeviceWorkerStore(SQLBaseStore):
         return db_to_json(content)
 
     @cached()
-    async def get_cached_devices_for_user(
-        self, user_id: str
-    ) -> Optional[Dict[str, JsonDict]]:
-        """Retrieve the most recent cached devices data.
-
-        We can be in three states, depending on the latest response from the remote
-        homeserver.
-
-        - We could never requested devices for this user. In this case, return `None`.
-        - We could have requested devices for this user, only to be told they don't
-          have any devices. In this case, return an empty dictionary.
-        - Otherwise, we've cached details of 1 or more devices for this user. Return
-          a a dictionary from device id to the device data.
-        """
-        return await self.db_pool.runInteraction(
-            "get_cached_devices_for_user",
-            self._get_cached_devices_for_user_txn,
-            user_id,
+    async def get_cached_devices_for_user(self, user_id: str) -> Dict[str, JsonDict]:
+        devices = await self.db_pool.simple_select_list(
+            table="device_lists_remote_cache",
+            keyvalues={"user_id": user_id},
+            retcols=("device_id", "content"),
+            desc="get_cached_devices_for_user",
         )
-
-    def _get_cached_devices_for_user_txn(
-        self, txn: LoggingTransaction, user_id: str
-    ) -> Optional[Dict[str, JsonDict]]:
-        # Four cases:
-        # 1. No stream id, no cached devices. Query yields no rows. Return None.
-        # 2. No stream id, >= 1 cached devices. Invalid state. Query will yield no rows.
-        #    return None.
-        # 3. Stream id, no cached devices. Return empty dict. Query returns one row
-        #    (non-NULL stream_id, NULL, NULL). Return empty dict.
-        # 4. Stream id, >= 1 cached devices. Query return 1 or more row
-        #    (non-NULL stream_id, non-NULL device_id, non-NULL content). Return dict.
-        query = """
-            SELECT stream_id, device_id, content
-            FROM device_lists_remote_extremeties
-                LEFT JOIN device_lists_remote_cache USING(user_id)
-            WHERE user_id = ?
-        """
-        txn.execute(query, (user_id,))
-        devices: List[Tuple[str, Optional[str], Optional[str]]] = txn.fetchall()
-        if not devices:
-            return None
-        elif devices[0][1] is None:
-            return {}
-        else:
-            return {
-                device_id: db_to_json(content) for (_, device_id, content) in devices
-            }
+        return {
+            device["device_id"]: db_to_json(device["content"]) for device in devices
+        }
 
     async def get_users_whose_devices_changed(
         self, from_key: int, user_ids: Iterable[str]
