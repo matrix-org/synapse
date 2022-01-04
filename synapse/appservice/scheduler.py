@@ -281,9 +281,7 @@ class _Recoverer:
 
     def recover(self) -> None:
         def _retry() -> None:
-            run_as_background_process(
-                f"as-recoverer-{self.service.id}", self.retry
-            )
+            run_as_background_process(f"as-recoverer-{self.service.id}", self.retry)
 
         delay = 2 ** self.backoff_counter
         logger.info("Scheduling retries on %s in %fs", self.service.id, delay)
