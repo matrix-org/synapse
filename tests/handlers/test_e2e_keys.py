@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Iterable
+from typing import Iterable
 from unittest import mock
 from unittest.mock import patch
 
@@ -24,7 +24,6 @@ from twisted.internet import defer
 
 from synapse.api.constants import RoomEncryptionAlgorithms
 from synapse.api.errors import Codes, SynapseError
-from synapse.types import JsonDict
 
 from tests import unittest
 
