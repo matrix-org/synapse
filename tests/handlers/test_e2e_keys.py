@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List
+from typing import List, Iterable
 from unittest import mock
 from unittest.mock import patch
 
@@ -838,24 +838,43 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             },
         )
 
-    @parameterized.expand([
-        # The remote homeserver's response indicates that this user has 0/1/2 devices.
-        ([],),
-        ([{"device_id": "device_1"}]),
-        ([{"device_id": "device_1"}, {"device_id": "device_2"}],)
-    ])
-    def test_query_all_devices_caches_result(self, response_devices: List[JsonDict]):
+    @parameterized.expand(
+        [
+            # The remote homeserver's response indicates that this user has 0/1/2 devices.
+            ([],),
+            (["device_1"],),
+            (["device_1", "device_2"],),
+        ]
+    )
+    def test_query_all_devices_caches_result(self, device_ids: Iterable[str]):
         """Test that requests for all of a remote user's devices are cached.
 
-        We do this by asserting that only one call over federation was made.
+        We do this by asserting that only one call over federation was made, and that
+        the two queries to the local homeserver produce the same response.
         """
         local_user_id = "@test:test"
         remote_user_id = "@test:other"
         request_body = {"device_keys": {remote_user_id: []}}
+
+        response_devices = [
+            {
+                "device_id": device_id,
+                "keys": {
+                    "algorithms": ["dummy"],
+                    "device_id": device_id,
+                    "keys": {f"dummy:{device_id}": "dummy"},
+                    "signatures": {device_id: {f"dummy:{device_id}": "dummy"}},
+                    "unsigned": {},
+                    "user_id": "@test:other",
+                },
+            }
+            for device_id in device_ids
+        ]
+
         response_body = {
             "devices": response_devices,
             "user_id": remote_user_id,
-            "stream_id": "remote_stream_id_1234",
+            "stream_id": 12345,  # an integer, according to the spec
         }
 
         e2e_handler = self.hs.get_e2e_keys_handler()
@@ -865,7 +884,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         mock_get_rooms = patch.object(
             self.store,
             "get_rooms_for_user",
-            return_value=defer.succeed(["some_room_id"]),
+            return_value=["some_room_id"],
         )
         mock_request = patch.object(
             self.hs.get_federation_client(),
@@ -875,7 +894,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
 
         with mock_get_rooms, mock_request as mocked_federation_request:
             # Make the first query.
-            self.get_success(
+            response_1 = self.get_success(
                 e2e_handler.query_devices(
                     request_body,
                     timeout=10,
@@ -888,7 +907,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             mocked_federation_request.assert_called_once()
 
             # Repeat the query.
-            self.get_success(
+            response_2 = self.get_success(
                 e2e_handler.query_devices(
                     request_body,
                     timeout=10,
@@ -899,3 +918,8 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
 
             # We should not have made a second federation request.
             mocked_federation_request.assert_called_once()
+
+            # The two requests to the local homeserver should be identical, and should
+            # not indicate any errors.
+            self.assertEqual(response_1, response_2)
+            self.assertEqual(response_1["failures"], {})
