@@ -26,6 +26,7 @@ from synapse.api.constants import RoomEncryptionAlgorithms
 from synapse.api.errors import Codes, SynapseError
 
 from tests import unittest
+from tests.test_utils import make_awaitable
 
 
 class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
@@ -883,12 +884,12 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         mock_get_rooms = patch.object(
             self.store,
             "get_rooms_for_user",
-            return_value=["some_room_id"],
+            return_value=make_awaitable("some_room_id"),
         )
         mock_request = patch.object(
             self.hs.get_federation_client(),
             "query_user_devices",
-            return_value=defer.succeed(response_body),
+            return_value=make_awaitable(response_body),
         )
 
         with mock_get_rooms, mock_request as mocked_federation_request:
