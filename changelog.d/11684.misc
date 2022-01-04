@@ -1,0 +1,1 @@
+Run `pyupgrade --py36-plus` on `synapse/app`, `synapse/appservice`, `synapse/_scripts`, 'synapse/api'.
