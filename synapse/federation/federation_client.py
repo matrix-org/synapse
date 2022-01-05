@@ -265,10 +265,7 @@ class FederationClient(FederationBase):
 
         room_version = await self.store.get_room_version(room_id)
 
-        pdus = [
-            event_from_pdu_json(p, room_version, outlier=False)
-            for p in transaction_data_pdus
-        ]
+        pdus = [event_from_pdu_json(p, room_version) for p in transaction_data_pdus]
 
         # Check signatures and hash of pdus, removing any from the list that fail checks
         pdus[:] = await self._check_sigs_and_hash_and_fetch(
@@ -282,7 +279,6 @@ class FederationClient(FederationBase):
         destination: str,
         event_id: str,
         room_version: RoomVersion,
-        outlier: bool = False,
         timeout: Optional[int] = None,
     ) -> Optional[EventBase]:
         """Requests the PDU with given origin and ID from the remote home
@@ -292,9 +288,6 @@ class FederationClient(FederationBase):
             destination: Which homeserver to query
             event_id: event to fetch
             room_version: version of the room
-            outlier: Indicates whether the PDU is an `outlier`, i.e. if
-                it's from an arbitrary point in the context as opposed to part
-                of the current block of PDUs. Defaults to `False`
             timeout: How long to try (in ms) each destination for before
                 moving to the next destination. None indicates no timeout.
 
@@ -316,8 +309,7 @@ class FederationClient(FederationBase):
         )
 
         pdu_list: List[EventBase] = [
-            event_from_pdu_json(p, room_version, outlier=outlier)
-            for p in transaction_data["pdus"]
+            event_from_pdu_json(p, room_version) for p in transaction_data["pdus"]
         ]
 
         if pdu_list and pdu_list[0]:
@@ -334,7 +326,6 @@ class FederationClient(FederationBase):
         destinations: Iterable[str],
         event_id: str,
         room_version: RoomVersion,
-        outlier: bool = False,
         timeout: Optional[int] = None,
     ) -> Optional[EventBase]:
         """Requests the PDU with given origin and ID from the remote home
@@ -347,9 +338,6 @@ class FederationClient(FederationBase):
             destinations: Which homeservers to query
             event_id: event to fetch
             room_version: version of the room
-            outlier: Indicates whether the PDU is an `outlier`, i.e. if
-                it's from an arbitrary point in the context as opposed to part
-                of the current block of PDUs. Defaults to `False`
             timeout: How long to try (in ms) each destination for before
                 moving to the next destination. None indicates no timeout.
 
@@ -377,7 +365,6 @@ class FederationClient(FederationBase):
                     destination=destination,
                     event_id=event_id,
                     room_version=room_version,
-                    outlier=outlier,
                     timeout=timeout,
                 )
 
@@ -435,7 +422,6 @@ class FederationClient(FederationBase):
         origin: str,
         pdus: Collection[EventBase],
         room_version: RoomVersion,
-        outlier: bool = False,
     ) -> List[EventBase]:
         """Takes a list of PDUs and checks the signatures and hashes of each
         one. If a PDU fails its signature check then we check if we have it in
@@ -451,7 +437,6 @@ class FederationClient(FederationBase):
             origin
             pdu
             room_version
-            outlier: Whether the events are outliers or not
 
         Returns:
             A list of PDUs that have valid signatures and hashes.
@@ -466,7 +451,6 @@ class FederationClient(FederationBase):
             valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
                 pdu=pdu,
                 origin=origin,
-                outlier=outlier,
                 room_version=room_version,
             )
 
@@ -482,7 +466,6 @@ class FederationClient(FederationBase):
         pdu: EventBase,
         origin: str,
         room_version: RoomVersion,
-        outlier: bool = False,
     ) -> Optional[EventBase]:
         """Takes a PDU and checks its signatures and hashes. If the PDU fails
         its signature check then we check if we have it in the database and if
@@ -494,9 +477,6 @@ class FederationClient(FederationBase):
             origin
             pdu
             room_version
-            outlier: Whether the events are outliers or not
-            include_none: Whether to include None in the returned list
-                for events that have failed their checks
 
         Returns:
             The PDU (possibly redacted) if it has valid signatures and hashes.
@@ -521,7 +501,6 @@ class FederationClient(FederationBase):
                     destinations=[pdu_origin],
                     event_id=pdu.event_id,
                     room_version=room_version,
-                    outlier=outlier,
                     timeout=10000,
                 )
             except SynapseError:
@@ -541,13 +520,10 @@ class FederationClient(FederationBase):
 
         room_version = await self.store.get_room_version(room_id)
 
-        auth_chain = [
-            event_from_pdu_json(p, room_version, outlier=True)
-            for p in res["auth_chain"]
-        ]
+        auth_chain = [event_from_pdu_json(p, room_version) for p in res["auth_chain"]]
 
         signed_auth = await self._check_sigs_and_hash_and_fetch(
-            destination, auth_chain, outlier=True, room_version=room_version
+            destination, auth_chain, room_version=room_version
         )
 
         return signed_auth
@@ -816,7 +792,6 @@ class FederationClient(FederationBase):
                 valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
                     pdu=event,
                     origin=destination,
-                    outlier=True,
                     room_version=room_version,
                 )
 
@@ -864,7 +839,6 @@ class FederationClient(FederationBase):
                 valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
                     pdu=pdu,
                     origin=destination,
-                    outlier=True,
                     room_version=room_version,
                 )
 
@@ -1235,7 +1209,7 @@ class FederationClient(FederationBase):
             ]
 
             signed_events = await self._check_sigs_and_hash_and_fetch(
-                destination, events, outlier=False, room_version=room_version
+                destination, events, room_version=room_version
             )
         except HttpResponseException as e:
             if not e.code == 400:

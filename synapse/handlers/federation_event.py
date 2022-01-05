@@ -421,9 +421,6 @@ class FederationEventHandler:
         Raises:
             SynapseError if the response is in some way invalid.
         """
-        for e in itertools.chain(auth_events, state):
-            e.internal_metadata.outlier = True
-
         event_map = {e.event_id: e for e in itertools.chain(auth_events, state)}
 
         create_event = None
@@ -1194,7 +1191,6 @@ class FederationEventHandler:
                         [destination],
                         event_id,
                         room_version,
-                        outlier=True,
                     )
                     if event is None:
                         logger.warning(
@@ -1223,9 +1219,10 @@ class FederationEventHandler:
         """Persist a batch of outlier events fetched from remote servers.
 
         We first sort the events to make sure that we process each event's auth_events
-        before the event itself, and then auth and persist them.
+        before the event itself.
 
-        Notifies about the events where appropriate.
+        We then mark the events as outliers, persist them to the database, and, where
+        appropriate (eg, an invite), awake the notifier.
 
         Params:
             room_id: the room that the events are meant to be in (though this has
@@ -1276,7 +1273,8 @@ class FederationEventHandler:
         Persists a batch of events where we have (theoretically) already persisted all
         of their auth events.
 
-        Notifies about the events where appropriate.
+        Marks the events as outliers, auths them, persists them to the database, and,
+        where appropriate (eg, an invite), awakes the notifier.
 
         Params:
             origin: where the events came from
@@ -1313,6 +1311,9 @@ class FederationEventHandler:
                         )
                         return None
                     auth.append(ae)
+
+                # we're not bothering about room state, so flag the event as an outlier.
+                event.internal_metadata.outlier = True
 
                 context = EventContext.for_outlier()
                 try:
