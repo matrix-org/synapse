@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from synapse.storage.databases.main import DataStore
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class EventContext:
     """
     Holds information relevant to persisting an event
@@ -103,15 +103,15 @@ class EventContext:
             accessed via get_prev_state_ids.
     """
 
-    rejected = attr.ib(default=False, type=Union[bool, str])
-    _state_group = attr.ib(default=None, type=Optional[int])
-    state_group_before_event = attr.ib(default=None, type=Optional[int])
-    prev_group = attr.ib(default=None, type=Optional[int])
-    delta_ids = attr.ib(default=None, type=Optional[StateMap[str]])
-    app_service = attr.ib(default=None, type=Optional[ApplicationService])
+    rejected: Union[bool, str] = False
+    _state_group: Optional[int] = None
+    state_group_before_event: Optional[int] = None
+    prev_group: Optional[int] = None
+    delta_ids: Optional[StateMap[str]] = None
+    app_service: Optional[ApplicationService] = None
 
-    _current_state_ids = attr.ib(default=None, type=Optional[StateMap[str]])
-    _prev_state_ids = attr.ib(default=None, type=Optional[StateMap[str]])
+    _current_state_ids: Optional[StateMap[str]] = None
+    _prev_state_ids: Optional[StateMap[str]] = None
 
     @staticmethod
     def with_state(
