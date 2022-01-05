@@ -418,7 +418,6 @@ class ServerConfig(Config):
 
         self.mau_trial_days = config.get("mau_trial_days", 0)
         self.mau_limit_alerting = config.get("mau_limit_alerting", True)
-        self.mau_track_puppeted_users = config.get("mau_track_puppeted_users", False)
 
         # How long to keep redacted events in the database in unredacted form
         # before redacting them.
@@ -1128,11 +1127,6 @@ class ServerConfig(Config):
         #mau_limit_reserved_threepids:
         #  - medium: 'email'
         #    address: 'reserved_user@example.com'
-
-        # If enabled, puppeted users can also be tracked. By default when
-        # puppeting another user, the user who has created the access token
-        # for puppeting is tracked. If this is enabled, both requests are tracked.
-        #mau_track_puppeted_users: false
 
         # Used by phonehome stats to group together related servers.
         #server_context: context

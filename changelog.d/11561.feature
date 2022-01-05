@@ -1,1 +1,1 @@
-Add `mau_track_puppeted_users` config flag to include puppeted users in the monthly active users count.
+Add `track_puppeted_user_ips` config flag to track puppeted user IP addresses. This also includes them in monthly active user counts.

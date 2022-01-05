@@ -71,9 +71,9 @@ class Auth:
         self._auth_blocking = AuthBlocking(self.hs)
 
         self._track_appservice_user_ips = hs.config.appservice.track_appservice_user_ips
+        self._track_puppeted_user_ips = hs.config.api.track_puppeted_user_ips
         self._macaroon_secret_key = hs.config.key.macaroon_secret_key
         self._force_tracing_for_users = hs.config.tracing.force_tracing_for_users
-        self._mau_track_puppeted_users = hs.config.server.mau_track_puppeted_users
 
     async def check_user_in_room(
         self,
@@ -250,7 +250,7 @@ class Auth:
                 # Track also the puppeted user client IP if enabled and the user is puppeting
                 if (
                     user_info.user_id != user_info.token_owner
-                    and self._mau_track_puppeted_users
+                    and self._track_puppeted_user_ips
                 ):
                     await self.store.insert_client_ip(
                         user_id=user_info.user_id,

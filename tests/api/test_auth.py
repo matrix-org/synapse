@@ -291,7 +291,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.store.insert_client_ip.assert_called_once()
 
     def test_get_user_by_req__puppeted_token__tracking_puppeted_mau(self):
-        self.auth._mau_track_puppeted_users = True
+        self.auth._track_puppeted_user_ips = True
         self.store.get_user_by_access_token = simple_async_mock(
             TokenLookupResult(
                 user_id="@baldrick:matrix.org",
