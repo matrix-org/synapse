@@ -81,7 +81,7 @@ class ISynapseReactor(
     """The interfaces necessary for Synapse to function."""
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class Requester:
     """
     Represents the user making a request
@@ -99,13 +99,13 @@ class Requester:
             "puppeting" the user.
     """
 
-    user = attr.ib(type="UserID")
-    access_token_id = attr.ib(type=Optional[int])
-    is_guest = attr.ib(type=bool)
-    shadow_banned = attr.ib(type=bool)
-    device_id = attr.ib(type=Optional[str])
-    app_service = attr.ib(type=Optional["ApplicationService"])
-    authenticated_entity = attr.ib(type=str)
+    user: "UserID"
+    access_token_id: Optional[int]
+    is_guest: bool
+    shadow_banned: bool
+    device_id: Optional[str]
+    app_service: Optional["ApplicationService"]
+    authenticated_entity: str
 
     def serialize(self):
         """Converts self to a type that can be serialized as JSON, and then
@@ -212,7 +212,7 @@ def get_localpart_from_id(string: str) -> str:
 DS = TypeVar("DS", bound="DomainSpecificString")
 
 
-@attr.s(slots=True, frozen=True, repr=False)
+@attr.s(slots=True, frozen=True, repr=False, auto_attribs=True)
 class DomainSpecificString(metaclass=abc.ABCMeta):
     """Common base class among ID/name strings that have a local part and a
     domain name, prefixed with a sigil.
@@ -225,10 +225,10 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
 
     SIGIL: ClassVar[str] = abc.abstractproperty()  # type: ignore
 
-    localpart = attr.ib(type=str)
-    domain = attr.ib(type=str)
+    localpart: str
+    domain: str
 
-    # Because this is a frozen class, it is deeply immutable.
+    # Because this is a frozen class, it is deeplyx immutable.
     def __copy__(self):
         return self
 
@@ -462,14 +462,12 @@ class RoomStreamToken:
     attributes, must be hashable.
     """
 
-    topological = attr.ib(
-        type=Optional[int],
+    topological: Optional[int] = attr.ib(
         validator=attr.validators.optional(attr.validators.instance_of(int)),
     )
-    stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
+    stream: int = attr.ib(validator=attr.validators.instance_of(int))
 
-    instance_map = attr.ib(
-        type="frozendict[str, int]",
+    instance_map: "frozendict[str, int]" = attr.ib(
         factory=frozendict,
         validator=attr.validators.deep_mapping(
             key_validator=attr.validators.instance_of(str),
@@ -478,7 +476,7 @@ class RoomStreamToken:
         ),
     )
 
-    def __attrs_post_init__(self):
+    def __attrs_post_init__(self) -> None:
         """Validates that both `topological` and `instance_map` aren't set."""
 
         if self.instance_map and self.topological:
@@ -594,7 +592,7 @@ class RoomStreamToken:
             return "s%d" % (self.stream,)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class StreamToken:
     """A collection of positions within multiple streams.
 
@@ -602,20 +600,20 @@ class StreamToken:
     must be hashable.
     """
 
-    room_key = attr.ib(
-        type=RoomStreamToken, validator=attr.validators.instance_of(RoomStreamToken)
+    room_key: RoomStreamToken = attr.ib(
+        validator=attr.validators.instance_of(RoomStreamToken)
     )
-    presence_key = attr.ib(type=int)
-    typing_key = attr.ib(type=int)
-    receipt_key = attr.ib(type=int)
-    account_data_key = attr.ib(type=int)
-    push_rules_key = attr.ib(type=int)
-    to_device_key = attr.ib(type=int)
-    device_list_key = attr.ib(type=int)
-    groups_key = attr.ib(type=int)
+    presence_key: int
+    typing_key: int
+    receipt_key: int
+    account_data_key: int
+    push_rules_key: int
+    to_device_key: int
+    device_list_key: int
+    groups_key: int
 
     _SEPARATOR = "_"
-    START: "StreamToken"
+    START: ClassVar["StreamToken"]
 
     @classmethod
     async def from_string(cls, store: "DataStore", string: str) -> "StreamToken":
@@ -675,7 +673,7 @@ class StreamToken:
 StreamToken.START = StreamToken(RoomStreamToken(None, 0), 0, 0, 0, 0, 0, 0, 0, 0)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class PersistedEventPosition:
     """Position of a newly persisted event with instance that persisted it.
 
@@ -683,8 +681,8 @@ class PersistedEventPosition:
     RoomStreamToken.
     """
 
-    instance_name = attr.ib(type=str)
-    stream = attr.ib(type=int)
+    instance_name: str
+    stream: int
 
     def persisted_after(self, token: RoomStreamToken) -> bool:
         return token.get_stream_pos_for_instance(self.instance_name) < self.stream
