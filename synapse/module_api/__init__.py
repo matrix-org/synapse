@@ -880,16 +880,6 @@ class ModuleApi:
             content=content,
         )
 
-        # Update the m direct list
-        is_direct = content.get("is_direct", None)
-        logger.debug("InviteAutoAccepter: is_direct is %s", is_direct)
-        if is_direct:
-            await self._hs.get_room_member_handler().update_m_direct(
-                sender=sender,
-                target=target,
-                room_id=room_id,
-            )
-
         # Try to retrieve the resulting event.
         event = await self._hs.get_datastore().get_event(event_id)
 
@@ -898,6 +888,40 @@ class ModuleApi:
         assert event is not None
 
         return event
+
+    async def update_m_direct(
+        self,
+        sender: str,
+        target: str,
+        room_id: str,
+        content: Optional[JsonDict] = None,
+    ) -> None:
+        """Update a user's m_direct list.
+
+        Params:
+            sender: The user who sent the invite, used as the key to update the list.
+            target: The user whose user's m_direct list is being updated.
+            room_id: The room ID which is being added to the list.
+        """
+        logger.debug("InviteAutoAccepter: content of update_m_direct %s", content)
+        if not self.is_mine(sender):
+            raise RuntimeError(
+                "Tried to send an event as a user that isn't local to this homeserver",
+            )
+
+        if content is None:
+            content = {}
+        # Update the m direct list
+        is_direct = content.get("is_direct", None)
+        logger.debug("InviteAutoAccepter: is_direct is %s", is_direct)
+        logger.debug("InviteAutoAccepter: target is %s", target)
+        logger.debug("InviteAutoAccepter: sender is %s", sender)
+        if target != sender and is_direct:
+            await self._hs.get_room_member_handler().update_m_direct(
+                sender=sender,
+                target=target,
+                room_id=room_id,
+            )
 
     async def create_and_send_event_into_room(self, event_dict: JsonDict) -> EventBase:
         """Create and send an event into a room.
