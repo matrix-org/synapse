@@ -76,19 +76,17 @@ class RegistryProxy:
                 yield metric
 
 
-@attr.s(slots=True, hash=True)
+@attr.s(slots=True, hash=True, auto_attribs=True)
 class LaterGauge:
 
-    name = attr.ib(type=str)
-    desc = attr.ib(type=str)
-    labels = attr.ib(hash=False, type=Optional[Iterable[str]])
+    name: str
+    desc: str
+    labels: Optional[Iterable[str]] = attr.ib(hash=False)
     # callback: should either return a value (if there are no labels for this metric),
     # or dict mapping from a label tuple to a value
-    caller = attr.ib(
-        type=Callable[
-            [], Union[Mapping[Tuple[str, ...], Union[int, float]], Union[int, float]]
-        ]
-    )
+    caller: Callable[
+        [], Union[Mapping[Tuple[str, ...], Union[int, float]], Union[int, float]]
+    ]
 
     def collect(self) -> Iterable[Metric]:
 
@@ -157,7 +155,9 @@ class InFlightGauge(Generic[MetricsEntry]):
         # Create a class which have the sub_metrics values as attributes, which
         # default to 0 on initialization. Used to pass to registered callbacks.
         self._metrics_class: Type[MetricsEntry] = attr.make_class(
-            "_MetricsEntry", attrs={x: attr.ib(0) for x in sub_metrics}, slots=True
+            "_MetricsEntry",
+            attrs={x: attr.ib(default=0) for x in sub_metrics},
+            slots=True,
         )
 
         # Counts number of in flight blocks for a given set of label values
