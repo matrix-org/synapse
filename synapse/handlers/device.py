@@ -948,14 +948,12 @@ class DeviceListUpdater:
             devices = []
             ignore_devices = True
         else:
-            sid = await self.store.get_device_list_last_stream_id_for_remote(user_id)
+            stream_id = await self.store.get_device_list_last_stream_id_for_remote(user_id)
             cached_devices = await self.store.get_cached_devices_for_user(user_id)
 
-            # If this is the first time we've queried this user, then `sid is None` and
-            # `cached_devices` will be empty. If the remote user has no devices (i.e.
-            # `devices` is empty), we should cache this fact. For this reason, we skip
-            # only if `sid is not None`.
-            if sid is not None and cached_devices == {
+            # To ensure that a user with no devices is cached, we skip the resync only
+            # if we have a stream_id from previously writing a cache entry.
+            if stream_id is not None and cached_devices == {
                 d["device_id"]: d for d in devices
             }:
                 logging.info(
