@@ -981,14 +981,11 @@ class RoomSummaryHandler:
             current_state_ids[(EventTypes.Create, "")]
         )
 
-        aliases = await self._store.get_aliases_for_room(room_id)
-
         entry = {
             "room_id": stats["room_id"],
             "name": stats["name"],
             "topic": stats["topic"],
             "canonical_alias": stats["canonical_alias"],
-            "aliases": aliases,
             "num_joined_members": stats["joined_members"],
             "avatar_url": stats["avatar"],
             # plural join_rules is a documentation error but kept for historical
