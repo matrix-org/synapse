@@ -154,10 +154,13 @@ class OEmbedProvider:
                 "og:url": url,
             }
 
-            # Use either title or author's name as the title.
-            title = oembed.get("title") or oembed.get("author_name")
+            title = oembed.get("title")
             if title:
                 open_graph_response["og:title"] = title
+
+            author_name = oembed.get("author_name")
+            if author_name:
+                open_graph_response["og:author_name"] = author_name
 
             # Use the provider name and as the site.
             provider_name = oembed.get("provider_name")

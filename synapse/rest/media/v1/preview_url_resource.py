@@ -294,17 +294,20 @@ class PreviewUrlResource(DirectServeJsonResource):
                 # Check if this HTML document points to oEmbed information and
                 # defer to that.
                 oembed_url = self._oembed.autodiscover_from_html(tree)
-                og = {}
+                og_from_oembed: JsonDict = {}
                 if oembed_url:
                     oembed_info = await self._download_url(oembed_url, user)
-                    og, expiration_ms = await self._handle_oembed_response(
+                    og_from_oembed, expiration_ms = await self._handle_oembed_response(
                         url, oembed_info, expiration_ms
                     )
 
-                # If there was no oEmbed URL (or oEmbed parsing failed), attempt
-                # to generate the Open Graph information from the HTML.
-                if not oembed_url or not og:
-                    og = parse_html_to_open_graph(tree, media_info.uri)
+                og_from_og = parse_html_to_open_graph(tree, media_info.uri)
+
+                # If there was no oEmbed URL, or oEmbed parsing failed, or the
+                # information retrieved was incomplete, we complete it from
+                # the OpenGraph information. We give oEmbed information
+                # precedence.
+                og = {**og_from_og, **og_from_oembed}
 
                 await self._precache_image_url(user, media_info, og)
             else:
@@ -320,6 +323,11 @@ class PreviewUrlResource(DirectServeJsonResource):
         else:
             logger.warning("Failed to find any OG data in %s", url)
             og = {}
+
+        # If we don't have a title but we have author_name, copy it as
+        # title
+        if not og.get("og:title") and og.get("og:author_name"):
+            og["og:title"] = og["og:author_name"]
 
         # filter out any stupidly long values
         keys_to_remove = []

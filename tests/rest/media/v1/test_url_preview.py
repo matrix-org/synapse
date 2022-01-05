@@ -674,6 +674,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 "og:url": "http://twitter.com/matrixdotorg/status/12345",
                 "og:title": "Alice",
                 "og:description": "Content Preview",
+                "og:author_name": "Alice",
             },
         )
 
