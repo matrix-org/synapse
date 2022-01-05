@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import typing
 from typing import Dict, List, Tuple, Type
 
 from synapse.api.errors import SynapseError
@@ -19,9 +20,11 @@ from synapse.federation.transport.server._base import (
     BaseFederationServlet,
 )
 from synapse.handlers.groups_local import GroupsLocalHandler
-from synapse.server import HomeServer
 from synapse.types import JsonDict, get_domain_from_id
 from synapse.util.ratelimitutils import FederationRateLimiter
+
+if typing.TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class BaseGroupsLocalServlet(BaseFederationServlet):
@@ -32,7 +35,7 @@ class BaseGroupsLocalServlet(BaseFederationServlet):
 
     def __init__(
         self,
-        hs: HomeServer,
+        hs: "HomeServer",
         authenticator: Authenticator,
         ratelimiter: FederationRateLimiter,
         server_name: str,
