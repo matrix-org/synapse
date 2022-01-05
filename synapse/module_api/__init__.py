@@ -912,7 +912,7 @@ class ModuleApi:
         if content is None:
             content = {}
         # Update the m direct list
-        is_direct = content.get("is_direct", None)
+        is_direct = content.get("is_direct", False)
         logger.debug("InviteAutoAccepter: is_direct is %s", is_direct)
         logger.debug("InviteAutoAccepter: target is %s", target)
         logger.debug("InviteAutoAccepter: sender is %s", sender)
