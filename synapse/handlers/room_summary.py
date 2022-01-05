@@ -209,7 +209,7 @@ class RoomSummaryHandler:
                         # Before returning to the client, remove the allowed_room_ids
                         # and allowed_spaces keys.
                         room.pop("allowed_room_ids", None)
-                        room.pop("allowed_spaces", None)
+                        room.pop("allowed_spaces", None)  # historical
 
                         rooms_result.append(room)
                         events.extend(room_entry.children_state_events)
@@ -988,12 +988,14 @@ class RoomSummaryHandler:
             "canonical_alias": stats["canonical_alias"],
             "num_joined_members": stats["joined_members"],
             "avatar_url": stats["avatar"],
+            # plural join_rules is a documentation error but kept for historical
+            # purposes. Should match /publicRooms.
             "join_rules": stats["join_rules"],
+            "join_rule": stats["join_rules"],
             "world_readable": (
                 stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
             ),
             "guest_can_join": stats["guest_access"] == "can_join",
-            "creation_ts": create_event.origin_server_ts,
             "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
         }
 
