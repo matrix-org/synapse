@@ -11548,6 +11548,75 @@ member are returned.</p>
 <li><code>joined_rooms</code> - An array of <code>room_id</code>.</li>
 <li><code>total</code> - Number of rooms.</li>
 </ul>
+<h2 id="account-data"><a class="header" href="#account-data">Account Data</a></h2>
+<p>Gets information about account data for a specific <code>user_id</code>.</p>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/accountdata
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+    &quot;account_data&quot;: {
+        &quot;global&quot;: {
+            &quot;m.secret_storage.key.LmIGHTg5W&quot;: {
+                &quot;algorithm&quot;: &quot;m.secret_storage.v1.aes-hmac-sha2&quot;,
+                &quot;iv&quot;: &quot;fwjNZatxg==&quot;,
+                &quot;mac&quot;: &quot;eWh9kNnLWZUNOgnc=&quot;
+            },
+            &quot;im.vector.hide_profile&quot;: {
+                &quot;hide_profile&quot;: true
+            },
+            &quot;org.matrix.preview_urls&quot;: {
+                &quot;disable&quot;: false
+            },
+            &quot;im.vector.riot.breadcrumb_rooms&quot;: {
+                &quot;rooms&quot;: [
+                    &quot;!LxcBDAsDUVAfJDEo:matrix.org&quot;,
+                    &quot;!MAhRxqasbItjOqxu:matrix.org&quot;
+                ]
+            },
+            &quot;m.accepted_terms&quot;: {
+                &quot;accepted&quot;: [
+                    &quot;https://example.org/somewhere/privacy-1.2-en.html&quot;,
+                    &quot;https://example.org/somewhere/terms-2.0-en.html&quot;
+                ]
+            },
+            &quot;im.vector.setting.breadcrumbs&quot;: {
+                &quot;recent_rooms&quot;: [
+                    &quot;!MAhRxqasbItqxuEt:matrix.org&quot;,
+                    &quot;!ZtSaPCawyWtxiImy:matrix.org&quot;
+                ]
+            }
+        },
+        &quot;rooms&quot;: {
+            &quot;!GUdfZSHUJibpiVqHYd:matrix.org&quot;: {
+                &quot;m.fully_read&quot;: {
+                    &quot;event_id&quot;: &quot;$156334540fYIhZ:matrix.org&quot;
+                }
+            },
+            &quot;!tOZwOOiqwCYQkLhV:matrix.org&quot;: {
+                &quot;m.fully_read&quot;: {
+                    &quot;event_id&quot;: &quot;$xjsIyp4_NaVl2yPvIZs_k1Jl8tsC_Sp23wjqXPno&quot;
+                }
+            }
+        }
+    }
+}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>user_id</code> - fully qualified: for example, <code>@user:server.com</code>.</li>
+</ul>
+<p><strong>Response</strong></p>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>account_data</code> - A map containing the account data for the user
+<ul>
+<li><code>global</code> - A map containing the global account data for the user</li>
+<li><code>rooms</code> - A map containing the account data per room for the user</li>
+</ul>
+</li>
+</ul>
 <h2 id="user-media"><a class="header" href="#user-media">User media</a></h2>
 <h3 id="list-media-uploaded-by-a-user"><a class="header" href="#list-media-uploaded-by-a-user">List media uploaded by a user</a></h3>
 <p>Gets a list of all local media that a specific <code>user_id</code> has created.
