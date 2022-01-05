@@ -15,7 +15,6 @@
 # limitations under the License.
 from typing import Iterable
 from unittest import mock
-from unittest.mock import patch
 
 from parameterized import parameterized
 from signedjson import key as key, sign as sign
@@ -881,14 +880,16 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
 
         # Pretend we're sharing a room with the user we're querying. If not,
         # `_query_devices_for_destination` will return early.
-        mock_get_rooms = patch.object(
+        mock_get_rooms = mock.patch.object(
             self.store,
             "get_rooms_for_user",
-            return_value=make_awaitable("some_room_id"),
+            new_callable=mock.MagicMock,
+            return_value=make_awaitable(["some_room_id"]),
         )
-        mock_request = patch.object(
+        mock_request = mock.patch.object(
             self.hs.get_federation_client(),
             "query_user_devices",
+            new_callable=mock.MagicMock,
             return_value=make_awaitable(response_body),
         )
 
