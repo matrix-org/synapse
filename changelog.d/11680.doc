@@ -1,0 +1,1 @@
+Correct the documentation for `nginx` to use a case-sensitive url pattern. Fixes an error introduced in v1.21.0.

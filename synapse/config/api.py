@@ -107,6 +107,8 @@ _DEFAULT_PREJOIN_STATE_TYPES = [
     EventTypes.Name,
     # Per MSC1772.
     EventTypes.Create,
+    # Per MSC3173.
+    EventTypes.Topic,
 ]
 
 

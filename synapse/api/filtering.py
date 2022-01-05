@@ -351,8 +351,7 @@ class Filter:
             True if the event matches the filter.
         """
         # We usually get the full "events" as dictionaries coming through,
-        # except for presence which actually gets passed around as its own
-        # namedtuple type.
+        # except for presence which actually gets passed around as its own type.
         if isinstance(event, UserPresenceState):
             user_id = event.user_id
             field_matchers = {

@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from collections import namedtuple
 from typing import TYPE_CHECKING
 
 from synapse.api.constants import MAX_DEPTH, EventContentFields, EventTypes, Membership
@@ -102,10 +101,6 @@ class FederationBase:
             return redacted_event
 
         return pdu
-
-
-class PduToCheckSig(namedtuple("PduToCheckSig", ["pdu", "sender_domain", "deferreds"])):
-    pass
 
 
 async def _check_sigs_on_pdu(
