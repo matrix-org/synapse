@@ -127,7 +127,6 @@ class DestinationRestServlet(RestServlet):
         response: JsonDict = {
             "destination": destination,
             "last_successful_stream_ordering": last_successful_stream_ordering,
-            **retry_timing_respone,
         }
 
         if destination_retry_timings:
