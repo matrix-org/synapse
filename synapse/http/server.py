@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import abc
-import collections
 import html
 import logging
 import types
@@ -37,6 +36,7 @@ from typing import (
     Union,
 )
 
+import attr
 import jinja2
 from canonicaljson import encode_canonical_json
 from typing_extensions import Protocol
@@ -354,9 +354,11 @@ class DirectServeJsonResource(_AsyncResource):
         return_json_error(f, request)
 
 
-_PathEntry = collections.namedtuple(
-    "_PathEntry", ["pattern", "callback", "servlet_classname"]
-)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _PathEntry:
+    pattern: Pattern
+    callback: ServletCallback
+    servlet_classname: str
 
 
 class JsonResource(DirectServeJsonResource):

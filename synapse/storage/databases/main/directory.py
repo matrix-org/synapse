@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
 from typing import Iterable, List, Optional, Tuple
+
+import attr
 
 from synapse.api.errors import SynapseError
 from synapse.storage.database import LoggingTransaction
@@ -21,7 +22,12 @@ from synapse.storage.databases.main import CacheInvalidationWorkerStore
 from synapse.types import RoomAlias
 from synapse.util.caches.descriptors import cached
 
-RoomAliasMapping = namedtuple("RoomAliasMapping", ("room_id", "room_alias", "servers"))
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RoomAliasMapping:
+    room_id: str
+    room_alias: str
+    servers: List[str]
 
 
 class DirectoryWorkerStore(CacheInvalidationWorkerStore):
