@@ -1,0 +1,1 @@
+Fix a long-standing bug which could cause `AssertionError`s to be written to the log when Synapse was restarted after purging events from the database.

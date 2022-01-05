@@ -1,0 +1,1 @@
+Remove redundant `get_current_events_token` method.

@@ -3883,3 +3883,93 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertNotIn("messages_per_second", channel.json_body)
         self.assertNotIn("burst_count", channel.json_body)
+
+
+class AccountDataTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs) -> None:
+        self.store = hs.get_datastore()
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.url = f"/_synapse/admin/v1/users/{self.other_user}/accountdata"
+
+    def test_no_auth(self) -> None:
+        """Try to get information of a user without authentication."""
+        channel = self.make_request("GET", self.url, {})
+
+        self.assertEqual(HTTPStatus.UNAUTHORIZED, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
+
+    def test_requester_is_no_admin(self) -> None:
+        """If the user is not a server admin, an error is returned."""
+        other_user_token = self.login("user", "pass")
+
+        channel = self.make_request(
+            "GET",
+            self.url,
+            access_token=other_user_token,
+        )
+
+        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    def test_user_does_not_exist(self) -> None:
+        """Tests that a lookup for a user that does not exist returns a 404"""
+        url = "/_synapse/admin/v1/users/@unknown_person:test/override_ratelimit"
+
+        channel = self.make_request(
+            "GET",
+            url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+
+    def test_user_is_not_local(self) -> None:
+        """Tests that a lookup for a user that is not a local returns a 400"""
+        url = "/_synapse/admin/v1/users/@unknown_person:unknown_domain/accountdata"
+
+        channel = self.make_request(
+            "GET",
+            url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual("Can only look up local users", channel.json_body["error"])
+
+    def test_success(self) -> None:
+        """Request account data should succeed for an admin."""
+
+        # add account data
+        self.get_success(
+            self.store.add_account_data_for_user(self.other_user, "m.global", {"a": 1})
+        )
+        self.get_success(
+            self.store.add_account_data_to_room(
+                self.other_user, "test_room", "m.per_room", {"b": 2}
+            )
+        )
+
+        channel = self.make_request(
+            "GET",
+            self.url,
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(
+            {"a": 1}, channel.json_body["account_data"]["global"]["m.global"]
+        )
+        self.assertEqual(
+            {"b": 2},
+            channel.json_body["account_data"]["rooms"]["test_room"]["m.per_room"],
+        )

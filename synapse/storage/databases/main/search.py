@@ -14,8 +14,9 @@
 
 import logging
 import re
-from collections import namedtuple
 from typing import TYPE_CHECKING, Collection, Iterable, List, Optional, Set
+
+import attr
 
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
@@ -33,10 +34,15 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-SearchEntry = namedtuple(
-    "SearchEntry",
-    ["key", "value", "event_id", "room_id", "stream_ordering", "origin_server_ts"],
-)
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class SearchEntry:
+    key: str
+    value: str
+    event_id: str
+    room_id: str
+    stream_ordering: Optional[int]
+    origin_server_ts: int
 
 
 def _clean_value_for_search(value: str) -> str:
