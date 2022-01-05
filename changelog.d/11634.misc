@@ -1,1 +1,0 @@
-Refactor the way that the `outlier` flag is set on events received over federation.
