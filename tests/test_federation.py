@@ -280,13 +280,9 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         self.assertTrue(remote_self_signing_key in self_signing_key["keys"].values())
 
 
-class StripUnsignedFromEventsTestCase(MessageAcceptTests):
+class StripUnsignedFromEventsTestCase(unittest.TestCase):
     def test_strip_unauthorized_unsigned_values(self):
-        most_recent = self.get_success(
-            self.homeserver.get_datastore().get_latest_event_ids_in_room(self.room_id)
-        )[0]
         event1 = {
-            "room_id": self.room_id,
             "sender": "@baduser:test.serv",
             "state_key": "@baduser:test.serv",
             "event_id": "$event1:test.serv",
@@ -296,8 +292,6 @@ class StripUnsignedFromEventsTestCase(MessageAcceptTests):
             "origin": "test.servx",
             "content": {"membership": "join"},
             "auth_events": [],
-            "prev_state": [(most_recent, {})],
-            "prev_events": [(most_recent, {})],
             "unsigned": {"malicious garbage": "hackz", "more warez": "more hackz"},
         }
         filtered_event = event_from_pdu_json(event1, RoomVersions.V1)
@@ -305,11 +299,7 @@ class StripUnsignedFromEventsTestCase(MessageAcceptTests):
         self.assertNotIn("more warez", filtered_event.unsigned)
 
     def test_strip_event_maintains_allowed_fields(self):
-        most_recent = self.get_success(
-            self.homeserver.get_datastore().get_latest_event_ids_in_room(self.room_id)
-        )[0]
         event2 = {
-            "room_id": self.room_id,
             "sender": "@baduser:test.serv",
             "state_key": "@baduser:test.serv",
             "event_id": "$event2:test.serv",
@@ -318,8 +308,6 @@ class StripUnsignedFromEventsTestCase(MessageAcceptTests):
             "type": "m.room.member",
             "origin": "test.servx",
             "auth_events": [],
-            "prev_state": [(most_recent, {})],
-            "prev_events": [(most_recent, {})],
             "content": {"membership": "join"},
             "unsigned": {
                 "malicious garbage": "hackz",
@@ -338,11 +326,7 @@ class StripUnsignedFromEventsTestCase(MessageAcceptTests):
         self.assertEqual([], filtered_event2.unsigned["invite_room_state"])
 
     def test_strip_event_removes_fields_based_on_event_type(self):
-        most_recent = self.get_success(
-            self.homeserver.get_datastore().get_latest_event_ids_in_room(self.room_id)
-        )[0]
         event3 = {
-            "room_id": self.room_id,
             "sender": "@baduser:test.serv",
             "state_key": "@baduser:test.serv",
             "event_id": "$event3:test.serv",
@@ -352,8 +336,6 @@ class StripUnsignedFromEventsTestCase(MessageAcceptTests):
             "origin": "test.servx",
             "content": {},
             "auth_events": [],
-            "prev_state": [(most_recent, {})],
-            "prev_events": [(most_recent, {})],
             "unsigned": {
                 "malicious garbage": "hackz",
                 "more warez": "more hackz",

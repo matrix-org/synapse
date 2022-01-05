@@ -239,8 +239,8 @@ def event_from_pdu_json(
     assert_params_in_dict(pdu_json, ("type", "depth"))
 
     # Strip any unauthorized values from "unsigned" if they exist
-    if "unsigned" in pdu_json and pdu_json["unsigned"] != {}:
-        pdu_json = _strip_unsigned_values(pdu_json)
+    if "unsigned" in pdu_json:
+        _strip_unsigned_values(pdu_json)
 
     depth = pdu_json["depth"]
     if not isinstance(depth, int):
@@ -279,12 +279,7 @@ def _strip_unsigned_values(pdu_dict: JsonDict) -> JsonDict:
     else:
         whitelist = ["age"]
 
-    filtered_unsigned = {}
-
-    for k, v in unsigned.items():
-        if k in whitelist:
-            filtered_unsigned[k] = v
-
+    filtered_unsigned = {k: v for k, v in unsigned.items() if k in whitelist}
     pdu_dict["unsigned"] = filtered_unsigned
 
     return pdu_dict
