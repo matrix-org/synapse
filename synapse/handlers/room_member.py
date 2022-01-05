@@ -1020,7 +1020,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # Add new room to the room directory if the old room was there
         # Remove old room from the room directory
         old_room = await self.store.get_room(old_room_id)
-        if old_room and old_room["is_public"]:
+        if old_room is not None and old_room["is_public"]:
             await self.store.set_room_is_public(old_room_id, False)
             await self.store.set_room_is_public(room_id, True)
 
@@ -1031,7 +1031,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         local_group_ids = await self.store.get_local_groups_for_room(old_room_id)
         for group_id in local_group_ids:
             # Add new the new room to those groups
-            await self.store.add_room_to_group(group_id, room_id, old_room["is_public"])
+            await self.store.add_room_to_group(
+                group_id, room_id, old_room is not None and old_room["is_public"]
+            )
 
             # Remove the old room from those groups
             await self.store.remove_room_from_group(group_id, old_room_id)

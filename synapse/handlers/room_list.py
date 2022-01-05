@@ -13,9 +13,9 @@
 # limitations under the License.
 
 import logging
-from collections import namedtuple
 from typing import TYPE_CHECKING, Any, Optional, Tuple
 
+import attr
 import msgpack
 from unpaddedbase64 import decode_base64, encode_base64
 
@@ -474,16 +474,12 @@ class RoomListHandler:
         )
 
 
-class RoomListNextBatch(
-    namedtuple(
-        "RoomListNextBatch",
-        (
-            "last_joined_members",  # The count to get rooms after/before
-            "last_room_id",  # The room_id to get rooms after/before
-            "direction_is_forward",  # Bool if this is a next_batch, false if prev_batch
-        ),
-    )
-):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RoomListNextBatch:
+    last_joined_members: int  # The count to get rooms after/before
+    last_room_id: str  # The room_id to get rooms after/before
+    direction_is_forward: bool  # True if this is a next_batch, false if prev_batch
+
     KEY_DICT = {
         "last_joined_members": "m",
         "last_room_id": "r",
@@ -502,12 +498,12 @@ class RoomListNextBatch(
     def to_token(self) -> str:
         return encode_base64(
             msgpack.dumps(
-                {self.KEY_DICT[key]: val for key, val in self._asdict().items()}
+                {self.KEY_DICT[key]: val for key, val in attr.asdict(self).items()}
             )
         )
 
     def copy_and_replace(self, **kwds: Any) -> "RoomListNextBatch":
-        return self._replace(**kwds)
+        return attr.evolve(self, **kwds)
 
 
 def _matches_room_entry(room_entry: JsonDict, search_filter: dict) -> bool:

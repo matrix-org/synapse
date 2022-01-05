@@ -22,7 +22,7 @@ from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import JsonDict
 from synapse.util import json_encoder
-from synapse.util.caches.descriptors import cached, cachedList
+from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -195,27 +195,6 @@ class PusherWorkerStore(SQLBaseStore):
     async def get_if_user_has_pusher(self, user_id: str):
         # This only exists for the cachedList decorator
         raise NotImplementedError()
-
-    @cachedList(
-        cached_method_name="get_if_user_has_pusher",
-        list_name="user_ids",
-        num_args=1,
-    )
-    async def get_if_users_have_pushers(
-        self, user_ids: Iterable[str]
-    ) -> Dict[str, bool]:
-        rows = await self.db_pool.simple_select_many_batch(
-            table="pushers",
-            column="user_name",
-            iterable=user_ids,
-            retcols=["user_name"],
-            desc="get_if_users_have_pushers",
-        )
-
-        result = {user_id: False for user_id in user_ids}
-        result.update({r["user_name"]: True for r in rows})
-
-        return result
 
     async def update_pusher_last_stream_ordering(
         self, app_id, pushkey, user_id, last_stream_ordering
@@ -515,7 +494,7 @@ class PusherStore(PusherWorkerStore):
                 # invalidate, since we the user might not have had a pusher before
                 await self.db_pool.runInteraction(
                     "add_pusher",
-                    self._invalidate_cache_and_stream,  # type: ignore
+                    self._invalidate_cache_and_stream,  # type: ignore[attr-defined]
                     self.get_if_user_has_pusher,
                     (user_id,),
                 )
@@ -524,7 +503,7 @@ class PusherStore(PusherWorkerStore):
         self, app_id: str, pushkey: str, user_id: str
     ) -> None:
         def delete_pusher_txn(txn, stream_id):
-            self._invalidate_cache_and_stream(  # type: ignore
+            self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
                 txn, self.get_if_user_has_pusher, (user_id,)
             )
 
@@ -569,7 +548,7 @@ class PusherStore(PusherWorkerStore):
         pushers = list(await self.get_pushers_by_user_id(user_id))
 
         def delete_pushers_txn(txn, stream_ids):
-            self._invalidate_cache_and_stream(  # type: ignore
+            self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
                 txn, self.get_if_user_has_pusher, (user_id,)
             )
 

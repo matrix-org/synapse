@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from collections import namedtuple
 from typing import TYPE_CHECKING
 
 from synapse.api.constants import MAX_DEPTH, EventContentFields, EventTypes, Membership
@@ -102,10 +101,6 @@ class FederationBase:
             return redacted_event
 
         return pdu
-
-
-class PduToCheckSig(namedtuple("PduToCheckSig", ["pdu", "sender_domain", "deferreds"])):
-    pass
 
 
 async def _check_sigs_on_pdu(
@@ -220,15 +215,12 @@ def _is_invite_via_3pid(event: EventBase) -> bool:
     )
 
 
-def event_from_pdu_json(
-    pdu_json: JsonDict, room_version: RoomVersion, outlier: bool = False
-) -> EventBase:
+def event_from_pdu_json(pdu_json: JsonDict, room_version: RoomVersion) -> EventBase:
     """Construct an EventBase from an event json received over federation
 
     Args:
         pdu_json: pdu as received over federation
         room_version: The version of the room this event belongs to
-        outlier: True to mark this event as an outlier
 
     Raises:
         SynapseError: if the pdu is missing required fields or is otherwise
@@ -256,8 +248,6 @@ def event_from_pdu_json(
         validate_canonicaljson(pdu_json)
 
     event = make_event_from_dict(pdu_json, room_version)
-    event.internal_metadata.outlier = outlier
-
     return event
 
 

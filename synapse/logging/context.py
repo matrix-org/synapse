@@ -68,7 +68,6 @@ try:
     def get_thread_resource_usage() -> "Optional[resource.struct_rusage]":
         return resource.getrusage(RUSAGE_THREAD)
 
-
 except Exception:
     # If the system doesn't support resource.getrusage(RUSAGE_THREAD) then we
     # won't track resource usage.
