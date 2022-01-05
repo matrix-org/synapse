@@ -588,7 +588,7 @@ class SimpleHttpClient:
         if headers:
             actual_headers.update(headers)  # type: ignore
 
-        body = await self.get_raw(uri, args, headers=headers)
+        body = await self.get_raw(uri, args, headers=actual_headers)
         return json_decoder.decode(body.decode("utf-8"))
 
     async def put_json(
