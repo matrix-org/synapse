@@ -1,6 +1,9 @@
 Synapse 1.50.0rc1 (2022-01-05)
 ==============================
 
+Please note that we now only support Python 3.7+ and PostgreSQL 10+ (if applicable), because Python 3.6 and PostgreSQL 9.6 have reached end-of-life.
+
+
 Features
 --------
 
