@@ -666,7 +666,9 @@ class FederationEventHandler:
         logger.info("Processing pulled event %s", event)
 
         # these should not be outliers.
-        assert not event.internal_metadata.is_outlier()
+        assert (
+            not event.internal_metadata.is_outlier()
+        ), "pulled event unexpectedly flagged as outlier"
 
         event_id = event.event_id
 
@@ -1838,7 +1840,7 @@ class FederationEventHandler:
             The stream ID after which all events have been persisted.
         """
         if not event_and_contexts:
-            return self._store.get_current_events_token()
+            return self._store.get_room_max_stream_ordering()
 
         instance = self._config.worker.events_shard_config.get_instance(room_id)
         if instance != self._instance_name:

@@ -22,7 +22,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
 )
 from synapse.http.site import SynapseRequest
-from synapse.rest.admin._base import admin_patterns, assert_user_is_admin
+from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -41,8 +41,7 @@ class BackgroundUpdateEnabledRestServlet(RestServlet):
         self._data_stores = hs.get_datastores()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        requester = await self._auth.get_user_by_req(request)
-        await assert_user_is_admin(self._auth, requester.user)
+        await assert_requester_is_admin(self._auth, request)
 
         # We need to check that all configured databases have updates enabled.
         # (They *should* all be in sync.)
@@ -51,8 +50,7 @@ class BackgroundUpdateEnabledRestServlet(RestServlet):
         return HTTPStatus.OK, {"enabled": enabled}
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        requester = await self._auth.get_user_by_req(request)
-        await assert_user_is_admin(self._auth, requester.user)
+        await assert_requester_is_admin(self._auth, request)
 
         body = parse_json_object_from_request(request)
 
@@ -84,8 +82,7 @@ class BackgroundUpdateRestServlet(RestServlet):
         self._data_stores = hs.get_datastores()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        requester = await self._auth.get_user_by_req(request)
-        await assert_user_is_admin(self._auth, requester.user)
+        await assert_requester_is_admin(self._auth, request)
 
         # We need to check that all configured databases have updates enabled.
         # (They *should* all be in sync.)
@@ -111,15 +108,14 @@ class BackgroundUpdateRestServlet(RestServlet):
 class BackgroundUpdateStartJobRestServlet(RestServlet):
     """Allows to start specific background updates"""
 
-    PATTERNS = admin_patterns("/background_updates/start_job")
+    PATTERNS = admin_patterns("/background_updates/start_job$")
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()
         self._store = hs.get_datastore()
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        requester = await self._auth.get_user_by_req(request)
-        await assert_user_is_admin(self._auth, requester.user)
+        await assert_requester_is_admin(self._auth, request)
 
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["job_name"])

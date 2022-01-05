@@ -61,7 +61,7 @@ class RoomRestV2Servlet(RestServlet):
     If 'purge' is true, it will remove all traces of a room from the database.
     """
 
-    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)$", "v2")
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]*)$", "v2")
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()
@@ -106,9 +106,6 @@ class RoomRestV2Servlet(RestServlet):
                 HTTPStatus.BAD_REQUEST, "%s is not a legal room ID" % (room_id,)
             )
 
-        if not await self._store.get_room(room_id):
-            raise NotFoundError("Unknown room id %s" % (room_id,))
-
         delete_id = self._pagination_handler.start_shutdown_and_purge_room(
             room_id=room_id,
             new_room_user_id=content.get("new_room_user_id"),
@@ -126,7 +123,7 @@ class RoomRestV2Servlet(RestServlet):
 class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
     """Get the status of the delete room background task."""
 
-    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/delete_status$", "v2")
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]*)/delete_status$", "v2")
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()
@@ -163,7 +160,7 @@ class DeleteRoomStatusByRoomIdRestServlet(RestServlet):
 class DeleteRoomStatusByDeleteIdRestServlet(RestServlet):
     """Get the status of the delete room background task."""
 
-    PATTERNS = admin_patterns("/rooms/delete_status/(?P<delete_id>[^/]+)$", "v2")
+    PATTERNS = admin_patterns("/rooms/delete_status/(?P<delete_id>[^/]*)$", "v2")
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()
@@ -196,35 +193,17 @@ class ListRoomRestServlet(RestServlet):
         self.admin_handler = hs.get_admin_handler()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_requester_is_admin(self.auth, request)
 
         # Extract query parameters
         start = parse_integer(request, "from", default=0)
         limit = parse_integer(request, "limit", default=100)
-        order_by = parse_string(request, "order_by", default=RoomSortOrder.NAME.value)
-        if order_by not in (
-            RoomSortOrder.ALPHABETICAL.value,
-            RoomSortOrder.SIZE.value,
-            RoomSortOrder.NAME.value,
-            RoomSortOrder.CANONICAL_ALIAS.value,
-            RoomSortOrder.JOINED_MEMBERS.value,
-            RoomSortOrder.JOINED_LOCAL_MEMBERS.value,
-            RoomSortOrder.VERSION.value,
-            RoomSortOrder.CREATOR.value,
-            RoomSortOrder.ENCRYPTION.value,
-            RoomSortOrder.FEDERATABLE.value,
-            RoomSortOrder.PUBLIC.value,
-            RoomSortOrder.JOIN_RULES.value,
-            RoomSortOrder.GUEST_ACCESS.value,
-            RoomSortOrder.HISTORY_VISIBILITY.value,
-            RoomSortOrder.STATE_EVENTS.value,
-        ):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Unknown value for order_by: %s" % (order_by,),
-                errcode=Codes.INVALID_PARAM,
-            )
+        order_by = parse_string(
+            request,
+            "order_by",
+            default=RoomSortOrder.NAME.value,
+            allowed_values=[sort_order.value for sort_order in RoomSortOrder],
+        )
 
         search_term = parse_string(request, "search_term", encoding="utf-8")
         if search_term == "":
@@ -295,10 +274,9 @@ class RoomRestServlet(RestServlet):
     TODO: Add on_POST to allow room creation without joining the room
     """
 
-    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)$")
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.room_shutdown_handler = hs.get_room_shutdown_handler()
@@ -400,10 +378,9 @@ class RoomMembersRestServlet(RestServlet):
     Get members list of a room.
     """
 
-    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/members")
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]*)/members$")
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
 
@@ -427,10 +404,9 @@ class RoomStateRestServlet(RestServlet):
     Get full state within a room.
     """
 
-    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/state")
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]*)/state$")
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
@@ -439,8 +415,7 @@ class RoomStateRestServlet(RestServlet):
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_requester_is_admin(self.auth, request)
 
         ret = await self.store.get_room(room_id)
         if not ret:
@@ -449,13 +424,7 @@ class RoomStateRestServlet(RestServlet):
         event_ids = await self.store.get_current_state_ids(room_id)
         events = await self.store.get_events(event_ids.values())
         now = self.clock.time_msec()
-        room_state = await self._event_serializer.serialize_events(
-            events.values(),
-            now,
-            # We don't bother bundling aggregations in when asked for state
-            # events, as clients won't use them.
-            bundle_relations=False,
-        )
+        room_state = await self._event_serializer.serialize_events(events.values(), now)
         ret = {"state": room_state}
 
         return HTTPStatus.OK, ret
@@ -463,14 +432,14 @@ class RoomStateRestServlet(RestServlet):
 
 class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
 
-    PATTERNS = admin_patterns("/join/(?P<room_identifier>[^/]*)")
+    PATTERNS = admin_patterns("/join/(?P<room_identifier>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
-        self.hs = hs
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
         self.state_handler = hs.get_state_handler()
+        self.is_mine = hs.is_mine
 
     async def on_POST(
         self, request: SynapseRequest, room_identifier: str
@@ -486,7 +455,7 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
         assert_params_in_dict(content, ["user_id"])
         target_user = UserID.from_string(content["user_id"])
 
-        if not self.hs.is_mine(target_user):
+        if not self.is_mine(target_user):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "This endpoint can only be used with local users",
@@ -551,11 +520,10 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         }
     """
 
-    PATTERNS = admin_patterns("/rooms/(?P<room_identifier>[^/]*)/make_room_admin")
+    PATTERNS = admin_patterns("/rooms/(?P<room_identifier>[^/]*)/make_room_admin$")
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
-        self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -697,19 +665,17 @@ class ForwardExtremitiesRestServlet(ResolveRoomIdMixin, RestServlet):
         GET /_synapse/admin/v1/rooms/<room_id_or_alias>/forward_extremities
     """
 
-    PATTERNS = admin_patterns("/rooms/(?P<room_identifier>[^/]*)/forward_extremities")
+    PATTERNS = admin_patterns("/rooms/(?P<room_identifier>[^/]*)/forward_extremities$")
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
-        self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
 
     async def on_DELETE(
         self, request: SynapseRequest, room_identifier: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_requester_is_admin(self.auth, request)
 
         room_id, _ = await self.resolve_room_id(room_identifier)
 
@@ -719,8 +685,7 @@ class ForwardExtremitiesRestServlet(ResolveRoomIdMixin, RestServlet):
     async def on_GET(
         self, request: SynapseRequest, room_identifier: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_requester_is_admin(self.auth, request)
 
         room_id, _ = await self.resolve_room_id(room_identifier)
 
@@ -780,19 +745,22 @@ class RoomEventContextServlet(RestServlet):
 
         time_now = self.clock.time_msec()
         results["events_before"] = await self._event_serializer.serialize_events(
-            results["events_before"], time_now
+            results["events_before"],
+            time_now,
+            bundle_aggregations=True,
         )
         results["event"] = await self._event_serializer.serialize_event(
-            results["event"], time_now
+            results["event"],
+            time_now,
+            bundle_aggregations=True,
         )
         results["events_after"] = await self._event_serializer.serialize_events(
-            results["events_after"], time_now
+            results["events_after"],
+            time_now,
+            bundle_aggregations=True,
         )
         results["state"] = await self._event_serializer.serialize_events(
-            results["state"],
-            time_now,
-            # No need to bundle aggregations for state events
-            bundle_relations=False,
+            results["state"], time_now
         )
 
         return HTTPStatus.OK, results
@@ -805,7 +773,7 @@ class BlockRoomRestServlet(RestServlet):
     On GET: Get blocking status of room and user who has blocked this room.
     """
 
-    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/block$")
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]*)/block$")
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()

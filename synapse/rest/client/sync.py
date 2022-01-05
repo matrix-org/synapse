@@ -48,6 +48,7 @@ from synapse.handlers.sync import (
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
+from synapse.logging.opentracing import trace
 from synapse.types import JsonDict, StreamToken
 from synapse.util import json_decoder
 
@@ -222,6 +223,7 @@ class SyncRestServlet(RestServlet):
         logger.debug("Event formatting complete")
         return 200, response_content
 
+    @trace(opname="sync.encode_response")
     async def encode_response(
         self,
         time_now: int,
@@ -293,6 +295,9 @@ class SyncRestServlet(RestServlet):
         response[
             "org.matrix.msc2732.device_unused_fallback_key_types"
         ] = sync_result.device_unused_fallback_key_types
+        response[
+            "device_unused_fallback_key_types"
+        ] = sync_result.device_unused_fallback_key_types
 
         if joined:
             response["rooms"][Membership.JOIN] = joined
@@ -329,6 +334,7 @@ class SyncRestServlet(RestServlet):
             ]
         }
 
+    @trace(opname="sync.encode_joined")
     async def encode_joined(
         self,
         rooms: List[JoinedSyncResult],
@@ -365,6 +371,7 @@ class SyncRestServlet(RestServlet):
 
         return joined
 
+    @trace(opname="sync.encode_invited")
     async def encode_invited(
         self,
         rooms: List[InvitedSyncResult],
@@ -403,6 +410,7 @@ class SyncRestServlet(RestServlet):
 
         return invited
 
+    @trace(opname="sync.encode_knocked")
     async def encode_knocked(
         self,
         rooms: List[KnockedSyncResult],
@@ -457,6 +465,7 @@ class SyncRestServlet(RestServlet):
 
         return knocked
 
+    @trace(opname="sync.encode_archived")
     async def encode_archived(
         self,
         rooms: List[ArchivedSyncResult],
@@ -520,9 +529,17 @@ class SyncRestServlet(RestServlet):
             return self._event_serializer.serialize_events(
                 events,
                 time_now=time_now,
-                # We don't bundle "live" events, as otherwise clients
-                # will end up double counting annotations.
-                bundle_relations=False,
+                # Don't bother to bundle aggregations if the timeline is unlimited,
+                # as clients will have all the necessary information.
+                # bundle_aggregations=room.timeline.limited,
+                #
+                # richvdh 2021-12-15: disable this temporarily as it has too high an
+                # overhead for initialsyncs. We need to figure out a way that the
+                # bundling can be done *before* the events are stored in the
+                # SyncResponseCache so that this part can be synchronous.
+                #
+                # Ensure to re-enable the test at tests/rest/client/test_relations.py::RelationsTestCase.test_bundled_aggregations.
+                bundle_aggregations=False,
                 token_id=token_id,
                 event_format=event_formatter,
                 only_event_fields=only_fields,
