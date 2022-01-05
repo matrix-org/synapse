@@ -1,14 +1,17 @@
 # Dockerfile to build the matrixdotorg/synapse docker images.
 #
+# Note that it uses features which are only available in BuildKit - see
+# https://docs.docker.com/go/buildkit/ for more information.
+#
 # To build the image, run `docker build` command from the root of the
 # synapse repository:
 #
-#    docker build -f docker/Dockerfile .
+#    DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile .
 #
 # There is an optional PYTHON_VERSION build argument which sets the
 # version of python to build against: for example:
 #
-#    docker build -f docker/Dockerfile --build-arg PYTHON_VERSION=3.6 .
+#    DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --build-arg PYTHON_VERSION=3.6 .
 #
 
 ARG PYTHON_VERSION=3.8
@@ -19,7 +22,16 @@ ARG PYTHON_VERSION=3.8
 FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
 # install the OS build deps
-RUN apt-get update && apt-get install -y \
+#
+# RUN --mount is specific to buildkit and is documented at
+# https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/syntax.md#build-mounts-run---mount.
+# Here we use it to set up a cache for apt, to improve rebuild speeds on
+# slow connections.
+#
+RUN \
+   --mount=type=cache,target=/var/cache/apt,sharing=locked \
+   --mount=type=cache,target=/var/lib/apt,sharing=locked \
+ apt-get update && apt-get install -y \
     build-essential \
     libffi-dev \
     libjpeg-dev \
@@ -44,7 +56,8 @@ COPY synapse/python_dependencies.py /synapse/synapse/python_dependencies.py
 # used while you develop on the source
 #
 # This is aiming at installing the `install_requires` and `extras_require` from `setup.py`
-RUN pip install --prefix="/install" --no-warn-script-location \
+RUN --mount=type=cache,target=/root/.cache/pip \
+  pip install --prefix="/install" --no-warn-script-location \
     /synapse[all]
 
 # Copy over the rest of the project
@@ -66,7 +79,10 @@ LABEL org.opencontainers.image.documentation='https://github.com/matrix-org/syna
 LABEL org.opencontainers.image.source='https://github.com/matrix-org/synapse.git'
 LABEL org.opencontainers.image.licenses='Apache-2.0'
 
-RUN apt-get update && apt-get install -y \
+RUN \
+   --mount=type=cache,target=/var/cache/apt,sharing=locked \
+   --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  apt-get update && apt-get install -y \
     curl \
     gosu \
     libjpeg62-turbo \
