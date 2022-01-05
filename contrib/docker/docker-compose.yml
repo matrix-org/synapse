@@ -14,7 +14,7 @@ services:
     # failure
     restart: unless-stopped
     # See the readme for a full documentation of the environment settings
-    # NOTE: You must edit the config file to use postgres, it defaults to sqlite
+    # NOTE: You must edit homeserver.yaml to use postgres, it defaults to sqlite
     environment:
       - SYNAPSE_CONFIG_PATH=/data/homeserver.yaml
     volumes:
