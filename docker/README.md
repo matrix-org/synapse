@@ -68,6 +68,10 @@ The following environment variables are supported in `generate` mode:
   directories. If unset, and no user is set via `docker run --user`, defaults
   to `991`, `991`.
 
+## Postgres
+
+By default the config will use SQLite. See the [docs on using Postgres](https://github.com/matrix-org/synapse/blob/develop/docs/postgres.md) for more info on how to use Postgres. Until this section is improved [this issue](https://github.com/matrix-org/synapse/issues/8304) may provide useful information.
+
 ## Running synapse
 
 Once you have a valid configuration file, you can start synapse as follows:

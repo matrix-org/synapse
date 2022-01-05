@@ -36,6 +36,7 @@ from synapse.events import EventBase
 from synapse.logging.context import current_context
 from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, start_active_span
 from synapse.push.clientformat import format_push_rules_for_user
+from synapse.storage.databases.main.event_push_actions import NotifCounts
 from synapse.storage.roommember import MemberSummary
 from synapse.storage.state import StateFilter
 from synapse.types import (
@@ -421,7 +422,7 @@ class SyncHandler:
         span to track the sync. See `generate_sync_result` for the next part of your
         indoctrination.
         """
-        with start_active_span("current_sync_for_user"):
+        with start_active_span("sync.current_sync_for_user"):
             log_kv({"since_token": since_token})
             sync_result = await self.generate_sync_result(
                 sync_config, since_token, full_state
@@ -1041,7 +1042,7 @@ class SyncHandler:
 
     async def unread_notifs_for_room_id(
         self, room_id: str, sync_config: SyncConfig
-    ) -> Dict[str, int]:
+    ) -> NotifCounts:
         with Measure(self.clock, "unread_notifs_for_room_id"):
             last_unread_event_id = await self.store.get_last_receipt_event_id_for_user(
                 user_id=sync_config.user.to_string(),
@@ -1049,10 +1050,9 @@ class SyncHandler:
                 receipt_type=ReceiptTypes.READ,
             )
 
-            notifs = await self.store.get_unread_event_push_actions_by_room_for_user(
+            return await self.store.get_unread_event_push_actions_by_room_for_user(
                 room_id, sync_config.user.to_string(), last_unread_event_id
             )
-            return notifs
 
     async def generate_sync_result(
         self,
@@ -1585,7 +1585,8 @@ class SyncHandler:
             )
             logger.debug("Generated room entry for %s", room_entry.room_id)
 
-        await concurrently_execute(handle_room_entries, room_entries, 10)
+        with start_active_span("sync.generate_room_entries"):
+            await concurrently_execute(handle_room_entries, room_entries, 10)
 
         sync_result_builder.invited.extend(invited)
         sync_result_builder.knocked.extend(knocked)
@@ -2045,7 +2046,7 @@ class SyncHandler:
         since_token = room_builder.since_token
         upto_token = room_builder.upto_token
 
-        with start_active_span("generate_room_entry"):
+        with start_active_span("sync.generate_room_entry"):
             set_tag("room_id", room_id)
             log_kv({"events": len(events or ())})
 
@@ -2173,10 +2174,10 @@ class SyncHandler:
                 if room_sync or always_include:
                     notifs = await self.unread_notifs_for_room_id(room_id, sync_config)
 
-                    unread_notifications["notification_count"] = notifs["notify_count"]
-                    unread_notifications["highlight_count"] = notifs["highlight_count"]
+                    unread_notifications["notification_count"] = notifs.notify_count
+                    unread_notifications["highlight_count"] = notifs.highlight_count
 
-                    room_sync.unread_count = notifs["unread_count"]
+                    room_sync.unread_count = notifs.unread_count
 
                     sync_result_builder.joined.append(room_sync)
 

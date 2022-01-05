@@ -395,7 +395,7 @@ class EventClientSerializer:
         event: Union[JsonDict, EventBase],
         time_now: int,
         *,
-        bundle_aggregations: bool = True,
+        bundle_aggregations: bool = False,
         **kwargs: Any,
     ) -> JsonDict:
         """Serializes a single event.

@@ -23,6 +23,7 @@ from typing import (
     Optional,
     Tuple,
     Union,
+    cast,
 )
 
 from synapse.storage._base import SQLBaseStore
@@ -220,7 +221,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 WHERE user_id = ?
             """
             txn.execute(sql, args)
-            count = txn.fetchone()[0]  # type: ignore[index]
+            count = cast(Tuple[int], txn.fetchone())[0]
 
             sql = """
                 SELECT
