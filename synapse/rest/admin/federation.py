@@ -173,7 +173,7 @@ class DestinationResetConnectionRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self._auth, request)
 
-        if not await self._store.is_destination(destination):
+        if not await self._store.is_destination_known(destination):
             raise NotFoundError("Unknown destination")
 
         retry_timings = await self._store.get_destination_retry_timings(destination)
