@@ -6885,7 +6885,7 @@ comment these options out and use those specified by the module instead.</p>
 <h3 id="building-a-custom-openid-mapping-provider"><a class="header" href="#building-a-custom-openid-mapping-provider">Building a Custom OpenID Mapping Provider</a></h3>
 <p>A custom mapping provider must specify the following methods:</p>
 <ul>
-<li><code>__init__(self, parsed_config)</code>
+<li><code>def __init__(self, parsed_config)</code>
 <ul>
 <li>Arguments:
 <ul>
@@ -6896,7 +6896,7 @@ the module here.</li>
 </li>
 </ul>
 </li>
-<li><code>parse_config(config)</code>
+<li><code>def parse_config(config)</code>
 <ul>
 <li>This method should have the <code>@staticmethod</code> decoration.</li>
 <li>Arguments:
@@ -6911,7 +6911,7 @@ any option values they need here.</li>
 <code>__init__</code> method during construction.</li>
 </ul>
 </li>
-<li><code>get_remote_user_id(self, userinfo)</code>
+<li><code>def get_remote_user_id(self, userinfo)</code>
 <ul>
 <li>Arguments:
 <ul>
@@ -6923,7 +6923,7 @@ information from.</li>
 for the user. Commonly the <code>sub</code> claim of the response.</li>
 </ul>
 </li>
-<li><code>map_user_attributes(self, userinfo, token, failures)</code>
+<li><code>async def map_user_attributes(self, userinfo, token, failures)</code>
 <ul>
 <li>This method must be async.</li>
 <li>Arguments:
@@ -6954,7 +6954,7 @@ remote user ID (see <code>get_remote_user_id</code>) it cannot be updated.</li>
 </li>
 </ul>
 </li>
-<li><code>get_extra_attributes(self, userinfo, token)</code>
+<li><code>async def get_extra_attributes(self, userinfo, token)</code>
 <ul>
 <li>
 <p>This method must be async.</p>
@@ -6992,7 +6992,7 @@ comment these options out and use those specified by the module instead.</p>
 <h3 id="building-a-custom-saml-mapping-provider"><a class="header" href="#building-a-custom-saml-mapping-provider">Building a Custom SAML Mapping Provider</a></h3>
 <p>A custom mapping provider must specify the following methods:</p>
 <ul>
-<li><code>__init__(self, parsed_config, module_api)</code>
+<li><code>def __init__(self, parsed_config, module_api)</code>
 <ul>
 <li>Arguments:
 <ul>
@@ -7005,9 +7005,9 @@ stable API available for extension modules.</li>
 </li>
 </ul>
 </li>
-<li><code>parse_config(config)</code>
+<li><code>def parse_config(config)</code>
 <ul>
-<li>This method should have the <code>@staticmethod</code> decoration.</li>
+<li><strong>This method should have the <code>@staticmethod</code> decoration.</strong></li>
 <li>Arguments:
 <ul>
 <li><code>config</code> - A <code>dict</code> representing the parsed content of the
@@ -7020,9 +7020,9 @@ any option values they need here.</li>
 <code>__init__</code> method during construction.</li>
 </ul>
 </li>
-<li><code>get_saml_attributes(config)</code>
+<li><code>def get_saml_attributes(config)</code>
 <ul>
-<li>This method should have the <code>@staticmethod</code> decoration.</li>
+<li><strong>This method should have the <code>@staticmethod</code> decoration.</strong></li>
 <li>Arguments:
 <ul>
 <li><code>config</code> - A object resulting from a call to <code>parse_config</code>.</li>
@@ -7034,7 +7034,7 @@ the second set consists of those attributes which can be used if available,
 but are not necessary.</li>
 </ul>
 </li>
-<li><code>get_remote_user_id(self, saml_response, client_redirect_url)</code>
+<li><code>def get_remote_user_id(self, saml_response, client_redirect_url)</code>
 <ul>
 <li>Arguments:
 <ul>
@@ -7048,7 +7048,7 @@ redirected to.</li>
 for the user. Commonly the <code>uid</code> claim of the response.</li>
 </ul>
 </li>
-<li><code>saml_response_to_user_attributes(self, saml_response, failures, client_redirect_url)</code>
+<li><code>def saml_response_to_user_attributes(self, saml_response, failures, client_redirect_url)</code>
 <ul>
 <li>
 <p>Arguments:</p>
