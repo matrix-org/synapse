@@ -907,6 +907,9 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             # We should have made a federation request to do so.
             mocked_federation_request.assert_called_once()
 
+            # Reset the mock so we can prove we don't make a second federation request.
+            mocked_federation_request.reset_mock()
+
             # Repeat the query.
             response_2 = self.get_success(
                 e2e_handler.query_devices(
@@ -919,7 +922,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             self.assertEqual(response_2["failures"], {})
 
             # We should not have made a second federation request.
-            mocked_federation_request.assert_called_once()
+            mocked_federation_request.assert_not_called()
 
             # The two requests to the local homeserver should be identical.
             self.assertEqual(response_1, response_2)
