@@ -51,7 +51,7 @@ class ExternalIDReuseException(Exception):
     pass
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class TokenLookupResult:
     """Result of looking up an access token.
 
@@ -69,14 +69,14 @@ class TokenLookupResult:
             cached.
     """
 
-    user_id = attr.ib(type=str)
-    is_guest = attr.ib(type=bool, default=False)
-    shadow_banned = attr.ib(type=bool, default=False)
-    token_id = attr.ib(type=Optional[int], default=None)
-    device_id = attr.ib(type=Optional[str], default=None)
-    valid_until_ms = attr.ib(type=Optional[int], default=None)
-    token_owner = attr.ib(type=str)
-    token_used = attr.ib(type=bool, default=False)
+    user_id: str
+    is_guest: bool = False
+    shadow_banned: bool = False
+    token_id: Optional[int] = None
+    device_id: Optional[str] = None
+    valid_until_ms: Optional[int] = None
+    token_owner: str = attr.ib()
+    token_used: bool = False
 
     # Make the token owner default to the user ID, which is the common case.
     @token_owner.default
