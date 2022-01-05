@@ -60,7 +60,7 @@ class ApiConfig(Config):
            #
            #additional_event_types:
            #  - org.example.custom.event.type
-           
+
         # If enabled, puppeted user IP's can also be tracked. By default when
         # puppeting another user, the user who has created the access token
         # for puppeting is tracked. If this is enabled, both requests are tracked.
