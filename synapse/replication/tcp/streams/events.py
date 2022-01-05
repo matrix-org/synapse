@@ -50,12 +50,12 @@ data part are:
 """
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class EventsStreamRow:
     """A parsed row from the events replication stream"""
 
-    type = attr.ib()  # str: the TypeId of one of the *EventsStreamRows
-    data = attr.ib()  # BaseEventsStreamRow
+    type: str  # the TypeId of one of the *EventsStreamRows
+    data: "BaseEventsStreamRow"
 
 
 class BaseEventsStreamRow:
@@ -79,28 +79,28 @@ class BaseEventsStreamRow:
         return cls(*data)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class EventsStreamEventRow(BaseEventsStreamRow):
     TypeId = "ev"
 
-    event_id = attr.ib(type=str)
-    room_id = attr.ib(type=str)
-    type = attr.ib(type=str)
-    state_key = attr.ib(type=Optional[str])
-    redacts = attr.ib(type=Optional[str])
-    relates_to = attr.ib(type=Optional[str])
-    membership = attr.ib(type=Optional[str])
-    rejected = attr.ib(type=bool)
+    event_id: str
+    room_id: str
+    type: str
+    state_key: Optional[str]
+    redacts: Optional[str]
+    relates_to: Optional[str]
+    membership: Optional[str]
+    rejected: bool
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class EventsStreamCurrentStateRow(BaseEventsStreamRow):
     TypeId = "state"
 
-    room_id = attr.ib()  # str
-    type = attr.ib()  # str
-    state_key = attr.ib()  # str
-    event_id = attr.ib()  # str, optional
+    room_id: str
+    type: str
+    state_key: str
+    event_id: Optional[str]
 
 
 _EventRows: Tuple[Type[BaseEventsStreamRow], ...] = (
