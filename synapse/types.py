@@ -20,6 +20,7 @@ from typing import (
     Any,
     ClassVar,
     Dict,
+    List,
     Mapping,
     Match,
     MutableMapping,
@@ -733,15 +734,15 @@ class ThirdPartyInstanceID:
     __str__ = to_string
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class ReadReceipt:
     """Information about a read-receipt"""
 
-    room_id = attr.ib()
-    receipt_type = attr.ib()
-    user_id = attr.ib()
-    event_ids = attr.ib()
-    data = attr.ib()
+    room_id: str
+    receipt_type: str
+    user_id: str
+    event_ids: List[str]
+    data: JsonDict
 
 
 def get_verify_key_from_cross_signing_key(key_info):
