@@ -244,6 +244,7 @@ class _TransactionController:
         return state == ApplicationServiceState.UP or state is None
 
 
+# NOTE: Beeper changes from upstream to the backoff system
 class _Recoverer:
     """Manages retries and backoff for a DOWN appservice.
 
@@ -263,7 +264,7 @@ class _Recoverer:
         self.as_api = as_api
         self.service = service
         self.callback = callback
-        self.backoff_counter = 1
+        self.backoff_counter = 0
 
     def recover(self):
         def _retry():
@@ -271,13 +272,12 @@ class _Recoverer:
                 "as-recoverer-%s" % (self.service.id,), self.retry
             )
 
-        delay = 2 ** self.backoff_counter
+        delay = self.backoff_counter
         logger.info("Scheduling retries on %s in %fs", self.service.id, delay)
         self.clock.call_later(delay, _retry)
 
     def _backoff(self):
-        # cap the backoff to be around 8.5min => (2^9) = 512 secs
-        if self.backoff_counter < 9:
+        if self.backoff_counter < 5:
             self.backoff_counter += 1
         self.recover()
 
@@ -301,7 +301,7 @@ class _Recoverer:
                 await txn.complete(self.store)
 
                 # reset the backoff counter and then process the next transaction
-                self.backoff_counter = 1
+                self.backoff_counter = 0
 
         except Exception:
             logger.exception("Unexpected error running retries")
