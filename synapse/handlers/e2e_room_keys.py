@@ -14,7 +14,9 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Dict, Optional
+
+from typing_extensions import Literal
 
 from synapse.api.errors import (
     Codes,
@@ -24,6 +26,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.logging.opentracing import log_kv, trace
+from synapse.storage.databases.main.e2e_room_keys import RoomKey
 from synapse.types import JsonDict
 from synapse.util.async_helpers import Linearizer
 
@@ -58,7 +61,9 @@ class E2eRoomKeysHandler:
         version: str,
         room_id: Optional[str] = None,
         session_id: Optional[str] = None,
-    ) -> List[JsonDict]:
+    ) -> Dict[
+        Literal["rooms"], Dict[str, Dict[Literal["sessions"], Dict[str, RoomKey]]]
+    ]:
         """Bulk get the E2E room keys for a given backup, optionally filtered to a given
         room, or a given session.
         See EndToEndRoomKeyStore.get_e2e_room_keys for full details.
@@ -72,8 +77,8 @@ class E2eRoomKeysHandler:
         Raises:
             NotFoundError: if the backup version does not exist
         Returns:
-            A list of dicts giving the session_data and message metadata for
-            these room keys.
+            A dict giving the session_data and message metadata for these room keys.
+            `{"rooms": {room_id: {"sessions": {session_id: room_key}}}}`
         """
 
         # we deliberately take the lock to get keys so that changing the version
@@ -273,7 +278,7 @@ class E2eRoomKeysHandler:
 
     @staticmethod
     def _should_replace_room_key(
-        current_room_key: Optional[JsonDict], room_key: JsonDict
+        current_room_key: Optional[RoomKey], room_key: RoomKey
     ) -> bool:
         """
         Determine whether to replace a given current_room_key (if any)

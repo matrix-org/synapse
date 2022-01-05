@@ -542,7 +542,10 @@ class PaginationHandler:
         chunk = {
             "chunk": (
                 await self._event_serializer.serialize_events(
-                    events, time_now, as_client_event=as_client_event
+                    events,
+                    time_now,
+                    bundle_aggregations=True,
+                    as_client_event=as_client_event,
                 )
             ),
             "start": await from_token.to_string(self.store),

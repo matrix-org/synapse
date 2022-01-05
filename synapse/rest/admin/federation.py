@@ -100,7 +100,7 @@ class DestinationsRestServlet(RestServlet):
         200 OK with details of a destination if success otherwise an error.
     """
 
-    PATTERNS = admin_patterns("/federation/destinations/(?P<destination>[^/]+)$")
+    PATTERNS = admin_patterns("/federation/destinations/(?P<destination>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()

@@ -23,6 +23,7 @@ from synapse.api.errors import Codes
 from synapse.rest.client import login
 from synapse.server import HomeServer
 from synapse.storage.background_updates import BackgroundUpdater
+from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests import unittest
@@ -96,7 +97,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
     def _register_bg_update(self) -> None:
         "Adds a bg update but doesn't start it"
 
-        async def _fake_update(progress, batch_size) -> int:
+        async def _fake_update(progress: JsonDict, batch_size: int) -> int:
             await self.clock.sleep(0.2)
             return batch_size
 

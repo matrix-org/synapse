@@ -187,7 +187,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         state_key: str,
         txn_id: Optional[str] = None,
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         if txn_id:
             set_tag("txn_id", txn_id)
@@ -662,7 +662,9 @@ class RoomEventServlet(RestServlet):
 
         time_now = self.clock.time_msec()
         if event:
-            event_dict = await self._event_serializer.serialize_event(event, time_now)
+            event_dict = await self._event_serializer.serialize_event(
+                event, time_now, bundle_aggregations=True
+            )
             return 200, event_dict
 
         raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
@@ -707,13 +709,13 @@ class RoomEventContextServlet(RestServlet):
 
         time_now = self.clock.time_msec()
         results["events_before"] = await self._event_serializer.serialize_events(
-            results["events_before"], time_now
+            results["events_before"], time_now, bundle_aggregations=True
         )
         results["event"] = await self._event_serializer.serialize_event(
-            results["event"], time_now
+            results["event"], time_now, bundle_aggregations=True
         )
         results["events_after"] = await self._event_serializer.serialize_events(
-            results["events_after"], time_now
+            results["events_after"], time_now, bundle_aggregations=True
         )
         results["state"] = await self._event_serializer.serialize_events(
             results["state"], time_now

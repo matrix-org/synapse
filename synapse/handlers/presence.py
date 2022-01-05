@@ -729,7 +729,7 @@ class PresenceHandler(BasePresenceHandler):
 
         # Presence is best effort and quickly heals itself, so lets just always
         # stream from the current state when we restart.
-        self._event_pos = self.store.get_current_events_token()
+        self._event_pos = self.store.get_room_max_stream_ordering()
         self._event_processing = False
 
     async def _on_shutdown(self) -> None:

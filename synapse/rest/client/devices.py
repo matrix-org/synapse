@@ -17,6 +17,7 @@ import logging
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api import errors
+from synapse.api.errors import NotFoundError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
@@ -24,9 +25,8 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
 )
 from synapse.http.site import SynapseRequest
+from synapse.rest.client._base import client_patterns, interactive_auth_handler
 from synapse.types import JsonDict
-
-from ._base import client_patterns, interactive_auth_handler
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -116,6 +116,8 @@ class DeviceRestServlet(RestServlet):
         device = await self.device_handler.get_device(
             requester.user.to_string(), device_id
         )
+        if device is None:
+            raise NotFoundError("No device found")
         return 200, device
 
     @interactive_auth_handler

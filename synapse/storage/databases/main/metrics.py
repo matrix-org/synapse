@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Dict
 from synapse.metrics import GaugeBucketCollector
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.event_push_actions import (
     EventPushActionsWorkerStore,
 )
@@ -55,7 +55,12 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
     stats and prometheus metrics.
     """
 
-    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
         # Read the extrems every 60 minutes
@@ -100,7 +105,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
 
         def _count_messages(txn):
             sql = """
-                SELECT COALESCE(COUNT(*), 0) FROM events
+                SELECT COUNT(*) FROM events
                 WHERE type = 'm.room.encrypted'
                 AND stream_ordering > ?
             """
@@ -117,7 +122,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             like_clause = "%:" + self.hs.hostname
 
             sql = """
-                SELECT COALESCE(COUNT(*), 0) FROM events
+                SELECT COUNT(*) FROM events
                 WHERE type = 'm.room.encrypted'
                     AND sender LIKE ?
                 AND stream_ordering > ?
@@ -134,7 +139,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
     async def count_daily_active_e2ee_rooms(self):
         def _count(txn):
             sql = """
-                SELECT COALESCE(COUNT(DISTINCT room_id), 0) FROM events
+                SELECT COUNT(DISTINCT room_id) FROM events
                 WHERE type = 'm.room.encrypted'
                 AND stream_ordering > ?
             """
@@ -156,7 +161,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
 
         def _count_messages(txn):
             sql = """
-                SELECT COALESCE(COUNT(*), 0) FROM events
+                SELECT COUNT(*) FROM events
                 WHERE type = 'm.room.message'
                 AND stream_ordering > ?
             """
@@ -173,7 +178,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             like_clause = "%:" + self.hs.hostname
 
             sql = """
-                SELECT COALESCE(COUNT(*), 0) FROM events
+                SELECT COUNT(*) FROM events
                 WHERE type = 'm.room.message'
                     AND sender LIKE ?
                 AND stream_ordering > ?
@@ -190,7 +195,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
     async def count_daily_active_rooms(self):
         def _count(txn):
             sql = """
-                SELECT COALESCE(COUNT(DISTINCT room_id), 0) FROM events
+                SELECT COUNT(DISTINCT room_id) FROM events
                 WHERE type = 'm.room.message'
                 AND stream_ordering > ?
             """
@@ -226,7 +231,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
         Returns number of users seen in the past time_from period
         """
         sql = """
-            SELECT COALESCE(count(*), 0) FROM (
+            SELECT COUNT(*) FROM (
                 SELECT user_id FROM user_ips
                 WHERE last_seen > ?
                 GROUP BY user_id
@@ -253,7 +258,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             thirty_days_ago_in_secs = now - thirty_days_in_secs
 
             sql = """
-                SELECT platform, COALESCE(count(*), 0) FROM (
+                SELECT platform, COUNT(*) FROM (
                      SELECT
                         users.name, platform, users.creation_ts * 1000,
                         MAX(uip.last_seen)
@@ -291,7 +296,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                 results[row[0]] = row[1]
 
             sql = """
-                SELECT COALESCE(count(*), 0) FROM (
+                SELECT COUNT(*) FROM (
                     SELECT users.name, users.creation_ts * 1000,
                                                         MAX(uip.last_seen)
                     FROM users
