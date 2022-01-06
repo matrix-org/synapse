@@ -251,7 +251,7 @@ def event_from_pdu_json(pdu_json: JsonDict, room_version: RoomVersion) -> EventB
     return event
 
 
-def _strip_unsigned_values(pdu_dict: JsonDict) -> JsonDict:
+def _strip_unsigned_values(pdu_dict: JsonDict) -> None:
     """
     Strip any unsigned values unless specifically allowed, as defined by the whitelist.
 
@@ -262,7 +262,6 @@ def _strip_unsigned_values(pdu_dict: JsonDict) -> JsonDict:
 
     if not isinstance(unsigned, dict):
         pdu_dict["unsigned"] = {}
-        return pdu_dict
 
     if pdu_dict["type"] == "m.room.member":
         whitelist = ["knock_room_state", "invite_room_state", "age"]
@@ -271,5 +270,3 @@ def _strip_unsigned_values(pdu_dict: JsonDict) -> JsonDict:
 
     filtered_unsigned = {k: v for k, v in unsigned.items() if k in whitelist}
     pdu_dict["unsigned"] = filtered_unsigned
-
-    return pdu_dict
