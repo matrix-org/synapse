@@ -590,7 +590,9 @@ class RoomSummaryHandler:
 
         # Iterate through each child and potentially add it, but not its children,
         # to the response.
-        for child_room in root_room_entry.children_state_events:
+        for child_room in itertools.islice(
+            root_room_entry.children_state_events, MAX_ROOMS_PER_SPACE
+        ):
             room_id = child_room.get("state_key")
             assert isinstance(room_id, str)
             # If the room is unknown, skip it.
