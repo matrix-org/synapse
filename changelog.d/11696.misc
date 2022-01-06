@@ -1,0 +1,1 @@
+Work around Mjolnir compatibility issue by adding an import for `glob_to_regex` in `synapse.util`, where it moved from.
