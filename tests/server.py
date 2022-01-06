@@ -14,6 +14,7 @@
 import hashlib
 import json
 import logging
+import os
 import time
 import uuid
 import warnings
@@ -71,6 +72,7 @@ from tests.utils import (
     POSTGRES_HOST,
     POSTGRES_PASSWORD,
     POSTGRES_USER,
+    SQLITE_TEST_DB_LOCATION,
     USE_POSTGRES_FOR_TESTS,
     MockClock,
     default_config,
@@ -739,9 +741,16 @@ def setup_test_homeserver(
             },
         }
     else:
+        if SQLITE_TEST_DB_LOCATION != ":memory:":
+            # nuke the DB on disk
+            try:
+                os.remove(SQLITE_TEST_DB_LOCATION)
+            except FileNotFoundError:
+                pass
+
         database_config = {
             "name": "sqlite3",
-            "args": {"database": ":memory:", "cp_min": 1, "cp_max": 1},
+            "args": {"database": SQLITE_TEST_DB_LOCATION, "cp_min": 1, "cp_max": 1},
         }
 
     if "db_txn_limit" in kwargs:
