@@ -1114,7 +1114,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             relation_type: One of `RelationTypes`
             event_type: The type of the event to create
             key: The aggregation key used for m.annotation relation type.
-            content: The content of the created event, will modified to configure
+            content: The content of the created event. Will be modified to configure
                 the m.relates_to key based on the other provided parameters.
             access_token: The access token used to send the relation, defaults
                 to `self.user_token`
