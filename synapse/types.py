@@ -389,7 +389,7 @@ def map_username_to_mxid_localpart(
     # first we sort out upper-case characters
     if case_sensitive:
 
-        def f1(m: Match) -> bytes:
+        def f1(m: Match[bytes]) -> bytes:
             return b"_" + m.group().lower()
 
         username = UPPER_CASE_PATTERN.sub(f1, username)
@@ -397,7 +397,7 @@ def map_username_to_mxid_localpart(
         username = username.lower()
 
     # then we sort out non-ascii characters by converting to the hex equivalent.
-    def f2(m: Match) -> bytes:
+    def f2(m: Match[bytes]) -> bytes:
         return b"=%02x" % (m.group()[0],)
 
     username = NON_MXID_CHARACTER_PATTERN.sub(f2, username)
