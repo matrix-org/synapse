@@ -405,8 +405,7 @@ def map_username_to_mxid_localpart(
     # we also do the =-escaping to mxids starting with an underscore.
     username = re.sub(b"^_", b"=5f", username)
 
-    # we should now only have ascii bytes left, so can decode back to a
-    # unicode.
+    # we should now only have ascii bytes left, so can decode back to a string.
     return username.decode("ascii")
 
 
