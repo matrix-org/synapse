@@ -377,16 +377,6 @@ them:
 
 ##### The `events` stream
 
-The following endpoints should be routed directly to the workers configured as
-stream writers for the `events` stream:
-
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/redact
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/send
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state/
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/join/
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/profile/
-
 The `events` stream also experimentally supports having multiple writers, where
 work is sharded between them by room ID. Note that you *must* restart all worker
 instances when adding or removing event persisters. An example `stream_writers`
