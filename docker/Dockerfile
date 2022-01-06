@@ -11,7 +11,7 @@
 # There is an optional PYTHON_VERSION build argument which sets the
 # version of python to build against: for example:
 #
-#    DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --build-arg PYTHON_VERSION=3.6 .
+#    DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --build-arg PYTHON_VERSION=3.9 .
 #
 
 ARG PYTHON_VERSION=3.8
