@@ -377,7 +377,7 @@ them:
 
 ##### The `events` stream
 
-The following endpoints should be routed direclty to the workers configured as
+The following endpoints should be routed directly to the workers configured as
 stream writers for the `events` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/redact
@@ -408,14 +408,14 @@ stream writers for the `typing` stream:
 
 ##### The `to_device` stream
 
-The following endpoints should be routed direclty to the workers configured as
+The following endpoints should be routed directly to the workers configured as
 stream writers for the `to_device` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/sendToDevice/
 
 ##### The `account_data` stream
 
-The following endpoints should be routed direclty to the workers configured as
+The following endpoints should be routed directly to the workers configured as
 stream writers for the `account_data` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/tags
@@ -423,7 +423,7 @@ stream writers for the `account_data` stream:
 
 ##### The `receipts` stream
 
-The following endpoints should be routed direclty to the workers configured as
+The following endpoints should be routed directly to the workers configured as
 stream writers for the `receipts` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/receipt
@@ -431,7 +431,7 @@ stream writers for the `receipts` stream:
 
 ##### The `presence` stream
 
-The following endpoints should be routed direclty to the workers configured as
+The following endpoints should be routed directly to the workers configured as
 stream writers for the `presence` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/.*/status$
