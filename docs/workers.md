@@ -181,7 +181,7 @@ recommend the use of `systemd` where available: for information on setting up
 This worker can handle API requests matching the following regular expressions.
 `GET` requests will be handled directly while `POST` and `PUT` requests will be
 proxied to the proper worker. See the [stream writers](#stream-writers) section
-below for more  information.
+below for more information.
 
     # Sync requests
     ^/_matrix/client/(v2_alpha|r0|v3)/sync$
@@ -401,7 +401,7 @@ stream_writers:
 
 ##### The `typing` stream
 
-The following endpoints should be routed direclty to the workers configured as
+The following endpoints should be routed directly to the workers configured as
 stream writers for the `typing` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing
