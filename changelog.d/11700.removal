@@ -1,0 +1,1 @@
+Remove workaround introduced in Synapse v1.50.0rc1 for Mjolnir compatibility. Breaks compatibility with Mjolnir v1.2.1 and earlier.
