@@ -268,10 +268,21 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         expected = [(self.space, rooms[:50])] + [(room, []) for room in rooms[:49]]
         self._assert_rooms(result, expected)
 
+        # The result should have the space and the rooms in it, along with the links
+        # from space -> room.
+        expected = [(self.space, rooms)] + [(room, []) for room in rooms]
+
         # Make two requests to fully paginate the results.
         result = self.get_success(
             self.handler.get_room_hierarchy(create_requester(self.user), self.space)
         )
+        result2 = self.get_success(
+            self.handler.get_room_hierarchy(
+                create_requester(self.user), self.space, from_token=result["next_batch"]
+            )
+        )
+        # Combine the results.
+        result["rooms"] += result2["rooms"]
         self._assert_hierarchy(result, expected)
 
     def test_visibility(self):
