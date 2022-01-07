@@ -747,7 +747,7 @@ def setup_test_homeserver(
             logger.debug(
                 "Will persist db to %s", test_db_location
             )
-            # nuke the DB on disk if it already exists
+            # Ensure each test gets a clean database.
             try:
                 os.remove(test_db_location)
             except FileNotFoundError:
