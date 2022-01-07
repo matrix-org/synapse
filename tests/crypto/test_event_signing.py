@@ -36,8 +36,8 @@ HOSTNAME = "domain"
 class EventSigningTestCase(unittest.TestCase):
     def setUp(self):
         self.signing_key = nacl.signing.SigningKey(SIGNING_KEY_SEED)
-        self.signing_key.alg = KEY_ALG # type: ignore
-        self.signing_key.version = KEY_VER # type: ignore
+        self.signing_key.alg = KEY_ALG  # type: ignore
+        self.signing_key.version = KEY_VER  # type: ignore
 
     def test_sign_minimal(self):
         event_dict = {
