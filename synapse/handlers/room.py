@@ -1181,6 +1181,16 @@ class RoomContextHandler:
         # `filtered` rather than the event we retrieved from the datastore.
         results["event"] = filtered[0]
 
+        # Fetch the aggregations.
+        aggregations = await self.store.get_bundled_aggregations([results["event"]])
+        aggregations.update(
+            await self.store.get_bundled_aggregations(results["events_before"])
+        )
+        aggregations.update(
+            await self.store.get_bundled_aggregations(results["events_after"])
+        )
+        results["aggregations"] = aggregations
+
         if results["events_after"]:
             last_event_id = results["events_after"][-1].event_id
         else:
