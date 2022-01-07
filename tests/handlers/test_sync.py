@@ -27,7 +27,6 @@ from synapse.types import UserID, create_requester
 import tests.unittest
 import tests.utils
 from tests.test_utils import make_awaitable
-from tests.test_utils.event_injection import inject_event
 
 
 class SyncTestCase(tests.unittest.HomeserverTestCase):
