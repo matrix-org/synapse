@@ -50,6 +50,7 @@ from synapse.logging.context import (
     current_context,
     make_deferred_yieldable,
 )
+from synapse.logging.opentracing import trace
 from synapse.metrics import register_threadpool
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
@@ -106,15 +107,7 @@ def make_pool(
         with LoggingContext("db.on_new_connection"):
             # HACK Patch the connection's commit function so that we can see
             #      how long it's taking from Jaeger.
-            real_commit = conn.commit
-
-            def traced_commit(*args, **kwargs):
-                with opentracing.start_active_span(
-                    "db.conn.commit"
-                ):
-                    real_commit(*args, **kwargs)
-
-            conn.commit = traced_commit
+            conn.commit = trace(conn.commit, "db.conn.commit")
 
             engine.on_new_connection(
                 LoggingDatabaseConnection(conn, engine, "on_new_connection")
