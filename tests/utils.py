@@ -43,8 +43,8 @@ POSTGRES_PASSWORD = os.environ.get("SYNAPSE_POSTGRES_PASSWORD", None)
 POSTGRES_BASE_DB = "_synapse_unit_tests_base_%s" % (os.getpid(),)
 
 # When debugging a specific test, it's occasionally useful to write the
-# DB to /tmp and query it with the sqlite CLI.
-SQLITE_TEST_DB_LOCATION = os.environ.get("SYNAPSE_TEST_SQLITE_DB_LOCATION", ":memory:")
+# DB to disk and query it with the sqlite CLI.
+SQLITE_PERSIST_DB = os.environ.get("SYNAPSE_TEST_PERSIST_SQLITE_DB") is not None
 
 # the dbname we will connect to in order to create the base database.
 POSTGRES_DBNAME_FOR_INITIAL_CREATE = "postgres"

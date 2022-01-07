@@ -15,6 +15,7 @@ import hashlib
 import json
 import logging
 import os
+import os.path
 import time
 import uuid
 import warnings
@@ -72,7 +73,7 @@ from tests.utils import (
     POSTGRES_HOST,
     POSTGRES_PASSWORD,
     POSTGRES_USER,
-    SQLITE_TEST_DB_LOCATION,
+    SQLITE_PERSIST_DB,
     USE_POSTGRES_FOR_TESTS,
     MockClock,
     default_config,
@@ -741,16 +742,24 @@ def setup_test_homeserver(
             },
         }
     else:
-        if SQLITE_TEST_DB_LOCATION != ":memory:":
-            # nuke the DB on disk
+        if SQLITE_PERSIST_DB:
+            test_db_location = os.path.abspath("test.db")
+            logger.debug(
+                "Will persist db to %s",
+            )
+            # nuke the DB on disk if it already exists
             try:
-                os.remove(SQLITE_TEST_DB_LOCATION)
+                os.remove(test_db_location)
             except FileNotFoundError:
                 pass
+            else:
+                logger.debug("Removed existing DB at %s", test_db_location)
+        else:
+            test_db_location = ":memory:"
 
         database_config = {
             "name": "sqlite3",
-            "args": {"database": SQLITE_TEST_DB_LOCATION, "cp_min": 1, "cp_max": 1},
+            "args": {"database": test_db_location, "cp_min": 1, "cp_max": 1},
         }
 
     if "db_txn_limit" in kwargs:
