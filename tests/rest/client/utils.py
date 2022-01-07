@@ -196,6 +196,16 @@ class RestHelper:
             expect_code=expect_code,
         )
 
+    def ban(self, room=None, src=None, targ=None, expect_code=200, tok=None):
+        self.change_membership(
+            room=room,
+            src=src,
+            targ=targ,
+            tok=tok,
+            membership=Membership.BAN,
+            expect_code=expect_code,
+        )
+
     def change_membership(
         self,
         room: str,

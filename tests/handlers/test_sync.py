@@ -228,105 +228,55 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
             alice_sync_result.joined[0].timeline.events[-1].event_id
         )
 
-        # (Pretend that) a remote user Bob joins.
-        moderator = "@bob:example.com"
-        self.get_success(
-            inject_event(
-                self.hs,
-                sender=moderator,
-                prev_event_ids=[last_room_creation_event_id],
-                type=EventTypes.Member,
-                state_key=moderator,
-                room_id=room_id,
-                content={"membership": "join"},
-            )
-        )
-
-        # Alice makes Bob a moderator.
-        room_power_levels = self.helper.get_state(
-            room_id,
-            EventTypes.PowerLevels,
-            tok=owner_tok,
-        )
-        room_power_levels["users"][moderator] = 50
-        moderator_pl_event_id = self.helper.send_state(
-            room_id,
-            EventTypes.PowerLevels,
-            room_power_levels,
-            tok=owner_tok,
-        )["event_id"]
-
-        # We now want to concoct a situation where:
-        # - another local user Eve attempts to join the room
-        # - the homeserver generates a join event with prev_events that precede the ban
-        #   (so that it passes the "are you banned" test)
-        # - but the join event has a stream_ordering after that of the ban (so that it
-        #   comes down /sync after the ban).
-        #
-        # We do this by
-        # 1. Ban eve from the room.
-        # 2. Have eve join the room.
-        #    - mock the prev_events for the join event to precede the ban
-
-        # First, the ban.
+        # Eve, a ne'er-do-well, registers.
         eve = self.register_user("eve", "password")
         eve_token = self.login(eve, "password")
-        self.get_success(
-            inject_event(
-                self.hs,
-                sender=moderator,
-                prev_event_ids=[moderator_pl_event_id],
-                type=EventTypes.Member,
-                state_key=eve,
-                room_id=room_id,
-                content={"membership": "ban"},
-            )
-        )
 
-        # We need a sync_token for eve after the ban.
+        # Alice preemptively bans Eve.
+        self.helper.ban(room_id, owner, eve, tok=owner_tok)
+
+        # Eve syncs.
         eve_requester = create_requester(eve)
         eve_sync_config = generate_sync_config(eve)
         eve_sync_after_ban: SyncResult = self.get_success(
             self.sync_handler.wait_for_sync_for_user(eve_requester, eve_sync_config)
         )
-        since_token = eve_sync_after_ban.next_batch
-        # Sanity check this sync result. We should be banned from the room.
-        self.assertEqual(len(eve_sync_after_ban.joined), 0)
-        self.assertEqual(len(eve_sync_after_ban.archived), 1)
-        self.assertEqual(eve_sync_after_ban.archived[0].room_id, room_id)
 
+        # Sanity check this sync result. We shouldn't be joined to the room.
+        self.assertEqual(eve_sync_after_ban.joined, [])
+
+        # Eve tries to join the room. We monkey patch the internal logic which selects
+        # the prev_events used when creating the join event, such that the ban does not
+        # precede the join.
         mocked_get_prev_events = patch.object(
             self.hs.get_datastore(),
             "get_prev_events_for_room",
             new_callable=MagicMock,
-            return_value=make_awaitable([moderator_pl_event_id]),
+            return_value=make_awaitable([last_room_creation_event_id]),
         )
         with mocked_get_prev_events:
             self.helper.join(room_id, eve, tok=eve_token)
 
-        # Eve makes a second, incremental sync. The join event should appear, but not
-        # under the "joined" section.
+        # Eve makes a second, incremental sync.
         eve_incremental_sync_after_join: SyncResult = self.get_success(
             self.sync_handler.wait_for_sync_for_user(
                 eve_requester,
                 eve_sync_config,
-                since_token=since_token,
+                since_token=eve_sync_after_ban.next_batch,
             )
         )
-        # The incremental sync should have nothing to show.
-        self.assertEqual(len(eve_incremental_sync_after_join.joined), 0)
-        self.assertEqual(len(eve_incremental_sync_after_join.archived), 0)
+        # Eve should not see herself as joined to the room.
+        self.assertEqual(eve_incremental_sync_after_join.joined, [])
 
-        # If we did a third initial sync, we should _still_ see that eve is banned.
+        # If we did a third initial sync, we should _still_ see eve is not joined to the room.
         eve_initial_sync_after_join: SyncResult = self.get_success(
             self.sync_handler.wait_for_sync_for_user(
                 eve_requester,
                 eve_sync_config,
+                since_token=None,
             )
         )
-        self.assertEqual(len(eve_initial_sync_after_join.joined), 0)
-        self.assertEqual(len(eve_initial_sync_after_join.archived), 1)
-        self.assertEqual(eve_initial_sync_after_join.archived[0].room_id, room_id)
+        self.assertEqual(eve_initial_sync_after_join.joined, [])
 
 
 _request_key = 0
