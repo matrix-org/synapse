@@ -21,6 +21,7 @@ from typing import (
     ClassVar,
     Dict,
     Mapping,
+    Match,
     MutableMapping,
     Optional,
     Tuple,
@@ -380,7 +381,7 @@ def map_username_to_mxid_localpart(
             onto different mxids
 
     Returns:
-        unicode: string suitable for a mxid localpart
+        string suitable for a mxid localpart
     """
     if not isinstance(username, bytes):
         username = username.encode("utf-8")
@@ -388,29 +389,23 @@ def map_username_to_mxid_localpart(
     # first we sort out upper-case characters
     if case_sensitive:
 
-        def f1(m):
+        def f1(m: Match[bytes]) -> bytes:
             return b"_" + m.group().lower()
 
         username = UPPER_CASE_PATTERN.sub(f1, username)
     else:
         username = username.lower()
 
-    # then we sort out non-ascii characters
-    def f2(m):
-        g = m.group()[0]
-        if isinstance(g, str):
-            # on python 2, we need to do a ord(). On python 3, the
-            # byte itself will do.
-            g = ord(g)
-        return b"=%02x" % (g,)
+    # then we sort out non-ascii characters by converting to the hex equivalent.
+    def f2(m: Match[bytes]) -> bytes:
+        return b"=%02x" % (m.group()[0],)
 
     username = NON_MXID_CHARACTER_PATTERN.sub(f2, username)
 
     # we also do the =-escaping to mxids starting with an underscore.
     username = re.sub(b"^_", b"=5f", username)
 
-    # we should now only have ascii bytes left, so can decode back to a
-    # unicode.
+    # we should now only have ascii bytes left, so can decode back to a string.
     return username.decode("ascii")
 
 
