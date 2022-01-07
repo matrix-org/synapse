@@ -110,7 +110,7 @@ def make_pool(
             class NastyConnectionWrapper:
                 def __init__(self, connection):
                     self._connection = connection
-                    self.commit = trace(conn.commit, "db.conn.commit")
+                    self.commit = trace(connection.commit, "db.conn.commit")
 
                 def __getattr__(self, item):
                     return self._connection.__getattr__(item)
