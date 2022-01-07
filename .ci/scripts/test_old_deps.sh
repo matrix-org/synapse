@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# this script is run by GitHub Actions in a plain `bionic` container; it installs the
+# this script is run by GitHub Actions in a plain `focal` container; it installs the
 # minimal requirements for tox and hands over to the py3-old tox environment.
 
 set -ex
