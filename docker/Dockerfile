@@ -12,7 +12,6 @@
 #
 
 ARG PYTHON_VERSION=3.8
-ARG DEBIAN_FRONTEND=noninteractive
 
 ###
 ### Stage 0: builder
