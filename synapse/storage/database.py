@@ -107,7 +107,7 @@ def make_pool(
         with LoggingContext("db.on_new_connection"):
             # HACK Patch the connection's commit function so that we can see
             #      how long it's taking from Jaeger.
-            conn.commit = trace(conn.commit, "db.conn.commit")
+            setattr(conn, "commit", trace(conn.commit, "db.conn.commit"))
 
             engine.on_new_connection(
                 LoggingDatabaseConnection(conn, engine, "on_new_connection")
