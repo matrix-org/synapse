@@ -188,20 +188,28 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         self.assertNotIn(knock_room, [r.room_id for r in result.knocked])
 
     def test_ban_wins_race_with_join(self):
-        """Check rooms appear under the "leave" section if they lose a race to a ban.
+        """Rooms shouldn't appear under "joined" if a join loses a race to a ban.
 
-        A complicated edge case. Best to quote RvdH from
-        https://github.com/matrix-org/synapse/pull/11532#discussion_r769104461:
+        A complicated edge case. Imagine the following scenario:
 
         * you attempt to join a room
-        * racing with that, is a ban which comes in over federation, which ends up with
+        * racing with that is a ban which comes in over federation, which ends up with
           an earlier stream_ordering than the join.
-        * you get a sync response with a sync token which is _after_ the ban
+        * you get a sync response with a sync token which is _after_ the ban, but before
+          the join
         * now your join lands; it is a valid event because its `prev_event`s predate the
           ban, but will not make it into current_state_events (because bans win over
           joins in state res, essentially).
-        * Hence, the only event in the timeline is your join ... and yet you aren't
-          joined.
+        * When we do a sync from the incremental sync, the only event in the timeline
+          is your join ... and yet you aren't joined.
+
+        The ban coming in over federation isn't crucial for this behaviour; the key
+        requirements are:
+        1. the homeserver generates a join event with prev_events that precede the ban
+           (so that it passes the "are you banned" test)
+        2. the join event has a stream_ordering after that of the ban.
+
+        We use monkeypatching to artificially trigger condition (1).
         """
         # A local user Alice creates a room.
         owner = self.register_user("alice", "password")
