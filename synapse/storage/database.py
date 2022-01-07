@@ -107,10 +107,18 @@ def make_pool(
         with LoggingContext("db.on_new_connection"):
             # HACK Patch the connection's commit function so that we can see
             #      how long it's taking from Jaeger.
-            setattr(conn, "commit", trace(conn.commit, "db.conn.commit"))
+            class NastyConnectionWrapper:
+                def __init__(self, connection):
+                    self._connection = connection
+                    self.commit = trace(conn.commit, "db.conn.commit")
+
+                def __getattr__(self, item):
+                    return self._connection.__getattr__(item)
 
             engine.on_new_connection(
-                LoggingDatabaseConnection(conn, engine, "on_new_connection")
+                LoggingDatabaseConnection(
+                    NastyConnectionWrapper(conn), engine, "on_new_connection"
+                )
             )
 
     connection_pool = adbapi.ConnectionPool(
