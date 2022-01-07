@@ -743,6 +743,7 @@ def setup_test_homeserver(
         }
     else:
         if SQLITE_PERSIST_DB:
+            # The current working directory is in _trial_temp, so this gets created within that directory.
             test_db_location = os.path.abspath("test.db")
             logger.debug(
                 "Will persist db to %s", test_db_location
