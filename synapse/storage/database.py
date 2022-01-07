@@ -113,7 +113,7 @@ def make_pool(
                     self.commit = trace(connection.commit, "db.conn.commit")
 
                 def __getattr__(self, item):
-                    return self._connection.__getattr__(item)
+                    return getattr(self._connection, item)
 
             engine.on_new_connection(
                 LoggingDatabaseConnection(
