@@ -1622,6 +1622,12 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1500"><a class="header" href="#upgrading-to-v1500">Upgrading to v1.50.0</a></h1>
+<h2 id="dropping-support-for-old-python-and-postgres-versions"><a class="header" href="#dropping-support-for-old-python-and-postgres-versions">Dropping support for old Python and Postgres versions</a></h2>
+<p>In line with our <a href="deprecation_policy.html">deprecation policy</a>,
+we've dropped support for Python 3.6 and PostgreSQL 9.6, as they are no
+longer supported upstream.</p>
+<p>This release of Synapse requires Python 3.7+ and PostgreSQL 10+.</p>
 <h1 id="upgrading-to-v1470"><a class="header" href="#upgrading-to-v1470">Upgrading to v1.47.0</a></h1>
 <h2 id="removal-of-old-room-admin-api"><a class="header" href="#removal-of-old-room-admin-api">Removal of old Room Admin API</a></h2>
 <p>The following admin APIs were deprecated in <a href="https://github.com/matrix-org/synapse/blob/v1.34.0/CHANGES.md#deprecations-and-removals">Synapse 1.34</a>
