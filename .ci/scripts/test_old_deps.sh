@@ -6,7 +6,7 @@
 set -ex
 
 apt-get update
-apt-get install -y python3 python3-dev python3-pip libxml2-dev libxslt-dev xmlsec1 zlib1g-dev tox
+apt-get install -y python3 python3-dev python3-pip libxml2-dev libxslt-dev xmlsec1 zlib1g-dev tox tzdata
 
 export LANG="C.UTF-8"
 
