@@ -196,14 +196,14 @@ class RestHelper:
             expect_code=expect_code,
         )
 
-    def ban(self, room=None, src=None, targ=None, expect_code=200, tok=None):
+    def ban(self, room: str, src: str, targ: str, **kwargs: object):
+        """A convenience helper: `change_membership` with `membership` preset to "ban"."""
         self.change_membership(
             room=room,
             src=src,
             targ=targ,
-            tok=tok,
             membership=Membership.BAN,
-            expect_code=expect_code,
+            **kwargs,
         )
 
     def change_membership(
