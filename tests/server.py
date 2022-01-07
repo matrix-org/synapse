@@ -745,7 +745,7 @@ def setup_test_homeserver(
         if SQLITE_PERSIST_DB:
             test_db_location = os.path.abspath("test.db")
             logger.debug(
-                "Will persist db to %s",
+                "Will persist db to %s", test_db_location
             )
             # nuke the DB on disk if it already exists
             try:
