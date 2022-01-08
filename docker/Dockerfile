@@ -66,7 +66,7 @@ LABEL org.opencontainers.image.documentation='https://github.com/matrix-org/syna
 LABEL org.opencontainers.image.source='https://github.com/matrix-org/synapse.git'
 LABEL org.opencontainers.image.licenses='Apache-2.0'
 
-RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y \
     curl \
     gosu \
     libjpeg62-turbo \
