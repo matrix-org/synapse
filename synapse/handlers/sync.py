@@ -636,7 +636,7 @@ class SyncHandler:
         # Don't bother to bundle aggregations if the timeline is unlimited,
         # as clients will have all the necessary information.
         bundled_aggregations = None
-        if limited:
+        if limited or newly_joined_room:
             bundled_aggregations = await self.store.get_bundled_aggregations(recents)
 
         return TimelineBatch(
