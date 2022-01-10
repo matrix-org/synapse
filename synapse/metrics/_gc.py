@@ -28,6 +28,8 @@ from prometheus_client.core import (
     Metric,
 )
 
+from twisted.internet import task
+
 """Prometheus metrics for garbage collection"""
 
 
@@ -81,6 +83,42 @@ class GCCounts:
 if not running_on_pypy:
     REGISTRY.register(GCCounts())
 
+    # disable automatic GC, and replace it with a task that runs every 100ms, so that
+    # we can get some metrics about GC activity.
+    gc.disable()
+
+    # The time (in seconds since the epoch) of the last time we did a GC for each generation.
+    _last_gc = [0.0, 0.0, 0.0]
+
+    def _maybe_gc() -> None:
+        # Check if we need to do a manual GC (since its been disabled), and do
+        # one if necessary. Note we go in reverse order as e.g. a gen 1 GC may
+        # promote an object into gen 2, and we don't want to handle the same
+        # object multiple times.
+        threshold = gc.get_threshold()
+        counts = gc.get_count()
+        end = time.time()
+        for i in (2, 1, 0):
+            # We check if we need to do one based on a straightforward
+            # comparison between the threshold and count. We also do an extra
+            # check to make sure that we don't a GC too often.
+            if threshold[i] < counts[i] and MIN_TIME_BETWEEN_GCS[i] < end - _last_gc[i]:
+                if i == 0:
+                    logger.debug("Collecting gc %d", i)
+                else:
+                    logger.info("Collecting gc %d", i)
+
+                start = time.time()
+                unreachable = gc.collect(i)
+                end = time.time()
+
+                _last_gc[i] = end
+
+                gc_time.labels(i).observe(end - start)
+                gc_unreachable.labels(i).set(unreachable)
+
+    gc_task = task.LoopingCall(_maybe_gc)
+    gc_task.start(0.1)
 
 #
 # PyPy GC / memory metrics
@@ -153,43 +191,3 @@ class PyPyGCStats:
 
 if running_on_pypy:
     REGISTRY.register(PyPyGCStats())
-
-
-#
-# manually run a GC, if it's due, and we're not on pypy.
-#
-
-# The time (in seconds since the epoch) of the last time we did a GC for each generation.
-_last_gc = [0.0, 0.0, 0.0]
-
-
-def maybe_gc() -> None:
-    if running_on_pypy:
-        # nothing to do on pypy, since we let automated GC happen as normal
-        return
-
-    # Check if we need to do a manual GC (since its been disabled), and do
-    # one if necessary. Note we go in reverse order as e.g. a gen 1 GC may
-    # promote an object into gen 2, and we don't want to handle the same
-    # object multiple times.
-    threshold = gc.get_threshold()
-    counts = gc.get_count()
-    end = time.time()
-    for i in (2, 1, 0):
-        # We check if we need to do one based on a straightforward
-        # comparison between the threshold and count. We also do an extra
-        # check to make sure that we don't a GC too often.
-        if threshold[i] < counts[i] and MIN_TIME_BETWEEN_GCS[i] < end - _last_gc[i]:
-            if i == 0:
-                logger.debug("Collecting gc %d", i)
-            else:
-                logger.info("Collecting gc %d", i)
-
-            start = time.time()
-            unreachable = gc.collect(i)
-            end = time.time()
-
-            _last_gc[i] = end
-
-            gc_time.labels(i).observe(end - start)
-            gc_unreachable.labels(i).set(unreachable)

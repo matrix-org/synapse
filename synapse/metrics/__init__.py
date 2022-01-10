@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import functools
-import gc
 import itertools
 import logging
 import os
@@ -55,14 +54,13 @@ from synapse.metrics._exposition import (
     generate_latest,
     start_http_server,
 )
-from synapse.metrics._gc import MIN_TIME_BETWEEN_GCS, maybe_gc
+from synapse.metrics._gc import MIN_TIME_BETWEEN_GCS
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
 
 METRICS_PREFIX = "/_synapse/metrics"
 
-running_on_pypy = platform.python_implementation() == "PyPy"
 all_gauges: "Dict[str, Union[LaterGauge, InFlightGauge]]" = {}
 
 HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
@@ -535,7 +533,6 @@ def runUntilCurrentTimer(reactor: ReactorBase, func: F) -> F:
         global last_ticked
         last_ticked = end
 
-        maybe_gc()
         return ret
 
     return cast(F, f)
@@ -551,11 +548,6 @@ try:
     # runUntilCurrent is called when we have pending calls. It is called once
     # per iteratation after fd polling.
     reactor.runUntilCurrent = runUntilCurrentTimer(reactor, reactor.runUntilCurrent)  # type: ignore
-
-    # We manually run the GC each reactor tick so that we can get some metrics
-    # about time spent doing GC,
-    if not running_on_pypy:
-        gc.disable()
 except AttributeError:
     pass
 
