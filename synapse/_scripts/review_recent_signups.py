@@ -59,7 +59,7 @@ def get_recent_users(
     """
 
     if exclude_app_service:
-        sql += "\n AND appservice_id IS NOT NULL"
+        sql += " AND appservice_id IS NULL"
 
     txn.execute(sql, (since_ms / 1000,))
 
@@ -118,7 +118,7 @@ def main() -> None:
         "-e",
         "--exclude-emails",
         action="store_true",
-        help="Exclude users that have validated email addresses",
+        help="Exclude users that have validated email addresses.",
     )
     parser.add_argument(
         "-u",
@@ -127,7 +127,10 @@ def main() -> None:
         help="Only print user IDs that match.",
     )
     parser.add_argument(
-        "-a", "--exclude-app-service", help="Exclude appservice users.", default=False
+        "-a",
+        "--exclude-app-service",
+        help="Exclude appservice users.",
+        action="store_true",
     )
 
     config = ReviewConfig()

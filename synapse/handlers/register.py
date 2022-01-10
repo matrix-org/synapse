@@ -979,16 +979,18 @@ class RegistrationHandler:
         if (
             self.hs.config.email.email_enable_notifs
             and self.hs.config.email.email_notif_for_new_users
-            and token
         ):
             # Pull the ID of the access token back out of the db
             # It would really make more sense for this to be passed
             # up when the access token is saved, but that's quite an
             # invasive change I'd rather do separately.
-            user_tuple = await self.store.get_user_by_access_token(token)
-            # The token better still exist.
-            assert user_tuple
-            token_id = user_tuple.token_id
+            if token:
+                user_tuple = await self.store.get_user_by_access_token(token)
+                # The token better still exist.
+                assert user_tuple
+                token_id = user_tuple.token_id
+            else:
+                token_id = None
 
             await self.pusher_pool.add_pusher(
                 user_id=user_id,
