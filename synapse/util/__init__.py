@@ -31,6 +31,13 @@ from synapse.logging import context
 if typing.TYPE_CHECKING:
     pass
 
+# FIXME Mjolnir imports glob_to_regex from this file, but it was moved to
+#       matrix_common.
+#       As a temporary workaround, we import glob_to_regex here for
+#       compatibility with current versions of Mjolnir.
+# See https://github.com/matrix-org/mjolnir/pull/174
+from matrix_common.regex import glob_to_regex  # noqa
+
 logger = logging.getLogger(__name__)
 
 

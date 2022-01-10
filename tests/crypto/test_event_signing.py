@@ -14,6 +14,7 @@
 
 
 import nacl.signing
+import signedjson.types
 from unpaddedbase64 import decode_base64
 
 from synapse.api.room_versions import RoomVersions
@@ -35,7 +36,12 @@ HOSTNAME = "domain"
 
 class EventSigningTestCase(unittest.TestCase):
     def setUp(self):
-        self.signing_key = nacl.signing.SigningKey(SIGNING_KEY_SEED)
+        # NB: `signedjson` expects `nacl.signing.SigningKey` instances which have been
+        # monkeypatched to include new `alg` and `version` attributes. This is captured
+        # by the `signedjson.types.SigningKey` protocol.
+        self.signing_key: signedjson.types.SigningKey = nacl.signing.SigningKey(
+            SIGNING_KEY_SEED
+        )
         self.signing_key.alg = KEY_ALG
         self.signing_key.version = KEY_VER
 
