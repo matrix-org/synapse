@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-export DEBIAN_FRONTEND=noninteractive
 # this script is run by GitHub Actions in a plain `focal` container; it installs the
 # minimal requirements for tox and hands over to the py3-old tox environment.
+
+# Prevent tzdata from asking for user input
+export DEBIAN_FRONTEND=noninteractive
 
 set -ex
 
