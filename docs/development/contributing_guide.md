@@ -169,6 +169,21 @@ To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`:
 SYNAPSE_TEST_LOG_LEVEL=DEBUG trial tests
 ```
 
+By default, tests will use an in-memory SQLite database for test data. For additional
+help with debugging, one can use an on-disk SQLite database file instead, in order to
+review database state during and after running tests. This can be adjusted using the
+`SYNAPSE_TEST_PERSIST_SQLITE_DB` environment variable:
+
+```sh
+SYNAPSE_TEST_PERSIST_SQLITE_DB=test.db trial tests
+```
+
+The database file can then be inspected with:
+
+```sh
+sqlite3 test.db
+```
+
 ### Running tests under PostgreSQL
 
 Invoking `trial` as above will use an in-memory SQLite database. This is great for
