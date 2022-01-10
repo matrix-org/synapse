@@ -171,17 +171,19 @@ SYNAPSE_TEST_LOG_LEVEL=DEBUG trial tests
 
 By default, tests will use an in-memory SQLite database for test data. For additional
 help with debugging, one can use an on-disk SQLite database file instead, in order to
-review database state during and after running tests. This can be adjusted using the
-`SYNAPSE_TEST_PERSIST_SQLITE_DB` environment variable:
+review database state during and after running tests. This can be done by setting
+the `SYNAPSE_TEST_PERSIST_SQLITE_DB` environment variable. Doing so will cause the
+database state to be stored in a file named `test.db` under the trial process'
+working directory. Typically, this ends up being `_trial_temp/test.db`. For example:
 
 ```sh
-SYNAPSE_TEST_PERSIST_SQLITE_DB=test.db trial tests
+SYNAPSE_TEST_PERSIST_SQLITE_DB=1 trial tests
 ```
 
 The database file can then be inspected with:
 
 ```sh
-sqlite3 test.db
+sqlite3 _trial_temp/test.db
 ```
 
 ### Running tests under PostgreSQL
