@@ -36,6 +36,9 @@ HOSTNAME = "domain"
 
 class EventSigningTestCase(unittest.TestCase):
     def setUp(self):
+        # NB: `signedjson` expects `nacl.signing.SigningKey` instances which have been
+        # monkeypatched to include new `alg` and `version` attributes. This is captured
+        # by the `signedjson.types.SigningKey` protocol.
         self.signing_key: signedjson.types.SigningKey = nacl.signing.SigningKey(
             SIGNING_KEY_SEED
         )
