@@ -377,11 +377,6 @@ tick_time = Histogram(
     "Tick time of the Twisted reactor (sec)",
     buckets=[0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.5, 1, 2, 5],
 )
-pending_calls_metric = Histogram(
-    "python_twisted_reactor_pending_calls",
-    "Pending calls",
-    buckets=[1, 2, 5, 10, 25, 50, 100, 250, 500, 1000],
-)
 
 #
 # Federation Metrics
@@ -501,21 +496,6 @@ F = TypeVar("F", bound=Callable[..., Any])
 def runUntilCurrentTimer(reactor: ReactorBase, func: F) -> F:
     @functools.wraps(func)
     def f(*args: Any, **kwargs: Any) -> Any:
-        now = reactor.seconds()
-        num_pending = 0
-
-        # _newTimedCalls is one long list of *all* pending calls. Below loop
-        # is based off of impl of reactor.runUntilCurrent
-        for delayed_call in reactor._newTimedCalls:
-            if delayed_call.time > now:
-                break
-
-            if delayed_call.delayed_time > 0:
-                continue
-
-            num_pending += 1
-
-        num_pending += len(reactor.threadCallQueue)
         start = time.time()
         ret = func(*args, **kwargs)
         end = time.time()
@@ -526,7 +506,6 @@ def runUntilCurrentTimer(reactor: ReactorBase, func: F) -> F:
         # I/O events, but that is harder to capture without rewriting half the
         # reactor.
         tick_time.observe(end - start)
-        pending_calls_metric.observe(num_pending)
 
         # Update the time we last ticked, for the metric to test whether
         # Synapse's reactor has frozen
@@ -540,10 +519,7 @@ def runUntilCurrentTimer(reactor: ReactorBase, func: F) -> F:
 
 try:
     # Ensure the reactor has all the attributes we expect
-    reactor.seconds  # type: ignore
     reactor.runUntilCurrent  # type: ignore
-    reactor._newTimedCalls  # type: ignore
-    reactor.threadCallQueue  # type: ignore
 
     # runUntilCurrent is called when we have pending calls. It is called once
     # per iteratation after fd polling.
