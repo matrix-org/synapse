@@ -1,1 +1,1 @@
-Include the bundled aggregations in the `/sync` response.
+Include the bundled aggregations in the `/sync` response, per [MSC2675](https://github.com/matrix-org/matrix-doc/pull/2675).
