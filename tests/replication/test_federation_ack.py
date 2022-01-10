@@ -62,7 +62,11 @@ class FederationAckTestCase(HomeserverTestCase):
                 "federation",
                 "master",
                 token=10,
-                rows=[FederationStream.FederationStreamRow(type="x", data=[1, 2, 3])],
+                rows=[
+                    FederationStream.FederationStreamRow(
+                        type="x", data={"test": [1, 2, 3]}
+                    )
+                ],
             )
         )
 

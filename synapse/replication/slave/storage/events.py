@@ -80,12 +80,3 @@ class SlavedEventStore(
             min_curr_state_delta_id,
             prefilled_cache=curr_state_delta_prefill,
         )
-
-    # Cached functions can't be accessed through a class instance so we need
-    # to reach inside the __dict__ to extract them.
-
-    def get_room_max_stream_ordering(self):
-        return self._stream_id_gen.get_current_token()
-
-    def get_room_min_stream_ordering(self):
-        return self._backfill_id_gen.get_current_token()

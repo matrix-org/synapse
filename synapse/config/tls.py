@@ -16,11 +16,12 @@ import logging
 import os
 from typing import List, Optional, Pattern
 
+from matrix_common.regex import glob_to_regex
+
 from OpenSSL import SSL, crypto
 from twisted.internet._sslverify import Certificate, trustRootFromCertificates
 
 from synapse.config._base import Config, ConfigError
-from synapse.util import glob_to_regex
 
 logger = logging.getLogger(__name__)
 
