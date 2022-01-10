@@ -47,7 +47,7 @@ if [[ -n "$WORKERS" ]]; then
   COMPLEMENT_DOCKERFILE=SynapseWorkers.Dockerfile
   # And provide some more configuration to complement.
   export COMPLEMENT_CA=true
-  export COMPLEMENT_VERSION_CHECK_ITERATIONS=500
+  export COMPLEMENT_SPAWN_HS_TIMEOUT_SECS=25
 else
   export COMPLEMENT_BASE_IMAGE=complement-synapse
   COMPLEMENT_DOCKERFILE=Synapse.Dockerfile
