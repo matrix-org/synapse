@@ -331,7 +331,7 @@ class DeviceWorkerStore(SQLBaseStore):
         from_stream_id: int,
         now_stream_id: int,
         limit: int,
-    ):
+    ) -> List[Tuple[str, str, int, Optional[str]]]:
         """Return device update information for a given remote destination
 
         Args:
@@ -342,7 +342,11 @@ class DeviceWorkerStore(SQLBaseStore):
             limit: Maximum number of device updates to return
 
         Returns:
-            List: List of device updates
+            List: List of device update tuples:
+                - user_id
+                - device_id
+                - stream_id
+                - opentracing_context
         """
         # get the list of device updates that need to be sent
         sql = """
