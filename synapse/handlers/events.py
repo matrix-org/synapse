@@ -79,13 +79,14 @@ class EventStreamHandler:
                 # thundering herds on restart.
                 timeout = random.randint(int(timeout * 0.9), int(timeout * 1.1))
 
-            events, tokens = await self.notifier.get_events_for(
+            stream_result = await self.notifier.get_events_for(
                 auth_user,
                 pagin_config,
                 timeout,
                 is_guest=is_guest,
                 explicit_room_id=room_id,
             )
+            events = stream_result.events
 
             time_now = self.clock.time_msec()
 
@@ -118,18 +119,16 @@ class EventStreamHandler:
 
             events.extend(to_add)
 
-            chunks = await self._event_serializer.serialize_events(
+            chunks = self._event_serializer.serialize_events(
                 events,
                 time_now,
                 as_client_event=as_client_event,
-                # Don't bundle aggregations as this is a deprecated API.
-                bundle_aggregations=False,
             )
 
             chunk = {
                 "chunk": chunks,
-                "start": await tokens[0].to_string(self.store),
-                "end": await tokens[1].to_string(self.store),
+                "start": await stream_result.start_token.to_string(self.store),
+                "end": await stream_result.end_token.to_string(self.store),
             }
 
             return chunk

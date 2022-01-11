@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from collections import namedtuple
 from typing import TYPE_CHECKING
 
 from synapse.api.constants import MAX_DEPTH, EventContentFields, EventTypes, Membership
@@ -102,10 +101,6 @@ class FederationBase:
             return redacted_event
 
         return pdu
-
-
-class PduToCheckSig(namedtuple("PduToCheckSig", ["pdu", "sender_domain", "deferreds"])):
-    pass
 
 
 async def _check_sigs_on_pdu(
@@ -220,15 +215,12 @@ def _is_invite_via_3pid(event: EventBase) -> bool:
     )
 
 
-def event_from_pdu_json(
-    pdu_json: JsonDict, room_version: RoomVersion, outlier: bool = False
-) -> EventBase:
+def event_from_pdu_json(pdu_json: JsonDict, room_version: RoomVersion) -> EventBase:
     """Construct an EventBase from an event json received over federation
 
     Args:
         pdu_json: pdu as received over federation
         room_version: The version of the room this event belongs to
-        outlier: True to mark this event as an outlier
 
     Raises:
         SynapseError: if the pdu is missing required fields or is otherwise
@@ -237,6 +229,10 @@ def event_from_pdu_json(
     # we could probably enforce a bunch of other fields here (room_id, sender,
     # origin, etc etc)
     assert_params_in_dict(pdu_json, ("type", "depth"))
+
+    # Strip any unauthorized values from "unsigned" if they exist
+    if "unsigned" in pdu_json:
+        _strip_unsigned_values(pdu_json)
 
     depth = pdu_json["depth"]
     if not isinstance(depth, int):
@@ -252,6 +248,25 @@ def event_from_pdu_json(
         validate_canonicaljson(pdu_json)
 
     event = make_event_from_dict(pdu_json, room_version)
-    event.internal_metadata.outlier = outlier
-
     return event
+
+
+def _strip_unsigned_values(pdu_dict: JsonDict) -> None:
+    """
+    Strip any unsigned values unless specifically allowed, as defined by the whitelist.
+
+    pdu: the json dict to strip values from. Note that the dict is mutated by this
+    function
+    """
+    unsigned = pdu_dict["unsigned"]
+
+    if not isinstance(unsigned, dict):
+        pdu_dict["unsigned"] = {}
+
+    if pdu_dict["type"] == "m.room.member":
+        whitelist = ["knock_room_state", "invite_room_state", "age"]
+    else:
+        whitelist = ["age"]
+
+    filtered_unsigned = {k: v for k, v in unsigned.items() if k in whitelist}
+    pdu_dict["unsigned"] = filtered_unsigned

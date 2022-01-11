@@ -48,13 +48,28 @@ This is all tied together by the AppServiceScheduler which DIs the required
 components.
 """
 import logging
-from typing import Dict, Iterable, List, Optional
+from typing import (
+    TYPE_CHECKING,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Set,
+)
 
 from synapse.appservice import ApplicationService, ApplicationServiceState
+from synapse.appservice.api import ApplicationServiceApi
 from synapse.events import EventBase
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage.databases.main import DataStore
 from synapse.types import JsonDict
+from synapse.util import Clock
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +90,7 @@ class ApplicationServiceScheduler:
     case is a simple array.
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.as_api = hs.get_application_service_api()
@@ -83,7 +98,7 @@ class ApplicationServiceScheduler:
         self.txn_ctrl = _TransactionController(self.clock, self.store, self.as_api)
         self.queuer = _ServiceQueuer(self.txn_ctrl, self.clock)
 
-    async def start(self):
+    async def start(self) -> None:
         logger.info("Starting appservice scheduler")
 
         # check for any DOWN ASes and start recoverers for them.
@@ -137,20 +152,20 @@ class _ServiceQueuer:
     appservice at a given time.
     """
 
-    def __init__(self, txn_ctrl, clock):
+    def __init__(self, txn_ctrl: "_TransactionController", clock: Clock):
         # dict of {service_id: [events]}
         self.queued_events: Dict[str, List[EventBase]] = {}
-        # dict of {service_id: [event_json]}
+        # dict of {service_id: [events]}
         self.queued_ephemeral: Dict[str, List[JsonDict]] = {}
         # dict of {service_id: [to_device_message_json]}
         self.queued_to_device_messages: Dict[str, List[JsonDict]] = {}
 
         # the appservices which currently have a transaction in flight
-        self.requests_in_flight = set()
+        self.requests_in_flight: Set[str] = set()
         self.txn_ctrl = txn_ctrl
         self.clock = clock
 
-    def start_background_request(self, service):
+    def start_background_request(self, service: ApplicationService) -> None:
         # start a sender for this appservice if we don't already have one
         if service.id in self.requests_in_flight:
             return
@@ -159,7 +174,7 @@ class _ServiceQueuer:
             "as-sender-%s" % (service.id,), self._send_request, service
         )
 
-    async def _send_request(self, service: ApplicationService):
+    async def _send_request(self, service: ApplicationService) -> None:
         # sanity-check: we shouldn't get here if this service already has a sender
         # running.
         assert service.id not in self.requests_in_flight
@@ -203,20 +218,15 @@ class _TransactionController:
     if a transaction fails.
 
     (Note we have only have one of these in the homeserver.)
-
-    Args:
-        clock (synapse.util.Clock):
-        store (synapse.storage.DataStore):
-        as_api (synapse.appservice.api.ApplicationServiceApi):
     """
 
-    def __init__(self, clock, store, as_api):
+    def __init__(self, clock: Clock, store: DataStore, as_api: ApplicationServiceApi):
         self.clock = clock
         self.store = store
         self.as_api = as_api
 
         # map from service id to recoverer instance
-        self.recoverers = {}
+        self.recoverers: Dict[str, "_Recoverer"] = {}
 
         # for UTs
         self.RECOVERER_CLASS = _Recoverer
@@ -256,7 +266,7 @@ class _TransactionController:
             logger.exception("Error creating appservice transaction")
             run_in_background(self._on_txn_fail, service)
 
-    async def on_recovered(self, recoverer):
+    async def on_recovered(self, recoverer: "_Recoverer") -> None:
         logger.info(
             "Successfully recovered application service AS ID %s", recoverer.service.id
         )
@@ -266,18 +276,18 @@ class _TransactionController:
             recoverer.service, ApplicationServiceState.UP
         )
 
-    async def _on_txn_fail(self, service):
+    async def _on_txn_fail(self, service: ApplicationService) -> None:
         try:
             await self.store.set_appservice_state(service, ApplicationServiceState.DOWN)
             self.start_recoverer(service)
         except Exception:
             logger.exception("Error starting AS recoverer")
 
-    def start_recoverer(self, service):
+    def start_recoverer(self, service: ApplicationService) -> None:
         """Start a Recoverer for the given service
 
         Args:
-            service (synapse.appservice.ApplicationService):
+            service:
         """
         logger.info("Starting recoverer for AS ID %s", service.id)
         assert service.id not in self.recoverers
@@ -306,7 +316,14 @@ class _Recoverer:
         callback (callable[_Recoverer]): called once the service recovers.
     """
 
-    def __init__(self, clock, store, as_api, service, callback):
+    def __init__(
+        self,
+        clock: Clock,
+        store: DataStore,
+        as_api: ApplicationServiceApi,
+        service: ApplicationService,
+        callback: Callable[["_Recoverer"], Awaitable[None]],
+    ):
         self.clock = clock
         self.store = store
         self.as_api = as_api
@@ -314,8 +331,8 @@ class _Recoverer:
         self.callback = callback
         self.backoff_counter = 1
 
-    def recover(self):
-        def _retry():
+    def recover(self) -> None:
+        def _retry() -> None:
             run_as_background_process(
                 "as-recoverer-%s" % (self.service.id,), self.retry
             )
@@ -324,13 +341,13 @@ class _Recoverer:
         logger.info("Scheduling retries on %s in %fs", self.service.id, delay)
         self.clock.call_later(delay, _retry)
 
-    def _backoff(self):
+    def _backoff(self) -> None:
         # cap the backoff to be around 8.5min => (2^9) = 512 secs
         if self.backoff_counter < 9:
             self.backoff_counter += 1
         self.recover()
 
-    async def retry(self):
+    async def retry(self) -> None:
         logger.info("Starting retries on %s", self.service.id)
         try:
             while True:

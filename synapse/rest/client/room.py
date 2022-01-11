@@ -187,7 +187,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         state_key: str,
         txn_id: Optional[str] = None,
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         if txn_id:
             set_tag("txn_id", txn_id)
@@ -642,6 +642,7 @@ class RoomEventServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.clock = hs.get_clock()
+        self._store = hs.get_datastore()
         self.event_handler = hs.get_event_handler()
         self._event_serializer = hs.get_event_client_serializer()
         self.auth = hs.get_auth()
@@ -660,9 +661,14 @@ class RoomEventServlet(RestServlet):
             # https://matrix.org/docs/spec/client_server/r0.5.0#get-matrix-client-r0-rooms-roomid-event-eventid
             raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
-        time_now = self.clock.time_msec()
         if event:
-            event_dict = await self._event_serializer.serialize_event(event, time_now)
+            # Ensure there are bundled aggregations available.
+            aggregations = await self._store.get_bundled_aggregations([event])
+
+            time_now = self.clock.time_msec()
+            event_dict = self._event_serializer.serialize_event(
+                event, time_now, bundle_aggregations=aggregations
+            )
             return 200, event_dict
 
         raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
@@ -706,16 +712,20 @@ class RoomEventContextServlet(RestServlet):
             raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
         time_now = self.clock.time_msec()
-        results["events_before"] = await self._event_serializer.serialize_events(
-            results["events_before"], time_now
+        results["events_before"] = self._event_serializer.serialize_events(
+            results["events_before"],
+            time_now,
+            bundle_aggregations=results["aggregations"],
         )
-        results["event"] = await self._event_serializer.serialize_event(
-            results["event"], time_now
+        results["event"] = self._event_serializer.serialize_event(
+            results["event"], time_now, bundle_aggregations=results["aggregations"]
         )
-        results["events_after"] = await self._event_serializer.serialize_events(
-            results["events_after"], time_now
+        results["events_after"] = self._event_serializer.serialize_events(
+            results["events_after"],
+            time_now,
+            bundle_aggregations=results["aggregations"],
         )
-        results["state"] = await self._event_serializer.serialize_events(
+        results["state"] = self._event_serializer.serialize_events(
             results["state"], time_now
         )
 

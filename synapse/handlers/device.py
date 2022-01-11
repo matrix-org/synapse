@@ -106,10 +106,10 @@ class DeviceWorkerHandler:
         Raises:
             errors.NotFoundError: if the device was not found
         """
-        try:
-            device = await self.store.get_device(user_id, device_id)
-        except errors.StoreError:
-            raise errors.NotFoundError
+        device = await self.store.get_device(user_id, device_id)
+        if device is None:
+            raise errors.NotFoundError()
+
         ips = await self.store.get_last_client_ip_by_device(user_id, device_id)
         _update_device_from_client_ips(device, ips)
 
@@ -602,6 +602,8 @@ class DeviceHandler(DeviceWorkerHandler):
             access_token, device_id
         )
         old_device = await self.store.get_device(user_id, old_device_id)
+        if old_device is None:
+            raise errors.NotFoundError()
         await self.store.update_device(user_id, device_id, old_device["display_name"])
         # can't call self.delete_device because that will clobber the
         # access token so call the storage layer directly
@@ -946,8 +948,16 @@ class DeviceListUpdater:
             devices = []
             ignore_devices = True
         else:
+            prev_stream_id = await self.store.get_device_list_last_stream_id_for_remote(
+                user_id
+            )
             cached_devices = await self.store.get_cached_devices_for_user(user_id)
-            if cached_devices == {d["device_id"]: d for d in devices}:
+
+            # To ensure that a user with no devices is cached, we skip the resync only
+            # if we have a stream_id from previously writing a cache entry.
+            if prev_stream_id is not None and cached_devices == {
+                d["device_id"]: d for d in devices
+            }:
                 logging.info(
                     "Skipping device list resync for %s, as our cache matches already",
                     user_id,

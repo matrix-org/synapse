@@ -70,7 +70,6 @@ class ListRegistrationTokensRestServlet(RestServlet):
     PATTERNS = admin_patterns("/registration_tokens$")
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
 
@@ -109,7 +108,6 @@ class NewRegistrationTokenRestServlet(RestServlet):
     PATTERNS = admin_patterns("/registration_tokens/new$")
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
@@ -260,7 +258,6 @@ class RegistrationTokenRestServlet(RestServlet):
     PATTERNS = admin_patterns("/registration_tokens/(?P<token>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
         self.clock = hs.get_clock()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()

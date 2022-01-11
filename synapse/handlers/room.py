@@ -172,7 +172,7 @@ class RoomCreationHandler:
         user_id = requester.user.to_string()
 
         # Check if this room is already being upgraded by another person
-        for key in self._upgrade_response_cache.pending_result_cache:
+        for key in self._upgrade_response_cache.keys():
             if key[0] == old_room_id and key[1] != user_id:
                 # Two different people are trying to upgrade the same room.
                 # Send the second an error.
@@ -393,7 +393,9 @@ class RoomCreationHandler:
         user_id = requester.user.to_string()
 
         if not await self.spam_checker.user_may_create_room(user_id):
-            raise SynapseError(403, "You are not permitted to create rooms")
+            raise SynapseError(
+                403, "You are not permitted to create rooms", Codes.FORBIDDEN
+            )
 
         creation_content: JsonDict = {
             "room_version": new_room_version.identifier,
@@ -685,7 +687,9 @@ class RoomCreationHandler:
                 invite_3pid_list,
             )
         ):
-            raise SynapseError(403, "You are not permitted to create rooms")
+            raise SynapseError(
+                403, "You are not permitted to create rooms", Codes.FORBIDDEN
+            )
 
         if ratelimit:
             await self.request_ratelimiter.ratelimit(requester)
@@ -1177,6 +1181,16 @@ class RoomContextHandler:
         # `filtered` rather than the event we retrieved from the datastore.
         results["event"] = filtered[0]
 
+        # Fetch the aggregations.
+        aggregations = await self.store.get_bundled_aggregations([results["event"]])
+        aggregations.update(
+            await self.store.get_bundled_aggregations(results["events_before"])
+        )
+        aggregations.update(
+            await self.store.get_bundled_aggregations(results["events_after"])
+        )
+        results["aggregations"] = aggregations
+
         if results["events_after"]:
             last_event_id = results["events_after"][-1].event_id
         else:
@@ -1535,20 +1549,13 @@ class RoomShutdownHandler:
             await self.store.block_room(room_id, requester_user_id)
 
         if not await self.store.get_room(room_id):
-            if block:
-                # We allow you to block an unknown room.
-                return {
-                    "kicked_users": [],
-                    "failed_to_kick_users": [],
-                    "local_aliases": [],
-                    "new_room_id": None,
-                }
-            else:
-                # But if you don't want to preventatively block another room,
-                # this function can't do anything useful.
-                raise NotFoundError(
-                    "Cannot shut down room: unknown room id %s" % (room_id,)
-                )
+            # if we don't know about the room, there is nothing left to do.
+            return {
+                "kicked_users": [],
+                "failed_to_kick_users": [],
+                "local_aliases": [],
+                "new_room_id": None,
+            }
 
         if new_room_user_id is not None:
             if not self.hs.is_mine_id(new_room_user_id):

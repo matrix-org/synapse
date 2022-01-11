@@ -406,9 +406,6 @@ class PaginationHandler:
             force: set true to skip checking for joined users.
         """
         with await self.pagination_lock.write(room_id):
-            # check we know about the room
-            await self.store.get_room_version_id(room_id)
-
             # first check that we have no users in this room
             if not force:
                 joined = await self.store.is_host_joined(room_id, self._server_name)
@@ -540,12 +537,17 @@ class PaginationHandler:
                 state_dict = await self.store.get_events(list(state_ids.values()))
                 state = state_dict.values()
 
+        aggregations = await self.store.get_bundled_aggregations(events)
+
         time_now = self.clock.time_msec()
 
         chunk = {
             "chunk": (
-                await self._event_serializer.serialize_events(
-                    events, time_now, as_client_event=as_client_event
+                self._event_serializer.serialize_events(
+                    events,
+                    time_now,
+                    bundle_aggregations=aggregations,
+                    as_client_event=as_client_event,
                 )
             ),
             "start": await from_token.to_string(self.store),
@@ -553,7 +555,7 @@ class PaginationHandler:
         }
 
         if state:
-            chunk["state"] = await self._event_serializer.serialize_events(
+            chunk["state"] = self._event_serializer.serialize_events(
                 state, time_now, as_client_event=as_client_event
             )
 

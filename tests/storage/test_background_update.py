@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Use backported mock for AsyncMock support on Python 3.6.
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet.defer import Deferred, ensureDeferred
 
 from synapse.storage.background_updates import BackgroundUpdater
 
 from tests import unittest
-from tests.test_utils import make_awaitable
+from tests.test_utils import make_awaitable, simple_async_mock
 
 
 class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
@@ -116,14 +115,14 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
         )
 
         # Mock out the AsyncContextManager
-        self._update_ctx_manager = Mock(spec=["__aenter__", "__aexit__"])
-        self._update_ctx_manager.__aenter__ = Mock(
-            return_value=make_awaitable(None),
-        )
-        self._update_ctx_manager.__aexit__ = Mock(return_value=make_awaitable(None))
+        class MockCM:
+            __aenter__ = simple_async_mock(return_value=None)
+            __aexit__ = simple_async_mock(return_value=None)
+
+        self._update_ctx_manager = MockCM
 
         # Mock out the `update_handler` callback
-        self._on_update = Mock(return_value=self._update_ctx_manager)
+        self._on_update = Mock(return_value=self._update_ctx_manager())
 
         # Define a default batch size value that's not the same as the internal default
         # value (100).

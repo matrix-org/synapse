@@ -1,1 +1,0 @@
-Clean up `tests.storage.test_main` to remove use of legacy code.
