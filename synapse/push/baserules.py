@@ -528,16 +528,24 @@ BASE_APPEND_UNDERRIDE_RULES = [
         "rule_id": "global/override/com.beeper.reaction",
         "conditions": [
             {
-                "kind": "room_member_count",
-                "is": "<20",
-                "_id": "_member_count",
-            },
-            {
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.reaction",
                 "_id": "_reaction",
-            }
+            },
+            # Only send reaction notifications for smaller rooms (under 20 members)
+            {
+                "kind": "room_member_count",
+                "is": "<20",
+                "_id": "_member_count",
+            },
+            # Only send notification if the reaction is to your message
+            {
+                "kind": "related_event_match",
+                "key": "sender",
+                "pattern_type": "user_id",
+                "_id": "_sender",
+            },
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": False}],
     },
