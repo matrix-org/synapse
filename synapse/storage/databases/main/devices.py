@@ -222,6 +222,8 @@ class DeviceWorkerStore(SQLBaseStore):
             limit,
         )
 
+        # len(updates) <= limit.
+
         # Return an empty list if there are no updates
         if not updates:
             return now_stream_id, []
@@ -302,11 +304,17 @@ class DeviceWorkerStore(SQLBaseStore):
 
             last_processed_stream_id = update_stream_id
 
+        # len(query_map) + len(cross_signing_keys_by_user) <= len(updates) here,
+        # so len(query_map) + len(cross_signing_keys_by_user) <= limit.
+
         results = await self._get_device_update_edus_by_remote(
             destination, from_stream_id, query_map
         )
 
-        # add the updated cross-signing keys to the results list
+        # len(results) <= len(query_map) here,
+        # so len(results) + len(cross_signing_keys_by_user) <= limit.
+
+        # Add the updated cross-signing keys to the results list
         for user_id, result in cross_signing_keys_by_user.items():
             result["user_id"] = user_id
             results.append(("m.signing_key_update", result))
