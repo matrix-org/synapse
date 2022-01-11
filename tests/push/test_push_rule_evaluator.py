@@ -23,7 +23,7 @@ from tests import unittest
 
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):
-    def _get_evaluator(self, content):
+    def _get_evaluator(self, content, related_event=None):
         event = FrozenEvent(
             {
                 "event_id": "$event_id",
@@ -39,7 +39,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         sender_power_level = 0
         power_levels = {}
         return PushRuleEvaluatorForEvent(
-            event, room_member_count, sender_power_level, power_levels
+            event, room_member_count, sender_power_level, power_levels, related_event
         )
 
     def test_display_name(self):
@@ -265,4 +265,64 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         self.assertEqual(
             push_rule_evaluator.tweaks_for_actions(actions),
             {"sound": "default", "highlight": True},
+        )
+
+    def test_related_event_match(self):
+        evaluator = self._get_evaluator(
+            {
+                "m.relates_to": {
+                    "event_id": "$parent_event_id",
+                    "key": "\ud83d\udc4d\ufe0f",
+                    "rel_type": "m.annotation",
+                }
+            },
+            FrozenEvent(
+                {
+                    "event_id": "$parent.event_id",
+                    "type": "m.room.message",
+                    "sender": "@other_user:test",
+                    "state_key": "",
+                    "room_id": "#room:test",
+                    "content": {"msgtype": "m.text", "body": "Original message"},
+                },
+                RoomVersions.V1,
+            ),
+        )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "related_event_match",
+                    "key": "sender",
+                    "pattern_type": "user_id",
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
+        self.assertTrue(
+            evaluator.matches(
+                {
+                    "kind": "related_event_match",
+                    "key": "sender",
+                    "pattern_type": "user_id",
+                },
+                "@other_user:test",
+                "display_name",
+            )
+        )
+
+    def test_related_event_match_no_related_event(self):
+        evaluator = self._get_evaluator(
+            {"msgtype": "m.text", "body": "Message without related event"}
+        )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "related_event_match",
+                    "key": "sender",
+                    "pattern_type": "user_id",
+                },
+                "@user:test",
+                "display_name",
+            )
         )

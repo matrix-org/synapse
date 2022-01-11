@@ -37,7 +37,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 push_rules_invalidation_counter = Counter(
     "synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter", ""
 )
@@ -187,8 +186,13 @@ class BulkPushRuleEvaluator:
             sender_power_level,
         ) = await self._get_power_levels_and_sender_level(event, context)
 
+        related_event_id = event.content.get("m.relates_to", {}).get("event_id")
+        related_event = (
+            (await self.store.get_event(related_event_id)) if related_event_id else None
+        )
+
         evaluator = PushRuleEvaluatorForEvent(
-            event, len(room_members), sender_power_level, power_levels
+            event, len(room_members), sender_power_level, power_levels, related_event
         )
 
         condition_cache: Dict[str, bool] = {}
