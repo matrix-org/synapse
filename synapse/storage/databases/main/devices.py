@@ -280,6 +280,17 @@ class DeviceWorkerStore(SQLBaseStore):
         query_map = {}
         cross_signing_keys_by_user = {}
         for user_id, device_id, update_stream_id, update_context in updates:
+            # Calculate the remaining length budget.
+            # Note that, for now, each entry in `cross_signing_keys_by_user`
+            # gives rise to two device updates in the result, so those cost twice
+            # as much (and are the whole reason we need to separatly calculate
+            # the budget; we know len(updates) <= limit otherwise!)
+            # N.B. len() on dicts is cheap since they store their size.
+            remaining_length_budget = limit - (
+                len(query_map) + 2 * len(cross_signing_keys_by_user)
+            )
+            assert remaining_length_budget >= 0
+
             is_master_key_update = (
                 user_id in master_key_by_user
                 and device_id == master_key_by_user[user_id]["device_id"]
