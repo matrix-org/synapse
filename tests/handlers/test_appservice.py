@@ -566,7 +566,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         """
         # Create an application service
         appservice = ApplicationService(
-            token=None,
+            token=random_string(10),
             hostname="example.com",
             id=random_string(10),
             sender="@as:example.com",
