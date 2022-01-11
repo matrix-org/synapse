@@ -54,7 +54,7 @@ from synapse.metrics._exposition import (
     generate_latest,
     start_http_server,
 )
-from synapse.metrics._gc import MIN_TIME_BETWEEN_GCS
+from synapse.metrics._gc import MIN_TIME_BETWEEN_GCS, install_gc_manager
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
@@ -560,4 +560,5 @@ __all__ = [
     "InFlightGauge",
     "GaugeBucketCollector",
     "MIN_TIME_BETWEEN_GCS",
+    "install_gc_manager",
 ]

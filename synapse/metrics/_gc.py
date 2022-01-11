@@ -80,11 +80,20 @@ class GCCounts:
         yield cm
 
 
-if not running_on_pypy:
+def install_gc_manager() -> None:
+    """Disable automatic GC, and replace it with a task that runs every 100ms
+
+    This means that (a) we can limit how often GC runs; (b) we can get some metrics
+    about GC activity.
+
+    It does nothing on PyPy.
+    """
+
+    if running_on_pypy:
+        return
+
     REGISTRY.register(GCCounts())
 
-    # disable automatic GC, and replace it with a task that runs every 100ms, so that
-    # we can get some metrics about GC activity.
     gc.disable()
 
     # The time (in seconds since the epoch) of the last time we did a GC for each generation.
@@ -119,6 +128,7 @@ if not running_on_pypy:
 
     gc_task = task.LoopingCall(_maybe_gc)
     gc_task.start(0.1)
+
 
 #
 # PyPy GC / memory metrics
