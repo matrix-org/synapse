@@ -289,16 +289,10 @@ class DeviceWorkerStore(SQLBaseStore):
                 and device_id == self_signing_key_by_user[user_id]["device_id"]
             )
 
-            if (
-                user_id in master_key_by_user
-                and device_id == master_key_by_user[user_id]["device_id"]
-            ):
+            if is_master_key_update:
                 result = cross_signing_keys_by_user.setdefault(user_id, {})
                 result["master_key"] = master_key_by_user[user_id]["key_info"]
-            elif (
-                user_id in self_signing_key_by_user
-                and device_id == self_signing_key_by_user[user_id]["device_id"]
-            ):
+            elif is_self_signing_key_update:
                 result = cross_signing_keys_by_user.setdefault(user_id, {})
                 result["self_signing_key"] = self_signing_key_by_user[user_id][
                     "key_info"
