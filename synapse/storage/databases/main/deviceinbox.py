@@ -191,20 +191,18 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
             # Create a dictionary of (user ID, device ID) -> list of messages that
             # that device is meant to receive.
-            recipient_user_id_device_id_to_messages: Dict[
-                Tuple[str, str], List[JsonDict]
-            ] = {}
+            recipient_device_to_messages: Dict[Tuple[str, str], List[JsonDict]] = {}
 
             for row in txn:
                 recipient_user_id = row[0]
                 recipient_device_id = row[1]
                 message_dict = db_to_json(row[2])
 
-                recipient_user_id_device_id_to_messages.setdefault(
+                recipient_device_to_messages.setdefault(
                     (recipient_user_id, recipient_device_id), []
                 ).append(message_dict)
 
-            return recipient_user_id_device_id_to_messages
+            return recipient_device_to_messages
 
         return await self.db_pool.runInteraction(
             "get_new_messages", get_new_messages_txn

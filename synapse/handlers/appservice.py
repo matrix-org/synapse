@@ -510,7 +510,7 @@ class ApplicationServicesHandler:
             return []
 
         # Retrieve the to-device messages for each user
-        recipient_user_id_device_id_to_messages = await self.store.get_new_messages(
+        recipient_device_to_messages = await self.store.get_new_messages(
             users_appservice_is_interested_in,
             from_key,
             new_token,
@@ -526,7 +526,7 @@ class ApplicationServicesHandler:
         for (
             user_id,
             device_id,
-        ), messages in recipient_user_id_device_id_to_messages.items():
+        ), messages in recipient_device_to_messages.items():
             for message_json in messages:
                 # Remove 'message_id' from the to-device message, as it's an internal ID
                 message_json.pop("message_id", None)
