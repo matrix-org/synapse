@@ -120,6 +120,7 @@ class PushRuleEvaluatorForEvent:
         room_member_count: int,
         sender_power_level: int,
         power_levels: Dict[str, Union[int, Dict[str, int]]],
+        related_event: Optional[EventBase],
     ):
         self._event = event
         self._room_member_count = room_member_count
@@ -129,11 +130,22 @@ class PushRuleEvaluatorForEvent:
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
 
+        self._related_event = related_event
+        self._related_event_value_cache = (
+            _flatten_dict(related_event) if related_event else None
+        )
+
     def matches(
         self, condition: Dict[str, Any], user_id: str, display_name: Optional[str]
     ) -> bool:
         if condition["kind"] == "event_match":
-            return self._event_match(condition, user_id)
+            return self._event_match(condition, user_id, self._event, self._value_cache)
+        elif condition["kind"] == "related_event_match":
+            if not self._related_event:
+                return False
+            return self._event_match(
+                condition, user_id, self._related_event, self._related_event_value_cache
+            )
         elif condition["kind"] == "contains_display_name":
             return self._contains_display_name(display_name)
         elif condition["kind"] == "room_member_count":
@@ -145,7 +157,13 @@ class PushRuleEvaluatorForEvent:
         else:
             return True
 
-    def _event_match(self, condition: dict, user_id: str) -> bool:
+    def _event_match(
+        self,
+        condition: dict,
+        user_id: str,
+        event: EventBase,
+        event_value_cache: Dict[str, str],
+    ) -> bool:
         pattern = condition.get("pattern", None)
 
         if not pattern:
@@ -161,13 +179,13 @@ class PushRuleEvaluatorForEvent:
 
         # XXX: optimisation: cache our pattern regexps
         if condition["key"] == "content.body":
-            body = self._event.content.get("body", None)
+            body = event.content.get("body", None)
             if not body or not isinstance(body, str):
                 return False
 
             return _glob_matches(pattern, body, word_boundary=True)
         else:
-            haystack = self._get_value(condition["key"])
+            haystack = event_value_cache.get(condition["key"], None)
             if haystack is None:
                 return False
 
@@ -190,9 +208,6 @@ class PushRuleEvaluatorForEvent:
             regex_cache[(display_name, False, True)] = r
 
         return bool(r.search(body))
-
-    def _get_value(self, dotted_key: str) -> Optional[str]:
-        return self._value_cache.get(dotted_key, None)
 
 
 # Caches (string, is_glob, word_boundary) -> regex for push. See _glob_matches

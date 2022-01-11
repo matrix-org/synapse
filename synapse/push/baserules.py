@@ -427,6 +427,32 @@ NEW_APPEND_OVERRIDE_RULES = [
         ],
         "actions": ["notify", {"set_tweak": "sound", "value": "ring"}],
     },
+    # Enable notifications for reactions
+    {
+        "rule_id": "global/override/com.beeper.reaction",
+        "conditions": [
+            {
+                "kind": "event_match",
+                "key": "type",
+                "pattern": "m.reaction",
+                "_id": "_reaction",
+            },
+            # Only send reaction notifications for smaller rooms (under 20 members)
+            {
+                "kind": "room_member_count",
+                "is": "<20",
+                "_id": "_member_count",
+            },
+            # Only send notification if the reaction is to your message
+            {
+                "kind": "related_event_match",
+                "key": "sender",
+                "pattern_type": "user_id",
+                "_id": "_sender",
+            },
+        ],
+        "actions": ["notify", {"set_tweak": "highlight", "value": False}],
+    },
 ]
 
 
