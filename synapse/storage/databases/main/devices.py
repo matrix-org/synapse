@@ -366,12 +366,15 @@ class DeviceWorkerStore(SQLBaseStore):
         Args:
             destination: The host the device updates are intended for
             from_stream_id: The minimum stream_id to filter updates by, exclusive
-            query_map (Dict[(str, str): (int, str|None)]): Dictionary mapping
-                user_id/device_id to update stream_id and the relevant json-encoded
-                opentracing context
+            query_map: Dictionary mapping (user_id, device_id) to
+                (update stream_id, the relevant json-encoded opentracing context)
 
         Returns:
-            List of objects representing an device update EDU
+            List of objects representing a device update EDU.
+
+        Postconditions:
+            The returned list has a length not exceeding that of the query_map:
+                len(result) <= len(query_map)
         """
         devices = (
             await self.get_e2e_device_keys_and_signatures(
