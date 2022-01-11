@@ -378,6 +378,9 @@ class DeviceWorkerStore(SQLBaseStore):
         """
         devices = (
             await self.get_e2e_device_keys_and_signatures(
+                # Because these are (user_id, device_id) tuples with all
+                # device_ids not being None, the returned list's length will not
+                # exceed that of query_map.
                 query_map.keys(),
                 include_all_devices=True,
                 include_deleted_devices=True,
