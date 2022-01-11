@@ -280,6 +280,15 @@ class DeviceWorkerStore(SQLBaseStore):
         query_map = {}
         cross_signing_keys_by_user = {}
         for user_id, device_id, update_stream_id, update_context in updates:
+            is_master_key_update = (
+                user_id in master_key_by_user
+                and device_id == master_key_by_user[user_id]["device_id"]
+            )
+            is_self_signing_key_update = (
+                user_id in self_signing_key_by_user
+                and device_id == self_signing_key_by_user[user_id]["device_id"]
+            )
+
             if (
                 user_id in master_key_by_user
                 and device_id == master_key_by_user[user_id]["device_id"]
