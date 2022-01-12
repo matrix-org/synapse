@@ -228,7 +228,7 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
     localpart: str
     domain: str
 
-    # Because this is a frozen class, it is deeplyx immutable.
+    # Because this is a frozen class, it is deeply immutable.
     def __copy__(self):
         return self
 
