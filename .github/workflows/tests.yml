@@ -366,6 +366,8 @@ jobs:
       # Build initial Synapse image
       - run: docker build -t matrixdotorg/synapse:latest -f docker/Dockerfile .
         working-directory: synapse
+        env:
+          DOCKER_BUILDKIT: 1
 
       # Build a ready-to-run Synapse image based on the initial image above.
       # This new image includes a config file, keys for signing and TLS, and
