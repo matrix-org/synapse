@@ -23,6 +23,9 @@
 # Exit if a line returns a non-zero exit code
 set -e
 
+# enable buildkit for the docker builds
+export DOCKER_BUILDKIT=1
+
 # Change to the repository root
 cd "$(dirname $0)/.."
 
@@ -65,4 +68,5 @@ if [[ -n "$1" ]]; then
 fi
 
 # Run the tests!
+echo "Images built; running complement"
 go test -v -tags synapse_blacklist,msc2403 -count=1 $EXTRA_COMPLEMENT_ARGS ./tests/...
