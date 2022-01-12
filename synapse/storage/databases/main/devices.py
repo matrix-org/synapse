@@ -351,6 +351,7 @@ class DeviceWorkerStore(SQLBaseStore):
             results.append(("m.signing_key_update", result))
             # also send the unstable version
             # FIXME: remove this when enough servers have upgraded
+            #        and remove the length budgeting above.
             results.append(("org.matrix.signing_key_update", result))
 
         return last_processed_stream_id, results
