@@ -223,11 +223,16 @@ class DeviceStoreTestCase(HomeserverTestCase):
             self.store.get_device_updates_by_remote("somehost", -1, limit=3)
         )
 
-        # Even though the limit has not been hit, the next update will be duplicated
-        # but there's no space for it here.
+        # Here we expect the device updates for `device_id1` and `device_id2`.
+        # That means we only receive 2 updates this time around.
+        # If we had a higher limit, we would expect to see the pair of
+        # (unstable-prefixed & unprefixed) signing key updates for the device
+        # represented by `fakeMaster` and `fakeSelfSigning`.
+        # Our implementation only sends these two variants together, so we get
+        # a short batch.
         self.assertEqual(len(device_updates), 2, device_updates)
 
-        # Check the first two devices came out.
+        # Check the first two devices (device_id1, device_id2) came out.
         self._check_devices_in_updates(device_ids[:2], device_updates)
 
         # Get more device updates meant for this remote
@@ -237,8 +242,8 @@ class DeviceStoreTestCase(HomeserverTestCase):
 
         # The next 2 updates should be a cross-signing key update
         # (the master key update and the self-signing key update are combined into
-        # one, but the cross-signing key update is emitted twice, once with an unprefixed
-        # type and one with an unstable-prefixed type)
+        # one 'signing key update', but the cross-signing key update is emitted
+        # twice, once with an unprefixed type and once again with an unstable-prefixed type)
         # (This is a temporary arrangement for backwards compatibility!)
         self.assertEqual(len(device_updates), 2, device_updates)
         self.assertEqual(

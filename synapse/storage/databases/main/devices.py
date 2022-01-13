@@ -222,7 +222,7 @@ class DeviceWorkerStore(SQLBaseStore):
             limit,
         )
 
-        # We need to ensure `updates` doesn't grow too big. 
+        # We need to ensure `updates` doesn't grow too big.
         # Currently: `len(updates) <= limit`.
 
         # Return an empty list if there are no updates
@@ -334,8 +334,13 @@ class DeviceWorkerStore(SQLBaseStore):
                 if update_stream_id > previous_update_stream_id:
                     query_map[key] = (update_stream_id, update_context)
 
+            # As this update has been added to the response, advance the stream
+            # position.
             last_processed_stream_id = update_stream_id
 
+        # In the worst case scenario, each update is for a distinct user and is
+        # added either to the query_map or to cross_signing_keys_by_user,
+        # but not both:
         # len(query_map) + len(cross_signing_keys_by_user) <= len(updates) here,
         # so len(query_map) + len(cross_signing_keys_by_user) <= limit.
 
