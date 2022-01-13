@@ -56,7 +56,7 @@ class LogProducer:
     # (connected and registerProducer) which are part of the implementation.
     transport: Connection
     _format: Callable[[logging.LogRecord], str]
-    _buffer: deque
+    _buffer: Deque[logging.LogRecord]
     _paused: bool = attr.ib(default=False, init=False)
 
     def pauseProducing(self):
