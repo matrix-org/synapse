@@ -88,3 +88,58 @@ class DeactivateAccountTestCase(HomeserverTestCase):
                 )
             ),
         )
+
+    def test_room_account_data_deleted_upon_deactivation(self) -> None:
+        """
+        Tests that room account data is removed upon deactivation.
+        """
+        room_id = "!room:test"
+
+        # Add some room account data
+        self.get_success(
+            self._store.add_account_data_to_room(
+                self.user,
+                room_id,
+                "m.fully_read",
+                {"event_id": "$aaaa:test"},
+            )
+        )
+
+        # Check that we actually added some.
+        self.assertIsNotNone(
+            self.get_success(
+                self._store.get_account_data_for_room_and_type(
+                    self.user, room_id, "m.fully_read"
+                )
+            ),
+        )
+
+        # Request the deactivation of our account
+        req = self.get_success(
+            self.make_request(
+                "POST",
+                "account/deactivate",
+                {
+                    "auth": {
+                        "type": "m.login.password",
+                        "user": self.user,
+                        "password": "pass",
+                    },
+                    "erase": True,
+                },
+                access_token=self.token,
+            )
+        )
+        self.assertEqual(req.code, 200, req)
+
+        # Clear the cache (for testing)
+        self._store.get_account_data_for_room_and_type.invalidate_all()
+
+        # Check that the account data does not persist.
+        self.assertIsNone(
+            self.get_success(
+                self._store.get_account_data_for_room_and_type(
+                    self.user, room_id, "m.fully_read"
+                )
+            ),
+        )
