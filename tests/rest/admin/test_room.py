@@ -1089,6 +1089,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
             )
             room_ids.append(room_id)
 
+        room_ids.sort()
+
         # Request the list of rooms
         url = "/_synapse/admin/v1/rooms"
         channel = self.make_request(
@@ -1360,6 +1362,10 @@ class RoomTestCase(unittest.HomeserverTestCase):
         room_id_2 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
         room_id_3 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
 
+        # Also create a list sorted by IDs for properties that are equal (and thus sorted by room_id)
+        all_ids = [room_id_1, room_id_2, room_id_3]
+        all_ids.sort()
+
         # Set room names in alphabetical order. room 1 -> A, 2 -> B, 3 -> C
         self.helper.send_state(
             room_id_1,
@@ -1413,31 +1419,31 @@ class RoomTestCase(unittest.HomeserverTestCase):
             "joined_local_members", [room_id_1, room_id_2, room_id_3], reverse=True
         )
 
-        _order_test("version", [room_id_1, room_id_2, room_id_3])
-        _order_test("version", [room_id_1, room_id_2, room_id_3], reverse=True)
+        _order_test("version", all_ids)
+        _order_test("version", all_ids, reverse=True)
 
-        _order_test("creator", [room_id_1, room_id_2, room_id_3])
-        _order_test("creator", [room_id_1, room_id_2, room_id_3], reverse=True)
+        _order_test("creator", all_ids)
+        _order_test("creator", all_ids, reverse=True)
 
-        _order_test("encryption", [room_id_1, room_id_2, room_id_3])
-        _order_test("encryption", [room_id_1, room_id_2, room_id_3], reverse=True)
+        _order_test("encryption", all_ids)
+        _order_test("encryption", all_ids, reverse=True)
 
-        _order_test("federatable", [room_id_1, room_id_2, room_id_3])
-        _order_test("federatable", [room_id_1, room_id_2, room_id_3], reverse=True)
+        _order_test("federatable", all_ids)
+        _order_test("federatable", all_ids, reverse=True)
 
-        _order_test("public", [room_id_1, room_id_2, room_id_3])
+        _order_test("public", all_ids)
         # Different sort order of SQlite and PostreSQL
         # _order_test("public", [room_id_3, room_id_2, room_id_1], reverse=True)
 
-        _order_test("join_rules", [room_id_1, room_id_2, room_id_3])
-        _order_test("join_rules", [room_id_1, room_id_2, room_id_3], reverse=True)
+        _order_test("join_rules", all_ids)
+        _order_test("join_rules", all_ids, reverse=True)
 
-        _order_test("guest_access", [room_id_1, room_id_2, room_id_3])
-        _order_test("guest_access", [room_id_1, room_id_2, room_id_3], reverse=True)
+        _order_test("guest_access", all_ids)
+        _order_test("guest_access", all_ids, reverse=True)
 
-        _order_test("history_visibility", [room_id_1, room_id_2, room_id_3])
+        _order_test("history_visibility", all_ids)
         _order_test(
-            "history_visibility", [room_id_1, room_id_2, room_id_3], reverse=True
+            "history_visibility", all_ids, reverse=True
         )
 
         _order_test("state_events", [room_id_3, room_id_2, room_id_1])
