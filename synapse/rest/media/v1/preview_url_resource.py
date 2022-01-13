@@ -262,6 +262,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         # The number of milliseconds that the response should be considered valid.
         expiration_ms = media_info.expires
+        author_name: Optional[str] = None
 
         if _is_media(media_info.media_type):
             file_id = media_info.filesystem_id
@@ -297,7 +298,11 @@ class PreviewUrlResource(DirectServeJsonResource):
                 og_from_oembed: JsonDict = {}
                 if oembed_url:
                     oembed_info = await self._download_url(oembed_url, user)
-                    og_from_oembed, expiration_ms = await self._handle_oembed_response(
+                    (
+                        og_from_oembed,
+                        author_name,
+                        expiration_ms,
+                    ) = await self._handle_oembed_response(
                         url, oembed_info, expiration_ms
                     )
 
@@ -315,7 +320,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         elif oembed_url:
             # Handle the oEmbed information.
-            og, expiration_ms = await self._handle_oembed_response(
+            og, author_name, expiration_ms = await self._handle_oembed_response(
                 url, media_info, expiration_ms
             )
             await self._precache_image_url(user, media_info, og)
@@ -326,8 +331,8 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         # If we don't have a title but we have author_name, copy it as
         # title
-        if not og.get("og:title") and og.get("og:author_name"):
-            og["og:title"] = og["og:author_name"]
+        if not og.get("og:title") and author_name:
+            og["og:title"] = author_name
 
         # filter out any stupidly long values
         keys_to_remove = []
@@ -492,7 +497,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
     async def _handle_oembed_response(
         self, url: str, media_info: MediaInfo, expiration_ms: int
-    ) -> Tuple[JsonDict, int]:
+    ) -> Tuple[JsonDict, Optional[str], int]:
         """
         Parse the downloaded oEmbed info.
 
@@ -509,7 +514,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         """
         # If JSON was not returned, there's nothing to do.
         if not _is_json(media_info.media_type):
-            return {}, expiration_ms
+            return {}, None, expiration_ms
 
         with open(media_info.filename, "rb") as file:
             body = file.read()
@@ -521,7 +526,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         if open_graph_result and oembed_response.cache_age is not None:
             expiration_ms = oembed_response.cache_age
 
-        return open_graph_result, expiration_ms
+        return open_graph_result, oembed_response.author_name, expiration_ms
 
     def _start_expire_url_cache_data(self) -> Deferred:
         return run_as_background_process(
