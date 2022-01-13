@@ -25,6 +25,7 @@ from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
 from synapse.rest.client import account, account_validity, login, logout, register, sync
 from synapse.storage._base import db_to_json
+from synapse.types import UserID
 
 from tests import unittest
 from tests.unittest import override_config
@@ -725,6 +726,48 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             channel.json_body,
             {"errcode": "M_UNKNOWN", "error": "Unable to parse email address"},
         )
+
+    @override_config(
+        {
+            "ignore_client_username": True,
+        }
+    )
+    def test_ignore_client_username(self):
+        """Tests that the 'ignore_client_username' configuration flag behaves
+        correctly.
+        """
+        username = "arthur"
+
+        # Manually register the user so we know the test isn't passing because of a lack
+        # of clashing.
+        reg_handler = self.hs.get_registration_handler()
+        self.get_success(reg_handler.register_user(username))
+
+        # Check that /available correctly ignores the username provided despite the
+        # username being already registered.
+        channel = self.make_request("GET", "register/available?username=" + username)
+        self.assertEquals(200, channel.code, channel.result)
+
+        # Try to register a user with the same username.
+        request_data = json.dumps(
+            {
+                "username": username,
+                "password": "foo",
+                "auth": {"type": LoginType.DUMMY},
+            },
+        )
+        channel = self.make_request("POST", self.url, request_data)
+
+        # Check that the registration succeeded (since we ignored the username parameter)
+        # and that there's a user_id parameter in the response body.
+        self.assertEquals(200, channel.code, channel.result)
+        self.assertIn("user_id", channel.json_body)
+
+        # Check that the user_id parameter from the response body differs from the
+        # username provided in the request, proving that the request parameter got
+        # successfully ignored.
+        user_id = UserID.from_string(channel.json_body["user_id"])
+        self.assertNotEquals(user_id.localpart, username)
 
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):

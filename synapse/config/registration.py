@@ -190,6 +190,8 @@ class RegistrationConfig(Config):
         # The success template used during fallback auth.
         self.fallback_success_template = self.read_template("auth_success.html")
 
+        self.ignore_client_username = config.get("ignore_client_username", False)
+
     def generate_config_section(self, generate_secrets=False, **kwargs):
         if generate_secrets:
             registration_shared_secret = 'registration_shared_secret: "%s"' % (
@@ -446,6 +448,13 @@ class RegistrationConfig(Config):
         # Defaults to true.
         #
         #auto_join_rooms_for_guests: false
+
+        # Whether to ignore the username supplied by the client in the registration
+        # request and instead automatically generate one.
+        #
+        # Defaults to false.
+        #
+        #ignore_client_username: true
         """
             % locals()
         )

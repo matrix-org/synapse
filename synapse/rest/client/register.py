@@ -339,11 +339,20 @@ class UsernameAvailabilityRestServlet(RestServlet):
             ),
         )
 
+        self.client_username_ignored = hs.config.registration.ignore_client_username
+
     async def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
         if not self.hs.config.registration.enable_registration:
             raise SynapseError(
                 403, "Registration has been disabled", errcode=Codes.FORBIDDEN
             )
+
+        # If we're ignoring client-supplied usernames when registering new users, we want
+        # to just tell the client any username is available, so it understands the
+        # registration will succeed if they provide this username. This is also in place
+        # to avoid leaking existing usernames on the server.
+        if self.client_username_ignored:
+            return 200, {"available": True}
 
         ip = request.getClientIP()
         with self.ratelimiter.ratelimit(ip) as wait_deferred:
@@ -422,6 +431,7 @@ class RegisterRestServlet(RestServlet):
         self._refresh_tokens_enabled = (
             hs.config.registration.refreshable_access_token_lifetime is not None
         )
+        self._ignore_client_username = hs.config.registration.ignore_client_username
 
         self._registration_flows = _calculate_registration_flows(
             hs.config, self.auth_handler
@@ -458,7 +468,7 @@ class RegisterRestServlet(RestServlet):
         # Pull out the provided username and do basic sanity checks early since
         # the auth layer will store these in sessions.
         desired_username = None
-        if "username" in body:
+        if not self._ignore_client_username and "username" in body:
             if not isinstance(body["username"], str) or len(body["username"]) > 512:
                 raise SynapseError(400, "Invalid username")
             desired_username = body["username"]
@@ -627,7 +637,6 @@ class RegisterRestServlet(RestServlet):
             if not password_hash:
                 raise SynapseError(400, "Missing params: password", Codes.MISSING_PARAM)
 
-            desired_username = params.get("username", None)
             guest_access_token = params.get("guest_access_token", None)
 
             if desired_username is not None:
