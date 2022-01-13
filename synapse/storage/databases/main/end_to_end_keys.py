@@ -50,16 +50,16 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class DeviceKeyLookupResult:
     """The type returned by get_e2e_device_keys_and_signatures"""
 
-    display_name = attr.ib(type=Optional[str])
+    display_name: Optional[str]
 
     # the key data from e2e_device_keys_json. Typically includes fields like
     # "algorithm", "keys" (including the curve25519 identity key and the ed25519 signing
     # key) and "signatures" (a map from (user id) to (key id/device_id) to signature.)
-    keys = attr.ib(type=Optional[JsonDict])
+    keys: Optional[JsonDict]
 
 
 class EndToEndKeyBackgroundStore(SQLBaseStore):

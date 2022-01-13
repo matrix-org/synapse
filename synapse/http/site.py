@@ -534,9 +534,9 @@ class XForwardedForRequest(SynapseRequest):
 
 
 @implementer(IAddress)
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class _XForwardedForAddress:
-    host = attr.ib(type=str)
+    host: str
 
 
 class SynapseSite(Site):
