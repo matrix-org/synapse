@@ -253,6 +253,38 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         )
         self._assert_hierarchy(result, expected)
 
+    def test_large_space(self):
+        """Test a space with a large number of rooms."""
+        rooms = [self.room]
+        # Make at least 51 rooms that are part of the space.
+        for _ in range(55):
+            room = self.helper.create_room_as(self.user, tok=self.token)
+            self._add_child(self.space, room, self.token)
+            rooms.append(room)
+
+        result = self.get_success(self.handler.get_space_summary(self.user, self.space))
+        # The spaces result should have the space and the first 50 rooms in it,
+        # along with the links from space -> room for those 50 rooms.
+        expected = [(self.space, rooms[:50])] + [(room, []) for room in rooms[:49]]
+        self._assert_rooms(result, expected)
+
+        # The result should have the space and the rooms in it, along with the links
+        # from space -> room.
+        expected = [(self.space, rooms)] + [(room, []) for room in rooms]
+
+        # Make two requests to fully paginate the results.
+        result = self.get_success(
+            self.handler.get_room_hierarchy(create_requester(self.user), self.space)
+        )
+        result2 = self.get_success(
+            self.handler.get_room_hierarchy(
+                create_requester(self.user), self.space, from_token=result["next_batch"]
+            )
+        )
+        # Combine the results.
+        result["rooms"] += result2["rooms"]
+        self._assert_hierarchy(result, expected)
+
     def test_visibility(self):
         """A user not in a space cannot inspect it."""
         user2 = self.register_user("user2", "pass")

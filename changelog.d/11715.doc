@@ -1,0 +1,1 @@
+Document the new `SYNAPSE_TEST_PERSIST_SQLITE_DB` environment variable in the contributing guide.

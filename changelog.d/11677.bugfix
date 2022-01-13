@@ -1,1 +1,0 @@
-Fix wrong variable reference in `SimpleHttpClient.get_json` that results in the absence of the `Accept` header in the request.
