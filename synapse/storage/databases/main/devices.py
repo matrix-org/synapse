@@ -332,6 +332,11 @@ class DeviceWorkerStore(SQLBaseStore):
                 previous_update_stream_id, _ = query_map.get(key, (0, None))
 
                 if update_stream_id > previous_update_stream_id:
+                    # FIXME If this overwrites an older update, this discards the
+                    #  previous OpenTracing context.
+                    #  It might make it harder to track down issues using OpenTracing.
+                    #  If there's a good reason why it doesn't matter, a comment here
+                    #  about that would not hurt.
                     query_map[key] = (update_stream_id, update_context)
 
             # As this update has been added to the response, advance the stream
