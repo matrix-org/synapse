@@ -155,6 +155,12 @@ class DeviceStoreTestCase(HomeserverTestCase):
         # Check the newly-added device_ids are contained within these updates
         self._check_devices_in_updates(device_ids, device_updates)
 
+        # Check there are no more device updates left.
+        _, device_updates = self.get_success(
+            self.store.get_device_updates_by_remote("somehost", next_stream_id, limit=3)
+        )
+        self.assertEqual(device_updates, [])
+
     def test_get_device_updates_by_remote_cross_signing_key_updates(
         self,
     ) -> None:
@@ -252,6 +258,12 @@ class DeviceStoreTestCase(HomeserverTestCase):
         self.assertEqual(
             device_updates[1][0], "org.matrix.signing_key_update", device_updates[1]
         )
+
+        # Check there are no more device updates left.
+        _, device_updates = self.get_success(
+            self.store.get_device_updates_by_remote("somehost", next_stream_id, limit=3)
+        )
+        self.assertEqual(device_updates, [])
 
     def _check_devices_in_updates(self, expected_device_ids, device_updates):
         """Check that an specific device ids exist in a list of device update EDUs"""
