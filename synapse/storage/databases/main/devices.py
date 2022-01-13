@@ -1383,15 +1383,12 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             txn, table="device_lists_remote_cache", keyvalues={"user_id": user_id}
         )
 
-        self.db_pool.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_values_txn(
             txn,
             table="device_lists_remote_cache",
+            keys=("user_id", "device_id", "content"),
             values=[
-                {
-                    "user_id": user_id,
-                    "device_id": content["device_id"],
-                    "content": json_encoder.encode(content),
-                }
+                (user_id, content["device_id"], json_encoder.encode(content))
                 for content in devices
             ],
         )
@@ -1476,11 +1473,12 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             [(user_id, device_id, min_stream_id) for device_id in device_ids],
         )
 
-        self.db_pool.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_values_txn(
             txn,
             table="device_lists_stream",
+            keys=("stream_id", "user_id", "device_id"),
             values=[
-                {"stream_id": stream_id, "user_id": user_id, "device_id": device_id}
+                (stream_id, user_id, device_id)
                 for stream_id, device_id in zip(stream_ids, device_ids)
             ],
         )
@@ -1504,21 +1502,30 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         now = self._clock.time_msec()
         next_stream_id = iter(stream_ids)
 
-        self.db_pool.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_values_txn(
             txn,
             table="device_lists_outbound_pokes",
+            keys=(
+                "destination",
+                "stream_id",
+                "user_id",
+                "device_id",
+                "sent",
+                "ts",
+                "opentracing_context",
+            ),
             values=[
-                {
-                    "destination": destination,
-                    "stream_id": next(next_stream_id),
-                    "user_id": user_id,
-                    "device_id": device_id,
-                    "sent": False,
-                    "ts": now,
-                    "opentracing_context": json_encoder.encode(context)
+                (
+                    destination,
+                    next(next_stream_id),
+                    user_id,
+                    device_id,
+                    False,
+                    now,
+                    json_encoder.encode(context)
                     if whitelisted_homeserver(destination)
                     else "{}",
-                }
+                )
                 for destination in hosts
                 for device_id in device_ids
             ],

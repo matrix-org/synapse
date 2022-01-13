@@ -384,18 +384,19 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             # a unique constraint. If there is a race of two calls to
             # `add_e2e_one_time_keys` then they'll conflict and we will only
             # insert one set.
-            self.db_pool.simple_insert_many_txn(
+            self.db_pool.simple_insert_many_values_txn(
                 txn,
                 table="e2e_one_time_keys_json",
+                keys=(
+                    "user_id",
+                    "device_id",
+                    "algorithm",
+                    "key_id",
+                    "ts_added_ms",
+                    "key_json",
+                ),
                 values=[
-                    {
-                        "user_id": user_id,
-                        "device_id": device_id,
-                        "algorithm": algorithm,
-                        "key_id": key_id,
-                        "ts_added_ms": time_now,
-                        "key_json": json_bytes,
-                    }
+                    (user_id, device_id, algorithm, key_id, time_now, json_bytes)
                     for algorithm, key_id, json_bytes in new_keys
                 ],
             )

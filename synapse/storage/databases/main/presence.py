@@ -126,21 +126,32 @@ class PresenceStore(PresenceBackgroundUpdateStore):
             txn.execute(sql + clause, [stream_id] + list(args))
 
         # Actually insert new rows
-        self.db_pool.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_values_txn(
             txn,
             table="presence_stream",
+            keys=(
+                "stream_id",
+                "user_id",
+                "state",
+                "last_active_ts",
+                "last_federation_update_ts",
+                "last_user_sync_ts",
+                "status_msg",
+                "currently_active",
+                "instance_name",
+            ),
             values=[
-                {
-                    "stream_id": stream_id,
-                    "user_id": state.user_id,
-                    "state": state.state,
-                    "last_active_ts": state.last_active_ts,
-                    "last_federation_update_ts": state.last_federation_update_ts,
-                    "last_user_sync_ts": state.last_user_sync_ts,
-                    "status_msg": state.status_msg,
-                    "currently_active": state.currently_active,
-                    "instance_name": self._instance_name,
-                }
+                (
+                    stream_id,
+                    state.user_id,
+                    state.state,
+                    state.last_active_ts,
+                    state.last_federation_update_ts,
+                    state.last_user_sync_ts,
+                    state.status_msg,
+                    state.currently_active,
+                    self._instance_name,
+                )
                 for stream_id, state in zip(stream_orderings, presence_states)
             ],
         )

@@ -457,32 +457,22 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                     values={"state_group": state_group, "prev_state_group": prev_group},
                 )
 
-                self.db_pool.simple_insert_many_txn(
+                self.db_pool.simple_insert_many_values_txn(
                     txn,
                     table="state_groups_state",
+                    keys=("state_group", "room_id", "type", "state_key", "event_id"),
                     values=[
-                        {
-                            "state_group": state_group,
-                            "room_id": room_id,
-                            "type": key[0],
-                            "state_key": key[1],
-                            "event_id": state_id,
-                        }
+                        (state_group, room_id, key[0], key[1], state_id)
                         for key, state_id in delta_ids.items()
                     ],
                 )
             else:
-                self.db_pool.simple_insert_many_txn(
+                self.db_pool.simple_insert_many_values_txn(
                     txn,
                     table="state_groups_state",
+                    keys=("state_group", "room_id", "type", "state_key", "event_id"),
                     values=[
-                        {
-                            "state_group": state_group,
-                            "room_id": room_id,
-                            "type": key[0],
-                            "state_key": key[1],
-                            "event_id": state_id,
-                        }
+                        (state_group, room_id, key[0], key[1], state_id)
                         for key, state_id in current_state_ids.items()
                     ],
                 )
@@ -586,17 +576,12 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 txn, table="state_group_edges", keyvalues={"state_group": sg}
             )
 
-            self.db_pool.simple_insert_many_txn(
+            self.db_pool.simple_insert_many_values_txn(
                 txn,
                 table="state_groups_state",
+                keys=("state_group", "room_id", "type", "state_key", "event_id"),
                 values=[
-                    {
-                        "state_group": sg,
-                        "room_id": room_id,
-                        "type": key[0],
-                        "state_key": key[1],
-                        "event_id": state_id,
-                    }
+                    (sg, room_id, key[0], key[1], state_id)
                     for key, state_id in curr_state.items()
                 ],
             )

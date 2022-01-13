@@ -681,16 +681,17 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 try:
                     event_json = db_to_json(event_json_raw)
 
-                    self.db_pool.simple_insert_many_txn(
+                    self.db_pool.simple_insert_many_values_txn(
                         txn=txn,
                         table="event_labels",
+                        keys=("event_id", "label", "room_id", "topological_ordering"),
                         values=[
-                            {
-                                "event_id": event_id,
-                                "label": label,
-                                "room_id": event_json["room_id"],
-                                "topological_ordering": event_json["depth"],
-                            }
+                            (
+                                event_id,
+                                label,
+                                event_json["room_id"],
+                                event_json["depth"],
+                            )
                             for label in event_json["content"].get(
                                 EventContentFields.LABELS, []
                             )

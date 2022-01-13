@@ -872,17 +872,24 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         # If the `old.user_id` above is NULL then we know there isn't already an
         # entry in the table, so we simply insert it. Otherwise we update the
         # existing table.
-        self.db_pool.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_values_txn(
             txn,
             table="event_push_summary",
+            keys=(
+                "user_id",
+                "room_id",
+                "notif_count",
+                "unread_count",
+                "stream_ordering",
+            ),
             values=[
-                {
-                    "user_id": user_id,
-                    "room_id": room_id,
-                    "notif_count": summary.notif_count,
-                    "unread_count": summary.unread_count,
-                    "stream_ordering": summary.stream_ordering,
-                }
+                (
+                    user_id,
+                    room_id,
+                    summary.notif_count,
+                    summary.unread_count,
+                    summary.stream_ordering,
+                )
                 for ((user_id, room_id), summary) in summaries.items()
                 if summary.old_user_id is None
             ],
