@@ -191,7 +191,7 @@ class DeviceWorkerStore(SQLBaseStore):
     @trace
     async def get_device_updates_by_remote(
         self, destination: str, from_stream_id: int, limit: int
-    ) -> Tuple[int, List[Tuple[str, dict]]]:
+    ) -> Tuple[int, List[Tuple[str, JsonDict]]]:
         """Get a stream of device updates to send to the given remote server.
 
         Args:
