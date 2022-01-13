@@ -561,6 +561,10 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
                 txn, table="account_data", keyvalues={"user_id": user_id}
             )
 
+            self.db_pool.simple_delete_txn(
+                txn, table="room_account_data", keyvalues={"user_id": user_id}
+            )
+
             # Purge from ignored_users where this user is the ignorer.
             # N.B. We don't purge where this user is the ignoree, because that
             #      interferes with other users' account data.
