@@ -933,21 +933,6 @@ class DatabasePool:
 
         txn.execute(sql, vals)
 
-    async def simple_insert_many(
-        self, table: str, values: List[Dict[str, Any]], desc: str
-    ) -> None:
-        """Executes an INSERT query on the named table.
-
-        The input is given as a list of dicts, with one dict per row.
-        Generally simple_insert_many_values should be preferred for new code.
-
-        Args:
-            table: string giving the table name
-            values: dict of new column names and values for them
-            desc: description of the transaction, for logging and metrics
-        """
-        await self.runInteraction(desc, self.simple_insert_many_txn, table, values)
-
     @staticmethod
     def simple_insert_many_txn(
         txn: LoggingTransaction, table: str, values: List[Dict[str, Any]]
