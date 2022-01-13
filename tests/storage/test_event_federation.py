@@ -513,19 +513,25 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         # Insert a bunch of events that all reference the previous one.
         self.get_success(
-            self.store.db_pool.simple_insert_many(
+            self.store.db_pool.simple_insert_many_values(
                 table="federation_inbound_events_staging",
+                keys=(
+                    "origin",
+                    "room_id",
+                    "received_ts",
+                    "event_id",
+                    "event_json",
+                    "internal_metadata",
+                ),
                 values=[
-                    {
-                        "origin": "some_origin",
-                        "room_id": room_id,
-                        "received_ts": 0,
-                        "event_id": f"$fake_event_id_{i + 1}",
-                        "event_json": json_encoder.encode(
-                            {"prev_events": [f"$fake_event_id_{i}"]}
-                        ),
-                        "internal_metadata": "{}",
-                    }
+                    (
+                        "some_origin",
+                        room_id,
+                        0,
+                        f"$fake_event_id_{i + 1}",
+                        json_encoder.encode({"prev_events": [f"$fake_event_id_{i}"]}),
+                        "{}",
+                    )
                     for i in range(500)
                 ],
                 desc="test_prune_inbound_federation_queue",

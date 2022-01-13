@@ -1184,17 +1184,24 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             user_id: the user who made the signatures
             signatures: signatures to add
         """
-        await self.db_pool.simple_insert_many(
+        await self.db_pool.simple_insert_many_values(
             "e2e_cross_signing_signatures",
-            [
-                {
-                    "user_id": user_id,
-                    "key_id": item.signing_key_id,
-                    "target_user_id": item.target_user_id,
-                    "target_device_id": item.target_device_id,
-                    "signature": item.signature,
-                }
+            keys=(
+                "user_id",
+                "key_id",
+                "target_user_id",
+                "target_device_id",
+                "signature",
+            ),
+            values=[
+                (
+                    user_id,
+                    item.signing_key_id,
+                    item.target_user_id,
+                    item.target_device_id,
+                    item.signature,
+                )
                 for item in signatures
             ],
-            "add_e2e_signing_key",
+            desc="add_e2e_signing_key",
         )
