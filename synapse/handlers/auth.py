@@ -168,25 +168,25 @@ def login_id_phone_to_thirdparty(identifier: JsonDict) -> Dict[str, str]:
     }
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class SsoLoginExtraAttributes:
     """Data we track about SAML2 sessions"""
 
     # time the session was created, in milliseconds
-    creation_time = attr.ib(type=int)
-    extra_attributes = attr.ib(type=JsonDict)
+    creation_time: int
+    extra_attributes: JsonDict
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class LoginTokenAttributes:
     """Data we store in a short-term login token"""
 
-    user_id = attr.ib(type=str)
+    user_id: str
 
-    auth_provider_id = attr.ib(type=str)
+    auth_provider_id: str
     """The SSO Identity Provider that the user authenticated with, to get this token."""
 
-    auth_provider_session_id = attr.ib(type=Optional[str])
+    auth_provider_session_id: Optional[str]
     """The session ID advertised by the SSO Identity Provider."""
 
 

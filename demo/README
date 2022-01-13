@@ -22,5 +22,5 @@ Logs and sqlitedb will be stored in demo/808{0,1,2}.{log,db}
 
 
 
-Also note that when joining a public room on a differnt HS via "#foo:bar.net", then you are (in the current impl) joining a room with room_id "foo". This means that it won't work if your HS already has a room with that name.
+Also note that when joining a public room on a different HS via "#foo:bar.net", then you are (in the current impl) joining a room with room_id "foo". This means that it won't work if your HS already has a room with that name.
 
