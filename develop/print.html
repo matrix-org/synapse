@@ -12892,7 +12892,8 @@ license - in our case, this is almost always Apache Software License v2 (see
 recommended for development. More information about WSL can be found at
 <a href="https://docs.microsoft.com/en-us/windows/wsl/install">https://docs.microsoft.com/en-us/windows/wsl/install</a>. Running Synapse natively
 on Windows is not officially supported.</p>
-<p>The code of Synapse is written in Python 3. To do pretty much anything, you'll need <a href="https://wiki.python.org/moin/BeginnersGuide/Download">a recent version of Python 3</a>.</p>
+<p>The code of Synapse is written in Python 3. To do pretty much anything, you'll need <a href="https://www.python.org/downloads/">a recent version of Python 3</a>. Your Python also needs support for <a href="https://docs.python.org/3/library/venv.html">virtual environments</a>. This is usually built-in, but some Linux distributions like Debian and Ubuntu split it out into its own package. Running <code>sudo apt install python3-venv</code> should be enough.</p>
+<p>Synapse can connect to PostgreSQL via the <a href="https://pypi.org/project/psycopg2/">psycopg2</a> Python library. Building this library from source requires access to PostgreSQL's C header files. On Debian or Ubuntu Linux, these can be installed with <code>sudo apt install libpq-dev</code>.</p>
 <p>The source code of Synapse is hosted on GitHub. You will also need <a href="https://github.com/git-guides/install-git">a recent version of git</a>.</p>
 <p>For some tests, you will need <a href="https://docs.docker.com/get-docker/">a recent version of Docker</a>.</p>
 <h1 id="3-get-the-source"><a class="header" href="#3-get-the-source">3. Get the source.</a></h1>
