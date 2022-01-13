@@ -35,9 +35,9 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         self.user = self.register_user("user", "pass")
         self.token = self.login("user", "pass")
 
-    def test_account_data_deleted_upon_deactivation(self) -> None:
+    def test_global_account_data_deleted_upon_deactivation(self) -> None:
         """
-        Tests that account data is removed upon deactivation.
+        Tests that global account data is removed upon deactivation.
         """
         # Add some account data
         self.get_success(
@@ -46,6 +46,16 @@ class DeactivateAccountTestCase(HomeserverTestCase):
                 AccountDataTypes.DIRECT,
                 {"@someone:remote": ["!somewhere:remote"]},
             )
+        )
+
+        # Check that we actually added some.
+        self.assertIsNotNone(
+            self.get_success(
+                self._store.get_global_account_data_by_type_for_user(
+                    AccountDataTypes.DIRECT,
+                    self.user,
+                )
+            ),
         )
 
         # Request the deactivation of our account
@@ -65,6 +75,9 @@ class DeactivateAccountTestCase(HomeserverTestCase):
             )
         )
         self.assertEqual(req.code, 200, req)
+
+        # Clear the cache (for testing)
+        self._store.get_global_account_data_by_type_for_user.invalidate_all()
 
         # Check that the account data does not persist.
         self.assertIsNone(
