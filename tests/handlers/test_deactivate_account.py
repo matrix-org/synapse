@@ -30,7 +30,6 @@ class DeactivateAccountTestCase(HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        super(DeactivateAccountTestCase, self).prepare(reactor, clock, hs)
         self._store = hs.get_datastore()
 
         self.user = self.register_user("user", "pass")
