@@ -20,7 +20,7 @@ recommended for development. More information about WSL can be found at
 <https://docs.microsoft.com/en-us/windows/wsl/install>. Running Synapse natively
 on Windows is not officially supported.
 
-The code of Synapse is written in Python 3. To do pretty much anything, you'll need [a recent version of Python 3](https://wiki.python.org/moin/BeginnersGuide/Download), including support for [virtual environments](https://docs.python.org/3/library/venv.html). On Debian-derived Linux distros running `sudo apt install python3-venv` should be enough.
+The code of Synapse is written in Python 3. To do pretty much anything, you'll need [a recent version of Python 3](https://www.python.org/downloads/). Your Python also needs support for [virtual environments](https://docs.python.org/3/library/venv.html). This is usually built-in, but some Linux distributions like Debian and Ubuntu split it out into its own package. Running `sudo apt install python3-venv` should be enough.
 
 Synapse can connect to PostgreSQL via the Python plugin libpq-dev, so to build from source you need the PostgreSQL C client library, including its development header files.  On Debian-derived Linux distros you can install them using `sudo apt install libpq-dev`.
 
