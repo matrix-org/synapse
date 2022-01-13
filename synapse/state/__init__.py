@@ -450,19 +450,19 @@ class StateHandler:
         return {key: state_map[ev_id] for key, ev_id in new_state.items()}
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class _StateResMetrics:
     """Keeps track of some usage metrics about state res."""
 
     # System and User CPU time, in seconds
-    cpu_time = attr.ib(type=float, default=0.0)
+    cpu_time: float = 0.0
 
     # time spent on database transactions (excluding scheduling time). This roughly
     # corresponds to the amount of work done on the db server, excluding event fetches.
-    db_time = attr.ib(type=float, default=0.0)
+    db_time: float = 0.0
 
     # number of events fetched from the db.
-    db_events = attr.ib(type=int, default=0)
+    db_events: int = 0
 
 
 _biggest_room_by_cpu_counter = Counter(

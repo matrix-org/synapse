@@ -143,7 +143,7 @@ def make_conn(
     return db_conn
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class LoggingDatabaseConnection:
     """A wrapper around a database connection that returns `LoggingTransaction`
     as its cursor class.
@@ -151,9 +151,9 @@ class LoggingDatabaseConnection:
     This is mainly used on startup to ensure that queries get logged correctly
     """
 
-    conn = attr.ib(type=Connection)
-    engine = attr.ib(type=BaseDatabaseEngine)
-    default_txn_name = attr.ib(type=str)
+    conn: Connection
+    engine: BaseDatabaseEngine
+    default_txn_name: str
 
     def cursor(
         self, *, txn_name=None, after_callbacks=None, exception_callbacks=None

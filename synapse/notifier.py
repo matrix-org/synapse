@@ -193,15 +193,15 @@ class EventStreamResult:
         return bool(self.events)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class _PendingRoomEventEntry:
-    event_pos = attr.ib(type=PersistedEventPosition)
-    extra_users = attr.ib(type=Collection[UserID])
+    event_pos: PersistedEventPosition
+    extra_users: Collection[UserID]
 
-    room_id = attr.ib(type=str)
-    type = attr.ib(type=str)
-    state_key = attr.ib(type=Optional[str])
-    membership = attr.ib(type=Optional[str])
+    room_id: str
+    type: str
+    state_key: Optional[str]
+    membership: Optional[str]
 
 
 class Notifier:

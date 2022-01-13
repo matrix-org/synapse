@@ -65,22 +65,22 @@ class _BackgroundUpdates:
     REPLACE_STREAM_ORDERING_COLUMN = "replace_stream_ordering_column"
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class _CalculateChainCover:
     """Return value for _calculate_chain_cover_txn."""
 
     # The last room_id/depth/stream processed.
-    room_id = attr.ib(type=str)
-    depth = attr.ib(type=int)
-    stream = attr.ib(type=int)
+    room_id: str
+    depth: int
+    stream: int
 
     # Number of rows processed
-    processed_count = attr.ib(type=int)
+    processed_count: int
 
     # Map from room_id to last depth/stream processed for each room that we have
     # processed all events for (i.e. the rooms we can flip the
     # `has_auth_chain_index` for)
-    finished_room_map = attr.ib(type=Dict[str, Tuple[int, int]])
+    finished_room_map: Dict[str, Tuple[int, int]]
 
 
 class EventsBackgroundUpdatesStore(SQLBaseStore):

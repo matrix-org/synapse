@@ -69,7 +69,7 @@ event_counter = Counter(
 )
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class DeltaState:
     """Deltas to use to update the `current_state_events` table.
 
@@ -80,9 +80,9 @@ class DeltaState:
             should e.g. be removed from `current_state_events` table.
     """
 
-    to_delete = attr.ib(type=List[Tuple[str, str]])
-    to_insert = attr.ib(type=StateMap[str])
-    no_longer_in_room = attr.ib(type=bool, default=False)
+    to_delete: List[Tuple[str, str]]
+    to_insert: StateMap[str]
+    no_longer_in_room: bool = False
 
 
 class PersistEventsStore:
@@ -2226,17 +2226,17 @@ class PersistEventsStore:
         )
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class _LinkMap:
     """A helper type for tracking links between chains."""
 
     # Stores the set of links as nested maps: source chain ID -> target chain ID
     # -> source sequence number -> target sequence number.
-    maps = attr.ib(type=Dict[int, Dict[int, Dict[int, int]]], factory=dict)
+    maps: Dict[int, Dict[int, Dict[int, int]]] = attr.Factory(dict)
 
     # Stores the links that have been added (with new set to true), as tuples of
     # `(source chain ID, source sequence no, target chain ID, target sequence no.)`
-    additions = attr.ib(type=Set[Tuple[int, int, int, int]], factory=set)
+    additions: Set[Tuple[int, int, int, int]] = attr.Factory(set)
 
     def add_link(
         self,

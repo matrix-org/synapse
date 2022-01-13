@@ -200,8 +200,8 @@ class HttpListenerConfig:
     """Object describing the http-specific parts of the config of a listener"""
 
     x_forwarded: bool = False
-    resources: List[HttpResourceConfig] = attr.ib(factory=list)
-    additional_resources: Dict[str, dict] = attr.ib(factory=dict)
+    resources: List[HttpResourceConfig] = attr.Factory(list)
+    additional_resources: Dict[str, dict] = attr.Factory(dict)
     tag: Optional[str] = None
 
 
