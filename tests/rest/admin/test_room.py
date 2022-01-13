@@ -1443,9 +1443,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         _order_test("guest_access", sorted_by_room_id_desc, reverse=True)
 
         _order_test("history_visibility", sorted_by_room_id_asc)
-        _order_test(
-            "history_visibility", sorted_by_room_id_desc, reverse=True
-        )
+        _order_test("history_visibility", sorted_by_room_id_desc, reverse=True)
 
         _order_test("state_events", [room_id_3, room_id_2, room_id_1])
         _order_test("state_events", [room_id_1, room_id_2, room_id_3], reverse=True)
