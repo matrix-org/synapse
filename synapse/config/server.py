@@ -883,7 +883,7 @@ class ServerConfig(Config):
         # The default room version for newly created rooms.
         #
         # Known room versions are listed here:
-        # https://matrix.org/docs/spec/#complete-list-of-room-versions
+        # https://spec.matrix.org/latest/rooms/#complete-list-of-room-versions
         #
         # For example, for room version 1, default_room_version should be set
         # to "1".
