@@ -552,7 +552,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             INNER JOIN room_stats_current curr USING (room_id)
             INNER JOIN rooms USING (room_id)
             %s
-            ORDER BY %s %s
+            ORDER BY %s %s, state.room_id ASC
             LIMIT ?
             OFFSET ?
         """ % (
