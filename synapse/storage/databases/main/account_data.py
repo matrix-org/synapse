@@ -551,8 +551,8 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         Removes ALL the account data for a user.
         Intended to be used upon user deactivation.
 
-        Also purges the user from the ignored_users cache table
-        and the push_rules cache tables.
+        Also purges the user from the ignored_users table and the push_rules tables,
+        because those are derived from account data.
         """
 
         def purge_account_data_for_user_txn(txn: LoggingTransaction) -> None:
