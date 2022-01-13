@@ -384,7 +384,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             # a unique constraint. If there is a race of two calls to
             # `add_e2e_one_time_keys` then they'll conflict and we will only
             # insert one set.
-            self.db_pool.simple_insert_many_values_txn(
+            self.db_pool.simple_insert_many_txn(
                 txn,
                 table="e2e_one_time_keys_json",
                 keys=(
@@ -1185,7 +1185,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             user_id: the user who made the signatures
             signatures: signatures to add
         """
-        await self.db_pool.simple_insert_many_values(
+        await self.db_pool.simple_insert_many(
             "e2e_cross_signing_signatures",
             keys=(
                 "user_id",

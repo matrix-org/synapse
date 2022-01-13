@@ -1383,7 +1383,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             txn, table="device_lists_remote_cache", keyvalues={"user_id": user_id}
         )
 
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="device_lists_remote_cache",
             keys=("user_id", "device_id", "content"),
@@ -1473,7 +1473,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             [(user_id, device_id, min_stream_id) for device_id in device_ids],
         )
 
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="device_lists_stream",
             keys=("stream_id", "user_id", "device_id"),
@@ -1502,7 +1502,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         now = self._clock.time_msec()
         next_stream_id = iter(stream_ids)
 
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="device_lists_outbound_pokes",
             keys=(

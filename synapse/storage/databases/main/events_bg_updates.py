@@ -681,7 +681,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 try:
                     event_json = db_to_json(event_json_raw)
 
-                    self.db_pool.simple_insert_many_values_txn(
+                    self.db_pool.simple_insert_many_txn(
                         txn=txn,
                         table="event_labels",
                         keys=("event_id", "label", "room_id", "topological_ordering"),
@@ -814,7 +814,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                     auth_events.append((event.event_id, event.room_id, auth_id))
 
         if state_events:
-            await self.db_pool.simple_insert_many_values(
+            await self.db_pool.simple_insert_many(
                 table="state_events",
                 keys=("event_id", "room_id", "type", "state_key"),
                 values=state_events,
@@ -822,7 +822,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             )
 
         if auth_events:
-            await self.db_pool.simple_insert_many_values(
+            await self.db_pool.simple_insert_many(
                 table="event_auth",
                 keys=("event_id", "room_id", "auth_id"),
                 values=auth_events,

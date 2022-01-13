@@ -429,7 +429,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             # Add the remote messages to the federation outbox.
             # We'll send them to a remote server when we next send a
             # federation transaction to that destination.
-            self.db_pool.simple_insert_many_values_txn(
+            self.db_pool.simple_insert_many_txn(
                 txn,
                 table="device_federation_outbox",
                 keys=(
@@ -575,7 +575,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         if not local_by_user_then_device:
             return
 
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="device_inbox",
             keys=("user_id", "device_id", "stream_id", "message_json", "instance_name"),

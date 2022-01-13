@@ -225,7 +225,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         for c in string.ascii_letters + string.digits + "._~-":
             tokens.append((c, None, 0, 0, None))
         self.get_success(
-            self.store.db_pool.simple_insert_many_values(
+            self.store.db_pool.simple_insert_many(
                 "registration_tokens",
                 keys=("token", "uses_allowed", "pending", "completed", "expiry_time"),
                 values=tokens,

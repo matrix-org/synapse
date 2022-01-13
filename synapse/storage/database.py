@@ -933,7 +933,7 @@ class DatabasePool:
 
         txn.execute(sql, vals)
 
-    async def simple_insert_many_values(
+    async def simple_insert_many(
         self,
         table: str,
         keys: Collection[str],
@@ -952,11 +952,11 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
         """
         await self.runInteraction(
-            desc, self.simple_insert_many_values_txn, table, keys, values
+            desc, self.simple_insert_many_txn, table, keys, values
         )
 
     @staticmethod
-    def simple_insert_many_values_txn(
+    def simple_insert_many_txn(
         txn: LoggingTransaction,
         table: str,
         keys: Collection[str],

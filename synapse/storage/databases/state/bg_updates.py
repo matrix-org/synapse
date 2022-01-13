@@ -324,7 +324,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                             keyvalues={"state_group": state_group},
                         )
 
-                        self.db_pool.simple_insert_many_values_txn(
+                        self.db_pool.simple_insert_many_txn(
                             txn,
                             table="state_groups_state",
                             keys=(

@@ -439,7 +439,7 @@ class PersistEventsStore:
         # event's auth chain, but its easier for now just to store them (and
         # it doesn't take much storage compared to storing the entire event
         # anyway).
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="event_auth",
             keys=("event_id", "room_id", "auth_id"),
@@ -669,7 +669,7 @@ class PersistEventsStore:
         )
         chain_map.update(new_chain_tuples)
 
-        db_pool.simple_insert_many_values_txn(
+        db_pool.simple_insert_many_txn(
             txn,
             table="event_auth_chains",
             keys=("event_id", "chain_id", "sequence_number"),
@@ -777,7 +777,7 @@ class PersistEventsStore:
                         (chain_id, sequence_number), (target_id, target_seq)
                     )
 
-        db_pool.simple_insert_many_values_txn(
+        db_pool.simple_insert_many_txn(
             txn,
             table="event_auth_chain_links",
             keys=(
@@ -953,7 +953,7 @@ class PersistEventsStore:
                 )
 
         if to_insert:
-            self.db_pool.simple_insert_many_values_txn(
+            self.db_pool.simple_insert_many_txn(
                 txn,
                 table="event_txn_id",
                 keys=(
@@ -1165,7 +1165,7 @@ class PersistEventsStore:
                 self.store.get_latest_event_ids_in_room.invalidate, (room_id,)
             )
 
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="event_forward_extremities",
             keys=("event_id", "room_id"),
@@ -1179,7 +1179,7 @@ class PersistEventsStore:
         # new stream_ordering to new forward extremeties in the room.
         # This allows us to later efficiently look up the forward extremeties
         # for a room before a given stream_ordering
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="stream_ordering_to_exterm",
             keys=("room_id", "event_id", "stream_ordering"),
@@ -1347,7 +1347,7 @@ class PersistEventsStore:
             d.pop("redacted_because", None)
             return d
 
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="event_json",
             keys=("event_id", "room_id", "internal_metadata", "json", "format_version"),
@@ -1363,7 +1363,7 @@ class PersistEventsStore:
             ),
         )
 
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="events",
             keys=(
@@ -1417,7 +1417,7 @@ class PersistEventsStore:
         )
         txn.execute(sql + clause, [False] + args)
 
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="state_events",
             keys=("event_id", "room_id", "type", "state_key"),
@@ -1624,7 +1624,7 @@ class PersistEventsStore:
             room_id (str): The ID of the room the event was sent to.
             topological_ordering (int): The position of the event in the room's topology.
         """
-        return self.db_pool.simple_insert_many_values_txn(
+        return self.db_pool.simple_insert_many_txn(
             txn=txn,
             table="event_labels",
             keys=("event_id", "label", "room_id", "topological_ordering"),
@@ -1659,7 +1659,7 @@ class PersistEventsStore:
             ref_alg, ref_hash_bytes = compute_event_reference_hash(event)
             vals.append((event.event_id, ref_alg, memoryview(ref_hash_bytes)))
 
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="event_reference_hashes",
             keys=("event_id", "algorithm", "hash"),
@@ -1683,7 +1683,7 @@ class PersistEventsStore:
         def non_null_str_or_none(val: Any) -> Optional[str]:
             return val if isinstance(val, str) and "\u0000" not in val else None
 
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="room_memberships",
             keys=(
@@ -2164,7 +2164,7 @@ class PersistEventsStore:
         For the given event, update the event edges table and forward and
         backward extremities tables.
         """
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="event_edges",
             keys=("event_id", "prev_event_id", "room_id", "is_state"),

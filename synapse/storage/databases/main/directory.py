@@ -109,7 +109,7 @@ class DirectoryWorkerStore(CacheInvalidationWorkerStore):
                 },
             )
 
-            self.db_pool.simple_insert_many_values_txn(
+            self.db_pool.simple_insert_many_txn(
                 txn,
                 table="room_alias_servers",
                 keys=("room_alias", "server"),

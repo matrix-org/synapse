@@ -558,7 +558,7 @@ class PusherStore(PusherWorkerStore):
                 keyvalues={"user_name": user_id},
             )
 
-            self.db_pool.simple_insert_many_values_txn(
+            self.db_pool.simple_insert_many_txn(
                 txn,
                 table="deleted_pushers",
                 keys=("stream_id", "app_id", "pushkey", "user_id"),

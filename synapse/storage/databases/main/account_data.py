@@ -533,7 +533,7 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         )
 
         # Add entries which are newly ignored.
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="ignored_users",
             keys=("ignorer_user_id", "ignored_user_id"),

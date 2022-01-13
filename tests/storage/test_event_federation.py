@@ -513,7 +513,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         # Insert a bunch of events that all reference the previous one.
         self.get_success(
-            self.store.db_pool.simple_insert_many_values(
+            self.store.db_pool.simple_insert_many(
                 table="federation_inbound_events_staging",
                 keys=(
                     "origin",

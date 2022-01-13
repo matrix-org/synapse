@@ -130,7 +130,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 }
             )
 
-        await self.db_pool.simple_insert_many_values(
+        await self.db_pool.simple_insert_many(
             table="e2e_room_keys",
             keys=(
                 "user_id",

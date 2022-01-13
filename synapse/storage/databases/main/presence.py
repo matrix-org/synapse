@@ -126,7 +126,7 @@ class PresenceStore(PresenceBackgroundUpdateStore):
             txn.execute(sql + clause, [stream_id] + list(args))
 
         # Actually insert new rows
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="presence_stream",
             keys=(

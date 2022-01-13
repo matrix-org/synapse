@@ -872,7 +872,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         # If the `old.user_id` above is NULL then we know there isn't already an
         # entry in the table, so we simply insert it. Otherwise we update the
         # existing table.
-        self.db_pool.simple_insert_many_values_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="event_push_summary",
             keys=(

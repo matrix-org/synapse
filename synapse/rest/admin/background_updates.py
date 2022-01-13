@@ -147,7 +147,7 @@ class BackgroundUpdateStartJobRestServlet(RestServlet):
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Invalid job_name")
 
         try:
-            await self._store.db_pool.simple_insert_many_values(
+            await self._store.db_pool.simple_insert_many(
                 table="background_updates",
                 keys=("update_name", "progress_json", "depends_on"),
                 values=jobs,

@@ -106,7 +106,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             """
             txn.execute(sql)
             rooms = list(txn.fetchall())
-            self.db_pool.simple_insert_many_values_txn(
+            self.db_pool.simple_insert_many_txn(
                 txn, TEMP_TABLE + "_rooms", keys=("room_id", "events"), values=rooms
             )
             del rooms
@@ -121,7 +121,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             txn.execute("SELECT name FROM users")
             users = list(txn.fetchall())
 
-            self.db_pool.simple_insert_many_values_txn(
+            self.db_pool.simple_insert_many_txn(
                 txn, TEMP_TABLE + "_users", keys=("user_id",), values=users
             )
 
