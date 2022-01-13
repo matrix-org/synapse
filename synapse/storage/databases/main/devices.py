@@ -222,7 +222,8 @@ class DeviceWorkerStore(SQLBaseStore):
             limit,
         )
 
-        # len(updates) <= limit.
+        # We need to ensure `updates` doesn't grow too big. 
+        # Currently: `len(updates) <= limit`.
 
         # Return an empty list if there are no updates
         if not updates:
@@ -283,7 +284,7 @@ class DeviceWorkerStore(SQLBaseStore):
             # Calculate the remaining length budget.
             # Note that, for now, each entry in `cross_signing_keys_by_user`
             # gives rise to two device updates in the result, so those cost twice
-            # as much (and are the whole reason we need to separatly calculate
+            # as much (and are the whole reason we need to separately calculate
             # the budget; we know len(updates) <= limit otherwise!)
             # N.B. len() on dicts is cheap since they store their size.
             remaining_length_budget = limit - (
