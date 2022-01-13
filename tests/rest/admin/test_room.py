@@ -1363,8 +1363,10 @@ class RoomTestCase(unittest.HomeserverTestCase):
         room_id_3 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
 
         # Also create a list sorted by IDs for properties that are equal (and thus sorted by room_id)
-        all_ids = [room_id_1, room_id_2, room_id_3]
-        all_ids.sort()
+        sorted_by_room_id_asc = [room_id_1, room_id_2, room_id_3]
+        sorted_by_room_id_asc.sort()
+        sorted_by_room_id_desc = sorted_by_room_id_asc.copy()
+        sorted_by_room_id_desc.reverse()
 
         # Set room names in alphabetical order. room 1 -> A, 2 -> B, 3 -> C
         self.helper.send_state(
@@ -1419,31 +1421,30 @@ class RoomTestCase(unittest.HomeserverTestCase):
             "joined_local_members", [room_id_1, room_id_2, room_id_3], reverse=True
         )
 
-        _order_test("version", all_ids)
-        _order_test("version", all_ids, reverse=True)
+        _order_test("version", sorted_by_room_id_asc, reverse=True)
+        _order_test("version", sorted_by_room_id_desc)
 
-        _order_test("creator", all_ids)
-        _order_test("creator", all_ids, reverse=True)
+        _order_test("creator", sorted_by_room_id_asc)
+        _order_test("creator", sorted_by_room_id_desc, reverse=True)
 
-        _order_test("encryption", all_ids)
-        _order_test("encryption", all_ids, reverse=True)
+        _order_test("encryption", sorted_by_room_id_asc)
+        _order_test("encryption", sorted_by_room_id_desc, reverse=True)
 
-        _order_test("federatable", all_ids)
-        _order_test("federatable", all_ids, reverse=True)
+        _order_test("federatable", sorted_by_room_id_asc)
+        _order_test("federatable", sorted_by_room_id_desc, reverse=True)
 
-        _order_test("public", all_ids)
-        # Different sort order of SQlite and PostreSQL
-        # _order_test("public", [room_id_3, room_id_2, room_id_1], reverse=True)
+        _order_test("public", sorted_by_room_id_asc)
+        _order_test("public", sorted_by_room_id_desc, reverse=True)
 
-        _order_test("join_rules", all_ids)
-        _order_test("join_rules", all_ids, reverse=True)
+        _order_test("join_rules", sorted_by_room_id_asc)
+        _order_test("join_rules", sorted_by_room_id_desc, reverse=True)
 
-        _order_test("guest_access", all_ids)
-        _order_test("guest_access", all_ids, reverse=True)
+        _order_test("guest_access", sorted_by_room_id_asc)
+        _order_test("guest_access", sorted_by_room_id_desc, reverse=True)
 
-        _order_test("history_visibility", all_ids)
+        _order_test("history_visibility", sorted_by_room_id_asc)
         _order_test(
-            "history_visibility", all_ids, reverse=True
+            "history_visibility", sorted_by_room_id_desc, reverse=True
         )
 
         _order_test("state_events", [room_id_3, room_id_2, room_id_1])
