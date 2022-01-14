@@ -446,7 +446,6 @@ class RelationsWorkerStore(SQLBaseStore):
             """
 
             txn.execute(sql, (event_id, room_id, RelationTypes.THREAD, user_id))
-            row = txn.fetchone()
             participated = bool(txn.fetchone())
 
             return count, latest_event_id, participated
