@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 class OEmbedResult:
     # The Open Graph result (converted from the oEmbed result).
     open_graph_result: JsonDict
-    # The author_name of the OEmbed result
+    # The author_name of the oEmbed result
     author_name: Optional[str]
     # Number of milliseconds to cache the content, according to the oEmbed response.
     #
@@ -196,6 +196,7 @@ class OEmbedProvider:
             # Trap any exception and let the code follow as usual.
             logger.warning("Error parsing oEmbed metadata from %s: %r", url, e)
             open_graph_response = {}
+            author_name = None
             cache_age = None
 
         return OEmbedResult(open_graph_response, author_name, cache_age)

@@ -306,13 +306,14 @@ class PreviewUrlResource(DirectServeJsonResource):
                         url, oembed_info, expiration_ms
                     )
 
-                og_from_og = parse_html_to_open_graph(tree, media_info.uri)
+                # Parse Open Graph information from the HTML in case the oEmbed
+                # response failed or is incomplete.
+                og_from_html = parse_html_to_open_graph(tree, media_info.uri)
 
-                # If there was no oEmbed URL, or oEmbed parsing failed, or the
-                # information retrieved was incomplete, we complete it from
-                # the OpenGraph information. We give oEmbed information
-                # precedence.
-                og = {**og_from_og, **og_from_oembed}
+                # Compile the Open Graph response by using the scraped
+                # information from the HTML and overlaying any information
+                # from the oEmbed response.
+                og = {**og_from_html, **og_from_oembed}
 
                 await self._precache_image_url(user, media_info, og)
             else:
@@ -510,6 +511,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         Returns:
             A tuple of:
                 The Open Graph dictionary, if the oEmbed info can be parsed.
+                The author name if it could be retrieved from oEmbed.
                 The (possibly updated) length of time, in milliseconds, the media is valid for.
         """
         # If JSON was not returned, there's nothing to do.
