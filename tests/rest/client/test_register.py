@@ -768,7 +768,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         # Check that the registration succeeded (since we ignored the username parameter)
         # and that there's a user_id parameter in the response body.
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEquals(200, channel.code, channel.json_body)
         self.assertIn("user_id", channel.json_body)
 
         # Check that the user_id parameter from the response body differs from the
