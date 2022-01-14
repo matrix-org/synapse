@@ -29,6 +29,7 @@ class ApiConfig(Config):
     def read_config(self, config: JsonDict, **kwargs):
         validate_config(_MAIN_SCHEMA, config, ())
         self.room_prejoin_state = list(self._get_prejoin_state_types(config))
+        self.track_puppeted_user_ips = config.get("track_puppeted_user_ips", False)
 
     def generate_config_section(cls, **kwargs) -> str:
         formatted_default_state_types = "\n".join(
@@ -59,6 +60,12 @@ class ApiConfig(Config):
            #
            #additional_event_types:
            #  - org.example.custom.event.type
+
+        # If enabled, puppeted user IP's can also be tracked. By default when
+        # puppeting another user, the user who has created the access token
+        # for puppeting is tracked. If this is enabled, both requests are tracked.
+        # Implicitly enables MAU tracking for puppeted users.
+        #track_puppeted_user_ips: false
         """ % {
             "formatted_default_state_types": formatted_default_state_types
         }
@@ -138,5 +145,8 @@ _MAIN_SCHEMA = {
     "properties": {
         "room_prejoin_state": _ROOM_PREJOIN_STATE_CONFIG_SCHEMA,
         "room_invite_state_types": _ROOM_INVITE_STATE_TYPES_SCHEMA,
+        "track_puppeted_user_ips": {
+            "type": "boolean",
+        },
     },
 }
