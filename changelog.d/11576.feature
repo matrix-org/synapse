@@ -1,1 +1,1 @@
-Add a v3 of the Users Admin API which removes `"password_hash"` from response dictionaries. Deprecates the v2 version of the API.
+Remove the `"password_hash"` field from the response dictionaries of the [Users Admin API](https://matrix-org.github.io/synapse/latest/admin_api/user_admin_api.html).
