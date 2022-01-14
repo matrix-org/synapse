@@ -292,7 +292,7 @@ class _Recoverer:
 
     def _backoff(self) -> None:
         if self.backoff_counter < 5:
-            self.backoff_counter += 1
+            self.backoff_counter += 0.5
         self.recover()
 
     async def retry(self) -> None:
