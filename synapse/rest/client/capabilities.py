@@ -73,6 +73,9 @@ class CapabilitiesRestServlet(RestServlet):
                 "enabled": self.config.registration.enable_3pid_changes
             }
 
+        if self.config.experimental.msc3440_enabled:
+            response["capabilities"]["io.element.thread"] = {"enabled": True}
+
         return 200, response
 
 

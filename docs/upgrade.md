@@ -85,6 +85,17 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.50.0
+
+## Dropping support for old Python and Postgres versions
+
+In line with our [deprecation policy](deprecation_policy.md),
+we've dropped support for Python 3.6 and PostgreSQL 9.6, as they are no
+longer supported upstream.
+
+This release of Synapse requires Python 3.7+ and PostgreSQL 10+.
+
+
 # Upgrading to v1.47.0
 
 ## Removal of old Room Admin API

@@ -28,9 +28,9 @@ from typing import (
     Union,
 )
 
+from matrix_common.regex import glob_to_regex
 from prometheus_client import Counter, Gauge, Histogram
 
-from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
@@ -66,8 +66,8 @@ from synapse.replication.http.federation import (
 )
 from synapse.storage.databases.main.lock import Lock
 from synapse.types import JsonDict, get_domain_from_id
-from synapse.util import glob_to_regex, json_decoder, unwrapFirstError
-from synapse.util.async_helpers import Linearizer, concurrently_execute
+from synapse.util import json_decoder, unwrapFirstError
+from synapse.util.async_helpers import Linearizer, concurrently_execute, gather_results
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_server_name
 
@@ -360,13 +360,13 @@ class FederationServer(FederationBase):
         # want to block things like to device messages from reaching clients
         # behind the potentially expensive handling of PDUs.
         pdu_results, _ = await make_deferred_yieldable(
-            defer.gatherResults(
-                [
+            gather_results(
+                (
                     run_in_background(
                         self._handle_pdus_in_txn, origin, transaction, request_time
                     ),
                     run_in_background(self._handle_edus_in_txn, origin, transaction),
-                ],
+                ),
                 consumeErrors=True,
             ).addErrback(unwrapFirstError)
         )

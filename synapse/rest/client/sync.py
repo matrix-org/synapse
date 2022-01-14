@@ -48,6 +48,7 @@ from synapse.handlers.sync import (
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
+from synapse.logging.opentracing import trace
 from synapse.types import JsonDict, StreamToken
 from synapse.util import json_decoder
 
@@ -222,6 +223,7 @@ class SyncRestServlet(RestServlet):
         logger.debug("Event formatting complete")
         return 200, response_content
 
+    @trace(opname="sync.encode_response")
     async def encode_response(
         self,
         time_now: int,
@@ -293,6 +295,9 @@ class SyncRestServlet(RestServlet):
         response[
             "org.matrix.msc2732.device_unused_fallback_key_types"
         ] = sync_result.device_unused_fallback_key_types
+        response[
+            "device_unused_fallback_key_types"
+        ] = sync_result.device_unused_fallback_key_types
 
         if joined:
             response["rooms"][Membership.JOIN] = joined
@@ -329,6 +334,7 @@ class SyncRestServlet(RestServlet):
             ]
         }
 
+    @trace(opname="sync.encode_joined")
     async def encode_joined(
         self,
         rooms: List[JoinedSyncResult],
@@ -365,6 +371,7 @@ class SyncRestServlet(RestServlet):
 
         return joined
 
+    @trace(opname="sync.encode_invited")
     async def encode_invited(
         self,
         rooms: List[InvitedSyncResult],
@@ -403,6 +410,7 @@ class SyncRestServlet(RestServlet):
 
         return invited
 
+    @trace(opname="sync.encode_knocked")
     async def encode_knocked(
         self,
         rooms: List[KnockedSyncResult],
@@ -457,6 +465,7 @@ class SyncRestServlet(RestServlet):
 
         return knocked
 
+    @trace(opname="sync.encode_archived")
     async def encode_archived(
         self,
         rooms: List[ArchivedSyncResult],

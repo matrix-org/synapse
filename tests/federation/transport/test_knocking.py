@@ -108,6 +108,15 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
                         "state_key": "",
                     },
                 ),
+                (
+                    EventTypes.Topic,
+                    {
+                        "content": {
+                            "topic": "A really cool room",
+                        },
+                        "state_key": "",
+                    },
+                ),
             ]
         )
 

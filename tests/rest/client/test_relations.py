@@ -16,6 +16,7 @@
 import itertools
 import urllib.parse
 from typing import Dict, List, Optional, Tuple
+from unittest.mock import patch
 
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.rest import admin
@@ -23,6 +24,8 @@ from synapse.rest.client import login, register, relations, room, sync
 
 from tests import unittest
 from tests.server import FakeChannel
+from tests.test_utils import make_awaitable
+from tests.test_utils.event_injection import inject_event
 
 
 class RelationsTestCase(unittest.HomeserverTestCase):
@@ -650,6 +653,118 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                 },
             },
         )
+
+    @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
+    def test_ignore_invalid_room(self):
+        """Test that we ignore invalid relations over federation."""
+        # Create another room and send a message in it.
+        room2 = self.helper.create_room_as(self.user_id, tok=self.user_token)
+        res = self.helper.send(room2, body="Hi!", tok=self.user_token)
+        parent_id = res["event_id"]
+
+        # Disable the validation to pretend this came over federation.
+        with patch(
+            "synapse.handlers.message.EventCreationHandler._validate_event_relation",
+            new=lambda self, event: make_awaitable(None),
+        ):
+            # Generate a various relations from a different room.
+            self.get_success(
+                inject_event(
+                    self.hs,
+                    room_id=self.room,
+                    type="m.reaction",
+                    sender=self.user_id,
+                    content={
+                        "m.relates_to": {
+                            "rel_type": RelationTypes.ANNOTATION,
+                            "event_id": parent_id,
+                            "key": "A",
+                        }
+                    },
+                )
+            )
+
+            self.get_success(
+                inject_event(
+                    self.hs,
+                    room_id=self.room,
+                    type="m.room.message",
+                    sender=self.user_id,
+                    content={
+                        "body": "foo",
+                        "msgtype": "m.text",
+                        "m.relates_to": {
+                            "rel_type": RelationTypes.REFERENCE,
+                            "event_id": parent_id,
+                        },
+                    },
+                )
+            )
+
+            self.get_success(
+                inject_event(
+                    self.hs,
+                    room_id=self.room,
+                    type="m.room.message",
+                    sender=self.user_id,
+                    content={
+                        "body": "foo",
+                        "msgtype": "m.text",
+                        "m.relates_to": {
+                            "rel_type": RelationTypes.THREAD,
+                            "event_id": parent_id,
+                        },
+                    },
+                )
+            )
+
+            self.get_success(
+                inject_event(
+                    self.hs,
+                    room_id=self.room,
+                    type="m.room.message",
+                    sender=self.user_id,
+                    content={
+                        "body": "foo",
+                        "msgtype": "m.text",
+                        "new_content": {
+                            "body": "new content",
+                            "msgtype": "m.text",
+                        },
+                        "m.relates_to": {
+                            "rel_type": RelationTypes.REPLACE,
+                            "event_id": parent_id,
+                        },
+                    },
+                )
+            )
+
+        # They should be ignored when fetching relations.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{room2}/relations/{parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(channel.json_body["chunk"], [])
+
+        # And when fetching aggregations.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{room2}/aggregations/{parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEqual(channel.json_body["chunk"], [])
+
+        # And for bundled aggregations.
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{room2}/event/{parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertNotIn("m.relations", channel.json_body["unsigned"])
 
     def test_edit(self):
         """Test that a simple edit works."""
