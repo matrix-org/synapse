@@ -1,8 +1,9 @@
 Synapse 1.50.0rc2 (2022-01-14)
 ==============================
 
-This release candidate fixes a federation-breaking regression introduced in the previous release candidate. The bug broke sending federation traffic to destination servers that had enough outbound device updates to be sent (including at least one cross-signing key update).
-It would particularly affect sending to servers that have had downtime, as this would make it more likely that a big enough queue of outbound device updates had built up.
+This release candidate fixes a federation-breaking regression introduced in Synapse 1.50.0rc1.
+
+Please note that we now only support Python 3.7+ and PostgreSQL 10+ (if applicable), because Python 3.6 and PostgreSQL 9.6 have reached end-of-life.
 
 
 Bugfixes
@@ -26,8 +27,6 @@ Internal Changes
 
 Synapse 1.50.0rc1 (2022-01-05)
 ==============================
-
-Please note that we now only support Python 3.7+ and PostgreSQL 10+ (if applicable), because Python 3.6 and PostgreSQL 9.6 have reached end-of-life.
 
 
 Features
