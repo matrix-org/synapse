@@ -17,7 +17,6 @@ from collections import defaultdict
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
     Callable,
     Dict,
     Iterable,
@@ -48,6 +47,7 @@ from synapse.handlers.sync import (
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
+from synapse.logging.opentracing import trace
 from synapse.types import JsonDict, StreamToken
 from synapse.util import json_decoder
 
@@ -222,6 +222,7 @@ class SyncRestServlet(RestServlet):
         logger.debug("Event formatting complete")
         return 200, response_content
 
+    @trace(opname="sync.encode_response")
     async def encode_response(
         self,
         time_now: int,
@@ -332,6 +333,7 @@ class SyncRestServlet(RestServlet):
             ]
         }
 
+    @trace(opname="sync.encode_joined")
     async def encode_joined(
         self,
         rooms: List[JoinedSyncResult],
@@ -368,6 +370,7 @@ class SyncRestServlet(RestServlet):
 
         return joined
 
+    @trace(opname="sync.encode_invited")
     async def encode_invited(
         self,
         rooms: List[InvitedSyncResult],
@@ -391,7 +394,7 @@ class SyncRestServlet(RestServlet):
         """
         invited = {}
         for room in rooms:
-            invite = await self._event_serializer.serialize_event(
+            invite = self._event_serializer.serialize_event(
                 room.invite,
                 time_now,
                 token_id=token_id,
@@ -406,6 +409,7 @@ class SyncRestServlet(RestServlet):
 
         return invited
 
+    @trace(opname="sync.encode_knocked")
     async def encode_knocked(
         self,
         rooms: List[KnockedSyncResult],
@@ -427,7 +431,7 @@ class SyncRestServlet(RestServlet):
         """
         knocked = {}
         for room in rooms:
-            knock = await self._event_serializer.serialize_event(
+            knock = self._event_serializer.serialize_event(
                 room.knock,
                 time_now,
                 token_id=token_id,
@@ -460,6 +464,7 @@ class SyncRestServlet(RestServlet):
 
         return knocked
 
+    @trace(opname="sync.encode_archived")
     async def encode_archived(
         self,
         rooms: List[ArchivedSyncResult],
@@ -519,13 +524,14 @@ class SyncRestServlet(RestServlet):
             The room, encoded in our response format
         """
 
-        def serialize(events: Iterable[EventBase]) -> Awaitable[List[JsonDict]]:
+        def serialize(
+            events: Iterable[EventBase],
+            aggregations: Optional[Dict[str, Dict[str, Any]]] = None,
+        ) -> List[JsonDict]:
             return self._event_serializer.serialize_events(
                 events,
                 time_now=time_now,
-                # Don't bother to bundle aggregations if the timeline is unlimited,
-                # as clients will have all the necessary information.
-                bundle_aggregations=room.timeline.limited,
+                bundle_aggregations=aggregations,
                 token_id=token_id,
                 event_format=event_formatter,
                 only_event_fields=only_fields,
@@ -547,8 +553,21 @@ class SyncRestServlet(RestServlet):
                     event.room_id,
                 )
 
-        serialized_state = await serialize(state_events)
-        serialized_timeline = await serialize(timeline_events)
+        serialized_state = serialize(state_events)
+        # Don't bother to bundle aggregations if the timeline is unlimited,
+        # as clients will have all the necessary information.
+        # bundle_aggregations=room.timeline.limited,
+        #
+        # richvdh 2021-12-15: disable this temporarily as it has too high an
+        # overhead for initialsyncs. We need to figure out a way that the
+        # bundling can be done *before* the events are stored in the
+        # SyncResponseCache so that this part can be synchronous.
+        #
+        # Ensure to re-enable the test at tests/rest/client/test_relations.py::RelationsTestCase.test_bundled_aggregations.
+        # if room.timeline.limited:
+        #    aggregations = await self.store.get_bundled_aggregations(timeline_events)
+        aggregations = None
+        serialized_timeline = serialize(timeline_events, aggregations)
 
         account_data = room.account_data
 

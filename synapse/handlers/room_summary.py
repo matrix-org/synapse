@@ -153,6 +153,9 @@ class RoomSummaryHandler:
         rooms_result: List[JsonDict] = []
         events_result: List[JsonDict] = []
 
+        if max_rooms_per_space is None or max_rooms_per_space > MAX_ROOMS_PER_SPACE:
+            max_rooms_per_space = MAX_ROOMS_PER_SPACE
+
         while room_queue and len(rooms_result) < MAX_ROOMS:
             queue_entry = room_queue.popleft()
             room_id = queue_entry.room_id
@@ -167,7 +170,7 @@ class RoomSummaryHandler:
             # The client-specified max_rooms_per_space limit doesn't apply to the
             # room_id specified in the request, so we ignore it if this is the
             # first room we are processing.
-            max_children = max_rooms_per_space if processed_rooms else None
+            max_children = max_rooms_per_space if processed_rooms else MAX_ROOMS
 
             if is_in_room:
                 room_entry = await self._summarize_local_room(
@@ -209,7 +212,7 @@ class RoomSummaryHandler:
                         # Before returning to the client, remove the allowed_room_ids
                         # and allowed_spaces keys.
                         room.pop("allowed_room_ids", None)
-                        room.pop("allowed_spaces", None)
+                        room.pop("allowed_spaces", None)  # historical
 
                         rooms_result.append(room)
                         events.extend(room_entry.children_state_events)
@@ -395,7 +398,7 @@ class RoomSummaryHandler:
                     None,
                     room_id,
                     suggested_only,
-                    # TODO Handle max children.
+                    # Do not limit the maximum children.
                     max_children=None,
                 )
 
@@ -525,6 +528,10 @@ class RoomSummaryHandler:
         rooms_result: List[JsonDict] = []
         events_result: List[JsonDict] = []
 
+        # Set a limit on the number of rooms to return.
+        if max_rooms_per_space is None or max_rooms_per_space > MAX_ROOMS_PER_SPACE:
+            max_rooms_per_space = MAX_ROOMS_PER_SPACE
+
         while room_queue and len(rooms_result) < MAX_ROOMS:
             room_id = room_queue.popleft()
             if room_id in processed_rooms:
@@ -583,7 +590,9 @@ class RoomSummaryHandler:
 
         # Iterate through each child and potentially add it, but not its children,
         # to the response.
-        for child_room in root_room_entry.children_state_events:
+        for child_room in itertools.islice(
+            root_room_entry.children_state_events, MAX_ROOMS_PER_SPACE
+        ):
             room_id = child_room.get("state_key")
             assert isinstance(room_id, str)
             # If the room is unknown, skip it.
@@ -633,8 +642,8 @@ class RoomSummaryHandler:
             suggested_only: True if only suggested children should be returned.
                 Otherwise, all children are returned.
             max_children:
-                The maximum number of children rooms to include. This is capped
-                to a server-set limit.
+                The maximum number of children rooms to include. A value of None
+                means no limit.
 
         Returns:
             A room entry if the room should be returned. None, otherwise.
@@ -656,8 +665,13 @@ class RoomSummaryHandler:
             # we only care about suggested children
             child_events = filter(_is_suggested_child_event, child_events)
 
-        if max_children is None or max_children > MAX_ROOMS_PER_SPACE:
-            max_children = MAX_ROOMS_PER_SPACE
+        # TODO max_children is legacy code for the /spaces endpoint.
+        if max_children is not None:
+            child_iter: Iterable[EventBase] = itertools.islice(
+                child_events, max_children
+            )
+        else:
+            child_iter = child_events
 
         stripped_events: List[JsonDict] = [
             {
@@ -668,7 +682,7 @@ class RoomSummaryHandler:
                 "sender": e.sender,
                 "origin_server_ts": e.origin_server_ts,
             }
-            for e in itertools.islice(child_events, max_children)
+            for e in child_iter
         ]
         return _RoomEntry(room_id, room_entry, stripped_events)
 
@@ -988,12 +1002,14 @@ class RoomSummaryHandler:
             "canonical_alias": stats["canonical_alias"],
             "num_joined_members": stats["joined_members"],
             "avatar_url": stats["avatar"],
+            # plural join_rules is a documentation error but kept for historical
+            # purposes. Should match /publicRooms.
             "join_rules": stats["join_rules"],
+            "join_rule": stats["join_rules"],
             "world_readable": (
                 stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
             ),
             "guest_can_join": stats["guest_access"] == "can_join",
-            "creation_ts": create_event.origin_server_ts,
             "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
         }
 

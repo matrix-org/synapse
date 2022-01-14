@@ -1121,3 +1121,33 @@ class RateLimitRestServlet(RestServlet):
         await self.store.delete_ratelimit_for_user(user_id)
 
         return HTTPStatus.OK, {}
+
+
+class AccountDataRestServlet(RestServlet):
+    """Retrieve the given user's account data"""
+
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/accountdata")
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastore()
+        self._is_mine_id = hs.is_mine_id
+
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self._auth, request)
+
+        if not self._is_mine_id(user_id):
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only look up local users")
+
+        if not await self._store.get_user_by_id(user_id):
+            raise NotFoundError("User not found")
+
+        global_data, by_room_data = await self._store.get_account_data_for_user(user_id)
+        return HTTPStatus.OK, {
+            "account_data": {
+                "global": global_data,
+                "rooms": by_room_data,
+            },
+        }

@@ -948,8 +948,16 @@ class DeviceListUpdater:
             devices = []
             ignore_devices = True
         else:
+            prev_stream_id = await self.store.get_device_list_last_stream_id_for_remote(
+                user_id
+            )
             cached_devices = await self.store.get_cached_devices_for_user(user_id)
-            if cached_devices == {d["device_id"]: d for d in devices}:
+
+            # To ensure that a user with no devices is cached, we skip the resync only
+            # if we have a stream_id from previously writing a cache entry.
+            if prev_stream_id is not None and cached_devices == {
+                d["device_id"]: d for d in devices
+            }:
                 logging.info(
                     "Skipping device list resync for %s, as our cache matches already",
                     user_id,

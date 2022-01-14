@@ -119,12 +119,10 @@ class EventStreamHandler:
 
             events.extend(to_add)
 
-            chunks = await self._event_serializer.serialize_events(
+            chunks = self._event_serializer.serialize_events(
                 events,
                 time_now,
                 as_client_event=as_client_event,
-                # Don't bundle aggregations as this is a deprecated API.
-                bundle_aggregations=False,
             )
 
             chunk = {

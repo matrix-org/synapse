@@ -172,7 +172,7 @@ class RoomCreationHandler:
         user_id = requester.user.to_string()
 
         # Check if this room is already being upgraded by another person
-        for key in self._upgrade_response_cache.pending_result_cache:
+        for key in self._upgrade_response_cache.keys():
             if key[0] == old_room_id and key[1] != user_id:
                 # Two different people are trying to upgrade the same room.
                 # Send the second an error.
@@ -393,7 +393,9 @@ class RoomCreationHandler:
         user_id = requester.user.to_string()
 
         if not await self.spam_checker.user_may_create_room(user_id):
-            raise SynapseError(403, "You are not permitted to create rooms")
+            raise SynapseError(
+                403, "You are not permitted to create rooms", Codes.FORBIDDEN
+            )
 
         creation_content: JsonDict = {
             "room_version": new_room_version.identifier,
@@ -685,7 +687,9 @@ class RoomCreationHandler:
                 invite_3pid_list,
             )
         ):
-            raise SynapseError(403, "You are not permitted to create rooms")
+            raise SynapseError(
+                403, "You are not permitted to create rooms", Codes.FORBIDDEN
+            )
 
         if ratelimit:
             await self.request_ratelimiter.ratelimit(requester)
@@ -1176,6 +1180,16 @@ class RoomContextHandler:
         # there's something there but not see the content, so use the event that's in
         # `filtered` rather than the event we retrieved from the datastore.
         results["event"] = filtered[0]
+
+        # Fetch the aggregations.
+        aggregations = await self.store.get_bundled_aggregations([results["event"]])
+        aggregations.update(
+            await self.store.get_bundled_aggregations(results["events_before"])
+        )
+        aggregations.update(
+            await self.store.get_bundled_aggregations(results["events_after"])
+        )
+        results["aggregations"] = aggregations
 
         if results["events_after"]:
             last_event_id = results["events_after"][-1].event_id

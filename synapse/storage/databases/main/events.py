@@ -1976,14 +1976,17 @@ class PersistEventsStore:
                 txn, self.store.get_retention_policy_for_room, (event.room_id,)
             )
 
-    def store_event_search_txn(self, txn, event, key, value):
+    def store_event_search_txn(
+        self, txn: LoggingTransaction, event: EventBase, key: str, value: str
+    ) -> None:
         """Add event to the search table
 
         Args:
-            txn (cursor):
-            event (EventBase):
-            key (str):
-            value (str):
+            txn: The database transaction.
+            event: The event being added to the search table.
+            key: A key describing the search value (one of "content.name",
+                "content.topic", or "content.body")
+            value: The value from the event's content.
         """
         self.store.store_search_entries_txn(
             txn,

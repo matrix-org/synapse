@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import abc
-import collections
 import html
 import logging
 import types
@@ -37,6 +36,7 @@ from typing import (
     Union,
 )
 
+import attr
 import jinja2
 from canonicaljson import encode_canonical_json
 from typing_extensions import Protocol
@@ -58,12 +58,14 @@ from synapse.api.errors import (
 )
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread, preserve_fn, run_in_background
-from synapse.logging.opentracing import trace_servlet
+from synapse.logging.opentracing import active_span, start_active_span, trace_servlet
 from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
 from synapse.util.iterutils import chunk_seq
 
 if TYPE_CHECKING:
+    import opentracing
+
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -352,9 +354,11 @@ class DirectServeJsonResource(_AsyncResource):
         return_json_error(f, request)
 
 
-_PathEntry = collections.namedtuple(
-    "_PathEntry", ["pattern", "callback", "servlet_classname"]
-)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _PathEntry:
+    pattern: Pattern
+    callback: ServletCallback
+    servlet_classname: str
 
 
 class JsonResource(DirectServeJsonResource):
@@ -530,7 +534,7 @@ class RootRedirect(resource.Resource):
     """Redirects the root '/' path to another path."""
 
     def __init__(self, path: str):
-        resource.Resource.__init__(self)
+        super().__init__()
         self.url = path
 
     def render_GET(self, request: Request) -> bytes:
@@ -539,7 +543,7 @@ class RootRedirect(resource.Resource):
     def getChild(self, name: str, request: Request) -> resource.Resource:
         if len(name) == 0:
             return self  # select ourselves as the child to render
-        return resource.Resource.getChild(self, name, request)
+        return super().getChild(name, request)
 
 
 class OptionsResource(resource.Resource):
@@ -556,7 +560,7 @@ class OptionsResource(resource.Resource):
     def getChildWithDefault(self, path: str, request: Request) -> resource.Resource:
         if request.method == b"OPTIONS":
             return self  # select ourselves as the child to render
-        return resource.Resource.getChildWithDefault(self, path, request)
+        return super().getChildWithDefault(path, request)
 
 
 class RootOptionsRedirectResource(OptionsResource, RootRedirect):
@@ -759,7 +763,20 @@ async def _async_write_json_to_request_in_thread(
     expensive.
     """
 
-    json_str = await defer_to_thread(request.reactor, json_encoder, json_object)
+    def encode(opentracing_span: "Optional[opentracing.Span]") -> bytes:
+        # it might take a while for the threadpool to schedule us, so we write
+        # opentracing logs once we actually get scheduled, so that we can see how
+        # much that contributed.
+        if opentracing_span:
+            opentracing_span.log_kv({"event": "scheduled"})
+        res = json_encoder(json_object)
+        if opentracing_span:
+            opentracing_span.log_kv({"event": "encoded"})
+        return res
+
+    with start_active_span("encode_json_response"):
+        span = active_span()
+        json_str = await defer_to_thread(request.reactor, encode, span)
 
     _write_bytes_to_request(request, json_str)
 

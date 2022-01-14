@@ -1,6 +1,6 @@
 # Using Postgres
 
-Synapse supports PostgreSQL versions 9.6 or later.
+Synapse supports PostgreSQL versions 10 or later.
 
 ## Install postgres client libraries
 

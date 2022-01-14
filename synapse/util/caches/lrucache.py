@@ -69,7 +69,6 @@ try:
         sizer.exclude_refs((), None, "")
         return sizer.asizeof(val, limit=100 if recurse else 0)
 
-
 except ImportError:
 
     def _get_size_of(val: Any, *, recurse: bool = True) -> int:

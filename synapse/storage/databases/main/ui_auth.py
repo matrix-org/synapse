@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import attr
 
@@ -225,11 +225,14 @@ class UIAuthWorkerStore(SQLBaseStore):
         self, txn: LoggingTransaction, session_id: str, key: str, value: Any
     ):
         # Get the current value.
-        result: Dict[str, Any] = self.db_pool.simple_select_one_txn(  # type: ignore
-            txn,
-            table="ui_auth_sessions",
-            keyvalues={"session_id": session_id},
-            retcols=("serverdict",),
+        result = cast(
+            Dict[str, Any],
+            self.db_pool.simple_select_one_txn(
+                txn,
+                table="ui_auth_sessions",
+                keyvalues={"session_id": session_id},
+                retcols=("serverdict",),
+            ),
         )
 
         # Update it and add it back to the database.

@@ -1,1 +1,0 @@
-Stop populating unused database column `state_events.prev_state`.
