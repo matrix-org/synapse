@@ -11161,8 +11161,9 @@ about the user and their local media. Objects contain the following fields:
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
 server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>It returns a JSON body like the following:</p>
-<pre><code class="language-json">{
-    &quot;displayname&quot;: &quot;User&quot;,
+<pre><code class="language-jsonc">{
+    &quot;name&quot;: &quot;@user:example.com&quot;,
+    &quot;displayname&quot;: &quot;User&quot;, // can be null if not set
     &quot;threepids&quot;: [
         {
             &quot;medium&quot;: &quot;email&quot;,
@@ -11177,11 +11178,11 @@ server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a
             &quot;validated_at&quot;: 1586458409743
         }
     ],
-    &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;,
+    &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;,  // can be null if not set
+    &quot;is_guest&quot;: 0,
     &quot;admin&quot;: 0,
     &quot;deactivated&quot;: 0,
     &quot;shadow_banned&quot;: 0,
-    &quot;password_hash&quot;: &quot;$2b$12$p9B4GkqYdRTPGD&quot;,
     &quot;creation_ts&quot;: 1560432506,
     &quot;appservice_id&quot;: null,
     &quot;consent_server_notice_sent&quot;: null,
