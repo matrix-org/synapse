@@ -1,7 +1,32 @@
-Synapse 1.50.0rc1 (2022-01-05)
+Synapse 1.50.0rc2 (2022-01-14)
 ==============================
 
+This release candidate fixes a federation-breaking regression introduced in Synapse 1.50.0rc1.
+
 Please note that we now only support Python 3.7+ and PostgreSQL 10+ (if applicable), because Python 3.6 and PostgreSQL 9.6 have reached end-of-life.
+
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse v1.0.0 whereby some device list updates would not be sent to remote homeservers if there were too many to send at once. ([\#11729](https://github.com/matrix-org/synapse/issues/11729))
+- Fix a bug introduced in Synapse v1.50.0rc1 whereby outbound federation could fail because too many EDUs were produced for device updates. ([\#11730](https://github.com/matrix-org/synapse/issues/11730))
+
+
+Improved Documentation
+----------------------
+
+- Document that now the minimum supported PostgreSQL version is 10. ([\#11725](https://github.com/matrix-org/synapse/issues/11725))
+
+
+Internal Changes
+----------------
+
+- Fix a typechecker problem related to our (ab)use of `nacl.signing.SigningKey`s. ([\#11714](https://github.com/matrix-org/synapse/issues/11714))
+
+
+Synapse 1.50.0rc1 (2022-01-05)
+==============================
 
 
 Features
