@@ -67,7 +67,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
         self.applicable_edit_cache: LruCache[str, Optional[EventBase]] = LruCache(
             cache_name="applicable_edit_cache",
-            max_size=hs.config.caches.event_cache_size,  # TODO
+            max_size=1000,
         )
 
     @cached(tree=True)
