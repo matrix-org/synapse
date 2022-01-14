@@ -268,12 +268,11 @@ class Auth:
                 403,
                 "Application service cannot masquerade as this user (%s)." % user_id,
             )
-        # Let ASes manipulate nonexistent users (e.g. to shadow-register them)
         # Check to make sure the user is already registered on the homeserver
-        # elif not (await self.store.get_user_by_id(user_id)):
-        #     raise AuthError(
-        #         403, "Application service has not registered this user (%s)" % user_id
-        #     )
+        elif not (await self.store.get_user_by_id(user_id)):
+            raise AuthError(
+                403, "Application service has not registered this user (%s)" % user_id
+            )
 
     async def _get_appservice_user_id(
         self, request: Request
@@ -281,7 +280,6 @@ class Auth:
         app_service = self.store.get_app_service_by_token(
             self.get_access_token_from_request(request)
         )
-
         if app_service is None:
             return None, None
 
