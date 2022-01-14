@@ -401,7 +401,7 @@ class UserRestServletV2(RestServlet):
             user_info_dict = await self.admin_handler.get_user(target_user)
             assert user_info_dict is not None
 
-            return 201, user_info_dict
+            return HTTPStatus.CREATED, user_info_dict
 
 
 class UserRegisterServlet(RestServlet):
