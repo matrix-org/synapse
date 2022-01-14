@@ -637,6 +637,12 @@ class RegisterRestServlet(RestServlet):
             if not password_hash:
                 raise SynapseError(400, "Missing params: password", Codes.MISSING_PARAM)
 
+            if not self._ignore_client_username:
+                # Usernames will be stored in UIA sessions regardless of this setting, so
+                # if it's on we just don't try to retrieve the username from the session
+                # data.
+                desired_username = params.get("username", None)
+
             guest_access_token = params.get("guest_access_token", None)
 
             if desired_username is not None:

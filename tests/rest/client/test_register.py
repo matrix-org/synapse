@@ -748,15 +748,23 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", "register/available?username=" + username)
         self.assertEquals(200, channel.code, channel.result)
 
-        # Try to register a user with the same username.
-        request_data = json.dumps(
-            {
-                "username": username,
-                "password": "foo",
-                "auth": {"type": LoginType.DUMMY},
-            },
+        # Check that the registration succeeded (since we ignored the username parameter)
+        # and that there's a user_id parameter in the response body.
+        # Do it in a UIA flow to make sure the username won't be picked back up from the
+        # UIA session data.
+        channel = self.make_request(
+            "POST",
+            "register",
+            {"username": username, "type": "m.login.password", "password": "foo"},
         )
-        channel = self.make_request("POST", self.url, request_data)
+        self.assertEqual(channel.code, 401)
+
+        session = channel.json_body["session"]
+        channel = self.make_request(
+            "POST",
+            "register",
+            {"auth": {"session": session, "type": LoginType.DUMMY}},
+        )
 
         # Check that the registration succeeded (since we ignored the username parameter)
         # and that there's a user_id parameter in the response body.
