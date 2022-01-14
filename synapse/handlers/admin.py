@@ -61,7 +61,7 @@ class AdminHandler:
 
         # Restrict returned information to a known set of fields. This prevents additional
         # fields added to get_user_by_id from modifying Synapse's external API surface.
-        user_info_to_return = [
+        user_info_to_return = {
             "name",
             "admin",
             "deactivated",
@@ -72,7 +72,7 @@ class AdminHandler:
             "consent_version",
             "user_type",
             "is_guest",
-        ]
+        }
 
         # Restrict returned keys to a known set.
         user_info_dict = {
