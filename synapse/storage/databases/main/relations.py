@@ -388,7 +388,7 @@ class RelationsWorkerStore(SQLBaseStore):
             ORDER by edit.origin_server_ts DESC, edit.event_id DESC
         """
 
-        def _get_applicable_edit_txn(txn: LoggingTransaction) -> Dict[str, str]:
+        def _get_applicable_edits_txn(txn: LoggingTransaction) -> Dict[str, str]:
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "relates_to_id", event_ids_to_check
             )
@@ -404,7 +404,7 @@ class RelationsWorkerStore(SQLBaseStore):
             return result
 
         edit_ids = await self.db_pool.runInteraction(
-            "get_applicable_edit", _get_applicable_edit_txn
+            "get_applicable_edits", _get_applicable_edits_txn
         )
 
         edits = await self.get_events(edit_ids.values())  # type: ignore[attr-defined]
