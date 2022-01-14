@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Set, Tuple
 
 from synapse.api.constants import ReadReceiptEventFields, ReceiptTypes
 from synapse.appservice import ApplicationService
@@ -240,7 +240,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
     async def get_new_events_as(
         self, from_key: int, service: ApplicationService
-    ) -> Tuple[List[JsonDict], int]:
+    ) -> Tuple[Set[JsonDict], int]:
         """Returns a set of new read receipt events that an appservice
         may be interested in.
 
@@ -250,7 +250,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
         Returns:
             A two-tuple containing the following:
-                * A list of json dictionaries derived from read receipts that the
+                * A set of json dictionaries derived from read receipts that the
                   appservice may be interested in.
                 * The current read receipt stream token.
         """
@@ -258,7 +258,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         to_key = self.get_current_key()
 
         if from_key == to_key:
-            return [], to_key
+            return set(), to_key
 
         # Fetch all read receipts for all rooms, up to a limit of 100. This is ordered
         # by most recent.
@@ -267,12 +267,12 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         )
 
         # Then filter down to rooms that the AS can read
-        events = []
+        events = set()
         for room_id, event in rooms_to_events.items():
             if not await service.matches_user_in_member_list(room_id, self.store):
                 continue
 
-            events.append(event)
+            events.add(event)
 
         return events, to_key
 

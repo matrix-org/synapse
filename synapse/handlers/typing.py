@@ -464,7 +464,7 @@ class TypingNotificationEventSource(EventSource[int, JsonDict]):
 
     async def get_new_events_as(
         self, from_key: int, service: ApplicationService
-    ) -> Tuple[List[JsonDict], int]:
+    ) -> Tuple[Set[JsonDict], int]:
         """Returns a set of new typing events that an appservice
         may be interested in.
 
@@ -474,14 +474,14 @@ class TypingNotificationEventSource(EventSource[int, JsonDict]):
 
         Returns:
             A two-tuple containing the following:
-                * A list of json dictionaries derived from typing events that the
+                * A set of json dictionaries derived from typing events that the
                   appservice may be interested in.
                 * The latest known room serial.
         """
         with Measure(self.clock, "typing.get_new_events_as"):
             handler = self.get_typing_handler()
 
-            events = []
+            events = set()
             for room_id in handler._room_serials.keys():
                 if handler._room_serials[room_id] <= from_key:
                     continue
@@ -491,7 +491,7 @@ class TypingNotificationEventSource(EventSource[int, JsonDict]):
                 ):
                     continue
 
-                events.append(self._make_event_for(room_id))
+                events.add(self._make_event_for(room_id))
 
             return events, handler._latest_room_serial
 

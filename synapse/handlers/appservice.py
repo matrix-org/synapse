@@ -309,7 +309,7 @@ class ApplicationServicesHandler:
 
     async def _handle_typing(
         self, service: ApplicationService, new_token: int
-    ) -> List[JsonDict]:
+    ) -> Set[JsonDict]:
         """
         Return the typing events since the given stream token that the given application
         service should receive.
@@ -323,7 +323,7 @@ class ApplicationServicesHandler:
             new_token: A typing event stream token.
 
         Returns:
-            A list of JSON dictionaries containing data derived from the typing events that
+            A set of JSON dictionaries containing data derived from the typing events that
             should be sent to the given application service.
         """
         typing_source = self.event_sources.sources.typing
@@ -344,7 +344,7 @@ class ApplicationServicesHandler:
 
     async def _handle_receipts(
         self, service: ApplicationService, new_token: Optional[int]
-    ) -> List[JsonDict]:
+    ) -> Set[JsonDict]:
         """
         Return the latest read receipts that the given application service should receive.
 
@@ -360,7 +360,7 @@ class ApplicationServicesHandler:
                 token. Prevents accidentally duplicating work.
 
         Returns:
-            A list of JSON dictionaries containing data derived from the read receipts that
+            A set of JSON dictionaries containing data derived from the read receipts that
             should be sent to the given application service.
         """
         from_key = await self.store.get_type_stream_id_for_appservice(
@@ -370,7 +370,7 @@ class ApplicationServicesHandler:
             logger.debug(
                 "Rejecting token lower than or equal to stored: %s" % (new_token,)
             )
-            return []
+            return set()
 
         receipts_source = self.event_sources.sources.receipt
         receipts, _ = await receipts_source.get_new_events_as(
@@ -412,7 +412,7 @@ class ApplicationServicesHandler:
             logger.debug(
                 "Rejecting token lower than or equal to stored: %s" % (new_token,)
             )
-            return []
+            return set()
 
         for user in users:
             if isinstance(user, str):
