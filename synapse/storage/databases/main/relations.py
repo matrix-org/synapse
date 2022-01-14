@@ -65,8 +65,8 @@ class RelationsWorkerStore(SQLBaseStore):
         self._msc1849_enabled = hs.config.experimental.msc1849_enabled
         self._msc3440_enabled = hs.config.experimental.msc3440_enabled
 
-        self.get_applicable_edit: LruCache[str, Optional[EventBase]] = LruCache(
-            cache_name="get_applicable_edit",
+        self.applicable_edit_cache: LruCache[str, Optional[EventBase]] = LruCache(
+            cache_name="applicable_edit_cache",
             max_size=hs.config.caches.event_cache_size,  # TODO
         )
 
@@ -354,10 +354,10 @@ class RelationsWorkerStore(SQLBaseStore):
         # Check if an edit for this event is currently cached.
         event_ids_to_check = []
         for event_id in event_ids:
-            if event_id not in self.get_applicable_edit:
+            if event_id not in self.applicable_edit_cache:
                 event_ids_to_check.append(event_id)
             else:
-                edit_event = self.get_applicable_edit[event_id]
+                edit_event = self.applicable_edit_cache[event_id]
                 if edit_event:
                     edits_by_original[event_id] = edit_event
 
@@ -417,7 +417,7 @@ class RelationsWorkerStore(SQLBaseStore):
             edit_event_id = edit_ids.get(original_event_id)
             edit_event = edits.get(edit_event_id)
 
-            self.get_applicable_edit.set(original_event_id, edit_event)
+            self.applicable_edit_cache.set(original_event_id, edit_event)
             if edit_event:
                 edits_by_original[original_event_id] = edit_event
 
