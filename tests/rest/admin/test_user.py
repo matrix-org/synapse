@@ -2090,6 +2090,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("mxc://servername/mediaid", channel.json_body["avatar_url"])
         self.assertEqual("User", channel.json_body["displayname"])
 
+        # This key was removed intentionally. Ensure it is not accidentally re-included.
+        self.assertNotIn("password_hash", channel.json_body)
+
         # the user is deactivated, the threepid will be deleted
 
         # Get user
@@ -2105,6 +2108,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(0, len(channel.json_body["threepids"]))
         self.assertEqual("mxc://servername/mediaid", channel.json_body["avatar_url"])
         self.assertEqual("User", channel.json_body["displayname"])
+
+        # This key was removed intentionally. Ensure it is not accidentally re-included.
+        self.assertNotIn("password_hash", channel.json_body)
 
     @override_config({"user_directory": {"enabled": True, "search_all_users": True}})
     def test_change_name_deactivate_user_user_directory(self):
@@ -2179,6 +2185,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertFalse(channel.json_body["deactivated"])
         self._is_erased("@user:test", False)
 
+        # This key was removed intentionally. Ensure it is not accidentally re-included.
+        self.assertNotIn("password_hash", channel.json_body)
+
     @override_config({"password_config": {"localdb_enabled": False}})
     def test_reactivate_user_localdb_disabled(self):
         """
@@ -2210,6 +2219,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertFalse(channel.json_body["deactivated"])
         self._is_erased("@user:test", False)
 
+        # This key was removed intentionally. Ensure it is not accidentally re-included.
+        self.assertNotIn("password_hash", channel.json_body)
+
     @override_config({"password_config": {"enabled": False}})
     def test_reactivate_user_password_disabled(self):
         """
@@ -2240,6 +2252,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["deactivated"])
         self._is_erased("@user:test", False)
+
+        # This key was removed intentionally. Ensure it is not accidentally re-included.
+        self.assertNotIn("password_hash", channel.json_body)
 
     def test_set_user_as_admin(self):
         """
@@ -2400,6 +2415,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertIsNone(self.get_success(d))
         self._is_erased(user_id, True)
 
+        # This key was removed intentionally. Ensure it is not accidentally re-included.
+        self.assertNotIn("password_hash", channel.json_body)
+
     def _check_fields(self, content: JsonDict):
         """Checks that the expected user attributes are present in content
 
@@ -2417,6 +2435,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertIn("consent_server_notice_sent", content)
         self.assertIn("consent_version", content)
         self.assertIn("external_ids", content)
+
+        # This key was removed intentionally. Ensure it is not accidentally re-included.
+        self.assertNotIn("password_hash", content)
 
 
 class UserMembershipRestTestCase(unittest.HomeserverTestCase):
