@@ -1,3 +1,29 @@
+Synapse 1.50.0rc2 (2022-01-14)
+==============================
+
+This release candidate fixes a federation-breaking regression introduced in the previous release candidate. The bug broke sending federation traffic to destination servers that had enough outbound device updates to be sent (including at least one cross-signing key update).
+It would particularly affect sending to servers that have had downtime, as this would make it more likely that a big enough queue of outbound device updates had built up.
+
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse v1.0.0 whereby some device list updates would not be sent to remote homeservers if there were too many to send at once. ([\#11729](https://github.com/matrix-org/synapse/issues/11729))
+- Fix a bug introduced in Synapse v1.50.0rc1 whereby outbound federation could fail because too many EDUs were produced for device updates. ([\#11730](https://github.com/matrix-org/synapse/issues/11730))
+
+
+Improved Documentation
+----------------------
+
+- Document that now the minimum supported PostgreSQL version is 10. ([\#11725](https://github.com/matrix-org/synapse/issues/11725))
+
+
+Internal Changes
+----------------
+
+- Fix a typechecker problem related to our (ab)use of `nacl.signing.SigningKey`s. ([\#11714](https://github.com/matrix-org/synapse/issues/11714))
+
+
 Synapse 1.50.0rc1 (2022-01-05)
 ==============================
 
