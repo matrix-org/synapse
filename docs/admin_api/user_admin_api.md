@@ -17,6 +17,7 @@ It returns a JSON body like the following:
 
 ```json
 {
+    "name": "@user:example.com",
     "displayname": "User",
     "threepids": [
         {
@@ -33,6 +34,7 @@ It returns a JSON body like the following:
         }
     ],
     "avatar_url": "<avatar_url>",
+    "is_guest": 0,
     "admin": 0,
     "deactivated": 0,
     "shadow_banned": 0,
