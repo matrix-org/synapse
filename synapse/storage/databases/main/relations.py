@@ -382,15 +382,13 @@ class RelationsWorkerStore(SQLBaseStore):
 
     @cached()
     async def get_thread_summary(
-        self, event_id: str, room_id: str, user_id: str
-    ) -> Tuple[int, Optional[EventBase], bool]:
-        """Get the number of threaded replies, the senders of those replies, and
-        the latest reply (if any) for the given event.
+        self, event_id: str, room_id: str
+    ) -> Tuple[int, Optional[EventBase]]:
+        """Get the number of threaded replies and the latest reply (if any) for the given event.
 
         Args:
             event_id: Summarize the thread related to this event ID.
             room_id: The room the event belongs to.
-            user_id: The user requesting the summary.
 
         Returns:
             The number of items in the thread and the most recent response, if any.
@@ -398,7 +396,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
         def _get_thread_summary_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[int, Optional[str], bool]:
+        ) -> Tuple[int, Optional[str]]:
             # Fetch the latest event ID in the thread.
             # TODO Should this only allow m.room.message events.
             sql = """
@@ -416,7 +414,7 @@ class RelationsWorkerStore(SQLBaseStore):
             txn.execute(sql, (event_id, room_id, RelationTypes.THREAD))
             row = txn.fetchone()
             if row is None:
-                return 0, None, False
+                return 0, None
 
             latest_event_id = row[0]
 
@@ -433,6 +431,37 @@ class RelationsWorkerStore(SQLBaseStore):
             txn.execute(sql, (event_id, room_id, RelationTypes.THREAD))
             count = cast(Tuple[int], txn.fetchone())[0]
 
+            return count, latest_event_id
+
+        count, latest_event_id = await self.db_pool.runInteraction(
+            "get_thread_summary", _get_thread_summary_txn
+        )
+
+        latest_event = None
+        if latest_event_id:
+            latest_event = await self.get_event(latest_event_id, allow_none=True)  # type: ignore[attr-defined]
+
+        return count, latest_event
+
+    @cached()
+    async def get_thread_participated(
+        self, event_id: str, room_id: str, user_id: str
+    ) -> bool:
+        """Get whether the requesting user participated in a thread.
+
+        This is separate from get_thread_summary since that can be cached across
+        all users while this value is specific to the requeser.
+
+        Args:
+            event_id: The thread related to this event ID.
+            room_id: The room the event belongs to.
+            user_id: The user requesting the summary.
+
+        Returns:
+            True if the requesting user participated in the thread, otherwise false.
+        """
+
+        def _get_thread_summary_txn(txn: LoggingTransaction) -> bool:
             # Fetch whether the requester has participated or not.
             sql = """
                 SELECT 1
@@ -446,19 +475,11 @@ class RelationsWorkerStore(SQLBaseStore):
             """
 
             txn.execute(sql, (event_id, room_id, RelationTypes.THREAD, user_id))
-            participated = bool(txn.fetchone())
+            return bool(txn.fetchone())
 
-            return count, latest_event_id, participated
-
-        count, latest_event_id, participated = await self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_thread_summary", _get_thread_summary_txn
         )
-
-        latest_event = None
-        if latest_event_id:
-            latest_event = await self.get_event(latest_event_id, allow_none=True)  # type: ignore[attr-defined]
-
-        return count, latest_event, participated
 
     async def events_have_relations(
         self,
@@ -616,11 +637,12 @@ class RelationsWorkerStore(SQLBaseStore):
 
         # If this event is the start of a thread, include a summary of the replies.
         if self._msc3440_enabled:
-            (
-                thread_count,
-                latest_thread_event,
-                participated,
-            ) = await self.get_thread_summary(event_id, room_id, user_id)
+            thread_count, latest_thread_event = await self.get_thread_summary(
+                event_id, room_id
+            )
+            participated = await self.get_thread_participated(
+                event_id, room_id, user_id
+            )
             if latest_thread_event:
                 aggregations[RelationTypes.THREAD] = {
                     "latest_event": latest_thread_event,
