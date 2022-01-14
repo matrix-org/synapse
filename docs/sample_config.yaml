@@ -1503,8 +1503,8 @@ room_prejoin_state:
    #additional_event_types:
    #  - org.example.custom.event.type
 
-# By default when puppeting another user, the user who has created the 
-# access token for puppeting is tracked. If this is enabled, both 
+# By default when puppeting another user, the user who has created the
+# access token for puppeting is tracked. If this is enabled, both
 # requests are tracked. Implicitly enables MAU tracking for puppeted users.
 # Uncomment to also track puppeted user IP's.
 #
