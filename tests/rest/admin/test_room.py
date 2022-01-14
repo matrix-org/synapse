@@ -1413,14 +1413,17 @@ class RoomTestCase(unittest.HomeserverTestCase):
         _order_test("canonical_alias", [room_id_1, room_id_2, room_id_3])
         _order_test("canonical_alias", [room_id_3, room_id_2, room_id_1], reverse=True)
 
+        # Note: joined_member counts are sorted in descending order when dir=f
         _order_test("joined_members", [room_id_3, room_id_2, room_id_1])
         _order_test("joined_members", [room_id_1, room_id_2, room_id_3], reverse=True)
 
+        # Note: joined_local_member counts are sorted in descending order when dir=f
         _order_test("joined_local_members", [room_id_3, room_id_2, room_id_1])
         _order_test(
             "joined_local_members", [room_id_1, room_id_2, room_id_3], reverse=True
         )
 
+        # Note: versions are sorted in descending order when dir=f
         _order_test("version", sorted_by_room_id_asc, reverse=True)
         _order_test("version", sorted_by_room_id_desc)
 
@@ -1445,6 +1448,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         _order_test("history_visibility", sorted_by_room_id_asc)
         _order_test("history_visibility", sorted_by_room_id_desc, reverse=True)
 
+        # Note: state_event counts are sorted in descending order when dir=f
         _order_test("state_events", [room_id_3, room_id_2, room_id_1])
         _order_test("state_events", [room_id_1, room_id_2, room_id_3], reverse=True)
 
