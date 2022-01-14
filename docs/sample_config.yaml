@@ -1436,6 +1436,13 @@ account_threepid_delegates:
 #
 #auto_join_rooms_for_guests: false
 
+# Whether to ignore the username supplied by the client in the registration
+# request and instead automatically generate one.
+#
+# Defaults to false.
+#
+#ignore_client_username: true
+
 
 ## Metrics ###
 
