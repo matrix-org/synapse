@@ -44,10 +44,10 @@ Please add ``start_pushers: false`` to the main config
 """
 
 USER_UPDATE_DIRECTORY_DEPRECATION_WARNING = """
-Synapse now uses 'worker_to_update_user_directory' over 'update_user_directory',
+Synapse now uses 'update_user_directory_on' over 'update_user_directory',
 you have set 'update_user_directory', and while synapse will work in a backwards
 compatible manner, it is suggested to change this value to use
-'worker_to_update_user_directory' instead.
+'update_user_directory_on' instead.
 """
 
 
@@ -327,13 +327,11 @@ class WorkerConfig(Config):
         else:
             if "update_user_directory" in config:
                 # Backwards compatibility case
+                logger.warning(USER_UPDATE_DIRECTORY_DEPRECATION_WARNING)
                 uud_result = self.worker_app == "synapse.app.user_dir"
             else:
                 # Both values are undefined, assume None for update_user_directory_on
                 uud_result = is_master_process
-
-        if "update_user_directory" in config:
-            logger.warning(USER_UPDATE_DIRECTORY_DEPRECATION_WARNING)
 
         self.update_user_directory = uud_result
 
