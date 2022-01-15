@@ -1,1 +1,1 @@
-Add `track_puppeted_user_ips` config flag to track puppeted user IP addresses. This also includes them in monthly active user counts.
+Add `track_puppeted_user_ips` config flag to record client IP addresses against puppeted users, and include the puppeted users in monthly active user counts.
