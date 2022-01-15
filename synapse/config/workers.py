@@ -15,7 +15,7 @@
 
 import argparse
 import logging
-from typing import List, Union
+from typing import List, Union, Optional
 
 import attr
 
@@ -317,7 +317,7 @@ class WorkerConfig(Config):
         is_master_process = self.worker_name is None
 
         if "update_user_directory_on" in config:
-            update_user_directory_on = config["update_user_directory_on"]
+            update_user_directory_on: Optional[str] = config["update_user_directory_on"]
 
             if update_user_directory_on is None:
                 uud_result = is_master_process
@@ -328,7 +328,15 @@ class WorkerConfig(Config):
             if "update_user_directory" in config:
                 # Backwards compatibility case
                 logger.warning(USER_UPDATE_DIRECTORY_DEPRECATION_WARNING)
-                uud_result = self.worker_app == "synapse.app.user_dir"
+
+                update_user_directory: bool = config['update_user_directory']
+
+                if update_user_directory:
+                    # Main process should update
+                    uud_result = is_master_process
+                else:
+                    # user directory worker should update
+                    uud_result = self.worker_app == "synapse.app.user_dir"
             else:
                 # Both values are undefined, assume None for update_user_directory_on
                 uud_result = is_master_process
