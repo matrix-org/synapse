@@ -2661,7 +2661,8 @@ opentracing:
 # (e.g. users in public rooms, shared rooms between users.).
 #
 # If not provided, or null, this defaults to the main process.
-#update_user_directory_on: null
+#
+#update_user_directory_on: "sync1"
 
 # A shared secret used by the replication APIs to authenticate HTTP requests
 # from workers.

@@ -211,7 +211,7 @@ def start(config_options: List[str]) -> None:
         config.logging.no_redirect_stdio = True
 
     # Explicitly disable background processes
-    config.worker.update_user_directory_on = ""
+    config.worker.update_user_directory = False
     config.worker.run_background_tasks = False
     config.worker.start_pushers = False
     config.worker.pusher_shard_config.instances = []

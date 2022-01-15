@@ -15,7 +15,7 @@
 
 import argparse
 import logging
-from typing import Any, List, Union
+from typing import List, Union
 
 import attr
 
@@ -28,14 +28,6 @@ from ._base import (
 from .server import ListenerConfig, parse_listener_def
 
 logger = logging.Logger(__name__)
-
-# an object to pass to the "default" parameter, with which we can
-# `is` against to be sure we have an undefined config option.
-UNDEFINED = object()
-
-# an object to pass to self.worker_to_update_user_directory if
-# update_user_directory was defined, is used to compare with 'is'.
-ANY_USER_DIRECTORY_WORKER = object()
 
 _FEDERATION_SENDER_WITH_SEND_FEDERATION_ENABLED_ERROR = """
 The send_federation config option must be disabled in the main
@@ -314,36 +306,36 @@ class WorkerConfig(Config):
             self.worker_name is None and background_tasks_instance == "master"
         ) or self.worker_name == background_tasks_instance
 
-        # Which worker is responsible for updating the user directory,
-        # None means the main process handles this.
-        # Eventually this is expected to hold None, a `str`, or ANY_USER_DIRECTORY_WORKER
-        # Consider this an `Any`, only match positively with '== worker_name', 'is None' or
-        # 'is ANY_USER_DIRECTORY_WORKER' to determine if the local process should be updating the directory.
-        self.update_user_directory_on: Any = config.get(
-            "update_user_directory_on", UNDEFINED
-        )
+        # update_user_directory_on controls which worker is responsible for updating the user directory.
+        # None means that the main process should handle this, so does the absence of the config key.
+        #
+        # Note that due to backwards compatibility, we must also test for update_user_directory, and apply it if
+        # update_user_directory_on is not defined at the same time.
+        self.update_user_directory: bool
 
-        update_user_directory = config.get("update_user_directory", UNDEFINED)
+        uud_result: bool
+        is_master_process = self.worker_name is None
 
-        # Resolve backwards compat between update_user_directory (UUD) and
-        # worker_to_update_user_directory (WTUUD):
-        # - if WTUUD is defined, just use it
-        # - if UUD and WTUUD are undefined, assume WTUUD is None
-        # - if UUD is defined (and True), assume WTUUD is None
-        # - if UUD is defined (and False), set sentinel object so that user_dir
-        #    workers will work normally.
-        if self.update_user_directory_on is UNDEFINED:
-            if update_user_directory is UNDEFINED:
-                self.update_user_directory_on = None
+        if "update_user_directory_on" in config:
+            update_user_directory_on = config["update_user_directory_on"]
+
+            if update_user_directory_on is None:
+                uud_result = is_master_process
             else:
-                logger.warning(USER_UPDATE_DIRECTORY_DEPRECATION_WARNING)
-                if update_user_directory:
-                    self.update_user_directory_on = None
-                else:
-                    self.update_user_directory_on = ANY_USER_DIRECTORY_WORKER
+                uud_result = self.worker_name == update_user_directory_on
 
-        # Via all branches, this value is defined
-        assert self.update_user_directory_on is not UNDEFINED
+        else:
+            if "update_user_directory" in config:
+                # Backwards compatibility case
+                uud_result = self.worker_app == "synapse.app.user_dir"
+            else:
+                # Both values are undefined, assume None for update_user_directory_on
+                uud_result = is_master_process
+
+        if "update_user_directory" in config:
+            logger.warning(USER_UPDATE_DIRECTORY_DEPRECATION_WARNING)
+
+        self.update_user_directory = uud_result
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
@@ -390,7 +382,8 @@ class WorkerConfig(Config):
         # (e.g. users in public rooms, shared rooms between users.).
         #
         # If not provided, or null, this defaults to the main process.
-        #update_user_directory_on: null
+        #
+        #update_user_directory_on: "sync1"
 
         # A shared secret used by the replication APIs to authenticate HTTP requests
         # from workers.

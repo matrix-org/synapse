@@ -40,7 +40,7 @@ from synapse.app._base import (
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
-from synapse.config.workers import ANY_USER_DIRECTORY_WORKER, ListenerConfig
+from synapse.config.workers import ListenerConfig
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.server import JsonResource, OptionsResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -458,16 +458,11 @@ def start(config_options: List[str]) -> None:
         config.appservice.notify_appservices = False
 
     if config.worker.worker_app == "synapse.app.user_dir":
-        if (
-            config.worker.worker_name != config.worker.update_user_directory_on
-            and config.worker.update_user_directory_on is not ANY_USER_DIRECTORY_WORKER
-        ):
+        if not config.worker.update_user_directory:
             sys.stderr.write(
-                "\nThe update_user_directory_on config variable must point to this worker's name"
-                "\nto give this worker exclusive access to run it. (It is currently pointed at "
-                f"{config.worker.update_user_directory_on!r})"
+                "\nThe user directory worker is not allowed to perform user directory updates per the config."
                 "\nPlease add or edit "
-                f'``update_user_directory_on: "{config.worker.worker_name}"`` in the main config\n'
+                f'``update_user_directory_on: "{config.worker.worker_name}"`` in the config\n'
             )
             sys.exit(1)
 
