@@ -15,7 +15,7 @@
 
 import argparse
 import logging
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 
 import attr
 
@@ -329,7 +329,7 @@ class WorkerConfig(Config):
                 # Backwards compatibility case
                 logger.warning(USER_UPDATE_DIRECTORY_DEPRECATION_WARNING)
 
-                update_user_directory: bool = config['update_user_directory']
+                update_user_directory: bool = config["update_user_directory"]
 
                 if update_user_directory:
                     # Main process should update
