@@ -5,3 +5,4 @@ This section contains information on managing your Synapse homeserver. This incl
 * Managing users, rooms and media via the Admin API.
 * Setting up metrics and monitoring to give you insight into your homeserver's health.
 * Configuring structured logging.
+* Hardening your homeserver to improve its security.

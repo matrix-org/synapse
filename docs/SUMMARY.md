@@ -75,6 +75,7 @@
     - [State Groups](usage/administration/state_groups.md) 
     - [Request log format](usage/administration/request_log.md)
     - [Admin FAQ](usage/administration/admin_faq.md)
+    - [Hardening](usage/administration/hardening.md)
     - [Scripts]()
 
 # Development
