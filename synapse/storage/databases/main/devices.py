@@ -53,6 +53,7 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+issue_8631_logger = logging.getLogger("synapse.8631_debug")
 
 DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES = (
     "drop_device_list_streams_non_unique_indexes"
@@ -222,12 +223,17 @@ class DeviceWorkerStore(SQLBaseStore):
             limit,
         )
 
-        # We need to ensure `updates` doesn't grow too big.
-        # Currently: `len(updates) <= limit`.
+        # Note for later that `len(updates) <= limit`.
 
         # Return an empty list if there are no updates
         if not updates:
             return now_stream_id, []
+
+        if issue_8631_logger.isEnabledFor(logging.DEBUG):
+            data = {(user, device): stream_id for user, device, stream_id, _ in updates}
+            issue_8631_logger.debug(
+                "device updates need to be sent to %s: %s", destination, data
+            )
 
         # get the cross-signing keys of the users in the list, so that we can
         # determine which of the device changes were cross-signing keys
@@ -364,6 +370,17 @@ class DeviceWorkerStore(SQLBaseStore):
             # FIXME: remove this when enough servers have upgraded
             #        and remove the length budgeting above.
             results.append(("org.matrix.signing_key_update", result))
+
+        if issue_8631_logger.isEnabledFor(logging.DEBUG):
+            for (user_id, edu) in results:
+                issue_8631_logger.debug(
+                    "device update to %s for %s from %s to %s: %s",
+                    destination,
+                    user_id,
+                    from_stream_id,
+                    last_processed_stream_id,
+                    edu,
+                )
 
         return last_processed_stream_id, results
 
