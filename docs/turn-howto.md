@@ -151,7 +151,9 @@ This will install and start a systemd service called `coturn`.
 
     NB: If your TLS certificate was provided by Let's Encrypt, TLS/DTLS will
     not work with any Matrix client that uses Chromium's WebRTC library. This
-    currently includes Element Android & iOS. For more details, read the underlying
+    currently includes Element Android & iOS; for more details, see their
+    [respective](https://github.com/vector-im/element-android/issues/1533)
+    [issues](https://github.com/vector-im/element-ios/issues/2712) as well as the underlying
     [WebRTC issue](https://bugs.chromium.org/p/webrtc/issues/detail?id=11710).
     Consider using a ZeroSSL certificate for your TURN server as a working alternative.
 
