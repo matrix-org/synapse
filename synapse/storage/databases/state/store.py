@@ -255,11 +255,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         for the given state group, filtered with the given state filter.
 
         Returns:
-            tuple (
-                sequence of ObservableDeferreds to observe,
-                StateFilter representing what is left over (what else needs
-                to be requested to fulfil the request)
-            )
+            Tuple of two values:
+                A sequence of ObservableDeferreds to observe
+                A StateFilter representing what else needs to be requested to fulfill the request
         """
 
         inflight_requests = self._state_group_inflight_requests.get(group)
