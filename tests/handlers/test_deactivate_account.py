@@ -219,3 +219,51 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         push_rules = list(filter(self._is_custom_rule, push_rules))
         # Check our rule no longer exists
         self.assertEqual(push_rules, [], push_rules)
+
+    def test_ignored_users_deleted_upon_deactivation(self) -> None:
+        """
+        Ignored users are a special case of account data.
+        They get denormalised into the `ignored_users` table upon being stored as
+        account data.
+        Test that a user's list of ignored users is deleted upon deactivation.
+        """
+
+        # Add an ignored user
+        self.get_success(
+            self._store.add_account_data_for_user(
+                self.user,
+                AccountDataTypes.IGNORED_USER_LIST,
+                {"ignored_users": {"@sheltie:test": {}}},
+            )
+        )
+
+        # Test the user is ignored
+        self.assertEqual(
+            self.get_success(self._store.ignored_by("@sheltie:test")), {self.user}
+        )
+
+        # Request the deactivation of our account
+        req = self.get_success(
+            self.make_request(
+                "POST",
+                "account/deactivate",
+                {
+                    "auth": {
+                        "type": "m.login.password",
+                        "user": self.user,
+                        "password": "pass",
+                    },
+                    "erase": True,
+                },
+                access_token=self.token,
+            )
+        )
+        self.assertEqual(req.code, 200, req)
+
+        # Invalidate the cache
+        self._store.ignored_by.invalidate_all()
+
+        # Test the user is no longer ignored by the user that was deactivated
+        self.assertEqual(
+            self.get_success(self._store.ignored_by("@sheltie:test")), set()
+        )
