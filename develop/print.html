@@ -4991,10 +4991,13 @@ saml2_config:
 #       Defaults to false. Avoid this in production.
 #
 #   user_profile_method: Whether to fetch the user profile from the userinfo
-#       endpoint. Valid values are: 'auto' or 'userinfo_endpoint'.
+#       endpoint, or to rely on the data returned in the id_token from the
+#       token_endpoint.
 #
-#       Defaults to 'auto', which fetches the userinfo endpoint if 'openid' is
-#       included in 'scopes'. Set to 'userinfo_endpoint' to always fetch the
+#       Valid values are: 'auto' or 'userinfo_endpoint'.
+#
+#       Defaults to 'auto', which uses the userinfo endpoint if 'openid' is
+#       not included in 'scopes'. Set to 'userinfo_endpoint' to always use the
 #       userinfo endpoint.
 #
 #   allow_existing_users: set to 'true' to allow a user logging in via OIDC to
@@ -6681,8 +6684,6 @@ https://developers.google.com/identity/protocols/oauth2/openid-connect#appsetup)
         display_name_template: '{{ user.name }}'
 </code></pre>
 <h3 id="facebook"><a class="header" href="#facebook">Facebook</a></h3>
-<p>Like Github, Facebook provide a custom OAuth2 API rather than an OIDC-compliant
-one so requires a little more configuration.</p>
 <ol start="0">
 <li>You will need a Facebook developer account. You can register for one
 <a href="https://developers.facebook.com/async/registration/">here</a>.</li>
@@ -6704,25 +6705,28 @@ and &quot;App Secret&quot; for use below.</li>
     idp_name: Facebook
     idp_brand: &quot;facebook&quot;  # optional: styling hint for clients
     discover: false
-    issuer: &quot;https://facebook.com&quot;
+    issuer: &quot;https://www.facebook.com&quot;
     client_id: &quot;your-client-id&quot; # TO BE FILLED
     client_secret: &quot;your-client-secret&quot; # TO BE FILLED
     scopes: [&quot;openid&quot;, &quot;email&quot;]
-    authorization_endpoint: https://facebook.com/dialog/oauth
-    token_endpoint: https://graph.facebook.com/v9.0/oauth/access_token
-    user_profile_method: &quot;userinfo_endpoint&quot;
-    userinfo_endpoint: &quot;https://graph.facebook.com/v9.0/me?fields=id,name,email,picture&quot;
+    authorization_endpoint: &quot;https://facebook.com/dialog/oauth&quot;
+    token_endpoint: &quot;https://graph.facebook.com/v9.0/oauth/access_token&quot;
+    jwks_uri: &quot;https://www.facebook.com/.well-known/oauth/openid/jwks/&quot;
     user_mapping_provider:
       config:
-        subject_claim: &quot;id&quot;
         display_name_template: &quot;{{ user.name }}&quot;
+        email_template: &quot;{{ '{{ user.email }}' }}&quot;
 </code></pre>
 <p>Relevant documents:</p>
 <ul>
-<li>https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow</li>
-<li>Using Facebook's Graph API: https://developers.facebook.com/docs/graph-api/using-graph-api/</li>
-<li>Reference to the User endpoint: https://developers.facebook.com/docs/graph-api/reference/user</li>
+<li><a href="https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow">Manually Build a Login Flow</a></li>
+<li><a href="https://developers.facebook.com/docs/graph-api/using-graph-api/">Using Facebook's Graph API</a></li>
+<li><a href="https://developers.facebook.com/docs/graph-api/reference/user">Reference to the User endpoint</a></li>
 </ul>
+<p>Facebook do have an <a href="https://www.facebook.com/.well-known/openid-configuration">OIDC discovery endpoint</a>,
+but it has a <code>response_types_supported</code> which excludes &quot;code&quot; (which we rely on, and
+is even mentioned in their <a href="https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow#login">documentation</a>),
+so we have to disable discovery and configure the URIs manually.</p>
 <h3 id="gitea"><a class="header" href="#gitea">Gitea</a></h3>
 <p>Gitea is, like Github, not an OpenID provider, but just an OAuth2 provider.</p>
 <p>The <a href="https://try.gitea.io/api/swagger#/user/userGetCurrent"><code>/user</code> API endpoint</a>
