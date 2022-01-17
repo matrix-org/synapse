@@ -1283,11 +1283,22 @@ cert=/path/to/fullchain.pem
 
 # TLS private key file
 pkey=/path/to/privkey.pem
+
+# Ensure the configuration lines that disable TLS/DTLS are commented-out or removed
+#no-tls
+#no-dtls
 </code></pre>
 <p>In this case, replace the <code>turn:</code> schemes in the <code>turn_uris</code> settings below
 with <code>turns:</code>.</p>
 <p>We recommend that you only try to set up TLS/DTLS once you have set up a
 basic installation and got it working.</p>
+<p>NB: If your TLS certificate was provided by Let's Encrypt, TLS/DTLS will
+not work with any Matrix client that uses Chromium's WebRTC library. This
+currently includes Element Android &amp; iOS; for more details, see their
+<a href="https://github.com/vector-im/element-android/issues/1533">respective</a>
+<a href="https://github.com/vector-im/element-ios/issues/2712">issues</a> as well as the underlying
+<a href="https://bugs.chromium.org/p/webrtc/issues/detail?id=11710">WebRTC issue</a>.
+Consider using a ZeroSSL certificate for your TURN server as a working alternative.</p>
 </li>
 <li>
 <p>Ensure your firewall allows traffic into the TURN server on the ports
@@ -1387,6 +1398,11 @@ TURN ports (normally 3478 and 5349).</p>
 <li>
 <p>Check that you have opened your firewall to allow UDP traffic to the UDP
 relay ports (49152-65535 by default).</p>
+</li>
+<li>
+<p>Try disabling <code>coturn</code>'s TLS/DTLS listeners and enable only its (unencrypted)
+TCP/UDP listeners. (This will only leave signaling traffic unencrypted;
+voice &amp; video WebRTC traffic is always encrypted.)</p>
 </li>
 <li>
 <p>Some WebRTC implementations (notably, that of Google Chrome) appear to get
