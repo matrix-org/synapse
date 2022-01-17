@@ -1503,12 +1503,12 @@ room_prejoin_state:
    #additional_event_types:
    #  - org.example.custom.event.type
 
-# We record the IP address of clients used to access the API for various 
+# We record the IP address of clients used to access the API for various
 # reasons, including displaying it to the user in the "Where you're signed in"
 # dialog.
-# 
-# By default, when puppeting another user via the admin API, the client IP 
-# address is recorded against the user who created the access token (ie, the 
+#
+# By default, when puppeting another user via the admin API, the client IP
+# address is recorded against the user who created the access token (ie, the
 # admin user), and *not* the puppeted user.
 #
 # Uncomment the following to also record the IP address against the puppeted
