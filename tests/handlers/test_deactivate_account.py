@@ -11,9 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any, Dict
+
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import AccountDataTypes
+from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.rest import admin
 from synapse.rest.client import account, login
 from synapse.server import HomeServer
@@ -143,3 +146,76 @@ class DeactivateAccountTestCase(HomeserverTestCase):
                 )
             ),
         )
+
+    def _is_custom_rule(self, push_rule: Dict[str, Any]) -> bool:
+        """
+        Default rules start with a dot: such as .m.rule and .im.vector.
+        This function returns true iff a rule is custom (not default).
+        """
+        return "/." not in push_rule["rule_id"]
+
+    def test_push_rules_deleted_upon_account_deactivation(self) -> None:
+        """
+        Push rules are a special case of account data.
+        They are stored separately but get sent to the client as account data in /sync.
+        This tests that deactivating a user deletes push rules along with the rest
+        of their account data.
+        """
+
+        # Add a push rule
+        self.get_success(
+            self._store.add_push_rule(
+                self.user,
+                "personal.override.rule1",
+                PRIORITY_CLASS_MAP["override"],
+                [],
+                [],
+            )
+        )
+
+        # Test the rule exists
+        push_rules = self.get_success(self._store.get_push_rules_for_user(self.user))
+        # Filter out default rules; we don't care
+        push_rules = list(filter(self._is_custom_rule, push_rules))
+        # Check our rule made it
+        self.assertEqual(
+            push_rules,
+            [
+                {
+                    "user_name": "@user:test",
+                    "rule_id": "personal.override.rule1",
+                    "priority_class": 5,
+                    "priority": 0,
+                    "conditions": [],
+                    "actions": [],
+                    "default": False,
+                }
+            ],
+            push_rules,
+        )
+
+        # Request the deactivation of our account
+        req = self.get_success(
+            self.make_request(
+                "POST",
+                "account/deactivate",
+                {
+                    "auth": {
+                        "type": "m.login.password",
+                        "user": self.user,
+                        "password": "pass",
+                    },
+                    "erase": True,
+                },
+                access_token=self.token,
+            )
+        )
+        self.assertEqual(req.code, 200, req)
+
+        # Test the rule no longer exists (after clearing the cache)
+        self._store.get_push_rules_for_user.invalidate_all()
+        push_rules = self.get_success(self._store.get_push_rules_for_user(self.user))
+        # Filter out default rules; we don't care
+        push_rules = list(filter(self._is_custom_rule, push_rules))
+        # Check our rule no longer exists
+        self.assertEqual(push_rules, [], push_rules)
