@@ -25,7 +25,7 @@ from tests.unittest import HomeserverTestCase
 
 class StateGroupInflightCachingTestCase(HomeserverTestCase):
     def setUp(self) -> None:
-        super(StateGroupInflightCachingTestCase, self).setUp()
+        super().setUp()
         # Patch out the `_get_state_groups_from_groups`.
         # This is useful because it lets us pretend we have a slow database.
         gsgfg_patch = patch(
@@ -39,9 +39,6 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
         ] = []
 
     def prepare(self, reactor, clock, homeserver) -> None:
-        super(StateGroupInflightCachingTestCase, self).prepare(
-            reactor, clock, homeserver
-        )
         self.state_storage = homeserver.get_storage().state
         self.state_datastore = homeserver.get_datastores().state
 
