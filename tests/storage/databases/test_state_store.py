@@ -28,13 +28,13 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
         super().setUp()
         # Patch out the `_get_state_groups_from_groups`.
         # This is useful because it lets us pretend we have a slow database.
-        gsgfg_patch = patch(
+        get_state_groups_patch = patch(
             "synapse.storage.databases.state.store.StateGroupDataStore._get_state_groups_from_groups",
             self._fake_get_state_groups_from_groups,
         )
-        gsgfg_patch.start()
-        self.addCleanup(gsgfg_patch.stop)
-        self.gsgfg_calls: List[
+        get_state_groups_patch.start()
+        self.addCleanup(get_state_groups_patch.stop)
+        self.get_state_group_calls: List[
             Tuple[Tuple[int, ...], StateFilter, Deferred[Dict[int, StateMap[str]]]]
         ] = []
 
@@ -45,9 +45,8 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
     def _fake_get_state_groups_from_groups(
         self, groups: Sequence[int], state_filter: StateFilter
     ) -> "Deferred[Dict[int, StateMap[str]]]":
-        print("hi", groups, state_filter)
         d: Deferred[Dict[int, StateMap[str]]] = Deferred()
-        self.gsgfg_calls.append((tuple(groups), state_filter, d))
+        self.get_state_group_calls.append((tuple(groups), state_filter, d))
         return d
 
     def _complete_request_fake(
@@ -94,7 +93,7 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
         self.pump(by=0.1)
 
         # This should have gone to the database
-        self.assertEqual(len(self.gsgfg_calls), 1)
+        self.assertEqual(len(self.get_state_group_calls), 1)
         self.assertFalse(req1.called)
 
         req2 = ensureDeferred(
@@ -105,11 +104,11 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
         self.pump(by=0.1)
 
         # No more calls should have gone to the database
-        self.assertEqual(len(self.gsgfg_calls), 1)
+        self.assertEqual(len(self.get_state_group_calls), 1)
         self.assertFalse(req1.called)
         self.assertFalse(req2.called)
 
-        groups, sf, d = self.gsgfg_calls[0]
+        groups, sf, d = self.get_state_group_calls[0]
         self.assertEqual(groups, (42,))
         self.assertEqual(sf, StateFilter.all())
 
