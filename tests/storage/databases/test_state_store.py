@@ -67,20 +67,14 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
 
             for state_type, state_keys in state_filter.types.items():
                 if state_keys is None:
-                    group_result[
-                        (state_type, "wild wombat")
-                    ] = f"{group} {state_type} wild wombat"
-                    group_result[
-                        (state_type, "wild spqr")
-                    ] = f"{group} {state_type} wild spqr"
+                    group_result[(state_type, "a")] = "xyz"
+                    group_result[(state_type, "b")] = "xyz"
                 else:
                     for state_key in state_keys:
-                        group_result[
-                            (state_type, state_key)
-                        ] = f"{group} {state_type} {state_key}"
+                        group_result[(state_type, state_key)] = "abc"
 
             if state_filter.include_others:
-                group_result[("something.else", "wild")] = "card"
+                group_result[("other.event.type", "state.key")] = "123"
 
         d.callback(result)
 
@@ -115,5 +109,9 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
         # Now we can complete the request
         self._complete_request_fake(groups, sf, d)
 
-        self.assertEqual(self.get_success(req1), {("something.else", "wild"): "card"})
-        self.assertEqual(self.get_success(req2), {("something.else", "wild"): "card"})
+        self.assertEqual(
+            self.get_success(req1), {("other.event.type", "state.key"): "123"}
+        )
+        self.assertEqual(
+            self.get_success(req2), {("other.event.type", "state.key"): "123"}
+        )
