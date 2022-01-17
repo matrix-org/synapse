@@ -36,6 +36,7 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.storage.database import DatabasePool, make_conn
+from synapse.storage.databases.main.account_data import AccountDataWorkerStore
 from synapse.storage.databases.main.client_ips import ClientIpBackgroundUpdateStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxBackgroundUpdateStore
 from synapse.storage.databases.main.devices import DeviceBackgroundUpdateStore
@@ -183,6 +184,7 @@ class Store(
     PusherWorkerStore,
     PresenceBackgroundUpdateStore,
     GroupServerWorkerStore,
+    AccountDataWorkerStore,
 ):
     def execute(self, f, *args, **kwargs):
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
