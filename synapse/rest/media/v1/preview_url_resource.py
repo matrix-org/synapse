@@ -368,6 +368,20 @@ class PreviewUrlResource(DirectServeJsonResource):
         return jsonog.encode("utf8")
 
     async def _download_url(self, url: str, user: UserID) -> MediaInfo:
+        """
+        Fetches remote content and parses the headers to generate a MediaInfo.
+
+        It uses the media storage provider to persist the fetched content and
+        stores the mapping into the database.
+
+        Args:
+             url: The URL to fetch.
+             user: The user who ahs requested this URL.
+
+        Return:
+            A MediaInfo object describing the fetched content.
+        """
+
         # TODO: we should probably honour robots.txt... except in practice
         # we're most likely being explicitly triggered by a human rather than a
         # bot, so are we really a robot?
