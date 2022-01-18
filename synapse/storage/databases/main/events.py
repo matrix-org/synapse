@@ -39,7 +39,6 @@ from synapse.api.room_versions import RoomVersions
 from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
-from synapse.logging.utils import log_function
 from synapse.storage._base import db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
     DatabasePool,
@@ -328,7 +327,6 @@ class PersistEventsStore:
 
         return existing_prevs
 
-    @log_function
     def _persist_events_txn(
         self,
         txn: LoggingTransaction,

@@ -56,7 +56,6 @@ from synapse.api.room_versions import (
 from synapse.events import EventBase, builder
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.transport.client import SendJoinResponse
-from synapse.logging.utils import log_function
 from synapse.types import JsonDict, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -144,7 +143,6 @@ class FederationClient(FederationBase):
             if destination_dict:
                 self.pdu_destination_tried[event_id] = destination_dict
 
-    @log_function
     async def make_query(
         self,
         destination: str,
@@ -178,7 +176,6 @@ class FederationClient(FederationBase):
             ignore_backoff=ignore_backoff,
         )
 
-    @log_function
     async def query_client_keys(
         self, destination: str, content: JsonDict, timeout: int
     ) -> JsonDict:
@@ -196,7 +193,6 @@ class FederationClient(FederationBase):
             destination, content, timeout
         )
 
-    @log_function
     async def query_user_devices(
         self, destination: str, user_id: str, timeout: int = 30000
     ) -> JsonDict:
@@ -208,7 +204,6 @@ class FederationClient(FederationBase):
             destination, user_id, timeout
         )
 
-    @log_function
     async def claim_client_keys(
         self, destination: str, content: JsonDict, timeout: int
     ) -> JsonDict:
