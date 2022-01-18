@@ -637,7 +637,9 @@ class SyncHandler:
         # as clients will have all the necessary information.
         bundled_aggregations = None
         if limited or newly_joined_room:
-            bundled_aggregations = await self.store.get_bundled_aggregations(recents)
+            bundled_aggregations = await self.store.get_bundled_aggregations(
+                recents, sync_config.user.to_string()
+            )
 
         return TimelineBatch(
             events=recents,

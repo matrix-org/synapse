@@ -118,7 +118,9 @@ class RelationPaginationServlet(RestServlet):
         )
         # The relations returned for the requested event do include their
         # bundled aggregations.
-        aggregations = await self.store.get_bundled_aggregations(events)
+        aggregations = await self.store.get_bundled_aggregations(
+            events, requester.user.to_string()
+        )
         serialized_events = self._event_serializer.serialize_events(
             events, now, bundle_aggregations=aggregations
         )

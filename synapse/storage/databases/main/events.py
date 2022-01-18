@@ -1793,6 +1793,13 @@ class PersistEventsStore:
             txn.call_after(
                 self.store.get_thread_summary.invalidate, (parent_id, event.room_id)
             )
+            # It should be safe to only invalidate the cache if the user has not
+            # previously participated in the thread, but that's difficult (and
+            # potentially error-prone) so it is always invalidated.
+            txn.call_after(
+                self.store.get_thread_participated.invalidate,
+                (parent_id, event.room_id, event.sender),
+            )
 
     def _handle_insertion_event(self, txn: LoggingTransaction, event: EventBase):
         """Handles keeping track of insertion events and edges/connections.

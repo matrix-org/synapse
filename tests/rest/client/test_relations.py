@@ -515,6 +515,9 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                 2,
                 actual[RelationTypes.THREAD].get("count"),
             )
+            self.assertTrue(
+                actual[RelationTypes.THREAD].get("current_user_participated")
+            )
             # The latest thread event has some fields that don't matter.
             self.assert_dict(
                 {
