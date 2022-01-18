@@ -12,7 +12,9 @@ Bugfixes
 Synapse 1.50.0 (2022-01-18)
 ===========================
 
-**This release has a critical bug that may prevent clients from being able to connect. As such, we do not recommend upgrading to 1.50.0, and instead upgrading straight to 1.50.1. Further details are in [this issue](https://github.com/matrix-org/synapse/issues/11763).**
+**This release has a critical bug that may prevent clients from being able to connect. 
+As such, it is not recommended to upgrade to 1.50.0. Instead, please upgrade straight to
+to 1.50.1. Further details are in [this issue](https://github.com/matrix-org/synapse/issues/11763).**
 
 Please note that we now only support Python 3.7+ and PostgreSQL 10+ (if applicable), because Python 3.6 and PostgreSQL 9.6 have reached end-of-life.
 
