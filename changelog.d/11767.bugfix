@@ -1,0 +1,1 @@
+Fix a long-standing bug when previewing Reddit URLs which do not contain an image.
