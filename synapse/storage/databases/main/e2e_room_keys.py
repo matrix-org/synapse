@@ -110,16 +110,16 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         values = []
         for (room_id, session_id, room_key) in room_keys:
             values.append(
-                {
-                    "user_id": user_id,
-                    "version": version_int,
-                    "room_id": room_id,
-                    "session_id": session_id,
-                    "first_message_index": room_key["first_message_index"],
-                    "forwarded_count": room_key["forwarded_count"],
-                    "is_verified": room_key["is_verified"],
-                    "session_data": json_encoder.encode(room_key["session_data"]),
-                }
+                (
+                    user_id,
+                    version_int,
+                    room_id,
+                    session_id,
+                    room_key["first_message_index"],
+                    room_key["forwarded_count"],
+                    room_key["is_verified"],
+                    json_encoder.encode(room_key["session_data"]),
+                )
             )
             log_kv(
                 {
@@ -131,7 +131,19 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             )
 
         await self.db_pool.simple_insert_many(
-            table="e2e_room_keys", values=values, desc="add_e2e_room_keys"
+            table="e2e_room_keys",
+            keys=(
+                "user_id",
+                "version",
+                "room_id",
+                "session_id",
+                "first_message_index",
+                "forwarded_count",
+                "is_verified",
+                "session_data",
+            ),
+            values=values,
+            desc="add_e2e_room_keys",
         )
 
     @trace

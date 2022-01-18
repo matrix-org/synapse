@@ -40,7 +40,6 @@ from synapse.handlers.presence import format_user_presence_state
 from synapse.logging import issue9533_logger
 from synapse.logging.context import PreserveLoggingContext
 from synapse.logging.opentracing import log_kv, start_active_span
-from synapse.logging.utils import log_function
 from synapse.metrics import LaterGauge
 from synapse.streams.config import PaginationConfig
 from synapse.types import (
@@ -686,7 +685,6 @@ class Notifier:
         else:
             return False
 
-    @log_function
     def remove_expired_streams(self) -> None:
         time_now_ms = self.clock.time_msec()
         expired_streams = []
@@ -700,7 +698,6 @@ class Notifier:
         for expired_stream in expired_streams:
             expired_stream.remove(self)
 
-    @log_function
     def _register_with_keys(self, user_stream: _NotifierUserStream):
         self.user_to_user_stream[user_stream.user_id] = user_stream
 

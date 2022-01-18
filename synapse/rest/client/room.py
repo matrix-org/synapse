@@ -663,7 +663,9 @@ class RoomEventServlet(RestServlet):
 
         if event:
             # Ensure there are bundled aggregations available.
-            aggregations = await self._store.get_bundled_aggregations([event])
+            aggregations = await self._store.get_bundled_aggregations(
+                [event], requester.user.to_string()
+            )
 
             time_now = self.clock.time_msec()
             event_dict = self._event_serializer.serialize_event(

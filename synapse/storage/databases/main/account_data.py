@@ -536,9 +536,9 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         self.db_pool.simple_insert_many_txn(
             txn,
             table="ignored_users",
+            keys=("ignorer_user_id", "ignored_user_id"),
             values=[
-                {"ignorer_user_id": user_id, "ignored_user_id": u}
-                for u in currently_ignored_users - previously_ignored_users
+                (user_id, u) for u in currently_ignored_users - previously_ignored_users
             ],
         )
 
