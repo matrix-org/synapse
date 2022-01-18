@@ -1,10 +1,15 @@
+Synapse 1.50.0 (2022-01-18)
+===========================
+
+Please note that we now only support Python 3.7+ and PostgreSQL 10+ (if applicable), because Python 3.6 and PostgreSQL 9.6 have reached end-of-life.
+
+No significant changes since 1.50.0rc2.
+
+
 Synapse 1.50.0rc2 (2022-01-14)
 ==============================
 
 This release candidate fixes a federation-breaking regression introduced in Synapse 1.50.0rc1.
-
-Please note that we now only support Python 3.7+ and PostgreSQL 10+ (if applicable), because Python 3.6 and PostgreSQL 9.6 have reached end-of-life.
-
 
 Bugfixes
 --------
