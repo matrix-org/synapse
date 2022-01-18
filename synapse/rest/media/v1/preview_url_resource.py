@@ -256,7 +256,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         if oembed_url:
             url_to_download = oembed_url
 
-        media_info = await self._download_url(url_to_download, user)
+        media_info = await self._handle_url(url_to_download, user)
 
         logger.debug("got media_info of '%s'", media_info)
 
@@ -297,7 +297,7 @@ class PreviewUrlResource(DirectServeJsonResource):
                 oembed_url = self._oembed.autodiscover_from_html(tree)
                 og_from_oembed: JsonDict = {}
                 if oembed_url:
-                    oembed_info = await self._download_url(oembed_url, user)
+                    oembed_info = await self._handle_url(oembed_url, user)
                     (
                         og_from_oembed,
                         author_name,
@@ -367,7 +367,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         return jsonog.encode("utf8")
 
-    async def _download_url(self, url: str, user: UserID) -> MediaInfo:
+    async def _handle_url(self, url: str, user: UserID) -> MediaInfo:
         """
         Fetches remote content and parses the headers to generate a MediaInfo.
 
@@ -488,7 +488,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         # FIXME: it might be cleaner to use the same flow as the main /preview_url
         # request itself and benefit from the same caching etc.  But for now we
         # just rely on the caching on the master request to speed things up.
-        image_info = await self._download_url(
+        image_info = await self._handle_url(
             rebase_url(og["og:image"], media_info.uri), user
         )
 
