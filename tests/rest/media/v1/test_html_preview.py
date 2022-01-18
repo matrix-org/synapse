@@ -19,7 +19,7 @@ from synapse.rest.media.v1.preview_html import (
     summarize_paragraphs,
 )
 
-from . import unittest
+from tests import unittest
 
 try:
     import lxml
