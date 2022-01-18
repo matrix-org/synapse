@@ -371,6 +371,20 @@ class PreviewUrlResource(DirectServeJsonResource):
     async def _download_url(
         self, url: str, output_stream: BinaryIO
     ) -> Tuple[int, str, int, str, Optional[str], int, Optional[str]]:
+        """
+        Fetches a remote URL and parses the headers.
+
+        Args:
+             url: The URL to fetch.
+             output_stream: The stream to write the content to.
+
+        Returns:
+            A tuple of:
+                Media length, URL downloaded, the HTTP response code,
+                the media type, the downloaded file name, the number of
+                milliseconds the result is valid for, the etag header.
+        """
+
         try:
             logger.debug("Trying to get preview for url '%s'", url)
             length, headers, uri, code = await self.client.get_file(
@@ -422,8 +436,19 @@ class PreviewUrlResource(DirectServeJsonResource):
         self, url: str, output_stream: BinaryIO
     ) -> Tuple[int, str, int, str, Optional[str], int, Optional[str]]:
         """
-        Parses a data: URL and stores it.
+        Parses a data: URL.
+
+        Args:
+             url: The URL to parse.
+             output_stream: The stream to write the content to.
+
+        Returns:
+            A tuple of:
+                Media length, URL downloaded, the HTTP response code,
+                the media type, the downloaded file name, the number of
+                milliseconds the result is valid for, the etag header.
         """
+
         try:
             logger.debug("Trying to parse data url '%s'", url)
             with urlopen(url) as url_info:
@@ -452,7 +477,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
     async def _handle_url(self, url: str, user: UserID) -> MediaInfo:
         """
-        Fetches remote content and parses the headers to generate a MediaInfo.
+        Fetches content from a URL and parses the result to generate a MediaInfo.
 
         It uses the media storage provider to persist the fetched content and
         stores the mapping into the database.
@@ -461,7 +486,7 @@ class PreviewUrlResource(DirectServeJsonResource):
              url: The URL to fetch.
              user: The user who ahs requested this URL.
 
-        Return:
+        Returns:
             A MediaInfo object describing the fetched content.
         """
 
