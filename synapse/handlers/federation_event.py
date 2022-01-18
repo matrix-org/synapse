@@ -56,7 +56,6 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.logging.context import nested_logging_context, run_in_background
-from synapse.logging.utils import log_function
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
@@ -275,7 +274,6 @@ class FederationEventHandler:
 
         await self._process_received_pdu(origin, pdu, state=None)
 
-    @log_function
     async def on_send_membership_event(
         self, origin: str, event: EventBase
     ) -> Tuple[EventBase, EventContext]:
@@ -472,7 +470,6 @@ class FederationEventHandler:
 
             return await self.persist_events_and_notify(room_id, [(event, context)])
 
-    @log_function
     async def backfill(
         self, dest: str, room_id: str, limit: int, extremities: Collection[str]
     ) -> None:
