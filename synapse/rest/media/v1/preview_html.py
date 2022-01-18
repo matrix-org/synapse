@@ -323,10 +323,13 @@ def _iterate_over_text(
 def rebase_url(url: str, base: str) -> str:
     base_parts = list(urlparse.urlparse(base))
     url_parts = list(urlparse.urlparse(url))
-    if not url_parts[0]:  # fix up schema
+    # Add a scheme, if one does not exist.
+    if not url_parts[0]:
         url_parts[0] = base_parts[0] or "http"
-    if not url_parts[1]:  # fix up hostname
+    # Fix up the hostname, if this is not a data URL.
+    if url_parts[0] != "data" and not url_parts[1]:
         url_parts[1] = base_parts[1]
+        # If the path does not start with a /, nest it under the base path.
         if not url_parts[2].startswith("/"):
             url_parts[2] = re.sub(r"/[^/]+$", "/", base_parts[2]) + url_parts[2]
     return urlparse.urlunparse(url_parts)

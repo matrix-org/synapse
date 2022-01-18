@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
 import json
 import os
 import re
@@ -23,6 +24,7 @@ from twisted.test.proto_helpers import AccumulatingProtocol
 
 from synapse.config.oembed import OEmbedEndpointConfig
 from synapse.rest.media.v1.preview_url_resource import IMAGE_CACHE_EXPIRY_MS
+from synapse.types import JsonDict
 from synapse.util.stringutils import parse_and_validate_mxc_uri
 
 from tests import unittest
@@ -141,6 +143,13 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
     def create_test_resource(self):
         return self.hs.get_media_repository_resource()
+
+    def _assert_small_png(self, json_body: JsonDict) -> None:
+        """Assert properties from the SMALL_PNG test image."""
+        self.assertTrue(json_body["og:image"].startswith("mxc://"))
+        self.assertEqual(json_body["og:image:height"], 1)
+        self.assertEqual(json_body["og:image:width"], 1)
+        self.assertEqual(json_body["og:image:type"], "image/png")
 
     def test_cache_returns_correct_type(self):
         self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
@@ -569,6 +578,41 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             server.data,
         )
 
+    def test_data_url(self):
+        self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
+
+        data = base64.b64encode(SMALL_PNG)
+
+        end_content = (
+            b"<html><head>" b'<img src="data:image/png;base64,%s" />' b"</head></html>"
+        ) % (data,)
+
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://matrix.org",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b'Content-Type: text/html; charset="utf8"\r\n\r\n'
+            )
+            % (len(end_content),)
+            + end_content
+        )
+
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, 200)
+        self._assert_small_png(channel.json_body)
+
     def test_oembed_photo(self):
         """Test an oEmbed endpoint which returns a 'photo' type which redirects the preview to a new URL."""
         self.lookups["publish.twitter.com"] = [(IPv4Address, "10.1.2.3")]
@@ -626,10 +670,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         body = channel.json_body
         self.assertEqual(body["og:url"], "http://twitter.com/matrixdotorg/status/12345")
-        self.assertTrue(body["og:image"].startswith("mxc://"))
-        self.assertEqual(body["og:image:height"], 1)
-        self.assertEqual(body["og:image:width"], 1)
-        self.assertEqual(body["og:image:type"], "image/png")
+        self._assert_small_png(body)
 
     def test_oembed_rich(self):
         """Test an oEmbed endpoint which returns HTML content via the 'rich' type."""
@@ -820,10 +861,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(
             body["og:url"], "http://www.twitter.com/matrixdotorg/status/12345"
         )
-        self.assertTrue(body["og:image"].startswith("mxc://"))
-        self.assertEqual(body["og:image:height"], 1)
-        self.assertEqual(body["og:image:width"], 1)
-        self.assertEqual(body["og:image:type"], "image/png")
+        self._assert_small_png(body)
 
     def _download_image(self):
         """Downloads an image into the URL cache.

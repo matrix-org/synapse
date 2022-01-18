@@ -23,6 +23,7 @@ import sys
 import traceback
 from typing import TYPE_CHECKING, BinaryIO, Iterable, Optional, Tuple
 from urllib import parse as urlparse
+from urllib.request import urlopen
 
 import attr
 
@@ -417,6 +418,38 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         return length, uri, code, media_type, download_name, expires, etag
 
+    async def _parse_data_url(
+        self, url: str, output_stream: BinaryIO
+    ) -> Tuple[int, str, int, str, Optional[str], int, Optional[str]]:
+        """
+        Parses a data: URL and stores it.
+        """
+        try:
+            logger.debug("Trying to parse data url '%s'", url)
+            with urlopen(url) as url_info:
+                # TODO Can this be more efficient.
+                output_stream.write(url_info.read())
+        except Exception as e:
+            logger.warning("Error parsing data: URL %s: %r", url, e)
+
+            raise SynapseError(
+                500,
+                "Failed to parse data URL: %s"
+                % (traceback.format_exception_only(sys.exc_info()[0], e),),
+                Codes.UNKNOWN,
+            )
+
+        length = output_stream.seek(1)
+
+        media_type = url_info.headers.get_content_type()
+
+        # Some features are not supported by data: URLs.
+        download_name = None
+        expires = ONE_HOUR
+        etag = None
+
+        return length, url, 200, media_type, download_name, expires, etag
+
     async def _handle_url(self, url: str, user: UserID) -> MediaInfo:
         """
         Fetches remote content and parses the headers to generate a MediaInfo.
@@ -441,15 +474,27 @@ class PreviewUrlResource(DirectServeJsonResource):
         file_info = FileInfo(server_name=None, file_id=file_id, url_cache=True)
 
         with self.media_storage.store_into_file(file_info) as (f, fname, finish):
-            (
-                length,
-                uri,
-                code,
-                media_type,
-                download_name,
-                expires,
-                etag,
-            ) = await self._download_url(url, f)
+            if url.startswith("data:"):
+                (
+                    length,
+                    uri,
+                    code,
+                    media_type,
+                    download_name,
+                    expires,
+                    etag,
+                ) = await self._parse_data_url(url, f)
+            else:
+                (
+                    length,
+                    uri,
+                    code,
+                    media_type,
+                    download_name,
+                    expires,
+                    etag,
+                ) = await self._download_url(url, f)
+
             await finish()
 
         try:
