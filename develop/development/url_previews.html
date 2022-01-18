@@ -227,6 +227,14 @@ and saves the local media metadata.</li>
 <ol>
 <li>Decodes the HTML via the stored file.</li>
 <li>Generates an Open Graph response from the HTML.</li>
+<li>If a JSON oEmbed URL was found in the HTML via autodiscovery:
+<ol>
+<li>Downloads the URL and stores it into a file via the media storage provider
+and saves the local media metadata.</li>
+<li>Convert the oEmbed response to an Open Graph response.</li>
+<li>Override any Open Graph data from the HTML with data from oEmbed.</li>
+</ol>
+</li>
 <li>If an image exists in the Open Graph response:
 <ol>
 <li>Downloads the URL and stores it into a file via the media storage
