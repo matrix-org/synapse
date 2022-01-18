@@ -27,7 +27,6 @@ import synapse
 import synapse.config.logger
 from synapse import events
 from synapse.api.urls import (
-    CLIENT_API_PREFIX,
     FEDERATION_PREFIX,
     LEGACY_MEDIA_PREFIX,
     MEDIA_R0_PREFIX,
@@ -193,7 +192,13 @@ class SynapseHomeServer(HomeServer):
 
             resources.update(
                 {
-                    CLIENT_API_PREFIX: client_resource,
+                    "/_matrix/client/api/v1": client_resource,
+                    "/_matrix/client/r0": client_resource,
+                    "/_matrix/client/v1": client_resource,
+                    "/_matrix/client/v3": client_resource,
+                    "/_matrix/client/unstable": client_resource,
+                    "/_matrix/client/v2_alpha": client_resource,
+                    "/_matrix/client/versions": client_resource,
                     "/.well-known": well_known_resource(self),
                     "/_synapse/admin": AdminRestResource(self),
                     **build_synapse_client_resource_tree(self),
