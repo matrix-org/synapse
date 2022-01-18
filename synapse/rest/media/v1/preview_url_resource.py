@@ -21,7 +21,7 @@ import re
 import shutil
 import sys
 import traceback
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, BinaryIO, Iterable, Optional, Tuple
 from urllib import parse as urlparse
 
 import attr
@@ -367,6 +367,56 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         return jsonog.encode("utf8")
 
+    async def _download_url(
+        self, url: str, output_stream: BinaryIO
+    ) -> Tuple[int, str, int, str, Optional[str], int, Optional[str]]:
+        try:
+            logger.debug("Trying to get preview for url '%s'", url)
+            length, headers, uri, code = await self.client.get_file(
+                url,
+                output_stream=output_stream,
+                max_size=self.max_spider_size,
+                headers={"Accept-Language": self.url_preview_accept_language},
+            )
+        except SynapseError:
+            # Pass SynapseErrors through directly, so that the servlet
+            # handler will return a SynapseError to the client instead of
+            # blank data or a 500.
+            raise
+        except DNSLookupError:
+            # DNS lookup returned no results
+            # Note: This will also be the case if one of the resolved IP
+            # addresses is blacklisted
+            raise SynapseError(
+                502,
+                "DNS resolution failure during URL preview generation",
+                Codes.UNKNOWN,
+            )
+        except Exception as e:
+            # FIXME: pass through 404s and other error messages nicely
+            logger.warning("Error downloading %s: %r", url, e)
+
+            raise SynapseError(
+                500,
+                "Failed to download content: %s"
+                % (traceback.format_exception_only(sys.exc_info()[0], e),),
+                Codes.UNKNOWN,
+            )
+
+        if b"Content-Type" in headers:
+            media_type = headers[b"Content-Type"][0].decode("ascii")
+        else:
+            media_type = "application/octet-stream"
+
+        download_name = get_filename_from_headers(headers)
+
+        # FIXME: we should calculate a proper expiration based on the
+        # Cache-Control and Expire headers.  But for now, assume 1 hour.
+        expires = ONE_HOUR
+        etag = headers[b"ETag"][0].decode("ascii") if b"ETag" in headers else None
+
+        return length, uri, code, media_type, download_name, expires, etag
+
     async def _handle_url(self, url: str, user: UserID) -> MediaInfo:
         """
         Fetches remote content and parses the headers to generate a MediaInfo.
@@ -391,51 +441,16 @@ class PreviewUrlResource(DirectServeJsonResource):
         file_info = FileInfo(server_name=None, file_id=file_id, url_cache=True)
 
         with self.media_storage.store_into_file(file_info) as (f, fname, finish):
-            try:
-                logger.debug("Trying to get preview for url '%s'", url)
-                length, headers, uri, code = await self.client.get_file(
-                    url,
-                    output_stream=f,
-                    max_size=self.max_spider_size,
-                    headers={"Accept-Language": self.url_preview_accept_language},
-                )
-            except SynapseError:
-                # Pass SynapseErrors through directly, so that the servlet
-                # handler will return a SynapseError to the client instead of
-                # blank data or a 500.
-                raise
-            except DNSLookupError:
-                # DNS lookup returned no results
-                # Note: This will also be the case if one of the resolved IP
-                # addresses is blacklisted
-                raise SynapseError(
-                    502,
-                    "DNS resolution failure during URL preview generation",
-                    Codes.UNKNOWN,
-                )
-            except Exception as e:
-                # FIXME: pass through 404s and other error messages nicely
-                logger.warning("Error downloading %s: %r", url, e)
-
-                raise SynapseError(
-                    500,
-                    "Failed to download content: %s"
-                    % (traceback.format_exception_only(sys.exc_info()[0], e),),
-                    Codes.UNKNOWN,
-                )
+            (
+                length,
+                uri,
+                code,
+                media_type,
+                download_name,
+                expires,
+                etag,
+            ) = await self._download_url(url, f)
             await finish()
-
-            if b"Content-Type" in headers:
-                media_type = headers[b"Content-Type"][0].decode("ascii")
-            else:
-                media_type = "application/octet-stream"
-
-            download_name = get_filename_from_headers(headers)
-
-            # FIXME: we should calculate a proper expiration based on the
-            # Cache-Control and Expire headers.  But for now, assume 1 hour.
-            expires = ONE_HOUR
-            etag = headers[b"ETag"][0].decode("ascii") if b"ETag" in headers else None
 
         try:
             time_now_ms = self.clock.time_msec()
