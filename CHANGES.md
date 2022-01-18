@@ -1,5 +1,18 @@
+Synapse 1.50.1 (2022-01-18)
+===========================
+
+This release fixes a bug in Synapse 1.50.0 that could prevent clients from being able to connect to Synapse if the `webclient` resource was enabled. Further details are available in [this issue](https://github.com/matrix-org/synapse/issues/11763).
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.50.0rc1 that could cause Matrix clients to be unable to connect to Synapse instances with the 'webclient' resource enabled. ([\#11764](https://github.com/matrix-org/synapse/issues/11764))
+
+
 Synapse 1.50.0 (2022-01-18)
 ===========================
+
+**This release has a critical bug that may prevent clients from being able to connect. As such, we do not recommend upgrading to 1.50.0, and instead upgrading straight to 1.50.1. Further details are in [this issue](https://github.com/matrix-org/synapse/issues/11763).**
 
 Please note that we now only support Python 3.7+ and PostgreSQL 10+ (if applicable), because Python 3.6 and PostgreSQL 9.6 have reached end-of-life.
 

@@ -1,1 +1,0 @@
-Fixes a bug introduced in Synapse 1.50.0rc1 that could cause Matrix clients to be unable to connect to Synapse instances with the 'webclient' resource enabled.
