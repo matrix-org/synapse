@@ -247,7 +247,7 @@ try:
         class BaseReporter:  # type: ignore[no-redef]
             pass
 
-    @attr.s(slots=True, frozen=True)
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
     class _WrappedRustReporter(BaseReporter):
         """Wrap the reporter to ensure `report_span` never throws."""
 
