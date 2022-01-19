@@ -762,13 +762,13 @@ class _AsyncCtxManagerWrapper(Generic[T]):
         return self.inner.__exit__(exc_type, exc, tb)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class _MultiWriterCtxManager:
     """Async context manager returned by MultiWriterIdGenerator"""
 
-    id_gen = attr.ib(type=MultiWriterIdGenerator)
-    multiple_ids = attr.ib(type=Optional[int], default=None)
-    stream_ids = attr.ib(type=List[int], factory=list)
+    id_gen: MultiWriterIdGenerator
+    multiple_ids: Optional[int] = None
+    stream_ids: List[int] = attr.Factory(list)
 
     async def __aenter__(self) -> Union[int, List[int]]:
         # It's safe to run this in autocommit mode as fetching values from a

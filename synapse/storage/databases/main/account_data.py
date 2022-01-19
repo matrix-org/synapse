@@ -450,7 +450,7 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
     async def add_account_data_for_user(
         self, user_id: str, account_data_type: str, content: JsonDict
     ) -> int:
-        """Add some account_data to a room for a user.
+        """Add some global account_data for a user.
 
         Args:
             user_id: The user to add a tag for.
@@ -536,9 +536,9 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         self.db_pool.simple_insert_many_txn(
             txn,
             table="ignored_users",
+            keys=("ignorer_user_id", "ignored_user_id"),
             values=[
-                {"ignorer_user_id": user_id, "ignored_user_id": u}
-                for u in currently_ignored_users - previously_ignored_users
+                (user_id, u) for u in currently_ignored_users - previously_ignored_users
             ],
         )
 

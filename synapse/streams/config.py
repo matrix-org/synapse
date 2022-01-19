@@ -28,14 +28,14 @@ logger = logging.getLogger(__name__)
 MAX_LIMIT = 1000
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class PaginationConfig:
     """A configuration object which stores pagination parameters."""
 
-    from_token = attr.ib(type=Optional[StreamToken])
-    to_token = attr.ib(type=Optional[StreamToken])
-    direction = attr.ib(type=str)
-    limit = attr.ib(type=Optional[int])
+    from_token: Optional[StreamToken]
+    to_token: Optional[StreamToken]
+    direction: str
+    limit: Optional[int]
 
     @classmethod
     async def from_request(

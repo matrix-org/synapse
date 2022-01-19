@@ -35,7 +35,12 @@ When Synapse is asked to preview a URL it does the following:
    5. If the media is HTML:
       1. Decodes the HTML via the stored file.
       2. Generates an Open Graph response from the HTML.
-      3. If an image exists in the Open Graph response:
+      3. If a JSON oEmbed URL was found in the HTML via autodiscovery:
+         1. Downloads the URL and stores it into a file via the media storage provider
+            and saves the local media metadata.
+         2. Convert the oEmbed response to an Open Graph response.
+         3. Override any Open Graph data from the HTML with data from oEmbed.
+      4. If an image exists in the Open Graph response:
          1. Downloads the URL and stores it into a file via the media storage
             provider and saves the local media metadata.
          2. Generates thumbnails.

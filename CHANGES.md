@@ -1,7 +1,52 @@
-Synapse 1.50.0rc1 (2022-01-05)
-==============================
+Synapse 1.50.1 (2022-01-18)
+===========================
+
+This release fixes a bug in Synapse 1.50.0 that could prevent clients from being able to connect to Synapse if the `webclient` resource was enabled. Further details are available in [this issue](https://github.com/matrix-org/synapse/issues/11763).
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.50.0rc1 that could cause Matrix clients to be unable to connect to Synapse instances with the `webclient` resource enabled. ([\#11764](https://github.com/matrix-org/synapse/issues/11764))
+
+
+Synapse 1.50.0 (2022-01-18)
+===========================
+
+**This release contains a critical bug that may prevent clients from being able to connect. 
+As such, it is not recommended to upgrade to 1.50.0. Instead, please upgrade straight to
+to 1.50.1. Further details are available in [this issue](https://github.com/matrix-org/synapse/issues/11763).**
 
 Please note that we now only support Python 3.7+ and PostgreSQL 10+ (if applicable), because Python 3.6 and PostgreSQL 9.6 have reached end-of-life.
+
+No significant changes since 1.50.0rc2.
+
+
+Synapse 1.50.0rc2 (2022-01-14)
+==============================
+
+This release candidate fixes a federation-breaking regression introduced in Synapse 1.50.0rc1.
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse v1.0.0 whereby some device list updates would not be sent to remote homeservers if there were too many to send at once. ([\#11729](https://github.com/matrix-org/synapse/issues/11729))
+- Fix a bug introduced in Synapse v1.50.0rc1 whereby outbound federation could fail because too many EDUs were produced for device updates. ([\#11730](https://github.com/matrix-org/synapse/issues/11730))
+
+
+Improved Documentation
+----------------------
+
+- Document that now the minimum supported PostgreSQL version is 10. ([\#11725](https://github.com/matrix-org/synapse/issues/11725))
+
+
+Internal Changes
+----------------
+
+- Fix a typechecker problem related to our (ab)use of `nacl.signing.SigningKey`s. ([\#11714](https://github.com/matrix-org/synapse/issues/11714))
+
+
+Synapse 1.50.0rc1 (2022-01-05)
+==============================
 
 
 Features

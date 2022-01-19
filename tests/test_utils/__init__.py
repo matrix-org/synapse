@@ -19,7 +19,7 @@ import sys
 import warnings
 from asyncio import Future
 from binascii import unhexlify
-from typing import Any, Awaitable, Callable, TypeVar
+from typing import Awaitable, Callable, TypeVar
 from unittest.mock import Mock
 
 import attr
@@ -46,7 +46,7 @@ def get_awaitable_result(awaitable: Awaitable[TV]) -> TV:
     raise Exception("awaitable has not yet completed")
 
 
-def make_awaitable(result: Any) -> Awaitable[Any]:
+def make_awaitable(result: TV) -> Awaitable[TV]:
     """
     Makes an awaitable, suitable for mocking an `async` function.
     This uses Futures as they can be awaited multiple times so can be returned

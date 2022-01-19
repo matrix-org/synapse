@@ -607,18 +607,18 @@ class PerDestinationQueue:
         self._pending_pdus = []
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class _TransactionQueueManager:
     """A helper async context manager for pulling stuff off the queues and
     tracking what was last successfully sent, etc.
     """
 
-    queue = attr.ib(type=PerDestinationQueue)
+    queue: PerDestinationQueue
 
-    _device_stream_id = attr.ib(type=Optional[int], default=None)
-    _device_list_id = attr.ib(type=Optional[int], default=None)
-    _last_stream_ordering = attr.ib(type=Optional[int], default=None)
-    _pdus = attr.ib(type=List[EventBase], factory=list)
+    _device_stream_id: Optional[int] = None
+    _device_list_id: Optional[int] = None
+    _last_stream_ordering: Optional[int] = None
+    _pdus: List[EventBase] = attr.Factory(list)
 
     async def __aenter__(self) -> Tuple[List[EventBase], List[Edu]]:
         # First we calculate the EDUs we want to send, if any.
