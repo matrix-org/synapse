@@ -464,7 +464,8 @@ class PreviewUrlResource(DirectServeJsonResource):
                 Codes.UNKNOWN,
             )
 
-        length = output_stream.seek(1)
+        # Read back the length that has been written.
+        length = output_stream.tell()
 
         media_type = url_info.headers.get_content_type()
 
