@@ -705,7 +705,7 @@ class RelationsWorkerStore(SQLBaseStore):
         events = [
             event
             for event in events
-            if event.is_state() or event.internal_metadata.is_redacted()
+            if not event.is_state() and not event.internal_metadata.is_redacted()
         ]
 
         # event ID -> bundled aggregation in non-serialized form.
