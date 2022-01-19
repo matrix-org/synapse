@@ -217,9 +217,7 @@ class ApplicationServiceTransactionWorkerStore(
             # The highest id may be the last one sent (in which case it is last_txn)
             # or it may be the highest in the txns list (which are waiting to be/are
             # being sent)
-
-            # Beeper hack: removed tracking of AS last txn IDs
-            # last_txn_id = self._get_last_txn(txn, service.id)
+            last_txn_id = self._get_last_txn(txn, service.id)
 
             txn.execute(
                 "SELECT MAX(txn_id) FROM application_services_txns WHERE as_id=?",
@@ -229,8 +227,7 @@ class ApplicationServiceTransactionWorkerStore(
             if highest_txn_id is None:
                 highest_txn_id = 0
 
-            # new_txn_id = max(highest_txn_id, last_txn_id) + 1
-            new_txn_id = highest_txn_id + 1
+            new_txn_id = max(highest_txn_id, last_txn_id) + 1
 
             # Insert new txn into txn table
             event_ids = json_encoder.encode([e.event_id for e in events])
@@ -263,27 +260,25 @@ class ApplicationServiceTransactionWorkerStore(
             # what was there before. If it isn't, we've got problems (e.g. the AS
             # has probably missed some events), so whine loudly but still continue,
             # since it shouldn't fail completion of the transaction.
+            last_txn_id = self._get_last_txn(txn, service.id)
+            if (last_txn_id + 1) != txn_id:
+                logger.error(
+                    "appservice: Completing a transaction which has an ID > 1 from "
+                    "the last ID sent to this AS. We've either dropped events or "
+                    "sent it to the AS out of order. FIX ME. last_txn=%s "
+                    "completing_txn=%s service_id=%s",
+                    last_txn_id,
+                    txn_id,
+                    service.id,
+                )
 
-            # Beeper hack: removed tracking of AS last txn IDs
-            # last_txn_id = self._get_last_txn(txn, service.id)
-            # if (last_txn_id + 1) != txn_id:
-            #     logger.error(
-            #         "appservice: Completing a transaction which has an ID > 1 from "
-            #         "the last ID sent to this AS. We've either dropped events or "
-            #         "sent it to the AS out of order. FIX ME. last_txn=%s "
-            #         "completing_txn=%s service_id=%s",
-            #         last_txn_id,
-            #         txn_id,
-            #         service.id,
-            #     )
-
-            # # Set current txn_id for AS to 'txn_id'
-            # self.db_pool.simple_upsert_txn(
-            #     txn,
-            #     "application_services_state",
-            #     {"as_id": service.id},
-            #     {"last_txn": txn_id},
-            # )
+            # Set current txn_id for AS to 'txn_id'
+            self.db_pool.simple_upsert_txn(
+                txn,
+                "application_services_state",
+                {"as_id": service.id},
+                {"last_txn": txn_id},
+            )
 
             # Delete txn
             self.db_pool.simple_delete_txn(
