@@ -475,6 +475,10 @@ def main() -> None:
     with LoggingContext("main"):
         # check base requirements
         check_requirements()
+
+        # Set up VizTracer for debugging (if enabled)
+        setup_viztracer()
+
         hs = setup(sys.argv[1:])
 
         # redirect stdio to the logs, if configured.
