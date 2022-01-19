@@ -14,6 +14,7 @@
 
 from typing import Optional
 
+from typing import List
 from synapse.storage._base import SQLBaseStore
 
 

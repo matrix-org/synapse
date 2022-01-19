@@ -1,8 +1,11 @@
 import logging
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING, Dict, List, NamedTuple, Tuple
 
 from synapse.api.constants import EventContentFields, EventTypes
 from synapse.appservice import ApplicationService
+from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
+from synapse.events.validator import EventValidator
 from synapse.http.servlet import assert_params_in_dict
 from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util.stringutils import random_string
@@ -13,6 +16,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class EventCreationCacheItem(NamedTuple):
+    event: EventBase
+    context: EventContext
+
+
 class RoomBatchHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
@@ -20,6 +28,8 @@ class RoomBatchHandler:
         self.state_store = hs.get_storage().state
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
+        self.validator = EventValidator()
+        self.event_builder_factory = hs.get_event_builder_factory()
         self.auth = hs.get_auth()
 
     async def inherit_depth_from_prev_ids(self, prev_event_ids: List[str]) -> int:
@@ -290,6 +300,12 @@ class RoomBatchHandler:
         """
         assert app_service_requester.app_service
 
+        room_version_obj = await self.store.get_room_version(room_id)
+
+        # Map from event type to the shared info to re-use and create another
+        # event in the batch with the same type
+        event_type_creation_cache: Dict[str, EventCreationCacheItem] = {}
+
         # Make the historical event chain float off on its own by specifying no
         # prev_events for the first event in the chain which causes the HS to
         # ask for the state at the start of the batch later.
@@ -309,28 +325,60 @@ class RoomBatchHandler:
                 "origin_server_ts": ev["origin_server_ts"],
                 "content": ev["content"],
                 "room_id": room_id,
-                "sender": ev["sender"],  # requester.user.to_string(),
+                "sender": ev["sender"],
                 "prev_events": prev_event_ids.copy(),
             }
 
             # Mark all events as historical
             event_dict["content"][EventContentFields.MSC2716_HISTORICAL] = True
 
-            event, context = await self.event_creation_handler.create_event(
-                await self.create_requester_for_user_id_from_app_service(
-                    ev["sender"], app_service_requester.app_service
-                ),
-                event_dict,
-                # Only the first event in the chain should be floating.
-                # The rest should hang off each other in a chain.
-                allow_no_prev_events=index == 0,
-                prev_event_ids=event_dict.get("prev_events"),
-                auth_event_ids=auth_event_ids,
-                historical=True,
-                depth=inherited_depth,
-            )
+            # We can skip a bunch of context and state calculations if we
+            # already have an event with the same type to base off of.
+            cached_creation_info = event_type_creation_cache.get(ev["type"])
 
-            assert context._state_group
+            if cached_creation_info is None:
+                event, context = await self.event_creation_handler.create_event(
+                    await self.create_requester_for_user_id_from_app_service(
+                        ev["sender"], app_service_requester.app_service
+                    ),
+                    event_dict,
+                    # Only the first event in the chain should be floating.
+                    # The rest should hang off each other in a chain.
+                    allow_no_prev_events=index == 0,
+                    prev_event_ids=event_dict.get("prev_events"),
+                    auth_event_ids=auth_event_ids,
+                    historical=True,
+                    depth=inherited_depth,
+                )
+
+                event_type_creation_cache[event.type] = EventCreationCacheItem(
+                    event=event, context=context
+                )
+            else:
+                builder = self.event_builder_factory.for_room_version(
+                    room_version_obj, event_dict
+                )
+                builder.internal_metadata.historical = True
+
+                # TODO: Can we get away without this? Does it validate on persist?
+                # self.validator.validate_builder(builder)
+
+                shared_event, shared_context = cached_creation_info
+
+                event = await builder.build(
+                    prev_event_ids=prev_event_ids,
+                    auth_event_ids=shared_event.auth_event_ids().copy(),
+                    depth=inherited_depth,
+                )
+                # We can re-use the context per-event type because it will
+                # calculate out to be the same for all events in the batch. We
+                # also get the benefit of sharing the same state_group.
+                context = shared_context
+
+                # TODO: Do we need to check `third_party_event_rules.check_event_allowed(...)`?
+
+                # TODO: Can we get away without this?
+                # self.validator.validate_new(event, self.config)
 
             # Normally this is done when persisting the event but we have to
             # pre-emptively do it here because we create all the events first,
