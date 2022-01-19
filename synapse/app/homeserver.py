@@ -453,17 +453,20 @@ def setup_viztracer() -> None:
     at some point during runtime.
     """
 
+    def eprint(msg: str) -> None:
+        print(msg, file=sys.stderr)
+
     if os.environ.get("SYNAPSE_VIZTRACER", ""):
-        logger.info("SYNAPSE_VIZTRACER is set. Installing VizTracer hooks.")
+        eprint("SYNAPSE_VIZTRACER is set. Installing VizTracer hooks.")
 
         try:
             from viztracer import VizTracer
 
             VizTracer().install()
         except ImportError:
-            logger.info("VizTracer could not be imported: can't install hooks.")
+            eprint("VizTracer could not be imported: can't install hooks.")
     else:
-        logger.info(
+        eprint(
             "SYNAPSE_VIZTRACER not set (or is empty): won't install VizTracer hooks."
         )
 
