@@ -371,8 +371,6 @@ class RelationsWorkerStore(SQLBaseStore):
 
         # Fetches latest edit that has the same type and sender as the
         # original, and is an `m.room.message`.
-        #
-        # TODO Should this ensure it does not return results for state events / redacted events?
         sql = """
             SELECT original.event_id, edit.event_id FROM events AS edit
             INNER JOIN event_relations USING (event_id)
@@ -641,9 +639,6 @@ class RelationsWorkerStore(SQLBaseStore):
             The bundled aggregations for an event, if bundled aggregations are
             enabled and the event can have bundled aggregations.
         """
-        # State events and redacted events do not get bundled aggregations.
-        if event.is_state() or event.internal_metadata.is_redacted():
-            return None
 
         # Do not bundle aggregations for an event which represents an edit or an
         # annotation. It does not make sense for them to have related events.
@@ -705,6 +700,13 @@ class RelationsWorkerStore(SQLBaseStore):
         # If bundled aggregations are disabled, nothing to do.
         if not self._msc1849_enabled:
             return {}
+
+        # State events and redacted events do not get bundled aggregations.
+        events = [
+            event
+            for event in events
+            if event.is_state() or event.internal_metadata.is_redacted()
+        ]
 
         # event ID -> bundled aggregation in non-serialized form.
         results: Dict[str, Dict[str, Any]] = {}
