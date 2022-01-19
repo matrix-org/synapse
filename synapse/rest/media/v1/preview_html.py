@@ -321,6 +321,20 @@ def _iterate_over_text(
 
 
 def rebase_url(url: str, base: str) -> str:
+    """
+    Resolves a potentially relative `url` against an absolute `base` URL.
+
+    For example:
+
+        >>> rebase_url("subpage", "https://example.com/foo/")
+        'https://example.com/foo/subpage'
+        >>> rebase_url("sibling", "https://example.com/foo")
+        'https://example.com/sibling'
+        >>> rebase_url("/bar", "https://example.com/foo/")
+        'https://example.com/bar'
+        >>> rebase_url("https://alice.com/a/", "https://example.com/foo/")
+        'https://alice.com/a'
+    """
     base_parts = list(urlparse.urlparse(base))
     url_parts = list(urlparse.urlparse(url))
     # Add a scheme, if one does not exist.
@@ -329,7 +343,8 @@ def rebase_url(url: str, base: str) -> str:
     # Fix up the hostname, if this is not a data URL.
     if url_parts[0] != "data" and not url_parts[1]:
         url_parts[1] = base_parts[1]
-        # If the path does not start with a /, nest it under the base path.
+        # If the path does not start with a /, nest it under the base path's last
+        # directory.
         if not url_parts[2].startswith("/"):
             url_parts[2] = re.sub(r"/[^/]+$", "/", base_parts[2]) + url_parts[2]
     return urlparse.urlunparse(url_parts)
