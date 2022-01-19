@@ -298,7 +298,9 @@ class PreviewUrlResource(DirectServeJsonResource):
                 oembed_url = self._oembed.autodiscover_from_html(tree)
                 og_from_oembed: JsonDict = {}
                 if oembed_url:
-                    oembed_info = await self._handle_url(oembed_url, user)
+                    oembed_info = await self._handle_url(
+                        oembed_url, user, allow_data_urls=True
+                    )
                     (
                         og_from_oembed,
                         author_name,
@@ -478,7 +480,9 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         return length, url, 200, media_type, download_name, expires, etag
 
-    async def _handle_url(self, url: str, user: UserID) -> MediaInfo:
+    async def _handle_url(
+        self, url: str, user: UserID, allow_data_urls: bool = False
+    ) -> MediaInfo:
         """
         Fetches content from a URL and parses the result to generate a MediaInfo.
 
@@ -488,6 +492,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         Args:
              url: The URL to fetch.
              user: The user who ahs requested this URL.
+             allow_data_urls: True if data URLs should be allowed.
 
         Returns:
             A MediaInfo object describing the fetched content.
@@ -503,6 +508,11 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         with self.media_storage.store_into_file(file_info) as (f, fname, finish):
             if url.startswith("data:"):
+                if not allow_data_urls:
+                    raise SynapseError(
+                        500, "Previewing of data: URLs is forbidden", Codes.UNKNOWN
+                    )
+
                 (
                     length,
                     uri,
@@ -577,7 +587,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         # request itself and benefit from the same caching etc.  But for now we
         # just rely on the caching on the master request to speed things up.
         image_info = await self._handle_url(
-            rebase_url(og["og:image"], media_info.uri), user
+            rebase_url(og["og:image"], media_info.uri), user, allow_data_urls=True
         )
 
         if _is_media(image_info.media_type):

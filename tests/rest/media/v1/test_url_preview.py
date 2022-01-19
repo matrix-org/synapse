@@ -16,6 +16,7 @@ import base64
 import json
 import os
 import re
+from urllib.parse import urlencode
 
 from twisted.internet._resolver import HostResolution
 from twisted.internet.address import IPv4Address, IPv6Address
@@ -579,6 +580,32 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
     def test_data_url(self):
+        """
+        Requesting to preview a data URL is not supported.
+        """
+        self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
+
+        data = base64.b64encode(SMALL_PNG).decode()
+
+        query_params = urlencode(
+            {
+                "url": f'<html><head><img src="data:image/png;base64,{data}" /></head></html>'
+            }
+        )
+
+        channel = self.make_request(
+            "GET",
+            f"preview_url?{query_params}",
+            shorthand=False,
+        )
+        self.pump()
+
+        self.assertEqual(channel.code, 500)
+
+    def test_inline_data_url(self):
+        """
+        An inline image (as a data URL) should be parsed properly.
+        """
         self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
 
         data = base64.b64encode(SMALL_PNG)
@@ -609,7 +636,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
         self.pump()
-        self.assertEqual(channel.code, 200)
         self.assertEqual(channel.code, 200)
         self._assert_small_png(channel.json_body)
 
