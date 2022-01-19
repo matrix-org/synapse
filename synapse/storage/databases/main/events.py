@@ -1296,7 +1296,7 @@ class PersistEventsStore:
             outlier_persisted = have_persisted[event.event_id]
             if not event.internal_metadata.is_outlier() and outlier_persisted:
                 # We received a copy of an event that we had already stored as
-                # an outlier in the database. We now have some state at that
+                # an outlier in the database. We now have some state at that event
                 # so we need to update the state_groups table with that state.
                 #
                 # Note that we do not update the stream_ordering of the event in this
