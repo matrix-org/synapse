@@ -116,6 +116,9 @@ CONDITIONAL_REQUIREMENTS = {
     "redis": ["txredisapi>=1.4.7", "hiredis"],
     # Required to use experimental `caches.track_memory_usage` config option.
     "cache_memory": ["pympler"],
+    # Required to install VizTracer hooks, which allows VizTracer to be attached
+    # at runtime.
+    "viztracer": ["viztracer"],
 }
 
 ALL_OPTIONAL_REQUIREMENTS: Set[str] = set()

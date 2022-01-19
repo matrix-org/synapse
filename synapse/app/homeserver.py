@@ -446,6 +446,28 @@ def run(hs: HomeServer) -> None:
     )
 
 
+def setup_viztracer() -> None:
+    """
+    If installed and enabled by environment variable SYNAPSE_VIZTRACER=1,
+    install VizTracer's hooks so that Synapse can be attached to by VizTracer
+    at some point during runtime.
+    """
+
+    if os.environ.get("SYNAPSE_VIZTRACER", ""):
+        logger.info("SYNAPSE_VIZTRACER is set. Installing VizTracer hooks.")
+
+        try:
+            from viztracer import VizTracer
+
+            VizTracer().install()
+        except ImportError:
+            logger.info("VizTracer could not be imported: can't install hooks.")
+    else:
+        logger.info(
+            "SYNAPSE_VIZTRACER not set (or is empty): won't install VizTracer hooks."
+        )
+
+
 def main() -> None:
     with LoggingContext("main"):
         # check base requirements
