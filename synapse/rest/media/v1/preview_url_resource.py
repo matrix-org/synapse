@@ -467,6 +467,8 @@ class PreviewUrlResource(DirectServeJsonResource):
         # Read back the length that has been written.
         length = output_stream.tell()
 
+        # urlopen shoves the media-type from the data URL into the content type
+        # header object.
         media_type = url_info.headers.get_content_type()
 
         # Some features are not supported by data: URLs.
