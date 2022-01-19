@@ -335,18 +335,19 @@ def rebase_url(url: str, base: str) -> str:
         >>> rebase_url("https://alice.com/a/", "https://example.com/foo/")
         'https://alice.com/a'
     """
-    base_parts = list(urlparse.urlparse(base))
+    base_parts = urlparse.urlparse(base)
+    # Convert the parsed URL to a list for (potential) modification.
     url_parts = list(urlparse.urlparse(url))
     # Add a scheme, if one does not exist.
     if not url_parts[0]:
-        url_parts[0] = base_parts[0] or "http"
+        url_parts[0] = base_parts.scheme or "http"
     # Fix up the hostname, if this is not a data URL.
     if url_parts[0] != "data" and not url_parts[1]:
-        url_parts[1] = base_parts[1]
+        url_parts[1] = base_parts.netloc
         # If the path does not start with a /, nest it under the base path's last
         # directory.
         if not url_parts[2].startswith("/"):
-            url_parts[2] = re.sub(r"/[^/]+$", "/", base_parts[2]) + url_parts[2]
+            url_parts[2] = re.sub(r"/[^/]+$", "/", base_parts.path) + url_parts[2]
     return urlparse.urlunparse(url_parts)
 
 
