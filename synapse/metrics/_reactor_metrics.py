@@ -35,7 +35,7 @@ tick_time = Histogram(
 class EpollWrapper:
     """a wrapper for an epoll object which records the time between polls"""
 
-    def __init__(self, poller: "select.epoll"):
+    def __init__(self, poller: "select.epoll"):  # type: ignore[name-defined]
         self.last_polled = time.time()
         self._poller = poller
 
@@ -71,7 +71,7 @@ try:
     # if the reactor has a `_poller` attribute, which is an `epoll` object
     # (ie, it's an EPollReactor), we wrap the `epoll` with a thing that will
     # measure the time between ticks
-    from select import epoll
+    from select import epoll  # type: ignore[attr-defined]
 
     poller = reactor._poller  # type: ignore[attr-defined]
 except (AttributeError, ImportError):
