@@ -151,6 +151,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(json_body["og:image:height"], 1)
         self.assertEqual(json_body["og:image:width"], 1)
         self.assertEqual(json_body["og:image:type"], "image/png")
+        self.assertEqual(json_body["matrix:image:size"], 67)
 
     def test_cache_returns_correct_type(self):
         self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
