@@ -171,11 +171,6 @@ class ApplicationService:
         if not event:
             return False
 
-        # Beeper Hack
-        # Don't bother sending events for bridged users, the bridge presumably already knows this happened.
-        if event.sender.startswith("@_"):
-            return False
-
         if self.is_interested_in_user(event.sender):
             return True
         # also check m.room.member state key
@@ -248,6 +243,11 @@ class ApplicationService:
         # Do cheap checks first
         if self._matches_room_id(event):
             return True
+
+        # Beeper Hack
+        # Don't bother sending events for bridged users, the bridge presumably already knows this happened.
+        if event and event.sender.startswith("@_"):
+            return False
 
         # This will check the namespaces first before
         # checking the store, so should be run before _matches_aliases
