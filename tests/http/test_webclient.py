@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from http import HTTPStatus
 from typing import Dict
 
 from twisted.web.resource import Resource
@@ -90,7 +91,8 @@ class WebClientTests(HomeserverTestCase):
             method="GET",
             path="/_matrix/client",
         )
-        self.assertEqual(channel.code, 302)
+        # Check that we are being redirected to the webclient location URI.
+        self.assertEqual(channel.code, HTTPStatus.FOUND)
         self.assertEqual(
             channel.headers.getRawHeaders("Location"), ["https://example.org"]
         )
@@ -102,5 +104,5 @@ class WebClientTests(HomeserverTestCase):
             method="GET",
             path="/_matrix/client/v3/login",
         )
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, HTTPStatus.OK)
         self.assertIn("flows", channel.json_body)
