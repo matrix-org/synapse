@@ -803,8 +803,10 @@ class RoomSummaryHandler:
             if "room_id" in c and isinstance(c["room_id"], str)
         }
 
+        room_response = dict(room_response)
+        children_state = room_response.pop("children_state", ())
         return (
-            _RoomEntry(room_id, room_response, room_response.pop("children_state", ())),
+            _RoomEntry(room_id, room_response, children_state),
             children_by_room_id,
             set(inaccessible_children),
         )
