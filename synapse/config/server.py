@@ -801,13 +801,7 @@ class ServerConfig(Config):
         #
         pid_file: %(pid_file)s
 
-        # The absolute URL to the web client which /_matrix/client will redirect
-        # to if 'webclient' is configured under the 'listeners' configuration.
-        #
-        # This option can be also set to the filesystem path to the web client
-        # which will be served at /_matrix/client/ if 'webclient' is configured
-        # under the 'listeners' configuration, however this is a security risk:
-        # https://github.com/matrix-org/synapse#security-note
+        # The absolute URL to the web client which / will redirect to.
         #
         #web_client_location: https://riot.example.com/
 
@@ -1018,8 +1012,6 @@ class ServerConfig(Config):
         #
         #   static: static resources under synapse/static (/_matrix/static). (Mostly
         #       useful for 'fallback authentication'.)
-        #
-        #   webclient: A web client. Requires web_client_location to be set.
         #
         listeners:
           # TLS-enabled listener: for when matrix traffic is sent directly to synapse.
