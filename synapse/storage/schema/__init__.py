@@ -57,7 +57,9 @@ Changes in SCHEMA_VERSION = 67:
 
 
 SCHEMA_COMPAT_VERSION = (
-    61  # 61: Remove unused tables `user_stats_historical` and `room_stats_historical`
+    # we have removed the public_room_list_stream table, so are now incompatible with
+    # synapses wth SCHEMA_VERSION < 63.
+    63
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 
