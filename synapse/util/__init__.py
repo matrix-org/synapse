@@ -63,8 +63,18 @@ def _handle_frozendict(obj: Any) -> Dict[Any, Any]:
             # there isn't a `_dict` attribute with a dict
             # so we resort to making a copy of the frozendict
             return dict(obj)
+
+    elif hasattr(obj, "get_dict"):
+        copied_dict = obj.get_dict()
+
+        # Warn that a FrozenEvent was passed
+        logger.warning("Attempted to JSON serialise a %s: %s", type(obj), copied_dict)
+
+        # Return the non-frozen dict
+        return copied_dict
+
     raise TypeError(
-        "Object of type %s is not JSON serializable" % obj.__class__.__name__
+        "Object of type %s is not JSON serializable: %s" % (obj.__class__.__name__, obj)
     )
 
 
