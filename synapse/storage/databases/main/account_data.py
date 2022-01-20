@@ -558,7 +558,7 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         """
 
         def purge_account_data_for_user_txn(txn: LoggingTransaction) -> None:
-            # Purge from the primary account_data table.
+            # Purge from the primary account_data tables.
             self.db_pool.simple_delete_txn(
                 txn, table="account_data", keyvalues={"user_id": user_id}
             )
