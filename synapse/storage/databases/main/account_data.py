@@ -553,8 +553,8 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         This is intended to be used upon user deactivation and also removes any
         derived information from account data (e.g. push rules and ignored users).
 
-		Args:
-			user_id: The user ID to remove data for.
+        Args:
+            user_id: The user ID to remove data for.
         """
 
         def purge_account_data_for_user_txn(txn: LoggingTransaction) -> None:
