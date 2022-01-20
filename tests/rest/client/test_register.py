@@ -25,7 +25,6 @@ from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
 from synapse.rest.client import account, account_validity, login, logout, register, sync
 from synapse.storage._base import db_to_json
-from synapse.types import UserID
 
 from tests import unittest
 from tests.unittest import override_config

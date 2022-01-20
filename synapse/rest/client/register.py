@@ -339,7 +339,9 @@ class UsernameAvailabilityRestServlet(RestServlet):
             ),
         )
 
-        self.inhibit_user_in_use_error = hs.config.registration.inhibit_user_in_use_error
+        self.inhibit_user_in_use_error = (
+            hs.config.registration.inhibit_user_in_use_error
+        )
 
     async def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
         if not self.hs.config.registration.enable_registration:
@@ -427,7 +429,9 @@ class RegisterRestServlet(RestServlet):
         self._refresh_tokens_enabled = (
             hs.config.registration.refreshable_access_token_lifetime is not None
         )
-        self._inhibit_user_in_use_error = hs.config.registration.inhibit_user_in_use_error
+        self._inhibit_user_in_use_error = (
+            hs.config.registration.inhibit_user_in_use_error
+        )
 
         self._registration_flows = _calculate_registration_flows(
             hs.config, self.auth_handler
