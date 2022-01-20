@@ -21,6 +21,7 @@ from unittest.mock import patch
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.rest import admin
 from synapse.rest.client import login, register, relations, room, sync
+from synapse.types import JsonDict
 
 from tests import unittest
 from tests.server import FakeChannel
@@ -486,12 +487,13 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.json_body)
         thread_2 = channel.json_body["event_id"]
 
-        def assert_bundle(actual):
+        def assert_bundle(event_json: JsonDict) -> None:
             """Assert the expected values of the bundled aggregations."""
+            relations_dict = event_json["unsigned"].get("m.relations")
 
             # Ensure the fields are as expected.
             self.assertCountEqual(
-                actual.keys(),
+                relations_dict.keys(),
                 (
                     RelationTypes.ANNOTATION,
                     RelationTypes.REFERENCE,
@@ -507,20 +509,20 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                         {"type": "m.reaction", "key": "b", "count": 1},
                     ]
                 },
-                actual[RelationTypes.ANNOTATION],
+                relations_dict[RelationTypes.ANNOTATION],
             )
 
             self.assertEquals(
                 {"chunk": [{"event_id": reply_1}, {"event_id": reply_2}]},
-                actual[RelationTypes.REFERENCE],
+                relations_dict[RelationTypes.REFERENCE],
             )
 
             self.assertEquals(
                 2,
-                actual[RelationTypes.THREAD].get("count"),
+                relations_dict[RelationTypes.THREAD].get("count"),
             )
             self.assertTrue(
-                actual[RelationTypes.THREAD].get("current_user_participated")
+                relations_dict[RelationTypes.THREAD].get("current_user_participated")
             )
             # The latest thread event has some fields that don't matter.
             self.assert_dict(
@@ -537,19 +539,8 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                     "type": "m.room.test",
                     "user_id": self.user_id,
                 },
-                actual[RelationTypes.THREAD].get("latest_event"),
+                relations_dict[RelationTypes.THREAD].get("latest_event"),
             )
-
-        def _find_and_assert_event(events):
-            """
-            Find the parent event in a chunk of events and assert that it has the proper bundled aggregations.
-            """
-            for event in events:
-                if event["event_id"] == self.parent_id:
-                    break
-            else:
-                raise AssertionError(f"Event {self.parent_id} not found in chunk")
-            assert_bundle(event["unsigned"].get("m.relations"))
 
         # Request the event directly.
         channel = self.make_request(
@@ -558,7 +549,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)
-        assert_bundle(channel.json_body["unsigned"].get("m.relations"))
+        assert_bundle(channel.json_body)
 
         # Request the room messages.
         channel = self.make_request(
@@ -567,7 +558,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)
-        _find_and_assert_event(channel.json_body["chunk"])
+        assert_bundle(self._find_event_in_chunk(channel.json_body["chunk"]))
 
         # Request the room context.
         channel = self.make_request(
@@ -576,14 +567,14 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)
-        assert_bundle(channel.json_body["event"]["unsigned"].get("m.relations"))
+        assert_bundle(channel.json_body["event"])
 
         # Request sync.
         channel = self.make_request("GET", "/sync", access_token=self.user_token)
         self.assertEquals(200, channel.code, channel.json_body)
         room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
         self.assertTrue(room_timeline["limited"])
-        _find_and_assert_event(room_timeline["events"])
+        self._find_event_in_chunk(room_timeline["events"])
 
         # Note that /relations is tested separately in test_aggregation_get_event_for_thread
         # since it needs different data configured.
@@ -781,8 +772,9 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         edit_event_id = channel.json_body["event_id"]
 
-        def assert_bundle(relations_dict):
+        def assert_bundle(event_json: JsonDict) -> None:
             """Assert the expected values of the bundled aggregations."""
+            relations_dict = event_json["unsigned"].get("m.relations")
             self.assertIn(RelationTypes.REPLACE, relations_dict)
 
             m_replace_dict = relations_dict[RelationTypes.REPLACE]
@@ -793,17 +785,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                 {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
             )
 
-        def _find_and_assert_event(events):
-            """
-            Find the parent event in a chunk of events and assert that it has the proper bundled aggregations.
-            """
-            for event in events:
-                if event["event_id"] == self.parent_id:
-                    break
-            else:
-                raise AssertionError(f"Event {self.parent_id} not found in chunk")
-            assert_bundle(event["unsigned"].get("m.relations"))
-
         channel = self.make_request(
             "GET",
             f"/rooms/{self.room}/event/{self.parent_id}",
@@ -811,7 +792,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEquals(200, channel.code, channel.json_body)
         self.assertEquals(channel.json_body["content"], new_body)
-        assert_bundle(channel.json_body["unsigned"].get("m.relations"))
+        assert_bundle(channel.json_body)
 
         # Request the room messages.
         channel = self.make_request(
@@ -820,7 +801,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)
-        _find_and_assert_event(channel.json_body["chunk"])
+        assert_bundle(self._find_event_in_chunk(channel.json_body["chunk"]))
 
         # Request the room context.
         channel = self.make_request(
@@ -829,7 +810,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)
-        assert_bundle(channel.json_body["event"]["unsigned"].get("m.relations"))
+        assert_bundle(channel.json_body["event"])
 
         # Request sync, but limit the timeline so it becomes limited (and includes
         # bundled aggregations).
@@ -842,7 +823,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.json_body)
         room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
         self.assertTrue(room_timeline["limited"])
-        _find_and_assert_event(room_timeline["events"])
+        assert_bundle(self._find_event_in_chunk(room_timeline["events"]))
 
         # Note that /relations is tested separately in test_aggregation_get_event_for_thread
         # since it needs different data configured.
@@ -1151,6 +1132,16 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEquals(200, channel.code, channel.json_body)
         self.assertEquals(channel.json_body["chunk"], [])
+
+    def _find_event_in_chunk(self, events: List[JsonDict]) -> JsonDict:
+        """
+        Find the parent event in a chunk of events and assert that it has the proper bundled aggregations.
+        """
+        for event in events:
+            if event["event_id"] == self.parent_id:
+                return event
+
+        raise AssertionError(f"Event {self.parent_id} not found in chunk")
 
     def _send_relation(
         self,
