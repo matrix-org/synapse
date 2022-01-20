@@ -548,11 +548,13 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
 
     async def purge_account_data_for_user(self, user_id: str) -> None:
         """
-        Removes ALL the account data for a user.
-        Intended to be used upon user deactivation.
+        Removes the account data for a user.
 
-        Also purges the user from the ignored_users table and the push_rules tables,
-        because those are derived from account data.
+        This is intended to be used upon user deactivation and also removes any
+        derived information from account data (e.g. push rules and ignored users).
+
+		Args:
+			user_id: The user ID to remove data for.
         """
 
         def purge_account_data_for_user_txn(txn: LoggingTransaction) -> None:
