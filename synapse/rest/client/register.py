@@ -630,7 +630,8 @@ class RegisterRestServlet(RestServlet):
 
             desired_username = await (
                 self.password_auth_provider.get_username_for_registration(
-                    auth_result, params,
+                    auth_result,
+                    params,
                 )
             )
 

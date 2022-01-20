@@ -1208,7 +1208,7 @@ class ModuleApi:
         """
         return await defer_to_thread(self._hs.get_reactor(), f, *args, **kwargs)
 
-    async def check_username(self, username) -> None:
+    async def check_username(self, username: str) -> None:
         """Checks if the provided username uses the grammar defined in the Matrix
         specification, and is already being used by an existing user.
 

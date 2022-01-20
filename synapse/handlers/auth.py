@@ -2302,7 +2302,9 @@ class PasswordAuthProvider:
                 continue
 
     async def get_username_for_registration(
-        self, uia_results: JsonDict, params: JsonDict,
+        self,
+        uia_results: JsonDict,
+        params: JsonDict,
     ) -> Optional[str]:
         """Defines the username to use when registering the user, using the credentials
         and parameters provided during the UIA flow.
@@ -2324,7 +2326,10 @@ class PasswordAuthProvider:
                 if isinstance(res, str):
                     return res
                 elif res is not None:
-                    logger.warning(
+                    # mypy complains that this line is unreachable because it assumes the
+                    # data returned by the module fits the expected type. We just want
+                    # to make sure this is the case.
+                    logger.warning(  # type: ignore[unreachable]
                         "Ignoring non-string value returned by module in "
                         "get_username_for_registration: %s",
                         res,
@@ -2335,3 +2340,5 @@ class PasswordAuthProvider:
                     e,
                 )
                 raise SynapseError(code=500, msg="Internal Server Error")
+
+        return None
