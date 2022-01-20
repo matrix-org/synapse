@@ -1350,7 +1350,7 @@ def parse_listener_def(listener: Any) -> ListenerConfig:
 
 
 NO_MORE_NONE_HTTP_WEB_CLIENT_LOCATION_WARNING = """
-Synapse no longer supports serving a web client. To remove this warning, ensure
+Synapse no longer supports serving a web client. To remove this warning,
 configure 'web_client_location' with an HTTP(S) URL.
 """
 
