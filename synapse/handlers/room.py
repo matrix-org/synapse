@@ -30,6 +30,7 @@ from typing import (
     Tuple,
 )
 
+import attr
 from typing_extensions import TypedDict
 
 from synapse.api.constants import (
@@ -88,6 +89,17 @@ logger = logging.getLogger(__name__)
 id_server_scheme = "https://"
 
 FIVE_MINUTES_IN_MS = 5 * 60 * 1000
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class EventContext:
+    events_before: List[EventBase]
+    event: EventBase
+    events_after: List[EventBase]
+    state: List[EventBase]
+    aggregations: Dict[str, JsonDict]
+    start: str
+    end: str
 
 
 class RoomCreationHandler:
@@ -1119,7 +1131,7 @@ class RoomContextHandler:
         limit: int,
         event_filter: Optional[Filter],
         use_admin_priviledge: bool = False,
-    ) -> Optional[JsonDict]:
+    ) -> Optional[EventContext]:
         """Retrieves events, pagination tokens and state around a given event
         in a room.
 
@@ -1179,11 +1191,11 @@ class RoomContextHandler:
         # filter_evts can return a pruned event in case the user is allowed to see that
         # there's something there but not see the content, so use the event that's in
         # `filtered` rather than the event we retrieved from the datastore.
-        results["event"] = filtered[0]
+        event = filtered[0]
 
         # Fetch the aggregations.
         aggregations = await self.store.get_bundled_aggregations(
-            [results["event"]], user.to_string()
+            [event], user.to_string()
         )
         aggregations.update(
             await self.store.get_bundled_aggregations(
@@ -1195,7 +1207,6 @@ class RoomContextHandler:
                 results["events_after"], user.to_string()
             )
         )
-        results["aggregations"] = aggregations
 
         if results["events_after"]:
             last_event_id = results["events_after"][-1].event_id
@@ -1207,7 +1218,7 @@ class RoomContextHandler:
                 ev.sender
                 for ev in itertools.chain(
                     results["events_before"],
-                    (results["event"],),
+                    (event,),
                     results["events_after"],
                 )
             )
@@ -1226,21 +1237,23 @@ class RoomContextHandler:
         if event_filter:
             state_events = await event_filter.filter(state_events)
 
-        results["state"] = await filter_evts(state_events)
-
         # We use a dummy token here as we only care about the room portion of
         # the token, which we replace.
         token = StreamToken.START
 
-        results["start"] = await token.copy_and_replace(
-            "room_key", results["start"]
-        ).to_string(self.store)
-
-        results["end"] = await token.copy_and_replace(
-            "room_key", results["end"]
-        ).to_string(self.store)
-
-        return results
+        return EventContext(
+            events_before=results["events_before"],
+            event=event,
+            events_after=results["events_after"],
+            state=await filter_evts(state_events),
+            aggregations=aggregations,
+            start=await token.copy_and_replace("room_key", results["start"]).to_string(
+                self.store
+            ),
+            end=await token.copy_and_replace("room_key", results["end"]).to_string(
+                self.store
+            ),
+        )
 
 
 class TimestampLookupHandler:
