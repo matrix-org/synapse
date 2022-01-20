@@ -1,1 +1,1 @@
-Add a configuration flag to ignore client-supplied usernames upon registration.
+Add a config flag to inhibit M_USER_IN_USE during registration.
