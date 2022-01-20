@@ -57,7 +57,9 @@ Changes in SCHEMA_VERSION = 67:
 
 
 SCHEMA_COMPAT_VERSION = (
-    61  # 61: Remove unused tables `user_stats_historical` and `room_stats_historical`
+    # the schema no longer support synapse versions with SCHEMA_VERSION < 66, because
+    # there are multiple state_key columns.
+    66
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 

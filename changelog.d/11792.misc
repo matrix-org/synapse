@@ -1,0 +1,1 @@
+Preparation for database schema simplifications: add `state_key` and `rejection_reason` columns to `events` table.
