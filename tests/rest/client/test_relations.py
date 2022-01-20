@@ -458,6 +458,9 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         """
         Test that annotations, references, and threads get correctly bundled.
 
+        Note that this doesn't test against /relations since only thread relations
+        get bundled via that API. See test_aggregation_get_event_for_thread.
+
         See test_edit for a similar test for edits.
         """
         # Setup by sending a variety of relations.
@@ -575,9 +578,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
         self.assertTrue(room_timeline["limited"])
         self._find_event_in_chunk(room_timeline["events"])
-
-        # Note that /relations is tested separately in test_aggregation_get_event_for_thread
-        # since it needs different data configured.
 
     def test_aggregation_get_event_for_annotation(self):
         """Test that annotations do not get bundled aggregations included
@@ -824,9 +824,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
         self.assertTrue(room_timeline["limited"])
         assert_bundle(self._find_event_in_chunk(room_timeline["events"]))
-
-        # Note that /relations is tested separately in test_aggregation_get_event_for_thread
-        # since it needs different data configured.
 
     def test_multi_edit(self):
         """Test that multiple edits, including attempts by people who
