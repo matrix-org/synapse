@@ -726,7 +726,12 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.register_user("rin", "password")
         tok = self.login("rin", "password")
 
-        on_logged_out = Mock(return_value=make_awaitable(None))
+        self.called = False
+
+        async def on_logged_out(user_id, device_id, access_token):
+            self.called = True
+
+        on_logged_out = Mock(side_effect=on_logged_out)
         self.hs.get_password_auth_provider().on_logged_out_callbacks.append(
             on_logged_out
         )
@@ -739,6 +744,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 200)
         on_logged_out.assert_called_once()
+        self.assertTrue(self.called)
 
     def _get_login_flows(self) -> JsonDict:
         channel = self.make_request("GET", "/_matrix/client/r0/login")
