@@ -105,7 +105,7 @@ class FederationSendServlet(BaseFederationServerServlet):
                 ]
                 if device_list_updates:
                     issue_8631_logger.debug(
-                        "transaction [%s] includes device list updates: %s",
+                        "received transaction [%s] including device list updates: %s",
                         transaction_id,
                         device_list_updates,
                     )

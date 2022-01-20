@@ -132,7 +132,7 @@ class TransactionManager:
                 ]
                 if device_list_updates:
                     issue_8631_logger.debug(
-                        "transaction [%s] includes device list updates: %s",
+                        "about to send txn [%s] including device list updates: %s",
                         transaction.transaction_id,
                         device_list_updates,
                     )
