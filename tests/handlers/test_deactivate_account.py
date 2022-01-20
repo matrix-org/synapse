@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from http import HTTPStatus
 from typing import Any, Dict
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -38,6 +39,28 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         self.user = self.register_user("user", "pass")
         self.token = self.login("user", "pass")
 
+    def _deactivate_my_account(self):
+        """
+        Deactivates the account `self.user` using `self.token` and asserts
+        that it returns a 200 success code.
+        """
+        req = self.get_success(
+            self.make_request(
+                "POST",
+                "account/deactivate",
+                {
+                    "auth": {
+                        "type": "m.login.password",
+                        "user": self.user,
+                        "password": "pass",
+                    },
+                    "erase": True,
+                },
+                access_token=self.token,
+            )
+        )
+        self.assertEqual(req.code, HTTPStatus.OK, req)
+
     def test_global_account_data_deleted_upon_deactivation(self) -> None:
         """
         Tests that global account data is removed upon deactivation.
@@ -62,22 +85,7 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         )
 
         # Request the deactivation of our account
-        req = self.get_success(
-            self.make_request(
-                "POST",
-                "account/deactivate",
-                {
-                    "auth": {
-                        "type": "m.login.password",
-                        "user": self.user,
-                        "password": "pass",
-                    },
-                    "erase": True,
-                },
-                access_token=self.token,
-            )
-        )
-        self.assertEqual(req.code, 200, req)
+        self._deactivate_my_account()
 
         # Clear the cache (for testing)
         self._store.get_global_account_data_by_type_for_user.invalidate_all()
@@ -118,22 +126,7 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         )
 
         # Request the deactivation of our account
-        req = self.get_success(
-            self.make_request(
-                "POST",
-                "account/deactivate",
-                {
-                    "auth": {
-                        "type": "m.login.password",
-                        "user": self.user,
-                        "password": "pass",
-                    },
-                    "erase": True,
-                },
-                access_token=self.token,
-            )
-        )
-        self.assertEqual(req.code, 200, req)
+        self._deactivate_my_account()
 
         # Clear the cache (for testing)
         self._store.get_account_data_for_room_and_type.invalidate_all()
@@ -195,22 +188,7 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         )
 
         # Request the deactivation of our account
-        req = self.get_success(
-            self.make_request(
-                "POST",
-                "account/deactivate",
-                {
-                    "auth": {
-                        "type": "m.login.password",
-                        "user": self.user,
-                        "password": "pass",
-                    },
-                    "erase": True,
-                },
-                access_token=self.token,
-            )
-        )
-        self.assertEqual(req.code, 200, req)
+        self._deactivate_my_account()
 
         # Test the rule no longer exists (after clearing the cache)
         self._store.get_push_rules_for_user.invalidate_all()
@@ -243,22 +221,7 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         )
 
         # Request the deactivation of our account
-        req = self.get_success(
-            self.make_request(
-                "POST",
-                "account/deactivate",
-                {
-                    "auth": {
-                        "type": "m.login.password",
-                        "user": self.user,
-                        "password": "pass",
-                    },
-                    "erase": True,
-                },
-                access_token=self.token,
-            )
-        )
-        self.assertEqual(req.code, 200, req)
+        self._deactivate_my_account()
 
         # Invalidate the cache
         self._store.ignored_by.invalidate_all()
