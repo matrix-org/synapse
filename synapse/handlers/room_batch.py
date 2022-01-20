@@ -354,6 +354,16 @@ class RoomBatchHandler:
                 event_type_creation_cache[event.type] = EventCreationCacheItem(
                     event=event, context=context
                 )
+
+                # Normally this is done when persisting the event but we have to
+                # pre-emptively do it here because we create all the events first,
+                # then persist them in another pass below. And we want to share
+                # state_groups across the whole batch so this lookup needs to work
+                # for the next event in the batch in this loop.
+                await self.store.store_state_group_id_for_event_id(
+                    event_id=event.event_id,
+                    state_group_id=context._state_group,
+                )
             else:
                 builder = self.event_builder_factory.for_room_version(
                     room_version_obj, event_dict
@@ -379,16 +389,6 @@ class RoomBatchHandler:
 
                 # TODO: Can we get away without this?
                 # self.validator.validate_new(event, self.config)
-
-            # Normally this is done when persisting the event but we have to
-            # pre-emptively do it here because we create all the events first,
-            # then persist them in another pass below. And we want to share
-            # state_groups across the whole batch so this lookup needs to work
-            # for the next event in the batch in this loop.
-            await self.store.store_state_group_id_for_event_id(
-                event_id=event.event_id,
-                state_group_id=context._state_group,
-            )
 
             logger.debug(
                 "RoomBatchSendEventRestServlet inserting event=%s, prev_event_ids=%s, auth_event_ids=%s",
