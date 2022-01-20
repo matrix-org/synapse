@@ -454,7 +454,11 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
     @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
     def test_bundled_aggregations(self):
-        """Test that annotations, references, and threads get correctly bundled."""
+        """
+        Test that annotations, references, and threads get correctly bundled.
+
+        See test_edit for a similar test for edits.
+        """
         # Setup by sending a variety of relations.
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
         self.assertEquals(200, channel.code, channel.json_body)
@@ -777,25 +781,71 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         edit_event_id = channel.json_body["event_id"]
 
+        def assert_bundle(relations_dict):
+            """Assert the expected values of the bundled aggregations."""
+            self.assertIn(RelationTypes.REPLACE, relations_dict)
+
+            m_replace_dict = relations_dict[RelationTypes.REPLACE]
+            for key in ["event_id", "sender", "origin_server_ts"]:
+                self.assertIn(key, m_replace_dict)
+
+            self.assert_dict(
+                {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
+            )
+
+        def _find_and_assert_event(events):
+            """
+            Find the parent event in a chunk of events and assert that it has the proper bundled aggregations.
+            """
+            for event in events:
+                if event["event_id"] == self.parent_id:
+                    break
+            else:
+                raise AssertionError(f"Event {self.parent_id} not found in chunk")
+            assert_bundle(event["unsigned"].get("m.relations"))
+
         channel = self.make_request(
             "GET",
-            "/rooms/%s/event/%s" % (self.room, self.parent_id),
+            f"/rooms/{self.room}/event/{self.parent_id}",
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)
-
         self.assertEquals(channel.json_body["content"], new_body)
+        assert_bundle(channel.json_body["unsigned"].get("m.relations"))
 
-        relations_dict = channel.json_body["unsigned"].get("m.relations")
-        self.assertIn(RelationTypes.REPLACE, relations_dict)
-
-        m_replace_dict = relations_dict[RelationTypes.REPLACE]
-        for key in ["event_id", "sender", "origin_server_ts"]:
-            self.assertIn(key, m_replace_dict)
-
-        self.assert_dict(
-            {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
+        # Request the room messages.
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/messages?dir=b",
+            access_token=self.user_token,
         )
+        self.assertEquals(200, channel.code, channel.json_body)
+        _find_and_assert_event(channel.json_body["chunk"])
+
+        # Request the room context.
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/context/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        assert_bundle(channel.json_body["event"]["unsigned"].get("m.relations"))
+
+        # Request sync, but limit the timeline so it becomes limited (and includes
+        # bundled aggregations).
+        filter = urllib.parse.quote_plus(
+            '{"room": {"timeline": {"limit": 2}}}'.encode()
+        )
+        channel = self.make_request(
+            "GET", f"/sync?filter={filter}", access_token=self.user_token
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
+        self.assertTrue(room_timeline["limited"])
+        _find_and_assert_event(room_timeline["events"])
+
+        # Note that /relations is tested separately in test_aggregation_get_event_for_thread
+        # since it needs different data configured.
 
     def test_multi_edit(self):
         """Test that multiple edits, including attempts by people who
