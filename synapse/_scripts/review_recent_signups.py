@@ -46,7 +46,9 @@ class UserInfo:
     ips: List[str] = attr.Factory(list)
 
 
-def get_recent_users(txn: LoggingTransaction, since_ms: int) -> List[UserInfo]:
+def get_recent_users(
+    txn: LoggingTransaction, since_ms: int, exclude_app_service: bool
+) -> List[UserInfo]:
     """Fetches recently registered users and some info on them."""
 
     sql = """
@@ -55,6 +57,9 @@ def get_recent_users(txn: LoggingTransaction, since_ms: int) -> List[UserInfo]:
             ? <= creation_ts
             AND deactivated = 0
     """
+
+    if exclude_app_service:
+        sql += " AND appservice_id IS NULL"
 
     txn.execute(sql, (since_ms / 1000,))
 
@@ -113,13 +118,19 @@ def main() -> None:
         "-e",
         "--exclude-emails",
         action="store_true",
-        help="Exclude users that have validated email addresses",
+        help="Exclude users that have validated email addresses.",
     )
     parser.add_argument(
         "-u",
         "--only-users",
         action="store_true",
         help="Only print user IDs that match.",
+    )
+    parser.add_argument(
+        "-a",
+        "--exclude-app-service",
+        help="Exclude appservice users.",
+        action="store_true",
     )
 
     config = ReviewConfig()
@@ -133,6 +144,7 @@ def main() -> None:
 
     since_ms = time.time() * 1000 - Config.parse_duration(config_args.since)
     exclude_users_with_email = config_args.exclude_emails
+    exclude_users_with_appservice = config_args.exclude_app_service
     include_context = not config_args.only_users
 
     for database_config in config.database.databases:
@@ -143,7 +155,7 @@ def main() -> None:
 
     with make_conn(database_config, engine, "review_recent_signups") as db_conn:
         # This generates a type of Cursor, not LoggingTransaction.
-        user_infos = get_recent_users(db_conn.cursor(), since_ms)  # type: ignore[arg-type]
+        user_infos = get_recent_users(db_conn.cursor(), since_ms, exclude_users_with_appservice)  # type: ignore[arg-type]
 
     for user_info in user_infos:
         if exclude_users_with_email and user_info.emails:

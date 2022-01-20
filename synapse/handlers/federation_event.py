@@ -56,7 +56,6 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.logging.context import nested_logging_context, run_in_background
-from synapse.logging.utils import log_function
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
@@ -275,7 +274,6 @@ class FederationEventHandler:
 
         await self._process_received_pdu(origin, pdu, state=None)
 
-    @log_function
     async def on_send_membership_event(
         self, origin: str, event: EventBase
     ) -> Tuple[EventBase, EventContext]:
@@ -421,9 +419,6 @@ class FederationEventHandler:
         Raises:
             SynapseError if the response is in some way invalid.
         """
-        for e in itertools.chain(auth_events, state):
-            e.internal_metadata.outlier = True
-
         event_map = {e.event_id: e for e in itertools.chain(auth_events, state)}
 
         create_event = None
@@ -475,7 +470,6 @@ class FederationEventHandler:
 
             return await self.persist_events_and_notify(room_id, [(event, context)])
 
-    @log_function
     async def backfill(
         self, dest: str, room_id: str, limit: int, extremities: Collection[str]
     ) -> None:
@@ -666,7 +660,9 @@ class FederationEventHandler:
         logger.info("Processing pulled event %s", event)
 
         # these should not be outliers.
-        assert not event.internal_metadata.is_outlier()
+        assert (
+            not event.internal_metadata.is_outlier()
+        ), "pulled event unexpectedly flagged as outlier"
 
         event_id = event.event_id
 
@@ -1192,7 +1188,6 @@ class FederationEventHandler:
                         [destination],
                         event_id,
                         room_version,
-                        outlier=True,
                     )
                     if event is None:
                         logger.warning(
@@ -1221,9 +1216,10 @@ class FederationEventHandler:
         """Persist a batch of outlier events fetched from remote servers.
 
         We first sort the events to make sure that we process each event's auth_events
-        before the event itself, and then auth and persist them.
+        before the event itself.
 
-        Notifies about the events where appropriate.
+        We then mark the events as outliers, persist them to the database, and, where
+        appropriate (eg, an invite), awake the notifier.
 
         Params:
             room_id: the room that the events are meant to be in (though this has
@@ -1274,7 +1270,8 @@ class FederationEventHandler:
         Persists a batch of events where we have (theoretically) already persisted all
         of their auth events.
 
-        Notifies about the events where appropriate.
+        Marks the events as outliers, auths them, persists them to the database, and,
+        where appropriate (eg, an invite), awakes the notifier.
 
         Params:
             origin: where the events came from
@@ -1311,6 +1308,9 @@ class FederationEventHandler:
                         )
                         return None
                     auth.append(ae)
+
+                # we're not bothering about room state, so flag the event as an outlier.
+                event.internal_metadata.outlier = True
 
                 context = EventContext.for_outlier()
                 try:
@@ -1838,7 +1838,7 @@ class FederationEventHandler:
             The stream ID after which all events have been persisted.
         """
         if not event_and_contexts:
-            return self._store.get_current_events_token()
+            return self._store.get_room_max_stream_ordering()
 
         instance = self._config.worker.events_shard_config.get_instance(room_id)
         if instance != self._instance_name:

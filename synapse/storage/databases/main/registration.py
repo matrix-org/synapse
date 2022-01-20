@@ -16,7 +16,7 @@
 import logging
 import random
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
 
 import attr
 
@@ -51,7 +51,7 @@ class ExternalIDReuseException(Exception):
     pass
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class TokenLookupResult:
     """Result of looking up an access token.
 
@@ -69,14 +69,14 @@ class TokenLookupResult:
             cached.
     """
 
-    user_id = attr.ib(type=str)
-    is_guest = attr.ib(type=bool, default=False)
-    shadow_banned = attr.ib(type=bool, default=False)
-    token_id = attr.ib(type=Optional[int], default=None)
-    device_id = attr.ib(type=Optional[str], default=None)
-    valid_until_ms = attr.ib(type=Optional[int], default=None)
-    token_owner = attr.ib(type=str)
-    token_used = attr.ib(type=bool, default=False)
+    user_id: str
+    is_guest: bool = False
+    shadow_banned: bool = False
+    token_id: Optional[int] = None
+    device_id: Optional[str] = None
+    valid_until_ms: Optional[int] = None
+    token_owner: str = attr.ib()
+    token_used: bool = False
 
     # Make the token owner default to the user ID, which is the common case.
     @token_owner.default
@@ -1357,12 +1357,15 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             # Override type because the return type is only optional if
             # allow_none is True, and we don't want mypy throwing errors
             # about None not being indexable.
-            res: Dict[str, Any] = self.db_pool.simple_select_one_txn(
-                txn,
-                "registration_tokens",
-                keyvalues={"token": token},
-                retcols=["pending", "completed"],
-            )  # type: ignore
+            res = cast(
+                Dict[str, Any],
+                self.db_pool.simple_select_one_txn(
+                    txn,
+                    "registration_tokens",
+                    keyvalues={"token": token},
+                    retcols=["pending", "completed"],
+                ),
+            )
 
             # Decrement pending and increment completed
             self.db_pool.simple_update_one_txn(

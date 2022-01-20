@@ -27,7 +27,6 @@ import synapse
 import synapse.config.logger
 from synapse import events
 from synapse.api.urls import (
-    CLIENT_API_PREFIX,
     FEDERATION_PREFIX,
     LEGACY_MEDIA_PREFIX,
     MEDIA_R0_PREFIX,
@@ -132,9 +131,18 @@ class SynapseHomeServer(HomeServer):
         resources.update(self._module_web_resources)
         self._module_web_resources_consumed = True
 
-        # try to find something useful to redirect '/' to
-        if WEB_CLIENT_PREFIX in resources:
-            root_resource: Resource = RootOptionsRedirectResource(WEB_CLIENT_PREFIX)
+        # Try to find something useful to serve at '/':
+        #
+        # 1. Redirect to the web client if it is an HTTP(S) URL.
+        # 2. Redirect to the web client served via Synapse.
+        # 3. Redirect to the static "Synapse is running" page.
+        # 4. Do not redirect and use a blank resource.
+        if self.config.server.web_client_location_is_redirect:
+            root_resource: Resource = RootOptionsRedirectResource(
+                self.config.server.web_client_location
+            )
+        elif WEB_CLIENT_PREFIX in resources:
+            root_resource = RootOptionsRedirectResource(WEB_CLIENT_PREFIX)
         elif STATIC_PREFIX in resources:
             root_resource = RootOptionsRedirectResource(STATIC_PREFIX)
         else:
@@ -193,7 +201,13 @@ class SynapseHomeServer(HomeServer):
 
             resources.update(
                 {
-                    CLIENT_API_PREFIX: client_resource,
+                    "/_matrix/client/api/v1": client_resource,
+                    "/_matrix/client/r0": client_resource,
+                    "/_matrix/client/v1": client_resource,
+                    "/_matrix/client/v3": client_resource,
+                    "/_matrix/client/unstable": client_resource,
+                    "/_matrix/client/v2_alpha": client_resource,
+                    "/_matrix/client/versions": client_resource,
                     "/.well-known": well_known_resource(self),
                     "/_synapse/admin": AdminRestResource(self),
                     **build_synapse_client_resource_tree(self),
@@ -257,15 +271,15 @@ class SynapseHomeServer(HomeServer):
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         if name == "webclient":
+            # webclient listeners are deprecated as of Synapse v1.51.0, remove it
+            # in > v1.53.0.
             webclient_loc = self.config.server.web_client_location
 
             if webclient_loc is None:
                 logger.warning(
                     "Not enabling webclient resource, as web_client_location is unset."
                 )
-            elif webclient_loc.startswith("http://") or webclient_loc.startswith(
-                "https://"
-            ):
+            elif self.config.server.web_client_location_is_redirect:
                 resources[WEB_CLIENT_PREFIX] = RootRedirect(webclient_loc)
             else:
                 logger.warning(

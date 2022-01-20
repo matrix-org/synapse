@@ -366,6 +366,8 @@ jobs:
       # Build initial Synapse image
       - run: docker build -t matrixdotorg/synapse:latest -f docker/Dockerfile .
         working-directory: synapse
+        env:
+          DOCKER_BUILDKIT: 1
 
       # Build a ready-to-run Synapse image based on the initial image above.
       # This new image includes a config file, keys for signing and TLS, and
@@ -374,7 +376,8 @@ jobs:
         working-directory: complement/dockerfiles
 
       # Run Complement
-      - run: go test -v -tags synapse_blacklist,msc2403 ./tests/...
+      - run: set -o pipefail && go test -v -json -tags synapse_blacklist,msc2403 ./tests/... 2>&1 | gotestfmt
+        shell: bash
         env:
           COMPLEMENT_BASE_IMAGE: complement-synapse:latest
         working-directory: complement
