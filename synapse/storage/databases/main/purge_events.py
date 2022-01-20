@@ -390,7 +390,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "event_search",
             "events",
             "group_rooms",
-            "public_room_list_stream",
             "receipts_graph",
             "receipts_linearized",
             "room_aliases",
