@@ -727,10 +727,15 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         tok = self.login("rin", "password")
 
         on_logged_out = Mock(return_value=make_awaitable(None))
-        self.hs.get_password_auth_provider().on_logged_out_callbacks.append(on_logged_out)
+        self.hs.get_password_auth_provider().on_logged_out_callbacks.append(
+            on_logged_out
+        )
 
         channel = self.make_request(
-            "POST", "/_matrix/client/v3/logout", {}, access_token=tok,
+            "POST",
+            "/_matrix/client/v3/logout",
+            {},
+            access_token=tok,
         )
         self.assertEqual(channel.code, 200)
         on_logged_out.assert_called_once()
