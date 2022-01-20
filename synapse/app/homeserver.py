@@ -131,11 +131,18 @@ class SynapseHomeServer(HomeServer):
         resources.update(self._module_web_resources)
         self._module_web_resources_consumed = True
 
-        # try to find something useful to redirect '/' to
+        # Try to find something useful to serve at '/':
+        #
+        # 1. Redirect to the web client if it is an HTTP(S) URL.
+        # 2. Redirect to the web client served via Synapse.
+        # 3. Redirect to the static "Synapse is running" page.
+        # 4. Do not redirect and use a blank resource.
         if self.config.server.web_client_location_is_redirect:
             root_resource: Resource = RootOptionsRedirectResource(
                 self.config.server.web_client_location
             )
+        elif WEB_CLIENT_PREFIX in resources:
+            root_resource: Resource = RootOptionsRedirectResource(WEB_CLIENT_PREFIX)
         elif STATIC_PREFIX in resources:
             root_resource = RootOptionsRedirectResource(STATIC_PREFIX)
         else:
