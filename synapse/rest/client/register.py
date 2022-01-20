@@ -642,15 +642,6 @@ class RegisterRestServlet(RestServlet):
             if desired_username is not None:
                 desired_username = desired_username.lower()
 
-            # Ensure that the username is valid. We need to do this check again since the
-            # username may have been changed by a module.
-            if desired_username is not None:
-                await self.registration_handler.check_username(
-                    desired_username,
-                    guest_access_token=guest_access_token,
-                    assigned_user_id=registered_user_id,
-                )
-
             threepid = None
             if auth_result:
                 threepid = auth_result.get(LoginType.EMAIL_IDENTITY)
