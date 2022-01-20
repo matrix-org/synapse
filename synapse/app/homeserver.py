@@ -142,7 +142,7 @@ class SynapseHomeServer(HomeServer):
                 self.config.server.web_client_location
             )
         elif WEB_CLIENT_PREFIX in resources:
-            root_resource: Resource = RootOptionsRedirectResource(WEB_CLIENT_PREFIX)
+            root_resource = RootOptionsRedirectResource(WEB_CLIENT_PREFIX)
         elif STATIC_PREFIX in resources:
             root_resource = RootOptionsRedirectResource(STATIC_PREFIX)
         else:
