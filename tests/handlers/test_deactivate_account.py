@@ -87,9 +87,6 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         # Request the deactivation of our account
         self._deactivate_my_account()
 
-        # Clear the cache (for testing)
-        self._store.get_global_account_data_by_type_for_user.invalidate_all()
-
         # Check that the account data does not persist.
         self.assertIsNone(
             self.get_success(
@@ -127,9 +124,6 @@ class DeactivateAccountTestCase(HomeserverTestCase):
 
         # Request the deactivation of our account
         self._deactivate_my_account()
-
-        # Clear the cache (for testing)
-        self._store.get_account_data_for_room_and_type.invalidate_all()
 
         # Check that the account data does not persist.
         self.assertIsNone(
@@ -190,8 +184,6 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         # Request the deactivation of our account
         self._deactivate_my_account()
 
-        # Test the rule no longer exists (after clearing the cache)
-        self._store.get_push_rules_for_user.invalidate_all()
         push_rules = self.get_success(self._store.get_push_rules_for_user(self.user))
         # Filter out default rules; we don't care
         push_rules = list(filter(self._is_custom_rule, push_rules))
@@ -222,9 +214,6 @@ class DeactivateAccountTestCase(HomeserverTestCase):
 
         # Request the deactivation of our account
         self._deactivate_my_account()
-
-        # Invalidate the cache
-        self._store.ignored_by.invalidate_all()
 
         # Test the user is no longer ignored by the user that was deactivated
         self.assertEqual(
