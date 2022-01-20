@@ -339,7 +339,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
             ),
         )
 
-        self.client_username_ignored = hs.config.registration.ignore_client_username
+        self.inhibit_user_in_use_error = hs.config.registration.inhibit_user_in_use_error
 
     async def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
         if not self.hs.config.registration.enable_registration:
@@ -347,11 +347,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
                 403, "Registration has been disabled", errcode=Codes.FORBIDDEN
             )
 
-        # If we're ignoring client-supplied usernames when registering new users, we want
-        # to just tell the client any username is available, so it understands the
-        # registration will succeed if they provide this username. This is also in place
-        # to avoid leaking existing usernames on the server.
-        if self.client_username_ignored:
+        if self.inhibit_user_in_use_error:
             return 200, {"available": True}
 
         ip = request.getClientIP()
@@ -431,7 +427,7 @@ class RegisterRestServlet(RestServlet):
         self._refresh_tokens_enabled = (
             hs.config.registration.refreshable_access_token_lifetime is not None
         )
-        self._ignore_client_username = hs.config.registration.ignore_client_username
+        self._inhibit_user_in_use_error = hs.config.registration.inhibit_user_in_use_error
 
         self._registration_flows = _calculate_registration_flows(
             hs.config, self.auth_handler
@@ -468,7 +464,7 @@ class RegisterRestServlet(RestServlet):
         # Pull out the provided username and do basic sanity checks early since
         # the auth layer will store these in sessions.
         desired_username = None
-        if not self._ignore_client_username and "username" in body:
+        if "username" in body:
             if not isinstance(body["username"], str) or len(body["username"]) > 512:
                 raise SynapseError(400, "Invalid username")
             desired_username = body["username"]
@@ -574,6 +570,7 @@ class RegisterRestServlet(RestServlet):
                 desired_username,
                 guest_access_token=guest_access_token,
                 assigned_user_id=registered_user_id,
+                inhibit_user_in_use_error=self._inhibit_user_in_use_error,
             )
 
         # Check if the user-interactive authentication flows are complete, if
@@ -637,12 +634,7 @@ class RegisterRestServlet(RestServlet):
             if not password_hash:
                 raise SynapseError(400, "Missing params: password", Codes.MISSING_PARAM)
 
-            if not self._ignore_client_username:
-                # Usernames will be stored in UIA sessions regardless of this setting, so
-                # if it's on we just don't try to retrieve the username from the session
-                # data.
-                desired_username = params.get("username", None)
-
+            desired_username = params.get("username", None)
             guest_access_token = params.get("guest_access_token", None)
 
             if desired_username is not None:

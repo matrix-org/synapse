@@ -729,16 +729,16 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     @override_config(
         {
-            "ignore_client_username": True,
+            "inhibit_user_in_use_error": True,
         }
     )
-    def test_ignore_client_username(self):
-        """Tests that the 'ignore_client_username' configuration flag behaves
+    def test_inhibit_user_in_use_error(self):
+        """Tests that the 'inhibit_user_in_use_error' configuration flag behaves
         correctly.
         """
         username = "arthur"
 
-        # Manually register the user so we know the test isn't passing because of a lack
+        # Manually register the user, so we know the test isn't passing because of a lack
         # of clashing.
         reg_handler = self.hs.get_registration_handler()
         self.get_success(reg_handler.register_user(username))
@@ -748,34 +748,25 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", "register/available?username=" + username)
         self.assertEquals(200, channel.code, channel.result)
 
-        # Check that the registration succeeded (since we ignored the username parameter)
-        # and that there's a user_id parameter in the response body.
-        # Do it in a UIA flow to make sure the username won't be picked back up from the
-        # UIA session data.
+        # Test that when starting a UIA registration flow the request doesn't fail because
+        # of a conflicting username
         channel = self.make_request(
             "POST",
             "register",
             {"username": username, "type": "m.login.password", "password": "foo"},
         )
         self.assertEqual(channel.code, 401)
+        self.assertIn("session", channel.json_body)
 
+        # Test that finishing the registration fails because of a conflicting username.
         session = channel.json_body["session"]
         channel = self.make_request(
             "POST",
             "register",
             {"auth": {"session": session, "type": LoginType.DUMMY}},
         )
-
-        # Check that the registration succeeded (since we ignored the username parameter)
-        # and that there's a user_id parameter in the response body.
-        self.assertEquals(200, channel.code, channel.json_body)
-        self.assertIn("user_id", channel.json_body)
-
-        # Check that the user_id parameter from the response body differs from the
-        # username provided in the request, proving that the request parameter got
-        # successfully ignored.
-        user_id = UserID.from_string(channel.json_body["user_id"])
-        self.assertNotEquals(user_id.localpart, username)
+        self.assertEqual(channel.code, 400, channel.json_body)
+        self.assertEqual(channel.json_body["errcode"], Codes.USER_IN_USE)
 
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):
