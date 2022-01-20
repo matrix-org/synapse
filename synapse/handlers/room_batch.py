@@ -302,6 +302,12 @@ class RoomBatchHandler:
         # another event in the batch with the same type
         event_type_to_context_cache: Dict[str, EventContext] = {}
 
+        # Map from (event.sender, event.type) to auth_event_ids that we can re-use and create
+        # another event in the batch with the same sender and type
+        event_sender_and_type_to_auth_event_ids_cache: Dict[
+            Tuple(str, str), List[str]
+        ] = {}
+
         # Make the historical event chain float off on its own by specifying no
         # prev_events for the first event in the chain which causes the HS to
         # ask for the state at the start of the batch later.
@@ -350,6 +356,11 @@ class RoomBatchHandler:
                 # Cache the context so we can re-use it for events in
                 # the batch that have the same type.
                 event_type_to_context_cache[event.type] = context
+                # Cache the auth_event_ids so we can re-use it for events in
+                # the batch that have the same sender and type.
+                event_sender_and_type_to_auth_event_ids_cache[
+                    (event.sender, event.type)
+                ] = event.auth_event_ids()
 
                 # Normally this is done when persisting the event but we have to
                 # pre-emptively do it here because we create all the events first,
@@ -370,16 +381,27 @@ class RoomBatchHandler:
                 # TODO: Can we get away without this? Can't we just rely on validate_new below?
                 # self.validator.validate_builder(builder)
 
-                stripped_auth_event_ids = await self.event_creation_handler.strip_auth_event_ids_for_given_event_builder(
-                    builder=builder,
-                    prev_event_ids=prev_event_ids,
-                    auth_event_ids=auth_event_ids,
-                    depth=inherited_depth,
+                resultant_auth_event_ids = (
+                    event_sender_and_type_to_auth_event_ids_cache.get(
+                        (ev["sender"], ev["type"])
+                    )
                 )
+                if resultant_auth_event_ids is None:
+                    resultant_auth_event_ids = await self.event_creation_handler.strip_auth_event_ids_for_given_event_builder(
+                        builder=builder,
+                        prev_event_ids=prev_event_ids,
+                        auth_event_ids=auth_event_ids,
+                        depth=inherited_depth,
+                    )
+                    # Cache the auth_event_ids so we can re-use it for events in
+                    # the batch that have the same sender and type.
+                    event_sender_and_type_to_auth_event_ids_cache[
+                        (ev["sender"], ev["type"])
+                    ] = resultant_auth_event_ids
 
                 event = await builder.build(
                     prev_event_ids=event_dict.get("prev_events"),
-                    auth_event_ids=stripped_auth_event_ids,
+                    auth_event_ids=resultant_auth_event_ids.copy(),
                     depth=inherited_depth,
                 )
                 # We can re-use the context per-event type because it will
