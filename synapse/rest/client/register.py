@@ -418,6 +418,7 @@ class RegisterRestServlet(RestServlet):
         self.ratelimiter = hs.get_registration_ratelimiter()
         self.password_policy_handler = hs.get_password_policy_handler()
         self.clock = hs.get_clock()
+        self.password_auth_provider = hs.get_password_auth_provider()
         self._registration_enabled = self.hs.config.registration.enable_registration
         self._refresh_tokens_enabled = (
             hs.config.registration.refreshable_access_token_lifetime is not None
@@ -627,11 +628,28 @@ class RegisterRestServlet(RestServlet):
             if not password_hash:
                 raise SynapseError(400, "Missing params: password", Codes.MISSING_PARAM)
 
-            desired_username = params.get("username", None)
+            desired_username = await (
+                self.password_auth_provider.get_username_for_registration(
+                    auth_result, params,
+                )
+            )
+
+            if desired_username is None:
+                desired_username = params.get("username", None)
+
             guest_access_token = params.get("guest_access_token", None)
 
             if desired_username is not None:
                 desired_username = desired_username.lower()
+
+            # Ensure that the username is valid. We need to do this check again since the
+            # username may have been changed by a module.
+            if desired_username is not None:
+                await self.registration_handler.check_username(
+                    desired_username,
+                    guest_access_token=guest_access_token,
+                    assigned_user_id=registered_user_id,
+                )
 
             threepid = None
             if auth_result:
