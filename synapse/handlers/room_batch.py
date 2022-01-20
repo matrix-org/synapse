@@ -16,14 +16,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class EventCreationCacheItem(NamedTuple):
-    event: EventBase
-    context: EventContext
-
-
 class RoomBatchHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
+        self.config = hs.config
         self.store = hs.get_datastore()
         self.state_store = hs.get_storage().state
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -302,9 +298,15 @@ class RoomBatchHandler:
 
         room_version_obj = await self.store.get_room_version(room_id)
 
-        # Map from event type to the shared info to re-use and create another
-        # event in the batch with the same type
-        event_type_creation_cache: Dict[str, EventCreationCacheItem] = {}
+        # Map from event type to EventContext that we can re-use and create
+        # another event in the batch with the same type
+        event_type_to_context_cache: Dict[str, EventContext] = {}
+
+        # Map from (event.sender, event.type) to auth_event_ids that we can re-use and create
+        # another event in the batch with the same sender and type
+        event_sender_and_type_to_auth_event_ids_cache: Dict[
+            Tuple(str, str), List[str]
+        ] = {}
 
         # Make the historical event chain float off on its own by specifying no
         # prev_events for the first event in the chain which causes the HS to
@@ -334,9 +336,9 @@ class RoomBatchHandler:
 
             # We can skip a bunch of context and state calculations if we
             # already have an event with the same type to base off of.
-            cached_creation_info = event_type_creation_cache.get(ev["type"])
+            cached_context = event_type_to_context_cache.get(ev["type"])
 
-            if cached_creation_info is None:
+            if cached_context is None:
                 event, context = await self.event_creation_handler.create_event(
                     await self.create_requester_for_user_id_from_app_service(
                         ev["sender"], app_service_requester.app_service
@@ -351,9 +353,14 @@ class RoomBatchHandler:
                     depth=inherited_depth,
                 )
 
-                event_type_creation_cache[event.type] = EventCreationCacheItem(
-                    event=event, context=context
-                )
+                # Cache the context so we can re-use it for events in
+                # the batch that have the same type.
+                event_type_to_context_cache[event.type] = context
+                # Cache the auth_event_ids so we can re-use it for events in
+                # the batch that have the same sender and type.
+                event_sender_and_type_to_auth_event_ids_cache[
+                    (event.sender, event.type)
+                ] = event.auth_event_ids()
 
                 # Normally this is done when persisting the event but we have to
                 # pre-emptively do it here because we create all the events first,
@@ -365,30 +372,46 @@ class RoomBatchHandler:
                     state_group_id=context._state_group,
                 )
             else:
+                # Create an event with a lot less overhead than create_event
                 builder = self.event_builder_factory.for_room_version(
                     room_version_obj, event_dict
                 )
                 builder.internal_metadata.historical = True
 
-                # TODO: Can we get away without this? Does it validate on persist?
+                # TODO: Can we get away without this? Can't we just rely on validate_new below?
                 # self.validator.validate_builder(builder)
 
-                shared_event, shared_context = cached_creation_info
+                resultant_auth_event_ids = (
+                    event_sender_and_type_to_auth_event_ids_cache.get(
+                        (ev["sender"], ev["type"])
+                    )
+                )
+                if resultant_auth_event_ids is None:
+                    resultant_auth_event_ids = await self.event_creation_handler.strip_auth_event_ids_for_given_event_builder(
+                        builder=builder,
+                        prev_event_ids=prev_event_ids,
+                        auth_event_ids=auth_event_ids,
+                        depth=inherited_depth,
+                    )
+                    # Cache the auth_event_ids so we can re-use it for events in
+                    # the batch that have the same sender and type.
+                    event_sender_and_type_to_auth_event_ids_cache[
+                        (ev["sender"], ev["type"])
+                    ] = resultant_auth_event_ids
 
                 event = await builder.build(
-                    prev_event_ids=prev_event_ids,
-                    auth_event_ids=shared_event.auth_event_ids().copy(),
+                    prev_event_ids=event_dict.get("prev_events"),
+                    auth_event_ids=resultant_auth_event_ids.copy(),
                     depth=inherited_depth,
                 )
                 # We can re-use the context per-event type because it will
                 # calculate out to be the same for all events in the batch. We
                 # also get the benefit of sharing the same state_group.
-                context = shared_context
+                context = cached_context
 
                 # TODO: Do we need to check `third_party_event_rules.check_event_allowed(...)`?
 
-                # TODO: Can we get away without this?
-                # self.validator.validate_new(event, self.config)
+                self.validator.validate_new(event, self.config)
 
             logger.debug(
                 "RoomBatchSendEventRestServlet inserting event=%s, prev_event_ids=%s, auth_event_ids=%s",

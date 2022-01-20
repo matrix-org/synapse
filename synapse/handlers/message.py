@@ -884,6 +884,30 @@ class EventCreationHandler:
         assert ev.internal_metadata.stream_ordering
         return ev, ev.internal_metadata.stream_ordering
 
+    async def strip_auth_event_ids_for_given_event_builder(
+        self,
+        builder: EventBuilder,
+        prev_event_ids: List[str],
+        auth_event_ids: List[str],
+        depth: Optional[int] = None,
+    ) -> List[str]:
+        temp_event = await builder.build(
+            prev_event_ids=prev_event_ids,
+            auth_event_ids=auth_event_ids,
+            depth=depth,
+        )
+        auth_events = await self.store.get_events_as_list(auth_event_ids)
+        # Create a StateMap[str]
+        auth_event_state_map = {(e.type, e.state_key): e.event_id for e in auth_events}
+        # Actually strip down and use the necessary auth events
+        stripped_auth_event_ids = self._event_auth_handler.compute_auth_events(
+            event=temp_event,
+            current_state_ids=auth_event_state_map,
+            for_verification=False,
+        )
+
+        return stripped_auth_event_ids
+
     @measure_func("create_new_client_event")
     async def create_new_client_event(
         self,
@@ -925,28 +949,18 @@ class EventCreationHandler:
         # For example, we don't need extra m.room.member that don't match event.sender
         full_state_ids_at_event = None
         if auth_event_ids is not None:
-            # If auth events are provided, prev events must be also.
+            # If auth events are provided, prev events must also be provided.
             # prev_event_ids could be an empty array though.
             assert prev_event_ids is not None
 
             # Copy the full auth state before it stripped down
             full_state_ids_at_event = auth_event_ids.copy()
 
-            temp_event = await builder.build(
+            auth_event_ids = await self.strip_auth_event_ids_for_given_event_builder(
+                builder=builder,
                 prev_event_ids=prev_event_ids,
                 auth_event_ids=auth_event_ids,
                 depth=depth,
-            )
-            auth_events = await self.store.get_events_as_list(auth_event_ids)
-            # Create a StateMap[str]
-            auth_event_state_map = {
-                (e.type, e.state_key): e.event_id for e in auth_events
-            }
-            # Actually strip down and use the necessary auth events
-            auth_event_ids = self._event_auth_handler.compute_auth_events(
-                event=temp_event,
-                current_state_ids=auth_event_state_map,
-                for_verification=False,
             )
 
         if prev_event_ids is not None:
