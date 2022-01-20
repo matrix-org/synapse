@@ -776,7 +776,11 @@ async def _async_write_json_to_request_in_thread(
 
     with start_active_span("encode_json_response"):
         span = active_span()
-        json_str = await defer_to_thread(request.reactor, encode, span)
+        try:
+            json_str = await defer_to_thread(request.reactor, encode, span)
+        except Exception:
+            logger.exception("failed to encode json response")
+            return
 
     _write_bytes_to_request(request, json_str)
 
