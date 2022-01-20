@@ -78,8 +78,7 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         self.assertIsNotNone(
             self.get_success(
                 self._store.get_global_account_data_by_type_for_user(
-                    AccountDataTypes.DIRECT,
-                    self.user,
+                    self.user, AccountDataTypes.DIRECT
                 )
             ),
         )
@@ -91,8 +90,7 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         self.assertIsNone(
             self.get_success(
                 self._store.get_global_account_data_by_type_for_user(
-                    AccountDataTypes.DIRECT,
-                    self.user,
+                    self.user, AccountDataTypes.DIRECT
                 )
             ),
         )
