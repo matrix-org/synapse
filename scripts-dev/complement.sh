@@ -33,7 +33,7 @@ cd "$(dirname $0)/.."
 # Check for a user-specified Complement checkout
 if [[ -z "$COMPLEMENT_DIR" ]]; then
   COMPLEMENT_REF=${COMPLEMENT_REF:-master}
-  echo "COMPLEMENT_DIR not set. Fetching the latest Complement checkout..."
+  echo "COMPLEMENT_DIR not set. Fetching Complement checkout from ${COMPLEMENT_REF}..."
   wget -Nq https://github.com/matrix-org/complement/archive/${COMPLEMENT_REF}.tar.gz
   tar -xzf ${COMPLEMENT_REF}.tar.gz
   COMPLEMENT_DIR=complement-${COMPLEMENT_REF}
