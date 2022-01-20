@@ -8,7 +8,8 @@
 # By default the script will fetch the latest Complement master branch and
 # run tests with that. This can be overridden to use a custom Complement
 # checkout by setting the COMPLEMENT_DIR environment variable to the
-# filepath of a local Complement checkout.
+# filepath of a local Complement checkout or by setting the COMPLEMENT_REF
+# environment variable to pull a different branch or commit.
 #
 # By default Synapse is run in monolith mode. This can be overridden by
 # setting the WORKERS environment variable.
@@ -31,11 +32,12 @@ cd "$(dirname $0)/.."
 
 # Check for a user-specified Complement checkout
 if [[ -z "$COMPLEMENT_DIR" ]]; then
-  echo "COMPLEMENT_DIR not set. Fetching the latest Complement checkout..."
-  wget -Nq https://github.com/matrix-org/complement/archive/master.tar.gz
-  tar -xzf master.tar.gz
-  COMPLEMENT_DIR=complement-master
-  echo "Checkout available at 'complement-master'"
+  COMPLEMENT_REF=${COMPLEMENT_REF:-master}
+  echo "COMPLEMENT_DIR not set. Fetching Complement checkout from ${COMPLEMENT_REF}..."
+  wget -Nq https://github.com/matrix-org/complement/archive/${COMPLEMENT_REF}.tar.gz
+  tar -xzf ${COMPLEMENT_REF}.tar.gz
+  COMPLEMENT_DIR=complement-${COMPLEMENT_REF}
+  echo "Checkout available at 'complement-${COMPLEMENT_REF}'"
 fi
 
 # Build the base Synapse image from the local checkout

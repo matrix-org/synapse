@@ -551,24 +551,24 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             FROM room_stats_state state
             INNER JOIN room_stats_current curr USING (room_id)
             INNER JOIN rooms USING (room_id)
-            %s
-            ORDER BY %s %s
+            {where}
+            ORDER BY {order_by} {direction}, state.room_id {direction}
             LIMIT ?
             OFFSET ?
-        """ % (
-            where_statement,
-            order_by_column,
-            "ASC" if order_by_asc else "DESC",
+        """.format(
+            where=where_statement,
+            order_by=order_by_column,
+            direction="ASC" if order_by_asc else "DESC",
         )
 
         # Use a nested SELECT statement as SQL can't count(*) with an OFFSET
         count_sql = """
             SELECT count(*) FROM (
               SELECT room_id FROM room_stats_state state
-              %s
+              {where}
             ) AS get_room_ids
-        """ % (
-            where_statement,
+        """.format(
+            where=where_statement,
         )
 
         def _get_rooms_paginate_txn(

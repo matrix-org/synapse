@@ -1182,12 +1182,18 @@ class RoomContextHandler:
         results["event"] = filtered[0]
 
         # Fetch the aggregations.
-        aggregations = await self.store.get_bundled_aggregations([results["event"]])
-        aggregations.update(
-            await self.store.get_bundled_aggregations(results["events_before"])
+        aggregations = await self.store.get_bundled_aggregations(
+            [results["event"]], user.to_string()
         )
         aggregations.update(
-            await self.store.get_bundled_aggregations(results["events_after"])
+            await self.store.get_bundled_aggregations(
+                results["events_before"], user.to_string()
+            )
+        )
+        aggregations.update(
+            await self.store.get_bundled_aggregations(
+                results["events_after"], user.to_string()
+            )
         )
         results["aggregations"] = aggregations
 

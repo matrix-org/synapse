@@ -1,0 +1,1 @@
+Fix a long-standing bug where space hierarchy over federation would only work correctly some of the time.

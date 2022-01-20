@@ -45,7 +45,6 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, StateResolutionVersio
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.logging.context import ContextResourceUsage
-from synapse.logging.utils import log_function
 from synapse.state import v1, v2
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.roommember import ProfileInfo
@@ -512,7 +511,6 @@ class StateResolutionHandler:
 
         self.clock.looping_call(self._report_metrics, 120 * 1000)
 
-    @log_function
     async def resolve_state_groups(
         self,
         room_id: str,

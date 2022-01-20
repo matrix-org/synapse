@@ -12,15 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
 import itertools
 import logging
 import os
 import platform
 import threading
-import time
 from typing import (
-    Any,
     Callable,
     Dict,
     Generic,
@@ -33,7 +30,6 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    cast,
 )
 
 import attr
@@ -44,11 +40,9 @@ from prometheus_client.core import (
     GaugeMetricFamily,
 )
 
-from twisted.internet import reactor
-from twisted.internet.base import ReactorBase
 from twisted.python.threadpool import ThreadPool
 
-import synapse
+import synapse.metrics._reactor_metrics
 from synapse.metrics._exposition import (
     MetricsResource,
     generate_latest,
@@ -369,21 +363,6 @@ REGISTRY.register(CPUMetrics())
 
 
 #
-# Twisted reactor metrics
-#
-
-tick_time = Histogram(
-    "python_twisted_reactor_tick_time",
-    "Tick time of the Twisted reactor (sec)",
-    buckets=[0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.5, 1, 2, 5],
-)
-pending_calls_metric = Histogram(
-    "python_twisted_reactor_pending_calls",
-    "Pending calls",
-    buckets=[1, 2, 5, 10, 25, 50, 100, 250, 500, 1000],
-)
-
-#
 # Federation Metrics
 #
 
@@ -434,8 +413,6 @@ build_info.labels(
     " ".join([platform.system(), platform.release()]),
 ).set(1)
 
-last_ticked = time.time()
-
 # 3PID send info
 threepid_send_requests = Histogram(
     "synapse_threepid_send_requests_with_tries",
@@ -481,75 +458,6 @@ def register_threadpool(name: str, threadpool: ThreadPool) -> None:
     threadpool_total_working_threads.labels(name).set_function(
         lambda: len(threadpool.working)
     )
-
-
-class ReactorLastSeenMetric:
-    def collect(self) -> Iterable[Metric]:
-        cm = GaugeMetricFamily(
-            "python_twisted_reactor_last_seen",
-            "Seconds since the Twisted reactor was last seen",
-        )
-        cm.add_metric([], time.time() - last_ticked)
-        yield cm
-
-
-REGISTRY.register(ReactorLastSeenMetric())
-
-F = TypeVar("F", bound=Callable[..., Any])
-
-
-def runUntilCurrentTimer(reactor: ReactorBase, func: F) -> F:
-    @functools.wraps(func)
-    def f(*args: Any, **kwargs: Any) -> Any:
-        now = reactor.seconds()
-        num_pending = 0
-
-        # _newTimedCalls is one long list of *all* pending calls. Below loop
-        # is based off of impl of reactor.runUntilCurrent
-        for delayed_call in reactor._newTimedCalls:
-            if delayed_call.time > now:
-                break
-
-            if delayed_call.delayed_time > 0:
-                continue
-
-            num_pending += 1
-
-        num_pending += len(reactor.threadCallQueue)
-        start = time.time()
-        ret = func(*args, **kwargs)
-        end = time.time()
-
-        # record the amount of wallclock time spent running pending calls.
-        # This is a proxy for the actual amount of time between reactor polls,
-        # since about 25% of time is actually spent running things triggered by
-        # I/O events, but that is harder to capture without rewriting half the
-        # reactor.
-        tick_time.observe(end - start)
-        pending_calls_metric.observe(num_pending)
-
-        # Update the time we last ticked, for the metric to test whether
-        # Synapse's reactor has frozen
-        global last_ticked
-        last_ticked = end
-
-        return ret
-
-    return cast(F, f)
-
-
-try:
-    # Ensure the reactor has all the attributes we expect
-    reactor.seconds  # type: ignore
-    reactor.runUntilCurrent  # type: ignore
-    reactor._newTimedCalls  # type: ignore
-    reactor.threadCallQueue  # type: ignore
-
-    # runUntilCurrent is called when we have pending calls. It is called once
-    # per iteratation after fd polling.
-    reactor.runUntilCurrent = runUntilCurrentTimer(reactor, reactor.runUntilCurrent)  # type: ignore
-except AttributeError:
-    pass
 
 
 __all__ = [

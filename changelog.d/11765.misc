@@ -1,0 +1,1 @@
+Add a unit test that checks both `client` and `webclient` resources will function when simultaneously enabled.
