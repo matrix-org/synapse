@@ -223,7 +223,8 @@ class DeviceWorkerStore(SQLBaseStore):
             limit,
         )
 
-        # Note for later that `len(updates) <= limit`.
+        # We need to ensure `updates` doesn't grow too big.
+        # Currently: `len(updates) <= limit`.
 
         # Return an empty list if there are no updates
         if not updates:
