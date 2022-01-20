@@ -105,6 +105,64 @@ device ID), and the (now deactivated) access token.
 
 If multiple modules implement this callback, Synapse runs them all in order.
 
+### `get_username_for_registration`
+
+_First introduced in Synapse v1.52.0_
+
+```python
+async def get_username_for_registration(
+    uia_results: Dict[str, Any],
+    params: Dict[str, Any],
+) -> Optional[str]
+```
+
+Called when registering a new user, allowing the module to define the username to give the user.
+The username is the local part of a user's full Matrix ID, i.e. it's `alice` in `@alice:example.com`.
+
+This callback is called once [User-Interactive Authentication](https://spec.matrix.org/latest/client-server-api/#user-interactive-authentication-api)
+has been completed by the user. It is passed two dictionaries, which include the information that the user has provided
+during the registration process.
+
+The first dictionary contains the results of the [User-Interactive Authentication](https://spec.matrix.org/latest/client-server-api/#user-interactive-authentication-api)
+flow followed by the user. Its keys are the identifiers of every step involved in the flow,
+associated with either a boolean value indicating whether the step was correctly completed,
+or additional information (e.g. email address, phone number...). Here's an example featuring
+all currently supported keys:
+
+```python
+{
+    "m.login.dummy": True,  # Dummy authentication
+    "m.login.terms": True,  # User has accepted the terms of service for the homeserver
+    "m.login.recaptcha": True,  # User has completed the recaptcha challenge
+    "m.login.email.identity": {  # User has provided and verified an email address
+        "medium": "email",
+        "address": "alice@example.com",
+        "validated_at": 1642701357084,
+    },
+    "m.login.msisdn": {  # User has provided and verified a phone number
+        "medium": "msisdn",
+        "address": "33123456789",
+        "validated_at": 1642701357084,
+    },
+    "org.matrix.msc3231.login.registration_token": "sometoken",  # User has registered through the flow described in MSC3231
+}
+```
+
+The second dictionary contains the parameters provided by the user's client in the request
+to `/_matrix/client/v3/register`. See the [Matrix specification](https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3register)
+for a complete list of these parameters.
+
+If the module cannot, or does not wish to, generate a username for this user, it must
+return `None`.
+
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `None`, Synapse falls through to the next one. The value of the first
+callback that does not return `None` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback. If every callback return `None`,
+the username provided by the user is used, if any (otherwise one is automatically
+generated).
+
+
 ## Example
 
 The example module below implements authentication checkers for two different login types: 
