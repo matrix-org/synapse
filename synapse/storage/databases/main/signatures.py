@@ -44,6 +44,7 @@ class SignatureWorkerStore(EventsWorkerStore):
 
         Returns:
              A mapping of event ID to a mapping of algorithm to hash.
+             Returns an empty dict for a given event id if that event is unknown.
         """
         events = await self.get_events(
             event_ids,
@@ -53,9 +54,12 @@ class SignatureWorkerStore(EventsWorkerStore):
 
         hashes: Dict[str, Dict[str, bytes]] = {}
         for event_id in event_ids:
-            event = events[event_id]
-            ref_alg, ref_hash_bytes = compute_event_reference_hash(event)
-            hashes[event.event_id] = {ref_alg: ref_hash_bytes}
+            event = events.get(event_id)
+            if event is None:
+                hashes[event_id] = {}
+            else:
+                ref_alg, ref_hash_bytes = compute_event_reference_hash(event)
+                hashes[event_id] = {ref_alg: ref_hash_bytes}
 
         return hashes
 
