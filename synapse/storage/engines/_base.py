@@ -12,9 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import abc
+from enum import IntEnum
 from typing import Generic, Optional, TypeVar
 
 from synapse.storage.types import Connection
+
+
+class IsolationLevel(IntEnum):
+    READ_COMMITTED: int = 1
+    REPEATABLE_READ: int = 2
+    SERIALIZABLE: int = 3
 
 
 class IncorrectDatabaseSetup(RuntimeError):

@@ -13,9 +13,13 @@
 # limitations under the License.
 
 import logging
-from typing import Optional
+from typing import Mapping, Optional
 
-from synapse.storage.engines._base import BaseDatabaseEngine, IncorrectDatabaseSetup
+from synapse.storage.engines._base import (
+    BaseDatabaseEngine,
+    IncorrectDatabaseSetup,
+    IsolationLevel,
+)
 from synapse.storage.types import Connection
 
 logger = logging.getLogger(__name__)
@@ -34,6 +38,12 @@ class PostgresEngine(BaseDatabaseEngine):
         self.module.extensions.register_adapter(bytes, _disable_bytes_adapter)
         self.synchronous_commit = database_config.get("synchronous_commit", True)
         self._version = None  # unknown as yet
+
+        self.isolation_level_map: Mapping[int, int] = {
+            IsolationLevel.READ_COMMITTED: self.module.extensions.ISOLATION_LEVEL_READ_COMMITTED,
+            IsolationLevel.REPEATABLE_READ: self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ,
+            IsolationLevel.SERIALIZABLE: self.module.extensions.ISOLATION_LEVEL_SERIALIZABLE,
+        }
 
     @property
     def single_threaded(self) -> bool:
@@ -182,4 +192,6 @@ class PostgresEngine(BaseDatabaseEngine):
     ):
         if isolation_level is None:
             isolation_level = self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
+        else:
+            isolation_level = self.isolation_level_map[isolation_level]
         return conn.set_isolation_level(isolation_level)  # type: ignore
