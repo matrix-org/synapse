@@ -1,0 +1,531 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Upgrading from pre-Synapse 1.0 - Synapse</title>
+        
+        
+
+
+        <!-- Custom HTML head -->
+        
+
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        
+        <link rel="icon" href="favicon.svg">
+        
+        
+        <link rel="shortcut icon" href="favicon.png">
+        
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        
+        <link rel="stylesheet" href="css/print.css" media="print">
+        
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        
+        <link rel="stylesheet" href="fonts/fonts.css">
+        
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+        <link rel="stylesheet" href="docs/website_files/table-of-contents.css">
+        
+        <link rel="stylesheet" href="docs/website_files/remove-nav-buttons.css">
+        
+        <link rel="stylesheet" href="docs/website_files/indent-section-headers.css">
+        
+
+        
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded "><a href="MSC1711_certificates_FAQ.html" class="active">Upgrading from pre-Synapse 1.0</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="federate.html">Federation</a></li><li class="chapter-item expanded "><a href="usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="templates.html">Templates</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="development/url_previews.html">URL Previews</a></li><li class="chapter-item expanded "><a href="user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="admin_api/delete_group.html">Delete Group</a></li><li class="chapter-item expanded "><a href="admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="metrics-howto.html">Monitoring</a></li><li class="chapter-item expanded "><a href="usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li class="chapter-item expanded "><a href="opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="replication.html">Replication</a></li><li class="chapter-item expanded "><a href="tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                        
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        
+                        
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        
+                        
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/MSC1711_certificates_FAQ.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                        
+
+                    </div>
+                </div>
+
+                
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="msc1711-certificates-faq"><a class="header" href="#msc1711-certificates-faq">MSC1711 Certificates FAQ</a></h1>
+<h2 id="historical-note"><a class="header" href="#historical-note">Historical Note</a></h2>
+<p>This document was originally written to guide server admins through the upgrade
+path towards Synapse 1.0. Specifically,
+<a href="https://github.com/matrix-org/matrix-doc/blob/main/proposals/1711-x509-for-federation.md">MSC1711</a>
+required that all servers present valid TLS certificates on their federation
+API. Admins were encouraged to achieve compliance from version 0.99.0 (released
+in February 2019) ahead of version 1.0 (released June 2019) enforcing the
+certificate checks.</p>
+<p>Much of what follows is now outdated since most admins will have already
+upgraded, however it may be of use to those with old installs returning to the
+project.</p>
+<p>If you are setting up a server from scratch you almost certainly should look at
+the <a href="setup/installation.html">installation guide</a> instead.</p>
+<h2 id="introduction"><a class="header" href="#introduction">Introduction</a></h2>
+<p>The goal of Synapse 0.99.0 is to act as a stepping stone to Synapse 1.0.0. It
+supports the r0.1 release of the server to server specification, but is
+compatible with both the legacy Matrix federation behaviour (pre-r0.1) as well
+as post-r0.1 behaviour, in order to allow for a smooth upgrade across the
+federation.</p>
+<p>The most important thing to know is that Synapse 1.0.0 will require a valid TLS
+certificate on federation endpoints. Self signed certificates will not be
+sufficient.</p>
+<p>Synapse 0.99.0 makes it easy to configure TLS certificates and will
+interoperate with both &gt;= 1.0.0 servers as well as existing servers yet to
+upgrade.</p>
+<p><strong>It is critical that all admins upgrade to 0.99.0 and configure a valid TLS
+certificate.</strong> Admins will have 1 month to do so, after which 1.0.0 will be
+released and those servers without a valid certificate will not longer be able
+to federate with &gt;= 1.0.0 servers.</p>
+<p>Full details on how to carry out this configuration change is given
+<a href="#configuring-certificates-for-compatibility-with-synapse-100">below</a>. A
+timeline and some frequently asked questions are also given below.</p>
+<p>For more details and context on the release of the r0.1 Server/Server API and
+imminent Matrix 1.0 release, you can also see our
+<a href="https://matrix.org/blog/2019/02/04/matrix-at-fosdem-2019/">main talk from FOSDEM 2019</a>.</p>
+<h2 id="contents"><a class="header" href="#contents">Contents</a></h2>
+<ul>
+<li>Timeline</li>
+<li>Configuring certificates for compatibility with Synapse 1.0</li>
+<li>FAQ
+<ul>
+<li>Synapse 0.99.0 has just been released, what do I need to do right now?</li>
+<li>How do I upgrade?</li>
+<li>What will happen if I do not set up a valid federation certificate
+immediately?</li>
+<li>What will happen if I do nothing at all?</li>
+<li>When do I need a SRV record or .well-known URI?</li>
+<li>Can I still use an SRV record?</li>
+<li>I have created a .well-known URI. Do I still need an SRV record?</li>
+<li>It used to work just fine, why are you breaking everything?</li>
+<li>Can I manage my own certificates rather than having Synapse renew
+certificates itself?</li>
+<li>Do you still recommend against using a reverse proxy on the federation port?</li>
+<li>Do I still need to give my TLS certificates to Synapse if I am using a
+reverse proxy?</li>
+<li>Do I need the same certificate for the client and federation port?</li>
+<li>How do I tell Synapse to reload my keys/certificates after I replace them?</li>
+</ul>
+</li>
+</ul>
+<h2 id="timeline"><a class="header" href="#timeline">Timeline</a></h2>
+<p><strong>5th Feb 2019  - Synapse 0.99.0 is released.</strong></p>
+<p>All server admins are encouraged to upgrade.</p>
+<p>0.99.0:</p>
+<ul>
+<li>
+<p>provides support for ACME to make setting up Let's Encrypt certs easy, as
+well as .well-known support.</p>
+</li>
+<li>
+<p>does not enforce that a valid CA cert is present on the federation API, but
+rather makes it easy to set one up.</p>
+</li>
+<li>
+<p>provides support for .well-known</p>
+</li>
+</ul>
+<p>Admins should upgrade and configure a valid CA cert. Homeservers that require a
+.well-known entry (see below), should retain their SRV record and use it
+alongside their .well-known record.</p>
+<p><strong>10th June 2019  - Synapse 1.0.0 is released</strong></p>
+<p>1.0.0 is scheduled for release on 10th June. In
+accordance with the the <a href="https://matrix.org/docs/spec/server_server/r0.1.0.html">S2S spec</a>
+1.0.0 will enforce certificate validity. This means that any homeserver without a
+valid certificate after this point will no longer be able to federate with
+1.0.0 servers.</p>
+<h2 id="configuring-certificates-for-compatibility-with-synapse-100"><a class="header" href="#configuring-certificates-for-compatibility-with-synapse-100">Configuring certificates for compatibility with Synapse 1.0.0</a></h2>
+<h3 id="if-you-do-not-currently-have-an-srv-record"><a class="header" href="#if-you-do-not-currently-have-an-srv-record">If you do not currently have an SRV record</a></h3>
+<p>In this case, your <code>server_name</code> points to the host where your Synapse is
+running. There is no need to create a <code>.well-known</code> URI or an SRV record, but
+you will need to give Synapse a valid, signed, certificate.</p>
+<h3 id="if-you-do-have-an-srv-record-currently"><a class="header" href="#if-you-do-have-an-srv-record-currently">If you do have an SRV record currently</a></h3>
+<p>If you are using an SRV record, your matrix domain (<code>server_name</code>) may not
+point to the same host that your Synapse is running on (the 'target
+domain'). (If it does, you can follow the recommendation above; otherwise, read
+on.)</p>
+<p>Let's assume that your <code>server_name</code> is <code>example.com</code>, and your Synapse is
+hosted at a target domain of <code>customer.example.net</code>. Currently you should have
+an SRV record which looks like:</p>
+<pre><code>_matrix._tcp.example.com. IN SRV 10 5 8000 customer.example.net.
+</code></pre>
+<p>In this situation, you have three choices for how to proceed:</p>
+<h4 id="option-1-give-synapse-a-certificate-for-your-matrix-domain"><a class="header" href="#option-1-give-synapse-a-certificate-for-your-matrix-domain">Option 1: give Synapse a certificate for your matrix domain</a></h4>
+<p>Synapse 1.0 will expect your server to present a TLS certificate for your
+<code>server_name</code> (<code>example.com</code> in the above example). You can achieve this by acquiring a
+certificate for the <code>server_name</code> yourself (for example, using <code>certbot</code>), and giving it
+and the key to Synapse via <code>tls_certificate_path</code> and <code>tls_private_key_path</code>.</p>
+<h4 id="option-2-run-synapse-behind-a-reverse-proxy"><a class="header" href="#option-2-run-synapse-behind-a-reverse-proxy">Option 2: run Synapse behind a reverse proxy</a></h4>
+<p>If you have an existing reverse proxy set up with correct TLS certificates for
+your domain, you can simply route all traffic through the reverse proxy by
+updating the SRV record appropriately (or removing it, if the proxy listens on
+8448).</p>
+<p>See <a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a
+reverse proxy.</p>
+<h4 id="option-3-add-a-well-known-file-to-delegate-your-matrix-traffic"><a class="header" href="#option-3-add-a-well-known-file-to-delegate-your-matrix-traffic">Option 3: add a .well-known file to delegate your matrix traffic</a></h4>
+<p>This will allow you to keep Synapse on a separate domain, without having to
+give it a certificate for the matrix domain.</p>
+<p>You can do this with a <code>.well-known</code> file as follows:</p>
+<ol>
+<li>
+<p>Keep the SRV record in place - it is needed for backwards compatibility
+with Synapse 0.34 and earlier.</p>
+</li>
+<li>
+<p>Give Synapse a certificate corresponding to the target domain
+(<code>customer.example.net</code> in the above example). You can do this by acquire a 
+certificate for the target domain and giving it to Synapse via <code>tls_certificate_path</code>
+and <code>tls_private_key_path</code>.</p>
+</li>
+<li>
+<p>Restart Synapse to ensure the new certificate is loaded.</p>
+</li>
+<li>
+<p>Arrange for a <code>.well-known</code> file at
+<code>https://&lt;server_name&gt;/.well-known/matrix/server</code> with contents:</p>
+<pre><code class="language-json">{&quot;m.server&quot;: &quot;&lt;target server name&gt;&quot;}
+</code></pre>
+<p>where the target server name is resolved as usual (i.e. SRV lookup, falling
+back to talking to port 8448).</p>
+<p>In the above example, where synapse is listening on port 8000,
+<code>https://example.com/.well-known/matrix/server</code> should have <code>m.server</code> set to one of:</p>
+<ol>
+<li>
+<p><code>customer.example.net</code> ─ with a SRV record on
+<code>_matrix._tcp.customer.example.com</code> pointing to port 8000, or:</p>
+</li>
+<li>
+<p><code>customer.example.net</code> ─ updating synapse to listen on the default port
+8448, or:</p>
+</li>
+<li>
+<p><code>customer.example.net:8000</code> ─ ensuring that if there is a reverse proxy
+on <code>customer.example.net:8000</code> it correctly handles HTTP requests with
+Host header set to <code>customer.example.net:8000</code>.</p>
+</li>
+</ol>
+</li>
+</ol>
+<h2 id="faq"><a class="header" href="#faq">FAQ</a></h2>
+<h3 id="synapse-0990-has-just-been-released-what-do-i-need-to-do-right-now"><a class="header" href="#synapse-0990-has-just-been-released-what-do-i-need-to-do-right-now">Synapse 0.99.0 has just been released, what do I need to do right now?</a></h3>
+<p>Upgrade as soon as you can in preparation for Synapse 1.0.0, and update your
+TLS certificates as <a href="#configuring-certificates-for-compatibility-with-synapse-100">above</a>.</p>
+<h3 id="what-will-happen-if-i-do-not-set-up-a-valid-federation-certificate-immediately"><a class="header" href="#what-will-happen-if-i-do-not-set-up-a-valid-federation-certificate-immediately">What will happen if I do not set up a valid federation certificate immediately?</a></h3>
+<p>Nothing initially, but once 1.0.0 is in the wild it will not be possible to
+federate with 1.0.0 servers.</p>
+<h3 id="what-will-happen-if-i-do-nothing-at-all"><a class="header" href="#what-will-happen-if-i-do-nothing-at-all">What will happen if I do nothing at all?</a></h3>
+<p>If the admin takes no action at all, and remains on a Synapse &lt; 0.99.0 then the
+homeserver will be unable to federate with those who have implemented
+.well-known. Then, as above, once the month upgrade window has expired the
+homeserver will not be able to federate with any Synapse &gt;= 1.0.0</p>
+<h3 id="when-do-i-need-a-srv-record-or-well-known-uri"><a class="header" href="#when-do-i-need-a-srv-record-or-well-known-uri">When do I need a SRV record or .well-known URI?</a></h3>
+<p>If your homeserver listens on the default federation port (8448), and your
+<code>server_name</code> points to the host that your homeserver runs on, you do not need an
+SRV record or <code>.well-known/matrix/server</code> URI.</p>
+<p>For instance, if you registered <code>example.com</code> and pointed its DNS A record at a
+fresh Upcloud VPS or similar, you could install Synapse 0.99 on that host,
+giving it a server_name of <code>example.com</code>, and it would automatically generate a
+valid TLS certificate for you via Let's Encrypt and no SRV record or
+<code>.well-known</code> URI would be needed.</p>
+<p>This is the common case, although you can add an SRV record or
+<code>.well-known/matrix/server</code> URI for completeness if you wish.</p>
+<p><strong>However</strong>, if your server does not listen on port 8448, or if your <code>server_name</code>
+does not point to the host that your homeserver runs on, you will need to let
+other servers know how to find it.</p>
+<p>In this case, you should see <a href="#if-you-do-have-an-srv-record-currently">&quot;If you do have an SRV record
+currently&quot;</a> above.</p>
+<h3 id="can-i-still-use-an-srv-record"><a class="header" href="#can-i-still-use-an-srv-record">Can I still use an SRV record?</a></h3>
+<p>Firstly, if you didn't need an SRV record before (because your server is
+listening on port 8448 of your server_name), you certainly don't need one now:
+the defaults are still the same.</p>
+<p>If you previously had an SRV record, you can keep using it provided you are
+able to give Synapse a TLS certificate corresponding to your server name. For
+example, suppose you had the following SRV record, which directs matrix traffic
+for example.com to matrix.example.com:443:</p>
+<pre><code>_matrix._tcp.example.com. IN SRV 10 5 443 matrix.example.com
+</code></pre>
+<p>In this case, Synapse must be given a certificate for example.com - or be
+configured to acquire one from Let's Encrypt.</p>
+<p>If you are unable to give Synapse a certificate for your server_name, you will
+also need to use a .well-known URI instead. However, see also &quot;I have created a
+.well-known URI. Do I still need an SRV record?&quot;.</p>
+<h3 id="i-have-created-a-well-known-uri-do-i-still-need-an-srv-record"><a class="header" href="#i-have-created-a-well-known-uri-do-i-still-need-an-srv-record">I have created a .well-known URI. Do I still need an SRV record?</a></h3>
+<p>As of Synapse 0.99, Synapse will first check for the existence of a <code>.well-known</code>
+URI and follow any delegation it suggests. It will only then check for the
+existence of an SRV record.</p>
+<p>That means that the SRV record will often be redundant. However, you should
+remember that there may still be older versions of Synapse in the federation
+which do not understand <code>.well-known</code> URIs, so if you removed your SRV record you
+would no longer be able to federate with them.</p>
+<p>It is therefore best to leave the SRV record in place for now. Synapse 0.34 and
+earlier will follow the SRV record (and not care about the invalid
+certificate). Synapse 0.99 and later will follow the .well-known URI, with the
+correct certificate chain.</p>
+<h3 id="it-used-to-work-just-fine-why-are-you-breaking-everything"><a class="header" href="#it-used-to-work-just-fine-why-are-you-breaking-everything">It used to work just fine, why are you breaking everything?</a></h3>
+<p>We have always wanted Matrix servers to be as easy to set up as possible, and
+so back when we started federation in 2014 we didn't want admins to have to go
+through the cumbersome process of buying a valid TLS certificate to run a
+server. This was before Let's Encrypt came along and made getting a free and
+valid TLS certificate straightforward. So instead, we adopted a system based on
+<a href="https://en.wikipedia.org/wiki/Convergence_(SSL)">Perspectives</a>: an approach
+where you check a set of &quot;notary servers&quot; (in practice, homeservers) to vouch
+for the validity of a certificate rather than having it signed by a CA. As long
+as enough different notaries agree on the certificate's validity, then it is
+trusted.</p>
+<p>However, in practice this has never worked properly. Most people only use the
+default notary server (matrix.org), leading to inadvertent centralisation which
+we want to eliminate. Meanwhile, we never implemented the full consensus
+algorithm to query the servers participating in a room to determine consensus
+on whether a given certificate is valid. This is fiddly to get right
+(especially in face of sybil attacks), and we found ourselves questioning
+whether it was worth the effort to finish the work and commit to maintaining a
+secure certificate validation system as opposed to focusing on core Matrix
+development.</p>
+<p>Meanwhile, Let's Encrypt came along in 2016, and put the final nail in the
+coffin of the Perspectives project (which was already pretty dead). So, the
+Spec Core Team decided that a better approach would be to mandate valid TLS
+certificates for federation alongside the rest of the Web. More details can be
+found in
+<a href="https://github.com/matrix-org/matrix-doc/blob/main/proposals/1711-x509-for-federation.md#background-the-failure-of-the-perspectives-approach">MSC1711</a>.</p>
+<p>This results in a breaking change, which is disruptive, but absolutely critical
+for the security model. However, the existence of Let's Encrypt as a trivial
+way to replace the old self-signed certificates with valid CA-signed ones helps
+smooth things over massively, especially as Synapse can now automate Let's
+Encrypt certificate generation if needed.</p>
+<h3 id="can-i-manage-my-own-certificates-rather-than-having-synapse-renew-certificates-itself"><a class="header" href="#can-i-manage-my-own-certificates-rather-than-having-synapse-renew-certificates-itself">Can I manage my own certificates rather than having Synapse renew certificates itself?</a></h3>
+<p>Yes, you are welcome to manage your certificates yourself. Synapse will only
+attempt to obtain certificates from Let's Encrypt if you configure it to do
+so.The only requirement is that there is a valid TLS cert present for
+federation end points.</p>
+<h3 id="do-you-still-recommend-against-using-a-reverse-proxy-on-the-federation-port"><a class="header" href="#do-you-still-recommend-against-using-a-reverse-proxy-on-the-federation-port">Do you still recommend against using a reverse proxy on the federation port?</a></h3>
+<p>We no longer actively recommend against using a reverse proxy. Many admins will
+find it easier to direct federation traffic to a reverse proxy and manage their
+own TLS certificates, and this is a supported configuration.</p>
+<p>See <a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a
+reverse proxy.</p>
+<h3 id="do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy"><a class="header" href="#do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy">Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?</a></h3>
+<p>Practically speaking, this is no longer necessary.</p>
+<p>If you are using a reverse proxy for all of your TLS traffic, then you can set
+<code>no_tls: True</code>. In that case, the only reason Synapse needs the certificate is
+to populate a legacy 'tls_fingerprints' field in the federation API. This is
+ignored by Synapse 0.99.0 and later, and the only time pre-0.99 Synapses will
+check it is when attempting to fetch the server keys - and generally this is
+delegated via <code>matrix.org</code>, which is on 0.99.0.</p>
+<p>However, there is a bug in Synapse 0.99.0
+<a href="https://github.com/matrix-org/synapse/issues/4554">4554</a> which prevents
+Synapse from starting if you do not give it a TLS certificate. To work around
+this, you can give it any TLS certificate at all. This will be fixed soon.</p>
+<h3 id="do-i-need-the-same-certificate-for-the-client-and-federation-port"><a class="header" href="#do-i-need-the-same-certificate-for-the-client-and-federation-port">Do I need the same certificate for the client and federation port?</a></h3>
+<p>No. There is nothing stopping you from using different certificates,
+particularly if you are using a reverse proxy. However, Synapse will use the
+same certificate on any ports where TLS is configured.</p>
+<h3 id="how-do-i-tell-synapse-to-reload-my-keyscertificates-after-i-replace-them"><a class="header" href="#how-do-i-tell-synapse-to-reload-my-keyscertificates-after-i-replace-them">How do I tell Synapse to reload my keys/certificates after I replace them?</a></h3>
+<p>Synapse will reload the keys and certificates when it receives a SIGHUP - for
+example <code>kill -HUP $(cat homeserver.pid)</code>. Alternatively, simply restart
+Synapse, though this will result in downtime while it restarts.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+                            <a rel="prev" href="upgrade.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+
+                        
+                            <a rel="next" href="federate.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                    <a rel="prev" href="upgrade.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+
+                
+                    <a rel="next" href="federate.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                
+            </nav>
+
+        </div>
+
+        
+
+        
+
+        
+
+        
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+
+        
+
+        
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+        <script type="text/javascript" src="docs/website_files/table-of-contents.js"></script>
+        
+
+        
+
+    </body>
+</html>
