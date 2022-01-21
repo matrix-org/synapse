@@ -180,7 +180,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
         else:
             return None
 
-    @cached(num_args=2)
+    @cached(num_args=2, tree=True)
     async def get_account_data_for_room(
         self, user_id: str, room_id: str
     ) -> Dict[str, JsonDict]:
