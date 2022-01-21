@@ -32,7 +32,6 @@ from synapse.storage.util.id_generators import (
     AbstractStreamIdTracker,
     StreamIdGenerator,
 )
-from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.stream_change_cache import StreamChangeCache
@@ -127,7 +126,7 @@ class PushRulesWorkerStore(
         raise NotImplementedError()
 
     @cached(max_entries=5000)
-    async def get_push_rules_for_user(self, user_id: str) -> List[JsonDict]:
+    async def get_push_rules_for_user(self, user_id):
         rows = await self.db_pool.simple_select_list(
             table="push_rules",
             keyvalues={"user_name": user_id},
@@ -151,7 +150,7 @@ class PushRulesWorkerStore(
         return _load_rules(rows, enabled_map, use_new_defaults)
 
     @cached(max_entries=5000)
-    async def get_push_rules_enabled_for_user(self, user_id: str) -> Dict[str, bool]:
+    async def get_push_rules_enabled_for_user(self, user_id) -> Dict[str, bool]:
         results = await self.db_pool.simple_select_list(
             table="push_rules_enable",
             keyvalues={"user_name": user_id},
