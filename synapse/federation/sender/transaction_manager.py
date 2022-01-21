@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     import synapse.server
 
 logger = logging.getLogger(__name__)
+issue_8631_logger = logging.getLogger("synapse.8631_debug")
 
 last_pdu_ts_metric = Gauge(
     "synapse_federation_last_sent_pdu_time",
@@ -124,6 +125,17 @@ class TransactionManager:
                 len(pdus),
                 len(edus),
             )
+            if issue_8631_logger.isEnabledFor(logging.DEBUG):
+                DEVICE_UPDATE_EDUS = {"m.device_list_update", "m.signing_key_update"}
+                device_list_updates = [
+                    edu.content for edu in edus if edu.edu_type in DEVICE_UPDATE_EDUS
+                ]
+                if device_list_updates:
+                    issue_8631_logger.debug(
+                        "about to send txn [%s] including device list updates: %s",
+                        transaction.transaction_id,
+                        device_list_updates,
+                    )
 
             # Actually send the transaction
 

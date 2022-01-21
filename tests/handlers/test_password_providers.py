@@ -23,7 +23,7 @@ import synapse
 from synapse.api.constants import LoginType
 from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.module_api import ModuleApi
-from synapse.rest.client import devices, login, register
+from synapse.rest.client import devices, login, logout, register
 from synapse.types import JsonDict, UserID
 
 from tests import unittest
@@ -156,6 +156,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         synapse.rest.admin.register_servlets,
         login.register_servlets,
         devices.register_servlets,
+        logout.register_servlets,
         register.register_servlets,
     ]
 
@@ -720,6 +721,31 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         # ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
         self.assertEqual(channel.code, 400, channel.result)
+
+    def test_on_logged_out(self):
+        """Tests that the on_logged_out callback is called when the user logs out."""
+        self.register_user("rin", "password")
+        tok = self.login("rin", "password")
+
+        self.called = False
+
+        async def on_logged_out(user_id, device_id, access_token):
+            self.called = True
+
+        on_logged_out = Mock(side_effect=on_logged_out)
+        self.hs.get_password_auth_provider().on_logged_out_callbacks.append(
+            on_logged_out
+        )
+
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/v3/logout",
+            {},
+            access_token=tok,
+        )
+        self.assertEqual(channel.code, 200)
+        on_logged_out.assert_called_once()
+        self.assertTrue(self.called)
 
     def test_username(self):
         """Tests that the get_username_for_registration callback can define the username

@@ -1,1 +1,0 @@
-Remove `python_twisted_reactor_pending_calls` prometheus metric.

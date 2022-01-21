@@ -402,7 +402,7 @@ class EventClientSerializer:
         if bundle_aggregations:
             event_aggregations = bundle_aggregations.get(event.event_id)
             if event_aggregations:
-                self._injected_bundled_aggregations(
+                self._inject_bundled_aggregations(
                     event,
                     time_now,
                     bundle_aggregations[event.event_id],
@@ -411,7 +411,7 @@ class EventClientSerializer:
 
         return serialized_event
 
-    def _injected_bundled_aggregations(
+    def _inject_bundled_aggregations(
         self,
         event: EventBase,
         time_now: int,

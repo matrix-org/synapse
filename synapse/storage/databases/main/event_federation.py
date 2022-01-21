@@ -65,7 +65,7 @@ class _NoChainCoverIndex(Exception):
         super().__init__("Unexpectedly no chain cover for events in %s" % (room_id,))
 
 
-class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBaseStore):
+class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBaseStore):
     def __init__(
         self,
         database: DatabasePool,

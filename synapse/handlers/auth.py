@@ -2296,7 +2296,7 @@ class PasswordAuthProvider:
         # call all of the on_logged_out callbacks
         for callback in self.on_logged_out_callbacks:
             try:
-                callback(user_id, device_id, access_token)
+                await callback(user_id, device_id, access_token)
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue
