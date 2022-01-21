@@ -1,1 +1,0 @@
-Deprecate support for `webclient` listeners and non-HTTP(S) `web_client_location` configuration.
