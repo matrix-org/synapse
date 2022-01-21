@@ -1,0 +1,1 @@
+Fix `/_matrix/client/v1/room/{roomId}/hierarchy` endpoint returning incorrect fields which have been present since Synapse 1.49.0.

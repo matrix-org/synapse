@@ -66,7 +66,7 @@ class AccountDataServlet(RestServlet):
             raise AuthError(403, "Cannot get account data for other users.")
 
         event = await self.store.get_global_account_data_by_type_for_user(
-            account_data_type, user_id
+            user_id, account_data_type
         )
 
         if event is None:

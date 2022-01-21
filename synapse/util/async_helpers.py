@@ -309,12 +309,12 @@ def gather_results(  # type: ignore[misc]
     return deferred.addCallback(tuple)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class _LinearizerEntry:
     # The number of things executing.
-    count = attr.ib(type=int)
+    count: int
     # Deferreds for the things blocked from executing.
-    deferreds = attr.ib(type=collections.OrderedDict)
+    deferreds: collections.OrderedDict
 
 
 class Linearizer:

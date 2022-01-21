@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import attr
 
@@ -23,19 +23,19 @@ from synapse.types import JsonDict
 from synapse.util import json_encoder, stringutils
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class UIAuthSessionData:
-    session_id = attr.ib(type=str)
+    session_id: str
     # The dictionary from the client root level, not the 'auth' key.
-    clientdict = attr.ib(type=JsonDict)
+    clientdict: JsonDict
     # The URI and method the session was intiatied with. These are checked at
     # each stage of the authentication to ensure that the asked for operation
     # has not changed.
-    uri = attr.ib(type=str)
-    method = attr.ib(type=str)
+    uri: str
+    method: str
     # A string description of the operation that the current authentication is
     # authorising.
-    description = attr.ib(type=str)
+    description: str
 
 
 class UIAuthWorkerStore(SQLBaseStore):
@@ -225,11 +225,14 @@ class UIAuthWorkerStore(SQLBaseStore):
         self, txn: LoggingTransaction, session_id: str, key: str, value: Any
     ):
         # Get the current value.
-        result: Dict[str, Any] = self.db_pool.simple_select_one_txn(  # type: ignore
-            txn,
-            table="ui_auth_sessions",
-            keyvalues={"session_id": session_id},
-            retcols=("serverdict",),
+        result = cast(
+            Dict[str, Any],
+            self.db_pool.simple_select_one_txn(
+                txn,
+                table="ui_auth_sessions",
+                keyvalues={"session_id": session_id},
+                retcols=("serverdict",),
+            ),
         )
 
         # Update it and add it back to the database.

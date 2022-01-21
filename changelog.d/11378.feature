@@ -1,1 +1,0 @@
-Allow guests to send state events per [MSC3419](https://github.com/matrix-org/matrix-doc/pull/3419).

@@ -93,11 +93,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             channel.json_body,
         )
 
-    def test_deny_membership(self):
-        """Test that we deny relations on membership events"""
-        channel = self._send_relation(RelationTypes.ANNOTATION, EventTypes.Member)
-        self.assertEquals(400, channel.code, channel.json_body)
-
     def test_deny_invalid_event(self):
         """Test that we deny relations on non-existant events"""
         channel = self._send_relation(
@@ -520,6 +515,9 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                 2,
                 actual[RelationTypes.THREAD].get("count"),
             )
+            self.assertTrue(
+                actual[RelationTypes.THREAD].get("current_user_participated")
+            )
             # The latest thread event has some fields that don't matter.
             self.assert_dict(
                 {
@@ -577,11 +575,11 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         assert_bundle(channel.json_body["event"]["unsigned"].get("m.relations"))
 
         # Request sync.
-        # channel = self.make_request("GET", "/sync", access_token=self.user_token)
-        # self.assertEquals(200, channel.code, channel.json_body)
-        # room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
-        # self.assertTrue(room_timeline["limited"])
-        # _find_and_assert_event(room_timeline["events"])
+        channel = self.make_request("GET", "/sync", access_token=self.user_token)
+        self.assertEquals(200, channel.code, channel.json_body)
+        room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
+        self.assertTrue(room_timeline["limited"])
+        _find_and_assert_event(room_timeline["events"])
 
         # Note that /relations is tested separately in test_aggregation_get_event_for_thread
         # since it needs different data configured.
@@ -1119,7 +1117,8 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             relation_type: One of `RelationTypes`
             event_type: The type of the event to create
             key: The aggregation key used for m.annotation relation type.
-            content: The content of the created event.
+            content: The content of the created event. Will be modified to configure
+                the m.relates_to key based on the other provided parameters.
             access_token: The access token used to send the relation, defaults
                 to `self.user_token`
             parent_id: The event_id this relation relates to. If None, then self.parent_id
@@ -1130,17 +1129,21 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         if not access_token:
             access_token = self.user_token
 
-        query = ""
-        if key:
-            query = "?key=" + urllib.parse.quote_plus(key.encode("utf-8"))
-
         original_id = parent_id if parent_id else self.parent_id
+
+        if content is None:
+            content = {}
+        content["m.relates_to"] = {
+            "event_id": original_id,
+            "rel_type": relation_type,
+        }
+        if key is not None:
+            content["m.relates_to"]["key"] = key
 
         channel = self.make_request(
             "POST",
-            "/_matrix/client/unstable/rooms/%s/send_relation/%s/%s/%s%s"
-            % (self.room, original_id, relation_type, event_type, query),
-            content or {},
+            f"/_matrix/client/v3/rooms/{self.room}/send/{event_type}",
+            content,
             access_token=access_token,
         )
         return channel

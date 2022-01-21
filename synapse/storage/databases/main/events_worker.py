@@ -1383,10 +1383,6 @@ class EventsWorkerStore(SQLBaseStore):
 
         return {"v1": complexity_v1}
 
-    def get_current_events_token(self) -> int:
-        """The current maximum token that events have reached"""
-        return self._stream_id_gen.get_current_token()
-
     async def get_all_new_forward_event_rows(
         self, instance_name: str, last_id: int, current_id: int, limit: int
     ) -> List[Tuple[int, str, str, str, str, str, str, str, str]]:

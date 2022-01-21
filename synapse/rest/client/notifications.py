@@ -58,7 +58,7 @@ class NotificationsServlet(RestServlet):
             user_id, ReceiptTypes.READ
         )
 
-        notif_event_ids = [pa["event_id"] for pa in push_actions]
+        notif_event_ids = [pa.event_id for pa in push_actions]
         notif_events = await self.store.get_events(notif_event_ids)
 
         returned_push_actions = []
@@ -67,30 +67,30 @@ class NotificationsServlet(RestServlet):
 
         for pa in push_actions:
             returned_pa = {
-                "room_id": pa["room_id"],
-                "profile_tag": pa["profile_tag"],
-                "actions": pa["actions"],
-                "ts": pa["received_ts"],
+                "room_id": pa.room_id,
+                "profile_tag": pa.profile_tag,
+                "actions": pa.actions,
+                "ts": pa.received_ts,
                 "event": (
-                    await self._event_serializer.serialize_event(
-                        notif_events[pa["event_id"]],
+                    self._event_serializer.serialize_event(
+                        notif_events[pa.event_id],
                         self.clock.time_msec(),
                         event_format=format_event_for_client_v2_without_room_id,
                     )
                 ),
             }
 
-            if pa["room_id"] not in receipts_by_room:
+            if pa.room_id not in receipts_by_room:
                 returned_pa["read"] = False
             else:
-                receipt = receipts_by_room[pa["room_id"]]
+                receipt = receipts_by_room[pa.room_id]
 
                 returned_pa["read"] = (
                     receipt["topological_ordering"],
                     receipt["stream_ordering"],
-                ) >= (pa["topological_ordering"], pa["stream_ordering"])
+                ) >= (pa.topological_ordering, pa.stream_ordering)
             returned_push_actions.append(returned_pa)
-            next_token = str(pa["stream_ordering"])
+            next_token = str(pa.stream_ordering)
 
         return 200, {"notifications": returned_push_actions, "next_token": next_token}
 

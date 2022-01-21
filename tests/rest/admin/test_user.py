@@ -1181,6 +1181,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
                 self.other_user, device_id=None, valid_until_ms=None
             )
         )
+
         self.url_prefix = "/_synapse/admin/v2/users/%s"
         self.url_other_user = self.url_prefix % self.other_user
 
@@ -1188,7 +1189,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
         If the user is not a server admin, an error is returned.
         """
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         channel = self.make_request(
             "GET",
@@ -1216,7 +1217,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "/_synapse/admin/v2/users/@unknown_person:test",
+            self.url_prefix % "@unknown_person:test",
             access_token=self.admin_user_tok,
         )
 
@@ -1337,7 +1338,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
         Check that a new admin user is created successfully.
         """
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         # Create user (server admin)
         body = {
@@ -1386,7 +1387,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
         Check that a new regular user is created successfully.
         """
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         # Create user
         body = {
@@ -1478,7 +1479,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         # Register new user with admin API
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         # Create user
         channel = self.make_request(
@@ -1515,7 +1516,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         # Register new user with admin API
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         # Create user
         channel = self.make_request(
@@ -1545,7 +1546,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         Check that a new regular user is created successfully and
         got an email pusher.
         """
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         # Create user
         body = {
@@ -1588,7 +1589,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         Check that a new regular user is created successfully and
         got not an email pusher.
         """
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         # Create user
         body = {
@@ -2085,10 +2086,13 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["deactivated"])
-        self.assertIsNone(channel.json_body["password_hash"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
         self.assertEqual("mxc://servername/mediaid", channel.json_body["avatar_url"])
         self.assertEqual("User", channel.json_body["displayname"])
+
+        # This key was removed intentionally. Ensure it is not accidentally re-included.
+        self.assertNotIn("password_hash", channel.json_body)
+
         # the user is deactivated, the threepid will be deleted
 
         # Get user
@@ -2101,10 +2105,12 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["deactivated"])
-        self.assertIsNone(channel.json_body["password_hash"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
         self.assertEqual("mxc://servername/mediaid", channel.json_body["avatar_url"])
         self.assertEqual("User", channel.json_body["displayname"])
+
+        # This key was removed intentionally. Ensure it is not accidentally re-included.
+        self.assertNotIn("password_hash", channel.json_body)
 
     @override_config({"user_directory": {"enabled": True, "search_all_users": True}})
     def test_change_name_deactivate_user_user_directory(self):
@@ -2177,8 +2183,10 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["deactivated"])
-        self.assertIsNotNone(channel.json_body["password_hash"])
         self._is_erased("@user:test", False)
+
+        # This key was removed intentionally. Ensure it is not accidentally re-included.
+        self.assertNotIn("password_hash", channel.json_body)
 
     @override_config({"password_config": {"localdb_enabled": False}})
     def test_reactivate_user_localdb_disabled(self):
@@ -2209,8 +2217,10 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["deactivated"])
-        self.assertIsNone(channel.json_body["password_hash"])
         self._is_erased("@user:test", False)
+
+        # This key was removed intentionally. Ensure it is not accidentally re-included.
+        self.assertNotIn("password_hash", channel.json_body)
 
     @override_config({"password_config": {"enabled": False}})
     def test_reactivate_user_password_disabled(self):
@@ -2241,8 +2251,10 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["deactivated"])
-        self.assertIsNone(channel.json_body["password_hash"])
         self._is_erased("@user:test", False)
+
+        # This key was removed intentionally. Ensure it is not accidentally re-included.
+        self.assertNotIn("password_hash", channel.json_body)
 
     def test_set_user_as_admin(self):
         """
@@ -2328,7 +2340,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         Ensure an account can't accidentally be deactivated by using a str value
         for the deactivated body parameter
         """
-        url = "/_synapse/admin/v2/users/@bob:test"
+        url = self.url_prefix % "@bob:test"
 
         # Create user
         channel = self.make_request(
@@ -2392,17 +2404,19 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # Deactivate the user.
         channel = self.make_request(
             "PUT",
-            "/_synapse/admin/v2/users/%s" % urllib.parse.quote(user_id),
+            self.url_prefix % urllib.parse.quote(user_id),
             access_token=self.admin_user_tok,
             content={"deactivated": True},
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertTrue(channel.json_body["deactivated"])
-        self.assertIsNone(channel.json_body["password_hash"])
         self._is_erased(user_id, False)
         d = self.store.mark_user_erased(user_id)
         self.assertIsNone(self.get_success(d))
         self._is_erased(user_id, True)
+
+        # This key was removed intentionally. Ensure it is not accidentally re-included.
+        self.assertNotIn("password_hash", channel.json_body)
 
     def _check_fields(self, content: JsonDict):
         """Checks that the expected user attributes are present in content
@@ -2416,12 +2430,14 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertIn("admin", content)
         self.assertIn("deactivated", content)
         self.assertIn("shadow_banned", content)
-        self.assertIn("password_hash", content)
         self.assertIn("creation_ts", content)
         self.assertIn("appservice_id", content)
         self.assertIn("consent_server_notice_sent", content)
         self.assertIn("consent_version", content)
         self.assertIn("external_ids", content)
+
+        # This key was removed intentionally. Ensure it is not accidentally re-included.
+        self.assertNotIn("password_hash", content)
 
 
 class UserMembershipRestTestCase(unittest.HomeserverTestCase):
@@ -3883,3 +3899,93 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertNotIn("messages_per_second", channel.json_body)
         self.assertNotIn("burst_count", channel.json_body)
+
+
+class AccountDataTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs) -> None:
+        self.store = hs.get_datastore()
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.url = f"/_synapse/admin/v1/users/{self.other_user}/accountdata"
+
+    def test_no_auth(self) -> None:
+        """Try to get information of a user without authentication."""
+        channel = self.make_request("GET", self.url, {})
+
+        self.assertEqual(HTTPStatus.UNAUTHORIZED, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
+
+    def test_requester_is_no_admin(self) -> None:
+        """If the user is not a server admin, an error is returned."""
+        other_user_token = self.login("user", "pass")
+
+        channel = self.make_request(
+            "GET",
+            self.url,
+            access_token=other_user_token,
+        )
+
+        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    def test_user_does_not_exist(self) -> None:
+        """Tests that a lookup for a user that does not exist returns a 404"""
+        url = "/_synapse/admin/v1/users/@unknown_person:test/override_ratelimit"
+
+        channel = self.make_request(
+            "GET",
+            url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+
+    def test_user_is_not_local(self) -> None:
+        """Tests that a lookup for a user that is not a local returns a 400"""
+        url = "/_synapse/admin/v1/users/@unknown_person:unknown_domain/accountdata"
+
+        channel = self.make_request(
+            "GET",
+            url,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual("Can only look up local users", channel.json_body["error"])
+
+    def test_success(self) -> None:
+        """Request account data should succeed for an admin."""
+
+        # add account data
+        self.get_success(
+            self.store.add_account_data_for_user(self.other_user, "m.global", {"a": 1})
+        )
+        self.get_success(
+            self.store.add_account_data_to_room(
+                self.other_user, "test_room", "m.per_room", {"b": 2}
+            )
+        )
+
+        channel = self.make_request(
+            "GET",
+            self.url,
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(
+            {"a": 1}, channel.json_body["account_data"]["global"]["m.global"]
+        )
+        self.assertEqual(
+            {"b": 2},
+            channel.json_body["account_data"]["rooms"]["test_room"]["m.per_room"],
+        )

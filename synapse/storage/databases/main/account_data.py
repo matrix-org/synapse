@@ -158,9 +158,9 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
             "get_account_data_for_user", get_account_data_for_user_txn
         )
 
-    @cached(num_args=2, max_entries=5000)
+    @cached(num_args=2, max_entries=5000, tree=True)
     async def get_global_account_data_by_type_for_user(
-        self, data_type: str, user_id: str
+        self, user_id: str, data_type: str
     ) -> Optional[JsonDict]:
         """
         Returns:
@@ -210,7 +210,7 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
             "get_account_data_for_room", get_account_data_for_room_txn
         )
 
-    @cached(num_args=3, max_entries=5000)
+    @cached(num_args=3, max_entries=5000, tree=True)
     async def get_account_data_for_room_and_type(
         self, user_id: str, room_id: str, account_data_type: str
     ) -> Optional[JsonDict]:
@@ -392,7 +392,7 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
             for row in rows:
                 if not row.room_id:
                     self.get_global_account_data_by_type_for_user.invalidate(
-                        (row.data_type, row.user_id)
+                        (row.user_id, row.data_type)
                     )
                 self.get_account_data_for_user.invalidate((row.user_id,))
                 self.get_account_data_for_room.invalidate((row.user_id, row.room_id))
@@ -450,7 +450,7 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
     async def add_account_data_for_user(
         self, user_id: str, account_data_type: str, content: JsonDict
     ) -> int:
-        """Add some account_data to a room for a user.
+        """Add some global account_data for a user.
 
         Args:
             user_id: The user to add a tag for.
@@ -476,7 +476,7 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
             self._account_data_stream_cache.entity_has_changed(user_id, next_id)
             self.get_account_data_for_user.invalidate((user_id,))
             self.get_global_account_data_by_type_for_user.invalidate(
-                (account_data_type, user_id)
+                (user_id, account_data_type)
             )
 
         return self._account_data_id_gen.get_current_token()
@@ -536,9 +536,9 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         self.db_pool.simple_insert_many_txn(
             txn,
             table="ignored_users",
+            keys=("ignorer_user_id", "ignored_user_id"),
             values=[
-                {"ignorer_user_id": user_id, "ignored_user_id": u}
-                for u in currently_ignored_users - previously_ignored_users
+                (user_id, u) for u in currently_ignored_users - previously_ignored_users
             ],
         )
 

@@ -14,9 +14,10 @@
 
 import logging
 import os
-from collections import namedtuple
 from typing import Dict, List, Tuple
 from urllib.request import getproxies_environment  # type: ignore
+
+import attr
 
 from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST, generate_ip_set
 from synapse.python_dependencies import DependencyException, check_requirements
@@ -44,18 +45,20 @@ THUMBNAIL_SIZE_YAML = """\
 HTTP_PROXY_SET_WARNING = """\
 The Synapse config url_preview_ip_range_blacklist will be ignored as an HTTP(s) proxy is configured."""
 
-ThumbnailRequirement = namedtuple(
-    "ThumbnailRequirement", ["width", "height", "method", "media_type"]
-)
 
-MediaStorageProviderConfig = namedtuple(
-    "MediaStorageProviderConfig",
-    (
-        "store_local",  # Whether to store newly uploaded local files
-        "store_remote",  # Whether to store newly downloaded remote files
-        "store_synchronous",  # Whether to wait for successful storage for local uploads
-    ),
-)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class ThumbnailRequirement:
+    width: int
+    height: int
+    method: str
+    media_type: str
+
+
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class MediaStorageProviderConfig:
+    store_local: bool  # Whether to store newly uploaded local files
+    store_remote: bool  # Whether to store newly downloaded remote files
+    store_synchronous: bool  # Whether to wait for successful storage for local uploads
 
 
 def parse_thumbnail_requirements(
@@ -66,11 +69,10 @@ def parse_thumbnail_requirements(
     method, and thumbnail media type to precalculate
 
     Args:
-        thumbnail_sizes(list): List of dicts with "width", "height", and
-            "method" keys
+        thumbnail_sizes: List of dicts with "width", "height", and "method" keys
+
     Returns:
-        Dictionary mapping from media type string to list of
-        ThumbnailRequirement tuples.
+        Dictionary mapping from media type string to list of ThumbnailRequirement.
     """
     requirements: Dict[str, List[ThumbnailRequirement]] = {}
     for size in thumbnail_sizes:

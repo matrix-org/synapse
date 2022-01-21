@@ -314,15 +314,12 @@ class FederationTestCase(unittest.HomeserverTestCase):
             retry_interval,
             last_successful_stream_ordering,
         ) in dest:
-            self.get_success(
-                self.store.set_destination_retry_timings(
-                    destination, failure_ts, retry_last_ts, retry_interval
-                )
-            )
-            self.get_success(
-                self.store.set_destination_last_successful_stream_ordering(
-                    destination, last_successful_stream_ordering
-                )
+            self._create_destination(
+                destination,
+                failure_ts,
+                retry_last_ts,
+                retry_interval,
+                last_successful_stream_ordering,
             )
 
         # order by default (destination)
@@ -413,11 +410,9 @@ class FederationTestCase(unittest.HomeserverTestCase):
         _search_test(None, "foo")
         _search_test(None, "bar")
 
-    def test_get_single_destination(self) -> None:
-        """
-        Get one specific destinations.
-        """
-        self._create_destinations(5)
+    def test_get_single_destination_with_retry_timings(self) -> None:
+        """Get one specific destination which has retry timings."""
+        self._create_destinations(1)
 
         channel = self.make_request(
             "GET",
@@ -432,6 +427,53 @@ class FederationTestCase(unittest.HomeserverTestCase):
         # convert channel.json_body into a List
         self._check_fields([channel.json_body])
 
+    def test_get_single_destination_no_retry_timings(self) -> None:
+        """Get one specific destination which has no retry timings."""
+        self._create_destination("sub0.example.com")
+
+        channel = self.make_request(
+            "GET",
+            self.url + "/sub0.example.com",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual("sub0.example.com", channel.json_body["destination"])
+        self.assertEqual(0, channel.json_body["retry_last_ts"])
+        self.assertEqual(0, channel.json_body["retry_interval"])
+        self.assertIsNone(channel.json_body["failure_ts"])
+        self.assertIsNone(channel.json_body["last_successful_stream_ordering"])
+
+    def _create_destination(
+        self,
+        destination: str,
+        failure_ts: Optional[int] = None,
+        retry_last_ts: int = 0,
+        retry_interval: int = 0,
+        last_successful_stream_ordering: Optional[int] = None,
+    ) -> None:
+        """Create one specific destination
+
+        Args:
+            destination: the destination we have successfully sent to
+            failure_ts: when the server started failing (ms since epoch)
+            retry_last_ts: time of last retry attempt in unix epoch ms
+            retry_interval: how long until next retry in ms
+            last_successful_stream_ordering: the stream_ordering of the most
+                recent successfully-sent PDU
+        """
+        self.get_success(
+            self.store.set_destination_retry_timings(
+                destination, failure_ts, retry_last_ts, retry_interval
+            )
+        )
+        if last_successful_stream_ordering is not None:
+            self.get_success(
+                self.store.set_destination_last_successful_stream_ordering(
+                    destination, last_successful_stream_ordering
+                )
+            )
+
     def _create_destinations(self, number_destinations: int) -> None:
         """Create a number of destinations
 
@@ -440,10 +482,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         """
         for i in range(0, number_destinations):
             dest = f"sub{i}.example.com"
-            self.get_success(self.store.set_destination_retry_timings(dest, 50, 50, 50))
-            self.get_success(
-                self.store.set_destination_last_successful_stream_ordering(dest, 100)
-            )
+            self._create_destination(dest, 50, 50, 50, 100)
 
     def _check_fields(self, content: List[JsonDict]) -> None:
         """Checks that the expected destination attributes are present in content

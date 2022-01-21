@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple, cast
 
 from synapse.logging import issue9533_logger
 from synapse.logging.opentracing import log_kv, set_tag, trace
@@ -432,14 +432,21 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             self.db_pool.simple_insert_many_txn(
                 txn,
                 table="device_federation_outbox",
+                keys=(
+                    "destination",
+                    "stream_id",
+                    "queued_ts",
+                    "messages_json",
+                    "instance_name",
+                ),
                 values=[
-                    {
-                        "destination": destination,
-                        "stream_id": stream_id,
-                        "queued_ts": now_ms,
-                        "messages_json": json_encoder.encode(edu),
-                        "instance_name": self._instance_name,
-                    }
+                    (
+                        destination,
+                        stream_id,
+                        now_ms,
+                        json_encoder.encode(edu),
+                        self._instance_name,
+                    )
                     for destination, edu in remote_messages_by_destination.items()
                 ],
             )
@@ -571,14 +578,9 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         self.db_pool.simple_insert_many_txn(
             txn,
             table="device_inbox",
+            keys=("user_id", "device_id", "stream_id", "message_json", "instance_name"),
             values=[
-                {
-                    "user_id": user_id,
-                    "device_id": device_id,
-                    "stream_id": stream_id,
-                    "message_json": message_json,
-                    "instance_name": self._instance_name,
-                }
+                (user_id, device_id, stream_id, message_json, self._instance_name)
                 for user_id, messages_by_device in local_by_user_then_device.items()
                 for device_id, message_json in messages_by_device.items()
             ],
@@ -673,7 +675,7 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
                 # There's a type mismatch here between how we want to type the row and
                 # what fetchone says it returns, but we silence it because we know that
                 # res can't be None.
-                res: Tuple[Optional[int]] = txn.fetchone()  # type: ignore[assignment]
+                res = cast(Tuple[Optional[int]], txn.fetchone())
                 if res[0] is None:
                     # this can only happen if the `device_inbox` table is empty, in which
                     # case we have no work to do.
