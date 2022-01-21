@@ -26,6 +26,7 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
+from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import (
     AbstractStreamIdGenerator,
@@ -44,7 +45,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class AccountDataWorkerStore(CacheInvalidationWorkerStore):
+class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore):
     def __init__(
         self,
         database: DatabasePool,
@@ -585,6 +586,29 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
             self.db_pool.simple_delete_txn(
                 txn, table="push_rules_stream", keyvalues={"user_id": user_id}
             )
+
+            # Invalidate caches as appropriate
+            self._invalidate_cache_and_stream(
+                txn, self.get_account_data_for_room_and_type, (user_id,)
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_account_data_for_user, (user_id,)
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_global_account_data_by_type_for_user, (user_id,)
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_account_data_for_room, (user_id,)
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_push_rules_for_user, (user_id,)
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_push_rules_enabled_for_user, (user_id,)
+            )
+            # This user might be contained in the ignored_by cache for other users,
+            # so we have to invalidate it all.
+            self._invalidate_all_cache_and_stream(txn, self.ignored_by)
 
         await self.db_pool.runInteraction(
             "purge_account_data_for_user_txn",
