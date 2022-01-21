@@ -56,6 +56,8 @@ Changes in SCHEMA_VERSION = 67:
 
 Changes in SCHEMA_VERSION = 68:
     - event_reference_hashes is no longer read.
+    - `events` has `state_key` and `rejection_reason` columns, which are populated for
+      new events.
 """
 
 
