@@ -1,1 +1,0 @@
-Fix a bug where the only the first 50 rooms from a space were returned from the `/hierarchy` API. This has existed since the introduction of the API in Synapse v1.41.0.
