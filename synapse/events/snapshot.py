@@ -163,7 +163,7 @@ class EventContext:
         return {
             "prev_state_id": prev_state_id,
             "event_type": event.type,
-            "event_state_key": event.state_key if event.is_state() else None,
+            "event_state_key": event.get_state_key(),
             "state_group": self._state_group,
             "state_group_before_event": self.state_group_before_event,
             "rejected": self.rejected,
