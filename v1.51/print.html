@@ -395,7 +395,7 @@ and mounting it to <code>/var/synapse</code> should be taken into consideration.
 <p>System requirements:</p>
 <ul>
 <li>POSIX-compliant system (tested on Linux &amp; OS X)</li>
-<li>Python 3.6 or later, up to Python 3.9.</li>
+<li>Python 3.7 or later, up to Python 3.9.</li>
 <li>At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org</li>
 </ul>
 <p>To install the Synapse homeserver run:</p>
@@ -1638,6 +1638,12 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1510"><a class="header" href="#upgrading-to-v1510">Upgrading to v1.51.0</a></h1>
+<h2 id="deprecation-of-webclient-listeners-and-non-https-web_client_location"><a class="header" href="#deprecation-of-webclient-listeners-and-non-https-web_client_location">Deprecation of <code>webclient</code> listeners and non-HTTP(S) <code>web_client_location</code></a></h2>
+<p>Listeners of type  <code>webclient</code> are deprecated and scheduled to be removed in
+Synapse v1.53.0.</p>
+<p>Similarly, a non-HTTP(S) <code>web_client_location</code> configuration is deprecated and
+will become a configuration error in Synapse v1.53.0.</p>
 <h1 id="upgrading-to-v1500"><a class="header" href="#upgrading-to-v1500">Upgrading to v1.50.0</a></h1>
 <h2 id="dropping-support-for-old-python-and-postgres-versions"><a class="header" href="#dropping-support-for-old-python-and-postgres-versions">Dropping support for old Python and Postgres versions</a></h2>
 <p>In line with our <a href="deprecation_policy.html">deprecation policy</a>,
@@ -3204,13 +3210,7 @@ server_name: &quot;SERVERNAME&quot;
 #
 pid_file: DATADIR/homeserver.pid
 
-# The absolute URL to the web client which /_matrix/client will redirect
-# to if 'webclient' is configured under the 'listeners' configuration.
-#
-# This option can be also set to the filesystem path to the web client
-# which will be served at /_matrix/client/ if 'webclient' is configured
-# under the 'listeners' configuration, however this is a security risk:
-# https://github.com/matrix-org/synapse#security-note
+# The absolute URL to the web client which / will redirect to.
 #
 #web_client_location: https://riot.example.com/
 
@@ -3439,8 +3439,6 @@ presence:
 #
 #   static: static resources under synapse/static (/_matrix/static). (Mostly
 #       useful for 'fallback authentication'.)
-#
-#   webclient: A web client. Requires web_client_location to be set.
 #
 listeners:
   # TLS-enabled listener: for when matrix traffic is sent directly to synapse.
