@@ -123,7 +123,9 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
         # set the connection to autocommit mode.
         pass
 
-    def attempt_to_set_isolation_level(self, conn: Connection, isolation_level: Optional[int]):
+    def attempt_to_set_isolation_level(
+        self, conn: Connection, isolation_level: Optional[int]
+    ):
         # All transactions are SERIALIZABLE by default in sqllite
         pass
 

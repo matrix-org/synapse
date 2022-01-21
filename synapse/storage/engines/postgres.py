@@ -177,7 +177,9 @@ class PostgresEngine(BaseDatabaseEngine):
     def attempt_to_set_autocommit(self, conn: Connection, autocommit: bool):
         return conn.set_session(autocommit=autocommit)  # type: ignore
 
-    def attempt_to_set_isolation_level(self, conn: Connection, isolation_level: Optional[int]):
+    def attempt_to_set_isolation_level(
+        self, conn: Connection, isolation_level: Optional[int]
+    ):
         if isolation_level is None:
             isolation_level = self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
         return conn.set_isolation_level(isolation_level)  # type: ignore

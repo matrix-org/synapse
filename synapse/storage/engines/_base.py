@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import abc
-from typing import Generic, TypeVar, Optional
+from typing import Generic, Optional, TypeVar
 
 from synapse.storage.types import Connection
 
@@ -111,7 +111,9 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
-    def attempt_to_set_isolation_level(self, conn: Connection, isolation_level: Optional[int]):
+    def attempt_to_set_isolation_level(
+        self, conn: Connection, isolation_level: Optional[int]
+    ):
         """Attempt to set the connections isolation level.
 
         Note: This has no effect on SQLite3, as transactions are SERIALIZABLE by default.
