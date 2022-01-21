@@ -72,6 +72,17 @@ IMAGE_CACHE_EXPIRY_MS = 2 * ONE_DAY
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
+class DownloadResult:
+    length: int
+    uri: str
+    response_code: int
+    media_type: str
+    download_name: Optional[str]
+    expires: int
+    etag: Optional[str]
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class MediaInfo:
     """
     Information parsed from downloading media being previewed.
@@ -370,9 +381,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         return jsonog.encode("utf8")
 
-    async def _download_url(
-        self, url: str, output_stream: BinaryIO
-    ) -> Tuple[int, str, int, str, Optional[str], int, Optional[str]]:
+    async def _download_url(self, url: str, output_stream: BinaryIO) -> DownloadResult:
         """
         Fetches a remote URL and parses the headers.
 
@@ -432,11 +441,13 @@ class PreviewUrlResource(DirectServeJsonResource):
         expires = ONE_HOUR
         etag = headers[b"ETag"][0].decode("ascii") if b"ETag" in headers else None
 
-        return length, uri, code, media_type, download_name, expires, etag
+        return DownloadResult(
+            length, uri, code, media_type, download_name, expires, etag
+        )
 
     async def _parse_data_url(
         self, url: str, output_stream: BinaryIO
-    ) -> Tuple[int, str, int, str, Optional[str], int, Optional[str]]:
+    ) -> DownloadResult:
         """
         Parses a data: URL.
 
@@ -466,19 +477,20 @@ class PreviewUrlResource(DirectServeJsonResource):
                 Codes.UNKNOWN,
             )
 
-        # Read back the length that has been written.
-        length = output_stream.tell()
-
-        # urlopen shoves the media-type from the data URL into the content type
-        # header object.
-        media_type = url_info.headers.get_content_type()
-
-        # Some features are not supported by data: URLs.
-        download_name = None
-        expires = ONE_HOUR
-        etag = None
-
-        return length, url, 200, media_type, download_name, expires, etag
+        return DownloadResult(
+            # Read back the length that has been written.
+            length=output_stream.tell(),
+            uri=url,
+            # If it was parsed, consider this a 200 OK.
+            response_code=200,
+            # urlopen shoves the media-type from the data URL into the content type
+            # header object.
+            media_type=url_info.headers.get_content_type(),
+            # Some features are not supported by data: URLs.
+            download_name=None,
+            expires=ONE_HOUR,
+            etag=None,
+        )
 
     async def _handle_url(
         self, url: str, user: UserID, allow_data_urls: bool = False
@@ -513,25 +525,9 @@ class PreviewUrlResource(DirectServeJsonResource):
                         500, "Previewing of data: URLs is forbidden", Codes.UNKNOWN
                     )
 
-                (
-                    length,
-                    uri,
-                    code,
-                    media_type,
-                    download_name,
-                    expires,
-                    etag,
-                ) = await self._parse_data_url(url, f)
+                download_result = await self._parse_data_url(url, f)
             else:
-                (
-                    length,
-                    uri,
-                    code,
-                    media_type,
-                    download_name,
-                    expires,
-                    etag,
-                ) = await self._download_url(url, f)
+                download_result = await self._download_url(url, f)
 
             await finish()
 
@@ -540,10 +536,10 @@ class PreviewUrlResource(DirectServeJsonResource):
 
             await self.store.store_local_media(
                 media_id=file_id,
-                media_type=media_type,
+                media_type=download_result.media_type,
                 time_now_ms=time_now_ms,
-                upload_name=download_name,
-                media_length=length,
+                upload_name=download_result.download_name,
+                media_length=download_result.length,
                 user_id=user,
                 url_cache=url,
             )
@@ -556,16 +552,16 @@ class PreviewUrlResource(DirectServeJsonResource):
             raise
 
         return MediaInfo(
-            media_type=media_type,
-            media_length=length,
-            download_name=download_name,
+            media_type=download_result.media_type,
+            media_length=download_result.length,
+            download_name=download_result.download_name,
             created_ts_ms=time_now_ms,
             filesystem_id=file_id,
             filename=fname,
-            uri=uri,
-            response_code=code,
-            expires=expires,
-            etag=etag,
+            uri=download_result.uri,
+            response_code=download_result.response_code,
+            expires=download_result.expires,
+            etag=download_result.etag,
         )
 
     async def _precache_image_url(
