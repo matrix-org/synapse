@@ -702,6 +702,7 @@ class DatabasePool:
         func: Callable[..., R],
         *args: Any,
         db_autocommit: bool = False,
+        isolation_level: Optional[int] = None,
         **kwargs: Any,
     ) -> R:
         """Starts a transaction on the database and runs a given function
@@ -724,6 +725,7 @@ class DatabasePool:
                 called multiple times if the transaction is retried, so must
                 correctly handle that case.
 
+            isolation_level: Set the server isolation level for this transaction.
             args: positional args to pass to `func`
             kwargs: named args to pass to `func`
 
@@ -763,6 +765,7 @@ class DatabasePool:
         func: Callable[..., R],
         *args: Any,
         db_autocommit: bool = False,
+        isolation_level: Optional[int] = None,
         **kwargs: Any,
     ) -> R:
         """Wraps the .runWithConnection() method on the underlying db_pool.
@@ -775,6 +778,7 @@ class DatabasePool:
             db_autocommit: Whether to run the function in "autocommit" mode,
                 i.e. outside of a transaction. This is useful for transaction
                 that are only a single query. Currently only affects postgres.
+            isolation_level: Set the server isolation level for this transaction.
             kwargs: named args to pass to `func`
 
         Returns:
@@ -834,6 +838,10 @@ class DatabasePool:
                     try:
                         if db_autocommit:
                             self.engine.attempt_to_set_autocommit(conn, True)
+                        if isolation_level:
+                            self.engine.attempt_to_set_isolation_level(
+                                conn, isolation_level
+                            )
 
                         db_conn = LoggingDatabaseConnection(
                             conn, self.engine, "runWithConnection"
@@ -842,6 +850,8 @@ class DatabasePool:
                     finally:
                         if db_autocommit:
                             self.engine.attempt_to_set_autocommit(conn, False)
+                        if isolation_level:
+                            self.engine.attempt_to_set_isolation_level(conn, None)
 
         return await make_deferred_yieldable(
             self._db_pool.runWithConnection(inner_func, *args, **kwargs)
