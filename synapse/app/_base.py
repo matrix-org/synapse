@@ -16,7 +16,6 @@ import atexit
 import gc
 import logging
 import os
-import platform
 import signal
 import socket
 import sys
