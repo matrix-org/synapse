@@ -1,1 +1,0 @@
-Use buildkit's cache feature to speed up docker builds.
