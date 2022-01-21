@@ -52,5 +52,5 @@ __pycache__/
 book/
 
 # complement
-/complement-master
+/complement-*
 /master.tar.gz

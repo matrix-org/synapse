@@ -780,6 +780,7 @@ class RoomSummaryHandler:
         try:
             (
                 room_response,
+                children_state_events,
                 children,
                 inaccessible_children,
             ) = await self._federation_client.get_room_hierarchy(
@@ -804,7 +805,7 @@ class RoomSummaryHandler:
         }
 
         return (
-            _RoomEntry(room_id, room_response, room_response.pop("children_state", ())),
+            _RoomEntry(room_id, room_response, children_state_events),
             children_by_room_id,
             set(inaccessible_children),
         )
