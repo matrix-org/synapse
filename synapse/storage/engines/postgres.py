@@ -44,6 +44,7 @@ class PostgresEngine(BaseDatabaseEngine):
             IsolationLevel.REPEATABLE_READ: self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ,
             IsolationLevel.SERIALIZABLE: self.module.extensions.ISOLATION_LEVEL_SERIALIZABLE,
         }
+        self.default_isolation_level = self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
 
     @property
     def single_threaded(self) -> bool:
@@ -115,9 +116,7 @@ class PostgresEngine(BaseDatabaseEngine):
         return sql.replace("?", "%s")
 
     def on_new_connection(self, db_conn):
-        db_conn.set_isolation_level(
-            self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
-        )
+        db_conn.set_isolation_level(self.default_isolation_level)
 
         # Set the bytea output to escape, vs the default of hex
         cursor = db_conn.cursor()
@@ -191,7 +190,7 @@ class PostgresEngine(BaseDatabaseEngine):
         self, conn: Connection, isolation_level: Optional[int]
     ):
         if isolation_level is None:
-            isolation_level = self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
+            isolation_level = self.default_isolation_level
         else:
             isolation_level = self.isolation_level_map[isolation_level]
         return conn.set_isolation_level(isolation_level)  # type: ignore
