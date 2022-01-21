@@ -16,7 +16,6 @@ import atexit
 import gc
 import logging
 import os
-import platform
 import signal
 import socket
 import sys
@@ -468,16 +467,12 @@ async def start(hs: "HomeServer") -> None:
     # everything currently allocated are things that will be used for the
     # rest of time. Doing so means less work each GC (hopefully).
     #
-    # This only works on Python 3.7
-    if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
-        gc.collect()
-        gc.freeze()
+    gc.collect()
+    gc.freeze()
 
     # Speed up shutdowns by freezing all allocated objects. This moves everything
     # into the permanent generation and excludes them from the final GC.
-    # Unfortunately only works on Python 3.7
-    if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
-        atexit.register(gc.freeze)
+    atexit.register(gc.freeze)
 
 
 def setup_sentry(hs: "HomeServer") -> None:
