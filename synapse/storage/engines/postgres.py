@@ -44,7 +44,9 @@ class PostgresEngine(BaseDatabaseEngine):
             IsolationLevel.REPEATABLE_READ: self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ,
             IsolationLevel.SERIALIZABLE: self.module.extensions.ISOLATION_LEVEL_SERIALIZABLE,
         }
-        self.default_isolation_level = self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
+        self.default_isolation_level = (
+            self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
+        )
 
     @property
     def single_threaded(self) -> bool:
