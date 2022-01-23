@@ -1,1 +1,0 @@
-Run `pyupgrade --py37-plus --keep-percent-format` on Synapse.
