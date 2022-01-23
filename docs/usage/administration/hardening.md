@@ -22,7 +22,7 @@
 - ... (there are tons of other general - non synapse specific) security measures to consider, like AppArmor or SELinux - if you're not working on a VPS - or IDS/IPS like rkhunter, CrowdSec, etc.)
 
 ## Hardening the nginx configuration
-When running synapse on a nginx basis the following measures may be applied to your nginx configuration:
+When using nginx as a reverse proxy, the following measures may be applied to your nginx configuration:
 - Improve SSL security:
 	- Remove support for the old/insecure protocol versions 1.0 and 1.1; activate support for the most recent version 1.3; disable some insecure ciphers
 	When using Let's Encrypt for certificate generation, you have to change these settings not only in the nginx configuration file (`/etc/nginx/nginx.conf` - it contains a SSL section!) but also within the Let's Encrypt config file (`/etc/letsencrypt/options-ssl-nginx.conf`)
