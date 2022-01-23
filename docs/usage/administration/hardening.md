@@ -30,7 +30,7 @@ When using nginx as a reverse proxy, the following measures may be applied to yo
 		ssl_protocols TLSv1.2 TLSv1.3;
 		ssl_ciphers "EECDH+ECDSA+AESGCM EECDH+aRSA+AESGCM EECDH+ECDSA+SHA384 EECDH+ECDSA+SHA256 EECDH+aRSA+SHA384 EECDH+aRSA+SHA256 EECDH+aRSA+RC4 EECDH EDH+aRSA HIGH !RC4 !aNULL !eNULL !LOW !3DES !MD5 !EXP !PSK !SRP !DSS";
 		```
-		Also checked (via `cat /etc/nginx/sites-available/* | grep ssl_protocols`) for any overrides of the protocol version and change them accordingly, if there are any.
+		Also check (via `cat /etc/nginx/sites-available/* | grep ssl_protocols`) for any overrides of the protocol version and change them accordingly, if there are any.
 	- Create your own Diffie-Hellman group for SSL (**This may take several minutes!**)
 	`openssl dhparam -out dhparams.pem 4096`
 	`sudo mkdir -p /opt/cert && sudo cp dhparams.pem /opt/cert/`
