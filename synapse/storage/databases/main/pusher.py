@@ -561,13 +561,9 @@ class PusherStore(PusherWorkerStore):
             self.db_pool.simple_insert_many_txn(
                 txn,
                 table="deleted_pushers",
+                keys=("stream_id", "app_id", "pushkey", "user_id"),
                 values=[
-                    {
-                        "stream_id": stream_id,
-                        "app_id": pusher.app_id,
-                        "pushkey": pusher.pushkey,
-                        "user_id": user_id,
-                    }
+                    (stream_id, pusher.app_id, pusher.pushkey, user_id)
                     for stream_id, pusher in zip(stream_ids, pushers)
                 ],
             )

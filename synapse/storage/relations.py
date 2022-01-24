@@ -23,7 +23,7 @@ from synapse.types import JsonDict
 logger = logging.getLogger(__name__)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class PaginationChunk:
     """Returned by relation pagination APIs.
 
@@ -35,9 +35,9 @@ class PaginationChunk:
             None then there are no previous results.
     """
 
-    chunk = attr.ib(type=List[JsonDict])
-    next_batch = attr.ib(type=Optional[Any], default=None)
-    prev_batch = attr.ib(type=Optional[Any], default=None)
+    chunk: List[JsonDict]
+    next_batch: Optional[Any] = None
+    prev_batch: Optional[Any] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d = {"chunk": self.chunk}
@@ -51,7 +51,7 @@ class PaginationChunk:
         return d
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class RelationPaginationToken:
     """Pagination token for relation pagination API.
 
@@ -64,8 +64,8 @@ class RelationPaginationToken:
         stream: The stream ordering of the boundary event.
     """
 
-    topological = attr.ib(type=int)
-    stream = attr.ib(type=int)
+    topological: int
+    stream: int
 
     @staticmethod
     def from_string(string: str) -> "RelationPaginationToken":
@@ -82,7 +82,7 @@ class RelationPaginationToken:
         return attr.astuple(self)
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class AggregationPaginationToken:
     """Pagination token for relation aggregation pagination API.
 
@@ -94,8 +94,8 @@ class AggregationPaginationToken:
         stream: The MAX stream ordering in the boundary group.
     """
 
-    count = attr.ib(type=int)
-    stream = attr.ib(type=int)
+    count: int
+    stream: int
 
     @staticmethod
     def from_string(string: str) -> "AggregationPaginationToken":

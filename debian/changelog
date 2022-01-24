@@ -1,3 +1,39 @@
+matrix-synapse-py3 (1.51.0~rc2) stable; urgency=medium
+
+  * New synapse release 1.51.0~rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 24 Jan 2022 12:25:00 +0000
+
+matrix-synapse-py3 (1.50.2) stable; urgency=medium
+
+  * New synapse release 1.50.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 24 Jan 2022 13:37:11 +0000
+
+matrix-synapse-py3 (1.50.1) stable; urgency=medium
+
+  * New synapse release 1.50.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 18 Jan 2022 16:06:26 +0000
+
+matrix-synapse-py3 (1.50.0) stable; urgency=medium
+
+  * New synapse release 1.50.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 18 Jan 2022 10:40:38 +0000
+
+matrix-synapse-py3 (1.50.0~rc2) stable; urgency=medium
+
+  * New synapse release 1.50.0~rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 14 Jan 2022 11:18:06 +0000
+
+matrix-synapse-py3 (1.50.0~rc1) stable; urgency=medium
+
+  * New synapse release 1.50.0~rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 05 Jan 2022 12:36:17 +0000
+
 matrix-synapse-py3 (1.49.2) stable; urgency=medium
 
   * New synapse release 1.49.2.

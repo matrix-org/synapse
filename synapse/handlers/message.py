@@ -246,7 +246,7 @@ class MessageHandler:
                 room_state = room_state_events[membership_event_id]
 
         now = self.clock.time_msec()
-        events = await self._event_serializer.serialize_events(room_state.values(), now)
+        events = self._event_serializer.serialize_events(room_state.values(), now)
         return events
 
     async def get_joined_members(self, requester: Requester, room_id: str) -> dict:

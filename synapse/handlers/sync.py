@@ -60,10 +60,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Debug logger for https://github.com/matrix-org/synapse/issues/4422
-issue4422_logger = logging.getLogger("synapse.handler.sync.4422_debug")
-
-
 # Counts the number of times we returned a non-empty sync. `type` is one of
 # "initial_sync", "full_state_sync" or "incremental_sync", `lazy_loaded` is
 # "true" or "false" depending on if the request asked for lazy loaded members or
@@ -102,6 +98,9 @@ class TimelineBatch:
     prev_batch: StreamToken
     events: List[EventBase]
     limited: bool
+    # A mapping of event ID to the bundled aggregations for the above events.
+    # This is only calculated if limited is true.
+    bundled_aggregations: Optional[Dict[str, Dict[str, Any]]] = None
 
     def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
@@ -634,10 +633,19 @@ class SyncHandler:
 
             prev_batch_token = now_token.copy_and_replace("room_key", room_key)
 
+        # Don't bother to bundle aggregations if the timeline is unlimited,
+        # as clients will have all the necessary information.
+        bundled_aggregations = None
+        if limited or newly_joined_room:
+            bundled_aggregations = await self.store.get_bundled_aggregations(
+                recents, sync_config.user.to_string()
+            )
+
         return TimelineBatch(
             events=recents,
             prev_batch=prev_batch_token,
             limited=limited or newly_joined_room,
+            bundled_aggregations=bundled_aggregations,
         )
 
     async def get_state_after_event(
@@ -1161,13 +1169,8 @@ class SyncHandler:
 
         num_events = 0
 
-        # debug for https://github.com/matrix-org/synapse/issues/4422
+        # debug for https://github.com/matrix-org/synapse/issues/9424
         for joined_room in sync_result_builder.joined:
-            room_id = joined_room.room_id
-            if room_id in newly_joined_rooms:
-                issue4422_logger.debug(
-                    "Sync result for newly joined room %s: %r", room_id, joined_room
-                )
             num_events += len(joined_room.timeline.events)
 
         log_kv(
@@ -1616,7 +1619,7 @@ class SyncHandler:
         # TODO: Can we `SELECT ignored_user_id FROM ignored_users WHERE ignorer_user_id=?;` instead?
         ignored_account_data = (
             await self.store.get_global_account_data_by_type_for_user(
-                AccountDataTypes.IGNORED_USER_LIST, user_id=user_id
+                user_id=user_id, data_type=AccountDataTypes.IGNORED_USER_LIST
             )
         )
 
@@ -1738,18 +1741,6 @@ class SyncHandler:
                 if old_mem_ev_id:
                     old_mem_ev = await self.store.get_event(
                         old_mem_ev_id, allow_none=True
-                    )
-
-                # debug for #4422
-                if has_join:
-                    prev_membership = None
-                    if old_mem_ev:
-                        prev_membership = old_mem_ev.membership
-                    issue4422_logger.debug(
-                        "Previous membership for room %s with join: %s (event %s)",
-                        room_id,
-                        prev_membership,
-                        old_mem_ev_id,
                     )
 
                 if not old_mem_ev or old_mem_ev.membership != Membership.JOIN:
@@ -1893,13 +1884,6 @@ class SyncHandler:
                     upto_token=since_token,
                 )
 
-            if newly_joined:
-                # debugging for https://github.com/matrix-org/synapse/issues/4422
-                issue4422_logger.debug(
-                    "RoomSyncResultBuilder events for newly joined room %s: %r",
-                    room_id,
-                    entry.events,
-                )
             room_entries.append(entry)
 
         return _RoomChanges(
@@ -2076,14 +2060,6 @@ class SyncHandler:
             # Note: `batch` can be both empty and limited here in the case where
             # `_load_filtered_recents` can't find any events the user should see
             # (e.g. due to having ignored the sender of the last 50 events).
-
-            if newly_joined:
-                # debug for https://github.com/matrix-org/synapse/issues/4422
-                issue4422_logger.debug(
-                    "Timeline events after filtering in newly-joined room %s: %r",
-                    room_id,
-                    batch,
-                )
 
             # When we join the room (or the client requests full_state), we should
             # send down any existing tags. Usually the user won't have tags in a

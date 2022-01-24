@@ -178,7 +178,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
-            % {"server_name": self.hs.config.server.server_name},
+            % {"server_name": self.hs.config.server.server_name, "app": self.app_name},
             template_vars,
         )
 
@@ -209,7 +209,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
-            % {"server_name": self.hs.config.server.server_name},
+            % {"server_name": self.hs.config.server.server_name, "app": self.app_name},
             template_vars,
         )
 

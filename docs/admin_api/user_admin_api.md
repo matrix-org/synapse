@@ -15,9 +15,10 @@ server admin: [Admin API](../usage/administration/admin_api)
 
 It returns a JSON body like the following:
 
-```json
+```jsonc
 {
-    "displayname": "User",
+    "name": "@user:example.com",
+    "displayname": "User", // can be null if not set
     "threepids": [
         {
             "medium": "email",
@@ -32,11 +33,11 @@ It returns a JSON body like the following:
             "validated_at": 1586458409743
         }
     ],
-    "avatar_url": "<avatar_url>",
+    "avatar_url": "<avatar_url>",  // can be null if not set
+    "is_guest": 0,
     "admin": 0,
     "deactivated": 0,
     "shadow_banned": 0,
-    "password_hash": "$2b$12$p9B4GkqYdRTPGD",
     "creation_ts": 1560432506,
     "appservice_id": null,
     "consent_server_notice_sent": null,
@@ -352,6 +353,11 @@ The following actions are performed when deactivating an user:
 - Remove the user from the user directory
 - Reject all pending invites
 - Remove all account validity information related to the user
+- Remove the arbitrary data store known as *account data*. For example, this includes:
+    - list of ignored users;
+    - push rules;
+    - secret storage keys; and
+    - cross-signing keys.
 
 The following additional actions are performed during deactivation if `erase`
 is set to `true`:
@@ -365,7 +371,6 @@ The following actions are **NOT** performed. The list may be incomplete.
 - Remove mappings of SSO IDs
 - [Delete media uploaded](#delete-media-uploaded-by-a-user) by user (included avatar images)
 - Delete sent and received messages
-- Delete E2E cross-signing keys
 - Remove the user's creation (registration) timestamp
 - [Remove rate limit overrides](#override-ratelimiting-for-users)
 - Remove from monthly active users

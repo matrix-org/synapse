@@ -36,6 +36,7 @@ from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
+issue_8631_logger = logging.getLogger("synapse.8631_debug")
 
 
 class BaseFederationServerServlet(BaseFederationServlet):
@@ -94,6 +95,20 @@ class FederationSendServlet(BaseFederationServerServlet):
                 len(transaction_data.get("pdus", [])),
                 len(transaction_data.get("edus", [])),
             )
+
+            if issue_8631_logger.isEnabledFor(logging.DEBUG):
+                DEVICE_UPDATE_EDUS = {"m.device_list_update", "m.signing_key_update"}
+                device_list_updates = [
+                    edu.content
+                    for edu in transaction_data.get("edus", [])
+                    if edu.edu_type in DEVICE_UPDATE_EDUS
+                ]
+                if device_list_updates:
+                    issue_8631_logger.debug(
+                        "received transaction [%s] including device list updates: %s",
+                        transaction_id,
+                        device_list_updates,
+                    )
 
         except Exception as e:
             logger.exception(e)

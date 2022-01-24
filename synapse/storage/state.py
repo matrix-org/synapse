@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class StateFilter:
     """A filter used when querying for state.
 
@@ -58,8 +58,8 @@ class StateFilter:
             appear in `types`.
     """
 
-    types = attr.ib(type="frozendict[str, Optional[FrozenSet[str]]]")
-    include_others = attr.ib(default=False, type=bool)
+    types: "frozendict[str, Optional[FrozenSet[str]]]"
+    include_others: bool = False
 
     def __attrs_post_init__(self):
         # If `include_others` is set we canonicalise the filter by removing

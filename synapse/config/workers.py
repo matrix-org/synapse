@@ -51,12 +51,12 @@ def _instance_to_list_converter(obj: Union[str, List[str]]) -> List[str]:
     return obj
 
 
-@attr.s
+@attr.s(auto_attribs=True)
 class InstanceLocationConfig:
     """The host and port to talk to an instance via HTTP replication."""
 
-    host = attr.ib(type=str)
-    port = attr.ib(type=int)
+    host: str
+    port: int
 
 
 @attr.s
@@ -77,34 +77,28 @@ class WriterLocations:
             can only be a single instance.
     """
 
-    events = attr.ib(
+    events: List[str] = attr.ib(
         default=["master"],
-        type=List[str],
         converter=_instance_to_list_converter,
     )
-    typing = attr.ib(
+    typing: List[str] = attr.ib(
         default=["master"],
-        type=List[str],
         converter=_instance_to_list_converter,
     )
-    to_device = attr.ib(
+    to_device: List[str] = attr.ib(
         default=["master"],
-        type=List[str],
         converter=_instance_to_list_converter,
     )
-    account_data = attr.ib(
+    account_data: List[str] = attr.ib(
         default=["master"],
-        type=List[str],
         converter=_instance_to_list_converter,
     )
-    receipts = attr.ib(
+    receipts: List[str] = attr.ib(
         default=["master"],
-        type=List[str],
         converter=_instance_to_list_converter,
     )
-    presence = attr.ib(
+    presence: List[str] = attr.ib(
         default=["master"],
-        type=List[str],
         converter=_instance_to_list_converter,
     )
 
