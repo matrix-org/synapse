@@ -15,8 +15,7 @@
 import functools
 import logging
 import re
-import typing
-from typing import Any, Awaitable, Callable, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, Tuple, cast
 
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.urls import FEDERATION_V1_PREFIX

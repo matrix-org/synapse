@@ -12,8 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import logging
-import typing
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 
 from typing_extensions import Literal
 
