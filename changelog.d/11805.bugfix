@@ -1,0 +1,1 @@
+Fix a bug where email notifications were not enabled when the user logged in via an SSO even though in the config `email.notif_for_new_users` and `email.enable_notifs` were set to `true`.
