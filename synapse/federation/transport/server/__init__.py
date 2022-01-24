@@ -39,7 +39,7 @@ from synapse.http.servlet import (
 from synapse.types import JsonDict, ThirdPartyInstanceID
 from synapse.util.ratelimitutils import FederationRateLimiter
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)

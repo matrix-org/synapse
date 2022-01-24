@@ -25,7 +25,7 @@ from synapse.http.servlet import parse_string_from_args
 from synapse.types import JsonDict, get_domain_from_id
 from synapse.util.ratelimitutils import FederationRateLimiter
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
