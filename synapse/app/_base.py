@@ -467,12 +467,14 @@ async def start(hs: "HomeServer") -> None:
     # everything currently allocated are things that will be used for the
     # rest of time. Doing so means less work each GC (hopefully).
     #
-    gc.collect()
-    gc.freeze()
+    # gc.freeze may not be available in all Python implementations, thus we check here
+    if hasattr(gc, 'freeze'):
+        gc.collect()
+        gc.freeze()
 
-    # Speed up shutdowns by freezing all allocated objects. This moves everything
-    # into the permanent generation and excludes them from the final GC.
-    atexit.register(gc.freeze)
+        # Speed up shutdowns by freezing all allocated objects. This moves everything
+        # into the permanent generation and excludes them from the final GC.
+        atexit.register(gc.freeze)
 
 
 def setup_sentry(hs: "HomeServer") -> None:
