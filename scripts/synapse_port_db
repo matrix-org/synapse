@@ -181,10 +181,10 @@ class Store(
     UserDirectoryBackgroundUpdateStore,
     EndToEndKeyBackgroundStore,
     StatsStore,
+    AccountDataWorkerStore,
     PusherWorkerStore,
     PresenceBackgroundUpdateStore,
     GroupServerWorkerStore,
-    AccountDataWorkerStore,
 ):
     def execute(self, f, *args, **kwargs):
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
