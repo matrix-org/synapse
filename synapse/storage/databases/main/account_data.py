@@ -614,9 +614,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
         self._invalidate_cache_and_stream(
             txn, self.get_account_data_for_room, (user_id,)
         )
-        self._invalidate_cache_and_stream(
-            txn, self.get_push_rules_for_user, (user_id,)
-        )
+        self._invalidate_cache_and_stream(txn, self.get_push_rules_for_user, (user_id,))
         self._invalidate_cache_and_stream(
             txn, self.get_push_rules_enabled_for_user, (user_id,)
         )

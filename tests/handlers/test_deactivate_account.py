@@ -218,7 +218,6 @@ class DeactivateAccountTestCase(HomeserverTestCase):
             self.get_success(self._store.ignored_by("@sheltie:test")), set()
         )
 
-
     def _rerun_retroactive_account_data_deletion_job(self) -> None:
         # Reset the 'all done' flag
         self._store.db_pool.updates._all_done = False
@@ -234,7 +233,6 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         )
 
         self.wait_for_background_updates()
-
 
     def test_account_data_deleted_retroactively_by_background_job_if_deactivated(
         self,
@@ -298,7 +296,6 @@ class DeactivateAccountTestCase(HomeserverTestCase):
                 )
             ),
         )
-
 
     def test_account_data_preserved_by_background_job_if_not_deactivated(self) -> None:
         """
