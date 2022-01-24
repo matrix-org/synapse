@@ -468,7 +468,7 @@ async def start(hs: "HomeServer") -> None:
     # rest of time. Doing so means less work each GC (hopefully).
     #
     # gc.freeze may not be available in all Python implementations, thus we check here
-    if hasattr(gc, 'freeze'):
+    if hasattr(gc, "freeze"):
         gc.collect()
         gc.freeze()
 
