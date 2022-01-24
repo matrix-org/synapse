@@ -121,6 +121,14 @@ The response fields are the same like in the `destinations` array in
 
 ## Reset connection timeout
 
+Synapse makes federation requests to other homeservers. If a federation request fails,
+Synapse will marks the destination homeserver as offline, preventing any future requests
+to that server for a "cooldown" period. This period grows over time if the server
+continues to fail its responses
+([exponential backoff](https://en.wikipedia.org/wiki/Exponential_backoff)).
+
+Admins can cancel the cooldown period with this API.
+
 This API resets the retry timing for a specific remote server and tries to connect
 the remote server again. It does not wait for the next `retry_interval`.
 The connection must have previously run into an error and `retry_last_ts`
