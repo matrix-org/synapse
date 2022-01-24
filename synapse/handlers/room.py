@@ -61,6 +61,7 @@ from synapse.events.utils import copy_power_levels_contents
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.handlers.federation import get_domains_from_state
 from synapse.rest.admin._base import assert_user_is_admin
+from synapse.storage.databases.main.relations import BundledAggregations
 from synapse.storage.state import StateFilter
 from synapse.streams import EventSource
 from synapse.types import (
@@ -97,7 +98,7 @@ class EventContext:
     event: EventBase
     events_after: List[EventBase]
     state: List[EventBase]
-    aggregations: Dict[str, JsonDict]
+    aggregations: Dict[str, BundledAggregations]
     start: str
     end: str
 
