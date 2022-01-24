@@ -44,7 +44,6 @@ from synapse.api.urls import (
 from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.units import Transaction
 from synapse.http.matrixfederationclient import ByteParser
-from synapse.logging.utils import log_function
 from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
@@ -62,7 +61,6 @@ class TransportLayerClient:
         self.server_name = hs.hostname
         self.client = hs.get_federation_http_client()
 
-    @log_function
     async def get_room_state_ids(
         self, destination: str, room_id: str, event_id: str
     ) -> JsonDict:
@@ -88,7 +86,6 @@ class TransportLayerClient:
             try_trailing_slash_on_400=True,
         )
 
-    @log_function
     async def get_event(
         self, destination: str, event_id: str, timeout: Optional[int] = None
     ) -> JsonDict:
@@ -111,7 +108,6 @@ class TransportLayerClient:
             destination, path=path, timeout=timeout, try_trailing_slash_on_400=True
         )
 
-    @log_function
     async def backfill(
         self, destination: str, room_id: str, event_tuples: Collection[str], limit: int
     ) -> Optional[JsonDict]:
@@ -149,7 +145,6 @@ class TransportLayerClient:
             destination, path=path, args=args, try_trailing_slash_on_400=True
         )
 
-    @log_function
     async def timestamp_to_event(
         self, destination: str, room_id: str, timestamp: int, direction: str
     ) -> Union[JsonDict, List]:
@@ -185,7 +180,6 @@ class TransportLayerClient:
 
         return remote_response
 
-    @log_function
     async def send_transaction(
         self,
         transaction: Transaction,
@@ -234,7 +228,6 @@ class TransportLayerClient:
             try_trailing_slash_on_400=True,
         )
 
-    @log_function
     async def make_query(
         self,
         destination: str,
@@ -254,7 +247,6 @@ class TransportLayerClient:
             ignore_backoff=ignore_backoff,
         )
 
-    @log_function
     async def make_membership_event(
         self,
         destination: str,
@@ -317,7 +309,6 @@ class TransportLayerClient:
             ignore_backoff=ignore_backoff,
         )
 
-    @log_function
     async def send_join_v1(
         self,
         room_version: RoomVersion,
@@ -336,7 +327,6 @@ class TransportLayerClient:
             max_response_size=MAX_RESPONSE_SIZE_SEND_JOIN,
         )
 
-    @log_function
     async def send_join_v2(
         self,
         room_version: RoomVersion,
@@ -355,7 +345,6 @@ class TransportLayerClient:
             max_response_size=MAX_RESPONSE_SIZE_SEND_JOIN,
         )
 
-    @log_function
     async def send_leave_v1(
         self, destination: str, room_id: str, event_id: str, content: JsonDict
     ) -> Tuple[int, JsonDict]:
@@ -372,7 +361,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def send_leave_v2(
         self, destination: str, room_id: str, event_id: str, content: JsonDict
     ) -> JsonDict:
@@ -389,7 +377,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def send_knock_v1(
         self,
         destination: str,
@@ -423,7 +410,6 @@ class TransportLayerClient:
             destination=destination, path=path, data=content
         )
 
-    @log_function
     async def send_invite_v1(
         self, destination: str, room_id: str, event_id: str, content: JsonDict
     ) -> Tuple[int, JsonDict]:
@@ -433,7 +419,6 @@ class TransportLayerClient:
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
-    @log_function
     async def send_invite_v2(
         self, destination: str, room_id: str, event_id: str, content: JsonDict
     ) -> JsonDict:
@@ -443,7 +428,6 @@ class TransportLayerClient:
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
-    @log_function
     async def get_public_rooms(
         self,
         remote_server: str,
@@ -516,7 +500,6 @@ class TransportLayerClient:
 
         return response
 
-    @log_function
     async def exchange_third_party_invite(
         self, destination: str, room_id: str, event_dict: JsonDict
     ) -> JsonDict:
@@ -526,7 +509,6 @@ class TransportLayerClient:
             destination=destination, path=path, data=event_dict
         )
 
-    @log_function
     async def get_event_auth(
         self, destination: str, room_id: str, event_id: str
     ) -> JsonDict:
@@ -534,7 +516,6 @@ class TransportLayerClient:
 
         return await self.client.get_json(destination=destination, path=path)
 
-    @log_function
     async def query_client_keys(
         self, destination: str, query_content: JsonDict, timeout: int
     ) -> JsonDict:
@@ -576,7 +557,6 @@ class TransportLayerClient:
             destination=destination, path=path, data=query_content, timeout=timeout
         )
 
-    @log_function
     async def query_user_devices(
         self, destination: str, user_id: str, timeout: int
     ) -> JsonDict:
@@ -616,7 +596,6 @@ class TransportLayerClient:
             destination=destination, path=path, timeout=timeout
         )
 
-    @log_function
     async def claim_client_keys(
         self, destination: str, query_content: JsonDict, timeout: int
     ) -> JsonDict:
@@ -655,7 +634,6 @@ class TransportLayerClient:
             destination=destination, path=path, data=query_content, timeout=timeout
         )
 
-    @log_function
     async def get_missing_events(
         self,
         destination: str,
@@ -680,7 +658,6 @@ class TransportLayerClient:
             timeout=timeout,
         )
 
-    @log_function
     async def get_group_profile(
         self, destination: str, group_id: str, requester_user_id: str
     ) -> JsonDict:
@@ -694,7 +671,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def update_group_profile(
         self, destination: str, group_id: str, requester_user_id: str, content: JsonDict
     ) -> JsonDict:
@@ -716,7 +692,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def get_group_summary(
         self, destination: str, group_id: str, requester_user_id: str
     ) -> JsonDict:
@@ -730,7 +705,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def get_rooms_in_group(
         self, destination: str, group_id: str, requester_user_id: str
     ) -> JsonDict:
@@ -798,7 +772,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def get_users_in_group(
         self, destination: str, group_id: str, requester_user_id: str
     ) -> JsonDict:
@@ -812,7 +785,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def get_invited_users_in_group(
         self, destination: str, group_id: str, requester_user_id: str
     ) -> JsonDict:
@@ -826,7 +798,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def accept_group_invite(
         self, destination: str, group_id: str, user_id: str, content: JsonDict
     ) -> JsonDict:
@@ -837,7 +808,6 @@ class TransportLayerClient:
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
-    @log_function
     def join_group(
         self, destination: str, group_id: str, user_id: str, content: JsonDict
     ) -> Awaitable[JsonDict]:
@@ -848,7 +818,6 @@ class TransportLayerClient:
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
-    @log_function
     async def invite_to_group(
         self,
         destination: str,
@@ -868,7 +837,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def invite_to_group_notification(
         self, destination: str, group_id: str, user_id: str, content: JsonDict
     ) -> JsonDict:
@@ -882,7 +850,6 @@ class TransportLayerClient:
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
-    @log_function
     async def remove_user_from_group(
         self,
         destination: str,
@@ -902,7 +869,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def remove_user_from_group_notification(
         self, destination: str, group_id: str, user_id: str, content: JsonDict
     ) -> JsonDict:
@@ -916,7 +882,6 @@ class TransportLayerClient:
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
-    @log_function
     async def renew_group_attestation(
         self, destination: str, group_id: str, user_id: str, content: JsonDict
     ) -> JsonDict:
@@ -930,7 +895,6 @@ class TransportLayerClient:
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
-    @log_function
     async def update_group_summary_room(
         self,
         destination: str,
@@ -959,7 +923,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def delete_group_summary_room(
         self,
         destination: str,
@@ -986,7 +949,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def get_group_categories(
         self, destination: str, group_id: str, requester_user_id: str
     ) -> JsonDict:
@@ -1000,7 +962,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def get_group_category(
         self, destination: str, group_id: str, requester_user_id: str, category_id: str
     ) -> JsonDict:
@@ -1014,7 +975,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def update_group_category(
         self,
         destination: str,
@@ -1034,7 +994,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def delete_group_category(
         self, destination: str, group_id: str, requester_user_id: str, category_id: str
     ) -> JsonDict:
@@ -1048,7 +1007,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def get_group_roles(
         self, destination: str, group_id: str, requester_user_id: str
     ) -> JsonDict:
@@ -1062,7 +1020,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def get_group_role(
         self, destination: str, group_id: str, requester_user_id: str, role_id: str
     ) -> JsonDict:
@@ -1076,7 +1033,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def update_group_role(
         self,
         destination: str,
@@ -1096,7 +1052,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def delete_group_role(
         self, destination: str, group_id: str, requester_user_id: str, role_id: str
     ) -> JsonDict:
@@ -1110,7 +1065,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def update_group_summary_user(
         self,
         destination: str,
@@ -1136,7 +1090,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def set_group_join_policy(
         self, destination: str, group_id: str, requester_user_id: str, content: JsonDict
     ) -> JsonDict:
@@ -1151,7 +1104,6 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    @log_function
     async def delete_group_summary_user(
         self,
         destination: str,

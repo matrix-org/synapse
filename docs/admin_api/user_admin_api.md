@@ -15,9 +15,10 @@ server admin: [Admin API](../usage/administration/admin_api)
 
 It returns a JSON body like the following:
 
-```json
+```jsonc
 {
-    "displayname": "User",
+    "name": "@user:example.com",
+    "displayname": "User", // can be null if not set
     "threepids": [
         {
             "medium": "email",
@@ -32,11 +33,11 @@ It returns a JSON body like the following:
             "validated_at": 1586458409743
         }
     ],
-    "avatar_url": "<avatar_url>",
+    "avatar_url": "<avatar_url>",  // can be null if not set
+    "is_guest": 0,
     "admin": 0,
     "deactivated": 0,
     "shadow_banned": 0,
-    "password_hash": "$2b$12$p9B4GkqYdRTPGD",
     "creation_ts": 1560432506,
     "appservice_id": null,
     "consent_server_notice_sent": null,
@@ -352,7 +353,11 @@ The following actions are performed when deactivating an user:
 - Remove the user from the user directory
 - Reject all pending invites
 - Remove all account validity information related to the user
-- Remove the arbitrary data store known as *account data* (list of ignored users, push rules, etc.)
+- Remove the arbitrary data store known as *account data*. For example, this includes:
+    - list of ignored users;
+    - push rules;
+    - secret storage keys; and
+    - cross-signing keys.
 
 The following additional actions are performed during deactivation if `erase`
 is set to `true`:
@@ -366,7 +371,6 @@ The following actions are **NOT** performed. The list may be incomplete.
 - Remove mappings of SSO IDs
 - [Delete media uploaded](#delete-media-uploaded-by-a-user) by user (included avatar images)
 - Delete sent and received messages
-- Delete E2E cross-signing keys
 - Remove the user's creation (registration) timestamp
 - [Remove rate limit overrides](#override-ratelimiting-for-users)
 - Remove from monthly active users
@@ -480,6 +484,81 @@ The following fields are returned in the JSON response body:
 
 - `joined_rooms` - An array of `room_id`.
 - `total` - Number of rooms.
+
+## Account Data
+Gets information about account data for a specific `user_id`.
+
+The API is:
+
+```
+GET /_synapse/admin/v1/users/<user_id>/accountdata
+```
+
+A response body like the following is returned:
+
+```json
+{
+    "account_data": {
+        "global": {
+            "m.secret_storage.key.LmIGHTg5W": {
+                "algorithm": "m.secret_storage.v1.aes-hmac-sha2",
+                "iv": "fwjNZatxg==",
+                "mac": "eWh9kNnLWZUNOgnc="
+            },
+            "im.vector.hide_profile": {
+                "hide_profile": true
+            },
+            "org.matrix.preview_urls": {
+                "disable": false
+            },
+            "im.vector.riot.breadcrumb_rooms": {
+                "rooms": [
+                    "!LxcBDAsDUVAfJDEo:matrix.org",
+                    "!MAhRxqasbItjOqxu:matrix.org"
+                ]
+            },
+            "m.accepted_terms": {
+                "accepted": [
+                    "https://example.org/somewhere/privacy-1.2-en.html",
+                    "https://example.org/somewhere/terms-2.0-en.html"
+                ]
+            },
+            "im.vector.setting.breadcrumbs": {
+                "recent_rooms": [
+                    "!MAhRxqasbItqxuEt:matrix.org",
+                    "!ZtSaPCawyWtxiImy:matrix.org"
+                ]
+            }
+        },
+        "rooms": {
+            "!GUdfZSHUJibpiVqHYd:matrix.org": {
+                "m.fully_read": {
+                    "event_id": "$156334540fYIhZ:matrix.org"
+                }
+            },
+            "!tOZwOOiqwCYQkLhV:matrix.org": {
+                "m.fully_read": {
+                    "event_id": "$xjsIyp4_NaVl2yPvIZs_k1Jl8tsC_Sp23wjqXPno"
+                }
+            }
+        }
+    }
+}
+```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `user_id` - fully qualified: for example, `@user:server.com`.
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+- `account_data` - A map containing the account data for the user
+  - `global` - A map containing the global account data for the user
+  - `rooms` - A map containing the account data per room for the user
 
 ## User media
 

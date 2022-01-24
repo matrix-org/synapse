@@ -11,15 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from typing import Optional
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock, patch
 
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.errors import Codes, ResourceLimitError
 from synapse.api.filtering import Filtering
 from synapse.api.room_versions import RoomVersions
-from synapse.handlers.sync import SyncConfig
+from synapse.handlers.sync import SyncConfig, SyncResult
 from synapse.rest import admin
 from synapse.rest.client import knock, login, room
 from synapse.server import HomeServer
@@ -27,6 +26,7 @@ from synapse.types import UserID, create_requester
 
 import tests.unittest
 import tests.utils
+from tests.test_utils import make_awaitable
 
 
 class SyncTestCase(tests.unittest.HomeserverTestCase):
@@ -185,6 +185,97 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         self.assertNotIn(joined_room, [r.room_id for r in result.joined])
         self.assertNotIn(invite_room, [r.room_id for r in result.invited])
         self.assertNotIn(knock_room, [r.room_id for r in result.knocked])
+
+    def test_ban_wins_race_with_join(self):
+        """Rooms shouldn't appear under "joined" if a join loses a race to a ban.
+
+        A complicated edge case. Imagine the following scenario:
+
+        * you attempt to join a room
+        * racing with that is a ban which comes in over federation, which ends up with
+          an earlier stream_ordering than the join.
+        * you get a sync response with a sync token which is _after_ the ban, but before
+          the join
+        * now your join lands; it is a valid event because its `prev_event`s predate the
+          ban, but will not make it into current_state_events (because bans win over
+          joins in state res, essentially).
+        * When we do a sync from the incremental sync, the only event in the timeline
+          is your join ... and yet you aren't joined.
+
+        The ban coming in over federation isn't crucial for this behaviour; the key
+        requirements are:
+        1. the homeserver generates a join event with prev_events that precede the ban
+           (so that it passes the "are you banned" test)
+        2. the join event has a stream_ordering after that of the ban.
+
+        We use monkeypatching to artificially trigger condition (1).
+        """
+        # A local user Alice creates a room.
+        owner = self.register_user("alice", "password")
+        owner_tok = self.login(owner, "password")
+        room_id = self.helper.create_room_as(owner, is_public=True, tok=owner_tok)
+
+        # Do a sync as Alice to get the latest event in the room.
+        alice_sync_result: SyncResult = self.get_success(
+            self.sync_handler.wait_for_sync_for_user(
+                create_requester(owner), generate_sync_config(owner)
+            )
+        )
+        self.assertEqual(len(alice_sync_result.joined), 1)
+        self.assertEqual(alice_sync_result.joined[0].room_id, room_id)
+        last_room_creation_event_id = (
+            alice_sync_result.joined[0].timeline.events[-1].event_id
+        )
+
+        # Eve, a ne'er-do-well, registers.
+        eve = self.register_user("eve", "password")
+        eve_token = self.login(eve, "password")
+
+        # Alice preemptively bans Eve.
+        self.helper.ban(room_id, owner, eve, tok=owner_tok)
+
+        # Eve syncs.
+        eve_requester = create_requester(eve)
+        eve_sync_config = generate_sync_config(eve)
+        eve_sync_after_ban: SyncResult = self.get_success(
+            self.sync_handler.wait_for_sync_for_user(eve_requester, eve_sync_config)
+        )
+
+        # Sanity check this sync result. We shouldn't be joined to the room.
+        self.assertEqual(eve_sync_after_ban.joined, [])
+
+        # Eve tries to join the room. We monkey patch the internal logic which selects
+        # the prev_events used when creating the join event, such that the ban does not
+        # precede the join.
+        mocked_get_prev_events = patch.object(
+            self.hs.get_datastore(),
+            "get_prev_events_for_room",
+            new_callable=MagicMock,
+            return_value=make_awaitable([last_room_creation_event_id]),
+        )
+        with mocked_get_prev_events:
+            self.helper.join(room_id, eve, tok=eve_token)
+
+        # Eve makes a second, incremental sync.
+        eve_incremental_sync_after_join: SyncResult = self.get_success(
+            self.sync_handler.wait_for_sync_for_user(
+                eve_requester,
+                eve_sync_config,
+                since_token=eve_sync_after_ban.next_batch,
+            )
+        )
+        # Eve should not see herself as joined to the room.
+        self.assertEqual(eve_incremental_sync_after_join.joined, [])
+
+        # If we did a third initial sync, we should _still_ see eve is not joined to the room.
+        eve_initial_sync_after_join: SyncResult = self.get_success(
+            self.sync_handler.wait_for_sync_for_user(
+                eve_requester,
+                eve_sync_config,
+                since_token=None,
+            )
+        )
+        self.assertEqual(eve_initial_sync_after_join.joined, [])
 
 
 _request_key = 0

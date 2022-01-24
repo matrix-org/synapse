@@ -63,7 +63,7 @@ server {
 
     server_name matrix.example.com;
 
-    location ~* ^(\/_matrix|\/_synapse\/client) {
+    location ~ ^(/_matrix|/_synapse/client) {
         # note: do not add a path (even a single /) after the port in `proxy_pass`,
         # otherwise nginx will canonicalise the URI and cause signature verification
         # errors.

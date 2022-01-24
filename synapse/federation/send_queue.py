@@ -30,7 +30,6 @@ Events are replicated via a separate events stream.
 """
 
 import logging
-from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
     Dict,
@@ -43,6 +42,7 @@ from typing import (
     Type,
 )
 
+import attr
 from sortedcontainers import SortedDict
 
 from synapse.api.presence import UserPresenceState
@@ -382,13 +382,11 @@ class BaseFederationRow:
         raise NotImplementedError()
 
 
-class PresenceDestinationsRow(
-    BaseFederationRow,
-    namedtuple(
-        "PresenceDestinationsRow",
-        ("state", "destinations"),  # UserPresenceState  # list[str]
-    ),
-):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class PresenceDestinationsRow(BaseFederationRow):
+    state: UserPresenceState
+    destinations: List[str]
+
     TypeId = "pd"
 
     @staticmethod
@@ -404,16 +402,14 @@ class PresenceDestinationsRow(
         buff.presence_destinations.append((self.state, self.destinations))
 
 
-class KeyedEduRow(
-    BaseFederationRow,
-    namedtuple(
-        "KeyedEduRow",
-        ("key", "edu"),  # tuple(str) - the edu key passed to send_edu  # Edu
-    ),
-):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class KeyedEduRow(BaseFederationRow):
     """Streams EDUs that have an associated key that is ued to clobber. For example,
     typing EDUs clobber based on room_id.
     """
+
+    key: Tuple[str, ...]  # the edu key passed to send_edu
+    edu: Edu
 
     TypeId = "k"
 
@@ -428,8 +424,11 @@ class KeyedEduRow(
         buff.keyed_edus.setdefault(self.edu.destination, {})[self.key] = self.edu
 
 
-class EduRow(BaseFederationRow, namedtuple("EduRow", ("edu",))):  # Edu
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class EduRow(BaseFederationRow):
     """Streams EDUs that don't have keys. See KeyedEduRow"""
+
+    edu: Edu
 
     TypeId = "e"
 
@@ -453,14 +452,14 @@ _rowtypes: Tuple[Type[BaseFederationRow], ...] = (
 TypeToRow = {Row.TypeId: Row for Row in _rowtypes}
 
 
-ParsedFederationStreamData = namedtuple(
-    "ParsedFederationStreamData",
-    (
-        "presence_destinations",  # list of tuples of UserPresenceState and destinations
-        "keyed_edus",  # dict of destination -> { key -> Edu }
-        "edus",  # dict of destination -> [Edu]
-    ),
-)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class ParsedFederationStreamData:
+    # list of tuples of UserPresenceState and destinations
+    presence_destinations: List[Tuple[UserPresenceState, List[str]]]
+    # dict of destination -> { key -> Edu }
+    keyed_edus: Dict[str, Dict[Tuple[str, ...], Edu]]
+    # dict of destination -> [Edu]
+    edus: Dict[str, List[Edu]]
 
 
 def process_rows_for_federation(

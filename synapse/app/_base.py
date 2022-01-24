@@ -16,7 +16,6 @@ import atexit
 import gc
 import logging
 import os
-import platform
 import signal
 import socket
 import sys
@@ -60,7 +59,7 @@ from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.logging.context import PreserveLoggingContext
-from synapse.metrics import register_threadpool
+from synapse.metrics import install_gc_manager, register_threadpool
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
 from synapse.types import ISynapseReactor
@@ -159,6 +158,7 @@ def start_reactor(
         change_resource_limit(soft_file_limit)
         if gc_thresholds:
             gc.set_threshold(*gc_thresholds)
+        install_gc_manager()
         run_command()
 
     # make sure that we run the reactor with the sentinel log context,
@@ -467,16 +467,12 @@ async def start(hs: "HomeServer") -> None:
     # everything currently allocated are things that will be used for the
     # rest of time. Doing so means less work each GC (hopefully).
     #
-    # This only works on Python 3.7
-    if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
-        gc.collect()
-        gc.freeze()
+    gc.collect()
+    gc.freeze()
 
     # Speed up shutdowns by freezing all allocated objects. This moves everything
     # into the permanent generation and excludes them from the final GC.
-    # Unfortunately only works on Python 3.7
-    if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
-        atexit.register(gc.freeze)
+    atexit.register(gc.freeze)
 
 
 def setup_sentry(hs: "HomeServer") -> None:

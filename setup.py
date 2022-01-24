@@ -96,7 +96,7 @@ CONDITIONAL_REQUIREMENTS["all"] = list(ALL_OPTIONAL_REQUIREMENTS)
 # We pin black so that our tests don't start failing on new releases.
 CONDITIONAL_REQUIREMENTS["lint"] = [
     "isort==5.7.0",
-    "black==21.6b0",
+    "black==21.12b0",
     "flake8-comprehensions",
     "flake8-bugbear==21.3.2",
     "flake8",
@@ -150,7 +150,7 @@ setup(
     zip_safe=False,
     long_description=long_description,
     long_description_content_type="text/x-rst",
-    python_requires="~=3.6",
+    python_requires="~=3.7",
     entry_points={
         "console_scripts": [
             "synapse_homeserver = synapse.app.homeserver:main",
@@ -162,7 +162,6 @@ setup(
         "Topic :: Communications :: Chat",
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3 :: Only",
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",

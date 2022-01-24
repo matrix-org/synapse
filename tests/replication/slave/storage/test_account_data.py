@@ -30,7 +30,7 @@ class SlavedAccountDataStoreTestCase(BaseSlavedStoreTestCase):
         )
         self.replicate()
         self.check(
-            "get_global_account_data_by_type_for_user", [TYPE, USER_ID], {"a": 1}
+            "get_global_account_data_by_type_for_user", [USER_ID, TYPE], {"a": 1}
         )
 
         self.get_success(
@@ -38,5 +38,5 @@ class SlavedAccountDataStoreTestCase(BaseSlavedStoreTestCase):
         )
         self.replicate()
         self.check(
-            "get_global_account_data_by_type_for_user", [TYPE, USER_ID], {"a": 2}
+            "get_global_account_data_by_type_for_user", [USER_ID, TYPE], {"a": 2}
         )

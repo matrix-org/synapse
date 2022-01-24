@@ -327,14 +327,15 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                         self.db_pool.simple_insert_many_txn(
                             txn,
                             table="state_groups_state",
+                            keys=(
+                                "state_group",
+                                "room_id",
+                                "type",
+                                "state_key",
+                                "event_id",
+                            ),
                             values=[
-                                {
-                                    "state_group": state_group,
-                                    "room_id": room_id,
-                                    "type": key[0],
-                                    "state_key": key[1],
-                                    "event_id": state_id,
-                                }
+                                (state_group, room_id, key[0], key[1], state_id)
                                 for key, state_id in delta_state.items()
                             ],
                         )

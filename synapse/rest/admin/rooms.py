@@ -424,7 +424,7 @@ class RoomStateRestServlet(RestServlet):
         event_ids = await self.store.get_current_state_ids(room_id)
         events = await self.store.get_events(event_ids.values())
         now = self.clock.time_msec()
-        room_state = await self._event_serializer.serialize_events(events.values(), now)
+        room_state = self._event_serializer.serialize_events(events.values(), now)
         ret = {"state": room_state}
 
         return HTTPStatus.OK, ret
@@ -744,22 +744,17 @@ class RoomEventContextServlet(RestServlet):
             )
 
         time_now = self.clock.time_msec()
-        results["events_before"] = await self._event_serializer.serialize_events(
-            results["events_before"],
-            time_now,
-            bundle_aggregations=True,
+        aggregations = results.pop("aggregations", None)
+        results["events_before"] = self._event_serializer.serialize_events(
+            results["events_before"], time_now, bundle_aggregations=aggregations
         )
-        results["event"] = await self._event_serializer.serialize_event(
-            results["event"],
-            time_now,
-            bundle_aggregations=True,
+        results["event"] = self._event_serializer.serialize_event(
+            results["event"], time_now, bundle_aggregations=aggregations
         )
-        results["events_after"] = await self._event_serializer.serialize_events(
-            results["events_after"],
-            time_now,
-            bundle_aggregations=True,
+        results["events_after"] = self._event_serializer.serialize_events(
+            results["events_after"], time_now, bundle_aggregations=aggregations
         )
-        results["state"] = await self._event_serializer.serialize_events(
+        results["state"] = self._event_serializer.serialize_events(
             results["state"], time_now
         )
 

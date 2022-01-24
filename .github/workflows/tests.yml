@@ -76,7 +76,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
         database: ["sqlite"]
         toxenv: ["py"]
         include:
@@ -85,9 +85,9 @@ jobs:
             toxenv: "py-noextras"
 
           # Oldest Python with PostgreSQL
-          - python-version: "3.6"
+          - python-version: "3.7"
             database: "postgres"
-            postgres-version: "9.6"
+            postgres-version: "10"
             toxenv: "py"
 
           # Newest Python with newest PostgreSQL
@@ -141,7 +141,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Test with old deps
-        uses: docker://ubuntu:bionic # For old python and sqlite
+        uses: docker://ubuntu:focal # For old python and sqlite
         with:
           workdir: /github/workspace
           entrypoint: .ci/scripts/test_old_deps.sh
@@ -167,7 +167,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["pypy-3.6"]
+        python-version: ["pypy-3.7"]
 
     steps:
       - uses: actions/checkout@v2
@@ -213,15 +213,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - sytest-tag: bionic
+          - sytest-tag: focal
 
-          - sytest-tag: bionic
+          - sytest-tag: focal
             postgres: postgres
 
           - sytest-tag: testing
             postgres: postgres
 
-          - sytest-tag: bionic
+          - sytest-tag: focal
             postgres: multi-postgres
             workers: workers
 
@@ -291,8 +291,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - python-version: "3.6"
-            postgres-version: "9.6"
+          - python-version: "3.7"
+            postgres-version: "10"
 
           - python-version: "3.10"
             postgres-version: "14"
@@ -366,6 +366,8 @@ jobs:
       # Build initial Synapse image
       - run: docker build -t matrixdotorg/synapse:latest -f docker/Dockerfile .
         working-directory: synapse
+        env:
+          DOCKER_BUILDKIT: 1
 
       # Build a ready-to-run Synapse image based on the initial image above.
       # This new image includes a config file, keys for signing and TLS, and
@@ -374,7 +376,8 @@ jobs:
         working-directory: complement/dockerfiles
 
       # Run Complement
-      - run: go test -v -tags synapse_blacklist,msc2403 ./tests/...
+      - run: set -o pipefail && go test -v -json -tags synapse_blacklist,msc2403 ./tests/... 2>&1 | gotestfmt
+        shell: bash
         env:
           COMPLEMENT_BASE_IMAGE: complement-synapse:latest
         working-directory: complement

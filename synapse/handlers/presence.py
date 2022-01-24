@@ -55,7 +55,6 @@ from synapse.api.presence import UserPresenceState
 from synapse.appservice import ApplicationService
 from synapse.events.presence_router import PresenceRouter
 from synapse.logging.context import run_in_background
-from synapse.logging.utils import log_function
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.presence import (
@@ -729,7 +728,7 @@ class PresenceHandler(BasePresenceHandler):
 
         # Presence is best effort and quickly heals itself, so lets just always
         # stream from the current state when we restart.
-        self._event_pos = self.store.get_current_events_token()
+        self._event_pos = self.store.get_room_max_stream_ordering()
         self._event_processing = False
 
     async def _on_shutdown(self) -> None:
@@ -1542,7 +1541,6 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
 
-    @log_function
     async def get_new_events(
         self,
         user: UserID,

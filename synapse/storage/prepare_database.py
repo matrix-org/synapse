@@ -696,7 +696,7 @@ def _get_or_create_schema_state(
     )
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class _DirectoryListing:
     """Helper class to store schema file name and the
     absolute path to it.
@@ -705,5 +705,5 @@ class _DirectoryListing:
     `file_name` attr is kept first.
     """
 
-    file_name = attr.ib(type=str)
-    absolute_path = attr.ib(type=str)
+    file_name: str
+    absolute_path: str
