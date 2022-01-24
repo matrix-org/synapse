@@ -244,22 +244,7 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         """
 
         # Request the deactivation of our account
-        req = self.get_success(
-            self.make_request(
-                "POST",
-                "account/deactivate",
-                {
-                    "auth": {
-                        "type": "m.login.password",
-                        "user": self.user,
-                        "password": "pass",
-                    },
-                    "erase": True,
-                },
-                access_token=self.token,
-            )
-        )
-        self.assertEqual(req.code, 200, req)
+        self._deactivate_my_account()
 
         # Add some account data
         # (we do this after the deactivation so that the act of deactivating doesn't
