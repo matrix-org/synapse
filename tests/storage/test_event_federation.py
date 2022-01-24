@@ -17,7 +17,7 @@ from typing import Tuple, Union
 import attr
 from parameterized import parameterized
 
-from synapse.api.room_versions import RoomVersion, RoomVersions
+from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
 from synapse.events import _EventInternalMetadata
 from synapse.util import json_encoder
 
@@ -521,7 +521,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         def prev_event_format(prev_event_id: str) -> Union[Tuple[str, dict], str]:
             """Account for differences in prev_events format across room versions"""
-            if room_version == RoomVersions.V1:
+            if room_version.event_format == EventFormatVersions.V1:
                 return prev_event_id, {}
 
             return prev_event_id
