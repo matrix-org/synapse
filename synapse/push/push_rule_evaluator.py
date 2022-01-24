@@ -120,7 +120,7 @@ class PushRuleEvaluatorForEvent:
         room_member_count: int,
         sender_power_level: int,
         power_levels: Dict[str, Union[int, Dict[str, int]]],
-        related_event: Optional[EventBase],
+        related_events: Dict[str, EventBase],
     ):
         self._event = event
         self._room_member_count = room_member_count
@@ -130,21 +130,34 @@ class PushRuleEvaluatorForEvent:
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
 
-        self._related_event = related_event
-        self._related_event_value_cache = (
-            _flatten_dict(related_event) if related_event else None
-        )
+        self._related_events = related_events
+        self._related_events_value_cache = {
+            k: _flatten_dict(v) for k, v in related_events.items()
+        }
 
     def matches(
         self, condition: Dict[str, Any], user_id: str, display_name: Optional[str]
     ) -> bool:
         if condition["kind"] == "event_match":
             return self._event_match(condition, user_id, self._event, self._value_cache)
-        elif condition["kind"] == "related_event_match":
-            if not self._related_event:
+        elif condition["kind"] == "im.nheko.msc3664.related_event_match":
+            # If we have no related event, the pattern will never match
+            if not self._related_events:
                 return False
+
+            related_event = self._related_events.get(condition["rel_type"])
+            related_event_value_cache = self._related_events_value_cache.get(
+                condition["rel_type"]
+            )
+            if not related_event or not related_event_value_cache:
+                return False
+
+            # we have a related event, but we only want to match for existence
+            if not condition.get("key"):
+                return True
+
             return self._event_match(
-                condition, user_id, self._related_event, self._related_event_value_cache
+                condition, user_id, related_event, related_event_value_cache
             )
         elif condition["kind"] == "contains_display_name":
             return self._contains_display_name(display_name)
@@ -174,8 +187,12 @@ class PushRuleEvaluatorForEvent:
                 pattern = UserID.from_string(user_id).localpart
 
         if not pattern:
-            logger.warning("event_match condition with no pattern")
-            return False
+            # msc3664 specifies that key without pattern matches field existence
+            if condition["kind"] == "im.nheko.msc3664.related_event_match":
+                return condition["key"] in event_value_cache
+            else:
+                logger.warning("event_match condition with no pattern")
+                return False
 
         # XXX: optimisation: cache our pattern regexps
         if condition["key"] == "content.body":

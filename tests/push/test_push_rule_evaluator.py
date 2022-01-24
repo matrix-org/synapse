@@ -23,7 +23,7 @@ from tests import unittest
 
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):
-    def _get_evaluator(self, content, related_event=None):
+    def _get_evaluator(self, content, related_events=None):
         event = FrozenEvent(
             {
                 "event_id": "$event_id",
@@ -39,7 +39,11 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         sender_power_level = 0
         power_levels = {}
         return PushRuleEvaluatorForEvent(
-            event, room_member_count, sender_power_level, power_levels, related_event
+            event,
+            room_member_count,
+            sender_power_level,
+            power_levels,
+            {} if related_events is None else related_events,
         )
 
     def test_display_name(self):
@@ -274,25 +278,40 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
                     "event_id": "$parent_event_id",
                     "key": "\ud83d\udc4d\ufe0f",
                     "rel_type": "m.annotation",
+                    "m.in_reply_to": {
+                        "event_id": "$parent_event_id",
+                    },
                 }
             },
-            FrozenEvent(
-                {
-                    "event_id": "$parent.event_id",
-                    "type": "m.room.message",
-                    "sender": "@other_user:test",
-                    "state_key": "",
-                    "room_id": "#room:test",
-                    "content": {"msgtype": "m.text", "body": "Original message"},
-                },
-                RoomVersions.V1,
-            ),
+            {
+                "m.in_reply_to": FrozenEvent(
+                    {
+                        "event_id": "$parent_event_id",
+                        "type": "m.room.message",
+                        "sender": "@other_user:test",
+                        "room_id": "#room:test",
+                        "content": {"msgtype": "m.text", "body": "Original message"},
+                    },
+                    RoomVersions.V1,
+                ),
+                "m.annotation": FrozenEvent(
+                    {
+                        "event_id": "$parent_event_id",
+                        "type": "m.room.message",
+                        "sender": "@other_user:test",
+                        "room_id": "#room:test",
+                        "content": {"msgtype": "m.text", "body": "Original message"},
+                    },
+                    RoomVersions.V1,
+                ),
+            },
         )
         self.assertFalse(
             evaluator.matches(
                 {
-                    "kind": "related_event_match",
+                    "kind": "im.nheko.msc3664.related_event_match",
                     "key": "sender",
+                    "rel_type": "m.in_reply_to",
                     "pattern_type": "user_id",
                 },
                 "@user:test",
@@ -302,9 +321,53 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         self.assertTrue(
             evaluator.matches(
                 {
-                    "kind": "related_event_match",
+                    "kind": "im.nheko.msc3664.related_event_match",
                     "key": "sender",
+                    "rel_type": "m.in_reply_to",
                     "pattern_type": "user_id",
+                },
+                "@other_user:test",
+                "display_name",
+            )
+        )
+        self.assertTrue(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "key": "sender",
+                    "rel_type": "m.annotation",
+                    "pattern_type": "user_id",
+                },
+                "@other_user:test",
+                "display_name",
+            )
+        )
+        self.assertTrue(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "key": "sender",
+                    "rel_type": "m.in_reply_to",
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
+        self.assertTrue(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "rel_type": "m.in_reply_to",
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "rel_type": "m.replace",
                 },
                 "@other_user:test",
                 "display_name",
@@ -318,9 +381,31 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         self.assertFalse(
             evaluator.matches(
                 {
-                    "kind": "related_event_match",
+                    "kind": "im.nheko.msc3664.related_event_match",
                     "key": "sender",
+                    "rel_type": "m.in_reply_to",
                     "pattern_type": "user_id",
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "key": "sender",
+                    "rel_type": "m.in_reply_to",
+                },
+                "@user:test",
+                "display_name",
+            )
+        )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "im.nheko.msc3664.related_event_match",
+                    "rel_type": "m.in_reply_to",
                 },
                 "@user:test",
                 "display_name",

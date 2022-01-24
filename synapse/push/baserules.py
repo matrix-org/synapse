@@ -363,6 +363,25 @@ NEW_APPEND_OVERRIDE_RULES = [
         ],
         "actions": ["notify", {"set_tweak": "sound", "value": "default"}],
     },
+    # Enable notifications for replies without fallback
+    {
+        "rule_id": "global/override/im.nheko.msc3664.reply",
+        "conditions": [
+            # Only send notification if the reply is to your message
+            {
+                "kind": "related_event_match",
+                "key": "sender",
+                "rel_type": "m.in_reply_to",
+                "pattern_type": "user_id",
+                "_id": "_sender",
+            },
+        ],
+        "actions": [
+            "notify",
+            {"set_tweak": "sound", "value": "default"},
+            {"set_tweak": "highlight"},
+        ],
+    },
     {
         "rule_id": "global/override/.m.rule.contains_display_name",
         "conditions": [{"kind": "contains_display_name"}],
@@ -426,32 +445,6 @@ NEW_APPEND_OVERRIDE_RULES = [
             }
         ],
         "actions": ["notify", {"set_tweak": "sound", "value": "ring"}],
-    },
-    # Enable notifications for reactions
-    {
-        "rule_id": "global/override/com.beeper.reaction",
-        "conditions": [
-            {
-                "kind": "event_match",
-                "key": "type",
-                "pattern": "m.reaction",
-                "_id": "_reaction",
-            },
-            # Only send reaction notifications for smaller rooms (under 20 members)
-            {
-                "kind": "room_member_count",
-                "is": "<20",
-                "_id": "_member_count",
-            },
-            # Only send notification if the reaction is to your message
-            {
-                "kind": "related_event_match",
-                "key": "sender",
-                "pattern_type": "user_id",
-                "_id": "_sender",
-            },
-        ],
-        "actions": ["notify", {"set_tweak": "highlight", "value": False}],
     },
 ]
 
