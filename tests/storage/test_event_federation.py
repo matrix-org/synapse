@@ -17,7 +17,11 @@ from typing import Tuple, Union
 import attr
 from parameterized import parameterized
 
-from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
+from synapse.api.room_versions import (
+    KNOWN_ROOM_VERSIONS,
+    EventFormatVersions,
+    RoomVersion,
+)
 from synapse.events import _EventInternalMetadata
 from synapse.util import json_encoder
 
@@ -509,10 +513,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         self.assertSetEqual(difference, set())
 
     @parameterized.expand(
-        [
-            (RoomVersions.V1,),
-            (RoomVersions.V9,),
-        ]
+        [(room_version,) for room_version in KNOWN_ROOM_VERSIONS.values()]
     )
     def test_prune_inbound_federation_queue(self, room_version: RoomVersion):
         """Test that pruning of inbound federation queues work"""
