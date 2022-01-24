@@ -838,7 +838,7 @@ class DatabasePool:
                     try:
                         if db_autocommit:
                             self.engine.attempt_to_set_autocommit(conn, True)
-                        if isolation_level:
+                        if isolation_level is not None:
                             self.engine.attempt_to_set_isolation_level(
                                 conn, isolation_level
                             )
