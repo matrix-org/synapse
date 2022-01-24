@@ -23,19 +23,19 @@ from synapse.types import JsonDict
 from synapse.util import json_encoder, stringutils
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class UIAuthSessionData:
-    session_id = attr.ib(type=str)
+    session_id: str
     # The dictionary from the client root level, not the 'auth' key.
-    clientdict = attr.ib(type=JsonDict)
+    clientdict: JsonDict
     # The URI and method the session was intiatied with. These are checked at
     # each stage of the authentication to ensure that the asked for operation
     # has not changed.
-    uri = attr.ib(type=str)
-    method = attr.ib(type=str)
+    uri: str
+    method: str
     # A string description of the operation that the current authentication is
     # authorising.
-    description = attr.ib(type=str)
+    description: str
 
 
 class UIAuthWorkerStore(SQLBaseStore):

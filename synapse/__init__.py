@@ -21,8 +21,8 @@ import os
 import sys
 
 # Check that we're not running on an unsupported Python version.
-if sys.version_info < (3, 6):
-    print("Synapse requires Python 3.6 or above.")
+if sys.version_info < (3, 7):
+    print("Synapse requires Python 3.7 or above.")
     sys.exit(1)
 
 # Twisted and canonicaljson will fail to import when this file is executed to
@@ -47,7 +47,7 @@ try:
 except ImportError:
     pass
 
-__version__ = "1.49.2"
+__version__ = "1.51.0rc1"
 
 if bool(os.environ.get("SYNAPSE_TEST_PATCH_LOG_CONTEXTS", False)):
     # We import here so that we don't have to install a bunch of deps when

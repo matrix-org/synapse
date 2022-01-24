@@ -1,1 +1,0 @@
-Update Synapse install command for FreeBSD as the package is now prefixed with `py38`. Contributed by @itchychips.

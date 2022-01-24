@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse 1.17.0 where a pusher created for an email with capital letters would fail to be created.
