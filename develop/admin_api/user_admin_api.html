@@ -506,6 +506,14 @@ An empty body may be passed for backwards compatibility.</p>
 <li>Remove the user from the user directory</li>
 <li>Reject all pending invites</li>
 <li>Remove all account validity information related to the user</li>
+<li>Remove the arbitrary data store known as <em>account data</em>. For example, this includes:
+<ul>
+<li>list of ignored users;</li>
+<li>push rules;</li>
+<li>secret storage keys; and</li>
+<li>cross-signing keys.</li>
+</ul>
+</li>
 </ul>
 <p>The following additional actions are performed during deactivation if <code>erase</code>
 is set to <code>true</code>:</p>
@@ -519,7 +527,6 @@ is set to <code>true</code>:</p>
 <li>Remove mappings of SSO IDs</li>
 <li><a href="#delete-media-uploaded-by-a-user">Delete media uploaded</a> by user (included avatar images)</li>
 <li>Delete sent and received messages</li>
-<li>Delete E2E cross-signing keys</li>
 <li>Remove the user's creation (registration) timestamp</li>
 <li><a href="#override-ratelimiting-for-users">Remove rate limit overrides</a></li>
 <li>Remove from monthly active users</li>
