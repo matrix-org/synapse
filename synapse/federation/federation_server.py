@@ -58,7 +58,6 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.logging.opentracing import log_kv, start_active_span_from_edu, trace
-from synapse.logging.utils import log_function
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.replication.http.federation import (
     ReplicationFederationSendEduRestServlet,
@@ -859,7 +858,6 @@ class FederationServer(FederationBase):
             res = {"auth_chain": [a.get_pdu_json(time_now) for a in auth_pdus]}
         return 200, res
 
-    @log_function
     async def on_query_client_keys(
         self, origin: str, content: Dict[str, str]
     ) -> Tuple[int, Dict[str, Any]]:
@@ -940,7 +938,6 @@ class FederationServer(FederationBase):
 
         return {"events": [ev.get_pdu_json(time_now) for ev in missing_events]}
 
-    @log_function
     async def on_openid_userinfo(self, token: str) -> Optional[str]:
         ts_now_ms = self._clock.time_msec()
         return await self.store.get_user_id_for_open_id_token(token, ts_now_ms)

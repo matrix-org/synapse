@@ -262,6 +262,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         # The number of milliseconds that the response should be considered valid.
         expiration_ms = media_info.expires
+        author_name: Optional[str] = None
 
         if _is_media(media_info.media_type):
             file_id = media_info.filesystem_id
@@ -294,17 +295,25 @@ class PreviewUrlResource(DirectServeJsonResource):
                 # Check if this HTML document points to oEmbed information and
                 # defer to that.
                 oembed_url = self._oembed.autodiscover_from_html(tree)
-                og = {}
+                og_from_oembed: JsonDict = {}
                 if oembed_url:
                     oembed_info = await self._download_url(oembed_url, user)
-                    og, expiration_ms = await self._handle_oembed_response(
+                    (
+                        og_from_oembed,
+                        author_name,
+                        expiration_ms,
+                    ) = await self._handle_oembed_response(
                         url, oembed_info, expiration_ms
                     )
 
-                # If there was no oEmbed URL (or oEmbed parsing failed), attempt
-                # to generate the Open Graph information from the HTML.
-                if not oembed_url or not og:
-                    og = parse_html_to_open_graph(tree, media_info.uri)
+                # Parse Open Graph information from the HTML in case the oEmbed
+                # response failed or is incomplete.
+                og_from_html = parse_html_to_open_graph(tree, media_info.uri)
+
+                # Compile the Open Graph response by using the scraped
+                # information from the HTML and overlaying any information
+                # from the oEmbed response.
+                og = {**og_from_html, **og_from_oembed}
 
                 await self._precache_image_url(user, media_info, og)
             else:
@@ -312,7 +321,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         elif oembed_url:
             # Handle the oEmbed information.
-            og, expiration_ms = await self._handle_oembed_response(
+            og, author_name, expiration_ms = await self._handle_oembed_response(
                 url, media_info, expiration_ms
             )
             await self._precache_image_url(user, media_info, og)
@@ -320,6 +329,11 @@ class PreviewUrlResource(DirectServeJsonResource):
         else:
             logger.warning("Failed to find any OG data in %s", url)
             og = {}
+
+        # If we don't have a title but we have author_name, copy it as
+        # title
+        if not og.get("og:title") and author_name:
+            og["og:title"] = author_name
 
         # filter out any stupidly long values
         keys_to_remove = []
@@ -484,7 +498,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
     async def _handle_oembed_response(
         self, url: str, media_info: MediaInfo, expiration_ms: int
-    ) -> Tuple[JsonDict, int]:
+    ) -> Tuple[JsonDict, Optional[str], int]:
         """
         Parse the downloaded oEmbed info.
 
@@ -497,11 +511,12 @@ class PreviewUrlResource(DirectServeJsonResource):
         Returns:
             A tuple of:
                 The Open Graph dictionary, if the oEmbed info can be parsed.
+                The author name if it could be retrieved from oEmbed.
                 The (possibly updated) length of time, in milliseconds, the media is valid for.
         """
         # If JSON was not returned, there's nothing to do.
         if not _is_json(media_info.media_type):
-            return {}, expiration_ms
+            return {}, None, expiration_ms
 
         with open(media_info.filename, "rb") as file:
             body = file.read()
@@ -513,7 +528,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         if open_graph_result and oembed_response.cache_age is not None:
             expiration_ms = oembed_response.cache_age
 
-        return open_graph_result, expiration_ms
+        return open_graph_result, oembed_response.author_name, expiration_ms
 
     def _start_expire_url_cache_data(self) -> Deferred:
         return run_as_background_process(

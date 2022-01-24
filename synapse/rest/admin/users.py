@@ -174,12 +174,11 @@ class UserRestServletV2(RestServlet):
         if not self.hs.is_mine(target_user):
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only look up local users")
 
-        ret = await self.admin_handler.get_user(target_user)
-
-        if not ret:
+        user_info_dict = await self.admin_handler.get_user(target_user)
+        if not user_info_dict:
             raise NotFoundError("User not found")
 
-        return HTTPStatus.OK, ret
+        return HTTPStatus.OK, user_info_dict
 
     async def on_PUT(
         self, request: SynapseRequest, user_id: str
@@ -400,10 +399,10 @@ class UserRestServletV2(RestServlet):
                     target_user, requester, body["avatar_url"], True
                 )
 
-            user = await self.admin_handler.get_user(target_user)
-            assert user is not None
+            user_info_dict = await self.admin_handler.get_user(target_user)
+            assert user_info_dict is not None
 
-            return 201, user
+            return HTTPStatus.CREATED, user_info_dict
 
 
 class UserRegisterServlet(RestServlet):

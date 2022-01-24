@@ -55,7 +55,6 @@ from synapse.api.presence import UserPresenceState
 from synapse.appservice import ApplicationService
 from synapse.events.presence_router import PresenceRouter
 from synapse.logging.context import run_in_background
-from synapse.logging.utils import log_function
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.presence import (
@@ -1542,7 +1541,6 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
 
-    @log_function
     async def get_new_events(
         self,
         user: UserID,

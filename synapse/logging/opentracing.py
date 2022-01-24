@@ -247,11 +247,11 @@ try:
         class BaseReporter:  # type: ignore[no-redef]
             pass
 
-    @attr.s(slots=True, frozen=True)
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
     class _WrappedRustReporter(BaseReporter):
         """Wrap the reporter to ensure `report_span` never throws."""
 
-        _reporter = attr.ib(type=Reporter, default=attr.Factory(Reporter))
+        _reporter: Reporter = attr.Factory(Reporter)
 
         def set_process(self, *args, **kwargs):
             return self._reporter.set_process(*args, **kwargs)
