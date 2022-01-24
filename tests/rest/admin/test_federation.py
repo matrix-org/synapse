@@ -497,7 +497,7 @@ class DestinationMembershipTestCase(unittest.HomeserverTestCase):
         self.dest = "sub0.example.com"
         self.url = f"/_synapse/admin/v1/federation/destinations/{self.dest}/rooms"
 
-        # create destination
+        # Record that we successfully contacted a destination in the DB.
         self.get_success(
             self.store.set_destination_retry_timings(self.dest, None, 0, 0)
         )
