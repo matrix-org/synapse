@@ -238,6 +238,25 @@ BASE_APPEND_OVERRIDE_RULES = [
         ],
         "actions": ["dont_notify"],
     },
+    # Enable notifications for replies without fallback
+    {
+        "rule_id": "global/override/im.nheko.msc3664.reply",
+        "conditions": [
+            # Only send notification if the reply is to your message
+            {
+                "kind": "im.nheko.msc3664.related_event_match",
+                "key": "sender",
+                "rel_type": "m.in_reply_to",
+                "pattern_type": "user_id",
+                "_id": "_reply",
+            },
+        ],
+        "actions": [
+            "notify",
+            {"set_tweak": "sound", "value": "default"},
+            {"set_tweak": "highlight"},
+        ],
+    },
     # This was changed from underride to override so it's closer in priority
     # to the content rules where the user name highlight rule lives. This
     # way a room rule is lower priority than both but a custom override rule
@@ -369,11 +388,11 @@ NEW_APPEND_OVERRIDE_RULES = [
         "conditions": [
             # Only send notification if the reply is to your message
             {
-                "kind": "related_event_match",
+                "kind": "im.nheko.msc3664.related_event_match",
                 "key": "sender",
                 "rel_type": "m.in_reply_to",
                 "pattern_type": "user_id",
-                "_id": "_sender",
+                "_id": "_reply",
             },
         ],
         "actions": [
