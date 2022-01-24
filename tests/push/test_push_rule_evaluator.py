@@ -342,7 +342,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
                 "display_name",
             )
         )
-        self.assertTrue(
+        self.assertFalse(
             evaluator.matches(
                 {
                     "kind": "im.nheko.msc3664.related_event_match",

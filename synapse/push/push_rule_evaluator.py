@@ -187,12 +187,8 @@ class PushRuleEvaluatorForEvent:
                 pattern = UserID.from_string(user_id).localpart
 
         if not pattern:
-            # msc3664 specifies that key without pattern matches field existence
-            if condition["kind"] == "im.nheko.msc3664.related_event_match":
-                return condition["key"] in event_value_cache
-            else:
-                logger.warning("event_match condition with no pattern")
-                return False
+            logger.warning("event_match condition with no pattern")
+            return False
 
         # XXX: optimisation: cache our pattern regexps
         if condition["key"] == "content.body":
