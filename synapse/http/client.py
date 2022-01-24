@@ -734,7 +734,7 @@ class SimpleHttpClient:
             d = read_body_with_max_size(response, output_stream, max_size)
 
             # Ensure that the body is not read forever.
-            d = timeout_deferred(d, 60, self.hs.get_reactor())
+            d = timeout_deferred(d, 30, self.hs.get_reactor())
 
             length = await make_deferred_yieldable(d)
         except BodyExceededMaxSize:
