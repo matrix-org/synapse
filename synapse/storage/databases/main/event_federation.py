@@ -1380,7 +1380,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
     async def prune_staged_events_in_room(
         self,
         room_id: str,
-        room_version: RoomVersion,
     ) -> bool:
         """Checks if there are lots of staged events for the room, and if so
         prune them down.
@@ -1430,28 +1429,30 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 logger.info("Invalid prev_events for %s", event_id)
                 continue
 
-            if room_version.event_format == EventFormatVersions.V1:
-                for prev_event_tuple in prev_events:
-                    if (
-                        not isinstance(prev_event_tuple, list)
-                        or len(prev_event_tuple) != 2
-                    ):
-                        logger.info("Invalid prev_events for %s", event_id)
-                        break
+            if len(prev_events) > 0:
+                if isinstance(prev_events[0], dict):
+                    for prev_event_tuple in prev_events:
+                        if (
+                            not isinstance(prev_event_tuple, list)
+                            or len(prev_event_tuple) != 2
+                        ):
+                            logger.info("Invalid prev_events for %s", event_id)
+                            break
 
-                    prev_event_id = prev_event_tuple[0]
-                    if not isinstance(prev_event_id, str):
-                        logger.info("Invalid prev_events for %s", event_id)
-                        break
+                        prev_event_id = prev_event_tuple[0]
+                        if not isinstance(prev_event_id, str):
+                            logger.info("Invalid prev_events for %s", event_id)
+                            break
 
-                    referenced_events.add(prev_event_id)
-            else:
-                for prev_event_id in prev_events:
-                    if not isinstance(prev_event_id, str):
-                        logger.info("Invalid prev_events for %s", event_id)
-                        break
+                        referenced_events.add(prev_event_id)
+                else:
+                    for prev_event_id in prev_events:
+                        if not isinstance(prev_event_id, str):
+                            logger.info("Invalid prev_events for %s", event_id)
+                            break
 
-                    referenced_events.add(prev_event_id)
+                        referenced_events.add(prev_event_id)
+
 
         to_delete = referenced_events & seen_events
         if not to_delete:

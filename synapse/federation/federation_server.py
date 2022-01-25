@@ -1101,7 +1101,7 @@ class FederationServer(FederationBase):
             # We do this *after* handling the first event as the common case is
             # that the queue is empty (/has the single event in), and so there's
             # no need to do this check.
-            pruned = await self.store.prune_staged_events_in_room(room_id, room_version)
+            pruned = await self.store.prune_staged_events_in_room(room_id)
             if pruned:
                 # If we have pruned the queue check we need to refetch the next
                 # event to handle.
