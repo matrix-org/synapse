@@ -510,7 +510,7 @@ class ApplicationServicesHandler:
             return []
 
         # Retrieve the to-device messages for each user
-        recipient_device_to_messages = await self.store.get_new_messages(
+        recipient_device_to_messages = await self.store.get_messages_for_user_devices(
             users_appservice_is_interested_in,
             from_key,
             new_token,
