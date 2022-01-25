@@ -381,6 +381,8 @@ class RoomBatchHandler:
                 # TODO: Can we get away without this? Can't we just rely on validate_new below?
                 # self.validator.validate_builder(builder)
 
+                # TODO: Do we need to sanity check the number of prev_events?
+
                 resultant_auth_event_ids = (
                     event_sender_and_type_to_auth_event_ids_cache.get(
                         (ev["sender"], ev["type"])
