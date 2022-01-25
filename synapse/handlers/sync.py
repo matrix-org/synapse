@@ -1619,7 +1619,7 @@ class SyncHandler:
         # TODO: Can we `SELECT ignored_user_id FROM ignored_users WHERE ignorer_user_id=?;` instead?
         ignored_account_data = (
             await self.store.get_global_account_data_by_type_for_user(
-                AccountDataTypes.IGNORED_USER_LIST, user_id=user_id
+                user_id=user_id, data_type=AccountDataTypes.IGNORED_USER_LIST
             )
         )
 

@@ -714,18 +714,15 @@ class RoomEventContextServlet(RestServlet):
             raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
         time_now = self.clock.time_msec()
+        aggregations = results.pop("aggregations", None)
         results["events_before"] = self._event_serializer.serialize_events(
-            results["events_before"],
-            time_now,
-            bundle_aggregations=results["aggregations"],
+            results["events_before"], time_now, bundle_aggregations=aggregations
         )
         results["event"] = self._event_serializer.serialize_event(
-            results["event"], time_now, bundle_aggregations=results["aggregations"]
+            results["event"], time_now, bundle_aggregations=aggregations
         )
         results["events_after"] = self._event_serializer.serialize_events(
-            results["events_after"],
-            time_now,
-            bundle_aggregations=results["aggregations"],
+            results["events_after"], time_now, bundle_aggregations=aggregations
         )
         results["state"] = self._event_serializer.serialize_events(
             results["state"], time_now

@@ -1254,20 +1254,22 @@ class PersistEventsStore:
         for room_id, depth in depth_updates.items():
             self._update_min_depth_for_room_txn(txn, room_id, depth)
 
-    def _update_outliers_txn(self, txn, events_and_contexts):
+    def _update_outliers_txn(
+        self,
+        txn: LoggingTransaction,
+        events_and_contexts: List[Tuple[EventBase, EventContext]],
+    ) -> List[Tuple[EventBase, EventContext]]:
         """Update any outliers with new event info.
 
-        This turns outliers into ex-outliers (unless the new event was
-        rejected).
+        This turns outliers into ex-outliers (unless the new event was rejected), and
+        also removes any other events we have already seen from the list.
 
         Args:
-            txn (twisted.enterprise.adbapi.Connection): db connection
-            events_and_contexts (list[(EventBase, EventContext)]): events
-                we are persisting
+            txn: db connection
+            events_and_contexts: events we are persisting
 
         Returns:
-            list[(EventBase, EventContext)] new list, without events which
-            are already in the events table.
+            new list, without events which are already in the events table.
         """
         txn.execute(
             "SELECT event_id, outlier FROM events WHERE event_id in (%s)"
@@ -1275,7 +1277,9 @@ class PersistEventsStore:
             [event.event_id for event, _ in events_and_contexts],
         )
 
-        have_persisted = {event_id: outlier for event_id, outlier in txn}
+        have_persisted: Dict[str, bool] = {
+            event_id: outlier for event_id, outlier in txn
+        }
 
         to_remove = set()
         for event, context in events_and_contexts:
@@ -1285,15 +1289,22 @@ class PersistEventsStore:
             to_remove.add(event)
 
             if context.rejected:
-                # If the event is rejected then we don't care if the event
-                # was an outlier or not.
+                # If the incoming event is rejected then we don't care if the event
+                # was an outlier or not - what we have is at least as good.
                 continue
 
             outlier_persisted = have_persisted[event.event_id]
             if not event.internal_metadata.is_outlier() and outlier_persisted:
                 # We received a copy of an event that we had already stored as
-                # an outlier in the database. We now have some state at that
+                # an outlier in the database. We now have some state at that event
                 # so we need to update the state_groups table with that state.
+                #
+                # Note that we do not update the stream_ordering of the event in this
+                # scenario. XXX: does this cause bugs? It will mean we won't send such
+                # events down /sync. In general they will be historical events, so that
+                # doesn't matter too much, but that is not always the case.
+
+                logger.info("Updating state for ex-outlier event %s", event.event_id)
 
                 # insert into event_to_state_groups.
                 try:
@@ -1378,6 +1389,8 @@ class PersistEventsStore:
                 "received_ts",
                 "sender",
                 "contains_url",
+                "state_key",
+                "rejection_reason",
             ),
             values=(
                 (
@@ -1394,8 +1407,10 @@ class PersistEventsStore:
                     self._clock.time_msec(),
                     event.sender,
                     "url" in event.content and isinstance(event.content["url"], str),
+                    event.get_state_key(),
+                    context.rejected or None,
                 )
-                for event, _ in events_and_contexts
+                for event, context in events_and_contexts
             ),
         )
 
@@ -1445,6 +1460,7 @@ class PersistEventsStore:
         for event, context in events_and_contexts:
             if context.rejected:
                 # Insert the event_id into the rejections table
+                # (events.rejection_reason has already been done)
                 self._store_rejections_txn(txn, event.event_id, context.rejected)
                 to_remove.add(event)
 
