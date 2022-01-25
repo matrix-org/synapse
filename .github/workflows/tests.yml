@@ -382,7 +382,7 @@ jobs:
 
       # Run Complement
       - run: |
-          set -o pipefail &&
+          set -o pipefail
           go test -v -json -tags synapse_blacklist,msc2403 ./tests/... 2>&1 | gotestfmt
         shell: bash
         name: Run Complement Tests
