@@ -1,0 +1,1 @@
+Ensure we always log HTTP status codes as integers instead of e.g. `HTTPStatus.OK`.
