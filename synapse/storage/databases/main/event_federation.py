@@ -1430,7 +1430,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 continue
 
             if len(prev_events) > 0:
-                if isinstance(prev_events[0], dict):
+                if isinstance(prev_events[0], list):
                     for prev_event_tuple in prev_events:
                         if (
                             not isinstance(prev_event_tuple, list)
