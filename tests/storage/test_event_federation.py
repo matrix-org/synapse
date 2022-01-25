@@ -12,10 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Tuple, Union
+
 import attr
 from parameterized import parameterized
 
-from synapse.api.room_versions import RoomVersions
+from synapse.api.room_versions import (
+    KNOWN_ROOM_VERSIONS,
+    EventFormatVersions,
+    RoomVersion,
+)
 from synapse.events import _EventInternalMetadata
 from synapse.util import json_encoder
 
@@ -506,10 +512,20 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         )
         self.assertSetEqual(difference, set())
 
-    def test_prune_inbound_federation_queue(self):
-        "Test that pruning of inbound federation queues work"
+    @parameterized.expand(
+        [(room_version,) for room_version in KNOWN_ROOM_VERSIONS.values()]
+    )
+    def test_prune_inbound_federation_queue(self, room_version: RoomVersion):
+        """Test that pruning of inbound federation queues work"""
 
         room_id = "some_room_id"
+
+        def prev_event_format(prev_event_id: str) -> Union[Tuple[str, dict], str]:
+            """Account for differences in prev_events format across room versions"""
+            if room_version.event_format == EventFormatVersions.V1:
+                return prev_event_id, {}
+
+            return prev_event_id
 
         # Insert a bunch of events that all reference the previous one.
         self.get_success(
@@ -529,7 +545,9 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                         room_id,
                         0,
                         f"$fake_event_id_{i + 1}",
-                        json_encoder.encode({"prev_events": [f"$fake_event_id_{i}"]}),
+                        json_encoder.encode(
+                            {"prev_events": [prev_event_format(f"$fake_event_id_{i}")]}
+                        ),
                         "{}",
                     )
                     for i in range(500)
@@ -541,12 +559,12 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # Calling prune once should return True, i.e. a prune happen. The second
         # time it shouldn't.
         pruned = self.get_success(
-            self.store.prune_staged_events_in_room(room_id, RoomVersions.V6)
+            self.store.prune_staged_events_in_room(room_id, room_version)
         )
         self.assertTrue(pruned)
 
         pruned = self.get_success(
-            self.store.prune_staged_events_in_room(room_id, RoomVersions.V6)
+            self.store.prune_staged_events_in_room(room_id, room_version)
         )
         self.assertFalse(pruned)
 
