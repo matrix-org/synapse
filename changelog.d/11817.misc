@@ -1,1 +1,1 @@
-Compatibility with updated type hints for jsonschema 4.4.0.
+Correct a type annotation in the event validation logic.
