@@ -1,0 +1,1 @@
+Prevent federation from erroring & logging exponentially when the room is the wrong version. Contributed by @sequentialread

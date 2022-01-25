@@ -558,14 +558,10 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         # Calling prune once should return True, i.e. a prune happen. The second
         # time it shouldn't.
-        pruned = self.get_success(
-            self.store.prune_staged_events_in_room(room_id)
-        )
+        pruned = self.get_success(self.store.prune_staged_events_in_room(room_id))
         self.assertTrue(pruned)
 
-        pruned = self.get_success(
-            self.store.prune_staged_events_in_room(room_id)
-        )
+        pruned = self.get_success(self.store.prune_staged_events_in_room(room_id))
         self.assertFalse(pruned)
 
         # Assert that we only have a single event left in the queue, and that it

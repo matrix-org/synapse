@@ -1453,7 +1453,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
                         referenced_events.add(prev_event_id)
 
-
         to_delete = referenced_events & seen_events
         if not to_delete:
             return False
