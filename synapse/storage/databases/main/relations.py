@@ -39,6 +39,7 @@ from synapse.storage.database import (
     make_in_list_sql_clause,
 )
 from synapse.storage.databases.main.stream import generate_pagination_where_clause
+from synapse.storage.engines import PostgresEngine
 from synapse.storage.relations import (
     AggregationPaginationToken,
     PaginationChunk,
@@ -371,20 +372,42 @@ class RelationsWorkerStore(SQLBaseStore):
 
         # Fetches latest edit that has the same type and sender as the
         # original, and is an `m.room.message`.
-        sql = """
-            SELECT original.event_id, edit.event_id FROM events AS edit
-            INNER JOIN event_relations USING (event_id)
-            INNER JOIN events AS original ON
-                original.event_id = relates_to_id
-                AND edit.type = original.type
-                AND edit.sender = original.sender
-                AND edit.room_id = original.room_id
-            WHERE
-                %s
-                AND relation_type = ?
-                AND edit.type = 'm.room.message'
-            ORDER by edit.origin_server_ts DESC, edit.event_id DESC
-        """
+        if isinstance(self.database_engine, PostgresEngine):
+            # The `DISTINCT ON` clause will pick the *first* row it encounters,
+            # so ordering by origin server ts + event ID desc will ensure we get
+            # the latest edit.
+            sql = """
+                SELECT DISTINCT ON (original.event_id) original.event_id, edit.origin_server_ts, edit.event_id FROM events AS edit
+                INNER JOIN event_relations USING (event_id)
+                INNER JOIN events AS original ON
+                    original.event_id = relates_to_id
+                    AND edit.type = original.type
+                    AND edit.sender = original.sender
+                    AND edit.room_id = original.room_id
+                WHERE
+                    %s
+                    AND relation_type = ?
+                    AND edit.type = 'm.room.message'
+                ORDER by original.event_id DESC, edit.origin_server_ts DESC, edit.event_id DESC
+            """
+        else:
+            # SQLite has special handling for bare columns when using MIN/MAX
+            # with a `GROUP BY` clause where it picks the value from a row that
+            # matches the MIN/MAX.
+            sql = """
+                SELECT original.event_id, MAX(edit.origin_server_ts), MAX(edit.event_id) FROM events AS edit
+                INNER JOIN event_relations USING (event_id)
+                INNER JOIN events AS original ON
+                    original.event_id = relates_to_id
+                    AND edit.type = original.type
+                    AND edit.sender = original.sender
+                    AND edit.room_id = original.room_id
+                WHERE
+                    %s
+                    AND relation_type = ?
+                    AND edit.type = 'm.room.message'
+                GROUP BY (original.event_id)
+            """
 
         def _get_applicable_edits_txn(txn: LoggingTransaction) -> Dict[str, str]:
             clause, args = make_in_list_sql_clause(
@@ -394,12 +417,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
             txn.execute(sql % (clause,), args)
             rows = txn.fetchall()
-            result = {}
-            for original_event_id, edit_event_id in rows:
-                # Only consider the latest edit (by origin server ts).
-                if original_event_id not in result:
-                    result[original_event_id] = edit_event_id
-            return result
+            return {row[0]: row[2] for row in rows}
 
         edit_ids = await self.db_pool.runInteraction(
             "get_applicable_edits", _get_applicable_edits_txn
