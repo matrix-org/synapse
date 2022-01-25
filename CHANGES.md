@@ -3,7 +3,7 @@ Synapse 1.51.0 (2022-01-25)
 
 No significant changes since 1.51.0rc2.
 
-Synapse 1.51 deprecates `webclient` listeners and non-HTTP(S) `web_client_location`s. Support for these will be removed in Synapse 1.53.0, at which point Synapse will not be capable of directly serving a web client for Matrix.
+Synapse 1.51.0 deprecates `webclient` listeners and non-HTTP(S) `web_client_location`s. Support for these will be removed in Synapse 1.53.0, at which point Synapse will not be capable of directly serving a web client for Matrix.
 
 Synapse 1.51.0rc2 (2022-01-24)
 ==============================
