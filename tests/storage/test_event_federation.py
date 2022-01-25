@@ -512,9 +512,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         )
         self.assertSetEqual(difference, set())
 
-    @parameterized.expand(
-        [(event_format_v1,) for event_format_v1 in (True, False)]
-    )
+    @parameterized.expand([(event_format_v1,) for event_format_v1 in (True, False)])
     def test_prune_inbound_federation_queue(self, event_format_v1: bool):
         """Test that pruning of inbound federation queues work"""
 
