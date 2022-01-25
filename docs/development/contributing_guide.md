@@ -117,7 +117,7 @@ The linters look at your code and do two things:
 - ensure that your code follows the coding style adopted by the project;
 - catch a number of errors in your code.
 
-The linter takes no time at all to run as long as you've [downloaded the dependencies into your python virtual environment](#4-install-the-dependencies).
+The linter takes no time at all to run as soon as you've [downloaded the dependencies into your python virtual environment](#4-install-the-dependencies).
 
 ```sh
 source ./env/bin/activate
