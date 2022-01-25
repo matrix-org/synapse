@@ -206,7 +206,11 @@ class BulkPushRuleEvaluator:
         related_event_id = event.content.get("m.relates_to", {}).get("event_id")
         relation_type = event.content.get("m.relates_to", {}).get("rel_type")
         if related_event_id is not None and relation_type is not None:
-            related_events[relation_type] = await self.store.get_event(related_event_id)
+            related_event = await self.store.get_event(
+                related_event_id, allow_none=True
+            )
+            if related_event is not None:
+                related_events[relation_type] = related_event
 
         reply_event_id = (
             event.content.get("m.relates_to", {})
@@ -214,7 +218,9 @@ class BulkPushRuleEvaluator:
             .get("event_id")
         )
         if reply_event_id is not None:
-            related_events["m.in_reply_to"] = await self.store.get_event(reply_event_id)
+            related_event = await self.store.get_event(reply_event_id, allow_none=True)
+            if related_event is not None:
+                related_events["m.in_reply_to"] = related_event
 
         evaluator = PushRuleEvaluatorForEvent(
             event, len(room_members), sender_power_level, power_levels, related_events
