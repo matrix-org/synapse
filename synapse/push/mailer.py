@@ -455,7 +455,7 @@ class Mailer:
         }
 
         the_events = await filter_events_for_client(
-            self.storage, user_id, results["events_before"]
+            self.storage, user_id, results.events_before
         )
         the_events.append(notif_event)
 

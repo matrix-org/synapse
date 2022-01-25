@@ -1180,15 +1180,15 @@ class RoomContextHandler:
         results = await self.store.get_events_around(
             room_id, event_id, before_limit, after_limit, event_filter
         )
+        events_before = results.events_before
+        events_after = results.events_after
 
         if event_filter:
-            results["events_before"] = await event_filter.filter(
-                results["events_before"]
-            )
-            results["events_after"] = await event_filter.filter(results["events_after"])
+            events_before = await event_filter.filter(events_before)
+            events_after = await event_filter.filter(events_after)
 
-        results["events_before"] = await filter_evts(results["events_before"])
-        results["events_after"] = await filter_evts(results["events_after"])
+        events_before = await filter_evts(events_before)
+        events_after = await filter_evts(events_after)
         # filter_evts can return a pruned event in case the user is allowed to see that
         # there's something there but not see the content, so use the event that's in
         # `filtered` rather than the event we retrieved from the datastore.
@@ -1196,14 +1196,12 @@ class RoomContextHandler:
 
         # Fetch the aggregations.
         aggregations = await self.store.get_bundled_aggregations(
-            itertools.chain(
-                results["events_before"], (event,), results["events_after"]
-            ),
+            itertools.chain(events_before, (event,), events_after),
             user.to_string(),
         )
 
-        if results["events_after"]:
-            last_event_id = results["events_after"][-1].event_id
+        if events_after:
+            last_event_id = events_after[-1].event_id
         else:
             last_event_id = event_id
 
@@ -1211,9 +1209,9 @@ class RoomContextHandler:
             state_filter = StateFilter.from_lazy_load_member_list(
                 ev.sender
                 for ev in itertools.chain(
-                    results["events_before"],
+                    events_before,
                     (event,),
-                    results["events_after"],
+                    events_after,
                 )
             )
         else:
@@ -1236,15 +1234,15 @@ class RoomContextHandler:
         token = StreamToken.START
 
         return EventContext(
-            events_before=results["events_before"],
+            events_before=events_before,
             event=event,
-            events_after=results["events_after"],
+            events_after=events_after,
             state=await filter_evts(state_events),
             aggregations=aggregations,
-            start=await token.copy_and_replace("room_key", results["start"]).to_string(
+            start=await token.copy_and_replace("room_key", results.start).to_string(
                 self.store
             ),
-            end=await token.copy_and_replace("room_key", results["end"]).to_string(
+            end=await token.copy_and_replace("room_key", results.end).to_string(
                 self.store
             ),
         )
