@@ -246,7 +246,9 @@ POWER_LEVELS_SCHEMA = {
 
 # This could return something newer than Draft 7, but that's the current "latest"
 # validator.
-def _create_power_level_validator() -> jsonschema.Draft7Validator:
+#
+# See https://github.com/python/typeshed/issues/7028 for the ignored return type.
+def _create_power_level_validator() -> jsonschema.Draft7Validator:  # type: ignore[valid-type]
     validator = jsonschema.validators.validator_for(POWER_LEVELS_SCHEMA)
 
     # by default jsonschema does not consider a frozendict to be an object so
