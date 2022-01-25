@@ -14,6 +14,17 @@ Bugfixes
 - Fix a bug introduced in Synapse 1.40.0 that caused Synapse to fail to process incoming federation traffic after handling a large amount of events in a v1 room. ([\#11806](https://github.com/matrix-org/synapse/issues/11806))
 
 
+Synapse 1.50.2 (2022-01-24)
+===========================
+
+This release includes the same bugfix as Synapse 1.51.0rc2.
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.40.0 that caused Synapse to fail to process incoming federation traffic after handling a large amount of events in a v1 room. ([\#11806](https://github.com/matrix-org/synapse/issues/11806))
+
+
 Synapse 1.51.0rc1 (2022-01-21)
 ==============================
 
@@ -87,15 +98,6 @@ Internal Changes
 - Add a unit test that checks both `client` and `webclient` resources will function when simultaneously enabled. ([\#11765](https://github.com/matrix-org/synapse/issues/11765))
 - Allow overriding complement commit using `COMPLEMENT_REF`. ([\#11766](https://github.com/matrix-org/synapse/issues/11766))
 - Add some comments and type annotations for `_update_outliers_txn`. ([\#11776](https://github.com/matrix-org/synapse/issues/11776))
-
-
-Synapse 1.50.2 (2022-01-24)
-===========================
-
-Bugfixes
---------
-
-- Backport the sole fix from v1.51.0rc2. This fixes a bug introduced in Synapse 1.40.0 that caused Synapse to fail to process incoming federation traffic after handling a large amount of events in a v1 room. ([\#11806](https://github.com/matrix-org/synapse/issues/11806))
 
 
 Synapse 1.50.1 (2022-01-18)
