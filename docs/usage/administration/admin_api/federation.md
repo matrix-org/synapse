@@ -86,7 +86,7 @@ The following fields are returned in the JSON response body:
 - `next_token`: string representing a positive integer - Indication for pagination. See above.
 - `total` - integer - Total number of destinations.
 
-# Destination Details API
+## Destination Details API
 
 This API gets the retry timing info for a specific remote server.
 
@@ -107,6 +107,12 @@ A response body like the following is returned:
    "last_successful_stream_ordering": null
 }
 ```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `destination` - Name of the remote server.
 
 **Response**
 
@@ -172,3 +178,35 @@ The following fields are returned in the JSON response body:
     to this destination in this room.
 - `next_token`: string representing a positive integer - Indication for pagination. See above.
 - `total` - integer - Total number of destinations.
+
+## Reset connection timeout
+
+Synapse makes federation requests to other homeservers. If a federation request fails,
+Synapse will mark the destination homeserver as offline, preventing any future requests
+to that server for a "cooldown" period. This period grows over time if the server
+continues to fail its responses
+([exponential backoff](https://en.wikipedia.org/wiki/Exponential_backoff)).
+
+Admins can cancel the cooldown period with this API.
+
+This API resets the retry timing for a specific remote server and tries to connect to
+the remote server again. It does not wait for the next `retry_interval`.
+The connection must have previously run into an error and `retry_last_ts`
+([Destination Details API](#destination-details-api)) must not be equal to `0`.
+
+The connection attempt is carried out in the background and can take a while
+even if the API already returns the http status 200.
+
+The API is:
+
+```
+POST /_synapse/admin/v1/federation/destinations/<destination>/reset_connection
+
+{}
+```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `destination` - Name of the remote server.

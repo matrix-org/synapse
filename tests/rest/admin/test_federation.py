@@ -43,18 +43,22 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
     @parameterized.expand(
         [
-            ("/_synapse/admin/v1/federation/destinations",),
-            ("/_synapse/admin/v1/federation/destinations/dummy",),
+            ("GET", "/_synapse/admin/v1/federation/destinations"),
+            ("GET", "/_synapse/admin/v1/federation/destinations/dummy"),
+            (
+                "POST",
+                "/_synapse/admin/v1/federation/destinations/dummy/reset_connection",
+            ),
         ]
     )
-    def test_requester_is_no_admin(self, url: str) -> None:
+    def test_requester_is_no_admin(self, method: str, url: str) -> None:
         """If the user is not a server admin, an error 403 is returned."""
 
         self.register_user("user", "pass", admin=False)
         other_user_tok = self.login("user", "pass")
 
         channel = self.make_request(
-            "GET",
+            method,
             url,
             content={},
             access_token=other_user_tok,
@@ -110,6 +114,16 @@ class FederationTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET",
             self.url + "/dummy",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+
+        # invalid destination
+        channel = self.make_request(
+            "POST",
+            self.url + "/dummy/reset_connection",
             access_token=self.admin_user_tok,
         )
 
@@ -427,6 +441,39 @@ class FederationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(0, channel.json_body["retry_interval"])
         self.assertIsNone(channel.json_body["failure_ts"])
         self.assertIsNone(channel.json_body["last_successful_stream_ordering"])
+
+    def test_destination_reset_connection(self) -> None:
+        """Reset timeouts and wake up destination."""
+        self._create_destination("sub0.example.com", 100, 100, 100)
+
+        channel = self.make_request(
+            "POST",
+            self.url + "/sub0.example.com/reset_connection",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+
+        retry_timings = self.get_success(
+            self.store.get_destination_retry_timings("sub0.example.com")
+        )
+        self.assertIsNone(retry_timings)
+
+    def test_destination_reset_connection_not_required(self) -> None:
+        """Try to reset timeouts of a destination with no timeouts and get an error."""
+        self._create_destination("sub0.example.com", None, 0, 0)
+
+        channel = self.make_request(
+            "POST",
+            self.url + "/sub0.example.com/reset_connection",
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(
+            "The retry timing does not need to be reset for this destination.",
+            channel.json_body["error"],
+        )
 
     def _create_destination(
         self,
