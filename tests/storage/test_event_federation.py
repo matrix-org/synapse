@@ -513,16 +513,16 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         self.assertSetEqual(difference, set())
 
     @parameterized.expand(
-        [(room_version,) for room_version in KNOWN_ROOM_VERSIONS.values()]
+        [(event_format_v1,) for event_format_v1 in (True, False)]
     )
-    def test_prune_inbound_federation_queue(self, room_version: RoomVersion):
+    def test_prune_inbound_federation_queue(self, event_format_v1: bool):
         """Test that pruning of inbound federation queues work"""
 
         room_id = "some_room_id"
 
         def prev_event_format(prev_event_id: str) -> Union[Tuple[str, dict], str]:
             """Account for differences in prev_events format across room versions"""
-            if room_version.event_format == EventFormatVersions.V1:
+            if event_format_v1:
                 return prev_event_id, {}
 
             return prev_event_id
