@@ -435,7 +435,8 @@ async def start(hs: "HomeServer") -> None:
     # before we start the listeners.
     module_api = hs.get_module_api()
     for module, config in hs.config.modules.loaded_modules:
-        module(config=config, api=module_api)
+        m = module(config=config, api=module_api)
+        logger.info("Loaded module %s", m)
 
     load_legacy_spam_checkers(hs)
     load_legacy_third_party_event_rules(hs)
