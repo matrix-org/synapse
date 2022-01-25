@@ -20,7 +20,7 @@ from prometheus_client import Counter, Gauge
 
 from synapse.api.constants import MAX_DEPTH
 from synapse.api.errors import StoreError
-from synapse.api.room_versions import EventFormatVersions, RoomVersion
+from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase, make_event_from_dict
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause

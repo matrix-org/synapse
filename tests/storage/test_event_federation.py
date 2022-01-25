@@ -17,11 +17,6 @@ from typing import Tuple, Union
 import attr
 from parameterized import parameterized
 
-from synapse.api.room_versions import (
-    KNOWN_ROOM_VERSIONS,
-    EventFormatVersions,
-    RoomVersion,
-)
 from synapse.events import _EventInternalMetadata
 from synapse.util import json_encoder
 
