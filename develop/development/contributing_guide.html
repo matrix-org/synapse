@@ -218,6 +218,7 @@ setup a <em>virtualenv</em>, as follows:</p>
 <pre><code class="language-sh">cd path/where/you/have/cloned/the/repository
 python3 -m venv ./env
 source ./env/bin/activate
+pip install wheel
 pip install -e &quot;.[all,dev]&quot;
 pip install tox
 </code></pre>
@@ -261,7 +262,7 @@ want to test your code.</p>
 <li>ensure that your code follows the coding style adopted by the project;</li>
 <li>catch a number of errors in your code.</li>
 </ul>
-<p>They're pretty fast, don't hesitate!</p>
+<p>The linter takes no time at all to run as soon as you've <a href="#4-install-the-dependencies">downloaded the dependencies into your python virtual environment</a>.</p>
 <pre><code class="language-sh">source ./env/bin/activate
 ./scripts-dev/lint.sh
 </code></pre>
