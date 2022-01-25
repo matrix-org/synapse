@@ -139,7 +139,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
     async def get_new_messages_for_device(
         self,
         user_id: str,
-        device_id: Optional[str],
+        device_id: str,
         last_stream_id: int,
         current_stream_id: int,
         limit: int = 100,
@@ -197,7 +197,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
     @trace
     async def delete_messages_for_device(
-        self, user_id: str, device_id: Optional[str], up_to_stream_id: int
+        self, user_id: str, device_id: str, up_to_stream_id: int
     ) -> int:
         """
         Args:

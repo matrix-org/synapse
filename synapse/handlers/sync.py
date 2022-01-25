@@ -90,7 +90,7 @@ class SyncConfig:
     filter_collection: FilterCollection
     is_guest: bool
     request_key: SyncRequestKey
-    device_id: Optional[str]
+    device_id: str
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -288,7 +288,7 @@ class SyncHandler:
 
         # ExpiringCache((User, Device)) -> LruCache(user_id => event_id)
         self.lazy_loaded_members_cache: ExpiringCache[
-            Tuple[str, Optional[str]], LruCache[str, str]
+            Tuple[str, str], LruCache[str, str]
         ] = ExpiringCache(
             "lazy_loaded_members_cache",
             self.clock,
@@ -833,7 +833,7 @@ class SyncHandler:
         return summary
 
     def get_lazy_loaded_members_cache(
-        self, cache_key: Tuple[str, Optional[str]]
+        self, cache_key: Tuple[str, str]
     ) -> LruCache[str, str]:
         cache: Optional[LruCache[str, str]] = self.lazy_loaded_members_cache.get(
             cache_key

@@ -125,6 +125,9 @@ class SyncRestServlet(RestServlet):
         user = requester.user
         device_id = requester.device_id
 
+        # We must have a device ID, as this request is authenticated.
+        assert device_id
+
         timeout = parse_integer(request, "timeout", default=0)
         since = parse_string(request, "since")
         set_presence = parse_string(
