@@ -55,19 +55,19 @@ https://matrix-org.github.io/synapse/latest/templates.html
 ---------------------------------------------------------------------------------------"""
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class EmailSubjectConfig:
-    message_from_person_in_room = attr.ib(type=str)
-    message_from_person = attr.ib(type=str)
-    messages_from_person = attr.ib(type=str)
-    messages_in_room = attr.ib(type=str)
-    messages_in_room_and_others = attr.ib(type=str)
-    messages_from_person_and_others = attr.ib(type=str)
-    invite_from_person = attr.ib(type=str)
-    invite_from_person_to_room = attr.ib(type=str)
-    invite_from_person_to_space = attr.ib(type=str)
-    password_reset = attr.ib(type=str)
-    email_validation = attr.ib(type=str)
+    message_from_person_in_room: str
+    message_from_person: str
+    messages_from_person: str
+    messages_in_room: str
+    messages_in_room_and_others: str
+    messages_from_person_and_others: str
+    invite_from_person: str
+    invite_from_person_to_room: str
+    invite_from_person_to_space: str
+    password_reset: str
+    email_validation: str
 
 
 class EmailConfig(Config):

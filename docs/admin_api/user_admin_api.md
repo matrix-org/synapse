@@ -15,9 +15,10 @@ server admin: [Admin API](../usage/administration/admin_api)
 
 It returns a JSON body like the following:
 
-```json
+```jsonc
 {
-    "displayname": "User",
+    "name": "@user:example.com",
+    "displayname": "User", // can be null if not set
     "threepids": [
         {
             "medium": "email",
@@ -32,11 +33,11 @@ It returns a JSON body like the following:
             "validated_at": 1586458409743
         }
     ],
-    "avatar_url": "<avatar_url>",
+    "avatar_url": "<avatar_url>",  // can be null if not set
+    "is_guest": 0,
     "admin": 0,
     "deactivated": 0,
     "shadow_banned": 0,
-    "password_hash": "$2b$12$p9B4GkqYdRTPGD",
     "creation_ts": 1560432506,
     "appservice_id": null,
     "consent_server_notice_sent": null,

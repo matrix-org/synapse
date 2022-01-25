@@ -56,7 +56,6 @@ from synapse.api.room_versions import (
 from synapse.events import EventBase, builder
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.transport.client import SendJoinResponse
-from synapse.logging.utils import log_function
 from synapse.types import JsonDict, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -119,7 +118,8 @@ class FederationClient(FederationBase):
         # It is a map of (room ID, suggested-only) -> the response of
         # get_room_hierarchy.
         self._get_room_hierarchy_cache: ExpiringCache[
-            Tuple[str, bool], Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]
+            Tuple[str, bool],
+            Tuple[JsonDict, Sequence[JsonDict], Sequence[JsonDict], Sequence[str]],
         ] = ExpiringCache(
             cache_name="get_room_hierarchy_cache",
             clock=self._clock,
@@ -144,7 +144,6 @@ class FederationClient(FederationBase):
             if destination_dict:
                 self.pdu_destination_tried[event_id] = destination_dict
 
-    @log_function
     async def make_query(
         self,
         destination: str,
@@ -178,7 +177,6 @@ class FederationClient(FederationBase):
             ignore_backoff=ignore_backoff,
         )
 
-    @log_function
     async def query_client_keys(
         self, destination: str, content: JsonDict, timeout: int
     ) -> JsonDict:
@@ -196,7 +194,6 @@ class FederationClient(FederationBase):
             destination, content, timeout
         )
 
-    @log_function
     async def query_user_devices(
         self, destination: str, user_id: str, timeout: int = 30000
     ) -> JsonDict:
@@ -208,7 +205,6 @@ class FederationClient(FederationBase):
             destination, user_id, timeout
         )
 
-    @log_function
     async def claim_client_keys(
         self, destination: str, content: JsonDict, timeout: int
     ) -> JsonDict:
@@ -1338,7 +1334,7 @@ class FederationClient(FederationBase):
         destinations: Iterable[str],
         room_id: str,
         suggested_only: bool,
-    ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]:
+    ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[JsonDict], Sequence[str]]:
         """
         Call other servers to get a hierarchy of the given room.
 
@@ -1353,7 +1349,8 @@ class FederationClient(FederationBase):
 
         Returns:
             A tuple of:
-                The room as a JSON dictionary.
+                The room as a JSON dictionary, without a "children_state" key.
+                A list of `m.space.child` state events.
                 A list of children rooms, as JSON dictionaries.
                 A list of inaccessible children room IDs.
 
@@ -1368,7 +1365,7 @@ class FederationClient(FederationBase):
 
         async def send_request(
             destination: str,
-        ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]:
+        ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[JsonDict], Sequence[str]]:
             try:
                 res = await self.transport_layer.get_room_hierarchy(
                     destination=destination,
@@ -1397,7 +1394,7 @@ class FederationClient(FederationBase):
                 raise InvalidResponseError("'room' must be a dict")
 
             # Validate children_state of the room.
-            children_state = room.get("children_state", [])
+            children_state = room.pop("children_state", [])
             if not isinstance(children_state, Sequence):
                 raise InvalidResponseError("'room.children_state' must be a list")
             if any(not isinstance(e, dict) for e in children_state):
@@ -1426,7 +1423,7 @@ class FederationClient(FederationBase):
                     "Invalid room ID in 'inaccessible_children' list"
                 )
 
-            return room, children, inaccessible_children
+            return room, children_state, children, inaccessible_children
 
         try:
             result = await self._try_destination_list(
@@ -1474,8 +1471,6 @@ class FederationClient(FederationBase):
                 if event.room_id == room_id:
                     children_events.append(event.data)
                     children_room_ids.add(event.state_key)
-            # And add them under the requested room.
-            requested_room["children_state"] = children_events
 
             # Find the children rooms.
             children = []
@@ -1485,7 +1480,7 @@ class FederationClient(FederationBase):
 
             # It isn't clear from the response whether some of the rooms are
             # not accessible.
-            result = (requested_room, children, ())
+            result = (requested_room, children_events, children, ())
 
         # Cache the result to avoid fetching data over federation every time.
         self._get_room_hierarchy_cache[(room_id, suggested_only)] = result
