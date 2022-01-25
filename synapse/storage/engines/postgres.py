@@ -60,8 +60,8 @@ class PostgresEngine(BaseDatabaseEngine):
         self._version = db_conn.server_version
 
         # Are we on a supported PostgreSQL version?
-        if not allow_outdated_version and self._version < 90600:
-            raise RuntimeError("Synapse requires PostgreSQL 9.6 or above.")
+        if not allow_outdated_version and self._version < 100000:
+            raise RuntimeError("Synapse requires PostgreSQL 10 or above.")
 
         with db_conn.cursor() as txn:
             txn.execute("SHOW SERVER_ENCODING")
