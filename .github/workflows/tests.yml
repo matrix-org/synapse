@@ -329,6 +329,7 @@ jobs:
       # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-system-path
       - name: "Set Go Version"
         run: |
+          # Add Go 1.17 to the PATH: see https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md#environment-variables-2
           echo "$GOROOT_1_17_X64/bin" >> $GITHUB_PATH
           echo "~/go/bin" >> $GITHUB_PATH
 
