@@ -16,6 +16,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import Codes, NotFoundError, SynapseError
+from synapse.federation.transport.server import Authenticator
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
@@ -90,7 +91,7 @@ class ListDestinationsRestServlet(RestServlet):
         return HTTPStatus.OK, response
 
 
-class DestinationsRestServlet(RestServlet):
+class DestinationRestServlet(RestServlet):
     """Get details of a destination.
     This needs user to have administrator access in Synapse.
 
@@ -145,3 +146,44 @@ class DestinationsRestServlet(RestServlet):
             }
 
         return HTTPStatus.OK, response
+
+
+class DestinationResetConnectionRestServlet(RestServlet):
+    """Reset destinations' connection timeouts and wake it up.
+    This needs user to have administrator access in Synapse.
+
+    POST /_synapse/admin/v1/federation/destinations/<destination>/reset_connection
+    {}
+
+    returns:
+        200 OK otherwise an error.
+    """
+
+    PATTERNS = admin_patterns(
+        "/federation/destinations/(?P<destination>[^/]+)/reset_connection$"
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastore()
+        self._authenticator = Authenticator(hs)
+
+    async def on_POST(
+        self, request: SynapseRequest, destination: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self._auth, request)
+
+        if not await self._store.is_destination_known(destination):
+            raise NotFoundError("Unknown destination")
+
+        retry_timings = await self._store.get_destination_retry_timings(destination)
+        if not (retry_timings and retry_timings.retry_last_ts):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "The retry timing does not need to be reset for this destination.",
+            )
+
+        # reset timings and wake up
+        await self._authenticator.reset_retry_timings(destination)
+
+        return HTTPStatus.OK, {}
