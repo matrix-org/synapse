@@ -15,6 +15,7 @@ import platform
 import struct
 import threading
 import typing
+from typing import Optional
 
 from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.types import Connection
@@ -120,6 +121,12 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
     def attempt_to_set_autocommit(self, conn: Connection, autocommit: bool):
         # Twisted doesn't let us set attributes on the connections, so we can't
         # set the connection to autocommit mode.
+        pass
+
+    def attempt_to_set_isolation_level(
+        self, conn: Connection, isolation_level: Optional[int]
+    ):
+        # All transactions are SERIALIZABLE by default in sqllite
         pass
 
 
