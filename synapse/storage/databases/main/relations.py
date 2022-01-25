@@ -62,6 +62,9 @@ class BundledAggregations:
     replace: Optional[EventBase] = None
     thread: Optional[_ThreadAggregation] = None
 
+    def __bool__(self) -> bool:
+        return bool(self.annotations or self.references or self.replace or self.thread)
+
 
 class RelationsWorkerStore(SQLBaseStore):
     def __init__(
@@ -688,7 +691,7 @@ class RelationsWorkerStore(SQLBaseStore):
         results = {}
         for event in events:
             event_result = await self._get_bundled_aggregation_for_event(event, user_id)
-            if event_result is not None:
+            if event_result:
                 results[event.event_id] = event_result
 
         return results
