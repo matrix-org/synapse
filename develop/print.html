@@ -12289,7 +12289,7 @@ to this destination, or <code>null</code> if this information has not been track
 <li><code>next_token</code>: string representing a positive integer - Indication for pagination. See above.</li>
 <li><code>total</code> - integer - Total number of destinations.</li>
 </ul>
-<h1 id="destination-details-api"><a class="header" href="#destination-details-api">Destination Details API</a></h1>
+<h2 id="destination-details-api"><a class="header" href="#destination-details-api">Destination Details API</a></h2>
 <p>This API gets the retry timing info for a specific remote server.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/federation/destinations/&lt;destination&gt;
@@ -12303,9 +12303,37 @@ to this destination, or <code>null</code> if this information has not been track
    &quot;last_successful_stream_ordering&quot;: null
 }
 </code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>destination</code> - Name of the remote server.</li>
+</ul>
 <p><strong>Response</strong></p>
 <p>The response fields are the same like in the <code>destinations</code> array in
 <a href="usage/administration/admin_api/federation.html#list-of-destinations">List of destinations</a> response.</p>
+<h2 id="reset-connection-timeout"><a class="header" href="#reset-connection-timeout">Reset connection timeout</a></h2>
+<p>Synapse makes federation requests to other homeservers. If a federation request fails,
+Synapse will mark the destination homeserver as offline, preventing any future requests
+to that server for a &quot;cooldown&quot; period. This period grows over time if the server
+continues to fail its responses
+(<a href="https://en.wikipedia.org/wiki/Exponential_backoff">exponential backoff</a>).</p>
+<p>Admins can cancel the cooldown period with this API.</p>
+<p>This API resets the retry timing for a specific remote server and tries to connect to
+the remote server again. It does not wait for the next <code>retry_interval</code>.
+The connection must have previously run into an error and <code>retry_last_ts</code>
+(<a href="usage/administration/admin_api/federation.html#destination-details-api">Destination Details API</a>) must not be equal to <code>0</code>.</p>
+<p>The connection attempt is carried out in the background and can take a while
+even if the API already returns the http status 200.</p>
+<p>The API is:</p>
+<pre><code>POST /_synapse/admin/v1/federation/destinations/&lt;destination&gt;/reset_connection
+
+{}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>destination</code> - Name of the remote server.</li>
+</ul>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="using-the-synapse-manhole"><a class="header" href="#using-the-synapse-manhole">Using the synapse manhole</a></h1>
 <p>The &quot;manhole&quot; allows server administrators to access a Python shell on a running
 Synapse installation. This is a very powerful mechanism for administration and
