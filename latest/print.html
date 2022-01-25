@@ -395,7 +395,7 @@ and mounting it to <code>/var/synapse</code> should be taken into consideration.
 <p>System requirements:</p>
 <ul>
 <li>POSIX-compliant system (tested on Linux &amp; OS X)</li>
-<li>Python 3.6 or later, up to Python 3.9.</li>
+<li>Python 3.7 or later, up to Python 3.9.</li>
 <li>At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org</li>
 </ul>
 <p>To install the Synapse homeserver run:</p>
@@ -1283,11 +1283,22 @@ cert=/path/to/fullchain.pem
 
 # TLS private key file
 pkey=/path/to/privkey.pem
+
+# Ensure the configuration lines that disable TLS/DTLS are commented-out or removed
+#no-tls
+#no-dtls
 </code></pre>
 <p>In this case, replace the <code>turn:</code> schemes in the <code>turn_uris</code> settings below
 with <code>turns:</code>.</p>
 <p>We recommend that you only try to set up TLS/DTLS once you have set up a
 basic installation and got it working.</p>
+<p>NB: If your TLS certificate was provided by Let's Encrypt, TLS/DTLS will
+not work with any Matrix client that uses Chromium's WebRTC library. This
+currently includes Element Android &amp; iOS; for more details, see their
+<a href="https://github.com/vector-im/element-android/issues/1533">respective</a>
+<a href="https://github.com/vector-im/element-ios/issues/2712">issues</a> as well as the underlying
+<a href="https://bugs.chromium.org/p/webrtc/issues/detail?id=11710">WebRTC issue</a>.
+Consider using a ZeroSSL certificate for your TURN server as a working alternative.</p>
 </li>
 <li>
 <p>Ensure your firewall allows traffic into the TURN server on the ports
@@ -1387,6 +1398,11 @@ TURN ports (normally 3478 and 5349).</p>
 <li>
 <p>Check that you have opened your firewall to allow UDP traffic to the UDP
 relay ports (49152-65535 by default).</p>
+</li>
+<li>
+<p>Try disabling <code>coturn</code>'s TLS/DTLS listeners and enable only its (unencrypted)
+TCP/UDP listeners. (This will only leave signaling traffic unencrypted;
+voice &amp; video WebRTC traffic is always encrypted.)</p>
 </li>
 <li>
 <p>Some WebRTC implementations (notably, that of Google Chrome) appear to get
@@ -1622,6 +1638,12 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1510"><a class="header" href="#upgrading-to-v1510">Upgrading to v1.51.0</a></h1>
+<h2 id="deprecation-of-webclient-listeners-and-non-https-web_client_location"><a class="header" href="#deprecation-of-webclient-listeners-and-non-https-web_client_location">Deprecation of <code>webclient</code> listeners and non-HTTP(S) <code>web_client_location</code></a></h2>
+<p>Listeners of type  <code>webclient</code> are deprecated and scheduled to be removed in
+Synapse v1.53.0.</p>
+<p>Similarly, a non-HTTP(S) <code>web_client_location</code> configuration is deprecated and
+will become a configuration error in Synapse v1.53.0.</p>
 <h1 id="upgrading-to-v1500"><a class="header" href="#upgrading-to-v1500">Upgrading to v1.50.0</a></h1>
 <h2 id="dropping-support-for-old-python-and-postgres-versions"><a class="header" href="#dropping-support-for-old-python-and-postgres-versions">Dropping support for old Python and Postgres versions</a></h2>
 <p>In line with our <a href="deprecation_policy.html">deprecation policy</a>,
@@ -3188,13 +3210,7 @@ server_name: &quot;SERVERNAME&quot;
 #
 pid_file: DATADIR/homeserver.pid
 
-# The absolute URL to the web client which /_matrix/client will redirect
-# to if 'webclient' is configured under the 'listeners' configuration.
-#
-# This option can be also set to the filesystem path to the web client
-# which will be served at /_matrix/client/ if 'webclient' is configured
-# under the 'listeners' configuration, however this is a security risk:
-# https://github.com/matrix-org/synapse#security-note
+# The absolute URL to the web client which / will redirect to.
 #
 #web_client_location: https://riot.example.com/
 
@@ -3278,7 +3294,7 @@ presence:
 # The default room version for newly created rooms.
 #
 # Known room versions are listed here:
-# https://matrix.org/docs/spec/#complete-list-of-room-versions
+# https://spec.matrix.org/latest/rooms/#complete-list-of-room-versions
 #
 # For example, for room version 1, default_room_version should be set
 # to &quot;1&quot;.
@@ -3423,8 +3439,6 @@ presence:
 #
 #   static: static resources under synapse/static (/_matrix/static). (Mostly
 #       useful for 'fallback authentication'.)
-#
-#   webclient: A web client. Requires web_client_location to be set.
 #
 listeners:
   # TLS-enabled listener: for when matrix traffic is sent directly to synapse.
@@ -4617,6 +4631,21 @@ room_prejoin_state:
    #additional_event_types:
    #  - org.example.custom.event.type
 
+# We record the IP address of clients used to access the API for various
+# reasons, including displaying it to the user in the &quot;Where you're signed in&quot;
+# dialog.
+#
+# By default, when puppeting another user via the admin API, the client IP
+# address is recorded against the user who created the access token (ie, the
+# admin user), and *not* the puppeted user.
+#
+# Uncomment the following to also record the IP address against the puppeted
+# user. (This also means that the puppeted user will count as an &quot;active&quot; user
+# for the purpose of monthly active user tracking - see 'limit_usage_by_mau' etc
+# above.)
+#
+#track_puppeted_user_ips: true
+
 
 # A list of application service config files to use
 #
@@ -4984,10 +5013,13 @@ saml2_config:
 #       Defaults to false. Avoid this in production.
 #
 #   user_profile_method: Whether to fetch the user profile from the userinfo
-#       endpoint. Valid values are: 'auto' or 'userinfo_endpoint'.
+#       endpoint, or to rely on the data returned in the id_token from the
+#       token_endpoint.
 #
-#       Defaults to 'auto', which fetches the userinfo endpoint if 'openid' is
-#       included in 'scopes'. Set to 'userinfo_endpoint' to always fetch the
+#       Valid values are: 'auto' or 'userinfo_endpoint'.
+#
+#       Defaults to 'auto', which uses the userinfo endpoint if 'openid' is
+#       not included in 'scopes'. Set to 'userinfo_endpoint' to always use the
 #       userinfo endpoint.
 #
 #   allow_existing_users: set to 'true' to allow a user logging in via OIDC to
@@ -6674,8 +6706,6 @@ https://developers.google.com/identity/protocols/oauth2/openid-connect#appsetup)
         display_name_template: '{{ user.name }}'
 </code></pre>
 <h3 id="facebook"><a class="header" href="#facebook">Facebook</a></h3>
-<p>Like Github, Facebook provide a custom OAuth2 API rather than an OIDC-compliant
-one so requires a little more configuration.</p>
 <ol start="0">
 <li>You will need a Facebook developer account. You can register for one
 <a href="https://developers.facebook.com/async/registration/">here</a>.</li>
@@ -6697,25 +6727,28 @@ and &quot;App Secret&quot; for use below.</li>
     idp_name: Facebook
     idp_brand: &quot;facebook&quot;  # optional: styling hint for clients
     discover: false
-    issuer: &quot;https://facebook.com&quot;
+    issuer: &quot;https://www.facebook.com&quot;
     client_id: &quot;your-client-id&quot; # TO BE FILLED
     client_secret: &quot;your-client-secret&quot; # TO BE FILLED
     scopes: [&quot;openid&quot;, &quot;email&quot;]
-    authorization_endpoint: https://facebook.com/dialog/oauth
-    token_endpoint: https://graph.facebook.com/v9.0/oauth/access_token
-    user_profile_method: &quot;userinfo_endpoint&quot;
-    userinfo_endpoint: &quot;https://graph.facebook.com/v9.0/me?fields=id,name,email,picture&quot;
+    authorization_endpoint: &quot;https://facebook.com/dialog/oauth&quot;
+    token_endpoint: &quot;https://graph.facebook.com/v9.0/oauth/access_token&quot;
+    jwks_uri: &quot;https://www.facebook.com/.well-known/oauth/openid/jwks/&quot;
     user_mapping_provider:
       config:
-        subject_claim: &quot;id&quot;
         display_name_template: &quot;{{ user.name }}&quot;
+        email_template: &quot;{{ '{{ user.email }}' }}&quot;
 </code></pre>
 <p>Relevant documents:</p>
 <ul>
-<li>https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow</li>
-<li>Using Facebook's Graph API: https://developers.facebook.com/docs/graph-api/using-graph-api/</li>
-<li>Reference to the User endpoint: https://developers.facebook.com/docs/graph-api/reference/user</li>
+<li><a href="https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow">Manually Build a Login Flow</a></li>
+<li><a href="https://developers.facebook.com/docs/graph-api/using-graph-api/">Using Facebook's Graph API</a></li>
+<li><a href="https://developers.facebook.com/docs/graph-api/reference/user">Reference to the User endpoint</a></li>
 </ul>
+<p>Facebook do have an <a href="https://www.facebook.com/.well-known/openid-configuration">OIDC discovery endpoint</a>,
+but it has a <code>response_types_supported</code> which excludes &quot;code&quot; (which we rely on, and
+is even mentioned in their <a href="https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow#login">documentation</a>),
+so we have to disable discovery and configure the URIs manually.</p>
 <h3 id="gitea"><a class="header" href="#gitea">Gitea</a></h3>
 <p>Gitea is, like Github, not an OpenID provider, but just an OAuth2 provider.</p>
 <p>The <a href="https://try.gitea.io/api/swagger#/user/userGetCurrent"><code>/user</code> API endpoint</a>
@@ -7738,6 +7771,14 @@ and saves the local media metadata.</li>
 <ol>
 <li>Decodes the HTML via the stored file.</li>
 <li>Generates an Open Graph response from the HTML.</li>
+<li>If a JSON oEmbed URL was found in the HTML via autodiscovery:
+<ol>
+<li>Downloads the URL and stores it into a file via the media storage provider
+and saves the local media metadata.</li>
+<li>Convert the oEmbed response to an Open Graph response.</li>
+<li>Override any Open Graph data from the HTML with data from oEmbed.</li>
+</ol>
+</li>
 <li>If an image exists in the Open Graph response:
 <ol>
 <li>Downloads the URL and stores it into a file via the media storage
@@ -11154,8 +11195,9 @@ about the user and their local media. Objects contain the following fields:
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
 server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>It returns a JSON body like the following:</p>
-<pre><code class="language-json">{
-    &quot;displayname&quot;: &quot;User&quot;,
+<pre><code class="language-jsonc">{
+    &quot;name&quot;: &quot;@user:example.com&quot;,
+    &quot;displayname&quot;: &quot;User&quot;, // can be null if not set
     &quot;threepids&quot;: [
         {
             &quot;medium&quot;: &quot;email&quot;,
@@ -11170,11 +11212,11 @@ server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a
             &quot;validated_at&quot;: 1586458409743
         }
     ],
-    &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;,
+    &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;,  // can be null if not set
+    &quot;is_guest&quot;: 0,
     &quot;admin&quot;: 0,
     &quot;deactivated&quot;: 0,
     &quot;shadow_banned&quot;: 0,
-    &quot;password_hash&quot;: &quot;$2b$12$p9B4GkqYdRTPGD&quot;,
     &quot;creation_ts&quot;: 1560432506,
     &quot;appservice_id&quot;: null,
     &quot;consent_server_notice_sent&quot;: null,
@@ -12886,7 +12928,8 @@ license - in our case, this is almost always Apache Software License v2 (see
 recommended for development. More information about WSL can be found at
 <a href="https://docs.microsoft.com/en-us/windows/wsl/install">https://docs.microsoft.com/en-us/windows/wsl/install</a>. Running Synapse natively
 on Windows is not officially supported.</p>
-<p>The code of Synapse is written in Python 3. To do pretty much anything, you'll need <a href="https://wiki.python.org/moin/BeginnersGuide/Download">a recent version of Python 3</a>.</p>
+<p>The code of Synapse is written in Python 3. To do pretty much anything, you'll need <a href="https://www.python.org/downloads/">a recent version of Python 3</a>. Your Python also needs support for <a href="https://docs.python.org/3/library/venv.html">virtual environments</a>. This is usually built-in, but some Linux distributions like Debian and Ubuntu split it out into its own package. Running <code>sudo apt install python3-venv</code> should be enough.</p>
+<p>Synapse can connect to PostgreSQL via the <a href="https://pypi.org/project/psycopg2/">psycopg2</a> Python library. Building this library from source requires access to PostgreSQL's C header files. On Debian or Ubuntu Linux, these can be installed with <code>sudo apt install libpq-dev</code>.</p>
 <p>The source code of Synapse is hosted on GitHub. You will also need <a href="https://github.com/git-guides/install-git">a recent version of git</a>.</p>
 <p>For some tests, you will need <a href="https://docs.docker.com/get-docker/">a recent version of Docker</a>.</p>
 <h1 id="3-get-the-source"><a class="header" href="#3-get-the-source">3. Get the source.</a></h1>
@@ -12980,6 +13023,20 @@ trial tests.rest.admin.test_room tests.handlers.test_admin.ExfiltrateData.test_i
 <p>To increase the log level for the tests, set <code>SYNAPSE_TEST_LOG_LEVEL</code>:</p>
 <pre><code class="language-sh">SYNAPSE_TEST_LOG_LEVEL=DEBUG trial tests
 </code></pre>
+<p>By default, tests will use an in-memory SQLite database for test data. For additional
+help with debugging, one can use an on-disk SQLite database file instead, in order to
+review database state during and after running tests. This can be done by setting
+the <code>SYNAPSE_TEST_PERSIST_SQLITE_DB</code> environment variable. Doing so will cause the
+database state to be stored in a file named <code>test.db</code> under the trial process'
+working directory. Typically, this ends up being <code>_trial_temp/test.db</code>. For example:</p>
+<pre><code class="language-sh">SYNAPSE_TEST_PERSIST_SQLITE_DB=1 trial tests
+</code></pre>
+<p>The database file can then be inspected with:</p>
+<pre><code class="language-sh">sqlite3 _trial_temp/test.db
+</code></pre>
+<p>Note that the database file is cleared at the beginning of each test run. Thus it 
+will always only contain the data generated by the <em>last run test</em>. Though generally
+when debugging, one is only running a single test anyway.</p>
 <h3 id="running-tests-under-postgresql"><a class="header" href="#running-tests-under-postgresql">Running tests under PostgreSQL</a></h3>
 <p>Invoking <code>trial</code> as above will use an in-memory SQLite database. This is great for
 quick development and testing. However, we recommend using a PostgreSQL database
