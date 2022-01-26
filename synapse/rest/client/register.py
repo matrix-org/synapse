@@ -14,7 +14,6 @@
 # limitations under the License.
 import logging
 import random
-import re
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from twisted.web.server import Request
@@ -469,22 +468,13 @@ class RegisterRestServlet(RestServlet):
         else:
             should_issue_refresh_token = False
 
-        # We don't care about usernames for this deployment. In fact, the act
-        # of checking whether they exist already can leak metadata about
-        # which users are already registered.
-        #
-        # Usernames are already derived via the provided email.
-        # So, if they're not necessary, just ignore them.
-        #
-        # (we do still allow appservices to set them below)
+        # Pull out the provided username and do basic sanity checks early since
+        # the auth layer will store these in sessions.
         desired_username = None
-
-        desired_display_name = body.get("display_name")
-
-        # We need to retrieve the password early in order to pass it to
-        # application service registration
-        # This is specific to shadow server registration of users via an AS
-        password = body.pop("password", None)
+        if "username" in body:
+            if not isinstance(body["username"], str) or len(body["username"]) > 512:
+                raise SynapseError(400, "Invalid username")
+            desired_username = body["username"]
 
         # fork off as soon as possible for ASes which have completely
         # different registration flows to normal users
@@ -503,7 +493,7 @@ class RegisterRestServlet(RestServlet):
             # Set the desired user according to the AS API (which uses the
             # 'user' key not 'username'). Since this is a new addition, we'll
             # fallback to 'username' if they gave one.
-            desired_username = body.get("user", body.get("username"))
+            desired_username = body.get("user", desired_username)
 
             # XXX we should check that desired_username is valid. Currently
             # we give appservices carte blanche for any insanity in mxids,
@@ -533,6 +523,16 @@ class RegisterRestServlet(RestServlet):
         if not self._registration_enabled:
             raise SynapseError(403, "Registration has been disabled", Codes.FORBIDDEN)
 
+        # For regular registration, convert the provided username to lowercase
+        # before attempting to register it. This should mean that people who try
+        # to register with upper-case in their usernames don't get a nasty surprise.
+        #
+        # Note that we treat usernames case-insensitively in login, so they are
+        # free to carry on imagining that their username is CrAzYh4cKeR if that
+        # keeps them happy.
+        if desired_username is not None:
+            desired_username = desired_username.lower()
+
         # Check if this account is upgrading from a guest account.
         guest_access_token = body.get("guest_access_token", None)
 
@@ -541,6 +541,7 @@ class RegisterRestServlet(RestServlet):
         # Note that we remove the password from the body since the auth layer
         # will store the body in the session and we don't want a plaintext
         # password store there.
+        password = body.pop("password", None)
         if password is not None:
             if not isinstance(password, str) or len(password) > 512:
                 raise SynapseError(400, "Invalid password")
@@ -626,15 +627,6 @@ class RegisterRestServlet(RestServlet):
                             Codes.THREEPID_DENIED,
                         )
 
-                    existingUid = await self.store.get_user_id_by_threepid(
-                        medium, address
-                    )
-
-                    if existingUid is not None:
-                        raise SynapseError(
-                            400, "%s is already in use" % medium, Codes.THREEPID_IN_USE
-                        )
-
         if registered_user_id is not None:
             logger.info(
                 "Already registered user ID %r for this session", registered_user_id
@@ -702,6 +694,20 @@ class RegisterRestServlet(RestServlet):
             entries = await self.store.get_user_agents_ips_to_ui_auth_session(
                 session_id
             )
+
+            # TODO: This won't be needed anymore once https://github.com/matrix-org/matrix-dinsic/issues/793
+            #  is resolved.
+            desired_display_name = body.get("display_name")
+            if auth_result:
+                if LoginType.EMAIL_IDENTITY in auth_result:
+                    address = auth_result[LoginType.EMAIL_IDENTITY]["address"]
+                    if (
+                        self.hs.config.registration.register_just_use_email_for_display_name
+                    ):
+                        desired_display_name = address
+                    else:
+                        # Custom mapping between email address and display name
+                        desired_display_name = _map_email_to_displayname(address)
 
             registered_user_id = await self.registration_handler.register_user(
                 localpart=desired_username,
