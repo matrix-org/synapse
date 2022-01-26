@@ -63,7 +63,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 removed from Synapse.
         """
         room_version_id = await self.get_room_version_id(room_id)
-        return self.__retrieve_and_check_room_version(room_id, room_version_id)
+        return self._retrieve_and_check_room_version(room_id, room_version_id)
 
     def get_room_version_txn(
         self, txn: LoggingTransaction, room_id: str
@@ -79,9 +79,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 removed from Synapse.
         """
         room_version_id = self.get_room_version_id_txn(txn, room_id)
-        return self.__retrieve_and_check_room_version(room_id, room_version_id)
+        return self._retrieve_and_check_room_version(room_id, room_version_id)
 
-    def __retrieve_and_check_room_version(
+    def _retrieve_and_check_room_version(
         self, room_id: str, room_version_id: str
     ) -> RoomVersion:
         v = KNOWN_ROOM_VERSIONS.get(room_version_id)
