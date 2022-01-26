@@ -423,7 +423,7 @@ class RelationsWorkerStore(SQLBaseStore):
             args.append(RelationTypes.REPLACE)
 
             txn.execute(sql % (clause,), args)
-            return dict(txn.fetchall())
+            return dict(cast(Iterable[Tuple[str, str]], txn.fetchall()))
 
         edit_ids = await self.db_pool.runInteraction(
             "get_applicable_edits", _get_applicable_edits_txn
