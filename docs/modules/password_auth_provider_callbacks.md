@@ -116,18 +116,22 @@ async def get_username_for_registration(
 ) -> Optional[str]
 ```
 
-Called when registering a new user, allowing the module to define the username to give the user.
-The username is the local part of a user's full Matrix ID, i.e. it's `alice` in `@alice:example.com`.
+Called when registering a new user. The module can return a username to set for the user
+being registered by returning it as a string, or `None` if it doesn't wish to force a
+username for this user. If a username is returned, it will be used as the local part of a
+user's full Matrix ID (e.g. it's `alice` in `@alice:example.com`).
 
 This callback is called once [User-Interactive Authentication](https://spec.matrix.org/latest/client-server-api/#user-interactive-authentication-api)
-has been completed by the user. It is passed two dictionaries, which include the information that the user has provided
-during the registration process.
+has been completed by the user. It is not called when registering a user via SSO. It is
+passed two dictionaries, which include the information that the user has provided during
+the registration process.
 
 The first dictionary contains the results of the [User-Interactive Authentication](https://spec.matrix.org/latest/client-server-api/#user-interactive-authentication-api)
 flow followed by the user. Its keys are the identifiers of every step involved in the flow,
 associated with either a boolean value indicating whether the step was correctly completed,
-or additional information (e.g. email address, phone number...). Here's an example featuring
-all currently supported keys:
+or additional information (e.g. email address, phone number...). A list of most existing
+identifiers can be found in the [Matrix specification](https://spec.matrix.org/v1.1/client-server-api/#authentication-types).
+Here's an example featuring all currently supported keys:
 
 ```python
 {

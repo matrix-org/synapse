@@ -759,7 +759,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
             "/register",
             {
                 "username": username,
-                "password": "foo",
+                "password": "bar",
                 "auth": {"type": LoginType.DUMMY},
             },
         )
@@ -781,7 +781,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             "register",
-            {"username": username, "type": "m.login.password", "password": "foo"},
+            {"username": username, "type": "m.login.password", "password": "bar"},
         )
         self.assertEqual(channel.code, 401)
         self.assertIn("session", channel.json_body)

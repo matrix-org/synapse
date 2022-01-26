@@ -2330,8 +2330,9 @@ class PasswordAuthProvider:
                     # data returned by the module fits the expected type. We just want
                     # to make sure this is the case.
                     logger.warning(  # type: ignore[unreachable]
-                        "Ignoring non-string value returned by module in "
-                        "get_username_for_registration: %s",
+                        "Ignoring non-string value returned by"
+                        " get_username_for_registration callback %s: %s",
+                        callback,
                         res,
                     )
             except Exception as e:
