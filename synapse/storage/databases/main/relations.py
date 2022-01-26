@@ -13,7 +13,17 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 import attr
 from frozendict import frozendict
@@ -35,8 +45,7 @@ from synapse.storage.relations import (
     RelationPaginationToken,
 )
 from synapse.types import JsonDict
-from synapse.util.caches.descriptors import cached
-from synapse.util.caches.lrucache import LruCache
+from synapse.util.caches.descriptors import cached, cachedList
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -79,11 +88,6 @@ class RelationsWorkerStore(SQLBaseStore):
 
         self._msc1849_enabled = hs.config.experimental.msc1849_enabled
         self._msc3440_enabled = hs.config.experimental.msc3440_enabled
-
-        self.applicable_edit_cache: LruCache[str, Optional[EventBase]] = LruCache(
-            cache_name="applicable_edit_cache",
-            max_size=1000,
-        )
 
     @cached(tree=True)
     async def get_relations_for_event(
@@ -347,9 +351,14 @@ class RelationsWorkerStore(SQLBaseStore):
             "get_aggregation_groups_for_event", _get_aggregation_groups_for_event_txn
         )
 
+    @cached()
+    def get_applicable_edit(self, event_id: str) -> Optional[EventBase]:
+        raise NotImplementedError()
+
+    @cachedList(cached_method_name="get_applicable_edit", list_name="event_ids")
     async def _get_applicable_edits(
-        self, event_ids: Iterable[str]
-    ) -> Dict[str, EventBase]:
+        self, event_ids: Collection[str]
+    ) -> Dict[str, Optional[EventBase]]:
         """Get the most recent edit (if any) that has happened for the given
         events.
 
@@ -359,26 +368,9 @@ class RelationsWorkerStore(SQLBaseStore):
             event_ids: The original event IDs
 
         Returns:
-            A map of the most recent edit for each event. A missing event implies
-            there is no edits.
+            A map of the most recent edit for each event. If there are no edits,
+            the event will map to None.
         """
-
-        # A map of the original event IDs to the edit events.
-        edits_by_original = {}
-
-        # Check if an edit for this event is currently cached.
-        event_ids_to_check = []
-        for event_id in event_ids:
-            if event_id not in self.applicable_edit_cache:
-                event_ids_to_check.append(event_id)
-            else:
-                edit_event = self.applicable_edit_cache[event_id]
-                if edit_event:
-                    edits_by_original[event_id] = edit_event
-
-        # If all events were cached, all done.
-        if not event_ids_to_check:
-            return edits_by_original
 
         # We only allow edits for `m.room.message` events that have the same sender
         # and event type. We can't assert these things during regular event auth so
@@ -425,7 +417,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
         def _get_applicable_edits_txn(txn: LoggingTransaction) -> Dict[str, str]:
             clause, args = make_in_list_sql_clause(
-                txn.database_engine, "relates_to_id", event_ids_to_check
+                txn.database_engine, "relates_to_id", event_ids
             )
             args.append(RelationTypes.REPLACE)
 
@@ -439,19 +431,14 @@ class RelationsWorkerStore(SQLBaseStore):
 
         edits = await self.get_events(edit_ids.values())  # type: ignore[attr-defined]
 
-        # Add the newly checked events to the cache. If an edit exists, add it to
-        # the results.
-        for original_event_id in event_ids_to_check:
-            # There might not be an edit or the event might not be known. In
-            # either case, cache the None.
-            edit_event_id = edit_ids.get(original_event_id)
-            edit_event = edits.get(edit_event_id)
-
-            self.applicable_edit_cache.set(original_event_id, edit_event)
-            if edit_event:
-                edits_by_original[original_event_id] = edit_event
-
-        return edits_by_original
+        # Map to the original event IDs to the edit events.
+        #
+        # There might not be an edit event due to there being no edits or
+        # due to the event not being known, either case is treated the same.
+        return {
+            original_event_id: edits.get(edit_ids.get(original_event_id))
+            for original_event_id in event_ids
+        }
 
     @cached()
     async def get_thread_summary(
