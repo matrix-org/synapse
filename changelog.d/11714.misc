@@ -1,1 +1,0 @@
-Fix a typechecker problem related to our (ab)use of `nacl.signing.SigningKey`s.

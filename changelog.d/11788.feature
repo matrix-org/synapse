@@ -1,0 +1,1 @@
+Remove account data (including client config, push rules and ignored users) upon user deactivation.

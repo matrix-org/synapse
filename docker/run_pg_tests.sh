@@ -16,4 +16,4 @@ sudo -u postgres /usr/lib/postgresql/10/bin/pg_ctl -w -D /var/lib/postgresql/dat
 # Run the tests
 cd /src
 export TRIAL_FLAGS="-j 4"
-tox --workdir=./.tox-pg-container -e py36-postgres "$@"
+tox --workdir=./.tox-pg-container -e py37-postgres "$@"

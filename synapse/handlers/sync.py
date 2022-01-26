@@ -37,6 +37,7 @@ from synapse.logging.context import current_context
 from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, start_active_span
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.storage.databases.main.event_push_actions import NotifCounts
+from synapse.storage.databases.main.relations import BundledAggregations
 from synapse.storage.roommember import MemberSummary
 from synapse.storage.state import StateFilter
 from synapse.types import (
@@ -98,6 +99,9 @@ class TimelineBatch:
     prev_batch: StreamToken
     events: List[EventBase]
     limited: bool
+    # A mapping of event ID to the bundled aggregations for the above events.
+    # This is only calculated if limited is true.
+    bundled_aggregations: Optional[Dict[str, BundledAggregations]] = None
 
     def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
@@ -630,10 +634,19 @@ class SyncHandler:
 
             prev_batch_token = now_token.copy_and_replace("room_key", room_key)
 
+        # Don't bother to bundle aggregations if the timeline is unlimited,
+        # as clients will have all the necessary information.
+        bundled_aggregations = None
+        if limited or newly_joined_room:
+            bundled_aggregations = await self.store.get_bundled_aggregations(
+                recents, sync_config.user.to_string()
+            )
+
         return TimelineBatch(
             events=recents,
             prev_batch=prev_batch_token,
             limited=limited or newly_joined_room,
+            bundled_aggregations=bundled_aggregations,
         )
 
     async def get_state_after_event(
@@ -1607,7 +1620,7 @@ class SyncHandler:
         # TODO: Can we `SELECT ignored_user_id FROM ignored_users WHERE ignorer_user_id=?;` instead?
         ignored_account_data = (
             await self.store.get_global_account_data_by_type_for_user(
-                AccountDataTypes.IGNORED_USER_LIST, user_id=user_id
+                user_id=user_id, data_type=AccountDataTypes.IGNORED_USER_LIST
             )
         )
 

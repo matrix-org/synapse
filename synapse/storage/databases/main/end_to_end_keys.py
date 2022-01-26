@@ -50,16 +50,16 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class DeviceKeyLookupResult:
     """The type returned by get_e2e_device_keys_and_signatures"""
 
-    display_name = attr.ib(type=Optional[str])
+    display_name: Optional[str]
 
     # the key data from e2e_device_keys_json. Typically includes fields like
     # "algorithm", "keys" (including the curve25519 identity key and the ed25519 signing
     # key) and "signatures" (a map from (user id) to (key id/device_id) to signature.)
-    keys = attr.ib(type=Optional[JsonDict])
+    keys: Optional[JsonDict]
 
 
 class EndToEndKeyBackgroundStore(SQLBaseStore):
@@ -387,15 +387,16 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             self.db_pool.simple_insert_many_txn(
                 txn,
                 table="e2e_one_time_keys_json",
+                keys=(
+                    "user_id",
+                    "device_id",
+                    "algorithm",
+                    "key_id",
+                    "ts_added_ms",
+                    "key_json",
+                ),
                 values=[
-                    {
-                        "user_id": user_id,
-                        "device_id": device_id,
-                        "algorithm": algorithm,
-                        "key_id": key_id,
-                        "ts_added_ms": time_now,
-                        "key_json": json_bytes,
-                    }
+                    (user_id, device_id, algorithm, key_id, time_now, json_bytes)
                     for algorithm, key_id, json_bytes in new_keys
                 ],
             )
@@ -1186,15 +1187,22 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         """
         await self.db_pool.simple_insert_many(
             "e2e_cross_signing_signatures",
-            [
-                {
-                    "user_id": user_id,
-                    "key_id": item.signing_key_id,
-                    "target_user_id": item.target_user_id,
-                    "target_device_id": item.target_device_id,
-                    "signature": item.signature,
-                }
+            keys=(
+                "user_id",
+                "key_id",
+                "target_user_id",
+                "target_device_id",
+                "signature",
+            ),
+            values=[
+                (
+                    user_id,
+                    item.signing_key_id,
+                    item.target_user_id,
+                    item.target_device_id,
+                    item.signature,
+                )
                 for item in signatures
             ],
-            "add_e2e_signing_key",
+            desc="add_e2e_signing_key",
         )

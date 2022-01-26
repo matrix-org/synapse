@@ -74,13 +74,7 @@ server_name: "SERVERNAME"
 #
 pid_file: DATADIR/homeserver.pid
 
-# The absolute URL to the web client which /_matrix/client will redirect
-# to if 'webclient' is configured under the 'listeners' configuration.
-#
-# This option can be also set to the filesystem path to the web client
-# which will be served at /_matrix/client/ if 'webclient' is configured
-# under the 'listeners' configuration, however this is a security risk:
-# https://github.com/matrix-org/synapse#security-note
+# The absolute URL to the web client which / will redirect to.
 #
 #web_client_location: https://riot.example.com/
 
@@ -164,7 +158,7 @@ presence:
 # The default room version for newly created rooms.
 #
 # Known room versions are listed here:
-# https://matrix.org/docs/spec/#complete-list-of-room-versions
+# https://spec.matrix.org/latest/rooms/#complete-list-of-room-versions
 #
 # For example, for room version 1, default_room_version should be set
 # to "1".
@@ -309,8 +303,6 @@ presence:
 #
 #   static: static resources under synapse/static (/_matrix/static). (Mostly
 #       useful for 'fallback authentication'.)
-#
-#   webclient: A web client. Requires web_client_location to be set.
 #
 listeners:
   # TLS-enabled listener: for when matrix traffic is sent directly to synapse.
@@ -1436,6 +1428,16 @@ account_threepid_delegates:
 #
 #auto_join_rooms_for_guests: false
 
+# Whether to inhibit errors raised when registering a new account if the user ID
+# already exists. If turned on, that requests to /register/available will always
+# show a user ID as available, and Synapse won't raise an error when starting
+# a registration with a user ID that already exists. However, Synapse will still
+# raise an error if the registration completes and the username conflicts.
+#
+# Defaults to false.
+#
+#inhibit_user_in_use_error: true
+
 
 ## Metrics ###
 
@@ -1502,6 +1504,21 @@ room_prejoin_state:
    #
    #additional_event_types:
    #  - org.example.custom.event.type
+
+# We record the IP address of clients used to access the API for various
+# reasons, including displaying it to the user in the "Where you're signed in"
+# dialog.
+#
+# By default, when puppeting another user via the admin API, the client IP
+# address is recorded against the user who created the access token (ie, the
+# admin user), and *not* the puppeted user.
+#
+# Uncomment the following to also record the IP address against the puppeted
+# user. (This also means that the puppeted user will count as an "active" user
+# for the purpose of monthly active user tracking - see 'limit_usage_by_mau' etc
+# above.)
+#
+#track_puppeted_user_ips: true
 
 
 # A list of application service config files to use
@@ -1870,10 +1887,13 @@ saml2_config:
 #       Defaults to false. Avoid this in production.
 #
 #   user_profile_method: Whether to fetch the user profile from the userinfo
-#       endpoint. Valid values are: 'auto' or 'userinfo_endpoint'.
+#       endpoint, or to rely on the data returned in the id_token from the
+#       token_endpoint.
 #
-#       Defaults to 'auto', which fetches the userinfo endpoint if 'openid' is
-#       included in 'scopes'. Set to 'userinfo_endpoint' to always fetch the
+#       Valid values are: 'auto' or 'userinfo_endpoint'.
+#
+#       Defaults to 'auto', which uses the userinfo endpoint if 'openid' is
+#       not included in 'scopes'. Set to 'userinfo_endpoint' to always use the
 #       userinfo endpoint.
 #
 #   allow_existing_users: set to 'true' to allow a user logging in via OIDC to

@@ -137,6 +137,10 @@ This will install and start a systemd service called `coturn`.
 
     # TLS private key file
     pkey=/path/to/privkey.pem
+
+    # Ensure the configuration lines that disable TLS/DTLS are commented-out or removed
+    #no-tls
+    #no-dtls
     ```
 
     In this case, replace the `turn:` schemes in the `turn_uris` settings below
@@ -144,6 +148,14 @@ This will install and start a systemd service called `coturn`.
 
     We recommend that you only try to set up TLS/DTLS once you have set up a
     basic installation and got it working.
+
+    NB: If your TLS certificate was provided by Let's Encrypt, TLS/DTLS will
+    not work with any Matrix client that uses Chromium's WebRTC library. This
+    currently includes Element Android & iOS; for more details, see their
+    [respective](https://github.com/vector-im/element-android/issues/1533)
+    [issues](https://github.com/vector-im/element-ios/issues/2712) as well as the underlying
+    [WebRTC issue](https://bugs.chromium.org/p/webrtc/issues/detail?id=11710).
+    Consider using a ZeroSSL certificate for your TURN server as a working alternative.
 
 1.  Ensure your firewall allows traffic into the TURN server on the ports
     you've configured it to listen on (By default: 3478 and 5349 for TURN
@@ -249,6 +261,10 @@ Here are a few things to try:
 
  * Check that you have opened your firewall to allow UDP traffic to the UDP
    relay ports (49152-65535 by default).
+
+ * Try disabling `coturn`'s TLS/DTLS listeners and enable only its (unencrypted)
+   TCP/UDP listeners. (This will only leave signaling traffic unencrypted;
+   voice & video WebRTC traffic is always encrypted.)
 
  * Some WebRTC implementations (notably, that of Google Chrome) appear to get
    confused by TURN servers which are reachable over IPv6 (this appears to be

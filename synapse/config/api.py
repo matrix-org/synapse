@@ -29,6 +29,7 @@ class ApiConfig(Config):
     def read_config(self, config: JsonDict, **kwargs):
         validate_config(_MAIN_SCHEMA, config, ())
         self.room_prejoin_state = list(self._get_prejoin_state_types(config))
+        self.track_puppeted_user_ips = config.get("track_puppeted_user_ips", False)
 
     def generate_config_section(cls, **kwargs) -> str:
         formatted_default_state_types = "\n".join(
@@ -59,6 +60,21 @@ class ApiConfig(Config):
            #
            #additional_event_types:
            #  - org.example.custom.event.type
+
+        # We record the IP address of clients used to access the API for various
+        # reasons, including displaying it to the user in the "Where you're signed in"
+        # dialog.
+        #
+        # By default, when puppeting another user via the admin API, the client IP
+        # address is recorded against the user who created the access token (ie, the
+        # admin user), and *not* the puppeted user.
+        #
+        # Uncomment the following to also record the IP address against the puppeted
+        # user. (This also means that the puppeted user will count as an "active" user
+        # for the purpose of monthly active user tracking - see 'limit_usage_by_mau' etc
+        # above.)
+        #
+        #track_puppeted_user_ips: true
         """ % {
             "formatted_default_state_types": formatted_default_state_types
         }
@@ -138,5 +154,8 @@ _MAIN_SCHEMA = {
     "properties": {
         "room_prejoin_state": _ROOM_PREJOIN_STATE_CONFIG_SCHEMA,
         "room_invite_state_types": _ROOM_INVITE_STATE_TYPES_SCHEMA,
+        "track_puppeted_user_ips": {
+            "type": "boolean",
+        },
     },
 }

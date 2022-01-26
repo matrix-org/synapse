@@ -12,7 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import logging
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 
 from typing_extensions import Literal
 
@@ -30,12 +40,15 @@ from synapse.http.servlet import (
     parse_string_from_args,
     parse_strings_from_args,
 )
-from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.versionstring import get_version_string
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
+issue_8631_logger = logging.getLogger("synapse.8631_debug")
 
 
 class BaseFederationServerServlet(BaseFederationServlet):
@@ -46,7 +59,7 @@ class BaseFederationServerServlet(BaseFederationServlet):
 
     def __init__(
         self,
-        hs: HomeServer,
+        hs: "HomeServer",
         authenticator: Authenticator,
         ratelimiter: FederationRateLimiter,
         server_name: str,
@@ -94,6 +107,20 @@ class FederationSendServlet(BaseFederationServerServlet):
                 len(transaction_data.get("pdus", [])),
                 len(transaction_data.get("edus", [])),
             )
+
+            if issue_8631_logger.isEnabledFor(logging.DEBUG):
+                DEVICE_UPDATE_EDUS = {"m.device_list_update", "m.signing_key_update"}
+                device_list_updates = [
+                    edu.content
+                    for edu in transaction_data.get("edus", [])
+                    if edu.edu_type in DEVICE_UPDATE_EDUS
+                ]
+                if device_list_updates:
+                    issue_8631_logger.debug(
+                        "received transaction [%s] including device list updates: %s",
+                        transaction_id,
+                        device_list_updates,
+                    )
 
         except Exception as e:
             logger.exception(e)
@@ -581,7 +608,7 @@ class FederationSpaceSummaryServlet(BaseFederationServlet):
 
     def __init__(
         self,
-        hs: HomeServer,
+        hs: "HomeServer",
         authenticator: Authenticator,
         ratelimiter: FederationRateLimiter,
         server_name: str,
@@ -655,7 +682,7 @@ class FederationRoomHierarchyServlet(BaseFederationServlet):
 
     def __init__(
         self,
-        hs: HomeServer,
+        hs: "HomeServer",
         authenticator: Authenticator,
         ratelimiter: FederationRateLimiter,
         server_name: str,
@@ -691,7 +718,7 @@ class RoomComplexityServlet(BaseFederationServlet):
 
     def __init__(
         self,
-        hs: HomeServer,
+        hs: "HomeServer",
         authenticator: Authenticator,
         ratelimiter: FederationRateLimiter,
         server_name: str,

@@ -663,7 +663,9 @@ class RoomEventServlet(RestServlet):
 
         if event:
             # Ensure there are bundled aggregations available.
-            aggregations = await self._store.get_bundled_aggregations([event])
+            aggregations = await self._store.get_bundled_aggregations(
+                [event], requester.user.to_string()
+            )
 
             time_now = self.clock.time_msec()
             event_dict = self._event_serializer.serialize_event(
@@ -704,30 +706,36 @@ class RoomEventContextServlet(RestServlet):
         else:
             event_filter = None
 
-        results = await self.room_context_handler.get_event_context(
+        event_context = await self.room_context_handler.get_event_context(
             requester, room_id, event_id, limit, event_filter
         )
 
-        if not results:
+        if not event_context:
             raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
         time_now = self.clock.time_msec()
-        results["events_before"] = self._event_serializer.serialize_events(
-            results["events_before"],
-            time_now,
-            bundle_aggregations=results["aggregations"],
-        )
-        results["event"] = self._event_serializer.serialize_event(
-            results["event"], time_now, bundle_aggregations=results["aggregations"]
-        )
-        results["events_after"] = self._event_serializer.serialize_events(
-            results["events_after"],
-            time_now,
-            bundle_aggregations=results["aggregations"],
-        )
-        results["state"] = self._event_serializer.serialize_events(
-            results["state"], time_now
-        )
+        results = {
+            "events_before": self._event_serializer.serialize_events(
+                event_context.events_before,
+                time_now,
+                bundle_aggregations=event_context.aggregations,
+            ),
+            "event": self._event_serializer.serialize_event(
+                event_context.event,
+                time_now,
+                bundle_aggregations=event_context.aggregations,
+            ),
+            "events_after": self._event_serializer.serialize_events(
+                event_context.events_after,
+                time_now,
+                bundle_aggregations=event_context.aggregations,
+            ),
+            "state": self._event_serializer.serialize_events(
+                event_context.state, time_now
+            ),
+            "start": event_context.start,
+            "end": event_context.end,
+        }
 
         return 200, results
 

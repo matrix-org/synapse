@@ -394,7 +394,7 @@ class ApplicationServiceTransactionWorkerStore(
             "get_new_events_for_appservice", get_new_events_for_appservice_txn
         )
 
-        events = await self.get_events_as_list(event_ids)
+        events = await self.get_events_as_list(event_ids, get_prev_content=True)
 
         return upper_bound, events
 
