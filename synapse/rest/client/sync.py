@@ -48,6 +48,7 @@ from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import trace
+from synapse.storage.databases.main.relations import BundledAggregations
 from synapse.types import JsonDict, StreamToken
 from synapse.util import json_decoder
 
@@ -526,7 +527,7 @@ class SyncRestServlet(RestServlet):
 
         def serialize(
             events: Iterable[EventBase],
-            aggregations: Optional[Dict[str, Dict[str, Any]]] = None,
+            aggregations: Optional[Dict[str, BundledAggregations]] = None,
         ) -> List[JsonDict]:
             return self._event_serializer.serialize_events(
                 events,
