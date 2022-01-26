@@ -490,6 +490,10 @@ class RelationsWorkerStore(SQLBaseStore):
                 if parent_event_id not in latest_event_ids:
                     latest_event_ids[parent_event_id] = child_event_id
 
+            # If no threads were found, bail.
+            if not latest_event_ids:
+                return {}, latest_event_ids
+
             # Fetch the number of threaded replies.
             sql = """
                 SELECT parent.event_id, COUNT(child.event_id) FROM events AS child
@@ -502,7 +506,14 @@ class RelationsWorkerStore(SQLBaseStore):
                     AND relation_type = ?
                 GROUP BY parent.event_id
             """
-            # TODO Re-generate args since we know some events don't have threads now.
+
+            # Regenerate the arguments since only threads found above could
+            # possibly have any replies.
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "relates_to_id", latest_event_ids.keys()
+            )
+            args.append(RelationTypes.THREAD)
+
             txn.execute(sql % (clause,), args)
             counts = dict(cast(List[Tuple[str, int]], txn.fetchall()))
 
