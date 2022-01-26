@@ -343,15 +343,28 @@ class UsernameAvailabilityRestServlet(RestServlet):
             ),
         )
 
+        self.inhibit_user_in_use_error = (
+            hs.config.registration.inhibit_user_in_use_error
+        )
+
     async def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
         if not self.hs.config.registration.enable_registration:
             raise SynapseError(
                 403, "Registration has been disabled", errcode=Codes.FORBIDDEN
             )
 
-        # We are not interested in logging in via a username in this deployment.
-        # Simply allow anything here as it won't be used later.
-        return 200, {"available": True}
+        if self.inhibit_user_in_use_error:
+            return 200, {"available": True}
+
+        ip = request.getClientIP()
+        with self.ratelimiter.ratelimit(ip) as wait_deferred:
+            await wait_deferred
+
+            username = parse_string(request, "username", required=True)
+
+            await self.registration_handler.check_username(username)
+
+            return 200, {"available": True}
 
 
 class RegistrationTokenValidityRestServlet(RestServlet):
@@ -419,6 +432,9 @@ class RegisterRestServlet(RestServlet):
         self._registration_enabled = self.hs.config.registration.enable_registration
         self._msc2918_enabled = (
             hs.config.registration.refreshable_access_token_lifetime is not None
+        )
+        self._inhibit_user_in_use_error = (
+            hs.config.registration.inhibit_user_in_use_error
         )
 
         self._registration_flows = _calculate_registration_flows(
@@ -551,6 +567,15 @@ class RegisterRestServlet(RestServlet):
             # Extract the previously-hashed password from the session.
             password_hash = await self.auth_handler.get_session_data(
                 session_id, UIAuthSessionDataConstants.PASSWORD_HASH, None
+            )
+
+        # Ensure that the username is valid.
+        if desired_username is not None:
+            await self.registration_handler.check_username(
+                desired_username,
+                guest_access_token=guest_access_token,
+                assigned_user_id=registered_user_id,
+                inhibit_user_in_use_error=self._inhibit_user_in_use_error,
             )
 
         # Check if the user-interactive authentication flows are complete, if

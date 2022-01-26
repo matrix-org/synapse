@@ -189,6 +189,8 @@ class RegistrationConfig(Config):
                 self.bind_new_user_emails_to_sydent.strip("/")
             )
 
+        self.inhibit_user_in_use_error = config.get("inhibit_user_in_use_error", False)
+
     def generate_config_section(self, generate_secrets=False, **kwargs):
         if generate_secrets:
             registration_shared_secret = 'registration_shared_secret: "%s"' % (
@@ -475,6 +477,16 @@ class RegistrationConfig(Config):
         # without validation.
         #
         #bind_new_user_emails_to_sydent: https://example.com:8091
+
+        # Whether to inhibit errors raised when registering a new account if the user ID
+        # already exists. If turned on, that requests to /register/available will always
+        # show a user ID as available, and Synapse won't raise an error when starting
+        # a registration with a user ID that already exists. However, Synapse will still
+        # raise an error if the registration completes and the username conflicts.
+        #
+        # Defaults to false.
+        #
+        #inhibit_user_in_use_error: true
         """
             % locals()
         )
