@@ -727,6 +727,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 desc="updated-room-version",
             )
         )
+        self.hs.get_datastores().main.get_room_version_id.invalidate((self.room,))
 
         result = self.get_success(self.handler.get_space_summary(self.user, self.space))
         # The result should have only the space, along with a link from space -> room.
