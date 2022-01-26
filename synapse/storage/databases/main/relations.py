@@ -383,7 +383,7 @@ class RelationsWorkerStore(SQLBaseStore):
             # so ordering by origin server ts + event ID desc will ensure we get
             # the latest edit.
             sql = """
-                SELECT DISTINCT ON (original.event_id) original.event_id, edit.origin_server_ts, edit.event_id FROM events AS edit
+                SELECT DISTINCT ON (original.event_id) original.event_id, edit.event_id FROM events AS edit
                 INNER JOIN event_relations USING (event_id)
                 INNER JOIN events AS original ON
                     original.event_id = relates_to_id
@@ -397,11 +397,12 @@ class RelationsWorkerStore(SQLBaseStore):
                 ORDER by original.event_id DESC, edit.origin_server_ts DESC, edit.event_id DESC
             """
         else:
-            # SQLite has special handling for bare columns when using MIN/MAX
-            # with a `GROUP BY` clause where it picks the value from a row that
-            # matches the MIN/MAX.
+            # SQLite uses a simplified query which returns all edits for an
+            # original event. The results are then de-duplicated when turned into
+            # a dict. Due to the chosen ordering, the latest edit stomps on
+            # earlier edits.
             sql = """
-                SELECT original.event_id, MAX(edit.origin_server_ts), MAX(edit.event_id) FROM events AS edit
+                SELECT original.event_id, edit.event_id FROM events AS edit
                 INNER JOIN event_relations USING (event_id)
                 INNER JOIN events AS original ON
                     original.event_id = relates_to_id
@@ -412,7 +413,7 @@ class RelationsWorkerStore(SQLBaseStore):
                     %s
                     AND relation_type = ?
                     AND edit.type = 'm.room.message'
-                GROUP BY (original.event_id)
+                ORDER by edit.origin_server_ts, edit.event_id
             """
 
         def _get_applicable_edits_txn(txn: LoggingTransaction) -> Dict[str, str]:
@@ -422,8 +423,7 @@ class RelationsWorkerStore(SQLBaseStore):
             args.append(RelationTypes.REPLACE)
 
             txn.execute(sql % (clause,), args)
-            rows = txn.fetchall()
-            return {row[0]: row[2] for row in rows}
+            return dict(txn.fetchall())
 
         edit_ids = await self.db_pool.runInteraction(
             "get_applicable_edits", _get_applicable_edits_txn
