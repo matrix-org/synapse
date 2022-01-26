@@ -70,6 +70,7 @@ from synapse.handlers.account_validity import (
 from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
     CHECK_AUTH_CALLBACK,
+    GET_USERNAME_FOR_REGISTRATION_CALLBACK,
     ON_LOGGED_OUT_CALLBACK,
     AuthHandler,
 )
@@ -163,6 +164,7 @@ class ModuleApi:
         self._presence_stream = hs.get_event_sources().sources.presence
         self._state = hs.get_state_handler()
         self._clock: Clock = hs.get_clock()
+        self._registration_handler = hs.get_registration_handler()
         self._send_email_handler = hs.get_send_email_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
 
@@ -296,6 +298,9 @@ class ModuleApi:
         auth_checkers: Optional[
             Dict[Tuple[str, Tuple[str, ...]], CHECK_AUTH_CALLBACK]
         ] = None,
+        get_username_for_registration: Optional[
+            GET_USERNAME_FOR_REGISTRATION_CALLBACK
+        ] = None,
     ) -> None:
         """Registers callbacks for password auth provider capabilities.
 
@@ -305,6 +310,7 @@ class ModuleApi:
             check_3pid_auth=check_3pid_auth,
             on_logged_out=on_logged_out,
             auth_checkers=auth_checkers,
+            get_username_for_registration=get_username_for_registration,
         )
 
     def register_web_resource(self, path: str, resource: Resource):
@@ -1123,6 +1129,22 @@ class ModuleApi:
         state_events = await self._store.get_events(state_ids.values())
 
         return {key: state_events[event_id] for key, event_id in state_ids.items()}
+
+    async def check_username(self, username: str) -> None:
+        """Checks if the provided username uses the grammar defined in the Matrix
+        specification, and is already being used by an existing user.
+
+        Added in Synapse v1.52.0.
+
+        Args:
+            username: The username to check. This is the local part of the user's full
+                Matrix user ID, i.e. it's "alice" if the full user ID is "@alice:foo.com".
+
+        Raises:
+            SynapseError with the errcode "M_USER_IN_USE" if the username is already in
+            use.
+        """
+        await self._registration_handler.check_username(username)
 
 
 class PublicRoomListManager:
