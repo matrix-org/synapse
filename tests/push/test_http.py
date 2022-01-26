@@ -572,7 +572,7 @@ class HTTPPusherTests(HomeserverTestCase):
         #
         # This push should still only contain an unread count of 1 (for 1 unread room)
         self.assertEqual(
-            self.push_attempts[5][2]["notification"]["counts"]["unread"], 1
+            self.push_attempts[4][2]["notification"]["counts"]["unread"], 1
         )
 
     @override_config({"push": {"group_unread_count_by_room": False}})
@@ -588,7 +588,7 @@ class HTTPPusherTests(HomeserverTestCase):
         # We're counting every unread message, so there should now be 4 since the
         # last read receipt
         self.assertEqual(
-            self.push_attempts[5][2]["notification"]["counts"]["unread"], 4
+            self.push_attempts[4][2]["notification"]["counts"]["unread"], 4
         )
 
     def _test_push_unread_count(self):
@@ -673,30 +673,20 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         self.assertEqual(channel.code, 200, channel.json_body)
 
-        # Advance time and make the push succeed
-        self.push_attempts[1][0].callback({})
-        self.pump()
-
-        # Unread count is still zero as we've read the only message in the room
-        self.assertEqual(len(self.push_attempts), 2)
-        self.assertEqual(
-            self.push_attempts[1][2]["notification"]["counts"]["unread"], 0
-        )
-
         # Send another message
         self.helper.send(
             room_id, body="How's the weather today?", tok=other_access_token
         )
 
         # Advance time and make the push succeed
-        self.push_attempts[2][0].callback({})
+        self.push_attempts[1][0].callback({})
         self.pump()
 
         # This push should contain an unread count of 1 as there's now been one
         # message since our last read receipt
-        self.assertEqual(len(self.push_attempts), 3)
+        self.assertEqual(len(self.push_attempts), 2)
         self.assertEqual(
-            self.push_attempts[2][2]["notification"]["counts"]["unread"], 1
+            self.push_attempts[1][2]["notification"]["counts"]["unread"], 1
         )
 
         # Since we're grouping by room, sending more messages shouldn't increase the
@@ -705,18 +695,18 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Advance time and make the push succeed
         self.pump()
-        self.push_attempts[3][0].callback({})
+        self.push_attempts[2][0].callback({})
 
         self.helper.send(room_id, body="Hello??", tok=other_access_token)
 
         # Advance time and make the push succeed
         self.pump()
-        self.push_attempts[4][0].callback({})
+        self.push_attempts[3][0].callback({})
 
         self.helper.send(room_id, body="HELLO???", tok=other_access_token)
 
         # Advance time and make the push succeed
         self.pump()
-        self.push_attempts[5][0].callback({})
+        self.push_attempts[4][0].callback({})
 
-        self.assertEqual(len(self.push_attempts), 6)
+        self.assertEqual(len(self.push_attempts), 5)
