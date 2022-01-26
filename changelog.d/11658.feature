@@ -1,0 +1,1 @@
+Add an admin API to get a list of rooms that federate with a given remote homeserver.
