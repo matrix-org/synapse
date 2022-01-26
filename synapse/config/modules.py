@@ -41,9 +41,9 @@ class ModulesConfig(Config):
             # documentation on how to configure or create custom modules for Synapse.
             #
             modules:
-                # - module: my_super_module.MySuperClass
-                #   config:
-                #       do_thing: true
-                # - module: my_other_super_module.SomeClass
-                #   config: {}
+              #- module: my_super_module.MySuperClass
+              #  config:
+              #    do_thing: true
+              #- module: my_other_super_module.SomeClass
+              #  config: {}
             """
