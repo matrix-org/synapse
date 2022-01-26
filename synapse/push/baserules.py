@@ -240,7 +240,7 @@ BASE_APPEND_OVERRIDE_RULES = [
     },
     # Enable notifications for replies without fallback
     {
-        "rule_id": "global/override/im.nheko.msc3664.reply",
+        "rule_id": "global/override/.im.nheko.msc3664.reply",
         "conditions": [
             # Only send notification if the reply is to your message
             {
@@ -384,7 +384,7 @@ NEW_APPEND_OVERRIDE_RULES = [
     },
     # Enable notifications for replies without fallback
     {
-        "rule_id": "global/override/im.nheko.msc3664.reply",
+        "rule_id": "global/override/.im.nheko.msc3664.reply",
         "conditions": [
             # Only send notification if the reply is to your message
             {
