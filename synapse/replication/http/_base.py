@@ -257,13 +257,13 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                     # We convert to SynapseError as we know that it was a SynapseError
                     # on the main process that we should send to the client. (And
                     # importantly, not stack traces everywhere)
-                    _outgoing_request_counter.labels(cls.NAME, e.code).inc()
+                    _outgoing_request_counter.labels(cls.NAME, str(e.code)).inc()
                     raise e.to_synapse_error()
                 except Exception as e:
                     _outgoing_request_counter.labels(cls.NAME, "ERR").inc()
                     raise SynapseError(502, "Failed to talk to main process") from e
 
-                _outgoing_request_counter.labels(cls.NAME, 200).inc()
+                _outgoing_request_counter.labels(cls.NAME, "200").inc()
                 return result
 
         return send_request

@@ -123,8 +123,8 @@ def install_gc_manager() -> None:
 
                 _last_gc[i] = end
 
-                gc_time.labels(i).observe(end - start)
-                gc_unreachable.labels(i).set(unreachable)
+                gc_time.labels(str(i)).observe(end - start)
+                gc_unreachable.labels(str(i)).set(unreachable)
 
     gc_task = task.LoopingCall(_maybe_gc)
     gc_task.start(0.1)

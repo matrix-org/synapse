@@ -68,11 +68,11 @@ def init_counters_for_auth_provider(auth_provider_id: str) -> None:
     until the user first logs in/registers.
     """
     for is_guest in (True, False):
-        login_counter.labels(guest=is_guest, auth_provider=auth_provider_id)
+        login_counter.labels(guest=str(is_guest), auth_provider=auth_provider_id)
         for shadow_banned in (True, False):
             registration_counter.labels(
-                guest=is_guest,
-                shadow_banned=shadow_banned,
+                guest=str(is_guest),
+                shadow_banned=str(shadow_banned),
                 auth_provider=auth_provider_id,
             )
 
@@ -341,8 +341,8 @@ class RegistrationHandler:
                     fail_count += 1
 
         registration_counter.labels(
-            guest=make_guest,
-            shadow_banned=shadow_banned,
+            guest=str(make_guest),
+            shadow_banned=str(shadow_banned),
             auth_provider=(auth_provider_id or ""),
         ).inc()
 
@@ -775,7 +775,7 @@ class RegistrationHandler:
         )
 
         login_counter.labels(
-            guest=is_guest,
+            guest=str(is_guest),
             auth_provider=(auth_provider_id or ""),
         ).inc()
 
