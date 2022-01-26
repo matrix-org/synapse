@@ -339,11 +339,18 @@ class UsernameAvailabilityRestServlet(RestServlet):
             ),
         )
 
+        self.inhibit_user_in_use_error = (
+            hs.config.registration.inhibit_user_in_use_error
+        )
+
     async def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
         if not self.hs.config.registration.enable_registration:
             raise SynapseError(
                 403, "Registration has been disabled", errcode=Codes.FORBIDDEN
             )
+
+        if self.inhibit_user_in_use_error:
+            return 200, {"available": True}
 
         ip = request.getClientIP()
         with self.ratelimiter.ratelimit(ip) as wait_deferred:
@@ -422,6 +429,9 @@ class RegisterRestServlet(RestServlet):
         self._registration_enabled = self.hs.config.registration.enable_registration
         self._refresh_tokens_enabled = (
             hs.config.registration.refreshable_access_token_lifetime is not None
+        )
+        self._inhibit_user_in_use_error = (
+            hs.config.registration.inhibit_user_in_use_error
         )
 
         self._registration_flows = _calculate_registration_flows(
@@ -565,6 +575,7 @@ class RegisterRestServlet(RestServlet):
                 desired_username,
                 guest_access_token=guest_access_token,
                 assigned_user_id=registered_user_id,
+                inhibit_user_in_use_error=self._inhibit_user_in_use_error,
             )
 
         # Check if the user-interactive authentication flows are complete, if
