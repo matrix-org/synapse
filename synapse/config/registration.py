@@ -44,7 +44,6 @@ class RegistrationConfig(Config):
             "registration_requires_token", False
         )
         self.registration_shared_secret = config.get("registration_shared_secret")
-        self.register_mxid_from_3pid = config.get("register_mxid_from_3pid")
         self.register_just_use_email_for_display_name = config.get(
             "register_just_use_email_for_display_name", False
         )
@@ -231,13 +230,6 @@ class RegistrationConfig(Config):
         # flow (overrides registrations_require_3pid if MSISDNs are set as required)
         #
         #disable_msisdn_registration: true
-
-        # Derive the user's matrix ID from a type of 3PID used when registering.
-        # This overrides any matrix ID the user proposes when calling /register
-        # The 3PID type should be present in registrations_require_3pid to avoid
-        # users failing to register if they don't specify the right kind of 3pid.
-        #
-        #register_mxid_from_3pid: email
 
         # Uncomment to set the display name of new users to their email address,
         # rather than using the default heuristic.
