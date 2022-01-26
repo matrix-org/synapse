@@ -20,6 +20,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Set,
     Tuple,
     Union,
     cast,
@@ -529,41 +530,55 @@ class RelationsWorkerStore(SQLBaseStore):
         return summaries
 
     @cached()
-    async def get_thread_participated(self, event_id: str, user_id: str) -> bool:
-        """Get whether the requesting user participated in a thread.
+    def get_thread_participated(self, event_id: str, user_id: str) -> bool:
+        raise NotImplementedError()
+
+    @cachedList(cached_method_name="get_thread_participated", list_name="event_ids")
+    async def _get_threads_participated(
+        self, event_ids: Collection[str], user_id: str
+    ) -> Dict[str, bool]:
+        """Get whether the requesting user participated in the given threads.
 
         This is separate from get_thread_summaries since that can be cached across
-        all users while this value is specific to the requeser.
+        all users while this value is specific to the requester.
 
         Args:
-            event_id: The thread related to this event ID.
+            event_ids: The thread related to these event IDs.
             user_id: The user requesting the summary.
 
         Returns:
-            True if the requesting user participated in the thread, otherwise false.
+            A map of event ID to a boolean which represents if the requesting
+            user participated in that event's thread, otherwise false.
         """
 
-        def _get_thread_summary_txn(txn: LoggingTransaction) -> bool:
+        def _get_thread_summary_txn(txn: LoggingTransaction) -> Set[str]:
             # Fetch whether the requester has participated or not.
             sql = """
-                SELECT 1
+                SELECT DISTINCT relates_to_id
                 FROM events AS child
                 INNER JOIN event_relations USING (event_id)
                 INNER JOIN events AS parent ON
                     parent.event_id = relates_to_id
                     AND parent.room_id = child.room_id
                 WHERE
-                    relates_to_id = ?
+                    %s
                     AND relation_type = ?
                     AND child.sender = ?
             """
 
-            txn.execute(sql, (event_id, RelationTypes.THREAD, user_id))
-            return bool(txn.fetchone())
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "relates_to_id", event_ids
+            )
+            args.extend((RelationTypes.THREAD, user_id))
 
-        return await self.db_pool.runInteraction(
+            txn.execute(sql % (clause,), args)
+            return {row[0] for row in txn.fetchall()}
+
+        participated_threads = await self.db_pool.runInteraction(
             "get_thread_summary", _get_thread_summary_txn
         )
+
+        return {event_id: event_id in participated_threads for event_id in event_ids}
 
     async def events_have_relations(
         self,
@@ -715,7 +730,7 @@ class RelationsWorkerStore(SQLBaseStore):
             summary = summaries.get(event_id)
             if summary:
                 thread_count, latest_thread_event = summary
-                participated = await self.get_thread_participated(event_id, user_id)
+                participated = await self._get_threads_participated([event_id], user_id)
                 aggregations.thread = _ThreadAggregation(
                     latest_event=latest_thread_event,
                     count=thread_count,
