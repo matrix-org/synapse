@@ -497,11 +497,12 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             self.hs.get_datastore().db_pool.simple_insert_many(
                 desc="test_application_services_receive_burst_of_to_device",
                 table="devices",
+                keys=("user_id", "device_id"),
                 values=[
-                    {
-                        "user_id": self.exclusive_as_user,
-                        "device_id": device_id,
-                    }
+                    (
+                        self.exclusive_as_user,
+                        device_id,
+                    )
                     for device_id in fake_device_ids
                 ],
             )
