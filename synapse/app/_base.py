@@ -436,8 +436,8 @@ async def start(hs: "HomeServer") -> None:
     module_api = hs.get_module_api()
     for module, config, worker_name in hs.config.modules.loaded_modules:
         if (
-            hs.config.worker_name is None and worker_name == "master"
-        ) or worker_name == hs.config.worker_name:
+            hs.config.worker.worker_name is None and worker_name == "master"
+        ) or worker_name == hs.config.worker.worker_name:
             m = module(config=config, api=module_api)
             logger.info("Loaded module %s", m)
 
