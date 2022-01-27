@@ -149,8 +149,8 @@ class CacheConfig(Config):
             #get_users_who_share_room_with_user: 2.0
 
           # Controls how long an entry can be in a cache without having been
-          # accessed before being evicted. Defaults to None, which means
-          # entries are never evicted based on time.
+          # accessed before being evicted. Defaults to 30m. Comment out this
+          # option if you don't want entries to be evicted based on time.
           #
           expiry_time: 30m
 
