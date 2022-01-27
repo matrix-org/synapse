@@ -471,6 +471,22 @@ limit_remote_rooms:
 #
 #allow_per_room_profiles: false
 
+# The largest allowed size for a user avatar. If not defined, no
+# restriction will be imposed.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's media repository.
+#
+#max_avatar_size: 10M
+
+# Allow mimetypes for a user avatar. If not defined, no restriction will
+# be imposed.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's media repository.
+#
+#allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
+
 # How long to keep redacted events in unredacted form in the database. After
 # this period redacted events get replaced with their redacted form in the DB.
 #
