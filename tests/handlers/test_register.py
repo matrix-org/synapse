@@ -147,7 +147,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         load_legacy_spam_checkers(hs)
 
         module_api = hs.get_module_api()
-        for module, config in hs.config.modules.loaded_modules:
+        for module, config, _ in hs.config.modules.loaded_modules:
             module(config=config, api=module_api)
 
         return hs

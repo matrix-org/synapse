@@ -14,14 +14,19 @@ To use a module on Synapse, add it to the `modules` section of the configuration
 ```yaml
 modules:
   - module: my_super_module.MySuperClass
+    worker_name: None
     config:
       do_thing: true
   - module: my_other_super_module.SomeClass
+    worker_name: my_module_worker
     config: {}
 ```
 
 Each module is defined by a path to a Python class as well as a configuration. This
 information for a given module should be available in the module's own documentation.
+
+`worker_name` defines on wich worker the module is loaded. If `worker_name` is not set
+or is `None` the module is loaded on the main process.
 
 ## Using multiple modules
 

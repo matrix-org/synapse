@@ -42,9 +42,11 @@
 #
 modules:
   #- module: my_super_module.MySuperClass
+  #  worker_name: None
   #  config:
   #    do_thing: true
   #- module: my_other_super_module.SomeClass
+  #  worker_name: my_module_worker
   #  config: {}
 
 

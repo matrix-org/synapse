@@ -434,9 +434,12 @@ async def start(hs: "HomeServer") -> None:
     # Instantiate the modules so they can register their web resources to the module API
     # before we start the listeners.
     module_api = hs.get_module_api()
-    for module, config in hs.config.modules.loaded_modules:
-        m = module(config=config, api=module_api)
-        logger.info("Loaded module %s", m)
+    for module, config, worker_name in hs.config.modules.loaded_modules:
+        if (
+            hs.config.worker_name is None and worker_name == "master"
+        ) or worker_name == hs.config.worker_name:
+            m = module(config=config, api=module_api)
+            logger.info("Loaded module %s", m)
 
     load_legacy_spam_checkers(hs)
     load_legacy_third_party_event_rules(hs)

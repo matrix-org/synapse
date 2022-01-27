@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import itertools
 from typing import Any, Dict, List, Tuple
 
 from synapse.config._base import Config, ConfigError
@@ -21,7 +22,7 @@ class ModulesConfig(Config):
     section = "modules"
 
     def read_config(self, config: dict, **kwargs):
-        self.loaded_modules: List[Tuple[Any, Dict]] = []
+        self.loaded_modules: List[Tuple[Any, Dict, str]] = []
 
         configured_modules = config.get("modules") or []
         for i, module in enumerate(configured_modules):
@@ -29,7 +30,16 @@ class ModulesConfig(Config):
             if not isinstance(module, dict):
                 raise ConfigError("expected a mapping", config_path)
 
-            self.loaded_modules.append(load_module(module, config_path))
+            worker_name = module.get("worker_name", "master")
+            if not isinstance(worker_name, str):
+                raise ConfigError(
+                    "expected a string or None",
+                    path=itertools.chain(config_path, ("worker_name",)),
+                )
+
+            self.loaded_modules.append(
+                load_module(module, config_path) + (worker_name,)
+            )
 
     def generate_config_section(self, **kwargs):
         return """
@@ -42,8 +52,10 @@ class ModulesConfig(Config):
             #
             modules:
               #- module: my_super_module.MySuperClass
+              #  worker_name: None
               #  config:
               #    do_thing: true
               #- module: my_other_super_module.SomeClass
+              #  worker_name: my_module_worker
               #  config: {}
             """
