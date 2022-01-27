@@ -1,0 +1,1 @@
+Preparation for reducing Postgres serialization errors: allow setting transaction isolation level. Contributed by Nick @ Beeper.
