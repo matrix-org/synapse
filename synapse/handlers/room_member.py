@@ -591,8 +591,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             )
 
         if "avatar_url" in content:
-            await self.profile_handler.check_avatar_size_and_content_type(
-                content["avatar_url"],
+            await self.profile_handler.check_avatar_size_and_mime_type(
+                content["avatar_url"]
             )
 
         # The event content should *not* include the authorising user as

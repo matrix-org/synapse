@@ -13,8 +13,12 @@
 # limitations under the License.
 
 """Tests REST events for /profile paths."""
+from typing import Any, Dict
+
+from synapse.api.errors import Codes
 from synapse.rest import admin
 from synapse.rest.client import login, profile, room
+from synapse.types import UserID
 
 from tests import unittest
 
@@ -25,6 +29,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         profile.register_servlets,
+        room.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
@@ -149,6 +154,173 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body.get("avatar_url")
+
+    @unittest.override_config(
+        {
+            "max_avatar_size": 50,
+        }
+    )
+    def test_avatar_size_limit_global(self):
+        """Tests that the maximum size limit for avatars is enforced when updating a
+        global profile.
+        """
+        self._setup_local_files(
+            {
+                "small": {"size": 40},
+                "big": {"size": 60},
+            }
+        )
+
+        channel = self.make_request(
+            "PUT",
+            "/profile/%s/avatar_url" % (self.owner,),
+            content={"avatar_url": "mxc://test/big"},
+            access_token=self.owner_tok,
+        )
+        self.assertEqual(channel.code, 403, channel.result)
+        self.assertEqual(
+            channel.json_body["errcode"], Codes.FORBIDDEN, channel.json_body
+        )
+
+        channel = self.make_request(
+            "PUT",
+            "/profile/%s/avatar_url" % (self.owner,),
+            content={"avatar_url": "mxc://test/small"},
+            access_token=self.owner_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+    @unittest.override_config(
+        {
+            "max_avatar_size": 50,
+        }
+    )
+    def test_avatar_size_limit_per_room(self):
+        """Tests that the maximum size limit for avatars is enforced when updating a
+        per-room profile.
+        """
+        self._setup_local_files(
+            {
+                "small": {"size": 40},
+                "big": {"size": 60},
+            }
+        )
+
+        room_id = self.helper.create_room_as(tok=self.owner_tok)
+
+        channel = self.make_request(
+            "PUT",
+            "/rooms/%s/state/m.room.member/%s" % (room_id, self.owner),
+            content={"membership": "join", "avatar_url": "mxc://test/big"},
+            access_token=self.owner_tok,
+        )
+        self.assertEqual(channel.code, 403, channel.result)
+        self.assertEqual(
+            channel.json_body["errcode"], Codes.FORBIDDEN, channel.json_body
+        )
+
+        channel = self.make_request(
+            "PUT",
+            "/rooms/%s/state/m.room.member/%s" % (room_id, self.owner),
+            content={"membership": "join", "avatar_url": "mxc://test/small"},
+            access_token=self.owner_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+    @unittest.override_config(
+        {
+            "allowed_avatar_mimetypes": ["image/png"],
+        }
+    )
+    def test_avatar_allowed_mime_type_global(self):
+        """Tests that the MIME type whitelist for avatars is enforced when updating a
+        global profile.
+        """
+        self._setup_local_files(
+            {
+                "good": {"mimetype": "image/png"},
+                "bad": {"mimetype": "application/octet-stream"},
+            }
+        )
+
+        channel = self.make_request(
+            "PUT",
+            "/profile/%s/avatar_url" % (self.owner,),
+            content={"avatar_url": "mxc://test/bad"},
+            access_token=self.owner_tok,
+        )
+        self.assertEqual(channel.code, 403, channel.result)
+        self.assertEqual(
+            channel.json_body["errcode"], Codes.FORBIDDEN, channel.json_body
+        )
+
+        channel = self.make_request(
+            "PUT",
+            "/profile/%s/avatar_url" % (self.owner,),
+            content={"avatar_url": "mxc://test/good"},
+            access_token=self.owner_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+    @unittest.override_config(
+        {
+            "allowed_avatar_mimetypes": ["image/png"],
+        }
+    )
+    def test_avatar_allowed_mime_type_per_room(self):
+        """Tests that the MIME type whitelist for avatars is enforced when updating a
+        per-room profile.
+        """
+        self._setup_local_files(
+            {
+                "good": {"mimetype": "image/png"},
+                "bad": {"mimetype": "application/octet-stream"},
+            }
+        )
+
+        room_id = self.helper.create_room_as(tok=self.owner_tok)
+
+        channel = self.make_request(
+            "PUT",
+            "/rooms/%s/state/m.room.member/%s" % (room_id, self.owner),
+            content={"membership": "join", "avatar_url": "mxc://test/bad"},
+            access_token=self.owner_tok,
+        )
+        self.assertEqual(channel.code, 403, channel.result)
+        self.assertEqual(
+            channel.json_body["errcode"], Codes.FORBIDDEN, channel.json_body
+        )
+
+        channel = self.make_request(
+            "PUT",
+            "/rooms/%s/state/m.room.member/%s" % (room_id, self.owner),
+            content={"membership": "join", "avatar_url": "mxc://test/good"},
+            access_token=self.owner_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+    def _setup_local_files(self, names_and_props: Dict[str, Dict[str, Any]]):
+        """Stores metadata about files in the database.
+
+        Args:
+            names_and_props: A dictionary with one entry per file, with the key being the
+                file's name, and the value being a dictionary of properties. Supported
+                properties are "mimetype" (for the file's type) and "size" (for the
+                file's size).
+        """
+        store = self.hs.get_datastore()
+
+        for name, props in names_and_props.items():
+            self.get_success(
+                store.store_local_media(
+                    media_id=name,
+                    media_type=props.get("mimetype", "image/png"),
+                    time_now_ms=self.clock.time_msec(),
+                    upload_name=None,
+                    media_length=props.get("size", 50),
+                    user_id=UserID.from_string("@rin:test"),
+                )
+            )
 
 
 class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):

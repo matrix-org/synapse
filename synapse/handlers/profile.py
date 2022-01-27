@@ -293,7 +293,7 @@ class ProfileHandler:
                 400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
 
-        await self.check_avatar_size_and_content_type(new_avatar_url)
+        await self.check_avatar_size_and_mime_type(new_avatar_url)
 
         avatar_url_to_set: Optional[str] = new_avatar_url
         if new_avatar_url == "":
@@ -316,7 +316,7 @@ class ProfileHandler:
 
         await self._update_join_states(requester, target_user)
 
-    async def check_avatar_size_and_content_type(self, mxc: str) -> None:
+    async def check_avatar_size_and_mime_type(self, mxc: str) -> None:
         """Check that the size and content type of the avatar at the given MXC URI are
         within the configured limits.
 
@@ -327,11 +327,11 @@ class ProfileHandler:
             SynapseError with an M_FORBIDDEN error code if the avatar doesn't fit within
             the limits allowed by the configuration.
         """
-        if not await self._check_avatar_size_and_content_type(mxc):
+        if not await self._check_avatar_size_and_mime_type(mxc):
             raise SynapseError(403, "This avatar is not allowed", Codes.FORBIDDEN)
 
     @cached()
-    async def _check_avatar_size_and_content_type(self, mxc: str) -> bool:
+    async def _check_avatar_size_and_mime_type(self, mxc: str) -> bool:
         """Check that the size and content type of the avatar at the given MXC URI are
         within the configured limits.
 

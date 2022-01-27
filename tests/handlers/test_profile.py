@@ -11,12 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from typing import Any, Dict
 from unittest.mock import Mock
 
 import synapse.types
 from synapse.api.errors import AuthError, SynapseError
 from synapse.rest import admin
+from synapse.server import HomeServer
 from synapse.types import UserID
 
 from tests import unittest
@@ -46,7 +47,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
         return hs
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor, clock, hs: HomeServer):
         self.store = hs.get_datastore()
 
         self.frank = UserID.from_string("@1234abcd:test")
@@ -248,3 +249,104 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             ),
             SynapseError,
         )
+
+    def test_avatar_constraints_no_config(self):
+        """Tests that the method to check an avatar against configured constraints skips
+        all of its check if no constraint is configured.
+        """
+        # The first check that's done by this method is whether the file exists; if we
+        # don't get an error on a non-existing file then it means all of the checks were
+        # successfully skipped.
+        allowed = self.get_success(
+            self.handler._check_avatar_size_and_mime_type("mxc://test/unknown_file")
+        )
+        self.assertTrue(allowed)
+
+    @unittest.override_config(
+        {
+            "max_avatar_size": 50,
+        }
+    )
+    def test_avatar_constraints_missing(self):
+        """Tests that an avatar isn't allowed if the file at the given MXC URI couldn't
+        be found.
+        """
+        allowed = self.get_success(
+            self.handler._check_avatar_size_and_mime_type("mxc://test/unknown_file")
+        )
+        self.assertFalse(allowed)
+
+    @unittest.override_config(
+        {
+            "max_avatar_size": 50,
+        }
+    )
+    def test_avatar_constraints_file_size(self):
+        """Tests that a file that's above the allowed file size is forbidden but one
+        that's below it is allowed.
+        """
+        self._setup_local_files(
+            {
+                "small": {"size": 40},
+                "big": {"size": 60},
+            }
+        )
+
+        allowed = self.get_success(
+            self.handler._check_avatar_size_and_mime_type("mxc://test/small")
+        )
+        self.assertTrue(allowed)
+
+        allowed = self.get_success(
+            self.handler._check_avatar_size_and_mime_type("mxc://test/big")
+        )
+        self.assertFalse(allowed)
+
+    @unittest.override_config(
+        {
+            "allowed_avatar_mimetypes": ["image/png"],
+        }
+    )
+    def test_avatar_constraint_mime_type(self):
+        """Tests that a file with an unauthorised MIME type is forbidden but one with
+        an authorised content type is allowed.
+        """
+        self._setup_local_files(
+            {
+                "good": {"mimetype": "image/png"},
+                "bad": {"mimetype": "application/octet-stream"},
+            }
+        )
+
+        allowed = self.get_success(
+            self.handler._check_avatar_size_and_mime_type("mxc://test/good")
+        )
+        self.assertTrue(allowed)
+
+        allowed = self.get_success(
+            self.handler._check_avatar_size_and_mime_type("mxc://test/bad")
+        )
+        self.assertFalse(allowed)
+
+    def _setup_local_files(self, names_and_props: Dict[str, Dict[str, Any]]):
+        """Stores metadata about files in the database.
+
+        Args:
+            names_and_props: A dictionary with one entry per file, with the key being the
+                file's name, and the value being a dictionary of properties. Supported
+                properties are "mimetype" (for the file's type) and "size" (for the
+                file's size).
+        """
+        store = self.hs.get_datastore()
+
+        for name, props in names_and_props.items():
+            self.get_success(
+                store.store_local_media(
+                    media_id=name,
+                    media_type=props.get("mimetype", "image/png"),
+                    time_now_ms=self.clock.time_msec(),
+                    upload_name=None,
+                    media_length=props.get("size", 50),
+                    user_id=UserID.from_string("@rin:test"),
+                )
+            )
