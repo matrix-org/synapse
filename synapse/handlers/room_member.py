@@ -590,6 +590,11 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 errcode=Codes.BAD_JSON,
             )
 
+        if "avatar_url" in content:
+            await self.profile_handler.check_avatar_size_and_content_type(
+                content["avatar_url"],
+            )
+
         # The event content should *not* include the authorising user as
         # it won't be properly signed. Strip it out since it might come
         # back from a client updating a display name / avatar.

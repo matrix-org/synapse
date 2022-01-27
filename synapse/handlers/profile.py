@@ -31,6 +31,8 @@ from synapse.types import (
     create_requester,
     get_domain_from_id,
 )
+from synapse.util.caches.descriptors import cached
+from synapse.util.stringutils import parse_and_validate_mxc_uri
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -63,6 +65,11 @@ class ProfileHandler:
 
         self.user_directory_handler = hs.get_user_directory_handler()
         self.request_ratelimiter = hs.get_request_ratelimiter()
+
+        self.max_avatar_size = hs.config.server.max_avatar_size
+        self.allowed_avatar_mimetypes = hs.config.server.allowed_avatar_mimetypes
+
+        self.server_name = hs.config.server.server_name
 
         if hs.config.worker.run_background_tasks:
             self.clock.looping_call(
@@ -286,6 +293,8 @@ class ProfileHandler:
                 400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
 
+        await self.check_avatar_size_and_content_type(new_avatar_url)
+
         avatar_url_to_set: Optional[str] = new_avatar_url
         if new_avatar_url == "":
             avatar_url_to_set = None
@@ -306,6 +315,76 @@ class ProfileHandler:
         )
 
         await self._update_join_states(requester, target_user)
+
+    async def check_avatar_size_and_content_type(self, mxc: str) -> None:
+        """Check that the size and content type of the avatar at the given MXC URI are
+        within the configured limits.
+
+        Args:
+            mxc: The MXC URI at which the avatar can be found.
+
+        Raises:
+            SynapseError with an M_FORBIDDEN error code if the avatar doesn't fit within
+            the limits allowed by the configuration.
+        """
+        if not await self._check_avatar_size_and_content_type(mxc):
+            raise SynapseError(403, "This avatar is not allowed", Codes.FORBIDDEN)
+
+    @cached()
+    async def _check_avatar_size_and_content_type(self, mxc: str) -> bool:
+        """Check that the size and content type of the avatar at the given MXC URI are
+        within the configured limits.
+
+        Args:
+            mxc: The MXC URI at which the avatar can be found.
+
+        Returns:
+             A boolean indicating whether the file can be allowed to be set as an avatar.
+        """
+        if not self.max_avatar_size and not self.allowed_avatar_mimetypes:
+            return True
+
+        server_name, _, media_id = parse_and_validate_mxc_uri(mxc)
+
+        if server_name == self.server_name:
+            media_info = await self.store.get_local_media(media_id)
+        else:
+            media_info = await self.store.get_cached_remote_media(server_name, media_id)
+
+        if media_info is None:
+            # Both configuration options need to access the file's metadata, and
+            # retrieving remote avatars just for this becomes a bit of a faff, especially
+            # if e.g. the file is too big. It's also generally safe to assume most files
+            # used as avatar are uploaded locally, or if the upload didn't happen as part
+            # of a PUT request on /avatar_url that the file was at least previewed by the
+            # user locally (and therefore downloaded to the remote media cache).
+            logger.warning("Forbidding avatar change to %s: avatar not on server", mxc)
+            return False
+
+        if self.max_avatar_size:
+            # Ensure avatar does not exceed max allowed avatar size
+            if media_info["media_length"] > self.max_avatar_size:
+                logger.warning(
+                    "Forbidding avatar change to %s: avatar must be less than %s bytes",
+                    mxc,
+                    self.max_avatar_size,
+                )
+                return False
+
+        if self.allowed_avatar_mimetypes:
+            # Ensure the avatar's file type is allowed
+            if (
+                self.allowed_avatar_mimetypes
+                and media_info["media_type"] not in self.allowed_avatar_mimetypes
+            ):
+                logger.warning(
+                    "Forbidding avatar change to %s: mimetype %s not allowed",
+                    mxc,
+                    media_info["media_type"],
+                )
+                return False
+
+        return True
 
     async def on_profile_query(self, args: JsonDict) -> JsonDict:
         """Handles federation profile query requests."""
