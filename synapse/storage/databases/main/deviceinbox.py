@@ -218,7 +218,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             return [], to_stream_id
 
         # Extract the messages, no need to return the user and device ID again
-        to_device_messages = list(user_id_device_id_to_messages.values())[0]
+        to_device_messages = user_id_device_id_to_messages.get((user_id, device_id), [])
 
         return to_device_messages, last_processed_stream_id
 
@@ -343,7 +343,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             )
 
             # If a limit was provided, limit the data retrieved from the database
-            if limit:
+            if limit is not None:
                 sql += "LIMIT ?"
                 sql_args += (limit,)
 
@@ -351,8 +351,9 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
             # Create and fill a dictionary of (user ID, device ID) -> list of messages
             # intended for each device.
+            last_processed_stream_pos = to_stream_id
             recipient_device_to_messages: Dict[Tuple[str, str], List[JsonDict]] = {}
-            for message_count, row in enumerate(txn, start=1):
+            for row in txn:
                 last_processed_stream_pos = row[0]
                 recipient_user_id = row[1]
                 recipient_device_id = row[2]
@@ -363,13 +364,13 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                     (recipient_user_id, recipient_device_id), []
                 ).append(message_dict)
 
-                if limit and message_count == limit:
-                    # We ended up hitting the message limit. There may be more messages to retrieve.
-                    # Return what we have, as well as the last stream position that was processed.
-                    #
-                    # The caller is expected to set this as the lower (exclusive) bound
-                    # for the next query of this device.
-                    return recipient_device_to_messages, last_processed_stream_pos
+            if limit is not None and txn.rowcount == limit:
+                # We ended up hitting the message limit. There may be more messages to retrieve.
+                # Return what we have, as well as the last stream position that was processed.
+                #
+                # The caller is expected to set this as the lower (exclusive) bound
+                # for the next query of this device.
+                return recipient_device_to_messages, last_processed_stream_pos
 
             # The limit was not reached, thus we know that recipient_device_to_messages
             # contains all to-device messages for the given device and stream id range.
