@@ -118,6 +118,7 @@ class ApplicationServiceScheduler:
     ) -> None:
         """
         Enqueue some data to be sent off to an application service.
+
         Args:
             appservice: The application service to create and send a transaction to.
             events: The persistent room events to send.
@@ -127,7 +128,7 @@ class ApplicationServiceScheduler:
                 'to_user_id' fields.
         """
         # We purposefully allow this method to run with empty events/ephemeral
-        # iterables, so that callers do not need to check iterable size themselves.
+        # collections, so that callers do not need to check iterable size themselves.
         if not events and not ephemeral and not to_device_messages:
             return
 

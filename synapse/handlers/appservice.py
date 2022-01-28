@@ -477,7 +477,7 @@ class ApplicationServicesHandler:
     ) -> List[JsonDict]:
         """
         Given an application service, determine which events it should receive
-        from those between the last-recorded typing event stream token for this
+        from those between the last-recorded to-device message stream token for this
         appservice and the given stream token.
 
         Args:

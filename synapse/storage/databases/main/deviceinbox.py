@@ -157,7 +157,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         Returns:
             A dictionary of (user id, device id) -> list of to-device messages.
         """
-        # We expect the stream ID returned by _get_new_device_messages to always
+        # We expect the stream ID returned by _get_device_messages to always
         # return to_stream_id. So, no need to return it from this function.
         (
             user_id_device_id_to_messages,
@@ -238,7 +238,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
         Note that a stream ID can be shared by multiple copies of the same message with
         different recipient devices. Stream IDs are only unique in the context of a single
-        user ID / device ID pair Thus, applying a limit (of messages to return) when working
+        user ID / device ID pair. Thus, applying a limit (of messages to return) when working
         with a sliding window of stream IDs is only possible when querying messages of a
         single user device.
 
@@ -365,8 +365,9 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 ).append(message_dict)
 
             if limit is not None and txn.rowcount == limit:
-                # We ended up hitting the message limit. There may be more messages to retrieve.
-                # Return what we have, as well as the last stream position that was processed.
+                # We ended up bumping up against the message limit. There may be more messages
+                # to retrieve. Return what we have, as well as the last stream position that
+                # was processed.
                 #
                 # The caller is expected to set this as the lower (exclusive) bound
                 # for the next query of this device.
