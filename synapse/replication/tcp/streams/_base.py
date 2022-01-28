@@ -90,7 +90,7 @@ class Stream:
     ROW_TYPE: Any = None
 
     @classmethod
-    def parse_row(cls, row: StreamRow):
+    def parse_row(cls, row: StreamRow) -> Any:
         """Parse a row received over replication
 
         By default, assumes that the row data is an array object and passes its contents
@@ -139,7 +139,7 @@ class Stream:
         # The token from which we last asked for updates
         self.last_token = self.current_token(self.local_instance_name)
 
-    def discard_updates_and_advance(self):
+    def discard_updates_and_advance(self) -> None:
         """Called when the stream should advance but the updates would be discarded,
         e.g. when there are no currently connected workers.
         """
@@ -200,7 +200,7 @@ def current_token_without_instance(
     return lambda instance_name: current_token()
 
 
-def make_http_update_function(hs, stream_name: str) -> UpdateFunction:
+def make_http_update_function(hs: "HomeServer", stream_name: str) -> UpdateFunction:
     """Makes a suitable function for use as an `update_function` that queries
     the master process for updates.
     """
