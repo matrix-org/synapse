@@ -264,7 +264,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         self._module_web_resources: Dict[str, Resource] = {}
         self._module_web_resources_consumed = False
 
-    def register_module_web_resource(self, path: str, resource: Resource):
+    def register_module_web_resource(self, path: str, resource: Resource) -> None:
         """Allows a module to register a web resource to be served at the given path.
 
         If multiple modules register a resource for the same path, the module that
