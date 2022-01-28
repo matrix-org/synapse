@@ -197,7 +197,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
         Returns:
             A tuple containing:
-                * A dictionary of (user id, device id) -> list of to-device messages.
+                * A list of to-device messages within the given stream id range intended for
+                  the given user / device combo.
                 * The last-processed stream ID. Subsequent calls of this function with the
                   same device should pass this value as 'from_stream_id'.
         """
