@@ -159,11 +159,18 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         """
         # We expect the stream ID returned by _get_new_device_messages to always
         # return to_stream_id. So, no need to return it from this function.
-        user_id_device_id_to_messages, _ = await self._get_device_messages(
+        (
+            user_id_device_id_to_messages,
+            last_processed_stream_id,
+        ) = await self._get_device_messages(
             user_ids=user_ids,
             from_stream_id=from_stream_id,
             to_stream_id=to_stream_id,
         )
+
+        assert (
+            last_processed_stream_id == to_stream_id
+        ), "Expected _get_device_messages to process all to-device messages up to `to_stream_id`"
 
         return user_id_device_id_to_messages
 
