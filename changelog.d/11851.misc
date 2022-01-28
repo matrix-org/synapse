@@ -1,1 +1,1 @@
-Add type hints to `synapse/tests/rest/admin`.
+Add type hints to `tests/rest/admin`.
