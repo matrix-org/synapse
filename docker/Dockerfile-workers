@@ -1,5 +1,8 @@
+ARG base_version=latest
+
 # Inherit from the official Synapse docker image
-FROM matrixdotorg/synapse
+
+FROM matrixdotorg/synapse:$base_version
 
 # Install deps
 RUN apt-get update
