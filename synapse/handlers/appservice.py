@@ -487,7 +487,7 @@ class ApplicationServicesHandler:
                 (ie, the recipients of the messages).
 
         Returns:
-            A list of JSON dictionaries containing data derived from the typing events
+            A list of JSON dictionaries containing data derived from the to-device events
                 that should be sent to the given application service.
         """
         # Get the stream token that this application service has processed up until

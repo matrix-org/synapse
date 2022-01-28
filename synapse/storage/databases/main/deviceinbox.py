@@ -158,7 +158,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             A dictionary of (user id, device id) -> list of to-device messages.
         """
         # We expect the stream ID returned by _get_device_messages to always
-        # return to_stream_id. So, no need to return it from this function.
+        # be to_stream_id. So, no need to return it from this function.
         (
             user_id_device_id_to_messages,
             last_processed_stream_id,

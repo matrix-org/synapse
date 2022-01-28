@@ -462,7 +462,7 @@ class Notifier:
                 )
             except Exception:
                 logger.exception(
-                    "Error notifying application services of ephemeral event"
+                    "Error notifying application services of ephemeral events"
                 )
 
     def on_new_replication_data(self) -> None:
