@@ -150,31 +150,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         self.download_resource = self.media_repo.children[b"download"]
         self.upload_resource = self.media_repo.children[b"upload"]
 
-    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
-        self.storage_path = self.mktemp()
-        self.media_store_path = self.mktemp()
-        os.mkdir(self.storage_path)
-        os.mkdir(self.media_store_path)
-
-        config = self.default_config()
-        config["media_store_path"] = self.media_store_path
-        config["thumbnail_requirements"] = {}
-        config["max_image_pixels"] = 2000000
-
-        provider_config = {
-            "module": "synapse.rest.media.v1.storage_provider.FileStorageProviderBackend",
-            "store_local": True,
-            "store_synchronous": False,
-            "store_remote": True,
-            "config": {"directory": self.storage_path},
-        }
-        config["media_storage_providers"] = [provider_config]
-
-        hs = self.setup_test_homeserver(config=config)
-
-        return hs
-
     def _ensure_quarantined(
         self, admin_user_tok: str, server_and_media_id: str
     ) -> None:
