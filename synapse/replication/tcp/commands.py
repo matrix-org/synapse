@@ -20,7 +20,7 @@ import abc
 import logging
 from typing import Optional, Tuple, Type, TypeVar
 
-from synapse.types import JsonDict
+from synapse.replication.tcp.streams._base import StreamRow
 from synapse.util import json_decoder, json_encoder
 
 logger = logging.getLogger(__name__)
@@ -116,7 +116,7 @@ class RdataCommand(Command):
     NAME = "RDATA"
 
     def __init__(
-        self, stream_name: str, instance_name: str, token: Optional[int], row: JsonDict
+        self, stream_name: str, instance_name: str, token: Optional[int], row: StreamRow
     ):
         self.stream_name = stream_name
         self.instance_name = instance_name
