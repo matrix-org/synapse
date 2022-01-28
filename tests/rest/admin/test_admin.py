@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import urllib.parse
 from http import HTTPStatus
-from typing import List, Optional
+from typing import List
+
+from parameterized import parameterized
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -173,27 +174,18 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             ),
         )
 
-    def test_quarantine_media_requires_admin(self) -> None:
+    @parameterized.expand(
+        [
+            # Attempt quarantine media APIs as non-admin
+            "/_synapse/admin/v1/media/quarantine/example.org/abcde12345",
+            # And the roomID/userID endpoint
+            "/_synapse/admin/v1/room/!room%3Aexample.com/media/quarantine",
+        ]
+    )
+    def test_quarantine_media_requires_admin(self, url: str) -> None:
         self.register_user("nonadmin", "pass", admin=False)
         non_admin_user_tok = self.login("nonadmin", "pass")
 
-        # Attempt quarantine media APIs as non-admin
-        url = "/_synapse/admin/v1/media/quarantine/example.org/abcde12345"
-        channel = self.make_request(
-            "POST",
-            url.encode("ascii"),
-            access_token=non_admin_user_tok,
-        )
-
-        # Expect a forbidden error
-        self.assertEqual(
-            HTTPStatus.FORBIDDEN,
-            channel.code,
-            msg="Expected forbidden on quarantining media as a non-admin",
-        )
-
-        # And the roomID/userID endpoint
-        url = "/_synapse/admin/v1/room/!room%3Aexample.com/media/quarantine"
         channel = self.make_request(
             "POST",
             url.encode("ascii"),
@@ -252,9 +244,15 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         # Attempt to access the media
         self._ensure_quarantined(admin_user_tok, server_name_and_media_id)
 
-    def test_quarantine_all_media_in_room(
-        self, override_url_template: Optional[str] = None
-    ) -> None:
+    @parameterized.expand(
+        [
+            # regular API path
+            "/_synapse/admin/v1/room/%s/media/quarantine",
+            # deprecated API path
+            "/_synapse/admin/v1/quarantine_media/%s",
+        ]
+    )
+    def test_quarantine_all_media_in_room(self, url: str) -> None:
         self.register_user("room_admin", "pass", admin=True)
         admin_user_tok = self.login("room_admin", "pass")
 
@@ -292,16 +290,9 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             tok=non_admin_user_tok,
         )
 
-        # Quarantine all media in the room
-        if override_url_template:
-            url = override_url_template % urllib.parse.quote(room_id)
-        else:
-            url = "/_synapse/admin/v1/room/%s/media/quarantine" % urllib.parse.quote(
-                room_id
-            )
         channel = self.make_request(
             "POST",
-            url,
+            url % urllib.parse.quote(room_id),
             access_token=admin_user_tok,
         )
         self.pump(1.0)
@@ -317,10 +308,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         # Test that we cannot download any of the media anymore
         self._ensure_quarantined(admin_user_tok, server_and_media_id_1)
         self._ensure_quarantined(admin_user_tok, server_and_media_id_2)
-
-    def test_quarantine_all_media_in_room_deprecated_api_path(self) -> None:
-        # Perform the above test with the deprecated API path
-        self.test_quarantine_all_media_in_room("/_synapse/admin/v1/quarantine_media/%s")
 
     def test_quarantine_all_media_by_user(self) -> None:
         self.register_user("user_admin", "pass", admin=True)
