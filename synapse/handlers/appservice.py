@@ -483,7 +483,8 @@ class ApplicationServicesHandler:
         Args:
             service: The application service to check for which events it should receive.
             new_token: The latest to-device event stream token.
-            users: The users that should receive new to-device messages.
+            users: The users to be notified for the new to-device messages
+                (ie, the recipients of the messages).
 
         Returns:
             A list of JSON dictionaries containing data derived from the typing events
