@@ -233,8 +233,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         self,
         hostname: str,
         config: HomeServerConfig,
-        reactor=None,
-        version_string="Synapse",
+        reactor: Optional[ISynapseReactor] = None,
+        version_string: str = "Synapse",
     ):
         """
         Args:
@@ -244,7 +244,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         if not reactor:
             from twisted.internet import reactor as _reactor
 
-            reactor = _reactor
+            reactor = cast(ISynapseReactor, _reactor)
 
         self._reactor = reactor
         self.hostname = hostname
