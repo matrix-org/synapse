@@ -218,7 +218,7 @@ class DeactivateAccountTestCase(HomeserverTestCase):
             self.get_success(self._store.ignored_by("@sheltie:test")), set()
         )
 
-    def _rerun_retroactive_account_data_deletion_job(self) -> None:
+    def _rerun_retroactive_account_data_deletion_update(self) -> None:
         # Reset the 'all done' flag
         self._store.db_pool.updates._all_done = False
 
@@ -234,13 +234,13 @@ class DeactivateAccountTestCase(HomeserverTestCase):
 
         self.wait_for_background_updates()
 
-    def test_account_data_deleted_retroactively_by_background_job_if_deactivated(
+    def test_account_data_deleted_retroactively_by_background_update_if_deactivated(
         self,
     ) -> None:
         """
         Tests that a user, who deactivated their account before account data was
         deleted automatically upon deactivation, has their account data retroactively
-        scrubbed by the background job.
+        scrubbed by the background update.
         """
 
         # Request the deactivation of our account
@@ -268,8 +268,8 @@ class DeactivateAccountTestCase(HomeserverTestCase):
             ),
         )
 
-        # Re-run the retroactive deletion job
-        self._rerun_retroactive_account_data_deletion_job()
+        # Re-run the retroactive deletion update
+        self._rerun_retroactive_account_data_deletion_update()
 
         # Check that the account data was cleared.
         self._store.get_global_account_data_by_type_for_user.invalidate_all()
@@ -282,9 +282,11 @@ class DeactivateAccountTestCase(HomeserverTestCase):
             ),
         )
 
-    def test_account_data_preserved_by_background_job_if_not_deactivated(self) -> None:
+    def test_account_data_preserved_by_background_update_if_not_deactivated(
+        self,
+    ) -> None:
         """
-        Tests that the background job does not scrub account data for users that have
+        Tests that the background update does not scrub account data for users that have
         not been deactivated.
         """
 
@@ -310,8 +312,8 @@ class DeactivateAccountTestCase(HomeserverTestCase):
             ),
         )
 
-        # Re-run the retroactive deletion job
-        self._rerun_retroactive_account_data_deletion_job()
+        # Re-run the retroactive deletion update
+        self._rerun_retroactive_account_data_deletion_update()
 
         # Check that the account data was NOT cleared.
         self._store.get_global_account_data_by_type_for_user.invalidate_all()
