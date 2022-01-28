@@ -52,8 +52,8 @@ from typing import (
     TYPE_CHECKING,
     Awaitable,
     Callable,
+    Collection,
     Dict,
-    Iterable,
     List,
     Optional,
     Set,
@@ -112,9 +112,9 @@ class ApplicationServiceScheduler:
     def enqueue_for_appservice(
         self,
         appservice: ApplicationService,
-        events: Optional[Iterable[EventBase]] = None,
-        ephemeral: Optional[Iterable[JsonDict]] = None,
-        to_device_messages: Optional[Iterable[JsonDict]] = None,
+        events: Optional[Collection[EventBase]] = None,
+        ephemeral: Optional[Collection[JsonDict]] = None,
+        to_device_messages: Optional[Collection[JsonDict]] = None,
     ) -> None:
         """
         Enqueue some data to be sent off to an application service.
