@@ -63,3 +63,69 @@ jobs:
           tags: "matrixdotorg/synapse:${{ steps.set-tag.outputs.tag }}"
           file: "docker/Dockerfile"
           platforms: linux/amd64,linux/arm64
+
+  build_workers_test:
+    runs-on: ubuntu-latest
+
+    # The worker test image depends on the base image, so we must build the base
+    # first.
+    needs: build
+
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - name: Set up QEMU
+        id: qemu
+        uses: docker/setup-qemu-action@v1
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Inspect builder
+        run: docker buildx inspect
+
+      - name: Login to GitHub Container Registry (for worker-testing-only image)
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # This must match EXACTLY the one in the `build` pipeline.
+      - name: Calculate docker image tag
+        id: set-tag
+        run: |
+          case "${GITHUB_REF}" in
+              refs/heads/develop)
+                  tag=develop
+                  ;;
+              refs/heads/master|refs/heads/main)
+                  tag=latest
+                  ;;
+              refs/tags/*)
+                  tag=${GITHUB_REF#refs/tags/}
+                  ;;
+              *)
+                  tag=${GITHUB_SHA}
+                  ;;
+          esac
+          echo "::set-output name=tag::$tag"
+
+      # This image is solely intended to be used for automated test tools,
+      # such as mx-tester.
+      - name: Build and push worker-testing-only image for all platforms
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          build-args: |
+            "base_version=${{ steps.set-tag.outputs.tag }}"
+          labels: "gitsha1=${{ github.sha }}"
+          tags: "ghcr.io/matrix-org/synapse-workers-testing-only:${{ steps.set-tag.outputs.tag }}"
+          file: "docker/Dockerfile-workers"
+          platforms: linux/amd64,linux/arm64
