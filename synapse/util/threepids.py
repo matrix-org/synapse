@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 MAX_EMAIL_ADDRESS_LENGTH = 500
 
 
-def check_3pid_allowed(hs: "HomeServer", medium: str, address: str) -> bool:
+async def check_3pid_allowed(hs: "HomeServer", medium: str, address: str) -> bool:
     """Checks whether a given format of 3PID is allowed to be used on this HS
 
     Args:
@@ -43,6 +43,8 @@ def check_3pid_allowed(hs: "HomeServer", medium: str, address: str) -> bool:
     Returns:
         bool: whether the 3PID medium/address is allowed to be added to this HS
     """
+    if not await hs.get_password_auth_provider().is_3pid_allowed(medium, address):
+        return False
 
     if hs.config.registration.allowed_local_3pids:
         for constraint in hs.config.registration.allowed_local_3pids:
