@@ -591,9 +591,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             )
 
         if "avatar_url" in content:
-            await self.profile_handler.check_avatar_size_and_mime_type(
-                content["avatar_url"]
-            )
+            if not await self.profile_handler.check_avatar_size_and_mime_type(
+                content["avatar_url"],
+            ):
+                raise SynapseError(403, "This avatar is not allowed", Codes.FORBIDDEN)
 
         # The event content should *not* include the authorising user as
         # it won't be properly signed. Strip it out since it might come

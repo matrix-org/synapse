@@ -257,30 +257,22 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         # The first check that's done by this method is whether the file exists; if we
         # don't get an error on a non-existing file then it means all of the checks were
         # successfully skipped.
-        allowed = self.get_success(
-            self.handler._check_avatar_size_and_mime_type("mxc://test/unknown_file")
+        res = self.get_success(
+            self.handler.check_avatar_size_and_mime_type("mxc://test/unknown_file")
         )
-        self.assertTrue(allowed)
+        self.assertTrue(res)
 
-    @unittest.override_config(
-        {
-            "max_avatar_size": 50,
-        }
-    )
+    @unittest.override_config({"max_avatar_size": 50})
     def test_avatar_constraints_missing(self):
         """Tests that an avatar isn't allowed if the file at the given MXC URI couldn't
         be found.
         """
-        allowed = self.get_success(
-            self.handler._check_avatar_size_and_mime_type("mxc://test/unknown_file")
+        res = self.get_success(
+            self.handler.check_avatar_size_and_mime_type("mxc://test/unknown_file")
         )
-        self.assertFalse(allowed)
+        self.assertFalse(res)
 
-    @unittest.override_config(
-        {
-            "max_avatar_size": 50,
-        }
-    )
+    @unittest.override_config({"max_avatar_size": 50})
     def test_avatar_constraints_file_size(self):
         """Tests that a file that's above the allowed file size is forbidden but one
         that's below it is allowed.
@@ -292,21 +284,17 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             }
         )
 
-        allowed = self.get_success(
-            self.handler._check_avatar_size_and_mime_type("mxc://test/small")
+        res = self.get_success(
+            self.handler.check_avatar_size_and_mime_type("mxc://test/small")
         )
-        self.assertTrue(allowed)
+        self.assertTrue(res)
 
-        allowed = self.get_success(
-            self.handler._check_avatar_size_and_mime_type("mxc://test/big")
+        res = self.get_success(
+            self.handler.check_avatar_size_and_mime_type("mxc://test/big")
         )
-        self.assertFalse(allowed)
+        self.assertFalse(res)
 
-    @unittest.override_config(
-        {
-            "allowed_avatar_mimetypes": ["image/png"],
-        }
-    )
+    @unittest.override_config({"allowed_avatar_mimetypes": ["image/png"]})
     def test_avatar_constraint_mime_type(self):
         """Tests that a file with an unauthorised MIME type is forbidden but one with
         an authorised content type is allowed.
@@ -318,15 +306,15 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             }
         )
 
-        allowed = self.get_success(
-            self.handler._check_avatar_size_and_mime_type("mxc://test/good")
+        res = self.get_success(
+            self.handler.check_avatar_size_and_mime_type("mxc://test/good")
         )
-        self.assertTrue(allowed)
+        self.assertTrue(res)
 
-        allowed = self.get_success(
-            self.handler._check_avatar_size_and_mime_type("mxc://test/bad")
+        res = self.get_success(
+            self.handler.check_avatar_size_and_mime_type("mxc://test/bad")
         )
-        self.assertFalse(allowed)
+        self.assertFalse(res)
 
     def _setup_local_files(self, names_and_props: Dict[str, Dict[str, Any]]):
         """Stores metadata about files in the database.
