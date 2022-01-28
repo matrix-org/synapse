@@ -36,6 +36,7 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.storage.database import DatabasePool, make_conn
+from synapse.storage.databases.main import PushRuleStore
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
 from synapse.storage.databases.main.client_ips import ClientIpBackgroundUpdateStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxBackgroundUpdateStore
@@ -182,6 +183,7 @@ class Store(
     EndToEndKeyBackgroundStore,
     StatsStore,
     AccountDataWorkerStore,
+    PushRuleStore,
     PusherWorkerStore,
     PresenceBackgroundUpdateStore,
     GroupServerWorkerStore,
