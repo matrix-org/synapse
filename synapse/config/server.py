@@ -1181,16 +1181,14 @@ class ServerConfig(Config):
         #
         #allow_per_room_profiles: false
 
-        # The largest allowed size for a user avatar. If not defined, no
-        # restriction will be imposed.
+        # The largest allowed file size for a user avatar. Defaults to no restriction.
         #
         # Note that user avatar changes will not work if this is set without
         # using Synapse's media repository.
         #
         #max_avatar_size: 10M
 
-        # Allow mimetypes for a user avatar. If not defined, no restriction will
-        # be imposed.
+        # The MIME types allowed for user avatars. Defaults to no restriction.
         #
         # Note that user avatar changes will not work if this is set without
         # using Synapse's media repository.

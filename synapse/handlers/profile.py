@@ -293,7 +293,8 @@ class ProfileHandler:
                 400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
 
-        await self.check_avatar_size_and_mime_type(new_avatar_url)
+        if not await self.check_avatar_size_and_mime_type(new_avatar_url):
+            raise SynapseError(403, "This avatar is not allowed", Codes.FORBIDDEN)
 
         avatar_url_to_set: Optional[str] = new_avatar_url
         if new_avatar_url == "":
@@ -316,22 +317,8 @@ class ProfileHandler:
 
         await self._update_join_states(requester, target_user)
 
-    async def check_avatar_size_and_mime_type(self, mxc: str) -> None:
-        """Check that the size and content type of the avatar at the given MXC URI are
-        within the configured limits.
-
-        Args:
-            mxc: The MXC URI at which the avatar can be found.
-
-        Raises:
-            SynapseError with an M_FORBIDDEN error code if the avatar doesn't fit within
-            the limits allowed by the configuration.
-        """
-        if not await self._check_avatar_size_and_mime_type(mxc):
-            raise SynapseError(403, "This avatar is not allowed", Codes.FORBIDDEN)
-
     @cached()
-    async def _check_avatar_size_and_mime_type(self, mxc: str) -> bool:
+    async def check_avatar_size_and_mime_type(self, mxc: str) -> bool:
         """Check that the size and content type of the avatar at the given MXC URI are
         within the configured limits.
 
@@ -365,9 +352,10 @@ class ProfileHandler:
             # Ensure avatar does not exceed max allowed avatar size
             if media_info["media_length"] > self.max_avatar_size:
                 logger.warning(
-                    "Forbidding avatar change to %s: avatar must be less than %s bytes",
+                    "Forbidding avatar change to %s: %d bytes is above the allowed size "
+                    "limit",
                     mxc,
-                    self.max_avatar_size,
+                    media_info["media_length"],
                 )
                 return False
 

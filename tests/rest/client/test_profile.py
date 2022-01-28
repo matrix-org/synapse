@@ -155,11 +155,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body.get("avatar_url")
 
-    @unittest.override_config(
-        {
-            "max_avatar_size": 50,
-        }
-    )
+    @unittest.override_config({"max_avatar_size": 50})
     def test_avatar_size_limit_global(self):
         """Tests that the maximum size limit for avatars is enforced when updating a
         global profile.
@@ -173,7 +169,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "PUT",
-            "/profile/%s/avatar_url" % (self.owner,),
+            f"/profile/{self.owner}/avatar_url",
             content={"avatar_url": "mxc://test/big"},
             access_token=self.owner_tok,
         )
@@ -184,17 +180,13 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "PUT",
-            "/profile/%s/avatar_url" % (self.owner,),
+            f"/profile/{self.owner}/avatar_url",
             content={"avatar_url": "mxc://test/small"},
             access_token=self.owner_tok,
         )
         self.assertEqual(channel.code, 200, channel.result)
 
-    @unittest.override_config(
-        {
-            "max_avatar_size": 50,
-        }
-    )
+    @unittest.override_config({"max_avatar_size": 50})
     def test_avatar_size_limit_per_room(self):
         """Tests that the maximum size limit for avatars is enforced when updating a
         per-room profile.
@@ -210,7 +202,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "PUT",
-            "/rooms/%s/state/m.room.member/%s" % (room_id, self.owner),
+            f"/rooms/{room_id}/state/m.room.member/{self.owner}",
             content={"membership": "join", "avatar_url": "mxc://test/big"},
             access_token=self.owner_tok,
         )
@@ -221,17 +213,13 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "PUT",
-            "/rooms/%s/state/m.room.member/%s" % (room_id, self.owner),
+            f"/rooms/{room_id}/state/m.room.member/{self.owner}",
             content={"membership": "join", "avatar_url": "mxc://test/small"},
             access_token=self.owner_tok,
         )
         self.assertEqual(channel.code, 200, channel.result)
 
-    @unittest.override_config(
-        {
-            "allowed_avatar_mimetypes": ["image/png"],
-        }
-    )
+    @unittest.override_config({"allowed_avatar_mimetypes": ["image/png"]})
     def test_avatar_allowed_mime_type_global(self):
         """Tests that the MIME type whitelist for avatars is enforced when updating a
         global profile.
@@ -245,7 +233,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "PUT",
-            "/profile/%s/avatar_url" % (self.owner,),
+            f"/profile/{self.owner}/avatar_url",
             content={"avatar_url": "mxc://test/bad"},
             access_token=self.owner_tok,
         )
@@ -256,17 +244,13 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "PUT",
-            "/profile/%s/avatar_url" % (self.owner,),
+            f"/profile/{self.owner}/avatar_url",
             content={"avatar_url": "mxc://test/good"},
             access_token=self.owner_tok,
         )
         self.assertEqual(channel.code, 200, channel.result)
 
-    @unittest.override_config(
-        {
-            "allowed_avatar_mimetypes": ["image/png"],
-        }
-    )
+    @unittest.override_config({"allowed_avatar_mimetypes": ["image/png"]})
     def test_avatar_allowed_mime_type_per_room(self):
         """Tests that the MIME type whitelist for avatars is enforced when updating a
         per-room profile.
@@ -282,7 +266,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "PUT",
-            "/rooms/%s/state/m.room.member/%s" % (room_id, self.owner),
+            f"/rooms/{room_id}/state/m.room.member/{self.owner}",
             content={"membership": "join", "avatar_url": "mxc://test/bad"},
             access_token=self.owner_tok,
         )
@@ -293,7 +277,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "PUT",
-            "/rooms/%s/state/m.room.member/%s" % (room_id, self.owner),
+            f"/rooms/{room_id}/state/m.room.member/{self.owner}",
             content={"membership": "join", "avatar_url": "mxc://test/good"},
             access_token=self.owner_tok,
         )
