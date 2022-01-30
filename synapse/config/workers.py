@@ -318,7 +318,11 @@ class WorkerConfig(Config):
                 update_user_directory_on = "master"
             else:
                 # user directory worker should update
-                update_user_directory_on = "synapse.app.user_dir"
+                update_user_directory_on = (
+                    self.instance_name
+                    if self.worker_app == "synapse.app.user_dir"
+                    else ""
+                )
         else:
             update_user_directory_on = (
                 config.get("update_user_directory_on") or "master"
