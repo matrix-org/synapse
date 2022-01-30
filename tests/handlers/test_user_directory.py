@@ -56,6 +56,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
+        # Always process user directory updates on this main homeserver process.
         config["update_user_directory_on"] = None
 
         self.appservice = ApplicationService(

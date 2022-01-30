@@ -15,7 +15,7 @@
 
 import argparse
 import logging
-from typing import List, Optional, Union
+from typing import List, Union
 
 import attr
 
@@ -44,10 +44,9 @@ Please add ``start_pushers: false`` to the main config
 """
 
 USER_UPDATE_DIRECTORY_DEPRECATION_WARNING = """
-Synapse now uses 'update_user_directory_on' over 'update_user_directory',
-you have set 'update_user_directory', and while synapse will work in a backwards
-compatible manner, it is suggested to change this value to use
-'update_user_directory_on' instead.
+The 'update_user_directory' configuration setting is now deprecated,
+and replaced with 'update_user_directory_on'.  See the sample configuration
+file for details of 'update_user_directory_on'.
 """
 
 
@@ -302,46 +301,32 @@ class WorkerConfig(Config):
         # No effort is made to ensure only a single instance of these tasks is
         # running.
         background_tasks_instance = config.get("run_background_tasks_on") or "master"
-        self.run_background_tasks = (
-            self.worker_name is None and background_tasks_instance == "master"
-        ) or self.worker_name == background_tasks_instance
+        self.run_background_tasks = self.instance_name == background_tasks_instance
 
         # update_user_directory_on controls which worker is responsible for updating the user directory.
-        # None means that the main process should handle this, so does the absence of the config key.
+        # None means that the main process should handle this, as does the absence of the config key.
         #
         # Note that due to backwards compatibility, we must also test for update_user_directory, and apply it if
         # update_user_directory_on is not defined at the same time.
-        self.update_user_directory: bool
 
-        uud_result: bool
-        is_master_process = self.worker_name is None
+        if "update_user_directory" in config:
+            # Backwards compatibility case
+            logger.warning(USER_UPDATE_DIRECTORY_DEPRECATION_WARNING)
 
-        if "update_user_directory_on" in config:
-            update_user_directory_on: Optional[str] = config["update_user_directory_on"]
-
-            if update_user_directory_on is None:
-                uud_result = is_master_process
+            if config["update_user_directory"]:
+                # Main process should update
+                update_user_directory_on = "master"
             else:
-                uud_result = self.worker_name == update_user_directory_on
-
+                # user directory worker should update
+                update_user_directory_on = "synapse.app.user_dir"
         else:
-            if "update_user_directory" in config:
-                # Backwards compatibility case
-                logger.warning(USER_UPDATE_DIRECTORY_DEPRECATION_WARNING)
+            update_user_directory_on = (
+                config.get("update_user_directory_on") or "master"
+            )
 
-                update_user_directory: bool = config["update_user_directory"]
-
-                if update_user_directory:
-                    # Main process should update
-                    uud_result = is_master_process
-                else:
-                    # user directory worker should update
-                    uud_result = self.worker_app == "synapse.app.user_dir"
-            else:
-                # Both values are undefined, assume None for update_user_directory_on
-                uud_result = is_master_process
-
-        self.update_user_directory = uud_result
+        self.update_user_directory: bool = (
+            self.instance_name == update_user_directory_on
+        )
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
