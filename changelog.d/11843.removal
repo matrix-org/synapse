@@ -1,0 +1,1 @@
+Remove the `experimental_msc1849_support_enabled` flag as the features are now stable.
