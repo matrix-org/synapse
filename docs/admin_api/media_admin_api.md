@@ -1,20 +1,3 @@
-# Contents
-- [Querying media](#querying-media)
-  * [List all media in a room](#list-all-media-in-a-room)
-  * [List all media uploaded by a user](#list-all-media-uploaded-by-a-user)
-- [Quarantine media](#quarantine-media)
-  * [Quarantining media by ID](#quarantining-media-by-id)
-  * [Remove media from quarantine by ID](#remove-media-from-quarantine-by-id)
-  * [Quarantining media in a room](#quarantining-media-in-a-room)
-  * [Quarantining all media of a user](#quarantining-all-media-of-a-user)
-  * [Protecting media from being quarantined](#protecting-media-from-being-quarantined)
-  * [Unprotecting media from being quarantined](#unprotecting-media-from-being-quarantined)
-- [Delete local media](#delete-local-media)
-  * [Delete a specific local media](#delete-a-specific-local-media)
-  * [Delete local media by date or size](#delete-local-media-by-date-or-size)
-  * [Delete media uploaded by a user](#delete-media-uploaded-by-a-user)
-- [Purge Remote Media API](#purge-remote-media-api)
-
 # Querying media
 
 These APIs allow extracting media information from the homeserver.
