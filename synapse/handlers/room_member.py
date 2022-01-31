@@ -261,6 +261,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         target: UserID,
         room_id: str,
         membership: str,
+        origin_server_ts: Optional[int],
         prev_event_ids: List[str],
         auth_event_ids: Optional[List[str]] = None,
         txn_id: Optional[str] = None,
@@ -279,6 +280,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             target:
             room_id:
             membership:
+            origin_server_ts:
             prev_event_ids: The event IDs to use as the prev events
 
             auth_event_ids:
@@ -335,6 +337,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 "state_key": user_id,
                 # For backwards compatibility:
                 "membership": membership,
+                "origin_server_ts": origin_server_ts,
             },
             txn_id=txn_id,
             prev_event_ids=prev_event_ids,
@@ -441,6 +444,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         historical: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
+        origin_server_ts: Optional[int] = None,
     ) -> Tuple[str, int]:
         """Update a user's membership in a room.
 
@@ -468,6 +472,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 The event ids to use as the auth_events for the new event.
                 Should normally be left as None, which will cause them to be calculated
                 based on the room state at the prev_events.
+            origin_server_ts: The origin_server_ts to use if a new event is created. Uses
+                the current timestamp if set to None.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -499,6 +505,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 historical=historical,
                 prev_event_ids=prev_event_ids,
                 auth_event_ids=auth_event_ids,
+                origin_server_ts=origin_server_ts,
             )
 
         return result
@@ -520,6 +527,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         historical: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
+        origin_server_ts: Optional[int] = None,
     ) -> Tuple[str, int]:
         """Helper for update_membership.
 
@@ -549,6 +557,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 The event ids to use as the auth_events for the new event.
                 Should normally be left as None, which will cause them to be calculated
                 based on the room state at the prev_events.
+            origin_server_ts:
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -679,6 +688,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 require_consent=require_consent,
                 outlier=outlier,
                 historical=historical,
+                origin_server_ts=origin_server_ts,
             )
 
         latest_event_ids = await self.store.get_prev_events_for_room(room_id)
@@ -902,6 +912,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             content=content,
             require_consent=require_consent,
             outlier=outlier,
+            origin_server_ts=origin_server_ts,
         )
 
     async def _should_perform_remote_join(

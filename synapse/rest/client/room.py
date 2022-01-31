@@ -204,6 +204,11 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         if state_key is not None:
             event_dict["state_key"] = state_key
 
+        # Twisted will have processed the args by now.
+        assert request.args is not None
+        if b"ts" in request.args and requester.app_service:
+            event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
+
         try:
             if event_type == EventTypes.Member:
                 membership = content.get("membership", None)
@@ -213,6 +218,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     room_id=room_id,
                     action=membership,
                     content=content,
+                    origin_server_ts=event_dict.get("origin_server_ts", None),
                 )
             else:
                 (
