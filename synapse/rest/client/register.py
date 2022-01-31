@@ -379,8 +379,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
 
     PATTERNS = client_patterns(
         f"/v1/register/{LoginType.REGISTRATION_TOKEN}/validity",
-        releases=(),
-        unstable=True,
+        releases=("v1",),
     )
 
     def __init__(self, hs: "HomeServer"):
