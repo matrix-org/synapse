@@ -564,9 +564,9 @@ The following fields are returned in the JSON response body:
 
 ### List media uploaded by a user
 Gets a list of all local media that a specific `user_id` has created.
-These are media that the user has uploaded himself
+These are media that the user has uploaded themselves
 ([local media](../media_repository.md#local-media)), as well as
-[preview images](../media_repository.md#url-previews) if the
+[URL preview images](../media_repository.md#url-previews) requested by the user if the
 [feature is enabled](../development/url_previews.md).
 
 By default, the response is ordered by descending creation date and ascending media ID.
@@ -669,7 +669,7 @@ The following fields are returned in the JSON response body:
   - `created_ts` - integer - Timestamp when the content was uploaded in ms.
   - `last_access_ts` - integer - Timestamp when the content was last accessed in ms.
   - `media_id` - string - The id used to refer to the media. Details about the format
-    of the `media_id` are documented in the section about the
+    of the `media_id` are documented under
     [media repository](../media_repository.md).
   - `media_length` - integer - Length of the media in bytes.
   - `media_type` - string - The MIME-type of the media.
