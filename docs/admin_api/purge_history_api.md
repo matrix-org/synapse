@@ -57,9 +57,6 @@ It is possible to poll for updates on recent purges with a second API;
 GET /_synapse/admin/v1/purge_history_status/<purge_id>
 ```
 
-Again, you will need to authenticate by providing an `access_token` for a
-server admin.
-
 This API returns a JSON body like the following:
 
 ```json
