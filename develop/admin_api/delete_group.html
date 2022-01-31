@@ -186,11 +186,11 @@
 <p>This API lets a server admin delete a local group. Doing so will kick all
 users out of the group so that their clients will correctly handle the group
 being deleted.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <p>The API is:</p>
 <pre><code>POST /_synapse/admin/v1/delete_group/&lt;group_id&gt;
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 
                     </main>
 

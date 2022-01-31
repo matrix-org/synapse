@@ -186,6 +186,8 @@
 <p>The List Room admin API allows server admins to get a list of rooms on their
 server. There are various parameters available that allow for filtering and
 sorting the returned list. This API supports pagination.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <p><strong>Parameters</strong></p>
 <p>The following query parameters are available:</p>
 <ul>
@@ -598,8 +600,6 @@ Depending on the amount of history being purged, a call to the API may take
 several minutes or longer.</p>
 <p>The local server will only have the power to move local user and room aliases to
 the new room. Users on other servers will be unaffected.</p>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <h2 id="version-1-old-version"><a class="header" href="#version-1-old-version">Version 1 (old version)</a></h2>
 <p>This version works synchronously. That means you only get the response once the server has
 finished the action, which may take a long time. If you request the same action

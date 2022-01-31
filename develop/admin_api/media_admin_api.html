@@ -184,14 +184,14 @@
 
                         <h1 id="querying-media"><a class="header" href="#querying-media">Querying media</a></h1>
 <p>These APIs allow extracting media information from the homeserver.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <h2 id="list-all-media-in-a-room"><a class="header" href="#list-all-media-in-a-room">List all media in a room</a></h2>
 <p>This API gets a list of known media in a room.
 However, it only shows media from unencrypted events or rooms.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/room/&lt;room_id&gt;/media
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <p>The API returns a JSON body like the following:</p>
 <pre><code class="language-json">{
   &quot;local&quot;: [
@@ -391,8 +391,6 @@ All cached media that was last accessed before this timestamp will be removed.</
 <ul>
 <li><code>deleted</code>: integer - The number of media items successfully deleted</li>
 </ul>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <p>If the user re-requests purged remote media, synapse will re-request the media
 from the originating server.</p>
 
