@@ -207,7 +207,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             last_processed_stream_id,
         ) = await self._get_device_messages(
             user_ids=[user_id],
-            device_ids=[device_id],
+            device_id=device_id,
             from_stream_id=from_stream_id,
             to_stream_id=to_stream_id,
             limit=limit,
@@ -227,7 +227,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         user_ids: Collection[str],
         from_stream_id: int,
         to_stream_id: int,
-        device_ids: Optional[Collection[str]] = None,
+        device_id: Optional[str] = None,
         limit: Optional[int] = None,
     ) -> Tuple[Dict[Tuple[str, str], List[JsonDict]], int]:
         """
@@ -248,8 +248,9 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             user_ids: The user IDs to filter device messages by.
             from_stream_id: The lower boundary of stream id to filter with (exclusive).
             to_stream_id: The upper boundary of stream id to filter with (inclusive).
-            device_ids: If provided, only messages destined for these device IDs will be returned.
-                If not provided, all device IDs for the given user IDs will be used.
+            device_id: A device ID to query to-device messages for. If not provided, to-device
+                messages from all device IDs for the given user IDs will be queried. May not be
+                provided if `user_ids` contains more than one entry.
             limit: The maximum number of to-device messages to return. Can only be used when
                 passing a single user ID / device ID tuple.
 
@@ -260,28 +261,32 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                     there may be more messages to retrieve. If `limit` is not set, then this
                     is always equal to 'to_stream_id'.
         """
-        # A limit can only be applied when querying for a single user ID / device ID tuple.
-        if limit:
-            if not device_ids:
+        if not user_ids:
+            logger.warning("No users provided upon querying for device IDs")
+            return {}, to_stream_id
+
+        if len(user_ids) > 1:
+            if device_id is not None:
                 raise AssertionError(
-                    "Programming error: _get_new_device_messages was passed 'limit' "
-                    "but not device_ids. This could lead to querying multiple user ID "
-                    "/ device ID pairs, which is not compatible with 'limit'"
+                    "Programming error: 'device_id' cannot be supplied to "
+                    "_get_device_messages when >1 user_id has been provided"
                 )
 
-            if len(user_ids) > 1 or len(device_ids) > 1:
+            # A limit can only be applied when querying for a single user ID / device ID tuple.
+            if limit:
                 raise AssertionError(
-                    "Programming error: _get_new_device_messages was passed 'limit' "
-                    "with >1 user id/device id pair"
+                    "Programming error: _get_device_messages was passed 'limit' "
+                    "with >1 user_id"
                 )
 
         user_ids_to_query: Set[str] = set()
         device_ids_to_query: Set[str] = set()
 
-        if device_ids is not None:
-            # If a collection of device IDs were passed, use them to filter results.
+        # Note that a device ID could be an empty str
+        if device_id is not None:
+            # If a device ID was passed, use it to filter results.
             # Otherwise, device IDs will be derived from the given collection of user IDs.
-            device_ids_to_query.update(device_ids)
+            device_ids_to_query.add(device_id)
 
         # Determine which users have devices with pending messages
         for user_id in user_ids:
@@ -298,7 +303,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             # If a list of device IDs was not provided, retrieve all devices IDs
             # for the given users. We explicitly do not query hidden devices, as
             # hidden devices should not receive to-device messages.
-            if not device_ids:
+            if not device_ids_to_query:
                 user_device_dicts = self.db_pool.simple_select_many_txn(
                     txn,
                     table="devices",
@@ -312,7 +317,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                     {row["device_id"] for row in user_device_dicts}
                 )
 
-            if not user_ids_to_query or not device_ids_to_query:
+            if not device_ids_to_query:
                 # We've ended up with no devices to query.
                 return {}, to_stream_id
 
