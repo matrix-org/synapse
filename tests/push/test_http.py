@@ -597,7 +597,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         Note that:
         * Sending messages will cause push notifications to go out to relevant users
-        * Sending a read receipt will cause the HttpPusher to check whether the unread
+        * Sending a read receipt will cause the HTTP pusher to check whether the unread
             count has changed since the last push notification. If so, a "badge update"
             notification goes out to the user that sent the receipt
         """
@@ -643,23 +643,8 @@ class HTTPPusherTests(HomeserverTestCase):
         # position in the room. We'll set the read position to this event in a moment
         first_message_event_id = response["event_id"]
 
-        # Advance time a bit (so the pusher will register something has happened) and
-        # make the push succeed
-        self.push_attempts[0][0].callback({})
-        self.pump()
-
-        # Check our push made it
-        self.assertEqual(len(self.push_attempts), 1)
-        self.assertEqual(
-            self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
-        )
-
-        # Check that the unread count for the room is 0
-        #
-        # The unread count is zero as the user has no read receipt in the room yet
-        self.assertEqual(
-            self.push_attempts[0][2]["notification"]["counts"]["unread"], 0
-        )
+        expected_push_attempts = 1
+        self._check_push_attempt(expected_push_attempts, 0)
 
         self._send_read_request(access_token, first_message_event_id, room_id)
 
@@ -673,51 +658,61 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         second_message_event_id = response2["event_id"]
 
-        # Advance time and make the push succeed
-        self.push_attempts[1][0].callback({})
-        self.pump()
+        expected_push_attempts += 1
 
-        # This push should contain an unread count of 1 as there's now been one
-        # message since our last read receipt
-        self.assertEqual(len(self.push_attempts), 2)
-        self.assertEqual(
-            self.push_attempts[1][2]["notification"]["counts"]["unread"], 1
-        )
+        self._check_push_attempt(expected_push_attempts, 1)
 
         self._send_read_request(access_token, second_message_event_id, room_id)
+        expected_push_attempts += 1
 
-        # Advance time and make the push succeed
-        self.push_attempts[2][0].callback({})
-        self.pump()
-
-        # This push should contain an unread count of 0 as we have
-        # just read all the messages in the room.
-        self.assertEqual(len(self.push_attempts), 3)
-        self.assertEqual(
-            self.push_attempts[2][2]["notification"]["counts"]["unread"], 0
-        )
+        self._check_push_attempt(expected_push_attempts, 0)
 
         # Since we're grouping by room, sending more messages shouldn't increase the
         # unread count, as they're all being sent in the same room
         self.helper.send(room_id, body="Hello?", tok=other_access_token)
+        expected_push_attempts += 1
 
-        # Advance time and make the push succeed
-        self.pump()
-        self.push_attempts[3][0].callback({})
+        self._advance_time_and_make_push_succeed(expected_push_attempts)
 
         self.helper.send(room_id, body="Hello??", tok=other_access_token)
+        expected_push_attempts += 1
 
-        # Advance time and make the push succeed
-        self.pump()
-        self.push_attempts[4][0].callback({})
+        self._advance_time_and_make_push_succeed(expected_push_attempts)
 
         self.helper.send(room_id, body="HELLO???", tok=other_access_token)
+        expected_push_attempts += 1
 
-        # Advance time and make the push succeed
-        self.pump()
-        self.push_attempts[5][0].callback({})
+        self._advance_time_and_make_push_succeed(expected_push_attempts)
 
         self.assertEqual(len(self.push_attempts), 6)
+
+    def _advance_time_and_make_push_succeed(self, expected_push_attempts):
+        self.pump()
+        self.push_attempts[expected_push_attempts - 1][0].callback({})
+
+    def _check_push_attempt(
+        self, expected_push_attempts, expected_unread_count_last_push
+    ):
+        """
+        Makes sure that the last expected push attempt succeeds and checks whether
+        it contains the expected unread count.
+        """
+        self._advance_time_and_make_push_succeed(expected_push_attempts)
+        # Check our push made it
+        self.assertEqual(len(self.push_attempts), expected_push_attempts)
+        self.assertEqual(
+            self.push_attempts[expected_push_attempts - 1][1],
+            "http://example.com/_matrix/push/v1/notify",
+        )
+        # Check that the unread count for the room is 0
+        #
+        # The unread count is zero as the user has no read receipt in the room yet
+        self.assertEqual(
+            self.push_attempts[expected_push_attempts - 1][2]["notification"]["counts"][
+                "unread"
+            ],
+            expected_unread_count_last_push,
+        )
 
     def _send_read_request(self, access_token, message_event_id, room_id):
         # Now set the user's read receipt position to the first event
