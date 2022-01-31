@@ -2831,31 +2831,6 @@ timeline and some frequently asked questions are also given below.</p>
 <p>For more details and context on the release of the r0.1 Server/Server API and
 imminent Matrix 1.0 release, you can also see our
 <a href="https://matrix.org/blog/2019/02/04/matrix-at-fosdem-2019/">main talk from FOSDEM 2019</a>.</p>
-<h2 id="contents"><a class="header" href="#contents">Contents</a></h2>
-<ul>
-<li>Timeline</li>
-<li>Configuring certificates for compatibility with Synapse 1.0</li>
-<li>FAQ
-<ul>
-<li>Synapse 0.99.0 has just been released, what do I need to do right now?</li>
-<li>How do I upgrade?</li>
-<li>What will happen if I do not set up a valid federation certificate
-immediately?</li>
-<li>What will happen if I do nothing at all?</li>
-<li>When do I need a SRV record or .well-known URI?</li>
-<li>Can I still use an SRV record?</li>
-<li>I have created a .well-known URI. Do I still need an SRV record?</li>
-<li>It used to work just fine, why are you breaking everything?</li>
-<li>Can I manage my own certificates rather than having Synapse renew
-certificates itself?</li>
-<li>Do you still recommend against using a reverse proxy on the federation port?</li>
-<li>Do I still need to give my TLS certificates to Synapse if I am using a
-reverse proxy?</li>
-<li>Do I need the same certificate for the client and federation port?</li>
-<li>How do I tell Synapse to reload my keys/certificates after I replace them?</li>
-</ul>
-</li>
-</ul>
 <h2 id="timeline"><a class="header" href="#timeline">Timeline</a></h2>
 <p><strong>5th Feb 2019  - Synapse 0.99.0 is released.</strong></p>
 <p>All server admins are encouraged to upgrade.</p>
@@ -9708,34 +9683,7 @@ was reported.</li>
 have a canonical alias set.</li>
 <li><code>event_json</code>: object - Details of the original event that was reported.</li>
 </ul>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="contents-1"><a class="header" href="#contents-1">Contents</a></h1>
-<ul>
-<li><a href="admin_api/media_admin_api.html#querying-media">Querying media</a>
-<ul>
-<li><a href="admin_api/media_admin_api.html#list-all-media-in-a-room">List all media in a room</a></li>
-<li><a href="admin_api/media_admin_api.html#list-all-media-uploaded-by-a-user">List all media uploaded by a user</a></li>
-</ul>
-</li>
-<li><a href="admin_api/media_admin_api.html#quarantine-media">Quarantine media</a>
-<ul>
-<li><a href="admin_api/media_admin_api.html#quarantining-media-by-id">Quarantining media by ID</a></li>
-<li><a href="admin_api/media_admin_api.html#remove-media-from-quarantine-by-id">Remove media from quarantine by ID</a></li>
-<li><a href="admin_api/media_admin_api.html#quarantining-media-in-a-room">Quarantining media in a room</a></li>
-<li><a href="admin_api/media_admin_api.html#quarantining-all-media-of-a-user">Quarantining all media of a user</a></li>
-<li><a href="admin_api/media_admin_api.html#protecting-media-from-being-quarantined">Protecting media from being quarantined</a></li>
-<li><a href="admin_api/media_admin_api.html#unprotecting-media-from-being-quarantined">Unprotecting media from being quarantined</a></li>
-</ul>
-</li>
-<li><a href="admin_api/media_admin_api.html#delete-local-media">Delete local media</a>
-<ul>
-<li><a href="admin_api/media_admin_api.html#delete-a-specific-local-media">Delete a specific local media</a></li>
-<li><a href="admin_api/media_admin_api.html#delete-local-media-by-date-or-size">Delete local media by date or size</a></li>
-<li><a href="admin_api/media_admin_api.html#delete-media-uploaded-by-a-user">Delete media uploaded by a user</a></li>
-</ul>
-</li>
-<li><a href="admin_api/media_admin_api.html#purge-remote-media-api">Purge Remote Media API</a></li>
-</ul>
-<h1 id="querying-media"><a class="header" href="#querying-media">Querying media</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="querying-media"><a class="header" href="#querying-media">Querying media</a></h1>
 <p>These APIs allow extracting media information from the homeserver.</p>
 <h2 id="list-all-media-in-a-room"><a class="header" href="#list-all-media-in-a-room">List all media in a room</a></h2>
 <p>This API gets a list of known media in a room.
@@ -10324,26 +10272,7 @@ server admin: see <a href="admin_api/../usage/administration/admin_api">Admin AP
   &quot;room_id&quot;: &quot;!636q39766251:server.com&quot;
 }
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="contents-2"><a class="header" href="#contents-2">Contents</a></h1>
-<ul>
-<li><a href="admin_api/rooms.html#list-room-api">List Room API</a></li>
-<li><a href="admin_api/rooms.html#room-details-api">Room Details API</a></li>
-<li><a href="admin_api/rooms.html#room-members-api">Room Members API</a></li>
-<li><a href="admin_api/rooms.html#room-state-api">Room State API</a></li>
-<li><a href="admin_api/rooms.html#block-room-api">Block Room API</a></li>
-<li><a href="admin_api/rooms.html#delete-room-api">Delete Room API</a>
-<ul>
-<li><a href="admin_api/rooms.html#version-1-old-version">Version 1 (old version)</a></li>
-<li><a href="admin_api/rooms.html#version-2-new-version">Version 2 (new version)</a></li>
-<li><a href="admin_api/rooms.html#status-of-deleting-rooms">Status of deleting rooms</a></li>
-<li><a href="admin_api/rooms.html#undoing-room-shutdowns">Undoing room shutdowns</a></li>
-</ul>
-</li>
-<li><a href="admin_api/rooms.html#make-room-admin-api">Make Room Admin API</a></li>
-<li><a href="admin_api/rooms.html#forward-extremities-admin-api">Forward Extremities Admin API</a></li>
-<li><a href="admin_api/rooms.html#event-context-api">Event Context API</a></li>
-</ul>
-<h1 id="list-room-api"><a class="header" href="#list-room-api">List Room API</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="list-room-api"><a class="header" href="#list-room-api">List Room API</a></h1>
 <p>The List Room admin API allows server admins to get a list of rooms on their
 server. There are various parameters available that allow for filtering and
 sorting the returned list. This API supports pagination.</p>
