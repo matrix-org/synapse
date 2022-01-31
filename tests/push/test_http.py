@@ -585,10 +585,10 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Carry out our option-value specific test
         #
-        # We're counting every unread message, so there should now be 4 since the
+        # We're counting every unread message, so there should now be 3 since the
         # last read receipt
         self.assertEqual(
-            self.push_attempts[4][2]["notification"]["counts"]["unread"], 4
+            self.push_attempts[5][2]["notification"]["counts"]["unread"], 3
         )
 
     def _test_push_unread_count(self):
@@ -597,8 +597,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         Note that:
         * Sending messages will cause push notifications to go out to relevant users
-        * Sending a read receipt will cause a "badge update" notification to go out to
-          the user that sent the receipt
+        * Sending a read receipt will cause the HttpPusher to check whether the unread
+            count has changed since the last push notification. If so, a "badge update"
+            notification goes out to the user that sent the receipt
         """
         # Register the user who gets notified
         user_id = self.register_user("user", "pass")
@@ -660,23 +661,17 @@ class HTTPPusherTests(HomeserverTestCase):
             self.push_attempts[0][2]["notification"]["counts"]["unread"], 0
         )
 
-        # Now set the user's read receipt position to the first event
-        #
-        # This will actually trigger a new notification to be sent out so that
-        # even if the user does not receive another message, their unread
-        # count goes down
-        channel = self.make_request(
-            "POST",
-            "/rooms/%s/receipt/m.read/%s" % (room_id, first_message_event_id),
-            {},
-            access_token=access_token,
-        )
-        self.assertEqual(channel.code, 200, channel.json_body)
+        self._send_read_request(access_token, first_message_event_id, room_id)
+
+        # Unread count has not changed. Therefore, ensure that read request does not
+        # trigger a push notification.
+        self.assertEqual(len(self.push_attempts), 1)
 
         # Send another message
-        self.helper.send(
+        response2 = self.helper.send(
             room_id, body="How's the weather today?", tok=other_access_token
         )
+        second_message_event_id = response2["event_id"]
 
         # Advance time and make the push succeed
         self.push_attempts[1][0].callback({})
@@ -689,24 +684,51 @@ class HTTPPusherTests(HomeserverTestCase):
             self.push_attempts[1][2]["notification"]["counts"]["unread"], 1
         )
 
+        self._send_read_request(access_token, second_message_event_id, room_id)
+
+        # Advance time and make the push succeed
+        self.push_attempts[2][0].callback({})
+        self.pump()
+
+        # This push should contain an unread count of 0 as we have
+        # just read all the messages in the room.
+        self.assertEqual(len(self.push_attempts), 3)
+        self.assertEqual(
+            self.push_attempts[2][2]["notification"]["counts"]["unread"], 0
+        )
+
         # Since we're grouping by room, sending more messages shouldn't increase the
         # unread count, as they're all being sent in the same room
         self.helper.send(room_id, body="Hello?", tok=other_access_token)
 
         # Advance time and make the push succeed
         self.pump()
-        self.push_attempts[2][0].callback({})
+        self.push_attempts[3][0].callback({})
 
         self.helper.send(room_id, body="Hello??", tok=other_access_token)
 
         # Advance time and make the push succeed
         self.pump()
-        self.push_attempts[3][0].callback({})
+        self.push_attempts[4][0].callback({})
 
         self.helper.send(room_id, body="HELLO???", tok=other_access_token)
 
         # Advance time and make the push succeed
         self.pump()
-        self.push_attempts[4][0].callback({})
+        self.push_attempts[5][0].callback({})
 
-        self.assertEqual(len(self.push_attempts), 5)
+        self.assertEqual(len(self.push_attempts), 6)
+
+    def _send_read_request(self, access_token, message_event_id, room_id):
+        # Now set the user's read receipt position to the first event
+        #
+        # This will actually trigger a new notification to be sent out so that
+        # even if the user does not receive another message, their unread
+        # count goes down
+        channel = self.make_request(
+            "POST",
+            "/rooms/%s/receipt/m.read/%s" % (room_id, message_event_id),
+            {},
+            access_token=access_token,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
