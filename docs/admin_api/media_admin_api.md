@@ -19,6 +19,9 @@
 
 These APIs allow extracting media information from the homeserver.
 
+Details about the format of the `media_id` and storage of the media in the file system
+are documented in the section about the [media repository](../media_repository.md).
+
 ## List all media in a room
 
 This API gets a list of known media in a room.
