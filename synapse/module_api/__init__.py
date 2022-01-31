@@ -401,6 +401,23 @@ class ModuleApi:
         """
         return self._hs.config.email.email_app_name
 
+    @property
+    def server_name(self) -> str:
+        """The server name for the local homeserver.
+
+        Added in Synapse v1.53.0.
+        """
+        return self._server_name
+
+    @property
+    def worker_name(self) -> Optional[str]:
+        """The name of the worker this specific instance is running as per the
+        "worker_app" configuration setting, or None if it's the main process.
+
+        Added in Synapse v1.53.0.
+        """
+        return self._hs.config.worker.worker_app
+
     async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:
         """Get user info by user_id
 
