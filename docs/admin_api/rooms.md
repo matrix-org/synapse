@@ -1,18 +1,3 @@
-# Contents
-- [List Room API](#list-room-api)
-- [Room Details API](#room-details-api)
-- [Room Members API](#room-members-api)
-- [Room State API](#room-state-api)
-- [Block Room API](#block-room-api)
-- [Delete Room API](#delete-room-api)
-  * [Version 1 (old version)](#version-1-old-version)
-  * [Version 2 (new version)](#version-2-new-version)
-  * [Status of deleting rooms](#status-of-deleting-rooms)
-  * [Undoing room shutdowns](#undoing-room-shutdowns)
-- [Make Room Admin API](#make-room-admin-api)
-- [Forward Extremities Admin API](#forward-extremities-admin-api)
-- [Event Context API](#event-context-api)
-
 # List Room API
 
 The List Room admin API allows server admins to get a list of rooms on their
