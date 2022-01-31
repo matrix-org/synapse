@@ -810,8 +810,8 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
     @override_config({"email": {"notif_from": "noreply@test"}})
     def test_3pid_allowed(self):
         """Tests that an is_3pid_allowed_callbacks forbidding a 3PID makes Synapse refuse
-        to bind the new 3PID, and that one allong a 3PID makes Synapse accept to bind the
-        3PID.
+        to bind the new 3PID, and that one allowing a 3PID makes Synapse accept to bind
+        the 3PID.
         """
         self.hs.get_identity_handler().send_threepid_validation = Mock(
             return_value=make_awaitable(0),
