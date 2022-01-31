@@ -412,6 +412,15 @@ class ModuleApi:
     @property
     def worker_name(self) -> Optional[str]:
         """The name of the worker this specific instance is running as per the
+        "worker_name" configuration setting, or None if it's the main process.
+
+        Added in Synapse v1.53.0.
+        """
+        return self._hs.config.worker.worker_name
+
+    @property
+    def worker_app(self) -> Optional[str]:
+        """The name of the worker app this specific instance is running as per the
         "worker_app" configuration setting, or None if it's the main process.
 
         Added in Synapse v1.53.0.
