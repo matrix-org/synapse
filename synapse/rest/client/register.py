@@ -368,7 +368,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
 
     Example:
 
-        GET /_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity?token=abcd
+        GET /_matrix/client/v1/register/m.login.registration_token/validity?token=abcd
 
         200 OK
 
@@ -378,7 +378,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
     """
 
     PATTERNS = client_patterns(
-        f"/org.matrix.msc3231/register/{LoginType.REGISTRATION_TOKEN}/validity",
+        f"/v1/register/{LoginType.REGISTRATION_TOKEN}/validity",
         releases=(),
         unstable=True,
     )
