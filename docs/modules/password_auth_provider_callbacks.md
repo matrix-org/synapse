@@ -148,7 +148,7 @@ Here's an example featuring all currently supported keys:
         "address": "33123456789",
         "validated_at": 1642701357084,
     },
-    "m.login.registration_token": "sometoken",  # User has registered through registration tokens
+    "m.login.registration_token": "sometoken",  # User has registered through a registration token
 }
 ```
 
