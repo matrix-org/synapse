@@ -84,6 +84,20 @@ process, for example:
     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
+# Upgrading to v1.(next)
+
+## Stablisation of MSC3231
+
+A reverse proxy rule needs to be updated;
+
+`^/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity$`
+
+To
+
+`^/_matrix/client/v1/register/m.login.registration_token/validity$`
+
+Any currently-active UIA session where a user is registering with a 
+registration token will be invalidated.
 
 # Upgrading to v1.51.0
 
