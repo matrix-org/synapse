@@ -75,7 +75,6 @@ class RelationsWorkerStore(SQLBaseStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        self._msc1849_enabled = hs.config.experimental.msc1849_enabled
         self._msc3440_enabled = hs.config.experimental.msc3440_enabled
 
     @cached(tree=True)
@@ -683,9 +682,6 @@ class RelationsWorkerStore(SQLBaseStore):
             A map of event ID to the bundled aggregation for the event. Not all
             events may have bundled aggregations in the results.
         """
-        # If bundled aggregations are disabled, nothing to do.
-        if not self._msc1849_enabled:
-            return {}
 
         # TODO Parallelize.
         results = {}
