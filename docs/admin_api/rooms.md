@@ -4,6 +4,9 @@ The List Room admin API allows server admins to get a list of rooms on their
 server. There are various parameters available that allow for filtering and
 sorting the returned list. This API supports pagination.
 
+To use it, you will need to authenticate by providing an `access_token`
+for a server admin: see [Admin API](../usage/administration/admin_api).
+
 **Parameters**
 
 The following query parameters are available:
@@ -477,9 +480,6 @@ several minutes or longer.
 
 The local server will only have the power to move local user and room aliases to
 the new room. Users on other servers will be unaffected.
-
-To use it, you will need to authenticate by providing an ``access_token`` for a
-server admin: see [Admin API](../usage/administration/admin_api).
 
 ## Version 1 (old version)
 
