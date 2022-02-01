@@ -273,7 +273,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 )
 
             # A limit can only be applied when querying for a single user ID / device ID tuple.
-            if limit:
+            if limit is not None:
                 raise AssertionError(
                     "Programming error: _get_device_messages was passed 'limit' "
                     "with >1 user_id"
@@ -303,6 +303,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             # If a list of device IDs was not provided, retrieve all devices IDs
             # for the given users. We explicitly do not query hidden devices, as
             # hidden devices should not receive to-device messages.
+            # Note that this is more efficient than just dropping `device_id` from the query,
+            # since device_inbox has an index on `(user_id, device_id, stream_id)`
             if not device_ids_to_query:
                 user_device_dicts = self.db_pool.simple_select_many_txn(
                     txn,
