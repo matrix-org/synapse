@@ -2064,7 +2064,7 @@ GET_USERNAME_FOR_REGISTRATION_CALLBACK = Callable[
     [JsonDict, JsonDict],
     Awaitable[Optional[str]],
 ]
-IS_3PID_ALLOWED_CALLBACK = Callable[[str, str], Awaitable[bool]]
+IS_3PID_ALLOWED_CALLBACK = Callable[[str, str, bool], Awaitable[bool]]
 
 
 class PasswordAuthProvider:
@@ -2350,19 +2350,25 @@ class PasswordAuthProvider:
 
         return None
 
-    async def is_3pid_allowed(self, medium: str, address: str) -> bool:
+    async def is_3pid_allowed(
+        self,
+        medium: str,
+        address: str,
+        registration: bool,
+    ) -> bool:
         """Check if the user can be allowed to bind a 3PID on this homeserver.
 
         Args:
             medium: The medium of the 3PID.
             address: The address of the 3PID.
+            registration: Whether the 3PID is being bound when registering a new user.
 
         Returns:
             Whether the 3PID is allowed to be bound on this homeserver
         """
         for callback in self.is_3pid_allowed_callbacks:
             try:
-                res = await callback(medium, address)
+                res = await callback(medium, address, registration)
 
                 if res is False:
                     return res

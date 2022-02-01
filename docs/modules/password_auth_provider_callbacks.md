@@ -171,14 +171,15 @@ generated).
 _First introduced in Synapse v1.52.0_
 
 ```python
-async def is_3pid_allowed(self, medium: str, address: str) -> bool
+async def is_3pid_allowed(self, medium: str, address: str, registration: bool) -> bool
 ```
 
 Called when attempting to bind a third-party identifier (i.e. an email address or a phone
 number). The module is given the medium of the third-party identifier (which is `email` if
-the identifier is an email address, or `msisdn` if the identifier is a phone number). The
-module must return a boolean indicating whether the identifier can be allowed to be bound
-to an account on the local homeserver.
+the identifier is an email address, or `msisdn` if the identifier is a phone number) and
+its address, as well as a boolean indicating whether the attempt to bind is happening as
+part of registering a new user. The module must return a boolean indicating whether the
+identifier can be allowed to be bound to an account on the local homeserver.
 
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `True`, Synapse falls through to the next one. The value of the first

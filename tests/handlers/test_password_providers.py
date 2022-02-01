@@ -811,7 +811,19 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
     def test_3pid_allowed(self):
         """Tests that an is_3pid_allowed_callbacks forbidding a 3PID makes Synapse refuse
         to bind the new 3PID, and that one allowing a 3PID makes Synapse accept to bind
-        the 3PID.
+        the 3PID. Also checks that the module is passed a boolean indicating whether the
+        user to bind this 3PID to is currently registering.
+        """
+        self._test_3pid_allowed("rin", False)
+        self._test_3pid_allowed("kitay", True)
+
+    def _test_3pid_allowed(self, username: str, registration: bool):
+        """Tests that the "is_3pid_allowed" module callback is called correctly, using
+        either /register or /account URLs depending on the arguments.
+
+        Args:
+            username: The username to use for the test.
+            registration: Whether to test with registration URLs.
         """
         self.hs.get_identity_handler().send_threepid_validation = Mock(
             return_value=make_awaitable(0),
@@ -820,12 +832,17 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         m = Mock(return_value=make_awaitable(False))
         self.hs.get_password_auth_provider().is_3pid_allowed_callbacks = [m]
 
-        self.register_user("rin", "password")
-        tok = self.login("rin", "password")
+        self.register_user(username, "password")
+        tok = self.login(username, "password")
+
+        if registration:
+            url = "/register/email/requestToken"
+        else:
+            url = "/account/3pid/email/requestToken"
 
         channel = self.make_request(
             "POST",
-            "/account/3pid/email/requestToken",
+            url,
             {
                 "client_secret": "foo",
                 "email": "foo@test.com",
@@ -840,14 +857,14 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
             channel.json_body,
         )
 
-        m.assert_called_once_with("email", "foo@test.com")
+        m.assert_called_once_with("email", "foo@test.com", registration)
 
         m = Mock(return_value=make_awaitable(True))
         self.hs.get_password_auth_provider().is_3pid_allowed_callbacks = [m]
 
         channel = self.make_request(
             "POST",
-            "/account/3pid/email/requestToken",
+            url,
             {
                 "client_secret": "foo",
                 "email": "bar@test.com",
@@ -858,7 +875,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
         self.assertIn("sid", channel.json_body)
 
-        m.assert_called_once_with("email", "bar@test.com")
+        m.assert_called_once_with("email", "bar@test.com", registration)
 
     def _setup_get_username_for_registration(self) -> Mock:
         """Registers a get_username_for_registration callback that appends "-foo" to the
