@@ -1,3 +1,64 @@
+Synapse 1.52.0rc1 (2022-02-01)
+==============================
+
+Features
+--------
+
+- Remove account data (including client config, push rules and ignored users) upon user deactivation. ([\#11621](https://github.com/matrix-org/synapse/issues/11621), [\#11788](https://github.com/matrix-org/synapse/issues/11788), [\#11789](https://github.com/matrix-org/synapse/issues/11789))
+- Add admin API to reset connection timeouts for remote server. ([\#11639](https://github.com/matrix-org/synapse/issues/11639))
+- Add an admin API to get a list of rooms that federate with a given remote homeserver. ([\#11658](https://github.com/matrix-org/synapse/issues/11658))
+- Add a config flag to inhibit M_USER_IN_USE during registration. ([\#11743](https://github.com/matrix-org/synapse/issues/11743))
+- Add a module callback to set username at registration. ([\#11790](https://github.com/matrix-org/synapse/issues/11790))
+- Allow configuring a maximum file size as well as a list of allowed content types for avatars. ([\#11846](https://github.com/matrix-org/synapse/issues/11846))
+
+
+Bugfixes
+--------
+
+- Include the bundled aggregations in the `/sync` response, per [MSC2675](https://github.com/matrix-org/matrix-doc/pull/2675). ([\#11612](https://github.com/matrix-org/synapse/issues/11612))
+- Fix a long-standing bug when previewing Reddit URLs which do not contain an image. ([\#11767](https://github.com/matrix-org/synapse/issues/11767))
+- Fix a long-standing bug that media streams could cause long-lived connections when generating URL previews. ([\#11784](https://github.com/matrix-org/synapse/issues/11784))
+- Include a `prev_content` field in state events sent to Application Services. Contributed by @totallynotvaishnav. ([\#11798](https://github.com/matrix-org/synapse/issues/11798))
+- Fix a bug introduced in Synapse 0.33.3 causing requests to sometimes log strings such as `HTTPStatus.OK` instead of integer status codes. ([\#11827](https://github.com/matrix-org/synapse/issues/11827))
+
+
+Improved Documentation
+----------------------
+
+- Update pypi installation docs to indicate that we now support Python 3.10. ([\#11820](https://github.com/matrix-org/synapse/issues/11820))
+- Add missing steps to the contribution submission process in the documentation.  Contributed by @sequentialread. ([\#11821](https://github.com/matrix-org/synapse/issues/11821))
+- Remove not needed old table of contents in documentation. ([\#11860](https://github.com/matrix-org/synapse/issues/11860))
+- Consolidate the `access_token` information at the top of each relevant page in the Admin API documentation. ([\#11861](https://github.com/matrix-org/synapse/issues/11861))
+
+
+Deprecations and Removals
+-------------------------
+
+- Drop support for Python 3.6, which is EOL. ([\#11683](https://github.com/matrix-org/synapse/issues/11683))
+- Remove the `experimental_msc1849_support_enabled` flag as the features are now stable. ([\#11843](https://github.com/matrix-org/synapse/issues/11843))
+
+
+Internal Changes
+----------------
+
+- Preparation for database schema simplifications: add `state_key` and `rejection_reason` columns to `events` table. ([\#11792](https://github.com/matrix-org/synapse/issues/11792))
+- Add `FrozenEvent.get_state_key` and use it in a couple of places. ([\#11793](https://github.com/matrix-org/synapse/issues/11793))
+- Preparation for database schema simplifications: stop reading from `event_reference_hashes`. ([\#11794](https://github.com/matrix-org/synapse/issues/11794))
+- Drop unused table `public_room_list_stream`. ([\#11795](https://github.com/matrix-org/synapse/issues/11795))
+- Preparation for reducing Postgres serialization errors: allow setting transaction isolation level. Contributed by Nick @ Beeper. ([\#11799](https://github.com/matrix-org/synapse/issues/11799), [\#11847](https://github.com/matrix-org/synapse/issues/11847))
+- Docker: skip the initial amd64-only build and go straight to multiarch. ([\#11810](https://github.com/matrix-org/synapse/issues/11810))
+- Run Complement on the Github Actions VM and not inside a Docker container. ([\#11811](https://github.com/matrix-org/synapse/issues/11811))
+- Log module names at startup. ([\#11813](https://github.com/matrix-org/synapse/issues/11813))
+- Improve type safety of bundled aggregations code. ([\#11815](https://github.com/matrix-org/synapse/issues/11815))
+- Drop support for Python 3.6, which is EOL. ([\#11816](https://github.com/matrix-org/synapse/issues/11816))
+- Correct a type annotation in the event validation logic. ([\#11817](https://github.com/matrix-org/synapse/issues/11817), [\#11830](https://github.com/matrix-org/synapse/issues/11830))
+- Minor updates and documentation for database schema delta files. ([\#11823](https://github.com/matrix-org/synapse/issues/11823))
+- Workaround a type annotation problem in `prometheus_client` 0.13.0. ([\#11834](https://github.com/matrix-org/synapse/issues/11834))
+- Minor performance improvement in room state lookup. ([\#11836](https://github.com/matrix-org/synapse/issues/11836))
+- Fix some indentation inconsistencies in the sample config. ([\#11838](https://github.com/matrix-org/synapse/issues/11838))
+- Add type hints to `tests/rest/admin`. ([\#11851](https://github.com/matrix-org/synapse/issues/11851))
+
+
 Synapse 1.51.0 (2022-01-25)
 ===========================
 
