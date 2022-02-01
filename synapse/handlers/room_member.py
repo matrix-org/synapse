@@ -261,7 +261,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         target: UserID,
         room_id: str,
         membership: str,
-        origin_server_ts: Optional[int] = None,
         prev_event_ids: List[str],
         auth_event_ids: Optional[List[str]] = None,
         txn_id: Optional[str] = None,
@@ -270,6 +269,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         require_consent: bool = True,
         outlier: bool = False,
         historical: bool = False,
+        origin_server_ts: Optional[int] = None,
     ) -> Tuple[str, int]:
         """
         Internal membership update function to get an existing event or create
@@ -280,7 +280,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             target:
             room_id:
             membership:
-            origin_server_ts:
             prev_event_ids: The event IDs to use as the prev events
 
             auth_event_ids:
@@ -299,6 +298,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             historical: Indicates whether the message is being inserted
                 back in time around some existing events. This is used to skip
                 a few checks and mark the event as backfilled.
+            origin_server_ts:
 
         Returns:
             Tuple of event ID and stream ordering position
@@ -680,10 +680,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 target=target,
                 room_id=room_id,
                 membership=effective_membership_state,
-                txn_id=txn_id,
-                ratelimit=ratelimit,
                 prev_event_ids=prev_event_ids,
                 auth_event_ids=auth_event_ids,
+                txn_id=txn_id,
+                ratelimit=ratelimit,
                 content=content,
                 require_consent=require_consent,
                 outlier=outlier,
@@ -905,10 +905,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             target=target,
             room_id=room_id,
             membership=effective_membership_state,
-            txn_id=txn_id,
-            ratelimit=ratelimit,
             prev_event_ids=latest_event_ids,
             auth_event_ids=auth_event_ids,
+            txn_id=txn_id,
+            ratelimit=ratelimit,
             content=content,
             require_consent=require_consent,
             outlier=outlier,
