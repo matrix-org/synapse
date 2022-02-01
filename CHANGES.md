@@ -5,7 +5,7 @@ Features
 --------
 
 - Remove account data (including client config, push rules and ignored users) upon user deactivation. ([\#11621](https://github.com/matrix-org/synapse/issues/11621), [\#11788](https://github.com/matrix-org/synapse/issues/11788), [\#11789](https://github.com/matrix-org/synapse/issues/11789))
-- Add admin API to reset connection timeouts for remote server. ([\#11639](https://github.com/matrix-org/synapse/issues/11639))
+- Add an admin API to reset connection timeouts for remote server. ([\#11639](https://github.com/matrix-org/synapse/issues/11639))
 - Add an admin API to get a list of rooms that federate with a given remote homeserver. ([\#11658](https://github.com/matrix-org/synapse/issues/11658))
 - Add a config flag to inhibit M_USER_IN_USE during registration. ([\#11743](https://github.com/matrix-org/synapse/issues/11743))
 - Add a module callback to set username at registration. ([\#11790](https://github.com/matrix-org/synapse/issues/11790))
@@ -50,7 +50,6 @@ Internal Changes
 - Run Complement on the Github Actions VM and not inside a Docker container. ([\#11811](https://github.com/matrix-org/synapse/issues/11811))
 - Log module names at startup. ([\#11813](https://github.com/matrix-org/synapse/issues/11813))
 - Improve type safety of bundled aggregations code. ([\#11815](https://github.com/matrix-org/synapse/issues/11815))
-- Drop support for Python 3.6, which is EOL. ([\#11816](https://github.com/matrix-org/synapse/issues/11816))
 - Correct a type annotation in the event validation logic. ([\#11817](https://github.com/matrix-org/synapse/issues/11817), [\#11830](https://github.com/matrix-org/synapse/issues/11830))
 - Minor updates and documentation for database schema delta files. ([\#11823](https://github.com/matrix-org/synapse/issues/11823))
 - Workaround a type annotation problem in `prometheus_client` 0.13.0. ([\#11834](https://github.com/matrix-org/synapse/issues/11834))
