@@ -605,6 +605,7 @@ class StreamToken:
     )
     presence_key: int
     typing_key: int
+    edu_key: int
     receipt_key: int
     account_data_key: int
     push_rules_key: int
@@ -634,6 +635,7 @@ class StreamToken:
                 await self.room_key.to_string(store),
                 str(self.presence_key),
                 str(self.typing_key),
+                str(self.edu_key),
                 str(self.receipt_key),
                 str(self.account_data_key),
                 str(self.push_rules_key),

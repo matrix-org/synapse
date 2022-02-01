@@ -293,6 +293,59 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         )
 
 
+class RoomSendEphemeralRestServlet(TransactionRestServlet):
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
+        self.event_creation_handler = hs.get_event_creation_handler()
+        self.auth = hs.get_auth()
+
+    def register(self, http_server: HttpServer) -> None:
+        # /rooms/$roomid/ephemeral/$event_type[/$txn_id]
+        PATTERNS = "/rooms/(?P<room_id>[^/]*)/ephemeral/(?P<event_type>[^/]*)"
+        register_txn_path(self, PATTERNS, http_server, with_get=True)
+
+    async def on_POST(
+        self,
+        request: SynapseRequest,
+        room_id: str,
+        event_type: str,
+        txn_id: Optional[str] = None,
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
+        content = parse_json_object_from_request(request)
+
+        event_dict: JsonDict = {
+            "type": event_type,
+            "content": content,
+            "room_id": room_id,
+            "sender": requester.user.to_string(),
+        }
+
+        try:
+            await self.event_creation_handler.send_ephemeral_event(
+                requester, event_dict, txn_id=txn_id
+            )
+        except ShadowBanError:
+            pass
+
+        return 200, {}
+
+    def on_GET(
+        self, request: SynapseRequest, room_id: str, event_type: str, txn_id: str
+    ) -> Tuple[int, str]:
+        return 200, "Not implemented"
+
+    def on_PUT(
+        self, request: SynapseRequest, room_id: str, event_type: str, txn_id: str
+    ) -> Awaitable[Tuple[int, JsonDict]]:
+        set_tag("txn_id", txn_id)
+
+        return self.txns.fetch_or_execute_request(
+            request, self.on_POST, request, room_id, event_type, txn_id
+        )
+
+
+
 # TODO: Needs unit testing for room ID + alias joins
 class JoinRoomAliasServlet(ResolveRoomIdMixin, TransactionRestServlet):
     def __init__(self, hs: "HomeServer"):

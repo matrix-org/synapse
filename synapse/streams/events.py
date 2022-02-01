@@ -19,6 +19,7 @@ import attr
 from synapse.handlers.account_data import AccountDataEventSource
 from synapse.handlers.presence import PresenceEventSource
 from synapse.handlers.receipts import ReceiptEventSource
+from synapse.handlers.message import EduEventSource
 from synapse.handlers.room import RoomEventSource
 from synapse.handlers.typing import TypingNotificationEventSource
 from synapse.streams import EventSource
@@ -34,6 +35,7 @@ class _EventSourcesInner:
     presence: PresenceEventSource
     typing: TypingNotificationEventSource
     receipt: ReceiptEventSource
+    ephemeral: EduEventSource
     account_data: AccountDataEventSource
 
     def get_sources(self) -> Iterator[Tuple[str, EventSource]]:
@@ -58,6 +60,7 @@ class EventSources:
             room_key=self.sources.room.get_current_key(),
             presence_key=self.sources.presence.get_current_key(),
             typing_key=self.sources.typing.get_current_key(),
+            edu_key=self.sources.ephemeral.get_current_key(),
             receipt_key=self.sources.receipt.get_current_key(),
             account_data_key=self.sources.account_data.get_current_key(),
             push_rules_key=push_rules_key,
@@ -81,6 +84,7 @@ class EventSources:
             room_key=self.sources.room.get_current_key(),
             presence_key=0,
             typing_key=0,
+            edu_key=0,
             receipt_key=0,
             account_data_key=0,
             push_rules_key=0,

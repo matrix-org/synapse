@@ -199,8 +199,9 @@ class ApplicationServicesHandler:
         Args:
             stream_key: The stream the event came from.
 
-                `stream_key` can be "typing_key", "receipt_key" or "presence_key". Any other
-                value for `stream_key` will cause this function to return early.
+                `stream_key` can be "typing_key", "receipt_key", "edu_key"
+                or "presence_key". Any other value for `stream_key` will
+                cause this function to return early.
 
                 Ephemeral events will only be pushed to appservices that have opted into
                 receiving them by setting `push_ephemeral` to true in their registration
@@ -217,7 +218,7 @@ class ApplicationServicesHandler:
             return
 
         # Ignore any unsupported streams
-        if stream_key not in ("typing_key", "receipt_key", "presence_key"):
+        if stream_key not in ("typing_key", "receipt_key", "presence_key", "edu_key"):
             return
 
         # Assert that new_token is an integer (and not a RoomStreamToken).
@@ -307,6 +308,18 @@ class ApplicationServicesHandler:
                             service, "presence", new_token
                         )
 
+                    elif stream_key == "edu_key":
+                        events = await self._handle_edus(service, new_token)
+                        if events:
+                            self.scheduler.submit_ephemeral_events_for_as(
+                                service, events
+                            )
+
+                        # Persist the latest handled stream token for this appservice
+                        await self.store.set_type_stream_id_for_appservice(
+                            service, "edu", new_token
+                        )
+
     async def _handle_typing(
         self, service: ApplicationService, new_token: int
     ) -> List[JsonDict]:
@@ -377,6 +390,42 @@ class ApplicationServicesHandler:
             service=service, from_key=from_key
         )
         return receipts
+
+    async def _handle_edus(
+        self, service: ApplicationService, new_token: Optional[int]
+    ) -> List[JsonDict]:
+        """
+        Return the latest custom EDUs that the given application service should receive.
+
+        First fetch all custom EDUs between the last EDU stream token that this
+        application service should have previously received (non-inclusive) and the
+        latest EDU stream token (inclusive). Then from that set, return only
+        those custom EDUs that the given application service may be interested in.
+
+        Args:
+            service: The application service to check for which events it should receive.
+            new_token: A receipts event stream token. Purely used to double-check that the
+                from_token we pull from the database isn't greater than or equal to this
+                token. Prevents accidentally duplicating work.
+
+        Returns:
+            A list of JSON dictionaries containing data derived from the custom EDUs that
+            should be sent to the given application service.
+        """
+        from_key = await self.store.get_type_stream_id_for_appservice(
+            service, "edu"
+        )
+        if new_token is not None and new_token <= from_key:
+            logger.debug(
+                "Rejecting token lower than or equal to stored: %s" % (new_token,)
+            )
+            return []
+
+        edus_source = self.event_sources.sources.edus
+        edus, _ = await edus_source.get_new_events_as(
+            service=service, from_key=from_key
+        )
+        return edus
 
     async def _handle_presence(
         self,

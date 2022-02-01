@@ -499,6 +499,22 @@ class SyncHandler:
                 event_copy = {k: v for (k, v) in event.items() if k != "room_id"}
                 ephemeral_by_room.setdefault(room_id, []).append(event_copy)
 
+            edus_source = self.event_sources.sources.edus
+            edus, edu_key = await edus_source.get_new_events(
+                user=sync_config.user,
+                from_key=receipt_key,
+                limit=sync_config.filter_collection.ephemeral_limit(),
+                room_ids=room_ids,
+                is_guest=sync_config.is_guest,
+            )
+            now_token = now_token.copy_and_replace("edu_key", edu_key)
+
+            for event in edus:
+                room_id = event["room_id"]
+                # exclude room id, as above
+                event_copy = {k: v for (k, v) in event.items() if k != "room_id"}
+                ephemeral_by_room.setdefault(room_id, []).append(event_copy)
+
         return now_token, ephemeral_by_room
 
     async def _load_filtered_recents(

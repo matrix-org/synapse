@@ -1,7 +1,7 @@
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
-# Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 # Copyrignt 2020 Sorunome
+# Copyright 2019-2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -80,6 +80,10 @@ class MessageHandler:
         self.state_store = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
         self._ephemeral_events_enabled = hs.config.server.enable_ephemeral_messages
+        self.federation = None
+        if hs.should_send_federation():
+            self.federation = hs.get_federation_sender()
+        self.notifier = hs.get_notifier()
 
         # The scheduled call to self._expire_event. None if no call is currently
         # scheduled.
@@ -759,6 +763,86 @@ class EventCreationHandler:
             if prev_content == next_content:
                 return prev_event
         return None
+
+    async def _push_remote_edu(
+        self,
+        event_dict: dict,
+    ) -> None:
+        if not self.federation:
+            return
+
+        try:
+            users = await self.store.get_users_in_room(event_dict, room_id)
+
+            for domain in {get_domain_from_id(u) for u in users}:
+                if domain != self.server_name:
+                    logger.debug("sending custom EDU to %s", domain)
+                    self.federation.build_and_send_edu(
+                        destination=domain,
+                        edu_type=event_dict.type,
+                        content=event_dict,
+                    )
+        except Exception:
+            logger.exception("Error pushing custom EDU to remotes")
+
+    async def send_ephemeral_event(
+        self,
+        requester: Requester,
+        event_dict: dict,
+        ratelimit: bool = True,
+        txn_id: Optional[str] = None,
+        ignore_shadow_ban: bool = False,
+    ) -> None:
+        """
+        Creates an event, then sends it.
+
+        See self.create_event and self.handle_new_client_event.
+
+        Args:
+            requester: The requester sending the event.
+            event_dict: An entire ephemeral event dict.
+            ratelimit: Whether to rate limit this send.
+            txn_id: The transaction ID.
+            ignore_shadow_ban: True if shadow-banned users should be allowed to
+                send this event.
+
+        Raises:
+            ShadowBanError if the requester has been shadow-banned.
+        """
+
+        if not self._ephemeral_events_enabled:
+            return
+
+        if not ignore_shadow_ban and requester.shadow_banned:
+            # We randomly sleep a bit just to annoy the requester.
+            await self.clock.sleep(random.randint(1, 10))
+            raise ShadowBanError()
+
+        assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
+            event.sender,
+        )
+
+        # TODO: spam check the EDU
+
+        # TODO: store it in the DB so it's persisted nicely
+
+        # send it remotely
+        run_as_background_process(
+            "message._push_remote_edu", self._push_remote_edu, event_dict
+        )
+
+        # send it locally
+        async def _notify() -> None:
+            try:
+                await self.notifier.on_new_event(
+                    "ephemeral_key", self._latest_room_serial, rooms=[room_id]
+                )
+            except Exception:
+                logger.exception(
+                    "Error notifying about new custom EDU"
+                )
+
+        run_in_background(_notify);
 
     async def create_and_send_nonmember_event(
         self,
@@ -1789,3 +1873,70 @@ class EventCreationHandler:
         # delta_ids might need an update.
         context = await self.state.compute_event_context(event)
         return event, context
+
+class EduEventSource(EventSource[int, JsonDict]):
+    def __init__(self, hs: "HomeServer"):
+        self.store = hs.get_datastore()
+        self.config = hs.config
+
+    async def get_new_events(
+        self,
+        user: UserID,
+        from_key: int,
+        limit: Optional[int],
+        room_ids: Iterable[str],
+        is_guest: bool,
+        explicit_room_id: Optional[str] = None,
+    ) -> Tuple[List[JsonDict], int]:
+        from_key = int(from_key)
+        to_key = self.get_current_key()
+
+        if from_key == to_key:
+            return [], to_key
+
+        events = await self.store.get_edus_for_rooms(
+            room_ids, from_key=from_key, to_key=to_key
+        )
+
+        return events, to_key
+
+    async def get_new_events_as(
+        self, from_key: int, service: ApplicationService
+    ) -> Tuple[List[JsonDict], int]:
+        """Returns a set of new custom EDUs that an appservice
+        may be interested in.
+
+        Args:
+            from_key: the stream position at which events should be fetched from
+            service: The appservice which may be interested
+
+        Returns:
+            A two-tuple containing the following:
+                * A list of json dictionaries derived from read receipts that the
+                  appservice may be interested in.
+                * The current read receipt stream token.
+        """
+        from_key = int(from_key)
+        to_key = self.get_current_key()
+
+        if from_key == to_key:
+            return [], to_key
+
+        # Fetch all custom EDUs for all rooms, up to a limit of 100. This is ordered
+        # by most recent.
+        rooms_to_events = await self.store.get_edus_for_all_rooms(
+            from_key=from_key, to_key=to_key
+        )
+
+        # Then filter down to rooms that the AS can read
+        events = []
+        for room_id, event in rooms_to_events.items():
+            if not await service.matches_user_in_member_list(room_id, self.store):
+                continue
+
+            events.append(event)
+
+        return events, to_key
+
+    def get_current_key(self, direction: str = "f") -> int:
+        return self.store.get_max_edus_stream_id()
