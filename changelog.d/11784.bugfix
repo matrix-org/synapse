@@ -1,1 +1,0 @@
-Fix a long-standing bug that media streams could cause long-lived connections when generating URL previews.
