@@ -52,3 +52,10 @@ class ExperimentalConfig(Config):
         self.msc3202_device_masquerading_enabled: bool = experimental.get(
             "msc3202_device_masquerading", False
         )
+
+        # MSC2409 (this setting only relates to optionally sending to-device messages).
+        # Presence, typing and read receipt EDUs are already sent to application services that
+        # have opted in to receive them. If enabled, this adds to-device messages to that list.
+        self.msc2409_to_device_messages_enabled: bool = experimental.get(
+            "msc2409_to_device_messages_enabled", False
+        )
