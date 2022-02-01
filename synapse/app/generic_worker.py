@@ -127,7 +127,7 @@ from synapse.util.versionstring import get_version_string
 logger = logging.getLogger("synapse.app.generic_worker")
 
 DIRECTORY_UPDATE_WARNING = """
-The user directory worker is not allowed to perform user directory updates per the config.
+The user directory worker is not configured to perform user directory updates per the config.
 Please add or edit ``update_user_directory_on: "{0}"`` in the config'
 """
 
@@ -464,7 +464,7 @@ def start(config_options: List[str]) -> None:
 
     if config.worker.worker_app == "synapse.app.user_dir":
         if not config.worker.update_user_directory:
-            logger.warning(DIRECTORY_UPDATE_WARNING.format(config.worker.worker_name))
+            sys.stderr.write(DIRECTORY_UPDATE_WARNING.format(config.worker.worker_name))
 
     synapse.events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
     synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage

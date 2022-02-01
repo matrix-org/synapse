@@ -328,9 +328,7 @@ class WorkerConfig(Config):
                 config.get("update_user_directory_on") or "master"
             )
 
-        self.update_user_directory: bool = (
-            self.instance_name == update_user_directory_on
-        )
+        self.update_user_directory = self.instance_name == update_user_directory_on
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\

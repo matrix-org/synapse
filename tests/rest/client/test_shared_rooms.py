@@ -32,6 +32,7 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
+        # Enable user directory updates, as the test homeserver must always process them for tests.
         config["update_user_directory_on"] = None
         return self.setup_test_homeserver(config=config)
 
