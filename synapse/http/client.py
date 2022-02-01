@@ -726,6 +726,14 @@ class SimpleHttpClient:
                 HTTPStatus.BAD_GATEWAY, "Got error %d" % (response.code,), Codes.UNKNOWN
             )
 
+        if b"Content-Type" in resp_headers:
+            content_type = resp_headers[b"Content-Type"][0]
+            if _is_av_media(content_type):
+                raise SynapseError(
+                    HTTPStatus.BAD_GATEWAY,
+                    ("Unsupported content type for URL previews: %r" % content_type),
+                )
+
         # TODO: if our Content-Type is HTML or something, just read the first
         # N bytes into RAM rather than saving it all to disk only to read it
         # straight back in again
@@ -760,6 +768,12 @@ class SimpleHttpClient:
             response.request.absoluteURI.decode("ascii"),
             response.code,
         )
+
+
+def _is_av_media(content_type: bytes) -> bool:
+    return content_type.lower().startswith(
+        b"video/"
+    ) or content_type.lower().startswith(b"audio/")
 
 
 def _timeout_to_request_timed_out_error(f: Failure):
