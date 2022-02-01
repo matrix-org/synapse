@@ -261,7 +261,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         target: UserID,
         room_id: str,
         membership: str,
-        origin_server_ts: Optional[int],
+        origin_server_ts: Optional[int] = None,
         prev_event_ids: List[str],
         auth_event_ids: Optional[List[str]] = None,
         txn_id: Optional[str] = None,
