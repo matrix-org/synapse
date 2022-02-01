@@ -164,9 +164,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         )
         self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
         self.event.sender = "@irc_foobar:matrix.org"
-        self.store.get_aliases_for_room = simple_async_mock(
-            ["#irc_barfoo:matrix.org"]
-        )
+        self.store.get_aliases_for_room = simple_async_mock(["#irc_barfoo:matrix.org"])
         self.store.get_users_in_room = simple_async_mock([])
         self.assertTrue(
             (
