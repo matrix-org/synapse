@@ -218,7 +218,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                     room_id=room_id,
                     action=membership,
                     content=content,
-                    origin_server_ts=event_dict.get("origin_server_ts", None),
+                    origin_server_ts=event_dict.get("origin_server_ts"),
                 )
             else:
                 (
