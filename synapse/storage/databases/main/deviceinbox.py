@@ -265,19 +265,21 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             logger.warning("No users provided upon querying for device IDs")
             return {}, to_stream_id
 
-        if len(user_ids) > 1:
-            if device_id is not None:
-                raise AssertionError(
-                    "Programming error: 'device_id' cannot be supplied to "
-                    "_get_device_messages when >1 user_id has been provided"
-                )
+        # Prevent a query for one user's device also retrieving another user's device with
+        # the same device ID (device IDs are not unique across users).
+        if len(user_ids) > 1 and device_id is not None:
+            raise AssertionError(
+                "Programming error: 'device_id' cannot be supplied to "
+                "_get_device_messages when >1 user_id has been provided"
+            )
 
-            # A limit can only be applied when querying for a single user ID / device ID tuple.
-            if limit is not None:
-                raise AssertionError(
-                    "Programming error: _get_device_messages was passed 'limit' "
-                    "with >1 user_id"
-                )
+        # A limit can only be applied when querying for a single user ID / device ID tuple.
+        # See the docstring of this function for more details.
+        if limit is not None and device_id is None:
+            raise AssertionError(
+                "Programming error: _get_device_messages was passed 'limit' "
+                "without a specific user_id/device_id"
+            )
 
         user_ids_to_query: Set[str] = set()
         device_ids_to_query: Set[str] = set()
