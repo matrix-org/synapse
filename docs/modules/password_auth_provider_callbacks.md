@@ -168,7 +168,7 @@ generated).
 
 ## `is_3pid_allowed`
 
-_First introduced in Synapse v1.52.0_
+_First introduced in Synapse v1.53.0_
 
 ```python
 async def is_3pid_allowed(self, medium: str, address: str, registration: bool) -> bool
