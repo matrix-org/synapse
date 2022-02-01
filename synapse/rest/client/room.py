@@ -194,7 +194,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
         content = parse_json_object_from_request(request)
 
-        event_dict = {
+        event_dict: JsonDict = {
             "type": event_type,
             "content": content,
             "room_id": room_id,
