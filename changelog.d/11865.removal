@@ -1,4 +1,1 @@
-Deprecate using `synctl` with the config option `synctl_cache_factor`.
-Print a warning if a user still uses this option. Instead suggest the user to: 
- - Either set the environment variable 'SYNAPSE_CACHE_FACTOR'
- - or set 'caches.global_factor' in the configs.
+Deprecate using `synctl` with the config option `synctl_cache_factor` and print a warning if a user still uses this option.
