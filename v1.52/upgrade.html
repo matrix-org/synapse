@@ -1,0 +1,1490 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Upgrading between Synapse Versions - Synapse</title>
+        
+        
+
+
+        <!-- Custom HTML head -->
+        
+
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        
+        <link rel="icon" href="favicon.svg">
+        
+        
+        <link rel="shortcut icon" href="favicon.png">
+        
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        
+        <link rel="stylesheet" href="css/print.css" media="print">
+        
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        
+        <link rel="stylesheet" href="fonts/fonts.css">
+        
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+        <link rel="stylesheet" href="docs/website_files/table-of-contents.css">
+        
+        <link rel="stylesheet" href="docs/website_files/remove-nav-buttons.css">
+        
+        <link rel="stylesheet" href="docs/website_files/indent-section-headers.css">
+        
+
+        
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="setup/forward_proxy.html">Configuring a Forward/Outbound Proxy</a></li><li class="chapter-item expanded "><a href="turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="upgrade.html" class="active">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded "><a href="MSC1711_certificates_FAQ.html">Upgrading from pre-Synapse 1.0</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="federate.html">Federation</a></li><li class="chapter-item expanded "><a href="usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="templates.html">Templates</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/index.html">Single-Sign On</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/single_sign_on/cas.html">CAS</a></li><li class="chapter-item expanded "><a href="sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="jwt.html">JSON Web Tokens</a></li><li class="chapter-item expanded "><a href="usage/configuration/user_authentication/refresh_tokens.html">Refresh Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="development/url_previews.html">URL Previews</a></li><li class="chapter-item expanded "><a href="user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="modules/index.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/writing_a_module.html">Writing a module</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="modules/spam_checker_callbacks.html">Spam checker callbacks</a></li><li class="chapter-item expanded "><a href="modules/third_party_rules_callbacks.html">Third-party rules callbacks</a></li><li class="chapter-item expanded "><a href="modules/presence_router_callbacks.html">Presence router callbacks</a></li><li class="chapter-item expanded "><a href="modules/account_validity_callbacks.html">Account validity callbacks</a></li><li class="chapter-item expanded "><a href="modules/password_auth_provider_callbacks.html">Password auth provider callbacks</a></li><li class="chapter-item expanded "><a href="modules/background_update_controller_callbacks.html">Background update controller callbacks</a></li><li class="chapter-item expanded "><a href="modules/porting_legacy_module.html">Porting a legacy module to the new interface</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/background_updates.html">Background Updates</a></li><li class="chapter-item expanded "><a href="admin_api/delete_group.html">Delete Group</a></li><li class="chapter-item expanded "><a href="admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/registration_tokens.html">Registration Tokens</a></li><li class="chapter-item expanded "><a href="admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="admin_api/version_api.html">Server Version</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_api/federation.html">Federation</a></li></ol></li><li class="chapter-item expanded "><a href="manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="metrics-howto.html">Monitoring</a></li><li class="chapter-item expanded "><a href="usage/administration/understanding_synapse_through_grafana_graphs.html">Understanding Synapse Through Grafana Graphs</a></li><li class="chapter-item expanded "><a href="usage/administration/useful_sql_for_admins.html">Useful SQL for Admins</a></li><li class="chapter-item expanded "><a href="usage/administration/database_maintenance_tools.html">Database Maintenance Tools</a></li><li class="chapter-item expanded "><a href="usage/administration/state_groups.html">State Groups</a></li><li class="chapter-item expanded "><a href="usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><a href="usage/administration/admin_faq.html">Admin FAQ</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="development/git.html">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li class="chapter-item expanded "><a href="opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><a href="development/experimental_features.html">Experimental features</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="replication.html">Replication</a></li><li class="chapter-item expanded "><a href="tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><a href="development/room-dag-concepts.html">Room DAG concepts</a></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="deprecation_policy.html">Dependency Deprecation Policy</a></li><li class="chapter-item expanded "><a href="other/running_synapse_on_single_board_computers.html">Running Synapse on a Single-Board Computer</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                        
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        
+                        
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        
+                        
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/upgrade.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                        
+
+                    </div>
+                </div>
+
+                
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="upgrading-synapse"><a class="header" href="#upgrading-synapse">Upgrading Synapse</a></h1>
+<p>Before upgrading check if any special steps are required to upgrade from
+the version you currently have installed to the current version of
+Synapse. The extra instructions that may be required are listed later in
+this document.</p>
+<ul>
+<li>
+<p>Check that your versions of Python and PostgreSQL are still
+supported.</p>
+<p>Synapse follows upstream lifecycles for <a href="https://endoflife.date/python">Python</a> and
+<a href="https://endoflife.date/postgresql">PostgreSQL</a>, and removes support for versions
+which are no longer maintained.</p>
+<p>The website <a href="https://endoflife.date">https://endoflife.date</a> also offers convenient
+summaries.</p>
+</li>
+<li>
+<p>If Synapse was installed using <a href="setup/installation.html#prebuilt-packages">prebuilt
+packages</a>, you will need to follow the
+normal process for upgrading those packages.</p>
+</li>
+<li>
+<p>If Synapse was installed from source, then:</p>
+<ol>
+<li>
+<p>Activate the virtualenv before upgrading. For example, if
+Synapse is installed in a virtualenv in <code>~/synapse/env</code> then
+run:</p>
+<pre><code class="language-bash">source ~/synapse/env/bin/activate
+</code></pre>
+</li>
+<li>
+<p>If Synapse was installed using pip then upgrade to the latest
+version by running:</p>
+<pre><code class="language-bash">pip install --upgrade matrix-synapse
+</code></pre>
+<p>If Synapse was installed using git then upgrade to the latest
+version by running:</p>
+<pre><code class="language-bash">git pull
+pip install --upgrade .
+</code></pre>
+</li>
+<li>
+<p>Restart Synapse:</p>
+<pre><code class="language-bash">./synctl restart
+</code></pre>
+</li>
+</ol>
+</li>
+</ul>
+<p>To check whether your update was successful, you can check the running
+server version with:</p>
+<pre><code class="language-bash"># you may need to replace 'localhost:8008' if synapse is not configured
+# to listen on port 8008.
+
+curl http://localhost:8008/_synapse/admin/v1/server_version
+</code></pre>
+<h2 id="rolling-back-to-older-versions"><a class="header" href="#rolling-back-to-older-versions">Rolling back to older versions</a></h2>
+<p>Rolling back to previous releases can be difficult, due to database
+schema changes between releases. Where we have been able to test the
+rollback process, this will be noted below.</p>
+<p>In general, you will need to undo any changes made during the upgrade
+process, for example:</p>
+<ul>
+<li>
+<p>pip:</p>
+<pre><code class="language-bash">source env/bin/activate
+# replace `1.3.0` accordingly:
+pip install matrix-synapse==1.3.0
+</code></pre>
+</li>
+<li>
+<p>Debian:</p>
+<pre><code class="language-bash"># replace `1.3.0` and `stretch` accordingly:
+wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
+dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
+</code></pre>
+</li>
+</ul>
+<h1 id="upgrading-to-v1510"><a class="header" href="#upgrading-to-v1510">Upgrading to v1.51.0</a></h1>
+<h2 id="deprecation-of-webclient-listeners-and-non-https-web_client_location"><a class="header" href="#deprecation-of-webclient-listeners-and-non-https-web_client_location">Deprecation of <code>webclient</code> listeners and non-HTTP(S) <code>web_client_location</code></a></h2>
+<p>Listeners of type  <code>webclient</code> are deprecated and scheduled to be removed in
+Synapse v1.53.0.</p>
+<p>Similarly, a non-HTTP(S) <code>web_client_location</code> configuration is deprecated and
+will become a configuration error in Synapse v1.53.0.</p>
+<h1 id="upgrading-to-v1500"><a class="header" href="#upgrading-to-v1500">Upgrading to v1.50.0</a></h1>
+<h2 id="dropping-support-for-old-python-and-postgres-versions"><a class="header" href="#dropping-support-for-old-python-and-postgres-versions">Dropping support for old Python and Postgres versions</a></h2>
+<p>In line with our <a href="deprecation_policy.html">deprecation policy</a>,
+we've dropped support for Python 3.6 and PostgreSQL 9.6, as they are no
+longer supported upstream.</p>
+<p>This release of Synapse requires Python 3.7+ and PostgreSQL 10+.</p>
+<h1 id="upgrading-to-v1470"><a class="header" href="#upgrading-to-v1470">Upgrading to v1.47.0</a></h1>
+<h2 id="removal-of-old-room-admin-api"><a class="header" href="#removal-of-old-room-admin-api">Removal of old Room Admin API</a></h2>
+<p>The following admin APIs were deprecated in <a href="https://github.com/matrix-org/synapse/blob/v1.34.0/CHANGES.md#deprecations-and-removals">Synapse 1.34</a>
+(released on 2021-05-17) and have now been removed:</p>
+<ul>
+<li><code>POST /_synapse/admin/v1/&lt;room_id&gt;/delete</code></li>
+</ul>
+<p>Any scripts still using the above APIs should be converted to use the
+<a href="https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#delete-room-api">Delete Room API</a>.</p>
+<h2 id="deprecation-of-the-user_may_create_room_with_invites-module-callback"><a class="header" href="#deprecation-of-the-user_may_create_room_with_invites-module-callback">Deprecation of the <code>user_may_create_room_with_invites</code> module callback</a></h2>
+<p>The <code>user_may_create_room_with_invites</code> is deprecated and will be removed in a future
+version of Synapse. Modules implementing this callback can instead implement
+<a href="https://matrix-org.github.io/synapse/latest/modules/spam_checker_callbacks.html#user_may_invite"><code>user_may_invite</code></a>
+and use the <a href="https://github.com/matrix-org/synapse/blob/872f23b95fa980a61b0866c1475e84491991fa20/synapse/module_api/__init__.py#L869-L876"><code>get_room_state</code></a>
+module API method to infer whether the invite is happening in the context of creating a
+room.</p>
+<p>We plan to remove this callback in January 2022.</p>
+<h1 id="upgrading-to-v1450"><a class="header" href="#upgrading-to-v1450">Upgrading to v1.45.0</a></h1>
+<h2 id="changes-required-to-media-storage-provider-modules-when-reading-from-the-synapse-configuration-object"><a class="header" href="#changes-required-to-media-storage-provider-modules-when-reading-from-the-synapse-configuration-object">Changes required to media storage provider modules when reading from the Synapse configuration object</a></h2>
+<p>Media storage provider modules that read from the Synapse configuration object (i.e. that
+read the value of <code>hs.config.[...]</code>) now need to specify the configuration section they're
+reading from. This means that if a module reads the value of e.g. <code>hs.config.media_store_path</code>,
+it needs to replace it with <code>hs.config.media.media_store_path</code>.</p>
+<h1 id="upgrading-to-v1440"><a class="header" href="#upgrading-to-v1440">Upgrading to v1.44.0</a></h1>
+<h2 id="the-url-preview-cache-is-no-longer-mirrored-to-storage-providers"><a class="header" href="#the-url-preview-cache-is-no-longer-mirrored-to-storage-providers">The URL preview cache is no longer mirrored to storage providers</a></h2>
+<p>The <code>url_cache/</code> and <code>url_cache_thumbnails/</code> directories in the media store are
+no longer mirrored to storage providers. These two directories can be safely
+deleted from any configured storage providers to reclaim space.</p>
+<h1 id="upgrading-to-v1430"><a class="header" href="#upgrading-to-v1430">Upgrading to v1.43.0</a></h1>
+<h2 id="the-spaces-summary-apis-can-now-be-handled-by-workers"><a class="header" href="#the-spaces-summary-apis-can-now-be-handled-by-workers">The spaces summary APIs can now be handled by workers</a></h2>
+<p>The <a href="https://matrix-org.github.io/synapse/latest/workers.html#available-worker-applications">available worker applications documentation</a>
+has been updated to reflect that calls to the <code>/spaces</code>, <code>/hierarchy</code>, and
+<code>/summary</code> endpoints can now be routed to workers for both client API and
+federation requests.</p>
+<h1 id="upgrading-to-v1420"><a class="header" href="#upgrading-to-v1420">Upgrading to v1.42.0</a></h1>
+<h2 id="removal-of-old-room-admin-api-1"><a class="header" href="#removal-of-old-room-admin-api-1">Removal of old Room Admin API</a></h2>
+<p>The following admin APIs were deprecated in <a href="https://github.com/matrix-org/synapse/blob/v1.25.0/CHANGES.md#removal-warning">Synapse 1.25</a>
+(released on 2021-01-13) and have now been removed:</p>
+<ul>
+<li><code>POST /_synapse/admin/v1/purge_room</code></li>
+<li><code>POST /_synapse/admin/v1/shutdown_room/&lt;room_id&gt;</code></li>
+</ul>
+<p>Any scripts still using the above APIs should be converted to use the
+<a href="https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#delete-room-api">Delete Room API</a>.</p>
+<h2 id="user-interactive-authentication-fallback-templates-can-now-display-errors"><a class="header" href="#user-interactive-authentication-fallback-templates-can-now-display-errors">User-interactive authentication fallback templates can now display errors</a></h2>
+<p>This may affect you if you make use of custom HTML templates for the
+<a href="../synapse/res/templates/recaptcha.html">reCAPTCHA</a> or
+<a href="../synapse/res/templates/terms.html">terms</a> fallback pages.</p>
+<p>The template is now provided an <code>error</code> variable if the authentication
+process failed. See the default templates linked above for an example.</p>
+<h2 id="removal-of-out-of-date-email-pushers"><a class="header" href="#removal-of-out-of-date-email-pushers">Removal of out-of-date email pushers</a></h2>
+<p>Users will stop receiving message updates via email for addresses that were
+once, but not still, linked to their account.</p>
+<h1 id="upgrading-to-v1410"><a class="header" href="#upgrading-to-v1410">Upgrading to v1.41.0</a></h1>
+<h2 id="add-support-for-routing-outbound-http-requests-via-a-proxy-for-federation"><a class="header" href="#add-support-for-routing-outbound-http-requests-via-a-proxy-for-federation">Add support for routing outbound HTTP requests via a proxy for federation</a></h2>
+<p>Since Synapse 1.6.0 (2019-11-26) you can set a proxy for outbound HTTP requests via
+http_proxy/https_proxy environment variables. This proxy was set for:</p>
+<ul>
+<li>push</li>
+<li>url previews</li>
+<li>phone-home stats</li>
+<li>recaptcha validation</li>
+<li>CAS auth validation</li>
+<li>OpenID Connect</li>
+<li>Federation (checking public key revocation)</li>
+</ul>
+<p>In this version we have added support for outbound requests for:</p>
+<ul>
+<li>Outbound federation</li>
+<li>Downloading remote media</li>
+<li>Fetching public keys of other servers</li>
+</ul>
+<p>These requests use the same proxy configuration. If you have a proxy configuration we
+recommend to verify the configuration. It may be necessary to adjust the <code>no_proxy</code>
+environment variable.</p>
+<p>See <a href="setup/forward_proxy.html">using a forward proxy with Synapse documentation</a> for
+details.</p>
+<h2 id="deprecation-of-template_dir"><a class="header" href="#deprecation-of-template_dir">Deprecation of <code>template_dir</code></a></h2>
+<p>The <code>template_dir</code> settings in the <code>sso</code>, <code>account_validity</code> and <code>email</code> sections of the
+configuration file are now deprecated. Server admins should use the new
+<code>templates.custom_template_directory</code> setting in the configuration file and use one single
+custom template directory for all aforementioned features. Template file names remain
+unchanged. See <a href="https://matrix-org.github.io/synapse/latest/templates.html">the related documentation</a>
+for more information and examples.</p>
+<p>We plan to remove support for these settings in October 2021.</p>
+<h2 id="_synapseadminv1usersuseridmedia-must-be-handled-by-media-workers"><a class="header" href="#_synapseadminv1usersuseridmedia-must-be-handled-by-media-workers"><code>/_synapse/admin/v1/users/{userId}/media</code> must be handled by media workers</a></h2>
+<p>The <a href="https://matrix-org.github.io/synapse/latest/workers.html#synapseappmedia_repository">media repository worker documentation</a>
+has been updated to reflect that calls to <code>/_synapse/admin/v1/users/{userId}/media</code>
+must now be handled by media repository workers. This is due to the new <code>DELETE</code> method
+of this endpoint modifying the media store.</p>
+<h1 id="upgrading-to-v1390"><a class="header" href="#upgrading-to-v1390">Upgrading to v1.39.0</a></h1>
+<h2 id="deprecation-of-the-current-third-party-rules-module-interface"><a class="header" href="#deprecation-of-the-current-third-party-rules-module-interface">Deprecation of the current third-party rules module interface</a></h2>
+<p>The current third-party rules module interface is deprecated in favour of the new generic
+modules system introduced in Synapse v1.37.0. Authors of third-party rules modules can refer
+to <a href="modules/porting_legacy_module.html">this documentation</a>
+to update their modules. Synapse administrators can refer to <a href="modules/index.html">this documentation</a>
+to update their configuration once the modules they are using have been updated.</p>
+<p>We plan to remove support for the current third-party rules interface in September 2021.</p>
+<h1 id="upgrading-to-v1380"><a class="header" href="#upgrading-to-v1380">Upgrading to v1.38.0</a></h1>
+<h2 id="re-indexing-of-events-table-on-postgres-databases"><a class="header" href="#re-indexing-of-events-table-on-postgres-databases">Re-indexing of <code>events</code> table on Postgres databases</a></h2>
+<p>This release includes a database schema update which requires re-indexing one of
+the larger tables in the database, <code>events</code>. This could result in increased
+disk I/O for several hours or days after upgrading while the migration
+completes. Furthermore, because we have to keep the old indexes until the new
+indexes are ready, it could result in a significant, temporary, increase in
+disk space.</p>
+<p>To get a rough idea of the disk space required, check the current size of one
+of the indexes. For example, from a <code>psql</code> shell, run the following sql:</p>
+<pre><code class="language-sql">SELECT pg_size_pretty(pg_relation_size('events_order_room'));
+</code></pre>
+<p>We need to rebuild <strong>four</strong> indexes, so you will need to multiply this result
+by four to give an estimate of the disk space required. For example, on one
+particular server:</p>
+<pre><code>synapse=# select pg_size_pretty(pg_relation_size('events_order_room'));
+ pg_size_pretty
+----------------
+ 288 MB
+(1 row)
+</code></pre>
+<p>On this server, it would be wise to ensure that at least 1152MB are free.</p>
+<p>The additional disk space will be freed once the migration completes.</p>
+<p>SQLite databases are unaffected by this change.</p>
+<h1 id="upgrading-to-v1370"><a class="header" href="#upgrading-to-v1370">Upgrading to v1.37.0</a></h1>
+<h2 id="deprecation-of-the-current-spam-checker-interface"><a class="header" href="#deprecation-of-the-current-spam-checker-interface">Deprecation of the current spam checker interface</a></h2>
+<p>The current spam checker interface is deprecated in favour of a new generic modules system.
+Authors of spam checker modules can refer to [this
+documentation](modules/porting_legacy_module.md
+to update their modules. Synapse administrators can refer to <a href="modules/index.html">this
+documentation</a>
+to update their configuration once the modules they are using have been updated.</p>
+<p>We plan to remove support for the current spam checker interface in August 2021.</p>
+<p>More module interfaces will be ported over to this new generic system in future versions
+of Synapse.</p>
+<h1 id="upgrading-to-v1340"><a class="header" href="#upgrading-to-v1340">Upgrading to v1.34.0</a></h1>
+<h2 id="room_invite_state_types-configuration-setting"><a class="header" href="#room_invite_state_types-configuration-setting"><code>room_invite_state_types</code> configuration setting</a></h2>
+<p>The <code>room_invite_state_types</code> configuration setting has been deprecated
+and replaced with <code>room_prejoin_state</code>. See the <a href="https://github.com/matrix-org/synapse/blob/v1.34.0/docs/sample_config.yaml#L1515">sample configuration
+file</a>.</p>
+<p>If you have set <code>room_invite_state_types</code> to the default value you
+should simply remove it from your configuration file. The default value
+used to be:</p>
+<pre><code class="language-yaml">room_invite_state_types:
+   - &quot;m.room.join_rules&quot;
+   - &quot;m.room.canonical_alias&quot;
+   - &quot;m.room.avatar&quot;
+   - &quot;m.room.encryption&quot;
+   - &quot;m.room.name&quot;
+</code></pre>
+<p>If you have customised this value, you should remove
+<code>room_invite_state_types</code> and configure <code>room_prejoin_state</code> instead.</p>
+<h1 id="upgrading-to-v1330"><a class="header" href="#upgrading-to-v1330">Upgrading to v1.33.0</a></h1>
+<h2 id="account-validity-html-templates-can-now-display-a-users-expiration-date"><a class="header" href="#account-validity-html-templates-can-now-display-a-users-expiration-date">Account Validity HTML templates can now display a user's expiration date</a></h2>
+<p>This may affect you if you have enabled the account validity feature,
+and have made use of a custom HTML template specified by the
+<code>account_validity.template_dir</code> or
+<code>account_validity.account_renewed_html_path</code> Synapse config options.</p>
+<p>The template can now accept an <code>expiration_ts</code> variable, which
+represents the unix timestamp in milliseconds for the future date of
+which their account has been renewed until. See the <a href="https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_renewed.html">default
+template</a>
+for an example of usage.</p>
+<p>ALso note that a new HTML template, <code>account_previously_renewed.html</code>,
+has been added. This is is shown to users when they attempt to renew
+their account with a valid renewal token that has already been used
+before. The default template contents can been found
+<a href="https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_previously_renewed.html">here</a>,
+and can also accept an <code>expiration_ts</code> variable. This template replaces
+the error message users would previously see upon attempting to use a
+valid renewal token more than once.</p>
+<h1 id="upgrading-to-v1320"><a class="header" href="#upgrading-to-v1320">Upgrading to v1.32.0</a></h1>
+<h2 id="regression-causing-connected-prometheus-instances-to-become-overwhelmed"><a class="header" href="#regression-causing-connected-prometheus-instances-to-become-overwhelmed">Regression causing connected Prometheus instances to become overwhelmed</a></h2>
+<p>This release introduces <a href="https://github.com/matrix-org/synapse/issues/9853">a
+regression</a> that can
+overwhelm connected Prometheus instances. This issue is not present in
+Synapse v1.32.0rc1.</p>
+<p>If you have been affected, please downgrade to 1.31.0. You then may need
+to remove excess writeahead logs in order for Prometheus to recover.
+Instructions for doing so are provided
+<a href="https://github.com/matrix-org/synapse/pull/9854#issuecomment-823472183">here</a>.</p>
+<h2 id="dropping-support-for-old-python-postgres-and-sqlite-versions"><a class="header" href="#dropping-support-for-old-python-postgres-and-sqlite-versions">Dropping support for old Python, Postgres and SQLite versions</a></h2>
+<p>In line with our <a href="deprecation_policy.html">deprecation policy</a>,
+we've dropped support for Python 3.5 and PostgreSQL 9.5, as they are no
+longer supported upstream.</p>
+<p>This release of Synapse requires Python 3.6+ and PostgresSQL 9.6+ or
+SQLite 3.22+.</p>
+<h2 id="removal-of-old-list-accounts-admin-api"><a class="header" href="#removal-of-old-list-accounts-admin-api">Removal of old List Accounts Admin API</a></h2>
+<p>The deprecated v1 &quot;list accounts&quot; admin API
+(<code>GET /_synapse/admin/v1/users/&lt;user_id&gt;</code>) has been removed in this
+version.</p>
+<p>The <a href="admin_api/user_admin_api.html#list-accounts">v2 list accounts API</a>
+has been available since Synapse 1.7.0 (2019-12-13), and is accessible
+under <code>GET /_synapse/admin/v2/users</code>.</p>
+<p>The deprecation of the old endpoint was announced with Synapse 1.28.0
+(released on 2021-02-25).</p>
+<h2 id="application-services-must-use-type-mloginapplication_service-when-registering-users"><a class="header" href="#application-services-must-use-type-mloginapplication_service-when-registering-users">Application Services must use type <code>m.login.application_service</code> when registering users</a></h2>
+<p>In compliance with the <a href="https://matrix.org/docs/spec/application_service/r0.1.2#server-admin-style-permissions">Application Service
+spec</a>,
+Application Services are now required to use the
+<code>m.login.application_service</code> type when registering users via the
+<code>/_matrix/client/r0/register</code> endpoint. This behaviour was deprecated in
+Synapse v1.30.0.</p>
+<p>Please ensure your Application Services are up to date.</p>
+<h1 id="upgrading-to-v1290"><a class="header" href="#upgrading-to-v1290">Upgrading to v1.29.0</a></h1>
+<h2 id="requirement-for-x-forwarded-proto-header"><a class="header" href="#requirement-for-x-forwarded-proto-header">Requirement for X-Forwarded-Proto header</a></h2>
+<p>When using Synapse with a reverse proxy (in particular, when using the
+<code>x_forwarded</code> option on an HTTP listener), Synapse now
+expects to receive an <code>X-Forwarded-Proto</code> header on incoming
+HTTP requests. If it is not set, Synapse will log a warning on each
+received request.</p>
+<p>To avoid the warning, administrators using a reverse proxy should ensure
+that the reverse proxy sets <code>X-Forwarded-Proto</code> header to
+<code>https</code> or <code>http</code> to indicate the protocol used
+by the client.</p>
+<p>Synapse also requires the <code>Host</code> header to be preserved.</p>
+<p>See the <a href="reverse_proxy.html">reverse proxy documentation</a>, where the
+example configurations have been updated to show how to set these
+headers.</p>
+<p>(Users of <a href="https://caddyserver.com/">Caddy</a> are unaffected, since we
+believe it sets <code>X-Forwarded-Proto</code> by default.)</p>
+<h1 id="upgrading-to-v1270"><a class="header" href="#upgrading-to-v1270">Upgrading to v1.27.0</a></h1>
+<h2 id="changes-to-callback-uri-for-oauth2--openid-connect-and-saml2"><a class="header" href="#changes-to-callback-uri-for-oauth2--openid-connect-and-saml2">Changes to callback URI for OAuth2 / OpenID Connect and SAML2</a></h2>
+<p>This version changes the URI used for callbacks from OAuth2 and SAML2
+identity providers:</p>
+<ul>
+<li>
+<p>If your server is configured for single sign-on via an OpenID
+Connect or OAuth2 identity provider, you will need to add
+<code>[synapse public baseurl]/_synapse/client/oidc/callback</code> to the list
+of permitted &quot;redirect URIs&quot; at the identity provider.</p>
+<p>See the <a href="openid.html">OpenID docs</a> for more information on setting
+up OpenID Connect.</p>
+</li>
+<li>
+<p>If your server is configured for single sign-on via a SAML2 identity
+provider, you will need to add
+<code>[synapse public baseurl]/_synapse/client/saml2/authn_response</code> as a
+permitted &quot;ACS location&quot; (also known as &quot;allowed callback URLs&quot;)
+at the identity provider.</p>
+<p>The &quot;Issuer&quot; in the &quot;AuthnRequest&quot; to the SAML2 identity
+provider is also updated to
+<code>[synapse public baseurl]/_synapse/client/saml2/metadata.xml</code>. If
+your SAML2 identity provider uses this property to validate or
+otherwise identify Synapse, its configuration will need to be
+updated to use the new URL. Alternatively you could create a new,
+separate &quot;EntityDescriptor&quot; in your SAML2 identity provider with
+the new URLs and leave the URLs in the existing &quot;EntityDescriptor&quot;
+as they were.</p>
+</li>
+</ul>
+<h2 id="changes-to-html-templates"><a class="header" href="#changes-to-html-templates">Changes to HTML templates</a></h2>
+<p>The HTML templates for SSO and email notifications now have <a href="https://jinja.palletsprojects.com/en/2.11.x/api/#autoescaping">Jinja2's
+autoescape</a>
+enabled for files ending in <code>.html</code>, <code>.htm</code>, and <code>.xml</code>. If you have
+customised these templates and see issues when viewing them you might
+need to update them. It is expected that most configurations will need
+no changes.</p>
+<p>If you have customised the templates <em>names</em> for these templates, it is
+recommended to verify they end in <code>.html</code> to ensure autoescape is
+enabled.</p>
+<p>The above applies to the following templates:</p>
+<ul>
+<li><code>add_threepid.html</code></li>
+<li><code>add_threepid_failure.html</code></li>
+<li><code>add_threepid_success.html</code></li>
+<li><code>notice_expiry.html</code></li>
+<li><code>notice_expiry.html</code></li>
+<li><code>notif_mail.html</code> (which, by default, includes <code>room.html</code> and
+<code>notif.html</code>)</li>
+<li><code>password_reset.html</code></li>
+<li><code>password_reset_confirmation.html</code></li>
+<li><code>password_reset_failure.html</code></li>
+<li><code>password_reset_success.html</code></li>
+<li><code>registration.html</code></li>
+<li><code>registration_failure.html</code></li>
+<li><code>registration_success.html</code></li>
+<li><code>sso_account_deactivated.html</code></li>
+<li><code>sso_auth_bad_user.html</code></li>
+<li><code>sso_auth_confirm.html</code></li>
+<li><code>sso_auth_success.html</code></li>
+<li><code>sso_error.html</code></li>
+<li><code>sso_login_idp_picker.html</code></li>
+<li><code>sso_redirect_confirm.html</code></li>
+</ul>
+<h1 id="upgrading-to-v1260"><a class="header" href="#upgrading-to-v1260">Upgrading to v1.26.0</a></h1>
+<h2 id="rolling-back-to-v1250-after-a-failed-upgrade"><a class="header" href="#rolling-back-to-v1250-after-a-failed-upgrade">Rolling back to v1.25.0 after a failed upgrade</a></h2>
+<p>v1.26.0 includes a lot of large changes. If something problematic
+occurs, you may want to roll-back to a previous version of Synapse.
+Because v1.26.0 also includes a new database schema version, reverting
+that version is also required alongside the generic rollback
+instructions mentioned above. In short, to roll back to v1.25.0 you need
+to:</p>
+<ol>
+<li>
+<p>Stop the server</p>
+</li>
+<li>
+<p>Decrease the schema version in the database:</p>
+<pre><code class="language-sql">UPDATE schema_version SET version = 58;
+</code></pre>
+</li>
+<li>
+<p>Delete the ignored users &amp; chain cover data:</p>
+<pre><code class="language-sql">DROP TABLE IF EXISTS ignored_users;
+UPDATE rooms SET has_auth_chain_index = false;
+</code></pre>
+<p>For PostgreSQL run:</p>
+<pre><code class="language-sql">TRUNCATE event_auth_chain_links;
+TRUNCATE event_auth_chains;
+</code></pre>
+<p>For SQLite run:</p>
+<pre><code class="language-sql">DELETE FROM event_auth_chain_links;
+DELETE FROM event_auth_chains;
+</code></pre>
+</li>
+<li>
+<p>Mark the deltas as not run (so they will re-run on upgrade).</p>
+<pre><code class="language-sql">DELETE FROM applied_schema_deltas WHERE version = 59 AND file = &quot;59/01ignored_user.py&quot;;
+DELETE FROM applied_schema_deltas WHERE version = 59 AND file = &quot;59/06chain_cover_index.sql&quot;;
+</code></pre>
+</li>
+<li>
+<p>Downgrade Synapse by following the instructions for your
+installation method in the &quot;Rolling back to older versions&quot;
+section above.</p>
+</li>
+</ol>
+<h1 id="upgrading-to-v1250"><a class="header" href="#upgrading-to-v1250">Upgrading to v1.25.0</a></h1>
+<h2 id="last-release-supporting-python-35"><a class="header" href="#last-release-supporting-python-35">Last release supporting Python 3.5</a></h2>
+<p>This is the last release of Synapse which guarantees support with Python
+3.5, which passed its upstream End of Life date several months ago.</p>
+<p>We will attempt to maintain support through March 2021, but without
+guarantees.</p>
+<p>In the future, Synapse will follow upstream schedules for ending support
+of older versions of Python and PostgreSQL. Please upgrade to at least
+Python 3.6 and PostgreSQL 9.6 as soon as possible.</p>
+<h2 id="blacklisting-ip-ranges"><a class="header" href="#blacklisting-ip-ranges">Blacklisting IP ranges</a></h2>
+<p>Synapse v1.25.0 includes new settings, <code>ip_range_blacklist</code> and
+<code>ip_range_whitelist</code>, for controlling outgoing requests from Synapse for
+federation, identity servers, push, and for checking key validity for
+third-party invite events. The previous setting,
+<code>federation_ip_range_blacklist</code>, is deprecated. The new
+<code>ip_range_blacklist</code> defaults to private IP ranges if it is not defined.</p>
+<p>If you have never customised <code>federation_ip_range_blacklist</code> it is
+recommended that you remove that setting.</p>
+<p>If you have customised <code>federation_ip_range_blacklist</code> you should update
+the setting name to <code>ip_range_blacklist</code>.</p>
+<p>If you have a custom push server that is reached via private IP space
+you may need to customise <code>ip_range_blacklist</code> or <code>ip_range_whitelist</code>.</p>
+<h1 id="upgrading-to-v1240"><a class="header" href="#upgrading-to-v1240">Upgrading to v1.24.0</a></h1>
+<h2 id="custom-openid-connect-mapping-provider-breaking-change"><a class="header" href="#custom-openid-connect-mapping-provider-breaking-change">Custom OpenID Connect mapping provider breaking change</a></h2>
+<p>This release allows the OpenID Connect mapping provider to perform
+normalisation of the localpart of the Matrix ID. This allows for the
+mapping provider to specify different algorithms, instead of the
+<a href="https://matrix.org/docs/spec/appendices#mapping-from-other-character-sets">default
+way</a>.</p>
+<p>If your Synapse configuration uses a custom mapping provider
+(<code>oidc_config.user_mapping_provider.module</code> is specified and
+not equal to
+<code>synapse.handlers.oidc_handler.JinjaOidcMappingProvider</code>)
+then you <em>must</em> ensure that <code>map_user_attributes</code> of the
+mapping provider performs some normalisation of the
+<code>localpart</code> returned. To match previous behaviour you can
+use the <code>map_username_to_mxid_localpart</code> function provided
+by Synapse. An example is shown below:</p>
+<pre><code class="language-python">from synapse.types import map_username_to_mxid_localpart
+
+class MyMappingProvider:
+    def map_user_attributes(self, userinfo, token):
+        # ... your custom logic ...
+        sso_user_id = ...
+        localpart = map_username_to_mxid_localpart(sso_user_id)
+
+        return {&quot;localpart&quot;: localpart}
+</code></pre>
+<h2 id="removal-historical-synapse-admin-api"><a class="header" href="#removal-historical-synapse-admin-api">Removal historical Synapse Admin API</a></h2>
+<p>Historically, the Synapse Admin API has been accessible under:</p>
+<ul>
+<li><code>/_matrix/client/api/v1/admin</code></li>
+<li><code>/_matrix/client/unstable/admin</code></li>
+<li><code>/_matrix/client/r0/admin</code></li>
+<li><code>/_synapse/admin/v1</code></li>
+</ul>
+<p>The endpoints with <code>/_matrix/client/*</code> prefixes have been removed as of
+v1.24.0. The Admin API is now only accessible under:</p>
+<ul>
+<li><code>/_synapse/admin/v1</code></li>
+</ul>
+<p>The only exception is the <code>/admin/whois</code> endpoint, which is
+<a href="https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid">also available via the client-server
+API</a>.</p>
+<p>The deprecation of the old endpoints was announced with Synapse 1.20.0
+(released on 2020-09-22) and makes it easier for homeserver admins to
+lock down external access to the Admin API endpoints.</p>
+<h1 id="upgrading-to-v1230"><a class="header" href="#upgrading-to-v1230">Upgrading to v1.23.0</a></h1>
+<h2 id="structured-logging-configuration-breaking-changes"><a class="header" href="#structured-logging-configuration-breaking-changes">Structured logging configuration breaking changes</a></h2>
+<p>This release deprecates use of the <code>structured: true</code> logging
+configuration for structured logging. If your logging configuration
+contains <code>structured: true</code> then it should be modified based on the
+<a href="structured_logging.html">structured logging documentation</a>.</p>
+<p>The <code>structured</code> and <code>drains</code> logging options are now deprecated and
+should be replaced by standard logging configuration of <code>handlers</code> and
+<code>formatters</code>.</p>
+<p>A future will release of Synapse will make using <code>structured: true</code> an
+error.</p>
+<h1 id="upgrading-to-v1220"><a class="header" href="#upgrading-to-v1220">Upgrading to v1.22.0</a></h1>
+<h2 id="thirdpartyeventrules-breaking-changes"><a class="header" href="#thirdpartyeventrules-breaking-changes">ThirdPartyEventRules breaking changes</a></h2>
+<p>This release introduces a backwards-incompatible change to modules
+making use of <code>ThirdPartyEventRules</code> in Synapse. If you make use of a
+module defined under the <code>third_party_event_rules</code> config option, please
+make sure it is updated to handle the below change:</p>
+<p>The <code>http_client</code> argument is no longer passed to modules as they are
+initialised. Instead, modules are expected to make use of the
+<code>http_client</code> property on the <code>ModuleApi</code> class. Modules are now passed
+a <code>module_api</code> argument during initialisation, which is an instance of
+<code>ModuleApi</code>. <code>ModuleApi</code> instances have a <code>http_client</code> property which
+acts the same as the <code>http_client</code> argument previously passed to
+<code>ThirdPartyEventRules</code> modules.</p>
+<h1 id="upgrading-to-v1210"><a class="header" href="#upgrading-to-v1210">Upgrading to v1.21.0</a></h1>
+<h2 id="forwarding-_synapseclient-through-your-reverse-proxy"><a class="header" href="#forwarding-_synapseclient-through-your-reverse-proxy">Forwarding <code>/_synapse/client</code> through your reverse proxy</a></h2>
+<p>The <a href="reverse_proxy.html">reverse proxy documentation</a>
+has been updated to include reverse proxy directives for
+<code>/_synapse/client/*</code> endpoints. As the user password reset flow now uses
+endpoints under this prefix, <strong>you must update your reverse proxy
+configurations for user password reset to work</strong>.</p>
+<p>Additionally, note that the <a href="workers.html">Synapse worker documentation</a> has been updated to</p>
+<p>:   state that the <code>/_synapse/client/password_reset/email/submit_token</code>
+endpoint can be handled</p>
+<p>by all workers. If you make use of Synapse's worker feature, please
+update your reverse proxy configuration to reflect this change.</p>
+<h2 id="new-html-templates"><a class="header" href="#new-html-templates">New HTML templates</a></h2>
+<p>A new HTML template,
+<a href="https://github.com/matrix-org/synapse/blob/develop/synapse/res/templates/password_reset_confirmation.html">password_reset_confirmation.html</a>,
+has been added to the <code>synapse/res/templates</code> directory. If you are
+using a custom template directory, you may want to copy the template
+over and modify it.</p>
+<p>Note that as of v1.20.0, templates do not need to be included in custom
+template directories for Synapse to start. The default templates will be
+used if a custom template cannot be found.</p>
+<p>This page will appear to the user after clicking a password reset link
+that has been emailed to them.</p>
+<p>To complete password reset, the page must include a way to make a
+<code>POST</code> request to
+<code>/_synapse/client/password_reset/{medium}/submit_token</code> with the query
+parameters from the original link, presented as a URL-encoded form. See
+the file itself for more details.</p>
+<h2 id="updated-single-sign-on-html-templates"><a class="header" href="#updated-single-sign-on-html-templates">Updated Single Sign-on HTML Templates</a></h2>
+<p>The <code>saml_error.html</code> template was removed from Synapse and replaced
+with the <code>sso_error.html</code> template. If your Synapse is configured to use
+SAML and a custom <code>sso_redirect_confirm_template_dir</code> configuration then
+any customisations of the <code>saml_error.html</code> template will need to be
+merged into the <code>sso_error.html</code> template. These templates are similar,
+but the parameters are slightly different:</p>
+<ul>
+<li>The <code>msg</code> parameter should be renamed to <code>error_description</code>.</li>
+<li>There is no longer a <code>code</code> parameter for the response code.</li>
+<li>A string <code>error</code> parameter is available that includes a short hint
+of why a user is seeing the error page.</li>
+</ul>
+<h1 id="upgrading-to-v1180"><a class="header" href="#upgrading-to-v1180">Upgrading to v1.18.0</a></h1>
+<h2 id="docker--py3-suffix-will-be-removed-in-future-versions"><a class="header" href="#docker--py3-suffix-will-be-removed-in-future-versions">Docker <code>-py3</code> suffix will be removed in future versions</a></h2>
+<p>From 10th August 2020, we will no longer publish Docker images with the
+<code>-py3</code> tag suffix. The images tagged with the
+<code>-py3</code> suffix have been identical to the non-suffixed tags
+since release 0.99.0, and the suffix is obsolete.</p>
+<p>On 10th August, we will remove the <code>latest-py3</code> tag.
+Existing per-release tags (such as <code>v1.18.0-py3</code> will not
+be removed, but no new <code>-py3</code> tags will be added.</p>
+<p>Scripts relying on the <code>-py3</code> suffix will need to be
+updated.</p>
+<h2 id="redis-replication-is-now-recommended-in-lieu-of-tcp-replication"><a class="header" href="#redis-replication-is-now-recommended-in-lieu-of-tcp-replication">Redis replication is now recommended in lieu of TCP replication</a></h2>
+<p>When setting up worker processes, we now recommend the use of a Redis
+server for replication. <strong>The old direct TCP connection method is
+deprecated and will be removed in a future release.</strong> See
+<a href="workers.html">workers</a> for more details.</p>
+<h1 id="upgrading-to-v1140"><a class="header" href="#upgrading-to-v1140">Upgrading to v1.14.0</a></h1>
+<p>This version includes a database update which is run as part of the
+upgrade, and which may take a couple of minutes in the case of a large
+server. Synapse will not respond to HTTP requests while this update is
+taking place.</p>
+<h1 id="upgrading-to-v1130"><a class="header" href="#upgrading-to-v1130">Upgrading to v1.13.0</a></h1>
+<h2 id="incorrect-database-migration-in-old-synapse-versions"><a class="header" href="#incorrect-database-migration-in-old-synapse-versions">Incorrect database migration in old synapse versions</a></h2>
+<p>A bug was introduced in Synapse 1.4.0 which could cause the room
+directory to be incomplete or empty if Synapse was upgraded directly
+from v1.2.1 or earlier, to versions between v1.4.0 and v1.12.x.</p>
+<p>This will <em>not</em> be a problem for Synapse installations which were:</p>
+<p>:   -   created at v1.4.0 or later,
+-   upgraded via v1.3.x, or
+-   upgraded straight from v1.2.1 or earlier to v1.13.0 or later.</p>
+<p>If completeness of the room directory is a concern, installations which
+are affected can be repaired as follows:</p>
+<ol>
+<li>
+<p>Run the following sql from a <code>psql</code> or
+<code>sqlite3</code> console:</p>
+<pre><code class="language-sql">INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+   ('populate_stats_process_rooms', '{}', 'current_state_events_membership');
+
+INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+   ('populate_stats_process_users', '{}', 'populate_stats_process_rooms');
+</code></pre>
+</li>
+<li>
+<p>Restart synapse.</p>
+</li>
+</ol>
+<h2 id="new-single-sign-on-html-templates"><a class="header" href="#new-single-sign-on-html-templates">New Single Sign-on HTML Templates</a></h2>
+<p>New templates (<code>sso_auth_confirm.html</code>, <code>sso_auth_success.html</code>, and
+<code>sso_account_deactivated.html</code>) were added to Synapse. If your Synapse
+is configured to use SSO and a custom
+<code>sso_redirect_confirm_template_dir</code> configuration then these templates
+will need to be copied from
+<a href="synapse/res/templates">synapse/res/templates</a> into that directory.</p>
+<h2 id="synapse-sso-plugins-method-deprecation"><a class="header" href="#synapse-sso-plugins-method-deprecation">Synapse SSO Plugins Method Deprecation</a></h2>
+<p>Plugins using the <code>complete_sso_login</code> method of
+<code>synapse.module_api.ModuleApi</code> should update to using the async/await
+version <code>complete_sso_login_async</code> which includes additional checks. The
+non-async version is considered deprecated.</p>
+<h2 id="rolling-back-to-v1124-after-a-failed-upgrade"><a class="header" href="#rolling-back-to-v1124-after-a-failed-upgrade">Rolling back to v1.12.4 after a failed upgrade</a></h2>
+<p>v1.13.0 includes a lot of large changes. If something problematic
+occurs, you may want to roll-back to a previous version of Synapse.
+Because v1.13.0 also includes a new database schema version, reverting
+that version is also required alongside the generic rollback
+instructions mentioned above. In short, to roll back to v1.12.4 you need
+to:</p>
+<ol>
+<li>
+<p>Stop the server</p>
+</li>
+<li>
+<p>Decrease the schema version in the database:</p>
+<pre><code class="language-sql">UPDATE schema_version SET version = 57;
+</code></pre>
+</li>
+<li>
+<p>Downgrade Synapse by following the instructions for your
+installation method in the &quot;Rolling back to older versions&quot;
+section above.</p>
+</li>
+</ol>
+<h1 id="upgrading-to-v1120"><a class="header" href="#upgrading-to-v1120">Upgrading to v1.12.0</a></h1>
+<p>This version includes a database update which is run as part of the
+upgrade, and which may take some time (several hours in the case of a
+large server). Synapse will not respond to HTTP requests while this
+update is taking place.</p>
+<p>This is only likely to be a problem in the case of a server which is
+participating in many rooms.</p>
+<ol start="0">
+<li>
+<p>As with all upgrades, it is recommended that you have a recent
+backup of your database which can be used for recovery in the event
+of any problems.</p>
+</li>
+<li>
+<p>As an initial check to see if you will be affected, you can try
+running the following query from the <code>psql</code> or
+<code>sqlite3</code> console. It is safe to run it while Synapse is
+still running.</p>
+<pre><code class="language-sql">SELECT MAX(q.v) FROM (
+  SELECT (
+    SELECT ej.json AS v
+    FROM state_events se INNER JOIN event_json ej USING (event_id)
+    WHERE se.room_id=rooms.room_id AND se.type='m.room.create' AND se.state_key=''
+    LIMIT 1
+  ) FROM rooms WHERE rooms.room_version IS NULL
+) q;
+</code></pre>
+<p>This query will take about the same amount of time as the upgrade
+process: ie, if it takes 5 minutes, then it is likely that Synapse
+will be unresponsive for 5 minutes during the upgrade.</p>
+<p>If you consider an outage of this duration to be acceptable, no
+further action is necessary and you can simply start Synapse 1.12.0.</p>
+<p>If you would prefer to reduce the downtime, continue with the steps
+below.</p>
+</li>
+<li>
+<p>The easiest workaround for this issue is to manually create a new
+index before upgrading. On PostgreSQL, his can be done as follows:</p>
+<pre><code class="language-sql">CREATE INDEX CONCURRENTLY tmp_upgrade_1_12_0_index
+ON state_events(room_id) WHERE type = 'm.room.create';
+</code></pre>
+<p>The above query may take some time, but is also safe to run while
+Synapse is running.</p>
+<p>We assume that no SQLite users have databases large enough to be
+affected. If you <em>are</em> affected, you can run a similar query,
+omitting the <code>CONCURRENTLY</code> keyword. Note however that this
+operation may in itself cause Synapse to stop running for some time.
+Synapse admins are reminded that <a href="postgres.html">SQLite is not recommended for use
+outside a test environment</a>.</p>
+</li>
+<li>
+<p>Once the index has been created, the <code>SELECT</code> query in step 1 above
+should complete quickly. It is therefore safe to upgrade to Synapse
+1.12.0.</p>
+</li>
+<li>
+<p>Once Synapse 1.12.0 has successfully started and is responding to
+HTTP requests, the temporary index can be removed:</p>
+<pre><code class="language-sql">DROP INDEX tmp_upgrade_1_12_0_index;
+</code></pre>
+</li>
+</ol>
+<h1 id="upgrading-to-v1100"><a class="header" href="#upgrading-to-v1100">Upgrading to v1.10.0</a></h1>
+<p>Synapse will now log a warning on start up if used with a PostgreSQL
+database that has a non-recommended locale set.</p>
+<p>See <a href="postgres.html">Postgres</a> for details.</p>
+<h1 id="upgrading-to-v180"><a class="header" href="#upgrading-to-v180">Upgrading to v1.8.0</a></h1>
+<p>Specifying a <code>log_file</code> config option will now cause Synapse to refuse
+to start, and should be replaced by with the <code>log_config</code> option.
+Support for the <code>log_file</code> option was removed in v1.3.0 and has since
+had no effect.</p>
+<h1 id="upgrading-to-v170"><a class="header" href="#upgrading-to-v170">Upgrading to v1.7.0</a></h1>
+<p>In an attempt to configure Synapse in a privacy preserving way, the
+default behaviours of <code>allow_public_rooms_without_auth</code> and
+<code>allow_public_rooms_over_federation</code> have been inverted. This means that
+by default, only authenticated users querying the Client/Server API will
+be able to query the room directory, and relatedly that the server will
+not share room directory information with other servers over federation.</p>
+<p>If your installation does not explicitly set these settings one way or
+the other and you want either setting to be <code>true</code> then it will
+necessary to update your homeserver configuration file accordingly.</p>
+<p>For more details on the surrounding context see our
+<a href="https://matrix.org/blog/2019/11/09/avoiding-unwelcome-visitors-on-private-matrix-servers">explainer</a>.</p>
+<h1 id="upgrading-to-v150"><a class="header" href="#upgrading-to-v150">Upgrading to v1.5.0</a></h1>
+<p>This release includes a database migration which may take several
+minutes to complete if there are a large number (more than a million or
+so) of entries in the <code>devices</code> table. This is only likely to a be a
+problem on very large installations.</p>
+<h1 id="upgrading-to-v140"><a class="header" href="#upgrading-to-v140">Upgrading to v1.4.0</a></h1>
+<h2 id="new-custom-templates"><a class="header" href="#new-custom-templates">New custom templates</a></h2>
+<p>If you have configured a custom template directory with the
+<code>email.template_dir</code> option, be aware that there are new templates
+regarding registration and threepid management (see below) that must be
+included.</p>
+<ul>
+<li><code>registration.html</code> and <code>registration.txt</code></li>
+<li><code>registration_success.html</code> and <code>registration_failure.html</code></li>
+<li><code>add_threepid.html</code> and <code>add_threepid.txt</code></li>
+<li><code>add_threepid_failure.html</code> and <code>add_threepid_success.html</code></li>
+</ul>
+<p>Synapse will expect these files to exist inside the configured template
+directory, and <strong>will fail to start</strong> if they are absent. To view the
+default templates, see
+<a href="https://github.com/matrix-org/synapse/tree/master/synapse/res/templates">synapse/res/templates</a>.</p>
+<h2 id="3pid-verification-changes"><a class="header" href="#3pid-verification-changes">3pid verification changes</a></h2>
+<p><strong>Note: As of this release, users will be unable to add phone numbers or
+email addresses to their accounts, without changes to the Synapse
+configuration. This includes adding an email address during
+registration.</strong></p>
+<p>It is possible for a user to associate an email address or phone number
+with their account, for a number of reasons:</p>
+<ul>
+<li>for use when logging in, as an alternative to the user id.</li>
+<li>in the case of email, as an alternative contact to help with account
+recovery.</li>
+<li>in the case of email, to receive notifications of missed messages.</li>
+</ul>
+<p>Before an email address or phone number can be added to a user's
+account, or before such an address is used to carry out a
+password-reset, Synapse must confirm the operation with the owner of the
+email address or phone number. It does this by sending an email or text
+giving the user a link or token to confirm receipt. This process is
+known as '3pid verification'. ('3pid', or 'threepid', stands for
+third-party identifier, and we use it to refer to external identifiers
+such as email addresses and phone numbers.)</p>
+<p>Previous versions of Synapse delegated the task of 3pid verification to
+an identity server by default. In most cases this server is <code>vector.im</code>
+or <code>matrix.org</code>.</p>
+<p>In Synapse 1.4.0, for security and privacy reasons, the homeserver will
+no longer delegate this task to an identity server by default. Instead,
+the server administrator will need to explicitly decide how they would
+like the verification messages to be sent.</p>
+<p>In the medium term, the <code>vector.im</code> and <code>matrix.org</code> identity servers
+will disable support for delegated 3pid verification entirely. However,
+in order to ease the transition, they will retain the capability for a
+limited period. Delegated email verification will be disabled on Monday
+2nd December 2019 (giving roughly 2 months notice). Disabling delegated
+SMS verification will follow some time after that once SMS verification
+support lands in Synapse.</p>
+<p>Once delegated 3pid verification support has been disabled in the
+<code>vector.im</code> and <code>matrix.org</code> identity servers, all Synapse versions that
+depend on those instances will be unable to verify email and phone
+numbers through them. There are no imminent plans to remove delegated
+3pid verification from Sydent generally. (Sydent is the identity server
+project that backs the <code>vector.im</code> and <code>matrix.org</code> instances).</p>
+<h3 id="email"><a class="header" href="#email">Email</a></h3>
+<p>Following upgrade, to continue verifying email (e.g. as part of the
+registration process), admins can either:-</p>
+<ul>
+<li>Configure Synapse to use an email server.</li>
+<li>Run or choose an identity server which allows delegated email
+verification and delegate to it.</li>
+</ul>
+<h4 id="configure-smtp-in-synapse"><a class="header" href="#configure-smtp-in-synapse">Configure SMTP in Synapse</a></h4>
+<p>To configure an SMTP server for Synapse, modify the configuration
+section headed <code>email</code>, and be sure to have at least the
+<code>smtp_host, smtp_port</code> and <code>notif_from</code> fields filled out.</p>
+<p>You may also need to set <code>smtp_user</code>, <code>smtp_pass</code>, and
+<code>require_transport_security</code>.</p>
+<p>See the <a href="usage/configuration/homeserver_sample_config.html">sample configuration file</a>
+for more details on these settings.</p>
+<h4 id="delegate-email-to-an-identity-server"><a class="header" href="#delegate-email-to-an-identity-server">Delegate email to an identity server</a></h4>
+<p>Some admins will wish to continue using email verification as part of
+the registration process, but will not immediately have an appropriate
+SMTP server at hand.</p>
+<p>To this end, we will continue to support email verification delegation
+via the <code>vector.im</code> and <code>matrix.org</code> identity servers for two months.
+Support for delegated email verification will be disabled on Monday 2nd
+December.</p>
+<p>The <code>account_threepid_delegates</code> dictionary defines whether the
+homeserver should delegate an external server (typically an <a href="https://matrix.org/docs/spec/identity_service/r0.2.1">identity
+server</a>) to handle
+sending confirmation messages via email and SMS.</p>
+<p>So to delegate email verification, in <code>homeserver.yaml</code>, set
+<code>account_threepid_delegates.email</code> to the base URL of an identity
+server. For example:</p>
+<pre><code class="language-yaml">account_threepid_delegates:
+    email: https://example.com     # Delegate email sending to example.com
+</code></pre>
+<p>Note that <code>account_threepid_delegates.email</code> replaces the deprecated
+<code>email.trust_identity_server_for_password_resets</code>: if
+<code>email.trust_identity_server_for_password_resets</code> is set to <code>true</code>, and
+<code>account_threepid_delegates.email</code> is not set, then the first entry in
+<code>trusted_third_party_id_servers</code> will be used as the
+<code>account_threepid_delegate</code> for email. This is to ensure compatibility
+with existing Synapse installs that set up external server handling for
+these tasks before v1.4.0. If
+<code>email.trust_identity_server_for_password_resets</code> is <code>true</code> and no
+trusted identity server domains are configured, Synapse will report an
+error and refuse to start.</p>
+<p>If <code>email.trust_identity_server_for_password_resets</code> is <code>false</code> or
+absent and no <code>email</code> delegate is configured in
+<code>account_threepid_delegates</code>, then Synapse will send email verification
+messages itself, using the configured SMTP server (see above). that
+type.</p>
+<h3 id="phone-numbers"><a class="header" href="#phone-numbers">Phone numbers</a></h3>
+<p>Synapse does not support phone-number verification itself, so the only
+way to maintain the ability for users to add phone numbers to their
+accounts will be by continuing to delegate phone number verification to
+the <code>matrix.org</code> and <code>vector.im</code> identity servers (or another identity
+server that supports SMS sending).</p>
+<p>The <code>account_threepid_delegates</code> dictionary defines whether the
+homeserver should delegate an external server (typically an <a href="https://matrix.org/docs/spec/identity_service/r0.2.1">identity
+server</a>) to handle
+sending confirmation messages via email and SMS.</p>
+<p>So to delegate phone number verification, in <code>homeserver.yaml</code>, set
+<code>account_threepid_delegates.msisdn</code> to the base URL of an identity
+server. For example:</p>
+<pre><code class="language-yaml">account_threepid_delegates:
+    msisdn: https://example.com     # Delegate sms sending to example.com
+</code></pre>
+<p>The <code>matrix.org</code> and <code>vector.im</code> identity servers will continue to
+support delegated phone number verification via SMS until such time as
+it is possible for admins to configure their servers to perform phone
+number verification directly. More details will follow in a future
+release.</p>
+<h2 id="rolling-back-to-v131"><a class="header" href="#rolling-back-to-v131">Rolling back to v1.3.1</a></h2>
+<p>If you encounter problems with v1.4.0, it should be possible to roll
+back to v1.3.1, subject to the following:</p>
+<ul>
+<li>
+<p>The 'room statistics' engine was heavily reworked in this release
+(see <a href="https://github.com/matrix-org/synapse/pull/5971">#5971</a>),
+including significant changes to the database schema, which are not
+easily reverted. This will cause the room statistics engine to stop
+updating when you downgrade.</p>
+<p>The room statistics are essentially unused in v1.3.1 (in future
+versions of Synapse, they will be used to populate the room
+directory), so there should be no loss of functionality. However,
+the statistics engine will write errors to the logs, which can be
+avoided by setting the following in <code>homeserver.yaml</code>:</p>
+<pre><code class="language-yaml">stats:
+  enabled: false
+</code></pre>
+<p>Don't forget to re-enable it when you upgrade again, in preparation
+for its use in the room directory!</p>
+</li>
+</ul>
+<h1 id="upgrading-to-v120"><a class="header" href="#upgrading-to-v120">Upgrading to v1.2.0</a></h1>
+<p>Some counter metrics have been renamed, with the old names deprecated.
+See <a href="metrics-howto.html#renaming-of-metrics--deprecation-of-old-names-in-12">the metrics
+documentation</a>
+for details.</p>
+<h1 id="upgrading-to-v110"><a class="header" href="#upgrading-to-v110">Upgrading to v1.1.0</a></h1>
+<p>Synapse v1.1.0 removes support for older Python and PostgreSQL versions,
+as outlined in <a href="https://matrix.org/blog/2019/04/08/synapse-deprecating-postgres-9-4-and-python-2-x">our deprecation
+notice</a>.</p>
+<h2 id="minimum-python-version"><a class="header" href="#minimum-python-version">Minimum Python Version</a></h2>
+<p>Synapse v1.1.0 has a minimum Python requirement of Python 3.5. Python
+3.6 or Python 3.7 are recommended as they have improved internal string
+handling, significantly reducing memory usage.</p>
+<p>If you use current versions of the Matrix.org-distributed Debian
+packages or Docker images, action is not required.</p>
+<p>If you install Synapse in a Python virtual environment, please see
+&quot;Upgrading to v0.34.0&quot; for notes on setting up a new virtualenv under
+Python 3.</p>
+<h2 id="minimum-postgresql-version"><a class="header" href="#minimum-postgresql-version">Minimum PostgreSQL Version</a></h2>
+<p>If using PostgreSQL under Synapse, you will need to use PostgreSQL 9.5
+or above. Please see the <a href="https://www.postgresql.org/docs/11/upgrading.html">PostgreSQL
+documentation</a> for
+more details on upgrading your database.</p>
+<h1 id="upgrading-to-v10"><a class="header" href="#upgrading-to-v10">Upgrading to v1.0</a></h1>
+<h2 id="validation-of-tls-certificates"><a class="header" href="#validation-of-tls-certificates">Validation of TLS certificates</a></h2>
+<p>Synapse v1.0 is the first release to enforce validation of TLS
+certificates for the federation API. It is therefore essential that your
+certificates are correctly configured. See the
+<a href="MSC1711_certificates_FAQ.html">FAQ</a> for more information.</p>
+<p>Note, v1.0 installations will also no longer be able to federate with
+servers that have not correctly configured their certificates.</p>
+<p>In rare cases, it may be desirable to disable certificate checking: for
+example, it might be essential to be able to federate with a given
+legacy server in a closed federation. This can be done in one of two
+ways:-</p>
+<ul>
+<li>Configure the global switch <code>federation_verify_certificates</code> to
+<code>false</code>.</li>
+<li>Configure a whitelist of server domains to trust via
+<code>federation_certificate_verification_whitelist</code>.</li>
+</ul>
+<p>See the <a href="usage/configuration/homeserver_sample_config.html">sample configuration file</a>
+for more details on these settings.</p>
+<h2 id="email-1"><a class="header" href="#email-1">Email</a></h2>
+<p>When a user requests a password reset, Synapse will send an email to the
+user to confirm the request.</p>
+<p>Previous versions of Synapse delegated the job of sending this email to
+an identity server. If the identity server was somehow malicious or
+became compromised, it would be theoretically possible to hijack an
+account through this means.</p>
+<p>Therefore, by default, Synapse v1.0 will send the confirmation email
+itself. If Synapse is not configured with an SMTP server, password reset
+via email will be disabled.</p>
+<p>To configure an SMTP server for Synapse, modify the configuration
+section headed <code>email</code>, and be sure to have at least the <code>smtp_host</code>,
+<code>smtp_port</code> and <code>notif_from</code> fields filled out. You may also need to set
+<code>smtp_user</code>, <code>smtp_pass</code>, and <code>require_transport_security</code>.</p>
+<p>If you are absolutely certain that you wish to continue using an
+identity server for password resets, set
+<code>trust_identity_server_for_password_resets</code> to <code>true</code>.</p>
+<p>See the <a href="usage/configuration/homeserver_sample_config.html">sample configuration file</a>
+for more details on these settings.</p>
+<h2 id="new-email-templates"><a class="header" href="#new-email-templates">New email templates</a></h2>
+<p>Some new templates have been added to the default template directory for the purpose of
+the homeserver sending its own password reset emails. If you have configured a
+custom <code>template_dir</code> in your Synapse config, these files will need to be added.</p>
+<p><code>password_reset.html</code> and <code>password_reset.txt</code> are HTML and plain text
+templates respectively that contain the contents of what will be emailed
+to the user upon attempting to reset their password via email.
+<code>password_reset_success.html</code> and <code>password_reset_failure.html</code> are HTML
+files that the content of which (assuming no redirect URL is set) will
+be shown to the user after they attempt to click the link in the email
+sent to them.</p>
+<h1 id="upgrading-to-v0990"><a class="header" href="#upgrading-to-v0990">Upgrading to v0.99.0</a></h1>
+<p>Please be aware that, before Synapse v1.0 is released around March 2019,
+you will need to replace any self-signed certificates with those
+verified by a root CA. Information on how to do so can be found at the
+ACME docs.</p>
+<p>For more information on configuring TLS certificates see the
+<a href="MSC1711_certificates_FAQ.html">FAQ</a>.</p>
+<h1 id="upgrading-to-v0340"><a class="header" href="#upgrading-to-v0340">Upgrading to v0.34.0</a></h1>
+<ol>
+<li>
+<p>This release is the first to fully support Python 3. Synapse will
+now run on Python versions 3.5, or 3.6 (as well as 2.7). We
+recommend switching to Python 3, as it has been shown to give
+performance improvements.</p>
+<p>For users who have installed Synapse into a virtualenv, we recommend
+doing this by creating a new virtualenv. For example:</p>
+<pre><code class="language-sh">virtualenv -p python3 ~/synapse/env3
+source ~/synapse/env3/bin/activate
+pip install matrix-synapse
+</code></pre>
+<p>You can then start synapse as normal, having activated the new
+virtualenv:</p>
+<pre><code class="language-sh">cd ~/synapse
+source env3/bin/activate
+synctl start
+</code></pre>
+<p>Users who have installed from distribution packages should see the
+relevant package documentation. See below for notes on Debian
+packages.</p>
+<ul>
+<li>
+<p>When upgrading to Python 3, you <strong>must</strong> make sure that your log
+files are configured as UTF-8, by adding <code>encoding: utf8</code> to the
+<code>RotatingFileHandler</code> configuration (if you have one) in your
+<code>&lt;server&gt;.log.config</code> file. For example, if your <code>log.config</code>
+file contains:</p>
+<pre><code class="language-yaml">handlers:
+  file:
+    class: logging.handlers.RotatingFileHandler
+    formatter: precise
+    filename: homeserver.log
+    maxBytes: 104857600
+    backupCount: 10
+    filters: [context]
+  console:
+    class: logging.StreamHandler
+    formatter: precise
+    filters: [context]
+</code></pre>
+<p>Then you should update this to be:</p>
+<pre><code class="language-yaml">handlers:
+  file:
+    class: logging.handlers.RotatingFileHandler
+    formatter: precise
+    filename: homeserver.log
+    maxBytes: 104857600
+    backupCount: 10
+    filters: [context]
+    encoding: utf8
+  console:
+    class: logging.StreamHandler
+    formatter: precise
+    filters: [context]
+</code></pre>
+<p>There is no need to revert this change if downgrading to
+Python 2.</p>
+</li>
+</ul>
+<p>We are also making available Debian packages which will run Synapse
+on Python 3. You can switch to these packages with
+<code>apt-get install matrix-synapse-py3</code>, however, please read
+<a href="https://github.com/matrix-org/synapse/blob/release-v0.34.0/debian/NEWS">debian/NEWS</a>
+before doing so. The existing <code>matrix-synapse</code> packages will
+continue to use Python 2 for the time being.</p>
+</li>
+<li>
+<p>This release removes the <code>riot.im</code> from the default list of trusted
+identity servers.</p>
+<p>If <code>riot.im</code> is in your homeserver's list of
+<code>trusted_third_party_id_servers</code>, you should remove it. It was added
+in case a hypothetical future identity server was put there. If you
+don't remove it, users may be unable to deactivate their accounts.</p>
+</li>
+<li>
+<p>This release no longer installs the (unmaintained) Matrix Console
+web client as part of the default installation. It is possible to
+re-enable it by installing it separately and setting the
+<code>web_client_location</code> config option, but please consider switching
+to another client.</p>
+</li>
+</ol>
+<h1 id="upgrading-to-v0337"><a class="header" href="#upgrading-to-v0337">Upgrading to v0.33.7</a></h1>
+<p>This release removes the example email notification templates from
+<code>res/templates</code> (they are now internal to the python package). This
+should only affect you if you (a) deploy your Synapse instance from a
+git checkout or a github snapshot URL, and (b) have email notifications
+enabled.</p>
+<p>If you have email notifications enabled, you should ensure that
+<code>email.template_dir</code> is either configured to point at a directory where
+you have installed customised templates, or leave it unset to use the
+default templates.</p>
+<h1 id="upgrading-to-v0273"><a class="header" href="#upgrading-to-v0273">Upgrading to v0.27.3</a></h1>
+<p>This release expands the anonymous usage stats sent if the opt-in
+<code>report_stats</code> configuration is set to <code>true</code>. We now capture RSS memory
+and cpu use at a very coarse level. This requires administrators to
+install the optional <code>psutil</code> python module.</p>
+<p>We would appreciate it if you could assist by ensuring this module is
+available and <code>report_stats</code> is enabled. This will let us see if
+performance changes to synapse are having an impact to the general
+community.</p>
+<h1 id="upgrading-to-v0150"><a class="header" href="#upgrading-to-v0150">Upgrading to v0.15.0</a></h1>
+<p>If you want to use the new URL previewing API
+(<code>/_matrix/media/r0/preview_url</code>) then you have to explicitly enable it
+in the config and update your dependencies dependencies. See README.rst
+for details.</p>
+<h1 id="upgrading-to-v0110"><a class="header" href="#upgrading-to-v0110">Upgrading to v0.11.0</a></h1>
+<p>This release includes the option to send anonymous usage stats to
+matrix.org, and requires that administrators explictly opt in or out by
+setting the <code>report_stats</code> option to either <code>true</code> or <code>false</code>.</p>
+<p>We would really appreciate it if you could help our project out by
+reporting anonymized usage statistics from your homeserver. Only very
+basic aggregate data (e.g. number of users) will be reported, but it
+helps us to track the growth of the Matrix community, and helps us to
+make Matrix a success, as well as to convince other networks that they
+should peer with us.</p>
+<h1 id="upgrading-to-v090"><a class="header" href="#upgrading-to-v090">Upgrading to v0.9.0</a></h1>
+<p>Application services have had a breaking API change in this version.</p>
+<p>They can no longer register themselves with a home server using the AS
+HTTP API. This decision was made because a compromised application
+service with free reign to register any regex in effect grants full
+read/write access to the home server if a regex of <code>.*</code> is used. An
+attack where a compromised AS re-registers itself with <code>.*</code> was deemed
+too big of a security risk to ignore, and so the ability to register
+with the HS remotely has been removed.</p>
+<p>It has been replaced by specifying a list of application service
+registrations in <code>homeserver.yaml</code>:</p>
+<pre><code class="language-yaml">app_service_config_files: [&quot;registration-01.yaml&quot;, &quot;registration-02.yaml&quot;]
+</code></pre>
+<p>Where <code>registration-01.yaml</code> looks like:</p>
+<pre><code class="language-yaml">url: &lt;String&gt;  # e.g. &quot;https://my.application.service.com&quot;
+as_token: &lt;String&gt;
+hs_token: &lt;String&gt;
+sender_localpart: &lt;String&gt;  # This is a new field which denotes the user_id localpart when using the AS token
+namespaces:
+  users:
+    - exclusive: &lt;Boolean&gt;
+      regex: &lt;String&gt;  # e.g. &quot;@prefix_.*&quot;
+  aliases:
+    - exclusive: &lt;Boolean&gt;
+      regex: &lt;String&gt;
+  rooms:
+    - exclusive: &lt;Boolean&gt;
+      regex: &lt;String&gt;
+</code></pre>
+<h1 id="upgrading-to-v080"><a class="header" href="#upgrading-to-v080">Upgrading to v0.8.0</a></h1>
+<p>Servers which use captchas will need to add their public key to:</p>
+<pre><code>static/client/register/register_config.js
+
+  window.matrixRegistrationConfig = {
+      recaptcha_public_key: &quot;YOUR_PUBLIC_KEY&quot;
+  };
+</code></pre>
+<p>This is required in order to support registration fallback (typically
+used on mobile devices).</p>
+<h1 id="upgrading-to-v070"><a class="header" href="#upgrading-to-v070">Upgrading to v0.7.0</a></h1>
+<p>New dependencies are:</p>
+<ul>
+<li>pydenticon</li>
+<li>simplejson</li>
+<li>syutil</li>
+<li>matrix-angular-sdk</li>
+</ul>
+<p>To pull in these dependencies in a virtual env, run:</p>
+<pre><code>python synapse/python_dependencies.py | xargs -n 1 pip install
+</code></pre>
+<h1 id="upgrading-to-v060"><a class="header" href="#upgrading-to-v060">Upgrading to v0.6.0</a></h1>
+<p>To pull in new dependencies, run:</p>
+<pre><code>python setup.py develop --user
+</code></pre>
+<p>This update includes a change to the database schema. To upgrade you
+first need to upgrade the database by running:</p>
+<pre><code>python scripts/upgrade_db_to_v0.6.0.py &lt;db&gt; &lt;server_name&gt; &lt;signing_key&gt;
+</code></pre>
+<p>Where <code>&lt;db&gt;</code> is the location of the database,
+<code>&lt;server_name&gt;</code> is the server name as specified in the
+synapse configuration, and <code>&lt;signing_key&gt;</code> is the location
+of the signing key as specified in the synapse configuration.</p>
+<p>This may take some time to complete. Failures of signatures and content
+hashes can safely be ignored.</p>
+<h1 id="upgrading-to-v051"><a class="header" href="#upgrading-to-v051">Upgrading to v0.5.1</a></h1>
+<p>Depending on precisely when you installed v0.5.0 you may have ended up
+with a stale release of the reference matrix webclient installed as a
+python module. To uninstall it and ensure you are depending on the
+latest module, please run:</p>
+<pre><code>$ pip uninstall syweb
+</code></pre>
+<h1 id="upgrading-to-v050"><a class="header" href="#upgrading-to-v050">Upgrading to v0.5.0</a></h1>
+<p>The webclient has been split out into a seperate repository/pacakage in
+this release. Before you restart your homeserver you will need to pull
+in the webclient package by running:</p>
+<pre><code>python setup.py develop --user
+</code></pre>
+<p>This release completely changes the database schema and so requires
+upgrading it before starting the new version of the homeserver.</p>
+<p>The script &quot;database-prepare-for-0.5.0.sh&quot; should be used to upgrade
+the database. This will save all user information, such as logins and
+profiles, but will otherwise purge the database. This includes messages,
+which rooms the home server was a member of and room alias mappings.</p>
+<p>If you would like to keep your history, please take a copy of your
+database file and ask for help in #matrix:matrix.org. The upgrade
+process is, unfortunately, non trivial and requires human intervention
+to resolve any resulting conflicts during the upgrade process.</p>
+<p>Before running the command the homeserver should be first completely
+shutdown. To run it, simply specify the location of the database, e.g.:</p>
+<blockquote>
+<p>./scripts/database-prepare-for-0.5.0.sh &quot;homeserver.db&quot;</p>
+</blockquote>
+<p>Once this has successfully completed it will be safe to restart the
+homeserver. You may notice that the homeserver takes a few seconds
+longer to restart than usual as it reinitializes the database.</p>
+<p>On startup of the new version, users can either rejoin remote rooms
+using room aliases or by being reinvited. Alternatively, if any other
+homeserver sends a message to a room that the homeserver was previously
+in the local HS will automatically rejoin the room.</p>
+<h1 id="upgrading-to-v040"><a class="header" href="#upgrading-to-v040">Upgrading to v0.4.0</a></h1>
+<p>This release needs an updated syutil version. Run:</p>
+<pre><code>python setup.py develop
+</code></pre>
+<p>You will also need to upgrade your configuration as the signing key
+format has changed. Run:</p>
+<pre><code>python -m synapse.app.homeserver --config-path &lt;CONFIG&gt; --generate-config
+</code></pre>
+<h1 id="upgrading-to-v030"><a class="header" href="#upgrading-to-v030">Upgrading to v0.3.0</a></h1>
+<p>This registration API now closely matches the login API. This introduces
+a bit more backwards and forwards between the HS and the client, but
+this improves the overall flexibility of the API. You can now GET on
+/register to retrieve a list of valid registration flows. Upon choosing
+one, they are submitted in the same way as login, e.g:</p>
+<pre><code>{
+  type: m.login.password,
+  user: foo,
+  password: bar
+}
+</code></pre>
+<p>The default HS supports 2 flows, with and without Identity Server email
+authentication. Enabling captcha on the HS will add in an extra step to
+all flows: <code>m.login.recaptcha</code> which must be completed before you can
+transition to the next stage. There is a new login type:
+<code>m.login.email.identity</code> which contains the <code>threepidCreds</code> key which
+were previously sent in the original register request. For more
+information on this, see the specification.</p>
+<h2 id="web-client"><a class="header" href="#web-client">Web Client</a></h2>
+<p>The VoIP specification has changed between v0.2.0 and v0.3.0. Users
+should refresh any browser tabs to get the latest web client code. Users
+on v0.2.0 of the web client will not be able to call those on v0.3.0 and
+vice versa.</p>
+<h1 id="upgrading-to-v020"><a class="header" href="#upgrading-to-v020">Upgrading to v0.2.0</a></h1>
+<p>The home server now requires setting up of SSL config before it can run.
+To automatically generate default config use:</p>
+<pre><code>$ python synapse/app/homeserver.py \
+    --server-name machine.my.domain.name \
+    --bind-port 8448 \
+    --config-path homeserver.config \
+    --generate-config
+</code></pre>
+<p>This config can be edited if desired, for example to specify a different
+SSL certificate to use. Once done you can run the home server using:</p>
+<pre><code>$ python synapse/app/homeserver.py --config-path homeserver.config
+</code></pre>
+<p>See the README.rst for more information.</p>
+<p>Also note that some config options have been renamed, including:</p>
+<ul>
+<li>&quot;host&quot; to &quot;server-name&quot;</li>
+<li>&quot;database&quot; to &quot;database-path&quot;</li>
+<li>&quot;port&quot; to &quot;bind-port&quot; and &quot;unsecure-port&quot;</li>
+</ul>
+<h1 id="upgrading-to-v001"><a class="header" href="#upgrading-to-v001">Upgrading to v0.0.1</a></h1>
+<p>This release completely changes the database schema and so requires
+upgrading it before starting the new version of the homeserver.</p>
+<p>The script &quot;database-prepare-for-0.0.1.sh&quot; should be used to upgrade
+the database. This will save all user information, such as logins and
+profiles, but will otherwise purge the database. This includes messages,
+which rooms the home server was a member of and room alias mappings.</p>
+<p>Before running the command the homeserver should be first completely
+shutdown. To run it, simply specify the location of the database, e.g.:</p>
+<blockquote>
+<p>./scripts/database-prepare-for-0.0.1.sh &quot;homeserver.db&quot;</p>
+</blockquote>
+<p>Once this has successfully completed it will be safe to restart the
+homeserver. You may notice that the homeserver takes a few seconds
+longer to restart than usual as it reinitializes the database.</p>
+<p>On startup of the new version, users can either rejoin remote rooms
+using room aliases or by being reinvited. Alternatively, if any other
+homeserver sends a message to a room that the homeserver was previously
+in the local HS will automatically rejoin the room.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+                            <a rel="prev" href="delegate.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+
+                        
+                            <a rel="next" href="MSC1711_certificates_FAQ.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                    <a rel="prev" href="delegate.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+
+                
+                    <a rel="next" href="MSC1711_certificates_FAQ.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                
+            </nav>
+
+        </div>
+
+        
+
+        
+
+        
+
+        
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+
+        
+
+        
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+        <script type="text/javascript" src="docs/website_files/table-of-contents.js"></script>
+        
+
+        
+
+    </body>
+</html>
