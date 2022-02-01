@@ -298,7 +298,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             historical: Indicates whether the message is being inserted
                 back in time around some existing events. This is used to skip
                 a few checks and mark the event as backfilled.
-            origin_server_ts:
+            origin_server_ts: The origin_server_ts to use if a new event is created. Uses
+                the current timestamp if set to None.
 
         Returns:
             Tuple of event ID and stream ordering position
@@ -557,7 +558,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 The event ids to use as the auth_events for the new event.
                 Should normally be left as None, which will cause them to be calculated
                 based on the room state at the prev_events.
-            origin_server_ts:
+            origin_server_ts: The origin_server_ts to use if a new event is created. Uses
+                the current timestamp if set to None.
 
         Returns:
             A tuple of the new event ID and stream ID.
