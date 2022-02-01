@@ -14,9 +14,13 @@
 
 from http import HTTPStatus
 
+from twisted.test.proto_helpers import MemoryReactor
+
 import synapse.rest.admin
 from synapse.api.errors import Codes, SynapseError
 from synapse.rest.client import login
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -28,11 +32,11 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
     ]
     url = "/_synapse/admin/v1/username_available"
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
-        async def check_username(username):
+        async def check_username(username: str) -> bool:
             if username == "allowed":
                 return True
             raise SynapseError(
@@ -44,24 +48,24 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
         handler = self.hs.get_registration_handler()
         handler.check_username = check_username
 
-    def test_username_available(self):
+    def test_username_available(self) -> None:
         """
         The endpoint should return a HTTPStatus.OK response if the username does not exist
         """
 
         url = "%s?username=%s" % (self.url, "allowed")
-        channel = self.make_request("GET", url, None, self.admin_user_tok)
+        channel = self.make_request("GET", url, access_token=self.admin_user_tok)
 
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertTrue(channel.json_body["available"])
 
-    def test_username_unavailable(self):
+    def test_username_unavailable(self) -> None:
         """
         The endpoint should return a HTTPStatus.OK response if the username does not exist
         """
 
         url = "%s?username=%s" % (self.url, "disallowed")
-        channel = self.make_request("GET", url, None, self.admin_user_tok)
+        channel = self.make_request("GET", url, access_token=self.admin_user_tok)
 
         self.assertEqual(
             HTTPStatus.BAD_REQUEST,

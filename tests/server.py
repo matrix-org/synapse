@@ -313,7 +313,7 @@ def make_request(
     req = request(channel, site)
     req.content = BytesIO(content)
     # Twisted expects to be at the end of the content when parsing the request.
-    req.content.seek(SEEK_END)
+    req.content.seek(0, SEEK_END)
 
     if access_token:
         req.requestHeaders.addRawHeader(

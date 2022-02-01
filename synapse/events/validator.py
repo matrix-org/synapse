@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import collections.abc
-from typing import Iterable, Union
+from typing import Iterable, Type, Union
 
 import jsonschema
 
@@ -246,7 +246,7 @@ POWER_LEVELS_SCHEMA = {
 
 # This could return something newer than Draft 7, but that's the current "latest"
 # validator.
-def _create_power_level_validator() -> jsonschema.Draft7Validator:
+def _create_power_level_validator() -> Type[jsonschema.Draft7Validator]:
     validator = jsonschema.validators.validator_for(POWER_LEVELS_SCHEMA)
 
     # by default jsonschema does not consider a frozendict to be an object so
