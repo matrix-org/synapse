@@ -97,7 +97,7 @@ class NastyConnectionWrapper:
         self._synapse_parent_context = None
 
     def commit(self, *args, **kwargs):
-        with LoggingContext("db_commit", parent_context = self._synapse_parent_context):
+        with LoggingContext("db_commit", parent_context=self._synapse_parent_context):
             with opentracing.start_active_span("db.conn.commit"):
                 self._connection.commit(*args, **kwargs)
 
@@ -120,9 +120,7 @@ def make_pool(
         # etc.
         with LoggingContext("db.on_new_connection"):
             engine.on_new_connection(
-                LoggingDatabaseConnection(
-                    conn, engine, "on_new_connection"
-                )
+                LoggingDatabaseConnection(conn, engine, "on_new_connection")
             )
 
     # HACK Patch the connection's commit function so that we can see
