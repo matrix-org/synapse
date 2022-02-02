@@ -156,7 +156,8 @@ class SearchHandler:
 
             # Include context around each event?
             event_context = room_cat.get("event_context", None)
-            before_limit = after_limit = include_profile = None
+            before_limit = after_limit = None
+            include_profile = False
 
             # Group results together? May allow clients to paginate within a
             # group
@@ -215,7 +216,7 @@ class SearchHandler:
         event_context: Optional[bool],
         before_limit: Optional[int],
         after_limit: Optional[int],
-        include_profile: Optional[bool],
+        include_profile: bool,
     ) -> JsonDict:
         """Performs a full text search for a user.
 
@@ -330,72 +331,13 @@ class SearchHandler:
         # If client has asked for "context" for each event (i.e. some surrounding
         # events and state), fetch that
         if event_context is not None:
-            now_token = self.hs.get_event_sources().get_current_token()
-
             # Note that before and after limit must be set in this case.
             assert before_limit is not None
             assert after_limit is not None
 
-            contexts = {}
-            for event in allowed_events:
-                res = await self.store.get_events_around(
-                    event.room_id, event.event_id, before_limit, after_limit
-                )
-
-                logger.info(
-                    "Context for search returned %d and %d events",
-                    len(res.events_before),
-                    len(res.events_after),
-                )
-
-                events_before = await filter_events_for_client(
-                    self.storage, user.to_string(), res.events_before
-                )
-
-                events_after = await filter_events_for_client(
-                    self.storage, user.to_string(), res.events_after
-                )
-
-                context = {
-                    "events_before": events_before,
-                    "events_after": events_after,
-                    "start": await now_token.copy_and_replace(
-                        "room_key", res.start
-                    ).to_string(self.store),
-                    "end": await now_token.copy_and_replace(
-                        "room_key", res.end
-                    ).to_string(self.store),
-                }
-
-                if include_profile:
-                    senders = {
-                        ev.sender
-                        for ev in itertools.chain(events_before, [event], events_after)
-                    }
-
-                    if events_after:
-                        last_event_id = events_after[-1].event_id
-                    else:
-                        last_event_id = event.event_id
-
-                    state_filter = StateFilter.from_types(
-                        [(EventTypes.Member, sender) for sender in senders]
-                    )
-
-                    state = await self.state_store.get_state_for_event(
-                        last_event_id, state_filter
-                    )
-
-                    context["profile_info"] = {
-                        s.state_key: {
-                            "displayname": s.content.get("displayname", None),
-                            "avatar_url": s.content.get("avatar_url", None),
-                        }
-                        for s in state.values()
-                        if s.type == EventTypes.Member and s.state_key in senders
-                    }
-
-                contexts[event.event_id] = context
+            contexts = await self._calculate_event_contexts(
+                user, allowed_events, before_limit, after_limit, include_profile
+            )
         else:
             contexts = {}
 
@@ -688,3 +630,92 @@ class SearchHandler:
             highlights,
             global_next_batch,
         )
+
+    async def _calculate_event_contexts(
+        self,
+        user: UserID,
+        allowed_events: List[EventBase],
+        before_limit: int,
+        after_limit: int,
+        include_profile: bool,
+    ) -> Dict[str, JsonDict]:
+        """
+        Calculates the contextual events for any search results.
+
+        Args:
+            user: The user performing the search.
+            allowed_events: The search results.
+            before_limit:
+                The number of events before a result to include as context.
+            after_limit:
+                The number of events after a result to include as context.
+            include_profile: True if historical profile information should be
+                included in the event context.
+
+        Returns:
+            A map of event ID to contextual information.
+        """
+        now_token = self.hs.get_event_sources().get_current_token()
+
+        contexts = {}
+        for event in allowed_events:
+            res = await self.store.get_events_around(
+                event.room_id, event.event_id, before_limit, after_limit
+            )
+
+            logger.info(
+                "Context for search returned %d and %d events",
+                len(res.events_before),
+                len(res.events_after),
+            )
+
+            events_before = await filter_events_for_client(
+                self.storage, user.to_string(), res.events_before
+            )
+
+            events_after = await filter_events_for_client(
+                self.storage, user.to_string(), res.events_after
+            )
+
+            context = {
+                "events_before": events_before,
+                "events_after": events_after,
+                "start": await now_token.copy_and_replace(
+                    "room_key", res.start
+                ).to_string(self.store),
+                "end": await now_token.copy_and_replace("room_key", res.end).to_string(
+                    self.store
+                ),
+            }
+
+            if include_profile:
+                senders = {
+                    ev.sender
+                    for ev in itertools.chain(events_before, [event], events_after)
+                }
+
+                if events_after:
+                    last_event_id = events_after[-1].event_id
+                else:
+                    last_event_id = event.event_id
+
+                state_filter = StateFilter.from_types(
+                    [(EventTypes.Member, sender) for sender in senders]
+                )
+
+                state = await self.state_store.get_state_for_event(
+                    last_event_id, state_filter
+                )
+
+                context["profile_info"] = {
+                    s.state_key: {
+                        "displayname": s.content.get("displayname", None),
+                        "avatar_url": s.content.get("avatar_url", None),
+                    }
+                    for s in state.values()
+                    if s.type == EventTypes.Member and s.state_key in senders
+                }
+
+            contexts[event.event_id] = context
+
+        return contexts
