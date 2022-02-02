@@ -109,11 +109,11 @@ class FederationSendServlet(BaseFederationServerServlet):
             )
 
             if issue_8631_logger.isEnabledFor(logging.DEBUG):
-                DEVICE_UPDATE_EDUS = {"m.device_list_update", "m.signing_key_update"}
+                DEVICE_UPDATE_EDUS = ["m.device_list_update", "m.signing_key_update"]
                 device_list_updates = [
                     edu.content
                     for edu in transaction_data.get("edus", [])
-                    if edu.edu_type in DEVICE_UPDATE_EDUS
+                    if edu.get("edu_type") in DEVICE_UPDATE_EDUS
                 ]
                 if device_list_updates:
                     issue_8631_logger.debug(
