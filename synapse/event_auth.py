@@ -137,6 +137,22 @@ def check_auth_rules_for_event(
     Raises:
         AuthError if the checks fail
     """
+    # Before we get too far into event auth, validate that the event is even
+    # valid enough to be used
+    if event.type == EventTypes.PowerLevels:
+        # If applicable, validate that the known power levels are integers
+        if room_version_obj.msc3667_int_only_power_levels:
+            for k, v in event.content.items():
+                if k in ['events', 'notifications', 'users']:
+                    if type(v) is not dict:
+                        raise AuthError(403, "Not a valid object: %s" % (k,))
+                    for k2, v2 in v.items():
+                        if type(v2) is not int:
+                            raise AuthError(403, "Not a valid power level: %s" % (v2,))
+                else:
+                    if type(v) is not int:
+                        raise AuthError(403, "Not a valid power level: %s" % (v,))
+
     # We need to ensure that the auth events are actually for the same room, to
     # stop people from using powers they've been granted in other rooms for
     # example.

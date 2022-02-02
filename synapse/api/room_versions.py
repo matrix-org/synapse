@@ -81,6 +81,8 @@ class RoomVersion:
     msc2716_historical: bool
     # MSC2716: Adds support for redacting "insertion", "chunk", and "marker" events
     msc2716_redactions: bool
+    # MSC3667: Treat string format power levels as invalid, thus denied.
+    msc3667_int_only_power_levels: bool
 
 
 class RoomVersions:
@@ -99,6 +101,7 @@ class RoomVersions:
         msc2403_knocking=False,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3667_int_only_power_levels=False,
     )
     V2 = RoomVersion(
         "2",
@@ -115,6 +118,7 @@ class RoomVersions:
         msc2403_knocking=False,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3667_int_only_power_levels=False,
     )
     V3 = RoomVersion(
         "3",
@@ -131,6 +135,7 @@ class RoomVersions:
         msc2403_knocking=False,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3667_int_only_power_levels=False,
     )
     V4 = RoomVersion(
         "4",
@@ -147,6 +152,7 @@ class RoomVersions:
         msc2403_knocking=False,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3667_int_only_power_levels=False,
     )
     V5 = RoomVersion(
         "5",
@@ -163,6 +169,7 @@ class RoomVersions:
         msc2403_knocking=False,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3667_int_only_power_levels=False,
     )
     V6 = RoomVersion(
         "6",
@@ -179,6 +186,7 @@ class RoomVersions:
         msc2403_knocking=False,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3667_int_only_power_levels=False,
     )
     MSC2176 = RoomVersion(
         "org.matrix.msc2176",
@@ -195,6 +203,7 @@ class RoomVersions:
         msc2403_knocking=False,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3667_int_only_power_levels=False,
     )
     V7 = RoomVersion(
         "7",
@@ -211,6 +220,7 @@ class RoomVersions:
         msc2403_knocking=True,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3667_int_only_power_levels=False,
     )
     V8 = RoomVersion(
         "8",
@@ -227,6 +237,7 @@ class RoomVersions:
         msc2403_knocking=True,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3667_int_only_power_levels=False,
     )
     V9 = RoomVersion(
         "9",
@@ -243,6 +254,7 @@ class RoomVersions:
         msc2403_knocking=True,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3667_int_only_power_levels=False,
     )
     MSC2716v3 = RoomVersion(
         "org.matrix.msc2716v3",
@@ -259,6 +271,43 @@ class RoomVersions:
         msc2403_knocking=True,
         msc2716_historical=True,
         msc2716_redactions=True,
+        msc3667_int_only_power_levels=False,
+    )
+    MSC3667 = RoomVersion(
+        # v7 + MSC3667
+        "org.matrix.msc3667",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=False,
+        msc3083_join_rules=False,
+        msc3375_redaction_rules=False,
+        msc2403_knocking=True,
+        msc2716_historical=False,
+        msc2716_redactions=False,
+        msc3667_int_only_power_levels=True,
+    )
+    MSC3604opt2 = RoomVersion(
+        # v9 + MSC2176 + MSC3667
+        "org.matrix.msc3604.opt2",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=True,
+        msc3083_join_rules=True,
+        msc3375_redaction_rules=True,
+        msc2403_knocking=True,
+        msc2716_historical=False,
+        msc2716_redactions=False,
+        msc3667_int_only_power_levels=True,
     )
 
 
@@ -276,6 +325,8 @@ KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
         RoomVersions.V8,
         RoomVersions.V9,
         RoomVersions.MSC2716v3,
+        RoomVersions.MSC3667,
+        RoomVersions.MSC3604opt2,
     )
 }
 
