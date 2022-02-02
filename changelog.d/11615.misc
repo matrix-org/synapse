@@ -1,1 +1,1 @@
-Expose the registered device ID from the `register_appservice_user` test helper.
+Enhance user registration test helpers to make them more useful for tests involving Application Services and devices.
