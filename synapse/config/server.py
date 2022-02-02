@@ -656,19 +656,6 @@ class ServerConfig(Config):
             False,
         )
 
-        # List of users trialing the new experimental default push rules. This setting is
-        # not included in the sample configuration file on purpose as it's a temporary
-        # hack, so that some users can trial the new defaults without impacting every
-        # user on the homeserver.
-        users_new_default_push_rules: list = (
-            config.get("users_new_default_push_rules") or []
-        )
-        if not isinstance(users_new_default_push_rules, list):
-            raise ConfigError("'users_new_default_push_rules' must be a list")
-
-        # Turn the list into a set to improve lookup speed.
-        self.users_new_default_push_rules: set = set(users_new_default_push_rules)
-
         # Whitelist of domain names that given next_link parameters must have
         next_link_domain_whitelist: Optional[List[str]] = config.get(
             "next_link_domain_whitelist"
