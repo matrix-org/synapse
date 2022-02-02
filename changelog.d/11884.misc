@@ -1,1 +1,1 @@
-Remove experimental push rules.
+Remove expermental changes to the default push rules which were introduced in v1.19.0 but never enabled.
