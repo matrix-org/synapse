@@ -255,7 +255,8 @@ class RestHelper:
         if appservice_user_id:
             url_params["user_id"] = appservice_user_id
 
-        path += "?" + urlencode(url_params)
+        if url_params:
+            path += "?" + urlencode(url_params)
 
         data = {"membership": membership}
         data.update(extra_data or {})
