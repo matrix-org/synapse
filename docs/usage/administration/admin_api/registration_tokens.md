@@ -5,8 +5,7 @@ registration requests, as proposed in
 [MSC3231](https://github.com/matrix-org/matrix-doc/blob/main/proposals/3231-token-authenticated-registration.md).
 To use it, you will need to enable the `registration_requires_token` config
 option, and authenticate by providing an `access_token` for a server admin:
-see [Admin API](../../usage/administration/admin_api).
-Note that this API is still experimental; not all clients may support it yet.
+see [Admin API](../../usage/administration/admin_api). This API is part of the Matrix since v1.2.
 
 
 ## Registration token objects
