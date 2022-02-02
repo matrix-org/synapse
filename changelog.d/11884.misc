@@ -1,1 +1,1 @@
-Remove expermental changes to the default push rules which were introduced in v1.19.0 but never enabled.
+Remove experimental changes to the default push rules which were introduced in Synapse 1.19.0 but never enabled.
