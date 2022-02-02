@@ -1,0 +1,1 @@
+Drop support for `webclient` listeners, they are now ignored. The `web_client_location` configuration must point to a HTTP(S) URL, if configured.

@@ -179,7 +179,6 @@ KNOWN_RESOURCES = {
     "openid",
     "replication",
     "static",
-    "webclient",
 }
 
 
@@ -519,16 +518,12 @@ class ServerConfig(Config):
             self.listeners = l2
 
         self.web_client_location = config.get("web_client_location", None)
-        self.web_client_location_is_redirect = self.web_client_location and (
+        # Non-HTTP(S) web client location is not supported.
+        if self.web_client_location and not (
             self.web_client_location.startswith("http://")
             or self.web_client_location.startswith("https://")
-        )
-        # A non-HTTP(S) web client location is deprecated.
-        if self.web_client_location and not self.web_client_location_is_redirect:
-            logger.warning(NO_MORE_NONE_HTTP_WEB_CLIENT_LOCATION_WARNING)
-
-        # Warn if webclient is configured for a worker.
-        _warn_if_webclient_configured(self.listeners)
+        ):
+            raise ConfigError("web_client_location must point to a HTTP(S) URL.")
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
         self.gc_seconds = self.read_gc_intervals(config.get("gc_min_interval", None))
@@ -1351,40 +1346,21 @@ def parse_listener_def(listener: Any) -> ListenerConfig:
 
     http_config = None
     if listener_type == "http":
+        try:
+            resources = [
+                HttpResourceConfig(**res) for res in listener.get("resources", [])
+            ]
+        except ValueError as e:
+            raise ConfigError("Unknown listener resource") from e
+
         http_config = HttpListenerConfig(
             x_forwarded=listener.get("x_forwarded", False),
-            resources=[
-                HttpResourceConfig(**res) for res in listener.get("resources", [])
-            ],
+            resources=resources,
             additional_resources=listener.get("additional_resources", {}),
             tag=listener.get("tag"),
         )
 
     return ListenerConfig(port, bind_addresses, listener_type, tls, http_config)
-
-
-NO_MORE_NONE_HTTP_WEB_CLIENT_LOCATION_WARNING = """
-Synapse no longer supports serving a web client. To remove this warning,
-configure 'web_client_location' with an HTTP(S) URL.
-"""
-
-
-NO_MORE_WEB_CLIENT_WARNING = """
-Synapse no longer includes a web client. To redirect the root resource to a web client, configure
-'web_client_location'. To remove this warning, remove 'webclient' from the 'listeners'
-configuration.
-"""
-
-
-def _warn_if_webclient_configured(listeners: Iterable[ListenerConfig]) -> None:
-    for listener in listeners:
-        if not listener.http_options:
-            continue
-        for res in listener.http_options.resources:
-            for name in res.names:
-                if name == "webclient":
-                    logger.warning(NO_MORE_WEB_CLIENT_WARNING)
-                    return
 
 
 _MANHOLE_SETTINGS_SCHEMA = {
