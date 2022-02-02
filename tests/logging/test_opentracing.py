@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from twisted.internet import defer
-from twisted.internet.testing import MemoryReactorClock
+from twisted.test.proto_helpers import MemoryReactorClock
 
 from synapse.logging.context import (
     LoggingContext,
@@ -77,7 +77,7 @@ class LogContextScopeManagerTestCase(TestCase):
 
             # ... but leaving it unsets the active span, and finishes the span.
             self.assertIsNone(self._tracer.active_span)
-            self.assertTrue(span.finished)
+            self.assertIsNotNone(span.end_time)
 
         # the span should have been reported
         self.assertEqual(self._reporter.get_spans(), [span])
@@ -115,8 +115,8 @@ class LogContextScopeManagerTestCase(TestCase):
 
                 # the root scope should be restored
                 self.assertEqual(self._tracer.active_span, root_scope.span)
-                self.assertTrue(scope2.span.finished)
-                self.assertTrue(scope1.span.finished)
+                self.assertIsNotNone(scope2.span.end_time)
+                self.assertIsNotNone(scope1.span.end_time)
 
             self.assertIsNone(self._tracer.active_span)
 
