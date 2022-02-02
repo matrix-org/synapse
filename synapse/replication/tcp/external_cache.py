@@ -115,7 +115,7 @@ class ExternalCache:
 
         logger.debug("Got cache result %s %s: %r", cache_name, key, result)
 
-        get_counter.labels(cache_name, str(result is not None)).inc()
+        get_counter.labels(cache_name, result is not None).inc()
 
         if not result:
             return None
