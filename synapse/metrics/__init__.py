@@ -30,6 +30,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
 )
 
 import attr
@@ -60,12 +61,19 @@ all_gauges: "Dict[str, Union[LaterGauge, InFlightGauge]]" = {}
 HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 
 
-class RegistryProxy:
+class _RegistryProxy:
     @staticmethod
     def collect() -> Iterable[Metric]:
         for metric in REGISTRY.collect():
             if not metric.name.startswith("__"):
                 yield metric
+
+
+# A little bit nasty, but collect() above is static so a Protocol doesn't work.
+# _RegistryProxy matches the signature of a CollectorRegistry instance enough
+# for it to be usable in the contexts in which we use it.
+# TODO Do something nicer about this.
+RegistryProxy = cast(CollectorRegistry, _RegistryProxy)
 
 
 @attr.s(slots=True, hash=True, auto_attribs=True)
