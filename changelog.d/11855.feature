@@ -1,0 +1,1 @@
+Support [MSC3667](https://github.com/matrix-org/matrix-doc/pull/3667) in a new room version.
