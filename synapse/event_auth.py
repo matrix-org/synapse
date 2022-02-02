@@ -143,7 +143,7 @@ def check_auth_rules_for_event(
         # If applicable, validate that the known power levels are integers
         if room_version_obj.msc3667_int_only_power_levels:
             for k, v in event.content.items():
-                if k in ['events', 'notifications', 'users']:
+                if k in ["events", "notifications", "users"]:
                     if type(v) is not dict:
                         raise AuthError(403, "Not a valid object: %s" % (k,))
                     for k2, v2 in v.items():
