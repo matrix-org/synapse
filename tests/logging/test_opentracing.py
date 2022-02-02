@@ -24,12 +24,13 @@ from synapse.logging.opentracing import (
     start_active_span,
     start_active_span_follows_from,
 )
-from synapse.logging.scopecontextmanager import LogContextScopeManager
 from synapse.util import Clock
 
 try:
     import jaeger_client
     import opentracing
+
+    from synapse.logging.scopecontextmanager import LogContextScopeManager
 except ImportError:
     pass
 
@@ -40,7 +41,7 @@ class LogContextScopeManagerTestCase(TestCase):
     if opentracing is None:
         skip = "Requires opentracing"  # type: ignore[unreachable]
     if jaeger_client is None:
-        skip = "Requires opentracing"  # type: ignore[unreachable]
+        skip = "Requires jaeger_client"  # type: ignore[unreachable]
 
     def setUp(self) -> None:
         # since this is a unit test, we don't really want to mess around with the
