@@ -17,4 +17,4 @@
 -- We want to retroactively delete account data for users that were already
 -- deactivated.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (6520, 'delete_account_data_for_deactivated_users', '{}');
+  (6803, 'delete_account_data_for_deactivated_users', '{}');
