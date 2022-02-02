@@ -122,6 +122,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             rate_hz=hs.config.ratelimiting.rc_third_party_invite.per_second,
             burst_count=hs.config.ratelimiting.rc_third_party_invite.burst_count,
         )
+
         self.request_ratelimiter = hs.get_request_ratelimiter()
 
     @abc.abstractmethod
