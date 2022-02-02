@@ -1,0 +1,23 @@
+name: Hotfixes
+on:
+  pull_request:
+    branches:
+      - 'matrix-org-hotfixes'
+jobs:
+  check-changelog:
+    name: Check change is described
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - run: git fetch origin ${{ github.base_ref }}
+
+      - name: Check CHANGES_HOTFIX.md has changed
+        run: |
+          # --exit-code: returns 1 if there were differences, 0 otherwise
+          if git diff --exit-code origin/${{ github.base_ref }} HEAD -- CHANGES_HOTFIXES.md; then
+            echo PRs to the hotfixes branch must update CHANGES_HOTFIXES.md
+            exit 1
+          else
+            echo All good
+          fi
