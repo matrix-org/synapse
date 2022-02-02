@@ -458,18 +458,17 @@ class SearchHandler:
         # Holds result of grouping by sender, if applicable
         sender_group: Dict[str, JsonDict] = {}
 
-        highlights = set()
-
         search_result = await self.store.search_msgs(room_ids, search_term, keys)
 
-        count = search_result["count"]
-
         if search_result["highlights"]:
-            highlights.update(search_result["highlights"])
+            highlights = search_result["highlights"]
+        else:
+            highlights = set()
 
         results = search_result["results"]
 
-        rank_map.update({r["event"].event_id: r["rank"] for r in results})
+        # event_id -> rank of event
+        rank_map = {r["event"].event_id: r["rank"] for r in results}
 
         filtered_events = await search_filter.filter([r["event"] for r in results])
 
@@ -491,7 +490,14 @@ class SearchHandler:
             )
             s["results"].append(e.event_id)
 
-        return count, rank_map, allowed_events, room_groups, highlights, sender_group
+        return (
+            search_result["count"],
+            rank_map,
+            allowed_events,
+            room_groups,
+            highlights,
+            sender_group,
+        )
 
     async def _search_by_recent(
         self,
@@ -535,7 +541,6 @@ class SearchHandler:
                 Optionally, a pagination token.
         """
         rank_map = {}  # event_id -> rank of event
-        allowed_events: List[EventBase] = []
         # Holds result of grouping by room, if applicable
         room_groups: Dict[str, JsonDict] = {}
 
@@ -617,12 +622,10 @@ class SearchHandler:
                     )
                 )
 
-        allowed_events.extend(room_events)
-
         return (
             count,
             rank_map,
-            allowed_events,
+            room_events,
             room_groups,
             highlights,
             global_next_batch,
