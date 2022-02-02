@@ -272,7 +272,6 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         self._rerun_retroactive_account_data_deletion_update()
 
         # Check that the account data was cleared.
-        self._store.get_global_account_data_by_type_for_user.invalidate_all()
         self.assertIsNone(
             self.get_success(
                 self._store.get_global_account_data_by_type_for_user(
@@ -316,7 +315,6 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         self._rerun_retroactive_account_data_deletion_update()
 
         # Check that the account data was NOT cleared.
-        self._store.get_global_account_data_by_type_for_user.invalidate_all()
         self.assertIsNotNone(
             self.get_success(
                 self._store.get_global_account_data_by_type_for_user(
