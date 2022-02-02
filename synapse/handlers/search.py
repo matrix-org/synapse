@@ -343,6 +343,15 @@ class SearchHandler:
 
         # TODO: Add a limit
 
+        state_results = {}
+        if include_state:
+            for room_id in {e.room_id for e in allowed_events}:
+                state = await self.state_handler.get_current_state(room_id)
+                state_results[room_id] = list(state.values())
+
+        # We're now about to serialize the events. We should not make any
+        # blocking calls after this. Otherwise the 'age' will be wrong
+
         time_now = self.clock.time_msec()
 
         aggregations = None
@@ -369,15 +378,6 @@ class SearchHandler:
             context["events_after"] = self._event_serializer.serialize_events(
                 context["events_after"], time_now, bundle_aggregations=aggregations  # type: ignore[arg-type]
             )
-
-        state_results = {}
-        if include_state:
-            for room_id in {e.room_id for e in allowed_events}:
-                state = await self.state_handler.get_current_state(room_id)
-                state_results[room_id] = list(state.values())
-
-        # We're now about to serialize the events. We should not make any
-        # blocking calls after this. Otherwise the 'age' will be wrong
 
         results = [
             {
