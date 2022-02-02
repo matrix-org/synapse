@@ -41,11 +41,11 @@
 # documentation on how to configure or create custom modules for Synapse.
 #
 modules:
-    # - module: my_super_module.MySuperClass
-    #   config:
-    #       do_thing: true
-    # - module: my_other_super_module.SomeClass
-    #   config: {}
+  #- module: my_super_module.MySuperClass
+  #  config:
+  #    do_thing: true
+  #- module: my_other_super_module.SomeClass
+  #  config: {}
 
 
 ## Server ##
@@ -470,6 +470,20 @@ limit_remote_rooms:
 # Defaults to 'true'.
 #
 #allow_per_room_profiles: false
+
+# The largest allowed file size for a user avatar. Defaults to no restriction.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's media repository.
+#
+#max_avatar_size: 10M
+
+# The MIME types allowed for user avatars. Defaults to no restriction.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's media repository.
+#
+#allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
 
 # How long to keep redacted events in unredacted form in the database. After
 # this period redacted events get replaced with their redacted form in the DB.
@@ -1427,6 +1441,16 @@ account_threepid_delegates:
 # Defaults to true.
 #
 #auto_join_rooms_for_guests: false
+
+# Whether to inhibit errors raised when registering a new account if the user ID
+# already exists. If turned on, that requests to /register/available will always
+# show a user ID as available, and Synapse won't raise an error when starting
+# a registration with a user ID that already exists. However, Synapse will still
+# raise an error if the registration completes and the username conflicts.
+#
+# Defaults to false.
+#
+#inhibit_user_in_use_error: true
 
 
 ## Metrics ###

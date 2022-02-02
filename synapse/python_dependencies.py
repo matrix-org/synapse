@@ -76,7 +76,8 @@ REQUIREMENTS = [
     "msgpack>=0.5.2",
     "phonenumbers>=8.2.0",
     # we use GaugeHistogramMetric, which was added in prom-client 0.4.0.
-    "prometheus_client>=0.4.0",
+    # 0.13.0 has an incorrect type annotation, see #11832.
+    "prometheus_client>=0.4.0,<0.13.0",
     # we use `order`, which arrived in attrs 19.2.0.
     # Note: 21.1.0 broke `/sync`, see #9936
     "attrs>=19.2.0,!=21.1.0",

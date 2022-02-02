@@ -339,11 +339,18 @@ class UsernameAvailabilityRestServlet(RestServlet):
             ),
         )
 
+        self.inhibit_user_in_use_error = (
+            hs.config.registration.inhibit_user_in_use_error
+        )
+
     async def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
         if not self.hs.config.registration.enable_registration:
             raise SynapseError(
                 403, "Registration has been disabled", errcode=Codes.FORBIDDEN
             )
+
+        if self.inhibit_user_in_use_error:
+            return 200, {"available": True}
 
         ip = request.getClientIP()
         with self.ratelimiter.ratelimit(ip) as wait_deferred:
@@ -418,9 +425,13 @@ class RegisterRestServlet(RestServlet):
         self.ratelimiter = hs.get_registration_ratelimiter()
         self.password_policy_handler = hs.get_password_policy_handler()
         self.clock = hs.get_clock()
+        self.password_auth_provider = hs.get_password_auth_provider()
         self._registration_enabled = self.hs.config.registration.enable_registration
         self._refresh_tokens_enabled = (
             hs.config.registration.refreshable_access_token_lifetime is not None
+        )
+        self._inhibit_user_in_use_error = (
+            hs.config.registration.inhibit_user_in_use_error
         )
 
         self._registration_flows = _calculate_registration_flows(
@@ -564,6 +575,7 @@ class RegisterRestServlet(RestServlet):
                 desired_username,
                 guest_access_token=guest_access_token,
                 assigned_user_id=registered_user_id,
+                inhibit_user_in_use_error=self._inhibit_user_in_use_error,
             )
 
         # Check if the user-interactive authentication flows are complete, if
@@ -627,7 +639,16 @@ class RegisterRestServlet(RestServlet):
             if not password_hash:
                 raise SynapseError(400, "Missing params: password", Codes.MISSING_PARAM)
 
-            desired_username = params.get("username", None)
+            desired_username = await (
+                self.password_auth_provider.get_username_for_registration(
+                    auth_result,
+                    params,
+                )
+            )
+
+            if desired_username is None:
+                desired_username = params.get("username", None)
+
             guest_access_token = params.get("guest_access_token", None)
 
             if desired_username is not None:
