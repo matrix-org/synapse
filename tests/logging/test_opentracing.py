@@ -127,10 +127,7 @@ class LogContextScopeManagerTestCase(TestCase):
         )
 
     def test_overlapping_spans(self) -> None:
-        """Overlapping spans which are not neatly nested should work
-
-        ... provided they
-        """
+        """Overlapping spans which are not neatly nested should work"""
         reactor = MemoryReactorClock()
         clock = Clock(reactor)
 
