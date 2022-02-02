@@ -469,8 +469,6 @@ class SearchHandler:
 
         results = search_result["results"]
 
-        results_map = {r["event"].event_id: r for r in results}
-
         rank_map.update({r["event"].event_id: r["rank"] for r in results})
 
         filtered_events = await search_filter.filter([r["event"] for r in results])
@@ -585,7 +583,6 @@ class SearchHandler:
             room_events = room_events[: search_filter.limit]
 
             if len(results) < search_filter.limit * 2:
-                pagination_token = None
                 break
             else:
                 pagination_token = results[-1]["pagination_token"]
