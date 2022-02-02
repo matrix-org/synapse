@@ -315,10 +315,11 @@ class EventBase(metaclass=abc.ABCMeta):
     redacts: DefaultDictProperty[Optional[str]] = DefaultDictProperty("redacts", None)
     room_id: DictProperty[str] = DictProperty("room_id")
     sender: DictProperty[str] = DictProperty("sender")
-    # TODO state_key should be Optional[str], this is generally asserted in Synapse
-    # by calling is_state() first (which ensures this), but it is hard (not possible?)
+    # TODO state_key should be Optional[str]. This is generally asserted in Synapse
+    # by calling is_state() first (which ensures it is not None), but it is hard (not possible?)
     # to properly annotate that calling is_state() asserts that state_key exists
-    # and is non-None.
+    # and is non-None. It would be better to replace such direct references with
+    # get_state_key() (and a check for None).
     state_key: DictProperty[str] = DictProperty("state_key")
     type: DictProperty[str] = DictProperty("type")
     user_id: DictProperty[str] = DictProperty("sender")
@@ -332,7 +333,11 @@ class EventBase(metaclass=abc.ABCMeta):
         return self.content["membership"]
 
     def is_state(self) -> bool:
-        return hasattr(self, "state_key") and self.state_key is not None
+        return self.get_state_key() is not None
+
+    def get_state_key(self) -> Optional[str]:
+        """Get the state key of this event, or None if it's not a state event"""
+        return self._dict.get("state_key")
 
     def get_dict(self) -> JsonDict:
         d = dict(self._dict)

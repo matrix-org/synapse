@@ -41,7 +41,9 @@ from synapse.rest.admin.event_reports import (
     EventReportsRestServlet,
 )
 from synapse.rest.admin.federation import (
-    DestinationsRestServlet,
+    DestinationMembershipRestServlet,
+    DestinationResetConnectionRestServlet,
+    DestinationRestServlet,
     ListDestinationsRestServlet,
 )
 from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
@@ -69,6 +71,7 @@ from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
 from synapse.rest.admin.statistics import UserMediaStatisticsRestServlet
 from synapse.rest.admin.username_available import UsernameAvailableRestServlet
 from synapse.rest.admin.users import (
+    AccountDataRestServlet,
     AccountValidityRenewServlet,
     DeactivateAccountRestServlet,
     PushersRestServlet,
@@ -255,6 +258,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     UserMediaStatisticsRestServlet(hs).register(http_server)
     EventReportDetailRestServlet(hs).register(http_server)
     EventReportsRestServlet(hs).register(http_server)
+    AccountDataRestServlet(hs).register(http_server)
     PushersRestServlet(hs).register(http_server)
     MakeRoomAdminRestServlet(hs).register(http_server)
     ShadowBanRestServlet(hs).register(http_server)
@@ -265,7 +269,9 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ListRegistrationTokensRestServlet(hs).register(http_server)
     NewRegistrationTokenRestServlet(hs).register(http_server)
     RegistrationTokenRestServlet(hs).register(http_server)
-    DestinationsRestServlet(hs).register(http_server)
+    DestinationMembershipRestServlet(hs).register(http_server)
+    DestinationResetConnectionRestServlet(hs).register(http_server)
+    DestinationRestServlet(hs).register(http_server)
     ListDestinationsRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.

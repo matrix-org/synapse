@@ -13,11 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
 import logging
 from abc import abstractmethod
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
+
+import attr
 
 from synapse.api.constants import EventContentFields, EventTypes, JoinRules
 from synapse.api.errors import StoreError
@@ -43,9 +54,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-RatelimitOverride = collections.namedtuple(
-    "RatelimitOverride", ("messages_per_second", "burst_count")
-)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RatelimitOverride:
+    messages_per_second: int
+    burst_count: int
 
 
 class RoomSortOrder(Enum):
@@ -207,6 +219,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                         WHERE appservice_id = ? AND network_id = ?
                     """
                     query_args.append(network_tuple.appservice_id)
+                    assert network_tuple.network_id is not None
                     query_args.append(network_tuple.network_id)
                 else:
                     published_sql = """
@@ -284,7 +297,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         """
 
         where_clauses = []
-        query_args = []
+        query_args: List[Union[str, int]] = []
 
         if network_tuple:
             if network_tuple.appservice_id:
@@ -293,6 +306,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                     WHERE appservice_id = ? AND network_id = ?
                 """
                 query_args.append(network_tuple.appservice_id)
+                assert network_tuple.network_id is not None
                 query_args.append(network_tuple.network_id)
             else:
                 published_sql = """
@@ -537,24 +551,24 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             FROM room_stats_state state
             INNER JOIN room_stats_current curr USING (room_id)
             INNER JOIN rooms USING (room_id)
-            %s
-            ORDER BY %s %s
+            {where}
+            ORDER BY {order_by} {direction}, state.room_id {direction}
             LIMIT ?
             OFFSET ?
-        """ % (
-            where_statement,
-            order_by_column,
-            "ASC" if order_by_asc else "DESC",
+        """.format(
+            where=where_statement,
+            order_by=order_by_column,
+            direction="ASC" if order_by_asc else "DESC",
         )
 
         # Use a nested SELECT statement as SQL can't count(*) with an OFFSET
         count_sql = """
             SELECT count(*) FROM (
               SELECT room_id FROM room_stats_state state
-              %s
+              {where}
             ) AS get_room_ids
-        """ % (
-            where_statement,
+        """.format(
+            where=where_statement,
         )
 
         def _get_rooms_paginate_txn(

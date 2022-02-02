@@ -15,26 +15,26 @@
 import functools
 import logging
 import re
-from typing import Any, Awaitable, Callable, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, Tuple, cast
 
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.urls import FEDERATION_V1_PREFIX
 from synapse.http.server import HttpServer, ServletCallback
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
-from synapse.logging import opentracing
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
-    SynapseTags,
-    start_active_span,
-    start_active_span_from_request,
-    tags,
+    set_tag,
+    span_context_from_request,
+    start_active_span_follows_from,
     whitelisted_homeserver,
 )
-from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import parse_and_validate_server_name
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class NoAuthenticationError(AuthenticationError):
 
 
 class Authenticator:
-    def __init__(self, hs: HomeServer):
+    def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
         self.keyring = hs.get_keyring()
         self.server_name = hs.hostname
@@ -116,11 +116,11 @@ class Authenticator:
         # alive
         retry_timings = await self.store.get_destination_retry_timings(origin)
         if retry_timings and retry_timings.retry_last_ts:
-            run_in_background(self._reset_retry_timings, origin)
+            run_in_background(self.reset_retry_timings, origin)
 
         return origin
 
-    async def _reset_retry_timings(self, origin: str) -> None:
+    async def reset_retry_timings(self, origin: str) -> None:
         try:
             logger.info("Marking origin %r as up", origin)
             await self.store.set_destination_retry_timings(origin, None, 0, 0)
@@ -229,7 +229,7 @@ class BaseFederationServlet:
 
     def __init__(
         self,
-        hs: HomeServer,
+        hs: "HomeServer",
         authenticator: Authenticator,
         ratelimiter: FederationRateLimiter,
         server_name: str,
@@ -279,30 +279,19 @@ class BaseFederationServlet:
                 logger.warning("authenticate_request failed: %s", e)
                 raise
 
-            request_tags = {
-                SynapseTags.REQUEST_ID: request.get_request_id(),
-                tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
-                tags.HTTP_METHOD: request.get_method(),
-                tags.HTTP_URL: request.get_redacted_uri(),
-                tags.PEER_HOST_IPV6: request.getClientIP(),
-                "authenticated_entity": origin,
-                "servlet_name": request.request_metrics.name,
-            }
+            # update the active opentracing span with the authenticated entity
+            set_tag("authenticated_entity", origin)
 
-            # Only accept the span context if the origin is authenticated
-            # and whitelisted
+            # if the origin is authenticated and whitelisted, link to its span context
+            context = None
             if origin and whitelisted_homeserver(origin):
-                scope = start_active_span_from_request(
-                    request, "incoming-federation-request", tags=request_tags
-                )
-            else:
-                scope = start_active_span(
-                    "incoming-federation-request", tags=request_tags
-                )
+                context = span_context_from_request(request)
+
+            scope = start_active_span_follows_from(
+                "incoming-federation-request", contexts=(context,) if context else ()
+            )
 
             with scope:
-                opentracing.inject_response_headers(request.responseHeaders)
-
                 if origin and self.RATELIMIT:
                     with ratelimiter.ratelimit(origin) as d:
                         await d

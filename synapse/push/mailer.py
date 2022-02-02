@@ -178,7 +178,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
-            % {"server_name": self.hs.config.server.server_name},
+            % {"server_name": self.hs.config.server.server_name, "app": self.app_name},
             template_vars,
         )
 
@@ -209,7 +209,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
-            % {"server_name": self.hs.config.server.server_name},
+            % {"server_name": self.hs.config.server.server_name, "app": self.app_name},
             template_vars,
         )
 
@@ -232,15 +232,13 @@ class Mailer:
             reason: The notification that was ready and is the cause of an email
                 being sent.
         """
-        rooms_in_order = deduped_ordered_list([pa["room_id"] for pa in push_actions])
+        rooms_in_order = deduped_ordered_list([pa.room_id for pa in push_actions])
 
-        notif_events = await self.store.get_events(
-            [pa["event_id"] for pa in push_actions]
-        )
+        notif_events = await self.store.get_events([pa.event_id for pa in push_actions])
 
         notifs_by_room: Dict[str, List[EmailPushAction]] = {}
         for pa in push_actions:
-            notifs_by_room.setdefault(pa["room_id"], []).append(pa)
+            notifs_by_room.setdefault(pa.room_id, []).append(pa)
 
         # collect the current state for all the rooms in which we have
         # notifications
@@ -264,7 +262,7 @@ class Mailer:
         await concurrently_execute(_fetch_room_state, rooms_in_order, 3)
 
         # actually sort our so-called rooms_in_order list, most recent room first
-        rooms_in_order.sort(key=lambda r: -(notifs_by_room[r][-1]["received_ts"] or 0))
+        rooms_in_order.sort(key=lambda r: -(notifs_by_room[r][-1].received_ts or 0))
 
         rooms: List[RoomVars] = []
 
@@ -356,7 +354,7 @@ class Mailer:
         # Check if one of the notifs is an invite event for the user.
         is_invite = False
         for n in notifs:
-            ev = notif_events[n["event_id"]]
+            ev = notif_events[n.event_id]
             if ev.type == EventTypes.Member and ev.state_key == user_id:
                 if ev.content.get("membership") == Membership.INVITE:
                     is_invite = True
@@ -376,7 +374,7 @@ class Mailer:
         if not is_invite:
             for n in notifs:
                 notifvars = await self._get_notif_vars(
-                    n, user_id, notif_events[n["event_id"]], room_state_ids
+                    n, user_id, notif_events[n.event_id], room_state_ids
                 )
 
                 # merge overlapping notifs together.
@@ -444,20 +442,20 @@ class Mailer:
         """
 
         results = await self.store.get_events_around(
-            notif["room_id"],
-            notif["event_id"],
+            notif.room_id,
+            notif.event_id,
             before_limit=CONTEXT_BEFORE,
             after_limit=CONTEXT_AFTER,
         )
 
         ret: NotifVars = {
             "link": self._make_notif_link(notif),
-            "ts": notif["received_ts"],
+            "ts": notif.received_ts,
             "messages": [],
         }
 
         the_events = await filter_events_for_client(
-            self.storage, user_id, results["events_before"]
+            self.storage, user_id, results.events_before
         )
         the_events.append(notif_event)
 
@@ -516,7 +514,7 @@ class Mailer:
 
         ret: MessageVars = {
             "event_type": event.type,
-            "is_historical": event.event_id != notif["event_id"],
+            "is_historical": event.event_id != notif.event_id,
             "id": event.event_id,
             "ts": event.origin_server_ts,
             "sender_name": sender_name,
@@ -610,7 +608,7 @@ class Mailer:
         # See if one of the notifs is an invite event for the user
         invite_event = None
         for n in notifs:
-            ev = notif_events[n["event_id"]]
+            ev = notif_events[n.event_id]
             if ev.type == EventTypes.Member and ev.state_key == user_id:
                 if ev.content.get("membership") == Membership.INVITE:
                     invite_event = ev
@@ -659,7 +657,7 @@ class Mailer:
         if len(notifs) == 1:
             # There is just the one notification, so give some detail
             sender_name = None
-            event = notif_events[notifs[0]["event_id"]]
+            event = notif_events[notifs[0].event_id]
             if ("m.room.member", event.sender) in room_state_ids:
                 state_event_id = room_state_ids[("m.room.member", event.sender)]
                 state_event = await self.store.get_event(state_event_id)
@@ -753,9 +751,9 @@ class Mailer:
         # are already in descending received_ts.
         sender_ids = {}
         for n in notifs:
-            sender = notif_events[n["event_id"]].sender
+            sender = notif_events[n.event_id].sender
             if sender not in sender_ids:
-                sender_ids[sender] = n["event_id"]
+                sender_ids[sender] = n.event_id
 
         # Get the actual member events (in order to calculate a pretty name for
         # the room).
@@ -830,17 +828,17 @@ class Mailer:
         if self.hs.config.email.email_riot_base_url:
             return "%s/#/room/%s/%s" % (
                 self.hs.config.email.email_riot_base_url,
-                notif["room_id"],
-                notif["event_id"],
+                notif.room_id,
+                notif.event_id,
             )
         elif self.app_name == "Vector":
             # need /beta for Universal Links to work on iOS
             return "https://vector.im/beta/#/room/%s/%s" % (
-                notif["room_id"],
-                notif["event_id"],
+                notif.room_id,
+                notif.event_id,
             )
         else:
-            return "https://matrix.to/#/%s/%s" % (notif["room_id"], notif["event_id"])
+            return "https://matrix.to/#/%s/%s" % (notif.room_id, notif.event_id)
 
     def _make_unsubscribe_link(
         self, user_id: str, app_id: str, email_address: str

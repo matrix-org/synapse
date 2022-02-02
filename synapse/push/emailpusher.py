@@ -177,12 +177,12 @@ class EmailPusher(Pusher):
             return
 
         for push_action in unprocessed:
-            received_at = push_action["received_ts"]
+            received_at = push_action.received_ts
             if received_at is None:
                 received_at = 0
             notif_ready_at = received_at + DELAY_BEFORE_MAIL_MS
 
-            room_ready_at = self.room_ready_to_notify_at(push_action["room_id"])
+            room_ready_at = self.room_ready_to_notify_at(push_action.room_id)
 
             should_notify_at = max(notif_ready_at, room_ready_at)
 
@@ -193,23 +193,23 @@ class EmailPusher(Pusher):
                 # to be delivered.
 
                 reason: EmailReason = {
-                    "room_id": push_action["room_id"],
+                    "room_id": push_action.room_id,
                     "now": self.clock.time_msec(),
                     "received_at": received_at,
                     "delay_before_mail_ms": DELAY_BEFORE_MAIL_MS,
-                    "last_sent_ts": self.get_room_last_sent_ts(push_action["room_id"]),
-                    "throttle_ms": self.get_room_throttle_ms(push_action["room_id"]),
+                    "last_sent_ts": self.get_room_last_sent_ts(push_action.room_id),
+                    "throttle_ms": self.get_room_throttle_ms(push_action.room_id),
                 }
 
                 await self.send_notification(unprocessed, reason)
 
                 await self.save_last_stream_ordering_and_success(
-                    max(ea["stream_ordering"] for ea in unprocessed)
+                    max(ea.stream_ordering for ea in unprocessed)
                 )
 
                 # we update the throttle on all the possible unprocessed push actions
                 for ea in unprocessed:
-                    await self.sent_notif_update_throttle(ea["room_id"], ea)
+                    await self.sent_notif_update_throttle(ea.room_id, ea)
                 break
             else:
                 if soonest_due_at is None or should_notify_at < soonest_due_at:
@@ -284,10 +284,10 @@ class EmailPusher(Pusher):
         # THROTTLE_RESET_AFTER_MS after the previous one that triggered a
         # notif, we release the throttle. Otherwise, the throttle is increased.
         time_of_previous_notifs = await self.store.get_time_of_last_push_action_before(
-            notified_push_action["stream_ordering"]
+            notified_push_action.stream_ordering
         )
 
-        time_of_this_notifs = notified_push_action["received_ts"]
+        time_of_this_notifs = notified_push_action.received_ts
 
         if time_of_previous_notifs is not None and time_of_this_notifs is not None:
             gap = time_of_this_notifs - time_of_previous_notifs

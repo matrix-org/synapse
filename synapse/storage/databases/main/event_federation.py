@@ -65,7 +65,7 @@ class _NoChainCoverIndex(Exception):
         super().__init__("Unexpectedly no chain cover for events in %s" % (room_id,))
 
 
-class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBaseStore):
+class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBaseStore):
     def __init__(
         self,
         database: DatabasePool,
@@ -288,7 +288,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             new_front = set()
             for chunk in batch_iter(front, 100):
                 # Pull the auth events either from the cache or DB.
-                to_fetch = []  # Event IDs to fetch from DB  # type: List[str]
+                to_fetch: List[str] = []  # Event IDs to fetch from DB
                 for event_id in chunk:
                     res = self._event_auth_cache.get(event_id)
                     if res is None:
@@ -615,8 +615,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             # currently walking, either from cache or DB.
             search, chunk = search[:-100], search[-100:]
 
-            found = []  # Results found  # type: List[Tuple[str, str, int]]
-            to_fetch = []  # Event IDs to fetch from DB  # type: List[str]
+            found: List[Tuple[str, str, int]] = []  # Results found
+            to_fetch: List[str] = []  # Event IDs to fetch from DB
             for _, event_id in chunk:
                 res = self._event_auth_cache.get(event_id)
                 if res is None:
@@ -1432,7 +1432,10 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
             if room_version.event_format == EventFormatVersions.V1:
                 for prev_event_tuple in prev_events:
-                    if not isinstance(prev_event_tuple, list) or len(prev_events) != 2:
+                    if (
+                        not isinstance(prev_event_tuple, list)
+                        or len(prev_event_tuple) != 2
+                    ):
                         logger.info("Invalid prev_events for %s", event_id)
                         break
 

@@ -361,36 +361,37 @@ class SearchHandler:
 
                 logger.info(
                     "Context for search returned %d and %d events",
-                    len(res["events_before"]),
-                    len(res["events_after"]),
+                    len(res.events_before),
+                    len(res.events_after),
                 )
 
-                res["events_before"] = await filter_events_for_client(
-                    self.storage, user.to_string(), res["events_before"]
+                events_before = await filter_events_for_client(
+                    self.storage, user.to_string(), res.events_before
                 )
 
-                res["events_after"] = await filter_events_for_client(
-                    self.storage, user.to_string(), res["events_after"]
+                events_after = await filter_events_for_client(
+                    self.storage, user.to_string(), res.events_after
                 )
 
-                res["start"] = await now_token.copy_and_replace(
-                    "room_key", res["start"]
-                ).to_string(self.store)
-
-                res["end"] = await now_token.copy_and_replace(
-                    "room_key", res["end"]
-                ).to_string(self.store)
+                context = {
+                    "events_before": events_before,
+                    "events_after": events_after,
+                    "start": await now_token.copy_and_replace(
+                        "room_key", res.start
+                    ).to_string(self.store),
+                    "end": await now_token.copy_and_replace(
+                        "room_key", res.end
+                    ).to_string(self.store),
+                }
 
                 if include_profile:
                     senders = {
                         ev.sender
-                        for ev in itertools.chain(
-                            res["events_before"], [event], res["events_after"]
-                        )
+                        for ev in itertools.chain(events_before, [event], events_after)
                     }
 
-                    if res["events_after"]:
-                        last_event_id = res["events_after"][-1].event_id
+                    if events_after:
+                        last_event_id = events_after[-1].event_id
                     else:
                         last_event_id = event.event_id
 
@@ -402,7 +403,7 @@ class SearchHandler:
                         last_event_id, state_filter
                     )
 
-                    res["profile_info"] = {
+                    context["profile_info"] = {
                         s.state_key: {
                             "displayname": s.content.get("displayname", None),
                             "avatar_url": s.content.get("avatar_url", None),
@@ -411,7 +412,7 @@ class SearchHandler:
                         if s.type == EventTypes.Member and s.state_key in senders
                     }
 
-                contexts[event.event_id] = res
+                contexts[event.event_id] = context
         else:
             contexts = {}
 
@@ -420,11 +421,11 @@ class SearchHandler:
         time_now = self.clock.time_msec()
 
         for context in contexts.values():
-            context["events_before"] = await self._event_serializer.serialize_events(
-                context["events_before"], time_now
+            context["events_before"] = self._event_serializer.serialize_events(
+                context["events_before"], time_now  # type: ignore[arg-type]
             )
-            context["events_after"] = await self._event_serializer.serialize_events(
-                context["events_after"], time_now
+            context["events_after"] = self._event_serializer.serialize_events(
+                context["events_after"], time_now  # type: ignore[arg-type]
             )
 
         state_results = {}
@@ -441,9 +442,7 @@ class SearchHandler:
             results.append(
                 {
                     "rank": rank_map[e.event_id],
-                    "result": (
-                        await self._event_serializer.serialize_event(e, time_now)
-                    ),
+                    "result": self._event_serializer.serialize_event(e, time_now),
                     "context": contexts.get(e.event_id, {}),
                 }
             )
@@ -457,7 +456,7 @@ class SearchHandler:
         if state_results:
             s = {}
             for room_id, state_events in state_results.items():
-                s[room_id] = await self._event_serializer.serialize_events(
+                s[room_id] = self._event_serializer.serialize_events(
                     state_events, time_now
                 )
 

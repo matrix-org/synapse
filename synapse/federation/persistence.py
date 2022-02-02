@@ -23,7 +23,6 @@ import logging
 from typing import Optional, Tuple
 
 from synapse.federation.units import Transaction
-from synapse.logging.utils import log_function
 from synapse.storage.databases.main import DataStore
 from synapse.types import JsonDict
 
@@ -36,7 +35,6 @@ class TransactionActions:
     def __init__(self, datastore: DataStore):
         self.store = datastore
 
-    @log_function
     async def have_responded(
         self, origin: str, transaction: Transaction
     ) -> Optional[Tuple[int, JsonDict]]:
@@ -53,7 +51,6 @@ class TransactionActions:
 
         return await self.store.get_received_txn_response(transaction_id, origin)
 
-    @log_function
     async def set_response(
         self, origin: str, transaction: Transaction, code: int, response: JsonDict
     ) -> None:

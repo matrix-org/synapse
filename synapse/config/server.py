@@ -200,8 +200,8 @@ class HttpListenerConfig:
     """Object describing the http-specific parts of the config of a listener"""
 
     x_forwarded: bool = False
-    resources: List[HttpResourceConfig] = attr.ib(factory=list)
-    additional_resources: Dict[str, dict] = attr.ib(factory=dict)
+    resources: List[HttpResourceConfig] = attr.Factory(list)
+    additional_resources: Dict[str, dict] = attr.Factory(dict)
     tag: Optional[str] = None
 
 
@@ -259,7 +259,6 @@ class ServerConfig(Config):
             raise ConfigError(str(e))
 
         self.pid_file = self.abspath(config.get("pid_file"))
-        self.web_client_location = config.get("web_client_location", None)
         self.soft_file_limit = config.get("soft_file_limit", 0)
         self.daemonize = config.get("daemonize")
         self.print_pidfile = config.get("print_pidfile")
@@ -490,6 +489,19 @@ class ServerConfig(Config):
         # events with profile information that differ from the target's global profile.
         self.allow_per_room_profiles = config.get("allow_per_room_profiles", True)
 
+        # The maximum size an avatar can have, in bytes.
+        self.max_avatar_size = config.get("max_avatar_size")
+        if self.max_avatar_size is not None:
+            self.max_avatar_size = self.parse_size(self.max_avatar_size)
+
+        # The MIME types allowed for an avatar.
+        self.allowed_avatar_mimetypes = config.get("allowed_avatar_mimetypes")
+        if self.allowed_avatar_mimetypes and not isinstance(
+            self.allowed_avatar_mimetypes,
+            list,
+        ):
+            raise ConfigError("allowed_avatar_mimetypes must be a list")
+
         self.listeners = [parse_listener_def(x) for x in config.get("listeners", [])]
 
         # no_tls is not really supported any more, but let's grandfather it in
@@ -506,8 +518,17 @@ class ServerConfig(Config):
                     l2.append(listener)
             self.listeners = l2
 
-        if not self.web_client_location:
-            _warn_if_webclient_configured(self.listeners)
+        self.web_client_location = config.get("web_client_location", None)
+        self.web_client_location_is_redirect = self.web_client_location and (
+            self.web_client_location.startswith("http://")
+            or self.web_client_location.startswith("https://")
+        )
+        # A non-HTTP(S) web client location is deprecated.
+        if self.web_client_location and not self.web_client_location_is_redirect:
+            logger.warning(NO_MORE_NONE_HTTP_WEB_CLIENT_LOCATION_WARNING)
+
+        # Warn if webclient is configured for a worker.
+        _warn_if_webclient_configured(self.listeners)
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
         self.gc_seconds = self.read_gc_intervals(config.get("gc_min_interval", None))
@@ -793,13 +814,7 @@ class ServerConfig(Config):
         #
         pid_file: %(pid_file)s
 
-        # The absolute URL to the web client which /_matrix/client will redirect
-        # to if 'webclient' is configured under the 'listeners' configuration.
-        #
-        # This option can be also set to the filesystem path to the web client
-        # which will be served at /_matrix/client/ if 'webclient' is configured
-        # under the 'listeners' configuration, however this is a security risk:
-        # https://github.com/matrix-org/synapse#security-note
+        # The absolute URL to the web client which / will redirect to.
         #
         #web_client_location: https://riot.example.com/
 
@@ -883,7 +898,7 @@ class ServerConfig(Config):
         # The default room version for newly created rooms.
         #
         # Known room versions are listed here:
-        # https://matrix.org/docs/spec/#complete-list-of-room-versions
+        # https://spec.matrix.org/latest/rooms/#complete-list-of-room-versions
         #
         # For example, for room version 1, default_room_version should be set
         # to "1".
@@ -1010,8 +1025,6 @@ class ServerConfig(Config):
         #
         #   static: static resources under synapse/static (/_matrix/static). (Mostly
         #       useful for 'fallback authentication'.)
-        #
-        #   webclient: A web client. Requires web_client_location to be set.
         #
         listeners:
           # TLS-enabled listener: for when matrix traffic is sent directly to synapse.
@@ -1167,6 +1180,20 @@ class ServerConfig(Config):
         # Defaults to 'true'.
         #
         #allow_per_room_profiles: false
+
+        # The largest allowed file size for a user avatar. Defaults to no restriction.
+        #
+        # Note that user avatar changes will not work if this is set without
+        # using Synapse's media repository.
+        #
+        #max_avatar_size: 10M
+
+        # The MIME types allowed for user avatars. Defaults to no restriction.
+        #
+        # Note that user avatar changes will not work if this is set without
+        # using Synapse's media repository.
+        #
+        #allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
 
         # How long to keep redacted events in unredacted form in the database. After
         # this period redacted events get replaced with their redacted form in the DB.
@@ -1349,9 +1376,15 @@ def parse_listener_def(listener: Any) -> ListenerConfig:
     return ListenerConfig(port, bind_addresses, listener_type, tls, http_config)
 
 
+NO_MORE_NONE_HTTP_WEB_CLIENT_LOCATION_WARNING = """
+Synapse no longer supports serving a web client. To remove this warning,
+configure 'web_client_location' with an HTTP(S) URL.
+"""
+
+
 NO_MORE_WEB_CLIENT_WARNING = """
-Synapse no longer includes a web client. To enable a web client, configure
-web_client_location. To remove this warning, remove 'webclient' from the 'listeners'
+Synapse no longer includes a web client. To redirect the root resource to a web client, configure
+'web_client_location'. To remove this warning, remove 'webclient' from the 'listeners'
 configuration.
 """
 
