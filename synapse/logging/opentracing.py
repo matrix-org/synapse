@@ -489,7 +489,6 @@ def start_active_span_follows_from(
         contexts: the previous spans to inherit from
         inherit_force_tracing: if set, and any of the previous contexts have had tracing
            forced, the new span will also have tracing forced.
-
         tracer: override the opentracing tracer. By default the global tracer is used.
     """
     if opentracing is None:

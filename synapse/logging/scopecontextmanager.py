@@ -118,7 +118,7 @@ class _LogContextScope(Scope):
             logcontext (LogContext):
                 the logcontext to which this scope is attached.
             enter_logcontext (Boolean):
-                if True the logcontext will exited when the scope is finished
+                if True the logcontext will be exited when the scope is finished
             finish_on_close (Boolean):
                 if True finish the span when the scope is closed
         """
