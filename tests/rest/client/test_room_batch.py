@@ -89,7 +89,7 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
         self.clock = clock
         self.storage = hs.get_storage()
 
-        self.virtual_user_id = self.register_appservice_user(
+        self.virtual_user_id, _ = self.register_appservice_user(
             "as_user_potato", self.appservice.token
         )
 
