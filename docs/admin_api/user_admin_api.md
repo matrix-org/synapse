@@ -1,5 +1,8 @@
 # User Admin API
 
+To use it, you will need to authenticate by providing an `access_token`
+for a server admin: see [Admin API](../usage/administration/admin_api).
+
 ## Query User Account
 
 This API returns information about a specific user account.
@@ -9,9 +12,6 @@ The api is:
 ```
 GET /_synapse/admin/v2/users/<user_id>
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 It returns a JSON body like the following:
 
@@ -104,9 +104,6 @@ with a body of:
 }
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 Returns HTTP status code:
 - `201` - When a new user object was created.
 - `200` - When a user was modified.
@@ -155,9 +152,6 @@ By default, the response is ordered by ascending user ID.
 ```
 GET /_synapse/admin/v2/users?from=0&limit=10&guests=false
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -278,9 +272,6 @@ GET /_matrix/client/r0/admin/whois/<userId>
 See also: [Client Server
 API Whois](https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid).
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 It returns a JSON body like the following:
 
 ```json
@@ -334,9 +325,6 @@ with a body of:
     "erase": true
 }
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 The erase parameter is optional and defaults to `false`.
 An empty body may be passed for backwards compatibility.
@@ -394,9 +382,6 @@ with a body of:
 }
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 The parameter `new_password` is required.
 The parameter `logout_devices` is optional and defaults to `true`.
 
@@ -408,9 +393,6 @@ The api is:
 ```
 GET /_synapse/admin/v1/users/<user_id>/admin
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -439,10 +421,6 @@ with a body of:
 }
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
-
 ## List room memberships of a user
 
 Gets a list of all `room_id` that a specific `user_id` is member.
@@ -452,9 +430,6 @@ The API is:
 ```
 GET /_synapse/admin/v1/users/<user_id>/joined_rooms
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -574,9 +549,6 @@ The API is:
 GET /_synapse/admin/v1/users/<user_id>/media
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 A response body like the following is returned:
 
 ```json
@@ -691,9 +663,6 @@ The API is:
 DELETE /_synapse/admin/v1/users/<user_id>/media
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 A response body like the following is returned:
 
 ```json
@@ -766,9 +735,6 @@ The API is:
 GET /_synapse/admin/v2/users/<user_id>/devices
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 A response body like the following is returned:
 
 ```json
@@ -834,9 +800,6 @@ POST /_synapse/admin/v2/users/<user_id>/delete_devices
 }
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 An empty JSON dict is returned.
 
 **Parameters**
@@ -857,9 +820,6 @@ The API is:
 ```
 GET /_synapse/admin/v2/users/<user_id>/devices/<device_id>
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -906,9 +866,6 @@ PUT /_synapse/admin/v2/users/<user_id>/devices/<device_id>
 }
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 An empty JSON dict is returned.
 
 **Parameters**
@@ -935,9 +892,6 @@ DELETE /_synapse/admin/v2/users/<user_id>/devices/<device_id>
 {}
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 An empty JSON dict is returned.
 
 **Parameters**
@@ -955,9 +909,6 @@ The API is:
 ```
 GET /_synapse/admin/v1/users/<user_id>/pushers
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -1053,9 +1004,6 @@ To un-shadow-ban a user the API is:
 DELETE /_synapse/admin/v1/users/<user_id>/shadow_ban
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 An empty JSON dict is returned in both cases.
 
 **Parameters**
@@ -1077,9 +1025,6 @@ The API is:
 ```
 GET /_synapse/admin/v1/users/<user_id>/override_ratelimit
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -1119,9 +1064,6 @@ The API is:
 ```
 POST /_synapse/admin/v1/users/<user_id>/override_ratelimit
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -1165,9 +1107,6 @@ The API is:
 DELETE /_synapse/admin/v1/users/<user_id>/override_ratelimit
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 An empty JSON dict is returned.
 
 ```json
@@ -1196,7 +1135,5 @@ The API is:
 GET /_synapse/admin/v1/username_available?username=$localpart
 ```
 
-The request and response format is the same as the [/_matrix/client/r0/register/available](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available) API.
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
+The request and response format is the same as the
+[/_matrix/client/r0/register/available](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available) API.

@@ -748,6 +748,7 @@ class DatabasePool:
                     func,
                     *args,
                     db_autocommit=db_autocommit,
+                    isolation_level=isolation_level,
                     **kwargs,
                 )
 
