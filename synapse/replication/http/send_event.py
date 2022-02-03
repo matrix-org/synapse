@@ -23,12 +23,12 @@ from synapse.events.snapshot import EventContext
 from synapse.http.server import HttpServer
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
-from synapse.storage.databases.main import DataStore
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+    from synapse.storage.databases.main import DataStore
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
         event_id: str,
-        store: DataStore,
+        store: "DataStore",
         event: EventBase,
         context: EventContext,
         requester: Requester,
