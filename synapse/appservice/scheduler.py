@@ -58,7 +58,7 @@ from typing import (
     List,
     Optional,
     Set,
-    Tuple
+    Tuple,
 )
 
 from synapse.appservice import (
@@ -160,7 +160,9 @@ class _ServiceQueuer:
     appservice at a given time.
     """
 
-    def __init__(self, txn_ctrl: "_TransactionController", clock: Clock, hs: "HomeServer"):
+    def __init__(
+        self, txn_ctrl: "_TransactionController", clock: Clock, hs: "HomeServer"
+    ):
         # dict of {service_id: [events]}
         self.queued_events: Dict[str, List[EventBase]] = {}
         # dict of {service_id: [events]}
