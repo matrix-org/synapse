@@ -1302,10 +1302,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         # We need to rate limit *before* we send out any 3PID invites, so we
         # can't just rely on the standard ratelimiting of events.
-        await self._third_party_invite_limiter.ratelimit(
-            requester=requester,
-            key=requester.user.to_string(),
-        )
+        await self._third_party_invite_limiter.ratelimit(requester)
 
         can_invite = await self.third_party_event_rules.check_threepid_can_be_invited(
             medium, address, room_id
