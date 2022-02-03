@@ -495,13 +495,11 @@ class DeviceHandler(DeviceWorkerHandler):
                 "Notifying about update %r/%r, ID: %r", user_id, device_id, position
             )
 
-        room_ids = await self.store.get_rooms_for_user(user_id)
-
         # specify the user ID too since the user should always get their own device list
         # updates, even if they aren't in any rooms.
-        self.notifier.on_new_event(
-            "device_list_key", position, users=[user_id], rooms=room_ids
-        )
+        users_to_notify = users_who_share_room.union(user_id)
+
+        self.notifier.on_new_event("device_list_key", position, users=users_to_notify)
 
         if hosts:
             logger.info(
