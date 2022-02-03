@@ -458,7 +458,10 @@ class Notifier:
                 self.appservice_handler.notify_interested_services_ephemeral(
                     stream_key,
                     new_token,
-                    users,
+                    [
+                        UserID.from_string(user_stream.user_id)
+                        for user_stream in user_streams
+                    ],
                 )
             except Exception:
                 logger.exception(
