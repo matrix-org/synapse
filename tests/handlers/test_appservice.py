@@ -22,7 +22,7 @@ import synapse.storage
 from synapse.appservice import ApplicationService
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.rest.client import login, receipts, room, sendtodevice
-from synapse.types import RoomStreamToken
+from synapse.types import RoomStreamToken, UserID
 from synapse.util.stringutils import random_string
 
 from tests import unittest
@@ -280,7 +280,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
 
         self.handler.notify_interested_services_ephemeral(
-            "receipt_key", 580, ["@fakerecipient:example.com"]
+            "receipt_key", 580, [UserID.from_string("@fakerecipient:example.com")]
         )
         self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(
             interested_service, ephemeral=[event]
@@ -310,7 +310,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
 
         self.handler.notify_interested_services_ephemeral(
-            "receipt_key", 580, ["@fakerecipient:example.com"]
+            "receipt_key", 580, [UserID.from_string("@fakerecipient:example.com")]
         )
         # This method will be called, but with an empty list of events
         self.mock_scheduler.enqueue_for_appservice.assert_called_once_with(

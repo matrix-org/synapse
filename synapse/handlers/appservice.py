@@ -193,7 +193,7 @@ class ApplicationServicesHandler:
         self,
         stream_key: str,
         new_token: Union[int, RoomStreamToken],
-        users: Collection[Union[str, UserID]],
+        users: Collection[UserID],
     ) -> None:
         """
         This is called by the notifier in the background when an ephemeral event is handled
@@ -280,7 +280,7 @@ class ApplicationServicesHandler:
         services: List[ApplicationService],
         stream_key: str,
         new_token: int,
-        users: Collection[Union[str, UserID]],
+        users: Collection[UserID],
     ) -> None:
         logger.debug("Checking interested services for %s", stream_key)
         with Measure(self.clock, "notify_interested_services_ephemeral"):
@@ -410,7 +410,7 @@ class ApplicationServicesHandler:
     async def _handle_presence(
         self,
         service: ApplicationService,
-        users: Collection[Union[str, UserID]],
+        users: Collection[UserID],
         new_token: Optional[int],
     ) -> List[JsonDict]:
         """
@@ -444,9 +444,6 @@ class ApplicationServicesHandler:
             return []
 
         for user in users:
-            if isinstance(user, str):
-                user = UserID.from_string(user)
-
             interested = await service.is_interested_in_presence(user, self.store)
             if not interested:
                 continue
@@ -498,8 +495,6 @@ class ApplicationServicesHandler:
         # Filter out users that this appservice is not interested in
         users_appservice_is_interested_in: List[str] = []
         for user in users:
-            # FIXME: We should do this farther up the call stack. We currently repeat
-            #  this operation in _handle_presence.
             if isinstance(user, UserID):
                 user = user.to_string()
 
