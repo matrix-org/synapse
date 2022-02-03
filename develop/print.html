@@ -1638,6 +1638,14 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1530"><a class="header" href="#upgrading-to-v1530">Upgrading to v1.53.0</a></h1>
+<h2 id="dropping-support-for-webclient-listeners-and-non-https-web_client_location"><a class="header" href="#dropping-support-for-webclient-listeners-and-non-https-web_client_location">Dropping support for <code>webclient</code> listeners and non-HTTP(S) <code>web_client_location</code></a></h2>
+<p>Per the deprecation notice in Synapse v1.51.0, listeners of type  <code>webclient</code>
+are no longer supported and configuring them is a now a configuration error.</p>
+<p>Configuring a non-HTTP(S) <code>web_client_location</code> configuration is is now a
+configuration error. Since the <code>webclient</code> listener is no longer supported, this
+setting only applies to the root path <code>/</code> of Synapse's web server and no longer
+the <code>/_matrix/client/</code> path.</p>
 <h1 id="upgrading-to-v1510"><a class="header" href="#upgrading-to-v1510">Upgrading to v1.51.0</a></h1>
 <h2 id="deprecation-of-webclient-listeners-and-non-https-web_client_location"><a class="header" href="#deprecation-of-webclient-listeners-and-non-https-web_client_location">Deprecation of <code>webclient</code> listeners and non-HTTP(S) <code>web_client_location</code></a></h2>
 <p>Listeners of type  <code>webclient</code> are deprecated and scheduled to be removed in
