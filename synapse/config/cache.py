@@ -148,11 +148,15 @@ class CacheConfig(Config):
           per_cache_factors:
             #get_users_who_share_room_with_user: 2.0
 
-          # Controls how long an entry can be in a cache without having been
-          # accessed before being evicted. Defaults to 30m. Comment out this
-          # option if you don't want entries to be evicted based on time.
+          # Controls whether cache entries are evicted after a specified time
+          # period. Defaults to true.
+          # expire_caches: false
+
+          # If expire_caches is enabled, this flag controls how long an entry can
+          # be in a cache without having been accessed before being evicted.
+          # Defaults to 30m. Uncomment to set a different time to live for cache entries.
           #
-          expiry_time: 30m
+          # cache_entry_ttl: 30m
 
           # Controls how long the results of a /sync request are cached for after
           # a successful response is returned. A higher duration can help clients with
@@ -217,9 +221,16 @@ class CacheConfig(Config):
                     e.message  # noqa: B306, DependencyException.message is a property
                 )
 
-        expiry_time = cache_config.get("expiry_time")
-        if expiry_time:
-            self.expiry_time_msec: Optional[int] = self.parse_duration(expiry_time)
+        expire_caches = cache_config.get("expire_caches", True)
+        cache_entry_ttl = cache_config.get("cache_entry_ttl")
+
+        if expire_caches:
+            if cache_entry_ttl:
+                self.expiry_time_msec: Optional[int] = self.parse_duration(
+                    cache_entry_ttl
+                )
+            else:
+                self.expiry_time_msec = 1800000
         else:
             self.expiry_time_msec = None
 
