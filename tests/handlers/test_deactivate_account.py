@@ -217,3 +217,109 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         self.assertEqual(
             self.get_success(self._store.ignored_by("@sheltie:test")), set()
         )
+
+    def _rerun_retroactive_account_data_deletion_update(self) -> None:
+        # Reset the 'all done' flag
+        self._store.db_pool.updates._all_done = False
+
+        self.get_success(
+            self._store.db_pool.simple_insert(
+                "background_updates",
+                {
+                    "update_name": "delete_account_data_for_deactivated_users",
+                    "progress_json": "{}",
+                },
+            )
+        )
+
+        self.wait_for_background_updates()
+
+    def test_account_data_deleted_retroactively_by_background_update_if_deactivated(
+        self,
+    ) -> None:
+        """
+        Tests that a user, who deactivated their account before account data was
+        deleted automatically upon deactivation, has their account data retroactively
+        scrubbed by the background update.
+        """
+
+        # Request the deactivation of our account
+        self._deactivate_my_account()
+
+        # Add some account data
+        # (we do this after the deactivation so that the act of deactivating doesn't
+        # clear it out. This emulates a user that was deactivated before this was cleared
+        # upon deactivation.)
+        self.get_success(
+            self._store.add_account_data_for_user(
+                self.user,
+                AccountDataTypes.DIRECT,
+                {"@someone:remote": ["!somewhere:remote"]},
+            )
+        )
+
+        # Check that the account data is there.
+        self.assertIsNotNone(
+            self.get_success(
+                self._store.get_global_account_data_by_type_for_user(
+                    self.user,
+                    AccountDataTypes.DIRECT,
+                )
+            ),
+        )
+
+        # Re-run the retroactive deletion update
+        self._rerun_retroactive_account_data_deletion_update()
+
+        # Check that the account data was cleared.
+        self.assertIsNone(
+            self.get_success(
+                self._store.get_global_account_data_by_type_for_user(
+                    self.user,
+                    AccountDataTypes.DIRECT,
+                )
+            ),
+        )
+
+    def test_account_data_preserved_by_background_update_if_not_deactivated(
+        self,
+    ) -> None:
+        """
+        Tests that the background update does not scrub account data for users that have
+        not been deactivated.
+        """
+
+        # Add some account data
+        # (we do this after the deactivation so that the act of deactivating doesn't
+        # clear it out. This emulates a user that was deactivated before this was cleared
+        # upon deactivation.)
+        self.get_success(
+            self._store.add_account_data_for_user(
+                self.user,
+                AccountDataTypes.DIRECT,
+                {"@someone:remote": ["!somewhere:remote"]},
+            )
+        )
+
+        # Check that the account data is there.
+        self.assertIsNotNone(
+            self.get_success(
+                self._store.get_global_account_data_by_type_for_user(
+                    self.user,
+                    AccountDataTypes.DIRECT,
+                )
+            ),
+        )
+
+        # Re-run the retroactive deletion update
+        self._rerun_retroactive_account_data_deletion_update()
+
+        # Check that the account data was NOT cleared.
+        self.assertIsNotNone(
+            self.get_success(
+                self._store.get_global_account_data_by_type_for_user(
+                    self.user,
+                    AccountDataTypes.DIRECT,
+                )
+            ),
+        )

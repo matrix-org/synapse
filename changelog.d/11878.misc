@@ -1,0 +1,1 @@
+Do not needlessly clear the `get_users_in_room` and `get_users_in_room_with_profiles` caches when any room state changes.

@@ -21,7 +21,6 @@ from typing import Dict, Iterable, Iterator, List
 from twisted.internet.tcp import Port
 from twisted.web.resource import EncodingResourceWrapper, Resource
 from twisted.web.server import GzipEncoderFactory
-from twisted.web.static import File
 
 import synapse
 import synapse.config.logger
@@ -33,7 +32,6 @@ from synapse.api.urls import (
     MEDIA_V3_PREFIX,
     SERVER_KEY_V2_PREFIX,
     STATIC_PREFIX,
-    WEB_CLIENT_PREFIX,
 )
 from synapse.app import _base
 from synapse.app._base import (
@@ -53,7 +51,6 @@ from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import (
     OptionsResource,
     RootOptionsRedirectResource,
-    RootRedirect,
     StaticResource,
 )
 from synapse.http.site import SynapseSite
@@ -134,15 +131,12 @@ class SynapseHomeServer(HomeServer):
         # Try to find something useful to serve at '/':
         #
         # 1. Redirect to the web client if it is an HTTP(S) URL.
-        # 2. Redirect to the web client served via Synapse.
-        # 3. Redirect to the static "Synapse is running" page.
-        # 4. Do not redirect and use a blank resource.
-        if self.config.server.web_client_location_is_redirect:
+        # 2. Redirect to the static "Synapse is running" page.
+        # 3. Do not redirect and use a blank resource.
+        if self.config.server.web_client_location:
             root_resource: Resource = RootOptionsRedirectResource(
                 self.config.server.web_client_location
             )
-        elif WEB_CLIENT_PREFIX in resources:
-            root_resource = RootOptionsRedirectResource(WEB_CLIENT_PREFIX)
         elif STATIC_PREFIX in resources:
             root_resource = RootOptionsRedirectResource(STATIC_PREFIX)
         else:
@@ -269,28 +263,6 @@ class SynapseHomeServer(HomeServer):
 
         if name in ["keys", "federation"]:
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
-
-        if name == "webclient":
-            # webclient listeners are deprecated as of Synapse v1.51.0, remove it
-            # in > v1.53.0.
-            webclient_loc = self.config.server.web_client_location
-
-            if webclient_loc is None:
-                logger.warning(
-                    "Not enabling webclient resource, as web_client_location is unset."
-                )
-            elif self.config.server.web_client_location_is_redirect:
-                resources[WEB_CLIENT_PREFIX] = RootRedirect(webclient_loc)
-            else:
-                logger.warning(
-                    "Running webclient on the same domain is not recommended: "
-                    "https://github.com/matrix-org/synapse#security-note - "
-                    "after you move webclient to different host you can set "
-                    "web_client_location to its full URL to enable redirection."
-                )
-                # GZip is disabled here due to
-                # https://twistedmatrix.com/trac/ticket/7678
-                resources[WEB_CLIENT_PREFIX] = File(webclient_loc)
 
         if name == "metrics" and self.config.metrics.enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
