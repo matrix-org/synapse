@@ -94,7 +94,7 @@ are no longer supported and configuring them is a now a configuration error.
 
 Configuring a non-HTTP(S) `web_client_location` configuration is is now a
 configuration error. Since the `webclient` listener is no longer supported, this
-setting only applies to the root path `/` of the Synapse install and no longer
+setting only applies to the root path `/` of Synapse's web server and no longer
 the `/_matrix/client/` path.
 
 
