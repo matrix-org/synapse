@@ -277,8 +277,8 @@ class MessageHandler:
         # If this is an AS, double check that they are allowed to see the members.
         # This can either be because the AS user is in the room or because there
         # is a user in the room that the AS is "interested in"
-        if False and requester.app_service and user_id not in users_with_profile:
-            for uid in users_with_profile:
+        if False and requester.app_service and user_id not in users_with_profile:  # type: ignore[unreachable]
+            for uid in users_with_profile:  # type: ignore[unreachable]
                 if requester.app_service.is_interested_in_user(uid):
                     break
             else:
