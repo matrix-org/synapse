@@ -331,7 +331,7 @@ An empty body may be passed for backwards compatibility.
 
 The following actions are performed when deactivating an user:
 
-- Try to unpind 3PIDs from the identity server
+- Try to unbind 3PIDs from the identity server
 - Remove all 3PIDs from the homeserver
 - Delete all devices and E2EE keys
 - Delete all access tokens
