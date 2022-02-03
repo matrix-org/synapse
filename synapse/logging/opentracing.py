@@ -478,6 +478,8 @@ def start_active_span(
 def start_active_span_follows_from(
     operation_name: str,
     contexts: Collection,
+    child_of=None,
+    start_time: Optional[float] = None,
     *,
     inherit_force_tracing=False,
     tracer=None,
@@ -487,6 +489,14 @@ def start_active_span_follows_from(
     Args:
         operation_name: name of the operation represented by the new span
         contexts: the previous spans to inherit from
+
+        child_of: optionally override the parent span. If unset, the currently active
+           span will be the parent. (If there is no currently active span, the first
+           span in `contexts` will be the parent.)
+
+        start_time: optional override for the start time of the created span. Seconds
+            since the epoch.
+
         inherit_force_tracing: if set, and any of the previous contexts have had tracing
            forced, the new span will also have tracing forced.
         tracer: override the opentracing tracer. By default the global tracer is used.
@@ -497,7 +507,9 @@ def start_active_span_follows_from(
     references = [opentracing.follows_from(context) for context in contexts]
     scope = start_active_span(
         operation_name,
+        child_of=child_of,
         references=references,
+        start_time=start_time,
         tracer=tracer,
     )
 
