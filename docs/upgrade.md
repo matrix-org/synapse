@@ -88,16 +88,17 @@ process, for example:
 
 ## Stablisation of MSC3231
 
-A reverse proxy rule needs to be updated;
+The unstable validity-check endpoint for the 
+[Registration Tokens](https://spec.matrix.org/v1.2/client-server-api/#get_matrixclientv1registermloginregistration_tokenvalidity) 
+feature has been stabilised and moved from:
 
 `^/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity$`
 
-To
+to:
 
 `^/_matrix/client/v1/register/m.login.registration_token/validity$`
 
-Any currently-active UIA session where a user is registering with a 
-registration token will be invalidated.
+Please update any relevant reverse proxy or firewall configurations appropriately.
 
 # Upgrading to v1.51.0
 
