@@ -655,7 +655,11 @@ member are returned.</p>
 <h2 id="user-media"><a class="header" href="#user-media">User media</a></h2>
 <h3 id="list-media-uploaded-by-a-user"><a class="header" href="#list-media-uploaded-by-a-user">List media uploaded by a user</a></h3>
 <p>Gets a list of all local media that a specific <code>user_id</code> has created.
-By default, the response is ordered by descending creation date and ascending media ID.
+These are media that the user has uploaded themselves
+(<a href="../media_repository.html#local-media">local media</a>), as well as
+<a href="../media_repository.html#url-previews">URL preview images</a> requested by the user if the
+<a href="../development/url_previews.html">feature is enabled</a>.</p>
+<p>By default, the response is ordered by descending creation date and ascending media ID.
 The newest media is on top. You can change the order with parameters
 <code>order_by</code> and <code>dir</code>.</p>
 <p>The API is:</p>
@@ -749,7 +753,9 @@ Media objects contain the following fields:
 <ul>
 <li><code>created_ts</code> - integer - Timestamp when the content was uploaded in ms.</li>
 <li><code>last_access_ts</code> - integer - Timestamp when the content was last accessed in ms.</li>
-<li><code>media_id</code> - string - The id used to refer to the media.</li>
+<li><code>media_id</code> - string - The id used to refer to the media. Details about the format
+are documented under
+<a href="../media_repository.html">media repository</a>.</li>
 <li><code>media_length</code> - integer - Length of the media in bytes.</li>
 <li><code>media_type</code> - string - The MIME-type of the media.</li>
 <li><code>quarantined_by</code> - string - The user ID that initiated the quarantine request
