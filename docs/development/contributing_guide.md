@@ -55,6 +55,7 @@ setup a *virtualenv*, as follows:
 cd path/where/you/have/cloned/the/repository
 python3 -m venv ./env
 source ./env/bin/activate
+pip install wheel
 pip install -e ".[all,dev]"
 pip install tox
 ```
@@ -116,7 +117,7 @@ The linters look at your code and do two things:
 - ensure that your code follows the coding style adopted by the project;
 - catch a number of errors in your code.
 
-They're pretty fast, don't hesitate!
+The linter takes no time at all to run as soon as you've [downloaded the dependencies into your python virtual environment](#4-install-the-dependencies).
 
 ```sh
 source ./env/bin/activate

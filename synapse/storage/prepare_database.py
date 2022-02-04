@@ -499,9 +499,12 @@ def _upgrade_existing_database(
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)  # type: ignore
 
-                logger.info("Running script %s", relative_path)
-                module.run_create(cur, database_engine)  # type: ignore
-                if not is_empty:
+                if hasattr(module, "run_create"):
+                    logger.info("Running %s:run_create", relative_path)
+                    module.run_create(cur, database_engine)  # type: ignore
+
+                if not is_empty and hasattr(module, "run_upgrade"):
+                    logger.info("Running %s:run_upgrade", relative_path)
                     module.run_upgrade(cur, database_engine, config=config)  # type: ignore
             elif ext == ".pyc" or file_name == "__pycache__":
                 # Sometimes .pyc files turn up anyway even though we've

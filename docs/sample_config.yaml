@@ -41,11 +41,11 @@
 # documentation on how to configure or create custom modules for Synapse.
 #
 modules:
-    # - module: my_super_module.MySuperClass
-    #   config:
-    #       do_thing: true
-    # - module: my_other_super_module.SomeClass
-    #   config: {}
+  #- module: my_super_module.MySuperClass
+  #  config:
+  #    do_thing: true
+  #- module: my_other_super_module.SomeClass
+  #  config: {}
 
 
 ## Server ##
@@ -471,6 +471,20 @@ limit_remote_rooms:
 #
 #allow_per_room_profiles: false
 
+# The largest allowed file size for a user avatar. Defaults to no restriction.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's media repository.
+#
+#max_avatar_size: 10M
+
+# The MIME types allowed for user avatars. Defaults to no restriction.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's media repository.
+#
+#allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
+
 # How long to keep redacted events in unredacted form in the database. After
 # this period redacted events get replaced with their redacted form in the DB.
 #
@@ -843,6 +857,9 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #   - one for ratelimiting how often a user or IP can attempt to validate a 3PID.
 #   - two for ratelimiting how often invites can be sent in a room or to a
 #     specific user.
+#   - one for ratelimiting 3PID invites (i.e. invites sent to a third-party ID
+#     such as an email address or a phone number) based on the account that's
+#     sending the invite.
 #
 # The defaults are as shown below.
 #
@@ -892,6 +909,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #  per_user:
 #    per_second: 0.003
 #    burst_count: 5
+#
+#rc_third_party_invite:
+#  per_second: 0.2
+#  burst_count: 10
 
 # Ratelimiting settings for incoming federation
 #
@@ -1427,6 +1448,16 @@ account_threepid_delegates:
 # Defaults to true.
 #
 #auto_join_rooms_for_guests: false
+
+# Whether to inhibit errors raised when registering a new account if the user ID
+# already exists. If turned on, that requests to /register/available will always
+# show a user ID as available, and Synapse won't raise an error when starting
+# a registration with a user ID that already exists. However, Synapse will still
+# raise an error if the registration completes and the username conflicts.
+#
+# Defaults to false.
+#
+#inhibit_user_in_use_error: true
 
 
 ## Metrics ###

@@ -41,7 +41,9 @@ from synapse.rest.admin.event_reports import (
     EventReportsRestServlet,
 )
 from synapse.rest.admin.federation import (
-    DestinationsRestServlet,
+    DestinationMembershipRestServlet,
+    DestinationResetConnectionRestServlet,
+    DestinationRestServlet,
     ListDestinationsRestServlet,
 )
 from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
@@ -267,7 +269,9 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ListRegistrationTokensRestServlet(hs).register(http_server)
     NewRegistrationTokenRestServlet(hs).register(http_server)
     RegistrationTokenRestServlet(hs).register(http_server)
-    DestinationsRestServlet(hs).register(http_server)
+    DestinationMembershipRestServlet(hs).register(http_server)
+    DestinationResetConnectionRestServlet(hs).register(http_server)
+    DestinationRestServlet(hs).register(http_server)
     ListDestinationsRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.

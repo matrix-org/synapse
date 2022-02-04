@@ -85,6 +85,19 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.53.0
+
+## Dropping support for `webclient` listeners and non-HTTP(S) `web_client_location`
+
+Per the deprecation notice in Synapse v1.51.0, listeners of type  `webclient`
+are no longer supported and configuring them is a now a configuration error.
+
+Configuring a non-HTTP(S) `web_client_location` configuration is is now a
+configuration error. Since the `webclient` listener is no longer supported, this
+setting only applies to the root path `/` of Synapse's web server and no longer
+the `/_matrix/client/` path.
+
+
 # Upgrading to v1.51.0
 
 ## Deprecation of `webclient` listeners and non-HTTP(S) `web_client_location`
