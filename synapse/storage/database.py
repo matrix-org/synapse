@@ -50,7 +50,6 @@ from synapse.logging.context import (
     current_context,
     make_deferred_yieldable,
 )
-from synapse.logging.opentracing import trace
 from synapse.metrics import register_threadpool
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
@@ -105,20 +104,8 @@ def make_pool(
         # Ensure we have a logging context so we can correctly track queries,
         # etc.
         with LoggingContext("db.on_new_connection"):
-            # HACK Patch the connection's commit function so that we can see
-            #      how long it's taking from Jaeger.
-            class NastyConnectionWrapper:
-                def __init__(self, connection):
-                    self._connection = connection
-                    self.commit = trace(connection.commit, "db.conn.commit")
-
-                def __getattr__(self, item):
-                    return getattr(self._connection, item)
-
             engine.on_new_connection(
-                LoggingDatabaseConnection(
-                    NastyConnectionWrapper(conn), engine, "on_new_connection"
-                )
+                LoggingDatabaseConnection(conn, engine, "on_new_connection")
             )
 
     connection_pool = adbapi.ConnectionPool(
