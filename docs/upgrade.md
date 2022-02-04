@@ -1142,8 +1142,7 @@ more details on upgrading your database.
 
 Synapse v1.0 is the first release to enforce validation of TLS
 certificates for the federation API. It is therefore essential that your
-certificates are correctly configured. See the
-[FAQ](MSC1711_certificates_FAQ.md) for more information.
+certificates are correctly configured.
 
 Note, v1.0 installations will also no longer be able to federate with
 servers that have not correctly configured their certificates.
@@ -1207,9 +1206,6 @@ Please be aware that, before Synapse v1.0 is released around March 2019,
 you will need to replace any self-signed certificates with those
 verified by a root CA. Information on how to do so can be found at the
 ACME docs.
-
-For more information on configuring TLS certificates see the
-[FAQ](MSC1711_certificates_FAQ.md).
 
 # Upgrading to v0.34.0
 
