@@ -1638,6 +1638,15 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1next"><a class="header" href="#upgrading-to-v1next">Upgrading to v1.(next)</a></h1>
+<h2 id="stablisation-of-msc3231"><a class="header" href="#stablisation-of-msc3231">Stablisation of MSC3231</a></h2>
+<p>The unstable validity-check endpoint for the 
+<a href="https://spec.matrix.org/v1.2/client-server-api/#get_matrixclientv1registermloginregistration_tokenvalidity">Registration Tokens</a> 
+feature has been stabilised and moved from:</p>
+<p><code>/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity</code></p>
+<p>to:</p>
+<p><code>/_matrix/client/v1/register/m.login.registration_token/validity</code></p>
+<p>Please update any relevant reverse proxy or firewall configurations appropriately.</p>
 <h1 id="upgrading-to-v1530"><a class="header" href="#upgrading-to-v1530">Upgrading to v1.53.0</a></h1>
 <h2 id="dropping-support-for-webclient-listeners-and-non-https-web_client_location"><a class="header" href="#dropping-support-for-webclient-listeners-and-non-https-web_client_location">Dropping support for <code>webclient</code> listeners and non-HTTP(S) <code>web_client_location</code></a></h2>
 <p>Per the deprecation notice in Synapse v1.51.0, listeners of type  <code>webclient</code>
@@ -8454,7 +8463,7 @@ Here's an example featuring all currently supported keys:</p>
         &quot;address&quot;: &quot;33123456789&quot;,
         &quot;validated_at&quot;: 1642701357084,
     },
-    &quot;org.matrix.msc3231.login.registration_token&quot;: &quot;sometoken&quot;,  # User has registered through the flow described in MSC3231
+    &quot;m.login.registration_token&quot;: &quot;sometoken&quot;,  # User has registered through a registration token
 }
 </code></pre>
 <p>The second dictionary contains the parameters provided by the user's client in the request
@@ -8801,7 +8810,7 @@ expressions:</p>
 # Registration/login requests
 ^/_matrix/client/(api/v1|r0|v3|unstable)/login$
 ^/_matrix/client/(r0|v3|unstable)/register$
-^/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity$
+^/_matrix/client/v1/register/m.login.registration_token/validity$
 
 # Event sending requests
 ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/redact
