@@ -149,7 +149,7 @@ class CacheConfig(Config):
             #get_users_who_share_room_with_user: 2.0
 
           # Controls whether cache entries are evicted after a specified time
-          # period. Defaults to true.
+          # period. Defaults to true. Uncomment to disable this feature.
           # expire_caches: false
 
           # If expire_caches is enabled, this flag controls how long an entry can
@@ -222,17 +222,21 @@ class CacheConfig(Config):
                 )
 
         expire_caches = cache_config.get("expire_caches", True)
-        cache_entry_ttl = cache_config.get("cache_entry_ttl")
+        cache_entry_ttl = cache_config.get("cache_entry_ttl", "30m")
 
         if expire_caches:
-            if cache_entry_ttl:
-                self.expiry_time_msec: Optional[int] = self.parse_duration(
+            self.expiry_time_msec: Optional[int] = self.parse_duration(
                     cache_entry_ttl
-                )
-            else:
-                self.expiry_time_msec = 1800000
+            )
         else:
             self.expiry_time_msec = None
+
+        # Backwards compatibility support for the now-removed "expiry_time" config flag.
+        expiry_time = cache_config.get("expiry_time")
+        if expiry_time:
+            self.expiry_time_msec = Optional[int] = self.parse_duration(
+                    expiry_time
+            )
 
         self.sync_response_cache_duration = self.parse_duration(
             cache_config.get("sync_response_cache_duration", 0)
