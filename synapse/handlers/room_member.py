@@ -116,6 +116,13 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
         )
 
+        self._third_party_invite_limiter = Ratelimiter(
+            store=self.store,
+            clock=self.clock,
+            rate_hz=hs.config.ratelimiting.rc_third_party_invite.per_second,
+            burst_count=hs.config.ratelimiting.rc_third_party_invite.burst_count,
+        )
+
         self.request_ratelimiter = hs.get_request_ratelimiter()
 
     @abc.abstractmethod
@@ -589,6 +596,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 f"Avatar URL is too long (max {MAX_AVATAR_URL_LEN})",
                 errcode=Codes.BAD_JSON,
             )
+
+        if "avatar_url" in content:
+            if not await self.profile_handler.check_avatar_size_and_mime_type(
+                content["avatar_url"],
+            ):
+                raise SynapseError(403, "This avatar is not allowed", Codes.FORBIDDEN)
 
         # The event content should *not* include the authorising user as
         # it won't be properly signed. Strip it out since it might come
@@ -1289,7 +1302,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         # We need to rate limit *before* we send out any 3PID invites, so we
         # can't just rely on the standard ratelimiting of events.
-        await self.request_ratelimiter.ratelimit(requester)
+        await self._third_party_invite_limiter.ratelimit(requester)
 
         can_invite = await self.third_party_event_rules.check_threepid_can_be_invited(
             medium, address, room_id

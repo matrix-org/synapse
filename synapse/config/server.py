@@ -179,7 +179,6 @@ KNOWN_RESOURCES = {
     "openid",
     "replication",
     "static",
-    "webclient",
 }
 
 
@@ -489,6 +488,19 @@ class ServerConfig(Config):
         # events with profile information that differ from the target's global profile.
         self.allow_per_room_profiles = config.get("allow_per_room_profiles", True)
 
+        # The maximum size an avatar can have, in bytes.
+        self.max_avatar_size = config.get("max_avatar_size")
+        if self.max_avatar_size is not None:
+            self.max_avatar_size = self.parse_size(self.max_avatar_size)
+
+        # The MIME types allowed for an avatar.
+        self.allowed_avatar_mimetypes = config.get("allowed_avatar_mimetypes")
+        if self.allowed_avatar_mimetypes and not isinstance(
+            self.allowed_avatar_mimetypes,
+            list,
+        ):
+            raise ConfigError("allowed_avatar_mimetypes must be a list")
+
         self.listeners = [parse_listener_def(x) for x in config.get("listeners", [])]
 
         # no_tls is not really supported any more, but let's grandfather it in
@@ -506,16 +518,12 @@ class ServerConfig(Config):
             self.listeners = l2
 
         self.web_client_location = config.get("web_client_location", None)
-        self.web_client_location_is_redirect = self.web_client_location and (
+        # Non-HTTP(S) web client location is not supported.
+        if self.web_client_location and not (
             self.web_client_location.startswith("http://")
             or self.web_client_location.startswith("https://")
-        )
-        # A non-HTTP(S) web client location is deprecated.
-        if self.web_client_location and not self.web_client_location_is_redirect:
-            logger.warning(NO_MORE_NONE_HTTP_WEB_CLIENT_LOCATION_WARNING)
-
-        # Warn if webclient is configured for a worker.
-        _warn_if_webclient_configured(self.listeners)
+        ):
+            raise ConfigError("web_client_location must point to a HTTP(S) URL.")
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
         self.gc_seconds = self.read_gc_intervals(config.get("gc_min_interval", None))
@@ -642,19 +650,6 @@ class ServerConfig(Config):
             "request_token_inhibit_3pid_errors",
             False,
         )
-
-        # List of users trialing the new experimental default push rules. This setting is
-        # not included in the sample configuration file on purpose as it's a temporary
-        # hack, so that some users can trial the new defaults without impacting every
-        # user on the homeserver.
-        users_new_default_push_rules: list = (
-            config.get("users_new_default_push_rules") or []
-        )
-        if not isinstance(users_new_default_push_rules, list):
-            raise ConfigError("'users_new_default_push_rules' must be a list")
-
-        # Turn the list into a set to improve lookup speed.
-        self.users_new_default_push_rules: set = set(users_new_default_push_rules)
 
         # Whitelist of domain names that given next_link parameters must have
         next_link_domain_whitelist: Optional[List[str]] = config.get(
@@ -1168,6 +1163,20 @@ class ServerConfig(Config):
         #
         #allow_per_room_profiles: false
 
+        # The largest allowed file size for a user avatar. Defaults to no restriction.
+        #
+        # Note that user avatar changes will not work if this is set without
+        # using Synapse's media repository.
+        #
+        #max_avatar_size: 10M
+
+        # The MIME types allowed for user avatars. Defaults to no restriction.
+        #
+        # Note that user avatar changes will not work if this is set without
+        # using Synapse's media repository.
+        #
+        #allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
+
         # How long to keep redacted events in unredacted form in the database. After
         # this period redacted events get replaced with their redacted form in the DB.
         #
@@ -1337,40 +1346,21 @@ def parse_listener_def(listener: Any) -> ListenerConfig:
 
     http_config = None
     if listener_type == "http":
+        try:
+            resources = [
+                HttpResourceConfig(**res) for res in listener.get("resources", [])
+            ]
+        except ValueError as e:
+            raise ConfigError("Unknown listener resource") from e
+
         http_config = HttpListenerConfig(
             x_forwarded=listener.get("x_forwarded", False),
-            resources=[
-                HttpResourceConfig(**res) for res in listener.get("resources", [])
-            ],
+            resources=resources,
             additional_resources=listener.get("additional_resources", {}),
             tag=listener.get("tag"),
         )
 
     return ListenerConfig(port, bind_addresses, listener_type, tls, http_config)
-
-
-NO_MORE_NONE_HTTP_WEB_CLIENT_LOCATION_WARNING = """
-Synapse no longer supports serving a web client. To remove this warning,
-configure 'web_client_location' with an HTTP(S) URL.
-"""
-
-
-NO_MORE_WEB_CLIENT_WARNING = """
-Synapse no longer includes a web client. To redirect the root resource to a web client, configure
-'web_client_location'. To remove this warning, remove 'webclient' from the 'listeners'
-configuration.
-"""
-
-
-def _warn_if_webclient_configured(listeners: Iterable[ListenerConfig]) -> None:
-    for listener in listeners:
-        if not listener.http_options:
-            continue
-        for res in listener.http_options.resources:
-            for name in res.names:
-                if name == "webclient":
-                    logger.warning(NO_MORE_WEB_CLIENT_WARNING)
-                    return
 
 
 _MANHOLE_SETTINGS_SCHEMA = {

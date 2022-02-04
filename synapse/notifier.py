@@ -461,7 +461,9 @@ class Notifier:
                     users,
                 )
             except Exception:
-                logger.exception("Error notifying application services of event")
+                logger.exception(
+                    "Error notifying application services of ephemeral events"
+                )
 
     def on_new_replication_data(self) -> None:
         """Used to inform replication listeners that something has happened
