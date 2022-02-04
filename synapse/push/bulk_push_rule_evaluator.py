@@ -17,6 +17,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union
 
 import attr
+import re
 from prometheus_client import Counter
 
 from synapse.api.constants import EventTypes, Membership, RelationTypes
@@ -53,6 +54,8 @@ push_rules_delta_state_cache_metric = register_cache(
     resizable=False,
 )
 
+# Regex pattern for detecting a bridge bot (cached here for performance)
+BOT_PATTERN = re.compile(r"^@_.*_bot\:.*")
 
 def _should_count_as_unread(
     event: EventBase, context: EventContext, room_members: Dict[str, ProfileInfo]
@@ -191,8 +194,11 @@ class BulkPushRuleEvaluator:
             (await self.store.get_event(related_event_id)) if related_event_id else None
         )
 
+        non_bot_room_members = [x for x in room_members if not BOT_PATTERN.match(x)]
+        logger.debug("Evaluating Push Rule - room_members: %r, non_bot_room_members: %r", len(room_members), len(non_bot_room_members))
+
         evaluator = PushRuleEvaluatorForEvent(
-            event, len(room_members), sender_power_level, power_levels, related_event
+            event, len(non_bot_room_members), sender_power_level, power_levels, related_event
         )
 
         condition_cache: Dict[str, bool] = {}
