@@ -13,6 +13,7 @@
 # limitations under the License.
 import itertools
 import logging
+import attr
 from queue import Empty, PriorityQueue
 from typing import (
     TYPE_CHECKING,
@@ -71,7 +72,8 @@ logger = logging.getLogger(__name__)
 
 
 # All the info we need while iterating the DAG while backfilling
-class BackfillQueueNavigationItem(NamedTuple):
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class BackfillQueueNavigationItem:
     depth: int
     stream_ordering: int
     event_id: str
@@ -1051,7 +1053,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             batch_connection_query,
             (insertion_event_id, limit),
         )
-        batch_start_event_id_results = txn.fetchall()
         return [
             BackfillQueueNavigationItem(
                 depth=row[0],
@@ -1059,7 +1060,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 event_id=row[2],
                 type=row[3],
             )
-            for row in batch_start_event_id_results
+            for row in txn
         ]
 
     def _get_connected_prev_event_backfill_results_txn(
