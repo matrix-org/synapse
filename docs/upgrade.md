@@ -84,6 +84,21 @@ process, for example:
     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
+# Upgrading to v1.(next)
+
+## Stablisation of MSC3231
+
+The unstable validity-check endpoint for the 
+[Registration Tokens](https://spec.matrix.org/v1.2/client-server-api/#get_matrixclientv1registermloginregistration_tokenvalidity) 
+feature has been stabilised and moved from:
+
+`/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity`
+
+to:
+
+`/_matrix/client/v1/register/m.login.registration_token/validity`
+
+Please update any relevant reverse proxy or firewall configurations appropriately.
 
 # Upgrading to v1.53.0
 
