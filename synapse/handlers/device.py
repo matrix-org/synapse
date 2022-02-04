@@ -497,7 +497,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
         # specify the user ID too since the user should always get their own device list
         # updates, even if they aren't in any rooms.
-        users_to_notify = users_who_share_room.union(user_id)
+        users_to_notify = users_who_share_room.union({user_id})
 
         self.notifier.on_new_event("device_list_key", position, users=users_to_notify)
 
