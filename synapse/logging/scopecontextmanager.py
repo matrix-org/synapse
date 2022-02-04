@@ -28,8 +28,9 @@ class LogContextScopeManager(ScopeManager):
     The LogContextScopeManager tracks the active scope in opentracing
     by using the log contexts which are native to synapse. This is so
     that the basic opentracing api can be used across twisted defereds.
-    (I would love to break logcontexts and this into an OS package. but
-    let's wait for twisted's contexts to be released.)
+
+    It would be nice just to use opentracing's ContextVarsScopeManager,
+    but currently that doesn't work due to https://twistedmatrix.com/trac/ticket/10301.
     """
 
     def __init__(self, config):
@@ -65,29 +66,45 @@ class LogContextScopeManager(ScopeManager):
             Scope.close() on the returned instance.
         """
 
-        enter_logcontext = False
         ctx = current_context()
 
         if not ctx:
-            # We don't want this scope to affect.
             logger.error("Tried to activate scope outside of loggingcontext")
             return Scope(None, span)  # type: ignore[arg-type]
-        elif ctx.scope is not None:
-            # We want the logging scope to look exactly the same so we give it
-            # a blank suffix
+
+        if ctx.scope is not None:
+            # start a new logging context as a child of the existing one.
+            # Doing so -- rather than updating the existing logcontext -- means that
+            # creating several concurrent spans under the same logcontext works
+            # correctly.
             ctx = nested_logging_context("")
             enter_logcontext = True
+        else:
+            # if there is no span currently associated with the current logcontext, we
+            # just store the scope in it.
+            #
+            # This feels a bit dubious, but it does hack around a problem where a
+            # span outlasts its parent logcontext (which would otherwise lead to
+            # "Re-starting finished log context" errors).
+            enter_logcontext = False
 
         scope = _LogContextScope(self, span, ctx, enter_logcontext, finish_on_close)
         ctx.scope = scope
+        if enter_logcontext:
+            ctx.__enter__()
+
         return scope
 
 
 class _LogContextScope(Scope):
     """
-    A custom opentracing scope. The only significant difference is that it will
-    close the log context it's related to if the logcontext was created specifically
-    for this scope.
+    A custom opentracing scope, associated with a LogContext
+
+      * filters out _DefGen_Return exceptions which arise from calling
+        `defer.returnValue` in Twisted code
+
+      * When the scope is closed, the logcontext's active scope is reset to None.
+        and - if enter_logcontext was set - the logcontext is finished too.
     """
 
     def __init__(self, manager, span, logcontext, enter_logcontext, finish_on_close):
@@ -101,8 +118,7 @@ class _LogContextScope(Scope):
             logcontext (LogContext):
                 the logcontext to which this scope is attached.
             enter_logcontext (Boolean):
-                if True the logcontext will be entered and exited when the scope
-                is entered and exited respectively
+                if True the logcontext will be exited when the scope is finished
             finish_on_close (Boolean):
                 if True finish the span when the scope is closed
         """
@@ -111,26 +127,28 @@ class _LogContextScope(Scope):
         self._finish_on_close = finish_on_close
         self._enter_logcontext = enter_logcontext
 
-    def __enter__(self):
-        if self._enter_logcontext:
-            self.logcontext.__enter__()
+    def __exit__(self, exc_type, value, traceback):
+        if exc_type == twisted.internet.defer._DefGen_Return:
+            # filter out defer.returnValue() calls
+            exc_type = value = traceback = None
+        super().__exit__(exc_type, value, traceback)
 
-        return self
-
-    def __exit__(self, type, value, traceback):
-        if type == twisted.internet.defer._DefGen_Return:
-            super().__exit__(None, None, None)
-        else:
-            super().__exit__(type, value, traceback)
-        if self._enter_logcontext:
-            self.logcontext.__exit__(type, value, traceback)
-        else:  # the logcontext existed before the creation of the scope
-            self.logcontext.scope = None
+    def __str__(self):
+        return f"Scope<{self.span}>"
 
     def close(self):
-        if self.manager.active is not self:
-            logger.error("Tried to close a non-active scope!")
-            return
+        active_scope = self.manager.active
+        if active_scope is not self:
+            logger.error(
+                "Closing scope %s which is not the currently-active one %s",
+                self,
+                active_scope,
+            )
 
         if self._finish_on_close:
             self.span.finish()
+
+        self.logcontext.scope = None
+
+        if self._enter_logcontext:
+            self.logcontext.__exit__(None, None, None)

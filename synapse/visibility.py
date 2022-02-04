@@ -87,7 +87,7 @@ async def filter_events_for_client(
     )
 
     ignore_dict_content = await storage.main.get_global_account_data_by_type_for_user(
-        AccountDataTypes.IGNORED_USER_LIST, user_id
+        user_id, AccountDataTypes.IGNORED_USER_LIST
     )
 
     ignore_list: FrozenSet[str] = frozenset()

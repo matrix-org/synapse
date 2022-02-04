@@ -51,7 +51,6 @@ from synapse.logging.context import (
     preserve_fn,
     run_in_background,
 )
-from synapse.logging.utils import log_function
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
@@ -562,7 +561,6 @@ class FederationHandler:
 
             run_in_background(self._handle_queued_pdus, room_queue)
 
-    @log_function
     async def do_knock(
         self,
         target_hosts: List[str],
@@ -934,7 +932,6 @@ class FederationHandler:
 
         return event
 
-    @log_function
     async def on_make_knock_request(
         self, origin: str, room_id: str, user_id: str
     ) -> EventBase:
@@ -1045,7 +1042,6 @@ class FederationHandler:
         else:
             return []
 
-    @log_function
     async def on_backfill_request(
         self, origin: str, room_id: str, pdu_list: List[str], limit: int
     ) -> List[EventBase]:
@@ -1075,7 +1071,6 @@ class FederationHandler:
 
         return events
 
-    @log_function
     async def get_persisted_pdu(
         self, origin: str, event_id: str
     ) -> Optional[EventBase]:
@@ -1137,7 +1132,6 @@ class FederationHandler:
 
         return missing_events
 
-    @log_function
     async def exchange_third_party_invite(
         self, sender_user_id: str, target_user_id: str, room_id: str, signed: JsonDict
     ) -> None:

@@ -61,11 +61,20 @@ class ApiConfig(Config):
            #additional_event_types:
            #  - org.example.custom.event.type
 
-        # If enabled, puppeted user IP's can also be tracked. By default when
-        # puppeting another user, the user who has created the access token
-        # for puppeting is tracked. If this is enabled, both requests are tracked.
-        # Implicitly enables MAU tracking for puppeted users.
-        #track_puppeted_user_ips: false
+        # We record the IP address of clients used to access the API for various
+        # reasons, including displaying it to the user in the "Where you're signed in"
+        # dialog.
+        #
+        # By default, when puppeting another user via the admin API, the client IP
+        # address is recorded against the user who created the access token (ie, the
+        # admin user), and *not* the puppeted user.
+        #
+        # Uncomment the following to also record the IP address against the puppeted
+        # user. (This also means that the puppeted user will count as an "active" user
+        # for the purpose of monthly active user tracking - see 'limit_usage_by_mau' etc
+        # above.)
+        #
+        #track_puppeted_user_ips: true
         """ % {
             "formatted_default_state_types": formatted_default_state_types
         }

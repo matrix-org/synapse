@@ -83,7 +83,7 @@ class _NoChainCoverIndex(Exception):
         super().__init__("Unexpectedly no chain cover for events in %s" % (room_id,))
 
 
-class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBaseStore):
+class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBaseStore):
     def __init__(
         self,
         database: DatabasePool,
@@ -1553,7 +1553,10 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
             if room_version.event_format == EventFormatVersions.V1:
                 for prev_event_tuple in prev_events:
-                    if not isinstance(prev_event_tuple, list) or len(prev_events) != 2:
+                    if (
+                        not isinstance(prev_event_tuple, list)
+                        or len(prev_event_tuple) != 2
+                    ):
                         logger.info("Invalid prev_events for %s", event_id)
                         break
 

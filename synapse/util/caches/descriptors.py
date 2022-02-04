@@ -254,9 +254,17 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
             return r1 + r2
 
     Args:
+        orig:
+        max_entries:
         num_args: number of positional arguments (excluding ``self`` and
             ``cache_context``) to use as cache keys. Defaults to all named
             args of the function.
+        tree:
+        cache_context:
+        iterable:
+        prune_unread_entries: If True, cache entries that haven't been read recently
+            will be evicted from the cache in the background. Set to False to opt-out
+            of this behaviour.
     """
 
     def __init__(

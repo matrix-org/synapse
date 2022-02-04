@@ -13,17 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union, cast
 
 import attr
 from frozendict import frozendict
@@ -43,12 +33,37 @@ from synapse.storage.relations import (
     PaginationChunk,
     RelationPaginationToken,
 )
+from synapse.types import JsonDict
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _ThreadAggregation:
+    latest_event: EventBase
+    count: int
+    current_user_participated: bool
+
+
+@attr.s(slots=True, auto_attribs=True)
+class BundledAggregations:
+    """
+    The bundled aggregations for an event.
+
+    Some values require additional processing during serialization.
+    """
+
+    annotations: Optional[JsonDict] = None
+    references: Optional[JsonDict] = None
+    replace: Optional[EventBase] = None
+    thread: Optional[_ThreadAggregation] = None
+
+    def __bool__(self) -> bool:
+        return bool(self.annotations or self.references or self.replace or self.thread)
 
 
 class RelationsWorkerStore(SQLBaseStore):
@@ -60,7 +75,6 @@ class RelationsWorkerStore(SQLBaseStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        self._msc1849_enabled = hs.config.experimental.msc1849_enabled
         self._msc3440_enabled = hs.config.experimental.msc3440_enabled
 
     @cached(tree=True)
@@ -384,8 +398,7 @@ class RelationsWorkerStore(SQLBaseStore):
     async def get_thread_summary(
         self, event_id: str, room_id: str
     ) -> Tuple[int, Optional[EventBase]]:
-        """Get the number of threaded replies, the senders of those replies, and
-        the latest reply (if any) for the given event.
+        """Get the number of threaded replies and the latest reply (if any) for the given event.
 
         Args:
             event_id: Summarize the thread related to this event ID.
@@ -398,7 +411,7 @@ class RelationsWorkerStore(SQLBaseStore):
         def _get_thread_summary_txn(
             txn: LoggingTransaction,
         ) -> Tuple[int, Optional[str]]:
-            # Fetch the count of threaded events and the latest event ID.
+            # Fetch the latest event ID in the thread.
             # TODO Should this only allow m.room.message events.
             sql = """
                 SELECT event_id
@@ -419,6 +432,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
             latest_event_id = row[0]
 
+            # Fetch the number of threaded replies.
             sql = """
                 SELECT COUNT(event_id)
                 FROM event_relations
@@ -442,6 +456,44 @@ class RelationsWorkerStore(SQLBaseStore):
             latest_event = await self.get_event(latest_event_id, allow_none=True)  # type: ignore[attr-defined]
 
         return count, latest_event
+
+    @cached()
+    async def get_thread_participated(
+        self, event_id: str, room_id: str, user_id: str
+    ) -> bool:
+        """Get whether the requesting user participated in a thread.
+
+        This is separate from get_thread_summary since that can be cached across
+        all users while this value is specific to the requeser.
+
+        Args:
+            event_id: The thread related to this event ID.
+            room_id: The room the event belongs to.
+            user_id: The user requesting the summary.
+
+        Returns:
+            True if the requesting user participated in the thread, otherwise false.
+        """
+
+        def _get_thread_summary_txn(txn: LoggingTransaction) -> bool:
+            # Fetch whether the requester has participated or not.
+            sql = """
+                SELECT 1
+                FROM event_relations
+                INNER JOIN events USING (event_id)
+                WHERE
+                    relates_to_id = ?
+                    AND room_id = ?
+                    AND relation_type = ?
+                    AND sender = ?
+            """
+
+            txn.execute(sql, (event_id, room_id, RelationTypes.THREAD, user_id))
+            return bool(txn.fetchone())
+
+        return await self.db_pool.runInteraction(
+            "get_thread_summary", _get_thread_summary_txn
+        )
 
     async def events_have_relations(
         self,
@@ -546,14 +598,15 @@ class RelationsWorkerStore(SQLBaseStore):
         )
 
     async def _get_bundled_aggregation_for_event(
-        self, event: EventBase
-    ) -> Optional[Dict[str, Any]]:
+        self, event: EventBase, user_id: str
+    ) -> Optional[BundledAggregations]:
         """Generate bundled aggregations for an event.
 
         Note that this does not use a cache, but depends on cached methods.
 
         Args:
             event: The event to calculate bundled aggregations for.
+            user_id: The user requesting the bundled aggregations.
 
         Returns:
             The bundled aggregations for an event, if bundled aggregations are
@@ -577,62 +630,64 @@ class RelationsWorkerStore(SQLBaseStore):
         # The bundled aggregations to include, a mapping of relation type to a
         # type-specific value. Some types include the direct return type here
         # while others need more processing during serialization.
-        aggregations: Dict[str, Any] = {}
+        aggregations = BundledAggregations()
 
         annotations = await self.get_aggregation_groups_for_event(event_id, room_id)
         if annotations.chunk:
-            aggregations[RelationTypes.ANNOTATION] = annotations.to_dict()
+            aggregations.annotations = annotations.to_dict()
 
         references = await self.get_relations_for_event(
             event_id, room_id, RelationTypes.REFERENCE, direction="f"
         )
         if references.chunk:
-            aggregations[RelationTypes.REFERENCE] = references.to_dict()
+            aggregations.references = references.to_dict()
 
         edit = None
         if event.type == EventTypes.Message:
             edit = await self.get_applicable_edit(event_id, room_id)
 
         if edit:
-            aggregations[RelationTypes.REPLACE] = edit
+            aggregations.replace = edit
 
         # If this event is the start of a thread, include a summary of the replies.
         if self._msc3440_enabled:
-            (
-                thread_count,
-                latest_thread_event,
-            ) = await self.get_thread_summary(event_id, room_id)
+            thread_count, latest_thread_event = await self.get_thread_summary(
+                event_id, room_id
+            )
+            participated = await self.get_thread_participated(
+                event_id, room_id, user_id
+            )
             if latest_thread_event:
-                aggregations[RelationTypes.THREAD] = {
-                    # Don't bundle aggregations as this could recurse forever.
-                    "latest_event": latest_thread_event,
-                    "count": thread_count,
-                }
+                aggregations.thread = _ThreadAggregation(
+                    latest_event=latest_thread_event,
+                    count=thread_count,
+                    current_user_participated=participated,
+                )
 
         # Store the bundled aggregations in the event metadata for later use.
         return aggregations
 
     async def get_bundled_aggregations(
-        self, events: Iterable[EventBase]
-    ) -> Dict[str, Dict[str, Any]]:
+        self,
+        events: Iterable[EventBase],
+        user_id: str,
+    ) -> Dict[str, BundledAggregations]:
         """Generate bundled aggregations for events.
 
         Args:
             events: The iterable of events to calculate bundled aggregations for.
+            user_id: The user requesting the bundled aggregations.
 
         Returns:
             A map of event ID to the bundled aggregation for the event. Not all
             events may have bundled aggregations in the results.
         """
-        # If bundled aggregations are disabled, nothing to do.
-        if not self._msc1849_enabled:
-            return {}
 
         # TODO Parallelize.
         results = {}
         for event in events:
-            event_result = await self._get_bundled_aggregation_for_event(event)
-            if event_result is not None:
+            event_result = await self._get_bundled_aggregation_for_event(event, user_id)
+            if event_result:
                 results[event.event_id] = event_result
 
         return results

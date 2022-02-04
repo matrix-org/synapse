@@ -141,7 +141,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Test with old deps
-        uses: docker://ubuntu:bionic # For old python and sqlite
+        uses: docker://ubuntu:focal # For old python and sqlite
         with:
           workdir: /github/workspace
           entrypoint: .ci/scripts/test_old_deps.sh
@@ -213,15 +213,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - sytest-tag: bionic
+          - sytest-tag: focal
 
-          - sytest-tag: bionic
+          - sytest-tag: focal
             postgres: postgres
 
           - sytest-tag: testing
             postgres: postgres
 
-          - sytest-tag: bionic
+          - sytest-tag: focal
             postgres: multi-postgres
             workers: workers
 
@@ -323,17 +323,22 @@ jobs:
     if: ${{ !failure() && !cancelled() }}
     needs: linting-done
     runs-on: ubuntu-latest
-    container:
-      # https://github.com/matrix-org/complement/blob/master/dockerfiles/ComplementCIBuildkite.Dockerfile
-      image: matrixdotorg/complement:latest
-      env:
-        CI: true
-      ports:
-        - 8448:8448
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
 
     steps:
+      # The path is set via a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on the path to run Complement.
+      # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-system-path
+      - name: "Set Go Version"
+        run: |
+          # Add Go 1.17 to the PATH: see https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md#environment-variables-2
+          echo "$GOROOT_1_17_X64/bin" >> $GITHUB_PATH
+          # Add the Go path to the PATH: We need this so we can call gotestfmt
+          echo "~/go/bin" >> $GITHUB_PATH
+
+      - name: "Install Complement Dependencies"
+        run: |
+          sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
+          go get -v github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@latest
+
       - name: Run actions/checkout@v2 for synapse
         uses: actions/checkout@v2
         with:
@@ -376,8 +381,11 @@ jobs:
         working-directory: complement/dockerfiles
 
       # Run Complement
-      - run: set -o pipefail && go test -v -json -tags synapse_blacklist,msc2403 ./tests/... 2>&1 | gotestfmt
+      - run: |
+          set -o pipefail
+          go test -v -json -p 1 -tags synapse_blacklist,msc2403 ./tests/... 2>&1 | gotestfmt
         shell: bash
+        name: Run Complement Tests
         env:
           COMPLEMENT_BASE_IMAGE: complement-synapse:latest
         working-directory: complement

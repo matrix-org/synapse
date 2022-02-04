@@ -20,7 +20,9 @@ recommended for development. More information about WSL can be found at
 <https://docs.microsoft.com/en-us/windows/wsl/install>. Running Synapse natively
 on Windows is not officially supported.
 
-The code of Synapse is written in Python 3. To do pretty much anything, you'll need [a recent version of Python 3](https://wiki.python.org/moin/BeginnersGuide/Download).
+The code of Synapse is written in Python 3. To do pretty much anything, you'll need [a recent version of Python 3](https://www.python.org/downloads/). Your Python also needs support for [virtual environments](https://docs.python.org/3/library/venv.html). This is usually built-in, but some Linux distributions like Debian and Ubuntu split it out into its own package. Running `sudo apt install python3-venv` should be enough.
+
+Synapse can connect to PostgreSQL via the [psycopg2](https://pypi.org/project/psycopg2/) Python library. Building this library from source requires access to PostgreSQL's C header files. On Debian or Ubuntu Linux, these can be installed with `sudo apt install libpq-dev`.
 
 The source code of Synapse is hosted on GitHub. You will also need [a recent version of git](https://github.com/git-guides/install-git).
 
@@ -53,6 +55,7 @@ setup a *virtualenv*, as follows:
 cd path/where/you/have/cloned/the/repository
 python3 -m venv ./env
 source ./env/bin/activate
+pip install wheel
 pip install -e ".[all,dev]"
 pip install tox
 ```
@@ -114,7 +117,7 @@ The linters look at your code and do two things:
 - ensure that your code follows the coding style adopted by the project;
 - catch a number of errors in your code.
 
-They're pretty fast, don't hesitate!
+The linter takes no time at all to run as soon as you've [downloaded the dependencies into your python virtual environment](#4-install-the-dependencies).
 
 ```sh
 source ./env/bin/activate
