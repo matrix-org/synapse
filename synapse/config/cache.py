@@ -225,18 +225,14 @@ class CacheConfig(Config):
         cache_entry_ttl = cache_config.get("cache_entry_ttl", "30m")
 
         if expire_caches:
-            self.expiry_time_msec: Optional[int] = self.parse_duration(
-                    cache_entry_ttl
-            )
+            self.expiry_time_msec: Optional[int] = self.parse_duration(cache_entry_ttl)
         else:
             self.expiry_time_msec = None
 
         # Backwards compatibility support for the now-removed "expiry_time" config flag.
         expiry_time = cache_config.get("expiry_time")
         if expiry_time:
-            self.expiry_time_msec = Optional[int] = self.parse_duration(
-                    expiry_time
-            )
+            self.expiry_time_msec = self.parse_duration(expiry_time)
 
         self.sync_response_cache_duration = self.parse_duration(
             cache_config.get("sync_response_cache_duration", 0)
