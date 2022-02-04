@@ -13,7 +13,6 @@
 # limitations under the License.
 import itertools
 import logging
-import attr
 from queue import Empty, PriorityQueue
 from typing import (
     TYPE_CHECKING,
@@ -27,6 +26,7 @@ from typing import (
     Tuple,
 )
 
+import attr
 from prometheus_client import Counter, Gauge
 
 from synapse.api.constants import MAX_DEPTH, EventTypes
