@@ -752,7 +752,7 @@ caches:
     #get_users_who_share_room_with_user: 2.0
 
   # Controls whether cache entries are evicted after a specified time
-  # period. Defaults to true.
+  # period. Defaults to true. Uncomment to disable this feature.
   # expire_caches: false
 
   # If expire_caches is enabled, this flag controls how long an entry can
