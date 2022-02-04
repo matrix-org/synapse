@@ -641,7 +641,7 @@ The following fields are returned in the JSON response body:
   - `created_ts` - integer - Timestamp when the content was uploaded in ms.
   - `last_access_ts` - integer - Timestamp when the content was last accessed in ms.
   - `media_id` - string - The id used to refer to the media. Details about the format
-    of the `media_id` are documented under
+    are documented under
     [media repository](../media_repository.md).
   - `media_length` - integer - Length of the media in bytes.
   - `media_type` - string - The MIME-type of the media.
