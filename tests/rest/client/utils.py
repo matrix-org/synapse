@@ -110,7 +110,9 @@ class RestHelper:
                 default room version.
             tok: The access token to use in the request.
             expect_code: The expected HTTP response code.
-            appservice_user_id: The user_id an apperservice should act on behalf.
+            appservice_user_id: The `user_id` URL parameter to pass.
+                This allows driving an application service user
+                using an application service access token in `tok`.
 
         Returns:
             The ID of the newly created room.
