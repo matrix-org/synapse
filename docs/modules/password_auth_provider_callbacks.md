@@ -148,7 +148,7 @@ Here's an example featuring all currently supported keys:
         "address": "33123456789",
         "validated_at": 1642701357084,
     },
-    "org.matrix.msc3231.login.registration_token": "sometoken",  # User has registered through the flow described in MSC3231
+    "m.login.registration_token": "sometoken",  # User has registered through a registration token
 }
 ```
 

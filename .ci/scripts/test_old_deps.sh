@@ -15,4 +15,4 @@ export LANG="C.UTF-8"
 # Prevent virtualenv from auto-updating pip to an incompatible version
 export VIRTUALENV_NO_DOWNLOAD=1
 
-exec tox -e py3-old,combine
+exec tox -e py3-old
