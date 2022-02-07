@@ -313,7 +313,7 @@ class RestHelper:
     def _append_query_params(
         self, path: str, query_params_dict: Dict[str, Union[str, None, int]]
     ):
-        query_params = urllib.parse.urlencode(
+        query_params = urlencode(
             {k: v for k, v in query_params_dict.items() if v is not None}
         )
         if query_params:
