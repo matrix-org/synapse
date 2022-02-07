@@ -42,7 +42,7 @@ SYNCTL_CACHE_FACTOR_WARNING = """\
 Setting 'synctl_cache_factor' in the config is deprecated. Instead, please do
 one of the following:
  - Either set the environment variable 'SYNAPSE_CACHE_FACTOR'
- - or set 'caches.global_factor' in the configs.
+ - or set 'caches.global_factor' in the homeserver config.
 --------------------------------------------------------------------------------"""
 
 logger = logging.getLogger(__name__)
