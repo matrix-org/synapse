@@ -1095,14 +1095,14 @@ class RoomAppserviceTsParamTestCase(RoomBase):
     def prepare(self, reactor, clock, homeserver):
         self.ts = 1
 
-        self.appservice_user = self.register_appservice_user(
+        self.appservice_user, _ = self.register_appservice_user(
             "as_user_potato", self.appservice.token
         )
 
         self.room = self.helper.create_room_as(
             room_creator=self.appservice_user,
             tok=self.appservice.token,
-            impersonated_user=self.appservice_user,
+            appservice_user_id=self.appservice_user,
         )
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
@@ -1125,23 +1125,32 @@ class RoomAppserviceTsParamTestCase(RoomBase):
             hs = self.setup_test_homeserver(config=config)
         return hs
 
-    def test_state_event(self):
+    def test_state_event_msc3316_ts(self):
         normal_user = self.register_user("thomas", "hackme")
         event_id = self.helper.invite(
             self.room,
             self.appservice_user,
             normal_user,
             tok=self.appservice.token,
-            ts=self.ts,
+            msc3316_ts=self.ts,
             appservice_user_id=self.appservice_user,
         )
         self._check_event_ts(event_id)
 
-    def test_send_event(self):
+    def test_send_event_ts(self):
         event_id = self.helper.send(
             self.room,
             tok=self.appservice.token,
             ts=self.ts,
+            appservice_user_id=self.appservice_user,
+        )["event_id"]
+        self._check_event_ts(event_id)
+
+    def test_send_event_msc3316_ts(self):
+        event_id = self.helper.send(
+            self.room,
+            tok=self.appservice.token,
+            msc3316_ts=self.ts,
             appservice_user_id=self.appservice_user,
         )["event_id"]
         self._check_event_ts(event_id)

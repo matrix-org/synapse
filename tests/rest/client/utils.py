@@ -154,7 +154,7 @@ class RestHelper:
         expect_code=200,
         tok=None,
         appservice_user_id=None,
-        ts=None,
+        msc3316_ts=None,
     ):
         return self.change_membership(
             room=room,
@@ -163,7 +163,7 @@ class RestHelper:
             tok=tok,
             membership=Membership.INVITE,
             expect_code=expect_code,
-            ts=ts,
+            msc3316_ts=msc3316_ts,
             appservice_user_id=appservice_user_id,
         )
 
@@ -245,7 +245,7 @@ class RestHelper:
         appservice_user_id: Optional[str] = None,
         expect_code: int = 200,
         expect_errcode: Optional[str] = None,
-        ts: Optional[int] = None,
+        msc3316_ts: Optional[int] = None,
     ) -> None:
         """
         Send a membership state event into a room.
@@ -262,8 +262,11 @@ class RestHelper:
                 using an application service access token in `tok`.
             expect_code: The expected HTTP response code
             expect_errcode: The expected Matrix error code
-            ts: If the user is an appservice, ts will be used as the event's
+            msc3316_ts: If the user is an appservice, msc3316_ts will be used as the event's
                 "original_server_ts"
+
+        Returns:
+            The id of the created event.
 
         """
         temp_id = self.auth_user_id
@@ -275,7 +278,7 @@ class RestHelper:
             path,
             {
                 "access_token": tok,
-                "ts": ts,
+                "org.matrix.msc3316.ts": msc3316_ts,
                 "user_id": appservice_user_id,
             },
         )
@@ -331,6 +334,7 @@ class RestHelper:
         expect_code=200,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
         ts: Optional[int] = None,
+        msc3316_ts: Optional[int] = None,
         appservice_user_id: Optional[str] = None,
     ):
         if body is None:
@@ -347,6 +351,7 @@ class RestHelper:
             expect_code,
             custom_headers=custom_headers,
             ts=ts,
+            msc3316_ts=msc3316_ts,
             appservice_user_id=appservice_user_id,
         )
 
@@ -360,6 +365,7 @@ class RestHelper:
         expect_code=200,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
         ts=None,
+        msc3316_ts=None,
         appservice_user_id: Optional[str] = None,
     ):
         if txn_id is None:
@@ -367,7 +373,13 @@ class RestHelper:
 
         path = "/_matrix/client/r0/rooms/%s/send/%s/%s" % (room_id, type, txn_id)
         path = self._append_query_params(
-            path, {"access_token": tok, "user_id": appservice_user_id, "ts": ts}
+            path,
+            {
+                "access_token": tok,
+                "user_id": appservice_user_id,
+                "ts": ts,
+                "org.matrix.msc3316.ts": msc3316_ts,
+            },
         )
 
         channel = make_request(

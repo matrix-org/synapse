@@ -207,7 +207,9 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         # Twisted will have processed the args by now.
         assert request.args is not None
         if requester.app_service:
-            event_dict["origin_server_ts"] = parse_integer(request, "ts")
+            event_dict["origin_server_ts"] = parse_integer(
+                request, "org.matrix.msc3316.ts"
+            )
 
         try:
             if event_type == EventTypes.Member:
@@ -267,8 +269,13 @@ class RoomSendEventRestServlet(TransactionRestServlet):
 
         # Twisted will have processed the args by now.
         assert request.args is not None
-        if b"ts" in request.args and requester.app_service:
-            event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
+        if requester.app_service:
+            if b"ts" in request.args:
+                event_dict["origin_server_ts"] = parse_integer(request, "ts")
+            elif b"org.matrix.msc3316.ts" in request.args:
+                event_dict["origin_server_ts"] = parse_integer(
+                    request, "org.matrix.msc3316.ts"
+                )
 
         try:
             (
