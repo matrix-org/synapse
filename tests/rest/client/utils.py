@@ -68,7 +68,7 @@ class RestHelper:
         expect_code: Literal[200] = ...,
         extra_content: Optional[Dict] = ...,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = ...,
-        impersonated_user: Optional[str] = ...,
+        appservice_user_id: Optional[str] = ...,
     ) -> str:
         ...
 
@@ -82,7 +82,7 @@ class RestHelper:
         expect_code: int = ...,
         extra_content: Optional[Dict] = ...,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = ...,
-        impersonated_user: Optional[str] = ...,
+        appservice_user_id: Optional[str] = ...,
     ) -> Optional[str]:
         ...
 
@@ -95,7 +95,7 @@ class RestHelper:
         expect_code: int = 200,
         extra_content: Optional[Dict] = None,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
-        impersonated_user: Optional[str] = None,
+        appservice_user_id: Optional[str] = None,
     ) -> Optional[str]:
         """
         Create a room.
@@ -110,7 +110,7 @@ class RestHelper:
                 default room version.
             tok: The access token to use in the request.
             expect_code: The expected HTTP response code.
-            impersonated_user: The user_id an apperservice should act on behalf.
+            appservice_user_id: The user_id an apperservice should act on behalf.
 
         Returns:
             The ID of the newly created room.
@@ -124,7 +124,7 @@ class RestHelper:
         if room_version:
             content["room_version"] = room_version
         path = self._append_query_params(
-            path, {"access_token": tok, "user_id": impersonated_user}
+            path, {"access_token": tok, "user_id": appservice_user_id}
         )
 
         channel = make_request(
@@ -151,7 +151,7 @@ class RestHelper:
         targ=None,
         expect_code=200,
         tok=None,
-        impersonated_user=None,
+        appservice_user_id=None,
         ts=None,
     ):
         return self.change_membership(
@@ -162,7 +162,7 @@ class RestHelper:
             membership=Membership.INVITE,
             expect_code=expect_code,
             ts=ts,
-            impersonated_user=impersonated_user,
+            appservice_user_id=appservice_user_id,
         )
 
     def join(
@@ -329,7 +329,7 @@ class RestHelper:
         expect_code=200,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
         ts: Optional[int] = None,
-        impersonated_user: Optional[str] = None,
+        appservice_user_id: Optional[str] = None,
     ):
         if body is None:
             body = "body_text_here"
@@ -345,7 +345,7 @@ class RestHelper:
             expect_code,
             custom_headers=custom_headers,
             ts=ts,
-            impersonated_user=impersonated_user,
+            appservice_user_id=appservice_user_id,
         )
 
     def send_event(
@@ -358,14 +358,14 @@ class RestHelper:
         expect_code=200,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
         ts=None,
-        impersonated_user: Optional[str] = None,
+        appservice_user_id: Optional[str] = None,
     ):
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
 
         path = "/_matrix/client/r0/rooms/%s/send/%s/%s" % (room_id, type, txn_id)
         path = self._append_query_params(
-            path, {"access_token": tok, "user_id": impersonated_user, "ts": ts}
+            path, {"access_token": tok, "user_id": appservice_user_id, "ts": ts}
         )
 
         channel = make_request(

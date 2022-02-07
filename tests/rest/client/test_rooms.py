@@ -1133,7 +1133,7 @@ class RoomAppserviceTsParamTestCase(RoomBase):
             normal_user,
             tok=self.appservice.token,
             ts=self.ts,
-            impersonated_user=self.appservice_user,
+            appservice_user_id=self.appservice_user,
         )
         self._check_event_ts(event_id)
 
@@ -1142,7 +1142,7 @@ class RoomAppserviceTsParamTestCase(RoomBase):
             self.room,
             tok=self.appservice.token,
             ts=self.ts,
-            impersonated_user=self.appservice_user,
+            appservice_user_id=self.appservice_user,
         )["event_id"]
         self._check_event_ts(event_id)
 
