@@ -70,7 +70,8 @@ class UploadResource(DirectServeJsonResource):
                 upload_name: Optional[str] = upload_name_bytes.decode("utf8")
             except UnicodeDecodeError:
                 raise SynapseError(
-                    msg="Invalid UTF-8 filename parameter: %r" % (upload_name), code=400
+                    msg="Invalid UTF-8 filename parameter: %r" % (upload_name_bytes,),
+                    code=400,
                 )
 
         # If the name is falsey (e.g. an empty byte string) ensure it is None.
