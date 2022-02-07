@@ -1086,7 +1086,6 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             connected_prev_event_query,
             (event_id, False, limit),
         )
-        prev_event_id_results = txn.fetchall()
         return [
             BackfillQueueNavigationItem(
                 depth=row[0],
@@ -1094,7 +1093,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 event_id=row[2],
                 type=row[3],
             )
-            for row in prev_event_id_results
+            for row in txn
         ]
 
     async def get_backfill_events(
