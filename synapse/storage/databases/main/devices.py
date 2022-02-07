@@ -1584,7 +1584,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         txn: LoggingTransaction,
         user_id: str,
         device_ids: Iterable[str],
-        hosts: Iterable[str],
+        hosts: Collection[str],
         stream_ids: List[str],
         context: Dict[str, str],
     ) -> None:
