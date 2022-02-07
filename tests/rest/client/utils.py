@@ -28,6 +28,7 @@ from typing import (
     MutableMapping,
     Optional,
     Tuple,
+    Union,
     overload,
 )
 from unittest.mock import patch
@@ -66,6 +67,7 @@ class RestHelper:
         expect_code: Literal[200] = ...,
         extra_content: Optional[Dict] = ...,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = ...,
+        impersonated_user: Optional[str] = ...,
     ) -> str:
         ...
 
@@ -79,6 +81,7 @@ class RestHelper:
         expect_code: int = ...,
         extra_content: Optional[Dict] = ...,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = ...,
+        impersonated_user: Optional[str] = ...,
     ) -> Optional[str]:
         ...
 
@@ -91,6 +94,7 @@ class RestHelper:
         expect_code: int = 200,
         extra_content: Optional[Dict] = None,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
+        impersonated_user: Optional[str] = None,
     ) -> Optional[str]:
         """
         Create a room.
@@ -105,6 +109,7 @@ class RestHelper:
                 default room version.
             tok: The access token to use in the request.
             expect_code: The expected HTTP response code.
+            impersonated_user: The user_id an apperservice should act on behalf.
 
         Returns:
             The ID of the newly created room.
@@ -117,8 +122,9 @@ class RestHelper:
             content["visibility"] = "public" if is_public else "private"
         if room_version:
             content["room_version"] = room_version
-        if tok:
-            path = path + "?access_token=%s" % tok
+        path = self._append_query_params(
+            path, {"access_token": tok, "user_id": impersonated_user}
+        )
 
         channel = make_request(
             self.hs.get_reactor(),
@@ -137,14 +143,25 @@ class RestHelper:
         else:
             return None
 
-    def invite(self, room=None, src=None, targ=None, expect_code=200, tok=None):
-        self.change_membership(
+    def invite(
+        self,
+        room=None,
+        src=None,
+        targ=None,
+        expect_code=200,
+        tok=None,
+        impersonated_user=None,
+        ts=None,
+    ):
+        return self.change_membership(
             room=room,
             src=src,
             targ=targ,
             tok=tok,
             membership=Membership.INVITE,
             expect_code=expect_code,
+            ts=ts,
+            impersonated_user=impersonated_user,
         )
 
     def join(self, room=None, user=None, expect_code=200, tok=None):
@@ -216,6 +233,8 @@ class RestHelper:
         tok: Optional[str] = None,
         expect_code: int = 200,
         expect_errcode: Optional[str] = None,
+        ts: Optional[int] = None,
+        impersonated_user=None,
     ) -> None:
         """
         Send a membership state event into a room.
@@ -229,13 +248,24 @@ class RestHelper:
             tok: The user access token to use
             expect_code: The expected HTTP response code
             expect_errcode: The expected Matrix error code
+            ts: If the user is an appservice, ts will be used as the event's
+                "original_server_ts"
+            impersonated_user: The user_id an apperservice should act on behalf.
+
         """
         temp_id = self.auth_user_id
         self.auth_user_id = src
 
         path = "/_matrix/client/r0/rooms/%s/state/m.room.member/%s" % (room, targ)
-        if tok:
-            path = path + "?access_token=%s" % tok
+
+        path = self._append_query_params(
+            path,
+            {
+                "access_token": tok,
+                "ts": ts,
+                "user_id": impersonated_user,
+            },
+        )
 
         data = {"membership": membership}
         data.update(extra_data or {})
@@ -267,6 +297,18 @@ class RestHelper:
 
         self.auth_user_id = temp_id
 
+        return channel.json_body.get("event_id")
+
+    def _append_query_params(
+        self, path: str, query_params_dict: Dict[str, Union[str, None, int]]
+    ):
+        query_params = urllib.parse.urlencode(
+            {k: v for k, v in query_params_dict.items() if v is not None}
+        )
+        if query_params:
+            path += "?%s" % query_params
+        return path
+
     def send(
         self,
         room_id,
@@ -275,6 +317,8 @@ class RestHelper:
         tok=None,
         expect_code=200,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
+        ts: Optional[int] = None,
+        impersonated_user: Optional[str] = None,
     ):
         if body is None:
             body = "body_text_here"
@@ -289,6 +333,8 @@ class RestHelper:
             tok,
             expect_code,
             custom_headers=custom_headers,
+            ts=ts,
+            impersonated_user=impersonated_user,
         )
 
     def send_event(
@@ -300,13 +346,16 @@ class RestHelper:
         tok=None,
         expect_code=200,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
+        ts=None,
+        impersonated_user: Optional[str] = None,
     ):
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
 
         path = "/_matrix/client/r0/rooms/%s/send/%s/%s" % (room_id, type, txn_id)
-        if tok:
-            path = path + "?access_token=%s" % tok
+        path = self._append_query_params(
+            path, {"access_token": tok, "user_id": impersonated_user, "ts": ts}
+        )
 
         channel = make_request(
             self.hs.get_reactor(),

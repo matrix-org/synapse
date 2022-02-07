@@ -19,10 +19,12 @@
 
 import json
 from typing import Dict, Iterable, List, Optional
-from unittest.mock import Mock, call
+from unittest.mock import Mock, call, patch
 from urllib import parse as urlparse
 
 from twisted.internet import defer
+from twisted.internet.task import Clock
+from twisted.internet.testing import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import (
@@ -32,9 +34,11 @@ from synapse.api.constants import (
     RelationTypes,
 )
 from synapse.api.errors import Codes, HttpResponseException
+from synapse.appservice import ApplicationService
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest import admin
-from synapse.rest.client import account, directory, login, profile, room, sync
+from synapse.rest.client import account, directory, login, profile, register, room, sync
+from synapse.server import HomeServer
 from synapse.types import JsonDict, Requester, RoomAlias, UserID, create_requester
 from synapse.util.stringutils import random_string
 
@@ -1079,6 +1083,72 @@ class RoomJoinTestCase(RoomBase):
         # Now make the callback deny all room joins, and check that a join actually fails.
         return_value = False
         self.helper.join(self.room3, self.user2, expect_code=403, tok=self.tok2)
+
+
+class RoomAppserviceTsParamTestCase(RoomBase):
+    servlets = [
+        room.register_servlets,
+        synapse.rest.admin.register_servlets,
+        register.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.ts = 1
+
+        self.appservice_user = self.register_appservice_user(
+            "as_user_potato", self.appservice.token
+        )
+
+        self.room = self.helper.create_room_as(
+            room_creator=self.appservice_user,
+            tok=self.appservice.token,
+            impersonated_user=self.appservice_user,
+        )
+
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+        config = self.default_config()
+
+        self.appservice = ApplicationService(
+            token="i_am_an_app_service",
+            hostname="test",
+            id="1234",
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+            # Note: this user does not have to match the regex above
+            sender="@as_main:test",
+        )
+
+        mock_load_appservices = Mock(return_value=[self.appservice])
+        with patch(
+            "synapse.storage.databases.main.appservice.load_appservices",
+            mock_load_appservices,
+        ):
+            hs = self.setup_test_homeserver(config=config)
+        return hs
+
+    def test_state_event(self):
+        normal_user = self.register_user("thomas", "hackme")
+        event_id = self.helper.invite(
+            self.room,
+            self.appservice_user,
+            normal_user,
+            tok=self.appservice.token,
+            ts=self.ts,
+            impersonated_user=self.appservice_user,
+        )
+        self._check_event_ts(event_id)
+
+    def test_send_event(self):
+        event_id = self.helper.send(
+            self.room,
+            tok=self.appservice.token,
+            ts=self.ts,
+            impersonated_user=self.appservice_user,
+        )["event_id"]
+        self._check_event_ts(event_id)
+
+    def _check_event_ts(self, event_id):
+        res = self.get_success(self.hs.get_datastore().get_event(event_id))
+        self.assertEquals(self.ts, res.origin_server_ts)
 
 
 class RoomJoinRatelimitTestCase(RoomBase):
