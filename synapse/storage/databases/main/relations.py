@@ -682,10 +682,20 @@ class RelationsWorkerStore(SQLBaseStore):
             A map of event ID to the bundled aggregation for the event. Not all
             events may have bundled aggregations in the results.
         """
+        # The already processed event IDs. Tracked separately from the result
+        # since the result omits events which do not have bundled aggregations.
+        seen_events = set()
 
         # TODO Parallelize.
         results = {}
         for event in events:
+            # De-duplicate events by ID to handle the same event requested multiple
+            # times. The caches that _get_bundled_aggregation_for_event use should
+            # capture this, but best to reduce work.
+            if event.event_id in seen_events:
+                continue
+            seen_events.add(event.event_id)
+
             event_result = await self._get_bundled_aggregation_for_event(event, user_id)
             if event_result:
                 results[event.event_id] = event_result
