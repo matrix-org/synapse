@@ -49,10 +49,14 @@ class UploadResource(DirectServeJsonResource):
 
     async def _async_render_POST(self, request: SynapseRequest) -> None:
         requester = await self.auth.get_user_by_req(request)
-        content_length = request.getHeader("Content-Length")
-        if content_length is None:
+        raw_content_length = request.getHeader("Content-Length")
+        if raw_content_length is None:
             raise SynapseError(msg="Request must specify a Content-Length", code=400)
-        if int(content_length) > self.max_upload_size:
+        try:
+            content_length = int(raw_content_length)
+        except ValueError:
+            raise SynapseError(msg="Content-Length value is invalid", code=400)
+        if content_length > self.max_upload_size:
             raise SynapseError(
                 msg="Upload request body is too large",
                 code=413,
