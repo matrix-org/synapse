@@ -23,7 +23,7 @@ from synapse.api.constants import (
     ReadReceiptEventFields,
     RelationTypes,
 )
-from synapse.rest.client import knock, login, read_marker, receipts, room, sync
+from synapse.rest.client import devices, knock, login, read_marker, receipts, room, sync
 
 from tests import unittest
 from tests.federation.transport.test_knocking import (
@@ -710,3 +710,58 @@ class SyncCacheTestCase(unittest.HomeserverTestCase):
             channel.await_result(timeout_ms=9900)
         channel.await_result(timeout_ms=200)
         self.assertEqual(channel.code, 200, channel.json_body)
+
+
+class DeviceListSyncTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        sync.register_servlets,
+        devices.register_servlets,
+    ]
+
+    def test_user_with_no_rooms_receives_self_device_list_updates(self):
+        """Tests that a user with no rooms still receives their own device list updates"""
+        device_id = "TESTDEVICE"
+
+        # Register a user and login, creating a device
+        self.user_id = self.register_user("kermit", "monkey")
+        self.tok = self.login("kermit", "monkey", device_id=device_id)
+
+        # Request an initial sync
+        channel = self.make_request("GET", "/sync", access_token=self.tok)
+        self.assertEqual(channel.code, 200, channel.json_body)
+        next_batch = channel.json_body["next_batch"]
+
+        # Now, make an incremental sync request.
+        # It won't return until something has happened
+        incremental_sync_channel = self.make_request(
+            "GET",
+            f"/sync?since={next_batch}&timeout=30000",
+            access_token=self.tok,
+            await_result=False,
+        )
+
+        # Change our device's display name
+        channel = self.make_request(
+            "PUT",
+            f"devices/{device_id}",
+            {
+                "display_name": "freeze ray",
+            },
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # The sync should now have returned
+        incremental_sync_channel.await_result(timeout_ms=20000)
+        self.assertEqual(incremental_sync_channel.code, 200, channel.json_body)
+
+        # We should have received notification that the (user's) device has changed
+        device_list_changes = incremental_sync_channel.json_body.get(
+            "device_lists", {}
+        ).get("changed", [])
+
+        self.assertIn(
+            self.user_id, device_list_changes, incremental_sync_channel.json_body
+        )

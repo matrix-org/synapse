@@ -32,6 +32,7 @@ from typing import (
     overload,
 )
 from unittest.mock import patch
+from urllib.parse import urlencode
 
 import attr
 from typing_extensions import Literal
@@ -164,12 +165,20 @@ class RestHelper:
             impersonated_user=impersonated_user,
         )
 
-    def join(self, room=None, user=None, expect_code=200, tok=None):
+    def join(
+        self,
+        room: str,
+        user: Optional[str] = None,
+        expect_code: int = 200,
+        tok: Optional[str] = None,
+        appservice_user_id: Optional[str] = None,
+    ) -> None:
         self.change_membership(
             room=room,
             src=user,
             targ=user,
             tok=tok,
+            appservice_user_id=appservice_user_id,
             membership=Membership.JOIN,
             expect_code=expect_code,
         )
@@ -226,15 +235,15 @@ class RestHelper:
     def change_membership(
         self,
         room: str,
-        src: str,
-        targ: str,
+        src: Optional[str],
+        targ: Optional[str],
         membership: str,
         extra_data: Optional[dict] = None,
         tok: Optional[str] = None,
+        appservice_user_id: Optional[str] = None,
         expect_code: int = 200,
         expect_errcode: Optional[str] = None,
         ts: Optional[int] = None,
-        impersonated_user=None,
     ) -> None:
         """
         Send a membership state event into a room.
@@ -246,11 +255,13 @@ class RestHelper:
             membership: The type of membership event
             extra_data: Extra information to include in the content of the event
             tok: The user access token to use
+            appservice_user_id: The `user_id` URL parameter to pass.
+                This allows driving an application service user
+                using an application service access token in `tok`.
             expect_code: The expected HTTP response code
             expect_errcode: The expected Matrix error code
             ts: If the user is an appservice, ts will be used as the event's
                 "original_server_ts"
-            impersonated_user: The user_id an apperservice should act on behalf.
 
         """
         temp_id = self.auth_user_id
@@ -263,7 +274,7 @@ class RestHelper:
             {
                 "access_token": tok,
                 "ts": ts,
-                "user_id": impersonated_user,
+                "user_id": appservice_user_id,
             },
         )
 

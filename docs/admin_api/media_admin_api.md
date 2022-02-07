@@ -2,6 +2,9 @@
 
 These APIs allow extracting media information from the homeserver.
 
+Details about the format of the `media_id` and storage of the media in the file system
+are documented under [media repository](../media_repository.md).
+
 To use it, you will need to authenticate by providing an `access_token`
 for a server admin: see [Admin API](../usage/administration/admin_api).
 
