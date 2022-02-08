@@ -453,7 +453,9 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEquals(400, channel.code, channel.json_body)
 
-    @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
+    @unittest.override_config(
+        {"experimental_features": {"msc3440_enabled": True, "msc3666_enabled": True}}
+    )
     def test_bundled_aggregations(self):
         """
         Test that annotations, references, and threads get correctly bundled.
@@ -578,6 +580,23 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
         self.assertTrue(room_timeline["limited"])
         assert_bundle(self._find_event_in_chunk(room_timeline["events"]))
+
+        # Request search.
+        channel = self.make_request(
+            "POST",
+            "/search",
+            # Search term matches the parent message.
+            content={"search_categories": {"room_events": {"search_term": "Hi"}}},
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        chunk = [
+            result["result"]
+            for result in channel.json_body["search_categories"]["room_events"][
+                "results"
+            ]
+        ]
+        assert_bundle(self._find_event_in_chunk(chunk))
 
     def test_aggregation_get_event_for_annotation(self):
         """Test that annotations do not get bundled aggregations included
@@ -759,6 +778,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.json_body)
         self.assertNotIn("m.relations", channel.json_body["unsigned"])
 
+    @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
     def test_edit(self):
         """Test that a simple edit works."""
 
@@ -824,6 +844,23 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
         self.assertTrue(room_timeline["limited"])
         assert_bundle(self._find_event_in_chunk(room_timeline["events"]))
+
+        # Request search.
+        channel = self.make_request(
+            "POST",
+            "/search",
+            # Search term matches the parent message.
+            content={"search_categories": {"room_events": {"search_term": "Hi"}}},
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        chunk = [
+            result["result"]
+            for result in channel.json_body["search_categories"]["room_events"][
+                "results"
+            ]
+        ]
+        assert_bundle(self._find_event_in_chunk(chunk))
 
     def test_multi_edit(self):
         """Test that multiple edits, including attempts by people who
