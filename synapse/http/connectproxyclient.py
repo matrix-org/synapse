@@ -32,9 +32,9 @@ class ProxyConnectError(ConnectError):
     pass
 
 
-@attr.s
+@attr.s(auto_attribs=True)
 class ProxyCredentials:
-    username_password = attr.ib(type=bytes)
+    username_password: bytes
 
     def as_proxy_authorization_value(self) -> bytes:
         """

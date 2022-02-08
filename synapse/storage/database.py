@@ -143,7 +143,7 @@ def make_conn(
     return db_conn
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class LoggingDatabaseConnection:
     """A wrapper around a database connection that returns `LoggingTransaction`
     as its cursor class.
@@ -151,9 +151,9 @@ class LoggingDatabaseConnection:
     This is mainly used on startup to ensure that queries get logged correctly
     """
 
-    conn = attr.ib(type=Connection)
-    engine = attr.ib(type=BaseDatabaseEngine)
-    default_txn_name = attr.ib(type=str)
+    conn: Connection
+    engine: BaseDatabaseEngine
+    default_txn_name: str
 
     def cursor(
         self, *, txn_name=None, after_callbacks=None, exception_callbacks=None
@@ -702,6 +702,7 @@ class DatabasePool:
         func: Callable[..., R],
         *args: Any,
         db_autocommit: bool = False,
+        isolation_level: Optional[int] = None,
         **kwargs: Any,
     ) -> R:
         """Starts a transaction on the database and runs a given function
@@ -724,6 +725,7 @@ class DatabasePool:
                 called multiple times if the transaction is retried, so must
                 correctly handle that case.
 
+            isolation_level: Set the server isolation level for this transaction.
             args: positional args to pass to `func`
             kwargs: named args to pass to `func`
 
@@ -746,6 +748,7 @@ class DatabasePool:
                     func,
                     *args,
                     db_autocommit=db_autocommit,
+                    isolation_level=isolation_level,
                     **kwargs,
                 )
 
@@ -763,6 +766,7 @@ class DatabasePool:
         func: Callable[..., R],
         *args: Any,
         db_autocommit: bool = False,
+        isolation_level: Optional[int] = None,
         **kwargs: Any,
     ) -> R:
         """Wraps the .runWithConnection() method on the underlying db_pool.
@@ -775,6 +779,7 @@ class DatabasePool:
             db_autocommit: Whether to run the function in "autocommit" mode,
                 i.e. outside of a transaction. This is useful for transaction
                 that are only a single query. Currently only affects postgres.
+            isolation_level: Set the server isolation level for this transaction.
             kwargs: named args to pass to `func`
 
         Returns:
@@ -834,6 +839,10 @@ class DatabasePool:
                     try:
                         if db_autocommit:
                             self.engine.attempt_to_set_autocommit(conn, True)
+                        if isolation_level is not None:
+                            self.engine.attempt_to_set_isolation_level(
+                                conn, isolation_level
+                            )
 
                         db_conn = LoggingDatabaseConnection(
                             conn, self.engine, "runWithConnection"
@@ -842,6 +851,8 @@ class DatabasePool:
                     finally:
                         if db_autocommit:
                             self.engine.attempt_to_set_autocommit(conn, False)
+                        if isolation_level:
+                            self.engine.attempt_to_set_isolation_level(conn, None)
 
         return await make_deferred_yieldable(
             self._db_pool.runWithConnection(inner_func, *args, **kwargs)
@@ -934,56 +945,6 @@ class DatabasePool:
         txn.execute(sql, vals)
 
     async def simple_insert_many(
-        self, table: str, values: List[Dict[str, Any]], desc: str
-    ) -> None:
-        """Executes an INSERT query on the named table.
-
-        The input is given as a list of dicts, with one dict per row.
-        Generally simple_insert_many_values should be preferred for new code.
-
-        Args:
-            table: string giving the table name
-            values: dict of new column names and values for them
-            desc: description of the transaction, for logging and metrics
-        """
-        await self.runInteraction(desc, self.simple_insert_many_txn, table, values)
-
-    @staticmethod
-    def simple_insert_many_txn(
-        txn: LoggingTransaction, table: str, values: List[Dict[str, Any]]
-    ) -> None:
-        """Executes an INSERT query on the named table.
-
-        The input is given as a list of dicts, with one dict per row.
-        Generally simple_insert_many_values_txn should be preferred for new code.
-
-        Args:
-            txn: The transaction to use.
-            table: string giving the table name
-            values: dict of new column names and values for them
-        """
-        if not values:
-            return
-
-        # This is a *slight* abomination to get a list of tuples of key names
-        # and a list of tuples of value names.
-        #
-        # i.e. [{"a": 1, "b": 2}, {"c": 3, "d": 4}]
-        #         => [("a", "b",), ("c", "d",)] and [(1, 2,), (3, 4,)]
-        #
-        # The sort is to ensure that we don't rely on dictionary iteration
-        # order.
-        keys, vals = zip(
-            *(zip(*(sorted(i.items(), key=lambda kv: kv[0]))) for i in values if i)
-        )
-
-        for k in keys:
-            if k != keys[0]:
-                raise RuntimeError("All items must have the same keys")
-
-        return DatabasePool.simple_insert_many_values_txn(txn, table, keys[0], vals)
-
-    async def simple_insert_many_values(
         self,
         table: str,
         keys: Collection[str],
@@ -1002,11 +963,11 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
         """
         await self.runInteraction(
-            desc, self.simple_insert_many_values_txn, table, keys, values
+            desc, self.simple_insert_many_txn, table, keys, values
         )
 
     @staticmethod
-    def simple_insert_many_values_txn(
+    def simple_insert_many_txn(
         txn: LoggingTransaction,
         table: str,
         keys: Collection[str],

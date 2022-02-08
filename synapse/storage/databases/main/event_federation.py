@@ -14,18 +14,9 @@
 import itertools
 import logging
 from queue import Empty, PriorityQueue
-from typing import (
-    TYPE_CHECKING,
-    Collection,
-    Dict,
-    Iterable,
-    List,
-    NamedTuple,
-    Optional,
-    Set,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Collection, Dict, Iterable, List, Optional, Set, Tuple
 
+import attr
 from prometheus_client import Counter, Gauge
 
 from synapse.api.constants import MAX_DEPTH, EventTypes
@@ -71,7 +62,8 @@ logger = logging.getLogger(__name__)
 
 
 # All the info we need while iterating the DAG while backfilling
-class BackfillQueueNavigationItem(NamedTuple):
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class BackfillQueueNavigationItem:
     depth: int
     stream_ordering: int
     event_id: str
@@ -83,7 +75,7 @@ class _NoChainCoverIndex(Exception):
         super().__init__("Unexpectedly no chain cover for events in %s" % (room_id,))
 
 
-class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBaseStore):
+class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBaseStore):
     def __init__(
         self,
         database: DatabasePool,
@@ -1051,7 +1043,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             batch_connection_query,
             (insertion_event_id, limit),
         )
-        batch_start_event_id_results = txn.fetchall()
         return [
             BackfillQueueNavigationItem(
                 depth=row[0],
@@ -1059,7 +1050,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 event_id=row[2],
                 type=row[3],
             )
-            for row in batch_start_event_id_results
+            for row in txn
         ]
 
     def _get_connected_prev_event_backfill_results_txn(
@@ -1095,7 +1086,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             connected_prev_event_query,
             (event_id, False, limit),
         )
-        prev_event_id_results = txn.fetchall()
         return [
             BackfillQueueNavigationItem(
                 depth=row[0],
@@ -1103,7 +1093,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 event_id=row[2],
                 type=row[3],
             )
-            for row in prev_event_id_results
+            for row in txn
         ]
 
     async def get_backfill_events(
@@ -1553,7 +1543,10 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
             if room_version.event_format == EventFormatVersions.V1:
                 for prev_event_tuple in prev_events:
-                    if not isinstance(prev_event_tuple, list) or len(prev_events) != 2:
+                    if (
+                        not isinstance(prev_event_tuple, list)
+                        or len(prev_event_tuple) != 2
+                    ):
                         logger.info("Invalid prev_events for %s", event_id)
                         break
 

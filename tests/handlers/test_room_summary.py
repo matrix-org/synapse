@@ -28,6 +28,7 @@ from synapse.api.constants import (
 from synapse.api.errors import AuthError, NotFoundError, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
+from synapse.federation.transport.client import TransportLayerClient
 from synapse.handlers.room_summary import _child_events_comparison_key, _RoomEntry
 from synapse.rest import admin
 from synapse.rest.client import login, room
@@ -134,10 +135,18 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self._add_child(self.space, self.room, self.token)
 
     def _add_child(
-        self, space_id: str, room_id: str, token: str, order: Optional[str] = None
+        self,
+        space_id: str,
+        room_id: str,
+        token: str,
+        order: Optional[str] = None,
+        via: Optional[List[str]] = None,
     ) -> None:
         """Add a child room to a space."""
-        content: JsonDict = {"via": [self.hs.hostname]}
+        if via is None:
+            via = [self.hs.hostname]
+
+        content: JsonDict = {"via": via}
         if order is not None:
             content["order"] = order
         self.helper.send_state(
@@ -1035,6 +1044,85 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 self.handler.get_room_hierarchy(create_requester(self.user), self.space)
             )
         self._assert_hierarchy(result, expected)
+
+    def test_fed_caching(self):
+        """
+        Federation `/hierarchy` responses should be cached.
+        """
+        fed_hostname = self.hs.hostname + "2"
+        fed_subspace = "#space:" + fed_hostname
+        fed_room = "#room:" + fed_hostname
+
+        # Add a room to the space which is on another server.
+        self._add_child(self.space, fed_subspace, self.token, via=[fed_hostname])
+
+        federation_requests = 0
+
+        async def get_room_hierarchy(
+            _self: TransportLayerClient,
+            destination: str,
+            room_id: str,
+            suggested_only: bool,
+        ) -> JsonDict:
+            nonlocal federation_requests
+            federation_requests += 1
+
+            return {
+                "room": {
+                    "room_id": fed_subspace,
+                    "world_readable": True,
+                    "room_type": RoomTypes.SPACE,
+                    "children_state": [
+                        {
+                            "type": EventTypes.SpaceChild,
+                            "room_id": fed_subspace,
+                            "state_key": fed_room,
+                            "content": {"via": [fed_hostname]},
+                        },
+                    ],
+                },
+                "children": [
+                    {
+                        "room_id": fed_room,
+                        "world_readable": True,
+                    },
+                ],
+                "inaccessible_children": [],
+            }
+
+        expected = [
+            (self.space, [self.room, fed_subspace]),
+            (self.room, ()),
+            (fed_subspace, [fed_room]),
+            (fed_room, ()),
+        ]
+
+        with mock.patch(
+            "synapse.federation.transport.client.TransportLayerClient.get_room_hierarchy",
+            new=get_room_hierarchy,
+        ):
+            result = self.get_success(
+                self.handler.get_room_hierarchy(create_requester(self.user), self.space)
+            )
+            self.assertEqual(federation_requests, 1)
+            self._assert_hierarchy(result, expected)
+
+            # The previous federation response should be reused.
+            result = self.get_success(
+                self.handler.get_room_hierarchy(create_requester(self.user), self.space)
+            )
+            self.assertEqual(federation_requests, 1)
+            self._assert_hierarchy(result, expected)
+
+            # Expire the response cache
+            self.reactor.advance(5 * 60 + 1)
+
+            # A new federation request should be made.
+            result = self.get_success(
+                self.handler.get_room_hierarchy(create_requester(self.user), self.space)
+            )
+            self.assertEqual(federation_requests, 2)
+            self._assert_hierarchy(result, expected)
 
 
 class RoomSummaryTestCase(unittest.HomeserverTestCase):

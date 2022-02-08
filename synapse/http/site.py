@@ -407,7 +407,10 @@ class SynapseRequest(Request):
 
         user_agent = get_request_user_agent(self, "-")
 
-        code = str(self.code)
+        # int(self.code) looks redundant, because self.code is already an int.
+        # But self.code might be an HTTPStatus (which inherits from int)---which has
+        # a different string representation. So ensure we really have an integer.
+        code = str(int(self.code))
         if not self.finished:
             # we didn't send the full response before we gave up (presumably because
             # the connection dropped)
@@ -534,9 +537,9 @@ class XForwardedForRequest(SynapseRequest):
 
 
 @implementer(IAddress)
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class _XForwardedForAddress:
-    host = attr.ib(type=str)
+    host: str
 
 
 class SynapseSite(Site):

@@ -48,6 +48,7 @@ from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import trace
+from synapse.storage.databases.main.relations import BundledAggregations
 from synapse.types import JsonDict, StreamToken
 from synapse.util import json_decoder
 
@@ -526,7 +527,7 @@ class SyncRestServlet(RestServlet):
 
         def serialize(
             events: Iterable[EventBase],
-            aggregations: Optional[Dict[str, Dict[str, Any]]] = None,
+            aggregations: Optional[Dict[str, BundledAggregations]] = None,
         ) -> List[JsonDict]:
             return self._event_serializer.serialize_events(
                 events,
@@ -554,20 +555,9 @@ class SyncRestServlet(RestServlet):
                 )
 
         serialized_state = serialize(state_events)
-        # Don't bother to bundle aggregations if the timeline is unlimited,
-        # as clients will have all the necessary information.
-        # bundle_aggregations=room.timeline.limited,
-        #
-        # richvdh 2021-12-15: disable this temporarily as it has too high an
-        # overhead for initialsyncs. We need to figure out a way that the
-        # bundling can be done *before* the events are stored in the
-        # SyncResponseCache so that this part can be synchronous.
-        #
-        # Ensure to re-enable the test at tests/rest/client/test_relations.py::RelationsTestCase.test_bundled_aggregations.
-        # if room.timeline.limited:
-        #    aggregations = await self.store.get_bundled_aggregations(timeline_events)
-        aggregations = None
-        serialized_timeline = serialize(timeline_events, aggregations)
+        serialized_timeline = serialize(
+            timeline_events, room.timeline.bundled_aggregations
+        )
 
         account_data = room.account_data
 
