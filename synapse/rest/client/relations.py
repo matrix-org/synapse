@@ -32,12 +32,18 @@ from synapse.storage.relations import (
     PaginationChunk,
     RelationPaginationToken,
 )
-from synapse.types import JsonDict
+from synapse.types import JsonDict, RoomStreamToken
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_token(token: Optional[str]) -> Optional[RoomStreamToken]:
+    if not token:
+        return None
+    return RelationPaginationToken.from_string(token).to_room_stream_token()
 
 
 class RelationPaginationServlet(RestServlet):
@@ -88,17 +94,8 @@ class RelationPaginationServlet(RestServlet):
             pagination_chunk = PaginationChunk(chunk=[])
         else:
             # Return the relations
-            from_token = None
-            if from_token_str:
-                from_token = RelationPaginationToken.from_string(
-                    from_token_str
-                ).to_room_stream_token()
-
-            to_token = None
-            if to_token_str:
-                to_token = RelationPaginationToken.from_string(
-                    to_token_str
-                ).to_room_stream_token()
+            from_token = _parse_token(from_token_str)
+            to_token = _parse_token(to_token_str)
 
             pagination_chunk = await self.store.get_relations_for_event(
                 event_id=parent_id,
@@ -291,17 +288,8 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
         from_token_str = parse_string(request, "from")
         to_token_str = parse_string(request, "to")
 
-        from_token = None
-        if from_token_str:
-            from_token = RelationPaginationToken.from_string(
-                from_token_str
-            ).to_room_stream_token()
-
-        to_token = None
-        if to_token_str:
-            to_token = RelationPaginationToken.from_string(
-                to_token_str
-            ).to_room_stream_token()
+        from_token = _parse_token(from_token_str)
+        to_token = _parse_token(to_token_str)
 
         result = await self.store.get_relations_for_event(
             event_id=parent_id,
