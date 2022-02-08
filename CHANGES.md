@@ -3,12 +3,13 @@ Synapse 1.52.0 (2022-02-08)
 
 No significant changes since 1.52.0rc1.
 
-During the making of this release, the developers of Twisted have released
-[Twisted 22.1.0](https://github.com/twisted/twisted/releases/tag/twisted-22.1.0), which
-fixes [a security issue](https://github.com/twisted/twisted/security/advisories/GHSA-92x2-jw7w-xvvx)
-within Twisted. We do not believe Synapse to be vulnerable to any security problem caused
-by this issue, though we advise server administrators to update their local version of
-Twisted if they can.
+Note that [Twisted 22.1.0](https://github.com/twisted/twisted/releases/tag/twisted-22.1.0)
+has recently been released, which fixes a [security issue](https://github.com/twisted/twisted/security/advisories/GHSA-92x2-jw7w-xvvx)
+within the Twisted library. We do not believe Synapse is affected by this vulnerability,
+though we advise server administrators who installed Synapse via pip to upgrade Twisted
+with `pip install --upgrade Twisted` as a matter of good practice. The Docker image
+`matrixdotorg/synapse` and the Debian packages from `packages.matrix.org` are using the
+updated library.
 
 
 Synapse 1.52.0rc1 (2022-02-01)
