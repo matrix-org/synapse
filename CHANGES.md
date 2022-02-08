@@ -1,7 +1,14 @@
 Synapse 1.52.0 (2022-02-08)
 ===========================
 
-No significant changes.
+No significant changes since 1.52.0rc1.
+
+During the making of this release, the developers of Twisted have released
+[Twisted 22.1.0](https://github.com/twisted/twisted/releases/tag/twisted-22.1.0), which
+fixes [a security issue](https://github.com/twisted/twisted/security/advisories/GHSA-92x2-jw7w-xvvx)
+within Twisted. We do not believe Synapse to be vulnerable to any security problem caused
+by this issue, though we advise server administrators to update their local version of
+Twisted if they can.
 
 
 Synapse 1.52.0rc1 (2022-02-01)
@@ -13,7 +20,7 @@ Features
 - Remove account data (including client config, push rules and ignored users) upon user deactivation. ([\#11621](https://github.com/matrix-org/synapse/issues/11621), [\#11788](https://github.com/matrix-org/synapse/issues/11788), [\#11789](https://github.com/matrix-org/synapse/issues/11789))
 - Add an admin API to reset connection timeouts for remote server. ([\#11639](https://github.com/matrix-org/synapse/issues/11639))
 - Add an admin API to get a list of rooms that federate with a given remote homeserver. ([\#11658](https://github.com/matrix-org/synapse/issues/11658))
-- Add a config flag to inhibit M_USER_IN_USE during registration. ([\#11743](https://github.com/matrix-org/synapse/issues/11743))
+- Add a config flag to inhibit `M_USER_IN_USE` during registration. ([\#11743](https://github.com/matrix-org/synapse/issues/11743))
 - Add a module callback to set username at registration. ([\#11790](https://github.com/matrix-org/synapse/issues/11790))
 - Allow configuring a maximum file size as well as a list of allowed content types for avatars. ([\#11846](https://github.com/matrix-org/synapse/issues/11846))
 
