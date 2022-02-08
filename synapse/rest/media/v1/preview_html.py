@@ -16,7 +16,7 @@ import itertools
 import logging
 import re
 from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Set, Union
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse, urljoin
 
 if TYPE_CHECKING:
     from lxml import etree
@@ -335,20 +335,11 @@ def rebase_url(url: str, base: str) -> str:
         >>> rebase_url("https://alice.com/a/", "https://example.com/foo/")
         'https://alice.com/a'
     """
-    base_parts = urlparse(base)
-    # Convert the parsed URL to a list for (potential) modification.
-    url_parts = list(urlparse(url))
-    # Add a scheme, if one does not exist.
-    if not url_parts[0]:
-        url_parts[0] = base_parts.scheme or "http"
-    # Fix up the hostname, if this is not a data URL.
-    if url_parts[0] != "data" and not url_parts[1]:
-        url_parts[1] = base_parts.netloc
-        # If the path does not start with a /, nest it under the base path's last
-        # directory.
-        if not url_parts[2].startswith("/"):
-            url_parts[2] = re.sub(r"/[^/]+$", "/", base_parts.path) + url_parts[2]
-    return urlunparse(url_parts)
+    url_parts = urlparse(url)
+    # If this is a data URL, do nothing.
+    if url_parts.scheme == "data":
+        return url
+    return urljoin(base, url)
 
 
 def summarize_paragraphs(
