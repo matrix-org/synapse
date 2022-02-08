@@ -717,7 +717,7 @@ class RelationsWorkerStore(SQLBaseStore):
         """
         # The already processed event IDs. Tracked separately from the result
         # since the result omits events which do not have bundled aggregations.
-        seen_events = set()
+        seen_event_ids = set()
 
         # State events and redacted events do not get bundled aggregations.
         events = [
@@ -734,17 +734,16 @@ class RelationsWorkerStore(SQLBaseStore):
             # De-duplicate events by ID to handle the same event requested multiple
             # times. The caches that _get_bundled_aggregation_for_event use should
             # capture this, but best to reduce work.
-            if event.event_id in seen_events:
+            if event.event_id in seen_event_ids:
                 continue
-            seen_events.add(event.event_id)
+            seen_event_ids.add(event.event_id)
 
             event_result = await self._get_bundled_aggregation_for_event(event, user_id)
             if event_result:
                 results[event.event_id] = event_result
 
         # Fetch any edits.
-        event_ids = [event.event_id for event in events]
-        edits = await self._get_applicable_edits(event_ids)
+        edits = await self._get_applicable_edits(seen_event_ids)
         for event_id, edit in edits.items():
             results.setdefault(event_id, BundledAggregations()).replace = edit
 
