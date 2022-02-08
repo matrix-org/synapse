@@ -22,7 +22,7 @@ import shutil
 import sys
 import traceback
 from typing import TYPE_CHECKING, BinaryIO, Iterable, Optional, Tuple
-from urllib import parse as urlparse
+from urllib.parse import urlsplit
 from urllib.request import urlopen
 
 import attr
@@ -187,7 +187,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             ts = self.clock.time_msec()
 
         # XXX: we could move this into _do_preview if we wanted.
-        url_tuple = urlparse.urlsplit(url)
+        url_tuple = urlsplit(url)
         for entry in self.url_preview_url_blacklist:
             match = True
             for attrib in entry:

@@ -16,7 +16,7 @@ import itertools
 import logging
 import re
 from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Set, Union
-from urllib import parse as urlparse
+from urllib.parse import urlparse, urlunparse
 
 if TYPE_CHECKING:
     from lxml import etree
@@ -335,9 +335,9 @@ def rebase_url(url: str, base: str) -> str:
         >>> rebase_url("https://alice.com/a/", "https://example.com/foo/")
         'https://alice.com/a'
     """
-    base_parts = urlparse.urlparse(base)
+    base_parts = urlparse(base)
     # Convert the parsed URL to a list for (potential) modification.
-    url_parts = list(urlparse.urlparse(url))
+    url_parts = list(urlparse(url))
     # Add a scheme, if one does not exist.
     if not url_parts[0]:
         url_parts[0] = base_parts.scheme or "http"
@@ -348,7 +348,7 @@ def rebase_url(url: str, base: str) -> str:
         # directory.
         if not url_parts[2].startswith("/"):
             url_parts[2] = re.sub(r"/[^/]+$", "/", base_parts.path) + url_parts[2]
-    return urlparse.urlunparse(url_parts)
+    return urlunparse(url_parts)
 
 
 def summarize_paragraphs(
