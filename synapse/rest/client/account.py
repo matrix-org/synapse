@@ -467,6 +467,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         next_link = body.get("next_link")  # Optional param
 
         msisdn = phone_number_to_msisdn(country, phone_number)
+        logger.info("Request #%s to verify ownership of %s", send_attempt, msisdn)
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
@@ -494,6 +495,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
                 await self.hs.get_clock().sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
+            logger.info("MSISDN %s is already in use by %s", msisdn, existing_user_id)
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
         if not self.hs.config.registration.account_threepid_delegate_msisdn:
@@ -518,6 +520,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         threepid_send_requests.labels(type="msisdn", reason="add_threepid").observe(
             send_attempt
         )
+        logger.info("MSISDN %s: got response from identity server: %s", msisdn, ret)
 
         return 200, ret
 
