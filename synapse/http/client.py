@@ -20,6 +20,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
+    Callable,
     Dict,
     Iterable,
     List,
@@ -693,12 +694,18 @@ class SimpleHttpClient:
         output_stream: BinaryIO,
         max_size: Optional[int] = None,
         headers: Optional[RawHeaders] = None,
+        is_allowed_content_type: Optional[Callable[[bytes], bool]] = None,
     ) -> Tuple[int, Dict[bytes, List[bytes]], str, int]:
         """GETs a file from a given URL
         Args:
             url: The URL to GET
             output_stream: File to write the response body to.
             headers: A map from header name to a list of values for that header
+            is_allowed_content_type: A predicate to determine whether the
+                content type of the file we're downloading is allowed. If set and
+                it evaluates to False when called with the content type, the
+                request will be terminated before completing the download by
+                raising SynapseError.
         Returns:
             A tuple of the file length, dict of the response
             headers, absolute URI of the response and HTTP response code.
@@ -726,9 +733,9 @@ class SimpleHttpClient:
                 HTTPStatus.BAD_GATEWAY, "Got error %d" % (response.code,), Codes.UNKNOWN
             )
 
-        if b"Content-Type" in resp_headers:
+        if is_allowed_content_type and b"Content-Type" in resp_headers:
             content_type = resp_headers[b"Content-Type"][0]
-            if _is_av_media(content_type):
+            if not is_allowed_content_type(content_type):
                 raise SynapseError(
                     HTTPStatus.BAD_GATEWAY,
                     ("Unsupported content type for URL previews: %r" % content_type),
@@ -768,12 +775,6 @@ class SimpleHttpClient:
             response.request.absoluteURI.decode("ascii"),
             response.code,
         )
-
-
-def _is_av_media(content_type: bytes) -> bool:
-    return content_type.lower().startswith(
-        b"video/"
-    ) or content_type.lower().startswith(b"audio/")
 
 
 def _timeout_to_request_timed_out_error(f: Failure):
