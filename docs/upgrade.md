@@ -113,6 +113,18 @@ setting only applies to the root path `/` of Synapse's web server and no longer
 the `/_matrix/client/` path.
 
 
+# Upgrading to v1.52.0
+
+## Twisted security release
+
+Note that [Twisted 22.1.0](https://github.com/twisted/twisted/releases/tag/twisted-22.1.0)
+has recently been released, which fixes a [security issue](https://github.com/twisted/twisted/security/advisories/GHSA-92x2-jw7w-xvvx)
+within the Twisted library. We do not believe Synapse is affected by this vulnerability,
+though we advise server administrators who installed Synapse via pip to upgrade Twisted
+with `pip install --upgrade Twisted` as a matter of good practice. The Docker image
+`matrixdotorg/synapse` and the Debian packages from `packages.matrix.org` are using the
+updated library.
+
 # Upgrading to v1.51.0
 
 ## Deprecation of `webclient` listeners and non-HTTP(S) `web_client_location`
