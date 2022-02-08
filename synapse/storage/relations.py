@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import attr
 
 from synapse.api.errors import SynapseError
-from synapse.types import JsonDict, RoomStreamToken
+from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +80,6 @@ class RelationPaginationToken:
 
     def as_tuple(self) -> Tuple[Any, ...]:
         return attr.astuple(self)
-
-    def to_room_stream_token(self) -> RoomStreamToken:
-        return RoomStreamToken(self.topological, self.stream)
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)

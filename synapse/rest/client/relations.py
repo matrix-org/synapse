@@ -32,18 +32,44 @@ from synapse.storage.relations import (
     PaginationChunk,
     RelationPaginationToken,
 )
-from synapse.types import JsonDict, RoomStreamToken
+from synapse.types import JsonDict, RoomStreamToken, StreamToken
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+    from synapse.storage.databases.main import DataStore
 
 logger = logging.getLogger(__name__)
 
 
-def _parse_token(token: Optional[str]) -> Optional[RoomStreamToken]:
+async def _parse_token(
+    store: "DataStore", token: Optional[str]
+) -> Optional[RoomStreamToken]:
+    """
+    For backwards compatibility support RelationPaginationToken, but new pagination
+    tokens are generated as full StreamTokens, to be compatible with /sync and /messages.
+    """
     if not token:
         return None
-    return RelationPaginationToken.from_string(token).to_room_stream_token()
+    # Luckily the format for StreamToken and RelationPaginationToken differ enough
+    # that they can easily be separated. An "_" appears in the serialization of
+    # RoomStreamToken (as part of StreamToken), but RelationPaginationToken uses
+    # "-" only for separators.
+    if "_" in token:
+        stream_token = await StreamToken.from_string(store, token)
+    else:
+        relation_token = RelationPaginationToken.from_string(token)
+        stream_token = StreamToken(
+            room_key=RoomStreamToken(relation_token.topological, relation_token.stream),
+            presence_key=0,
+            typing_key=0,
+            receipt_key=0,
+            account_data_key=0,
+            push_rules_key=0,
+            to_device_key=0,
+            device_list_key=0,
+            groups_key=0,
+        )
+    return stream_token.room_key
 
 
 class RelationPaginationServlet(RestServlet):
@@ -94,8 +120,8 @@ class RelationPaginationServlet(RestServlet):
             pagination_chunk = PaginationChunk(chunk=[])
         else:
             # Return the relations
-            from_token = _parse_token(from_token_str)
-            to_token = _parse_token(to_token_str)
+            from_token = await _parse_token(self.store, from_token_str)
+            to_token = await _parse_token(self.store, to_token_str)
 
             pagination_chunk = await self.store.get_relations_for_event(
                 event_id=parent_id,
@@ -288,8 +314,8 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
         from_token_str = parse_string(request, "from")
         to_token_str = parse_string(request, "to")
 
-        from_token = _parse_token(from_token_str)
-        to_token = _parse_token(to_token_str)
+        from_token = await _parse_token(self.store, from_token_str)
+        to_token = await _parse_token(self.store, to_token_str)
 
         result = await self.store.get_relations_for_event(
             event_id=parent_id,
