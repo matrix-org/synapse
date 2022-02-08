@@ -1638,6 +1638,14 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1520"><a class="header" href="#upgrading-to-v1520">Upgrading to v1.52.0</a></h1>
+<h2 id="twisted-security-release"><a class="header" href="#twisted-security-release">Twisted security release</a></h2>
+<p>During the making of this release, the developers of Twisted have released
+<a href="https://github.com/twisted/twisted/releases/tag/twisted-22.1.0">Twisted 22.1.0</a>, which
+fixes <a href="https://github.com/twisted/twisted/security/advisories/GHSA-92x2-jw7w-xvvx">a security issue</a>
+within Twisted. We do not believe Synapse to be vulnerable to any security problem caused
+by this issue, though we advise server administrators to update their local version of
+Twisted if they can.</p>
 <h1 id="upgrading-to-v1510"><a class="header" href="#upgrading-to-v1510">Upgrading to v1.51.0</a></h1>
 <h2 id="deprecation-of-webclient-listeners-and-non-https-web_client_location"><a class="header" href="#deprecation-of-webclient-listeners-and-non-https-web_client_location">Deprecation of <code>webclient</code> listeners and non-HTTP(S) <code>web_client_location</code></a></h2>
 <p>Listeners of type  <code>webclient</code> are deprecated and scheduled to be removed in
