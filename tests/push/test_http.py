@@ -691,8 +691,8 @@ class HTTPPusherTests(HomeserverTestCase):
         self.push_attempts[expected_push_attempts - 1][0].callback({})
 
     def _check_push_attempt(
-        self, expected_push_attempts, expected_unread_count_last_push
-    ):
+        self, expected_push_attempts: int, expected_unread_count_last_push: int
+    ) -> None:
         """
         Makes sure that the last expected push attempt succeeds and checks whether
         it contains the expected unread count.
