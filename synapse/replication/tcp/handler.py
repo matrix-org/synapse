@@ -318,7 +318,7 @@ class ReplicationCommandHandler:
                 hs, outbound_redis_connection
             )
             hs.get_reactor().connectTCP(
-                hs.config.redis.redis_host,  # type: ignore[arg-type]
+                hs.config.redis.redis_host,
                 hs.config.redis.redis_port,
                 self._factory,
                 timeout=30,
@@ -330,7 +330,7 @@ class ReplicationCommandHandler:
             host = hs.config.worker.worker_replication_host
             port = hs.config.worker.worker_replication_port
             hs.get_reactor().connectTCP(
-                host,  # type: ignore[arg-type]
+                host,
                 port,
                 self._factory,
                 timeout=30,

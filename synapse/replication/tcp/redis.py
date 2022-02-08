@@ -373,7 +373,7 @@ def lazyConnection(
 
     reactor = hs.get_reactor()
     reactor.connectTCP(
-        host,  # type: ignore[arg-type]
+        host,
         port,
         factory,
         timeout=30,
