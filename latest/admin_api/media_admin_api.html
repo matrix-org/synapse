@@ -182,43 +182,16 @@
                             <nav class="pagetoc"></nav>
                         </div>
 
-                        <h1 id="contents"><a class="header" href="#contents">Contents</a></h1>
-<ul>
-<li><a href="#querying-media">Querying media</a>
-<ul>
-<li><a href="#list-all-media-in-a-room">List all media in a room</a></li>
-<li><a href="#list-all-media-uploaded-by-a-user">List all media uploaded by a user</a></li>
-</ul>
-</li>
-<li><a href="#quarantine-media">Quarantine media</a>
-<ul>
-<li><a href="#quarantining-media-by-id">Quarantining media by ID</a></li>
-<li><a href="#remove-media-from-quarantine-by-id">Remove media from quarantine by ID</a></li>
-<li><a href="#quarantining-media-in-a-room">Quarantining media in a room</a></li>
-<li><a href="#quarantining-all-media-of-a-user">Quarantining all media of a user</a></li>
-<li><a href="#protecting-media-from-being-quarantined">Protecting media from being quarantined</a></li>
-<li><a href="#unprotecting-media-from-being-quarantined">Unprotecting media from being quarantined</a></li>
-</ul>
-</li>
-<li><a href="#delete-local-media">Delete local media</a>
-<ul>
-<li><a href="#delete-a-specific-local-media">Delete a specific local media</a></li>
-<li><a href="#delete-local-media-by-date-or-size">Delete local media by date or size</a></li>
-<li><a href="#delete-media-uploaded-by-a-user">Delete media uploaded by a user</a></li>
-</ul>
-</li>
-<li><a href="#purge-remote-media-api">Purge Remote Media API</a></li>
-</ul>
-<h1 id="querying-media"><a class="header" href="#querying-media">Querying media</a></h1>
+                        <h1 id="querying-media"><a class="header" href="#querying-media">Querying media</a></h1>
 <p>These APIs allow extracting media information from the homeserver.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <h2 id="list-all-media-in-a-room"><a class="header" href="#list-all-media-in-a-room">List all media in a room</a></h2>
 <p>This API gets a list of known media in a room.
 However, it only shows media from unencrypted events or rooms.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/room/&lt;room_id&gt;/media
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <p>The API returns a JSON body like the following:</p>
 <pre><code class="language-json">{
   &quot;local&quot;: [
@@ -418,8 +391,6 @@ All cached media that was last accessed before this timestamp will be removed.</
 <ul>
 <li><code>deleted</code>: integer - The number of media items successfully deleted</li>
 </ul>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <p>If the user re-requests purged remote media, synapse will re-request the media
 from the originating server.</p>
 

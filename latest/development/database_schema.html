@@ -267,6 +267,47 @@ has had all background updates run.</p>
 </code></pre>
 <p>NB at the time of writing, this script predates the split into separate <code>state</code>/<code>main</code>
 databases so will require updates to handle that correctly.</p>
+<h2 id="delta-files"><a class="header" href="#delta-files">Delta files</a></h2>
+<p>Delta files define the steps required to upgrade the database from an earlier version.
+They can be written as either a file containing a series of SQL statements, or a Python
+module.</p>
+<p>Synapse remembers which delta files it has applied to a database (they are stored in the
+<code>applied_schema_deltas</code> table) and will not re-apply them (even if a given file is
+subsequently updated).</p>
+<p>Delta files should be placed in a directory named <code>synapse/storage/schema/&lt;database&gt;/delta/&lt;version&gt;/</code>.
+They are applied in alphanumeric order, so  by convention the first two characters
+of the filename should be an integer such as <code>01</code>, to put the file in the right order.</p>
+<h3 id="sql-delta-files"><a class="header" href="#sql-delta-files">SQL delta files</a></h3>
+<p>These should be named <code>*.sql</code>, or —  for changes which should only be applied for a
+given database engine — <code>*.sql.posgres</code> or <code>*.sql.sqlite</code>. For example, a delta which
+adds a new column to the <code>foo</code> table might be called <code>01add_bar_to_foo.sql</code>.</p>
+<p>Note that our SQL parser is a bit simple - it understands comments (<code>--</code> and <code>/*...*/</code>),
+but complex statements which require a <code>;</code> in the middle of them (such as <code>CREATE TRIGGER</code>) are beyond it and you'll have to use a Python delta file.</p>
+<h3 id="python-delta-files"><a class="header" href="#python-delta-files">Python delta files</a></h3>
+<p>For more flexibility, a delta file can take the form of a python module. These should
+be named <code>*.py</code>. Note that database-engine-specific modules are not supported here –
+instead you can write <code>if isinstance(database_engine, PostgresEngine)</code> or similar.</p>
+<p>A Python delta module should define either or both of the following functions:</p>
+<pre><code class="language-python">import synapse.config.homeserver
+import synapse.storage.engines
+import synapse.storage.types
+
+
+def run_create(
+    cur: synapse.storage.types.Cursor,
+    database_engine: synapse.storage.engines.BaseDatabaseEngine,
+) -&gt; None:
+    &quot;&quot;&quot;Called whenever an existing or new database is to be upgraded&quot;&quot;&quot;
+    ...
+
+def run_upgrade(
+    cur: synapse.storage.types.Cursor,
+    database_engine: synapse.storage.engines.BaseDatabaseEngine,
+    config: synapse.config.homeserver.HomeServerConfig,
+) -&gt; None:
+    &quot;&quot;&quot;Called whenever an existing database is to be upgraded.&quot;&quot;&quot;
+    ...
+</code></pre>
 <h2 id="boolean-columns"><a class="header" href="#boolean-columns">Boolean columns</a></h2>
 <p>Boolean columns require special treatment, since SQLite treats booleans the
 same as integers.</p>

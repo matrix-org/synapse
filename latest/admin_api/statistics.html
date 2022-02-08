@@ -185,11 +185,11 @@
                         <h1 id="users-media-usage-statistics"><a class="header" href="#users-media-usage-statistics">Users' media usage statistics</a></h1>
 <p>Returns information about all local media usage of users. Gives the
 possibility to filter them by time and user.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/statistics/users/media
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code>
-for a server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;users&quot;: [

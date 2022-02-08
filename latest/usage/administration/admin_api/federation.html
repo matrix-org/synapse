@@ -258,7 +258,7 @@ to this destination, or <code>null</code> if this information has not been track
 <li><code>next_token</code>: string representing a positive integer - Indication for pagination. See above.</li>
 <li><code>total</code> - integer - Total number of destinations.</li>
 </ul>
-<h1 id="destination-details-api"><a class="header" href="#destination-details-api">Destination Details API</a></h1>
+<h2 id="destination-details-api"><a class="header" href="#destination-details-api">Destination Details API</a></h2>
 <p>This API gets the retry timing info for a specific remote server.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/federation/destinations/&lt;destination&gt;
@@ -272,9 +272,88 @@ to this destination, or <code>null</code> if this information has not been track
    &quot;last_successful_stream_ordering&quot;: null
 }
 </code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>destination</code> - Name of the remote server.</li>
+</ul>
 <p><strong>Response</strong></p>
 <p>The response fields are the same like in the <code>destinations</code> array in
 <a href="#list-of-destinations">List of destinations</a> response.</p>
+<h2 id="destination-rooms"><a class="header" href="#destination-rooms">Destination rooms</a></h2>
+<p>This API gets the rooms that federate with a specific remote server.</p>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v1/federation/destinations/&lt;destination&gt;/rooms
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+   &quot;rooms&quot;:[
+      {
+         &quot;room_id&quot;: &quot;!OGEhHVWSdvArJzumhm:matrix.org&quot;,
+         &quot;stream_ordering&quot;: 8326
+      },
+      {
+         &quot;room_id&quot;: &quot;!xYvNcQPhnkrdUmYczI:matrix.org&quot;,
+         &quot;stream_ordering&quot;: 93534
+      }
+   ],
+   &quot;total&quot;: 2
+}
+</code></pre>
+<p>To paginate, check for <code>next_token</code> and if present, call the endpoint again
+with <code>from</code> set to the value of <code>next_token</code>. This will return a new page.</p>
+<p>If the endpoint does not return a <code>next_token</code> then there are no more destinations
+to paginate through.</p>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>destination</code> - Name of the remote server.</li>
+</ul>
+<p>The following query parameters are available:</p>
+<ul>
+<li><code>from</code> - Offset in the returned list. Defaults to <code>0</code>.</li>
+<li><code>limit</code> - Maximum amount of destinations to return. Defaults to <code>100</code>.</li>
+<li><code>dir</code> - Direction of room order by <code>room_id</code>. Either <code>f</code> for forwards or <code>b</code> for
+backwards. Defaults to <code>f</code>.</li>
+</ul>
+<p><strong>Response</strong></p>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>rooms</code> - An array of objects, each containing information about a room.
+Room objects contain the following fields:
+<ul>
+<li><code>room_id</code> - string - The ID of the room.</li>
+<li><code>stream_ordering</code> - integer -  The stream ordering of the most recent
+successfully-sent <a href="understanding_synapse_through_grafana_graphs.html#federation">PDU</a>
+to this destination in this room.</li>
+</ul>
+</li>
+<li><code>next_token</code>: string representing a positive integer - Indication for pagination. See above.</li>
+<li><code>total</code> - integer - Total number of destinations.</li>
+</ul>
+<h2 id="reset-connection-timeout"><a class="header" href="#reset-connection-timeout">Reset connection timeout</a></h2>
+<p>Synapse makes federation requests to other homeservers. If a federation request fails,
+Synapse will mark the destination homeserver as offline, preventing any future requests
+to that server for a &quot;cooldown&quot; period. This period grows over time if the server
+continues to fail its responses
+(<a href="https://en.wikipedia.org/wiki/Exponential_backoff">exponential backoff</a>).</p>
+<p>Admins can cancel the cooldown period with this API.</p>
+<p>This API resets the retry timing for a specific remote server and tries to connect to
+the remote server again. It does not wait for the next <code>retry_interval</code>.
+The connection must have previously run into an error and <code>retry_last_ts</code>
+(<a href="#destination-details-api">Destination Details API</a>) must not be equal to <code>0</code>.</p>
+<p>The connection attempt is carried out in the background and can take a while
+even if the API already returns the http status 200.</p>
+<p>The API is:</p>
+<pre><code>POST /_synapse/admin/v1/federation/destinations/&lt;destination&gt;/reset_connection
+
+{}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>destination</code> - Name of the remote server.</li>
+</ul>
 
                     </main>
 

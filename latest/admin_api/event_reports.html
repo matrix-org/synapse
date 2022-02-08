@@ -184,11 +184,11 @@
 
                         <h1 id="show-reported-events"><a class="header" href="#show-reported-events">Show reported events</a></h1>
 <p>This API returns information about reported events.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <p>The api is:</p>
 <pre><code>GET /_synapse/admin/v1/event_reports?from=0&amp;limit=10
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <p>It returns a JSON body like the following:</p>
 <pre><code class="language-json">{
     &quot;event_reports&quot;: [
@@ -265,8 +265,6 @@ have a canonical alias set.</li>
 <p>The api is:</p>
 <pre><code>GET /_synapse/admin/v1/event_reports/&lt;report_id&gt;
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <p>It returns a JSON body like the following:</p>
 <pre><code class="language-json">{
     &quot;event_id&quot;: &quot;$bNUFCwGzWca1meCGkjp-zwslF-GfVcXukvRLI1_FaVY&quot;,

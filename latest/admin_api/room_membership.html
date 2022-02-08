@@ -187,6 +187,8 @@
 to a room with a given <code>room_id_or_alias</code>. You can only modify the membership of
 local users. The server administrator must be in the room and have permission to
 invite users.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <h2 id="parameters"><a class="header" href="#parameters">Parameters</a></h2>
 <p>The following parameters are available:</p>
 <ul>
@@ -201,8 +203,6 @@ invite users.</p>
   &quot;user_id&quot;: &quot;@user:server.com&quot;
 }
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 <p>Response:</p>
 <pre><code class="language-json">{
   &quot;room_id&quot;: &quot;!636q39766251:server.com&quot;

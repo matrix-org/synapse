@@ -395,7 +395,7 @@ and mounting it to <code>/var/synapse</code> should be taken into consideration.
 <p>System requirements:</p>
 <ul>
 <li>POSIX-compliant system (tested on Linux &amp; OS X)</li>
-<li>Python 3.7 or later, up to Python 3.9.</li>
+<li>Python 3.7 or later, up to Python 3.10.</li>
 <li>At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org</li>
 </ul>
 <p>To install the Synapse homeserver run:</p>
@@ -1638,6 +1638,15 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1520"><a class="header" href="#upgrading-to-v1520">Upgrading to v1.52.0</a></h1>
+<h2 id="twisted-security-release"><a class="header" href="#twisted-security-release">Twisted security release</a></h2>
+<p>Note that <a href="https://github.com/twisted/twisted/releases/tag/twisted-22.1.0">Twisted 22.1.0</a>
+has recently been released, which fixes a <a href="https://github.com/twisted/twisted/security/advisories/GHSA-92x2-jw7w-xvvx">security issue</a>
+within the Twisted library. We do not believe Synapse is affected by this vulnerability,
+though we advise server administrators who installed Synapse via pip to upgrade Twisted
+with <code>pip install --upgrade Twisted</code> as a matter of good practice. The Docker image
+<code>matrixdotorg/synapse</code> and the Debian packages from <code>packages.matrix.org</code> are using the
+updated library.</p>
 <h1 id="upgrading-to-v1510"><a class="header" href="#upgrading-to-v1510">Upgrading to v1.51.0</a></h1>
 <h2 id="deprecation-of-webclient-listeners-and-non-https-web_client_location"><a class="header" href="#deprecation-of-webclient-listeners-and-non-https-web_client_location">Deprecation of <code>webclient</code> listeners and non-HTTP(S) <code>web_client_location</code></a></h2>
 <p>Listeners of type  <code>webclient</code> are deprecated and scheduled to be removed in
@@ -2831,31 +2840,6 @@ timeline and some frequently asked questions are also given below.</p>
 <p>For more details and context on the release of the r0.1 Server/Server API and
 imminent Matrix 1.0 release, you can also see our
 <a href="https://matrix.org/blog/2019/02/04/matrix-at-fosdem-2019/">main talk from FOSDEM 2019</a>.</p>
-<h2 id="contents"><a class="header" href="#contents">Contents</a></h2>
-<ul>
-<li>Timeline</li>
-<li>Configuring certificates for compatibility with Synapse 1.0</li>
-<li>FAQ
-<ul>
-<li>Synapse 0.99.0 has just been released, what do I need to do right now?</li>
-<li>How do I upgrade?</li>
-<li>What will happen if I do not set up a valid federation certificate
-immediately?</li>
-<li>What will happen if I do nothing at all?</li>
-<li>When do I need a SRV record or .well-known URI?</li>
-<li>Can I still use an SRV record?</li>
-<li>I have created a .well-known URI. Do I still need an SRV record?</li>
-<li>It used to work just fine, why are you breaking everything?</li>
-<li>Can I manage my own certificates rather than having Synapse renew
-certificates itself?</li>
-<li>Do you still recommend against using a reverse proxy on the federation port?</li>
-<li>Do I still need to give my TLS certificates to Synapse if I am using a
-reverse proxy?</li>
-<li>Do I need the same certificate for the client and federation port?</li>
-<li>How do I tell Synapse to reload my keys/certificates after I replace them?</li>
-</ul>
-</li>
-</ul>
 <h2 id="timeline"><a class="header" href="#timeline">Timeline</a></h2>
 <p><strong>5th Feb 2019  - Synapse 0.99.0 is released.</strong></p>
 <p>All server admins are encouraged to upgrade.</p>
@@ -3177,11 +3161,11 @@ a fresh config using Synapse by following the instructions in
 # documentation on how to configure or create custom modules for Synapse.
 #
 modules:
-    # - module: my_super_module.MySuperClass
-    #   config:
-    #       do_thing: true
-    # - module: my_other_super_module.SomeClass
-    #   config: {}
+  #- module: my_super_module.MySuperClass
+  #  config:
+  #    do_thing: true
+  #- module: my_other_super_module.SomeClass
+  #  config: {}
 
 
 ## Server ##
@@ -3606,6 +3590,20 @@ limit_remote_rooms:
 # Defaults to 'true'.
 #
 #allow_per_room_profiles: false
+
+# The largest allowed file size for a user avatar. Defaults to no restriction.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's media repository.
+#
+#max_avatar_size: 10M
+
+# The MIME types allowed for user avatars. Defaults to no restriction.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's media repository.
+#
+#allowed_avatar_mimetypes: [&quot;image/png&quot;, &quot;image/jpeg&quot;, &quot;image/gif&quot;]
 
 # How long to keep redacted events in unredacted form in the database. After
 # this period redacted events get replaced with their redacted form in the DB.
@@ -4563,6 +4561,16 @@ account_threepid_delegates:
 # Defaults to true.
 #
 #auto_join_rooms_for_guests: false
+
+# Whether to inhibit errors raised when registering a new account if the user ID
+# already exists. If turned on, that requests to /register/available will always
+# show a user ID as available, and Synapse won't raise an error when starting
+# a registration with a user ID that already exists. However, Synapse will still
+# raise an error if the registration completes and the username conflicts.
+#
+# Defaults to false.
+#
+#inhibit_user_in_use_error: true
 
 
 ## Metrics ###
@@ -8659,6 +8667,55 @@ the authentication is denied.</p>
 deactivated device (if any: access tokens are occasionally created without an associated
 device ID), and the (now deactivated) access token.</p>
 <p>If multiple modules implement this callback, Synapse runs them all in order.</p>
+<h3 id="get_username_for_registration"><a class="header" href="#get_username_for_registration"><code>get_username_for_registration</code></a></h3>
+<p><em>First introduced in Synapse v1.52.0</em></p>
+<pre><code class="language-python">async def get_username_for_registration(
+    uia_results: Dict[str, Any],
+    params: Dict[str, Any],
+) -&gt; Optional[str]
+</code></pre>
+<p>Called when registering a new user. The module can return a username to set for the user
+being registered by returning it as a string, or <code>None</code> if it doesn't wish to force a
+username for this user. If a username is returned, it will be used as the local part of a
+user's full Matrix ID (e.g. it's <code>alice</code> in <code>@alice:example.com</code>).</p>
+<p>This callback is called once <a href="https://spec.matrix.org/latest/client-server-api/#user-interactive-authentication-api">User-Interactive Authentication</a>
+has been completed by the user. It is not called when registering a user via SSO. It is
+passed two dictionaries, which include the information that the user has provided during
+the registration process.</p>
+<p>The first dictionary contains the results of the <a href="https://spec.matrix.org/latest/client-server-api/#user-interactive-authentication-api">User-Interactive Authentication</a>
+flow followed by the user. Its keys are the identifiers of every step involved in the flow,
+associated with either a boolean value indicating whether the step was correctly completed,
+or additional information (e.g. email address, phone number...). A list of most existing
+identifiers can be found in the <a href="https://spec.matrix.org/v1.1/client-server-api/#authentication-types">Matrix specification</a>.
+Here's an example featuring all currently supported keys:</p>
+<pre><code class="language-python">{
+    &quot;m.login.dummy&quot;: True,  # Dummy authentication
+    &quot;m.login.terms&quot;: True,  # User has accepted the terms of service for the homeserver
+    &quot;m.login.recaptcha&quot;: True,  # User has completed the recaptcha challenge
+    &quot;m.login.email.identity&quot;: {  # User has provided and verified an email address
+        &quot;medium&quot;: &quot;email&quot;,
+        &quot;address&quot;: &quot;alice@example.com&quot;,
+        &quot;validated_at&quot;: 1642701357084,
+    },
+    &quot;m.login.msisdn&quot;: {  # User has provided and verified a phone number
+        &quot;medium&quot;: &quot;msisdn&quot;,
+        &quot;address&quot;: &quot;33123456789&quot;,
+        &quot;validated_at&quot;: 1642701357084,
+    },
+    &quot;org.matrix.msc3231.login.registration_token&quot;: &quot;sometoken&quot;,  # User has registered through the flow described in MSC3231
+}
+</code></pre>
+<p>The second dictionary contains the parameters provided by the user's client in the request
+to <code>/_matrix/client/v3/register</code>. See the <a href="https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3register">Matrix specification</a>
+for a complete list of these parameters.</p>
+<p>If the module cannot, or does not wish to, generate a username for this user, it must
+return <code>None</code>.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>None</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>None</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback. If every callback return <code>None</code>,
+the username provided by the user is used, if any (otherwise one is automatically
+generated).</p>
 <h2 id="example-3"><a class="header" href="#example-3">Example</a></h2>
 <p>The example module below implements authentication checkers for two different login types: </p>
 <ul>
@@ -9378,6 +9435,8 @@ providing the token as either a query parameter or a request header. To add it a
 <p>This API allows a server administrator to manage the validity of an account. To
 use it, you must enable the account validity feature (under
 <code>account_validity</code>) in Synapse's configuration.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <h2 id="renew-account"><a class="header" href="#renew-account">Renew account</a></h2>
 <p>This API extends the validity of an account by as much time as configured in the
 <code>period</code> parameter from the <code>account_validity</code> configuration.</p>
@@ -9475,18 +9534,18 @@ background updates which won't be cancelled once started.</p>
 <p>This API lets a server admin delete a local group. Doing so will kick all
 users out of the group so that their clients will correctly handle the group
 being deleted.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>The API is:</p>
 <pre><code>POST /_synapse/admin/v1/delete_group/&lt;group_id&gt;
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="show-reported-events"><a class="header" href="#show-reported-events">Show reported events</a></h1>
 <p>This API returns information about reported events.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>The api is:</p>
 <pre><code>GET /_synapse/admin/v1/event_reports?from=0&amp;limit=10
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>It returns a JSON body like the following:</p>
 <pre><code class="language-json">{
     &quot;event_reports&quot;: [
@@ -9563,8 +9622,6 @@ have a canonical alias set.</li>
 <p>The api is:</p>
 <pre><code>GET /_synapse/admin/v1/event_reports/&lt;report_id&gt;
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>It returns a JSON body like the following:</p>
 <pre><code class="language-json">{
     &quot;event_id&quot;: &quot;$bNUFCwGzWca1meCGkjp-zwslF-GfVcXukvRLI1_FaVY&quot;,
@@ -9635,43 +9692,16 @@ was reported.</li>
 have a canonical alias set.</li>
 <li><code>event_json</code>: object - Details of the original event that was reported.</li>
 </ul>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="contents-1"><a class="header" href="#contents-1">Contents</a></h1>
-<ul>
-<li><a href="admin_api/media_admin_api.html#querying-media">Querying media</a>
-<ul>
-<li><a href="admin_api/media_admin_api.html#list-all-media-in-a-room">List all media in a room</a></li>
-<li><a href="admin_api/media_admin_api.html#list-all-media-uploaded-by-a-user">List all media uploaded by a user</a></li>
-</ul>
-</li>
-<li><a href="admin_api/media_admin_api.html#quarantine-media">Quarantine media</a>
-<ul>
-<li><a href="admin_api/media_admin_api.html#quarantining-media-by-id">Quarantining media by ID</a></li>
-<li><a href="admin_api/media_admin_api.html#remove-media-from-quarantine-by-id">Remove media from quarantine by ID</a></li>
-<li><a href="admin_api/media_admin_api.html#quarantining-media-in-a-room">Quarantining media in a room</a></li>
-<li><a href="admin_api/media_admin_api.html#quarantining-all-media-of-a-user">Quarantining all media of a user</a></li>
-<li><a href="admin_api/media_admin_api.html#protecting-media-from-being-quarantined">Protecting media from being quarantined</a></li>
-<li><a href="admin_api/media_admin_api.html#unprotecting-media-from-being-quarantined">Unprotecting media from being quarantined</a></li>
-</ul>
-</li>
-<li><a href="admin_api/media_admin_api.html#delete-local-media">Delete local media</a>
-<ul>
-<li><a href="admin_api/media_admin_api.html#delete-a-specific-local-media">Delete a specific local media</a></li>
-<li><a href="admin_api/media_admin_api.html#delete-local-media-by-date-or-size">Delete local media by date or size</a></li>
-<li><a href="admin_api/media_admin_api.html#delete-media-uploaded-by-a-user">Delete media uploaded by a user</a></li>
-</ul>
-</li>
-<li><a href="admin_api/media_admin_api.html#purge-remote-media-api">Purge Remote Media API</a></li>
-</ul>
-<h1 id="querying-media"><a class="header" href="#querying-media">Querying media</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="querying-media"><a class="header" href="#querying-media">Querying media</a></h1>
 <p>These APIs allow extracting media information from the homeserver.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <h2 id="list-all-media-in-a-room"><a class="header" href="#list-all-media-in-a-room">List all media in a room</a></h2>
 <p>This API gets a list of known media in a room.
 However, it only shows media from unencrypted events or rooms.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/room/&lt;room_id&gt;/media
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>The API returns a JSON body like the following:</p>
 <pre><code class="language-json">{
   &quot;local&quot;: [
@@ -9871,8 +9901,6 @@ All cached media that was last accessed before this timestamp will be removed.</
 <ul>
 <li><code>deleted</code>: integer - The number of media items successfully deleted</li>
 </ul>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>If the user re-requests purged remote media, synapse will re-request the media
 from the originating server.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="purge-history-api"><a class="header" href="#purge-history-api">Purge History API</a></h1>
@@ -9883,11 +9911,11 @@ several minutes or longer. During this period users will not be able to
 paginate further back in the room from the point being purged from.</p>
 <p>Note that Synapse requires at least one message in each room, so it will never
 delete the last message in a room.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>The API is:</p>
 <pre><code>POST /_synapse/admin/v1/purge_history/&lt;room_id&gt;[/&lt;event_id&gt;]
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>By default, events sent by local users are not deleted, as they may represent
 the only copies of this content in existence. (Events sent by remote users are
 deleted.)</p>
@@ -9913,8 +9941,6 @@ a purge id:</p>
 <p>It is possible to poll for updates on recent purges with a second API;</p>
 <pre><code>GET /_synapse/admin/v1/purge_history_status/&lt;purge_id&gt;
 </code></pre>
-<p>Again, you will need to authenticate by providing an <code>access_token</code> for a
-server admin.</p>
 <p>This API returns a JSON body like the following:</p>
 <pre><code class="language-json">{
     &quot;status&quot;: &quot;active&quot;
@@ -10230,6 +10256,8 @@ the <a href="https://matrix.org/docs/spec/client_server/r0.6.1#api-standards">Ma
 to a room with a given <code>room_id_or_alias</code>. You can only modify the membership of
 local users. The server administrator must be in the room and have permission to
 invite users.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <h2 id="parameters"><a class="header" href="#parameters">Parameters</a></h2>
 <p>The following parameters are available:</p>
 <ul>
@@ -10244,36 +10272,17 @@ invite users.</p>
   &quot;user_id&quot;: &quot;@user:server.com&quot;
 }
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>Response:</p>
 <pre><code class="language-json">{
   &quot;room_id&quot;: &quot;!636q39766251:server.com&quot;
 }
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="contents-2"><a class="header" href="#contents-2">Contents</a></h1>
-<ul>
-<li><a href="admin_api/rooms.html#list-room-api">List Room API</a></li>
-<li><a href="admin_api/rooms.html#room-details-api">Room Details API</a></li>
-<li><a href="admin_api/rooms.html#room-members-api">Room Members API</a></li>
-<li><a href="admin_api/rooms.html#room-state-api">Room State API</a></li>
-<li><a href="admin_api/rooms.html#block-room-api">Block Room API</a></li>
-<li><a href="admin_api/rooms.html#delete-room-api">Delete Room API</a>
-<ul>
-<li><a href="admin_api/rooms.html#version-1-old-version">Version 1 (old version)</a></li>
-<li><a href="admin_api/rooms.html#version-2-new-version">Version 2 (new version)</a></li>
-<li><a href="admin_api/rooms.html#status-of-deleting-rooms">Status of deleting rooms</a></li>
-<li><a href="admin_api/rooms.html#undoing-room-shutdowns">Undoing room shutdowns</a></li>
-</ul>
-</li>
-<li><a href="admin_api/rooms.html#make-room-admin-api">Make Room Admin API</a></li>
-<li><a href="admin_api/rooms.html#forward-extremities-admin-api">Forward Extremities Admin API</a></li>
-<li><a href="admin_api/rooms.html#event-context-api">Event Context API</a></li>
-</ul>
-<h1 id="list-room-api"><a class="header" href="#list-room-api">List Room API</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="list-room-api"><a class="header" href="#list-room-api">List Room API</a></h1>
 <p>The List Room admin API allows server admins to get a list of rooms on their
 server. There are various parameters available that allow for filtering and
 sorting the returned list. This API supports pagination.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p><strong>Parameters</strong></p>
 <p>The following query parameters are available:</p>
 <ul>
@@ -10686,8 +10695,6 @@ Depending on the amount of history being purged, a call to the API may take
 several minutes or longer.</p>
 <p>The local server will only have the power to move local user and room aliases to
 the new room. Users on other servers will be unaffected.</p>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <h2 id="version-1-old-version"><a class="header" href="#version-1-old-version">Version 1 (old version)</a></h2>
 <p>This version works synchronously. That means you only get the response once the server has
 finished the action, which may take a long time. If you request the same action
@@ -11113,11 +11120,11 @@ can be used. See <a href="admin_api/../server_notices.html">the server notices d
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="users-media-usage-statistics"><a class="header" href="#users-media-usage-statistics">Users' media usage statistics</a></h1>
 <p>Returns information about all local media usage of users. Gives the
 possibility to filter them by time and user.</p>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/statistics/users/media
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code>
-for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;users&quot;: [
@@ -11187,13 +11194,13 @@ about the user and their local media. Objects contain the following fields:
 <li><code>total</code> - integer - Total number of users after filtering.</li>
 </ul>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="user-admin-api"><a class="header" href="#user-admin-api">User Admin API</a></h1>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <h2 id="query-user-account"><a class="header" href="#query-user-account">Query User Account</a></h2>
 <p>This API returns information about a specific user account.</p>
 <p>The api is:</p>
 <pre><code>GET /_synapse/admin/v2/users/&lt;user_id&gt;
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>It returns a JSON body like the following:</p>
 <pre><code class="language-jsonc">{
     &quot;name&quot;: &quot;@user:example.com&quot;,
@@ -11274,8 +11281,6 @@ specific <code>user_id</code>.</p>
     &quot;user_type&quot;: null
 }
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>Returns HTTP status code:</p>
 <ul>
 <li><code>201</code> - When a new user object was created.</li>
@@ -11326,8 +11331,6 @@ users do not login via single-sign-on, a new <code>password</code> must be provi
 By default, the response is ordered by ascending user ID.</p>
 <pre><code>GET /_synapse/admin/v2/users?from=0&amp;limit=10&amp;guests=false
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
     &quot;users&quot;: [
@@ -11451,8 +11454,6 @@ This allows user type specific behaviour. There are also types <code>support</co
 </code></pre>
 <p>See also: <a href="https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid">Client Server
 API Whois</a>.</p>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>It returns a JSON body like the following:</p>
 <pre><code class="language-json">{
     &quot;user_id&quot;: &quot;&lt;user_id&gt;&quot;,
@@ -11494,8 +11495,6 @@ were sent, but hidden from users joining the room afterwards.</p>
     &quot;erase&quot;: true
 }
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>The erase parameter is optional and defaults to <code>false</code>.
 An empty body may be passed for backwards compatibility.</p>
 <p>The following actions are performed when deactivating an user:</p>
@@ -11510,6 +11509,14 @@ An empty body may be passed for backwards compatibility.</p>
 <li>Remove the user from the user directory</li>
 <li>Reject all pending invites</li>
 <li>Remove all account validity information related to the user</li>
+<li>Remove the arbitrary data store known as <em>account data</em>. For example, this includes:
+<ul>
+<li>list of ignored users;</li>
+<li>push rules;</li>
+<li>secret storage keys; and</li>
+<li>cross-signing keys.</li>
+</ul>
+</li>
 </ul>
 <p>The following additional actions are performed during deactivation if <code>erase</code>
 is set to <code>true</code>:</p>
@@ -11523,7 +11530,6 @@ is set to <code>true</code>:</p>
 <li>Remove mappings of SSO IDs</li>
 <li><a href="admin_api/user_admin_api.html#delete-media-uploaded-by-a-user">Delete media uploaded</a> by user (included avatar images)</li>
 <li>Delete sent and received messages</li>
-<li>Delete E2E cross-signing keys</li>
 <li>Remove the user's creation (registration) timestamp</li>
 <li><a href="admin_api/user_admin_api.html#override-ratelimiting-for-users">Remove rate limit overrides</a></li>
 <li>Remove from monthly active users</li>
@@ -11539,16 +11545,12 @@ is set to <code>true</code>:</p>
    &quot;logout_devices&quot;: true
 }
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>The parameter <code>new_password</code> is required.
 The parameter <code>logout_devices</code> is optional and defaults to <code>true</code>.</p>
 <h2 id="get-whether-a-user-is-a-server-administrator-or-not"><a class="header" href="#get-whether-a-user-is-a-server-administrator-or-not">Get whether a user is a server administrator or not</a></h2>
 <p>The api is:</p>
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/admin
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
     &quot;admin&quot;: true
@@ -11564,15 +11566,11 @@ server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a
     &quot;admin&quot;: true
 }
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <h2 id="list-room-memberships-of-a-user"><a class="header" href="#list-room-memberships-of-a-user">List room memberships of a user</a></h2>
 <p>Gets a list of all <code>room_id</code> that a specific <code>user_id</code> is member.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/joined_rooms
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">    {
         &quot;joined_rooms&quot;: [
@@ -11674,8 +11672,6 @@ The newest media is on top. You can change the order with parameters
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/media
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;media&quot;: [
@@ -11787,8 +11783,6 @@ The newest media is deleted first. You can change the order with parameters
 <p>The API is:</p>
 <pre><code>DELETE /_synapse/admin/v1/users/&lt;user_id&gt;/media
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;deleted_media&quot;: [
@@ -11837,8 +11831,6 @@ same.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v2/users/&lt;user_id&gt;/devices
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;devices&quot;: [
@@ -11899,8 +11891,6 @@ any access token associated with them.</p>
   ],
 }
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>An empty JSON dict is returned.</p>
 <p><strong>Parameters</strong></p>
 <p>The following parameters should be set in the URL:</p>
@@ -11916,8 +11906,6 @@ server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v2/users/&lt;user_id&gt;/devices/&lt;device_id&gt;
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;device_id&quot;: &quot;&lt;device_id&gt;&quot;,
@@ -11954,8 +11942,6 @@ devices was last seen. (May be a few minutes out of date, for efficiency reasons
   &quot;display_name&quot;: &quot;My other phone&quot;
 }
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>An empty JSON dict is returned.</p>
 <p><strong>Parameters</strong></p>
 <p>The following parameters should be set in the URL:</p>
@@ -11976,8 +11962,6 @@ and invalidates any access token associated with it.</p>
 
 {}
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>An empty JSON dict is returned.</p>
 <p><strong>Parameters</strong></p>
 <p>The following parameters should be set in the URL:</p>
@@ -11990,8 +11974,6 @@ server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/pushers
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;pushers&quot;: [
@@ -12090,8 +12072,6 @@ A shadow-banned user will be unable to contact anyone on the server.</p>
 <p>To un-shadow-ban a user the API is:</p>
 <pre><code>DELETE /_synapse/admin/v1/users/&lt;user_id&gt;/shadow_ban
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>An empty JSON dict is returned in both cases.</p>
 <p><strong>Parameters</strong></p>
 <p>The following parameters should be set in the URL:</p>
@@ -12106,8 +12086,6 @@ There are specific APIs to set, get and delete a ratelimit.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/override_ratelimit
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;messages_per_second&quot;: 0,
@@ -12135,8 +12113,6 @@ being limited.</li>
 <p>The API is:</p>
 <pre><code>POST /_synapse/admin/v1/users/&lt;user_id&gt;/override_ratelimit
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;messages_per_second&quot;: 0,
@@ -12169,8 +12145,6 @@ being limited.</li>
 <p>The API is:</p>
 <pre><code>DELETE /_synapse/admin/v1/users/&lt;user_id&gt;/override_ratelimit
 </code></pre>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>An empty JSON dict is returned.</p>
 <pre><code class="language-json">{}
 </code></pre>
@@ -12189,9 +12163,8 @@ for more information.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/username_available?username=$localpart
 </code></pre>
-<p>The request and response format is the same as the <a href="https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available">/_matrix/client/r0/register/available</a> API.</p>
-<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
+<p>The request and response format is the same as the
+<a href="https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available">/_matrix/client/r0/register/available</a> API.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="version-api"><a class="header" href="#version-api">Version API</a></h1>
 <p>This API returns the running Synapse version and the Python version
 on which Synapse is being run. This is useful when a Synapse instance
@@ -12203,7 +12176,7 @@ contains Synapse version information).</p>
 <p>It returns a JSON body like the following:</p>
 <pre><code class="language-json">{
     &quot;server_version&quot;: &quot;0.99.2rc1 (b=develop, abcdef123)&quot;,
-    &quot;python_version&quot;: &quot;3.6.8&quot;
+    &quot;python_version&quot;: &quot;3.7.8&quot;
 }
 </code></pre>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="federation-api"><a class="header" href="#federation-api">Federation API</a></h1>
@@ -12282,7 +12255,7 @@ to this destination, or <code>null</code> if this information has not been track
 <li><code>next_token</code>: string representing a positive integer - Indication for pagination. See above.</li>
 <li><code>total</code> - integer - Total number of destinations.</li>
 </ul>
-<h1 id="destination-details-api"><a class="header" href="#destination-details-api">Destination Details API</a></h1>
+<h2 id="destination-details-api"><a class="header" href="#destination-details-api">Destination Details API</a></h2>
 <p>This API gets the retry timing info for a specific remote server.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/federation/destinations/&lt;destination&gt;
@@ -12296,9 +12269,88 @@ to this destination, or <code>null</code> if this information has not been track
    &quot;last_successful_stream_ordering&quot;: null
 }
 </code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>destination</code> - Name of the remote server.</li>
+</ul>
 <p><strong>Response</strong></p>
 <p>The response fields are the same like in the <code>destinations</code> array in
 <a href="usage/administration/admin_api/federation.html#list-of-destinations">List of destinations</a> response.</p>
+<h2 id="destination-rooms"><a class="header" href="#destination-rooms">Destination rooms</a></h2>
+<p>This API gets the rooms that federate with a specific remote server.</p>
+<p>The API is:</p>
+<pre><code>GET /_synapse/admin/v1/federation/destinations/&lt;destination&gt;/rooms
+</code></pre>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+   &quot;rooms&quot;:[
+      {
+         &quot;room_id&quot;: &quot;!OGEhHVWSdvArJzumhm:matrix.org&quot;,
+         &quot;stream_ordering&quot;: 8326
+      },
+      {
+         &quot;room_id&quot;: &quot;!xYvNcQPhnkrdUmYczI:matrix.org&quot;,
+         &quot;stream_ordering&quot;: 93534
+      }
+   ],
+   &quot;total&quot;: 2
+}
+</code></pre>
+<p>To paginate, check for <code>next_token</code> and if present, call the endpoint again
+with <code>from</code> set to the value of <code>next_token</code>. This will return a new page.</p>
+<p>If the endpoint does not return a <code>next_token</code> then there are no more destinations
+to paginate through.</p>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>destination</code> - Name of the remote server.</li>
+</ul>
+<p>The following query parameters are available:</p>
+<ul>
+<li><code>from</code> - Offset in the returned list. Defaults to <code>0</code>.</li>
+<li><code>limit</code> - Maximum amount of destinations to return. Defaults to <code>100</code>.</li>
+<li><code>dir</code> - Direction of room order by <code>room_id</code>. Either <code>f</code> for forwards or <code>b</code> for
+backwards. Defaults to <code>f</code>.</li>
+</ul>
+<p><strong>Response</strong></p>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>rooms</code> - An array of objects, each containing information about a room.
+Room objects contain the following fields:
+<ul>
+<li><code>room_id</code> - string - The ID of the room.</li>
+<li><code>stream_ordering</code> - integer -  The stream ordering of the most recent
+successfully-sent <a href="usage/administration/admin_api/understanding_synapse_through_grafana_graphs.html#federation">PDU</a>
+to this destination in this room.</li>
+</ul>
+</li>
+<li><code>next_token</code>: string representing a positive integer - Indication for pagination. See above.</li>
+<li><code>total</code> - integer - Total number of destinations.</li>
+</ul>
+<h2 id="reset-connection-timeout"><a class="header" href="#reset-connection-timeout">Reset connection timeout</a></h2>
+<p>Synapse makes federation requests to other homeservers. If a federation request fails,
+Synapse will mark the destination homeserver as offline, preventing any future requests
+to that server for a &quot;cooldown&quot; period. This period grows over time if the server
+continues to fail its responses
+(<a href="https://en.wikipedia.org/wiki/Exponential_backoff">exponential backoff</a>).</p>
+<p>Admins can cancel the cooldown period with this API.</p>
+<p>This API resets the retry timing for a specific remote server and tries to connect to
+the remote server again. It does not wait for the next <code>retry_interval</code>.
+The connection must have previously run into an error and <code>retry_last_ts</code>
+(<a href="usage/administration/admin_api/federation.html#destination-details-api">Destination Details API</a>) must not be equal to <code>0</code>.</p>
+<p>The connection attempt is carried out in the background and can take a while
+even if the API already returns the http status 200.</p>
+<p>The API is:</p>
+<pre><code>POST /_synapse/admin/v1/federation/destinations/&lt;destination&gt;/reset_connection
+
+{}
+</code></pre>
+<p><strong>Parameters</strong></p>
+<p>The following parameters should be set in the URL:</p>
+<ul>
+<li><code>destination</code> - Name of the remote server.</li>
+</ul>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="using-the-synapse-manhole"><a class="header" href="#using-the-synapse-manhole">Using the synapse manhole</a></h1>
 <p>The &quot;manhole&quot; allows server administrators to access a Python shell on a running
 Synapse installation. This is a very powerful mechanism for administration and
@@ -12948,6 +13000,7 @@ setup a <em>virtualenv</em>, as follows:</p>
 <pre><code class="language-sh">cd path/where/you/have/cloned/the/repository
 python3 -m venv ./env
 source ./env/bin/activate
+pip install wheel
 pip install -e &quot;.[all,dev]&quot;
 pip install tox
 </code></pre>
@@ -12991,7 +13044,7 @@ want to test your code.</p>
 <li>ensure that your code follows the coding style adopted by the project;</li>
 <li>catch a number of errors in your code.</li>
 </ul>
-<p>They're pretty fast, don't hesitate!</p>
+<p>The linter takes no time at all to run as soon as you've <a href="development/contributing_guide.html#4-install-the-dependencies">downloaded the dependencies into your python virtual environment</a>.</p>
 <pre><code class="language-sh">source ./env/bin/activate
 ./scripts-dev/lint.sh
 </code></pre>
@@ -13733,6 +13786,47 @@ has had all background updates run.</p>
 </code></pre>
 <p>NB at the time of writing, this script predates the split into separate <code>state</code>/<code>main</code>
 databases so will require updates to handle that correctly.</p>
+<h2 id="delta-files"><a class="header" href="#delta-files">Delta files</a></h2>
+<p>Delta files define the steps required to upgrade the database from an earlier version.
+They can be written as either a file containing a series of SQL statements, or a Python
+module.</p>
+<p>Synapse remembers which delta files it has applied to a database (they are stored in the
+<code>applied_schema_deltas</code> table) and will not re-apply them (even if a given file is
+subsequently updated).</p>
+<p>Delta files should be placed in a directory named <code>synapse/storage/schema/&lt;database&gt;/delta/&lt;version&gt;/</code>.
+They are applied in alphanumeric order, so  by convention the first two characters
+of the filename should be an integer such as <code>01</code>, to put the file in the right order.</p>
+<h3 id="sql-delta-files"><a class="header" href="#sql-delta-files">SQL delta files</a></h3>
+<p>These should be named <code>*.sql</code>, or —  for changes which should only be applied for a
+given database engine — <code>*.sql.posgres</code> or <code>*.sql.sqlite</code>. For example, a delta which
+adds a new column to the <code>foo</code> table might be called <code>01add_bar_to_foo.sql</code>.</p>
+<p>Note that our SQL parser is a bit simple - it understands comments (<code>--</code> and <code>/*...*/</code>),
+but complex statements which require a <code>;</code> in the middle of them (such as <code>CREATE TRIGGER</code>) are beyond it and you'll have to use a Python delta file.</p>
+<h3 id="python-delta-files"><a class="header" href="#python-delta-files">Python delta files</a></h3>
+<p>For more flexibility, a delta file can take the form of a python module. These should
+be named <code>*.py</code>. Note that database-engine-specific modules are not supported here –
+instead you can write <code>if isinstance(database_engine, PostgresEngine)</code> or similar.</p>
+<p>A Python delta module should define either or both of the following functions:</p>
+<pre><code class="language-python">import synapse.config.homeserver
+import synapse.storage.engines
+import synapse.storage.types
+
+
+def run_create(
+    cur: synapse.storage.types.Cursor,
+    database_engine: synapse.storage.engines.BaseDatabaseEngine,
+) -&gt; None:
+    &quot;&quot;&quot;Called whenever an existing or new database is to be upgraded&quot;&quot;&quot;
+    ...
+
+def run_upgrade(
+    cur: synapse.storage.types.Cursor,
+    database_engine: synapse.storage.engines.BaseDatabaseEngine,
+    config: synapse.config.homeserver.HomeServerConfig,
+) -&gt; None:
+    &quot;&quot;&quot;Called whenever an existing database is to be upgraded.&quot;&quot;&quot;
+    ...
+</code></pre>
 <h2 id="boolean-columns"><a class="header" href="#boolean-columns">Boolean columns</a></h2>
 <p>Boolean columns require special treatment, since SQLite treats booleans the
 same as integers.</p>
