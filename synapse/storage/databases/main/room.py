@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
 import logging
 from abc import abstractmethod
 from enum import Enum
@@ -540,6 +540,11 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             # Flip the boolean
             order_by_asc = not order_by_asc
 
+        if where_statement:
+            info_where_statement = where_statement + " AND events.type='m.room.create'"
+        else:
+            info_where_statement = "WHERE events.type='m.room.create'"
+
         # Create one query for getting the limited number of events that the user asked
         # for, and another query for getting the total number of events that could be
         # returned. Thus allowing us to see if there are more events to paginate through
@@ -547,16 +552,19 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             SELECT state.room_id, state.name, state.canonical_alias, curr.joined_members,
               curr.local_users_in_room, rooms.room_version, rooms.creator,
               state.encryption, state.is_federatable, rooms.is_public, state.join_rules,
-              state.guest_access, state.history_visibility, curr.current_state_events
+              state.guest_access, state.history_visibility, curr.current_state_events,
+              json.json
             FROM room_stats_state state
             INNER JOIN room_stats_current curr USING (room_id)
             INNER JOIN rooms USING (room_id)
+            INNER JOIN event_json json USING (room_id)
+            INNER JOIN state_events events USING (event_id)
             {where}
             ORDER BY {order_by} {direction}, state.room_id {direction}
             LIMIT ?
             OFFSET ?
         """.format(
-            where=where_statement,
+            where=info_where_statement,
             order_by=order_by_column,
             direction="ASC" if order_by_asc else "DESC",
         )
@@ -581,6 +589,13 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             # Refactor room query data into a structured dictionary
             rooms = []
             for room in txn:
+                type = None
+                if room[14]:
+                    event_json = json.loads(room[14])
+                    content = event_json.get("content")
+                    if content:
+                        type = content.get("type")
+
                 rooms.append(
                     {
                         "room_id": room[0],
@@ -597,6 +612,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                         "guest_access": room[11],
                         "history_visibility": room[12],
                         "state_events": room[13],
+                        "type": type,
                     }
                 )
 
