@@ -700,17 +700,16 @@ class HTTPPusherTests(HomeserverTestCase):
         self._advance_time_and_make_push_succeed(expected_push_attempts)
         # Check our push made it
         self.assertEqual(len(self.push_attempts), expected_push_attempts)
+        _, push_url, push_body = self.push_attempts[expected_push_attempts - 1]
         self.assertEqual(
-            self.push_attempts[expected_push_attempts - 1][1],
+            push_url,
             "http://example.com/_matrix/push/v1/notify",
         )
         # Check that the unread count for the room is 0
         #
         # The unread count is zero as the user has no read receipt in the room yet
         self.assertEqual(
-            self.push_attempts[expected_push_attempts - 1][2]["notification"]["counts"][
-                "unread"
-            ],
+            push_body["notification"]["counts"]["unread"],
             expected_unread_count_last_push,
         )
 
