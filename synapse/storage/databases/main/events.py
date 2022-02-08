@@ -1389,6 +1389,8 @@ class PersistEventsStore:
                 "received_ts",
                 "sender",
                 "contains_url",
+                "state_key",
+                "rejection_reason",
             ),
             values=(
                 (
@@ -1405,8 +1407,10 @@ class PersistEventsStore:
                     self._clock.time_msec(),
                     event.sender,
                     "url" in event.content and isinstance(event.content["url"], str),
+                    event.get_state_key(),
+                    context.rejected or None,
                 )
-                for event, _ in events_and_contexts
+                for event, context in events_and_contexts
             ),
         )
 
@@ -1456,6 +1460,7 @@ class PersistEventsStore:
         for event, context in events_and_contexts:
             if context.rejected:
                 # Insert the event_id into the rejections table
+                # (events.rejection_reason has already been done)
                 self._store_rejections_txn(txn, event.event_id, context.rejected)
                 to_remove.add(event)
 

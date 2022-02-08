@@ -577,7 +577,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.json_body)
         room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
         self.assertTrue(room_timeline["limited"])
-        self._find_event_in_chunk(room_timeline["events"])
+        assert_bundle(self._find_event_in_chunk(room_timeline["events"]))
 
     def test_aggregation_get_event_for_annotation(self):
         """Test that annotations do not get bundled aggregations included

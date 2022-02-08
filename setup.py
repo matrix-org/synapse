@@ -150,7 +150,7 @@ setup(
     zip_safe=False,
     long_description=long_description,
     long_description_content_type="text/x-rst",
-    python_requires="~=3.6",
+    python_requires="~=3.7",
     entry_points={
         "console_scripts": [
             "synapse_homeserver = synapse.app.homeserver:main",
