@@ -1,0 +1,1 @@
+Don't attempt URL previews for URLs with audio/* or video/* content types. This prevents Synapse from making useless longer-lived connections to streaming media servers.
