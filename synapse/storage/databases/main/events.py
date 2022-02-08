@@ -1801,9 +1801,7 @@ class PersistEventsStore:
         )
 
         if rel_type == RelationTypes.REPLACE:
-            txn.call_after(
-                self.store.get_applicable_edit.invalidate, (parent_id, event.room_id)
-            )
+            txn.call_after(self.store.get_applicable_edit.invalidate, (parent_id,))
 
         if rel_type == RelationTypes.THREAD:
             txn.call_after(
