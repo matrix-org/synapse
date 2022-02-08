@@ -571,9 +571,7 @@ class HTTPPusherTests(HomeserverTestCase):
         # Carry out our option-value specific test
         #
         # This push should still only contain an unread count of 1 (for 1 unread room)
-        self.assertEqual(
-            self.push_attempts[4][2]["notification"]["counts"]["unread"], 1
-        )
+        self._check_push_attempt(6, 1)
 
     @override_config({"push": {"group_unread_count_by_room": False}})
     def test_push_unread_count_message_count(self):
@@ -587,9 +585,7 @@ class HTTPPusherTests(HomeserverTestCase):
         #
         # We're counting every unread message, so there should now be 3 since the
         # last read receipt
-        self.assertEqual(
-            self.push_attempts[5][2]["notification"]["counts"]["unread"], 3
-        )
+        self._check_push_attempt(6, 3)
 
     def _test_push_unread_count(self):
         """
@@ -667,8 +663,10 @@ class HTTPPusherTests(HomeserverTestCase):
 
         self._check_push_attempt(expected_push_attempts, 0)
 
-        # Since we're grouping by room, sending more messages shouldn't increase the
-        # unread count, as they're all being sent in the same room
+        # If we're grouping by room, sending more messages shouldn't increase the
+        # unread count, as they're all being sent in the same room. Otherwise, it
+        # should. Therefore, the last call to _check_push_attempt is done in the
+        # caller method.
         self.helper.send(room_id, body="Hello?", tok=other_access_token)
         expected_push_attempts += 1
 
@@ -680,11 +678,6 @@ class HTTPPusherTests(HomeserverTestCase):
         self._advance_time_and_make_push_succeed(expected_push_attempts)
 
         self.helper.send(room_id, body="HELLO???", tok=other_access_token)
-        expected_push_attempts += 1
-
-        self._advance_time_and_make_push_succeed(expected_push_attempts)
-
-        self.assertEqual(len(self.push_attempts), 6)
 
     def _advance_time_and_make_push_succeed(self, expected_push_attempts):
         self.pump()
