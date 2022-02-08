@@ -90,11 +90,15 @@ class RelationPaginationServlet(RestServlet):
             # Return the relations
             from_token = None
             if from_token_str:
-                from_token = RelationPaginationToken.from_string(from_token_str)
+                from_token = RelationPaginationToken.from_string(
+                    from_token_str
+                ).to_room_stream_token()
 
             to_token = None
             if to_token_str:
-                to_token = RelationPaginationToken.from_string(to_token_str)
+                to_token = RelationPaginationToken.from_string(
+                    to_token_str
+                ).to_room_stream_token()
 
             pagination_chunk = await self.store.get_relations_for_event(
                 event_id=parent_id,
@@ -289,11 +293,15 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
 
         from_token = None
         if from_token_str:
-            from_token = RelationPaginationToken.from_string(from_token_str)
+            from_token = RelationPaginationToken.from_string(
+                from_token_str
+            ).to_room_stream_token()
 
         to_token = None
         if to_token_str:
-            to_token = RelationPaginationToken.from_string(to_token_str)
+            to_token = RelationPaginationToken.from_string(
+                to_token_str
+            ).to_room_stream_token()
 
         result = await self.store.get_relations_for_event(
             event_id=parent_id,

@@ -44,7 +44,7 @@ from synapse.storage.relations import (
     PaginationChunk,
     RelationPaginationToken,
 )
-from synapse.types import JsonDict
+from synapse.types import JsonDict, RoomStreamToken
 from synapse.util.caches.descriptors import cached, cachedList
 
 if TYPE_CHECKING:
@@ -98,8 +98,8 @@ class RelationsWorkerStore(SQLBaseStore):
         aggregation_key: Optional[str] = None,
         limit: int = 5,
         direction: str = "b",
-        from_token: Optional[RelationPaginationToken] = None,
-        to_token: Optional[RelationPaginationToken] = None,
+        from_token: Optional[RoomStreamToken] = None,
+        to_token: Optional[RoomStreamToken] = None,
     ) -> PaginationChunk:
         """Get a list of relations for an event, ordered by topological ordering.
 
@@ -138,8 +138,8 @@ class RelationsWorkerStore(SQLBaseStore):
         pagination_clause = generate_pagination_where_clause(
             direction=direction,
             column_names=("topological_ordering", "stream_ordering"),
-            from_token=attr.astuple(from_token) if from_token else None,  # type: ignore[arg-type]
-            to_token=attr.astuple(to_token) if to_token else None,  # type: ignore[arg-type]
+            from_token=from_token.as_historical_tuple() if from_token else None,
+            to_token=to_token.as_historical_tuple() if to_token else None,
             engine=self.database_engine,
         )
 
@@ -180,9 +180,15 @@ class RelationsWorkerStore(SQLBaseStore):
             next_batch = None
             if len(events) > limit and last_topo_id and last_stream_id:
                 next_batch = RelationPaginationToken(last_topo_id, last_stream_id)
+            prev_batch = None
+            if from_token:
+                assert from_token.topological is not None
+                prev_batch = RelationPaginationToken(
+                    from_token.topological, from_token.stream
+                )
 
             return PaginationChunk(
-                chunk=list(events[:limit]), next_batch=next_batch, prev_batch=from_token
+                chunk=list(events[:limit]), next_batch=next_batch, prev_batch=prev_batch
             )
 
         return await self.db_pool.runInteraction(
