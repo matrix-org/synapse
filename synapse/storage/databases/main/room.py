@@ -162,16 +162,18 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             txn: LoggingTransaction, room_id: str
         ) -> Optional[Dict[str, Any]]:
             sql = """
-                SELECT room_id, state.name, state.canonical_alias, curr.joined_members,
+                SELECT rooms.room_id, state.name, state.canonical_alias, curr.joined_members,
                   curr.local_users_in_room AS joined_local_members, rooms.room_version AS version,
                   rooms.creator, state.encryption, state.is_federatable AS federatable,
                   rooms.is_public AS public, state.join_rules, state.guest_access,
                   state.history_visibility, curr.current_state_events AS state_events,
-                  state.avatar, state.topic
+                  state.avatar, state.topic, json.json
                 FROM rooms
+                INNER JOIN event_json json USING (room_id)
+                INNER JOIN state_events events USING (event_id)
                 LEFT JOIN room_stats_state state USING (room_id)
                 LEFT JOIN room_stats_current curr USING (room_id)
-                WHERE room_id = ?
+                WHERE rooms.room_id = ? AND events.type = 'm.room.create'
                 """
             txn.execute(sql, [room_id])
             # Catch error if sql returns empty result to return "None" instead of an error
@@ -182,11 +184,22 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
             res["federatable"] = bool(res["federatable"])
             res["public"] = bool(res["public"])
+            res["type"] = self._get_type_from_event_json(res["json"])
+            del res["json"]
             return res
 
         return await self.db_pool.runInteraction(
             "get_room_with_stats", get_room_with_stats_txn, room_id
         )
+
+    def _get_type_from_event_json(self, event_json_str: Optional[str]) -> Optional[str]:
+        type_ = None
+        if event_json_str:
+            event_json = json.loads(event_json_str)
+            content = event_json.get("content")
+            if content:
+                type_ = content.get("type")
+        return type_
 
     async def get_public_room_ids(self) -> List[str]:
         return await self.db_pool.simple_select_onecol(
@@ -589,13 +602,6 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             # Refactor room query data into a structured dictionary
             rooms = []
             for room in txn:
-                type = None
-                if room[14]:
-                    event_json = json.loads(room[14])
-                    content = event_json.get("content")
-                    if content:
-                        type = content.get("type")
-
                 rooms.append(
                     {
                         "room_id": room[0],
@@ -612,7 +618,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                         "guest_access": room[11],
                         "history_visibility": room[12],
                         "state_events": room[13],
-                        "type": type,
+                        "type": self._get_type_from_event_json(room[14]),
                     }
                 )
 
