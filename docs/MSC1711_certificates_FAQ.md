@@ -44,27 +44,6 @@ For more details and context on the release of the r0.1 Server/Server API and
 imminent Matrix 1.0 release, you can also see our
 [main talk from FOSDEM 2019](https://matrix.org/blog/2019/02/04/matrix-at-fosdem-2019/).
 
-## Contents
-* Timeline
-* Configuring certificates for compatibility with Synapse 1.0
-* FAQ
-  * Synapse 0.99.0 has just been released, what do I need to do right now?
-  * How do I upgrade?
-  * What will happen if I do not set up a valid federation certificate
-    immediately?
-  * What will happen if I do nothing at all?
-  * When do I need a SRV record or .well-known URI?
-  * Can I still use an SRV record?
-  * I have created a .well-known URI. Do I still need an SRV record?
-  * It used to work just fine, why are you breaking everything?
-  * Can I manage my own certificates rather than having Synapse renew
-    certificates itself?
-  * Do you still recommend against using a reverse proxy on the federation port?
-  * Do I still need to give my TLS certificates to Synapse if I am using a
-    reverse proxy?
-  * Do I need the same certificate for the client and federation port?
-  * How do I tell Synapse to reload my keys/certificates after I replace them?
-
 ## Timeline
 
 **5th Feb 2019  - Synapse 0.99.0 is released.**

@@ -70,13 +70,14 @@ REQUIREMENTS = [
     "pyasn1>=0.1.9",
     "pyasn1-modules>=0.0.7",
     "bcrypt>=3.1.0",
-    "pillow>=4.3.0",
+    "pillow>=5.4.0",
     "sortedcontainers>=1.4.4",
     "pymacaroons>=0.13.0",
     "msgpack>=0.5.2",
     "phonenumbers>=8.2.0",
     # we use GaugeHistogramMetric, which was added in prom-client 0.4.0.
-    "prometheus_client>=0.4.0",
+    # 0.13.0 has an incorrect type annotation, see #11832.
+    "prometheus_client>=0.4.0,<0.13.0",
     # we use `order`, which arrived in attrs 19.2.0.
     # Note: 21.1.0 broke `/sync`, see #9936
     "attrs>=19.2.0,!=21.1.0",
@@ -107,7 +108,7 @@ CONDITIONAL_REQUIREMENTS = {
     # `systemd.journal.JournalHandler`, as is documented in
     # `contrib/systemd/log_config.yaml`.
     "systemd": ["systemd-python>=231"],
-    "url_preview": ["lxml>=3.5.0"],
+    "url_preview": ["lxml>=4.2.0"],
     "sentry": ["sentry-sdk>=0.7.2"],
     "opentracing": ["jaeger-client>=4.0.0", "opentracing>=2.2.0"],
     "jwt": ["pyjwt>=1.6.4"],
