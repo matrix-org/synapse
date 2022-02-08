@@ -715,7 +715,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
 
     def test_unknown_room_version(self):
         """
-        If an room with an unknown room version is encountered it should not cause
+        If a room with an unknown room version is encountered it should not cause
         the entire summary to skip.
         """
         # Poke the database and update the room version to an unknown one.
@@ -727,6 +727,8 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 desc="updated-room-version",
             )
         )
+        # Invalidate method so that it returns the currently updated version
+        # instead of the cached version.
         self.hs.get_datastores().main.get_room_version_id.invalidate((self.room,))
 
         result = self.get_success(self.handler.get_space_summary(self.user, self.space))
