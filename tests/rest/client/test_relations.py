@@ -1475,12 +1475,13 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertEqual(relations, {})
 
     def test_redact_parent_annotation(self) -> None:
-        """Test that annotations of an event are redacted when the original event
+        """Test that annotations of an event are viewable when the original event
         is redacted.
         """
         # Add a relation
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="👍")
         self.assertEqual(200, channel.code, channel.json_body)
+        related_event_id = channel.json_body["event_id"]
 
         # The relations should exist.
         event_ids, relations = self._make_relation_requests()
@@ -1494,11 +1495,11 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         # Redact the original event.
         self._redact(self.parent_id)
 
-        # The relations are not returned.
+        # The relations are returned.
         event_ids, relations = self._make_relation_requests()
-        self.assertEqual(event_ids, [])
+        self.assertEquals(event_ids, [related_event_id])
         self.assertEqual(relations, {})
 
         # There's nothing to aggregate.
         chunk = self._get_aggregations()
-        self.assertEqual(chunk, [])
+        self.assertEqual(chunk, [{"count": 1, "key": "👍", "type": "m.reaction"}])

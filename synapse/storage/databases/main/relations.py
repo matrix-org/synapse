@@ -94,7 +94,7 @@ class RelationsWorkerStore(SQLBaseStore):
     @cached(tree=True)
     async def get_relations_for_event(
         self,
-        event_id: str,
+        event: EventBase,
         room_id: str,
         relation_type: Optional[str] = None,
         event_type: Optional[str] = None,
@@ -124,7 +124,7 @@ class RelationsWorkerStore(SQLBaseStore):
         """
 
         where_clause = ["relates_to_id = ?", "room_id = ?"]
-        where_args: List[Union[str, int]] = [event_id, room_id]
+        where_args: List[Union[str, int]] = [event.event_id, room_id]
 
         if relation_type is not None:
             where_clause.append("relation_type = ?")
@@ -157,7 +157,7 @@ class RelationsWorkerStore(SQLBaseStore):
             order = "ASC"
 
         sql = """
-            SELECT event_id, topological_ordering, stream_ordering
+            SELECT event_id, relation_type, topological_ordering, stream_ordering
             FROM event_relations
             INNER JOIN events USING (event_id)
             WHERE %s
@@ -177,10 +177,14 @@ class RelationsWorkerStore(SQLBaseStore):
             last_topo_id = None
             last_stream_id = None
             events = []
+            is_redacted = event.internal_metadata.is_redacted()
             for row in txn:
-                events.append({"event_id": row[0]})
-                last_topo_id = row[1]
-                last_stream_id = row[2]
+                # Do not include edits for redacted events as they leak event
+                # content.
+                if not is_redacted or row[1] != RelationTypes.REPLACE:
+                    events.append({"event_id": row[0]})
+                last_topo_id = row[2]
+                last_stream_id = row[3]
 
             # If there are more events, generate the next pagination key.
             next_token = None
@@ -776,7 +780,7 @@ class RelationsWorkerStore(SQLBaseStore):
             )
 
         references = await self.get_relations_for_event(
-            event_id, room_id, RelationTypes.REFERENCE, direction="f"
+            event, room_id, RelationTypes.REFERENCE, direction="f"
         )
         if references.chunk:
             aggregations.references = await references.to_dict(cast("DataStore", self))
