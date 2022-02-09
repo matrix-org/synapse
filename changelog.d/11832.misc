@@ -1,0 +1,1 @@
+Fix type errors introduced by new annotations in the Prometheus Client library.

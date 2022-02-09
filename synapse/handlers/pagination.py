@@ -537,14 +537,16 @@ class PaginationHandler:
                 state_dict = await self.store.get_events(list(state_ids.values()))
                 state = state_dict.values()
 
+        aggregations = await self.store.get_bundled_aggregations(events, user_id)
+
         time_now = self.clock.time_msec()
 
         chunk = {
             "chunk": (
-                await self._event_serializer.serialize_events(
+                self._event_serializer.serialize_events(
                     events,
                     time_now,
-                    bundle_aggregations=True,
+                    bundle_aggregations=aggregations,
                     as_client_event=as_client_event,
                 )
             ),
@@ -553,7 +555,7 @@ class PaginationHandler:
         }
 
         if state:
-            chunk["state"] = await self._event_serializer.serialize_events(
+            chunk["state"] = self._event_serializer.serialize_events(
                 state, time_now, as_client_event=as_client_event
             )
 

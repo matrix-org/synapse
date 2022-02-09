@@ -340,6 +340,12 @@ class LruCache(Generic[KT, VT]):
 
             apply_cache_factor_from_config (bool): If true, `max_size` will be
                 multiplied by a cache factor derived from the homeserver config
+
+            clock:
+
+            prune_unread_entries: If True, cache entries that haven't been read recently
+                will be evicted from the cache in the background. Set to False to
+                opt-out of this behaviour.
         """
         # Default `clock` to something sensible. Note that we rename it to
         # `real_clock` so that mypy doesn't think its still `Optional`.

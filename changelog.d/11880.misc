@@ -1,0 +1,1 @@
+Convert `ApplicationServiceTestCase` to use `simple_async_mock`.

@@ -28,6 +28,7 @@ from typing import (
     Union,
 )
 
+from matrix_common.regex import glob_to_regex
 from prometheus_client import Counter, Gauge, Histogram
 
 from twisted.internet.abstract import isIPAddress
@@ -57,7 +58,6 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.logging.opentracing import log_kv, start_active_span_from_edu, trace
-from synapse.logging.utils import log_function
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.replication.http.federation import (
     ReplicationFederationSendEduRestServlet,
@@ -65,7 +65,7 @@ from synapse.replication.http.federation import (
 )
 from synapse.storage.databases.main.lock import Lock
 from synapse.types import JsonDict, get_domain_from_id
-from synapse.util import glob_to_regex, json_decoder, unwrapFirstError
+from synapse.util import json_decoder, unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute, gather_results
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_server_name
@@ -858,7 +858,6 @@ class FederationServer(FederationBase):
             res = {"auth_chain": [a.get_pdu_json(time_now) for a in auth_pdus]}
         return 200, res
 
-    @log_function
     async def on_query_client_keys(
         self, origin: str, content: Dict[str, str]
     ) -> Tuple[int, Dict[str, Any]]:
@@ -939,7 +938,6 @@ class FederationServer(FederationBase):
 
         return {"events": [ev.get_pdu_json(time_now) for ev in missing_events]}
 
-    @log_function
     async def on_openid_userinfo(self, token: str) -> Optional[str]:
         ts_now_ms = self._clock.time_msec()
         return await self.store.get_user_id_for_open_id_token(token, ts_now_ms)

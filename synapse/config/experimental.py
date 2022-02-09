@@ -24,10 +24,10 @@ class ExperimentalConfig(Config):
     def read_config(self, config: JsonDict, **kwargs):
         experimental = config.get("experimental_features") or {}
 
-        # Whether to enable experimental MSC1849 (aka relations) support
-        self.msc1849_enabled = config.get("experimental_msc1849_support_enabled", True)
         # MSC3440 (thread relation)
         self.msc3440_enabled: bool = experimental.get("msc3440_enabled", False)
+        # MSC3666: including bundled relations in /search.
+        self.msc3666_enabled: bool = experimental.get("msc3666_enabled", False)
 
         # MSC3026 (busy presence state)
         self.msc3026_enabled: bool = experimental.get("msc3026_enabled", False)
@@ -53,4 +53,11 @@ class ExperimentalConfig(Config):
         # The portion of MSC3202 which is related to device masquerading.
         self.msc3202_device_masquerading_enabled: bool = experimental.get(
             "msc3202_device_masquerading", False
+        )
+
+        # MSC2409 (this setting only relates to optionally sending to-device messages).
+        # Presence, typing and read receipt EDUs are already sent to application services that
+        # have opted in to receive them. If enabled, this adds to-device messages to that list.
+        self.msc2409_to_device_messages_enabled: bool = experimental.get(
+            "msc2409_to_device_messages_enabled", False
         )

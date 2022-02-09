@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class StateFilter:
     """A filter used when querying for state.
 
@@ -58,8 +58,8 @@ class StateFilter:
             appear in `types`.
     """
 
-    types = attr.ib(type="frozendict[str, Optional[FrozenSet[str]]]")
-    include_others = attr.ib(default=False, type=bool)
+    types: "frozendict[str, Optional[FrozenSet[str]]]"
+    include_others: bool = False
 
     def __attrs_post_init__(self):
         # If `include_others` is set we canonicalise the filter by removing
@@ -74,21 +74,21 @@ class StateFilter:
 
     @staticmethod
     def all() -> "StateFilter":
-        """Creates a filter that fetches everything.
+        """Returns a filter that fetches everything.
 
         Returns:
-            The new state filter.
+            The state filter.
         """
-        return StateFilter(types=frozendict(), include_others=True)
+        return _ALL_STATE_FILTER
 
     @staticmethod
     def none() -> "StateFilter":
-        """Creates a filter that fetches nothing.
+        """Returns a filter that fetches nothing.
 
         Returns:
             The new state filter.
         """
-        return StateFilter(types=frozendict(), include_others=False)
+        return _NONE_STATE_FILTER
 
     @staticmethod
     def from_types(types: Iterable[Tuple[str, Optional[str]]]) -> "StateFilter":
@@ -525,6 +525,10 @@ class StateFilter:
         return StateFilter._recompose_from_four_parts(
             new_all, new_excludes, new_wildcards, new_concrete_keys
         )
+
+
+_ALL_STATE_FILTER = StateFilter(types=frozendict(), include_others=True)
+_NONE_STATE_FILTER = StateFilter(types=frozendict(), include_others=False)
 
 
 class StateGroupStorage:

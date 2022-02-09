@@ -499,9 +499,12 @@ def _upgrade_existing_database(
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)  # type: ignore
 
-                logger.info("Running script %s", relative_path)
-                module.run_create(cur, database_engine)  # type: ignore
-                if not is_empty:
+                if hasattr(module, "run_create"):
+                    logger.info("Running %s:run_create", relative_path)
+                    module.run_create(cur, database_engine)  # type: ignore
+
+                if not is_empty and hasattr(module, "run_upgrade"):
+                    logger.info("Running %s:run_upgrade", relative_path)
                     module.run_upgrade(cur, database_engine, config=config)  # type: ignore
             elif ext == ".pyc" or file_name == "__pycache__":
                 # Sometimes .pyc files turn up anyway even though we've
@@ -696,7 +699,7 @@ def _get_or_create_schema_state(
     )
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class _DirectoryListing:
     """Helper class to store schema file name and the
     absolute path to it.
@@ -705,5 +708,5 @@ class _DirectoryListing:
     `file_name` attr is kept first.
     """
 
-    file_name = attr.ib(type=str)
-    absolute_path = attr.ib(type=str)
+    file_name: str
+    absolute_path: str

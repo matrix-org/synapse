@@ -14,7 +14,6 @@
 # limitations under the License.
 import collections.abc
 import logging
-from collections import namedtuple
 from typing import TYPE_CHECKING, Iterable, Optional, Set
 
 from synapse.api.constants import EventTypes, Membership
@@ -41,19 +40,6 @@ logger = logging.getLogger(__name__)
 
 
 MAX_STATE_DELTA_HOPS = 100
-
-
-class _GetStateGroupDelta(
-    namedtuple("_GetStateGroupDelta", ("prev_group", "delta_ids"))
-):
-    """Return type of get_state_group_delta that implements __len__, which lets
-    us use the itrable flag when caching
-    """
-
-    __slots__ = []
-
-    def __len__(self):
-        return len(self.delta_ids) if self.delta_ids else 0
 
 
 # this inherits from EventsWorkerStore because it calls self.get_events
@@ -191,11 +177,15 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             NotFoundError if the room is unknown
         """
         state_ids = await self.get_current_state_ids(room_id)
+
+        if not state_ids:
+            raise NotFoundError(f"Current state for room {room_id} is empty")
+
         create_id = state_ids.get((EventTypes.Create, ""))
 
         # If we can't find the create event, assume we've hit a dead end
         if not create_id:
-            raise NotFoundError("Unknown room %s" % (room_id,))
+            raise NotFoundError(f"No create event in current state for room {room_id}")
 
         # Retrieve the room's create event and return
         create_event = await self.get_event(create_id)

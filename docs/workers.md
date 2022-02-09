@@ -247,7 +247,7 @@ below for more information.
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/login$
     ^/_matrix/client/(r0|v3|unstable)/register$
-    ^/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity$
+    ^/_matrix/client/v1/register/m.login.registration_token/validity$
 
     # Event sending requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/redact

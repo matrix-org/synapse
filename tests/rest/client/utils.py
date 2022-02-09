@@ -31,6 +31,7 @@ from typing import (
     overload,
 )
 from unittest.mock import patch
+from urllib.parse import urlencode
 
 import attr
 from typing_extensions import Literal
@@ -147,12 +148,20 @@ class RestHelper:
             expect_code=expect_code,
         )
 
-    def join(self, room=None, user=None, expect_code=200, tok=None):
+    def join(
+        self,
+        room: str,
+        user: Optional[str] = None,
+        expect_code: int = 200,
+        tok: Optional[str] = None,
+        appservice_user_id: Optional[str] = None,
+    ) -> None:
         self.change_membership(
             room=room,
             src=user,
             targ=user,
             tok=tok,
+            appservice_user_id=appservice_user_id,
             membership=Membership.JOIN,
             expect_code=expect_code,
         )
@@ -196,14 +205,25 @@ class RestHelper:
             expect_code=expect_code,
         )
 
+    def ban(self, room: str, src: str, targ: str, **kwargs: object):
+        """A convenience helper: `change_membership` with `membership` preset to "ban"."""
+        self.change_membership(
+            room=room,
+            src=src,
+            targ=targ,
+            membership=Membership.BAN,
+            **kwargs,
+        )
+
     def change_membership(
         self,
         room: str,
-        src: str,
-        targ: str,
+        src: Optional[str],
+        targ: Optional[str],
         membership: str,
         extra_data: Optional[dict] = None,
         tok: Optional[str] = None,
+        appservice_user_id: Optional[str] = None,
         expect_code: int = 200,
         expect_errcode: Optional[str] = None,
     ) -> None:
@@ -217,15 +237,26 @@ class RestHelper:
             membership: The type of membership event
             extra_data: Extra information to include in the content of the event
             tok: The user access token to use
+            appservice_user_id: The `user_id` URL parameter to pass.
+                This allows driving an application service user
+                using an application service access token in `tok`.
             expect_code: The expected HTTP response code
             expect_errcode: The expected Matrix error code
         """
         temp_id = self.auth_user_id
         self.auth_user_id = src
 
-        path = "/_matrix/client/r0/rooms/%s/state/m.room.member/%s" % (room, targ)
+        path = f"/_matrix/client/r0/rooms/{room}/state/m.room.member/{targ}"
+        url_params: Dict[str, str] = {}
+
         if tok:
-            path = path + "?access_token=%s" % tok
+            url_params["access_token"] = tok
+
+        if appservice_user_id:
+            url_params["user_id"] = appservice_user_id
+
+        if url_params:
+            path += "?" + urlencode(url_params)
 
         data = {"membership": membership}
         data.update(extra_data or {})

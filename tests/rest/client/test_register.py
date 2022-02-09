@@ -726,6 +726,47 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             {"errcode": "M_UNKNOWN", "error": "Unable to parse email address"},
         )
 
+    @override_config(
+        {
+            "inhibit_user_in_use_error": True,
+        }
+    )
+    def test_inhibit_user_in_use_error(self):
+        """Tests that the 'inhibit_user_in_use_error' configuration flag behaves
+        correctly.
+        """
+        username = "arthur"
+
+        # Manually register the user, so we know the test isn't passing because of a lack
+        # of clashing.
+        reg_handler = self.hs.get_registration_handler()
+        self.get_success(reg_handler.register_user(username))
+
+        # Check that /available correctly ignores the username provided despite the
+        # username being already registered.
+        channel = self.make_request("GET", "register/available?username=" + username)
+        self.assertEquals(200, channel.code, channel.result)
+
+        # Test that when starting a UIA registration flow the request doesn't fail because
+        # of a conflicting username
+        channel = self.make_request(
+            "POST",
+            "register",
+            {"username": username, "type": "m.login.password", "password": "foo"},
+        )
+        self.assertEqual(channel.code, 401)
+        self.assertIn("session", channel.json_body)
+
+        # Test that finishing the registration fails because of a conflicting username.
+        session = channel.json_body["session"]
+        channel = self.make_request(
+            "POST",
+            "register",
+            {"auth": {"session": session, "type": LoginType.DUMMY}},
+        )
+        self.assertEqual(channel.code, 400, channel.json_body)
+        self.assertEqual(channel.json_body["errcode"], Codes.USER_IN_USE)
+
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):
 
@@ -1113,7 +1154,7 @@ class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
 
 class RegistrationTokenValidityRestServletTestCase(unittest.HomeserverTestCase):
     servlets = [register.register_servlets]
-    url = "/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity"
+    url = "/_matrix/client/v1/register/m.login.registration_token/validity"
 
     def default_config(self):
         config = super().default_config()

@@ -70,7 +70,7 @@ REQUIREMENTS = [
     "pyasn1>=0.1.9",
     "pyasn1-modules>=0.0.7",
     "bcrypt>=3.1.0",
-    "pillow>=4.3.0",
+    "pillow>=5.4.0",
     "sortedcontainers>=1.4.4",
     "pymacaroons>=0.13.0",
     "msgpack>=0.5.2",
@@ -88,6 +88,7 @@ REQUIREMENTS = [
     # with the latest security patches.
     "cryptography>=3.4.7",
     "ijson>=3.1",
+    "matrix-common==1.0.0",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
@@ -106,7 +107,7 @@ CONDITIONAL_REQUIREMENTS = {
     # `systemd.journal.JournalHandler`, as is documented in
     # `contrib/systemd/log_config.yaml`.
     "systemd": ["systemd-python>=231"],
-    "url_preview": ["lxml>=3.5.0"],
+    "url_preview": ["lxml>=4.2.0"],
     "sentry": ["sentry-sdk>=0.7.2"],
     "opentracing": ["jaeger-client>=4.0.0", "opentracing>=2.2.0"],
     "jwt": ["pyjwt>=1.6.4"],

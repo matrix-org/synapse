@@ -37,13 +37,13 @@ class ModulesConfig(Config):
 
             # Server admins can expand Synapse's functionality with external modules.
             #
-            # See https://matrix-org.github.io/synapse/latest/modules.html for more
+            # See https://matrix-org.github.io/synapse/latest/modules/index.html for more
             # documentation on how to configure or create custom modules for Synapse.
             #
             modules:
-                # - module: my_super_module.MySuperClass
-                #   config:
-                #       do_thing: true
-                # - module: my_other_super_module.SomeClass
-                #   config: {}
+              #- module: my_super_module.MySuperClass
+              #  config:
+              #    do_thing: true
+              #- module: my_other_super_module.SomeClass
+              #  config: {}
             """

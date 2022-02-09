@@ -92,22 +92,6 @@ new PromConsole.Graph({
 })
 </script>
 
-<h3>Pending calls per tick</h3>
-<div id="reactor_pending_calls"></div>
-<script>
-new PromConsole.Graph({
-  node: document.querySelector("#reactor_pending_calls"),
-  expr: "rate(python_twisted_reactor_pending_calls_sum[30s]) / rate(python_twisted_reactor_pending_calls_count[30s])",
-  name: "[[job]]-[[index]]",
-  min: 0,
-  renderer: "line",
-  height: 150,
-  yAxisFormatter: PromConsole.NumberFormatter.humanize,
-  yHoverFormatter: PromConsole.NumberFormatter.humanize,
-  yTitle: "Pending Calls"
-})
-</script>
-
 <h1>Storage</h1>
 
 <h3>Queries</h3>
