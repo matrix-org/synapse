@@ -466,17 +466,36 @@ class RelationsWorkerStore(SQLBaseStore):
         ) -> Tuple[Dict[str, int], Dict[str, str]]:
             # Fetch the count of threaded events and the latest event ID.
             # TODO Should this only allow m.room.message events.
-            sql = """
-                SELECT parent.event_id, child.event_id FROM events AS child
-                INNER JOIN event_relations USING (event_id)
-                INNER JOIN events AS parent ON
-                    parent.event_id = relates_to_id
-                    AND parent.room_id = child.room_id
-                WHERE
-                    %s
-                    AND relation_type = ?
-                ORDER BY child.topological_ordering DESC, child.stream_ordering DESC
-            """
+            if isinstance(self.database_engine, PostgresEngine):
+                # The `DISTINCT ON` clause will pick the *first* row it encounters,
+                # so ordering by topologica ordering + stream ordering desc will
+                # ensure we get the latest event in the thread.
+                sql = """
+                    SELECT DISTINCT ON (parent.event_id) parent.event_id, child.event_id FROM events AS child
+                    INNER JOIN event_relations USING (event_id)
+                    INNER JOIN events AS parent ON
+                        parent.event_id = relates_to_id
+                        AND parent.room_id = child.room_id
+                    WHERE
+                        %s
+                        AND relation_type = ?
+                    ORDER BY parent.event_id, child.topological_ordering DESC, child.stream_ordering DESC
+                """
+            else:
+                # SQLite uses a simplified query which returns all entries for a
+                # thread. The first result for each thread is chosen to and subsequent
+                # results for a thread are ignored.
+                sql = """
+                    SELECT parent.event_id, child.event_id FROM events AS child
+                    INNER JOIN event_relations USING (event_id)
+                    INNER JOIN events AS parent ON
+                        parent.event_id = relates_to_id
+                        AND parent.room_id = child.room_id
+                    WHERE
+                        %s
+                        AND relation_type = ?
+                    ORDER BY child.topological_ordering DESC, child.stream_ordering DESC
+                """
 
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "relates_to_id", event_ids
