@@ -767,6 +767,6 @@ def _is_json(content_type: str) -> bool:
 def _is_not_av_media(content_type: bytes) -> bool:
     """Returns False if the content type is audio or video."""
     content_type = content_type.lower()
-    return not content_type.startswith(
-        b"video/"
-    ) and not content_type.startswith(b"audio/")
+    return not content_type.startswith(b"video/") and not content_type.startswith(
+        b"audio/"
+    )
