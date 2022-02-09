@@ -275,7 +275,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             channel.json_body,
             {
                 "errcode": "M_UNKNOWN",
-                "error": "Unsupported content type for URL previews: b'video/mp4'",
+                "error": "Requested file's content type not allowed for this operation: video/mp4",
             },
         )
 
@@ -311,7 +311,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             channel.json_body,
             {
                 "errcode": "M_UNKNOWN",
-                "error": "Unsupported content type for URL previews: b'audio/aac'",
+                "error": "Requested file's content type not allowed for this operation: audio/aac",
             },
         )
 

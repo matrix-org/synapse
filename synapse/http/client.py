@@ -738,7 +738,10 @@ class SimpleHttpClient:
             if not is_allowed_content_type(content_type):
                 raise SynapseError(
                     HTTPStatus.BAD_GATEWAY,
-                    ("Unsupported content type for URL previews: %r" % content_type),
+                    (
+                        "Requested file's content type not allowed for this operation: %s"
+                        % content_type.decode(errors="ignore")
+                    ),
                 )
 
         # TODO: if our Content-Type is HTML or something, just read the first
