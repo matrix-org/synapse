@@ -1,0 +1,1 @@
+Remove deprecated `user_may_create_room_with_invites` spam checker callback.
