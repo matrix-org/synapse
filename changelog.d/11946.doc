@@ -1,1 +1,1 @@
-Fixes incorrect yaml key in structured logging example.
+Correct the structured logging configuration example. Contributed by Brad Jones.
