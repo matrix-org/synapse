@@ -272,7 +272,7 @@ below for more information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/read_markers
 
     # Presence requests
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/.*/status$
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
 
 
 Additionally, the following REST endpoints can be handled for GET requests:
@@ -424,7 +424,7 @@ stream writers for the `receipts` stream:
 The following endpoints should be routed directly to the workers configured as
 stream writers for the `presence` stream:
 
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/.*/status$
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
 
 #### Background tasks
 
