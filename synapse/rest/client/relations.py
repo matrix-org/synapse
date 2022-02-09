@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 async def _parse_token(
     store: "DataStore", token: Optional[str]
-) -> Optional[RoomStreamToken]:
+) -> Optional[StreamToken]:
     """
     For backwards compatibility support RelationPaginationToken, but new pagination
     tokens are generated as full StreamTokens, to be compatible with /sync and /messages.
@@ -55,10 +55,10 @@ async def _parse_token(
     # RoomStreamToken (as part of StreamToken), but RelationPaginationToken uses
     # "-" only for separators.
     if "_" in token:
-        stream_token = await StreamToken.from_string(store, token)
+        return await StreamToken.from_string(store, token)
     else:
         relation_token = RelationPaginationToken.from_string(token)
-        stream_token = StreamToken(
+        return StreamToken(
             room_key=RoomStreamToken(relation_token.topological, relation_token.stream),
             presence_key=0,
             typing_key=0,
@@ -69,7 +69,6 @@ async def _parse_token(
             device_list_key=0,
             groups_key=0,
         )
-    return stream_token.room_key
 
 
 class RelationPaginationServlet(RestServlet):
