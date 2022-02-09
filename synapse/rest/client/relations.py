@@ -152,7 +152,7 @@ class RelationPaginationServlet(RestServlet):
             events, now, bundle_aggregations=aggregations
         )
 
-        return_value = pagination_chunk.to_dict()
+        return_value = await pagination_chunk.to_dict(self.store)
         return_value["chunk"] = serialized_events
         return_value["original_event"] = original_event
 
@@ -243,7 +243,7 @@ class RelationAggregationPaginationServlet(RestServlet):
                 to_token=to_token,
             )
 
-        return 200, pagination_chunk.to_dict()
+        return 200, await pagination_chunk.to_dict(self.store)
 
 
 class RelationAggregationGroupPaginationServlet(RestServlet):
@@ -335,7 +335,7 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
         now = self.clock.time_msec()
         serialized_events = self._event_serializer.serialize_events(events, now)
 
-        return_value = result.to_dict()
+        return_value = await result.to_dict(self.store)
         return_value["chunk"] = serialized_events
 
         return 200, return_value

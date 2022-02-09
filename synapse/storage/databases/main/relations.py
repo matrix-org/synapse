@@ -49,6 +49,7 @@ from synapse.util.caches.descriptors import cached, cachedList
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+    from synapse.storage.databases.main import DataStore
 
 logger = logging.getLogger(__name__)
 
@@ -682,13 +683,15 @@ class RelationsWorkerStore(SQLBaseStore):
 
         annotations = await self.get_aggregation_groups_for_event(event_id, room_id)
         if annotations.chunk:
-            aggregations.annotations = annotations.to_dict()
+            aggregations.annotations = await annotations.to_dict(
+                cast("DataStore", self)
+            )
 
         references = await self.get_relations_for_event(
             event_id, room_id, RelationTypes.REFERENCE, direction="f"
         )
         if references.chunk:
-            aggregations.references = references.to_dict()
+            aggregations.references = await references.to_dict(cast("DataStore", self))
 
         # If this event is the start of a thread, include a summary of the replies.
         if self._msc3440_enabled:
