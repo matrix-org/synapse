@@ -18,7 +18,7 @@
 """Tests REST events for /rooms paths."""
 
 import json
-from typing import Dict, Iterable, List, Optional
+from typing import Iterable, List
 from unittest.mock import Mock, call
 from urllib import parse as urlparse
 
@@ -35,7 +35,7 @@ from synapse.api.errors import Codes, HttpResponseException
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest import admin
 from synapse.rest.client import account, directory, login, profile, room, sync
-from synapse.types import JsonDict, Requester, RoomAlias, UserID, create_requester
+from synapse.types import JsonDict, RoomAlias, UserID, create_requester
 from synapse.util.stringutils import random_string
 
 from tests import unittest
