@@ -229,8 +229,6 @@ below for more information.
     ^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/account/3pid$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/devices$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/query$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/changes$
     ^/_matrix/client/versions$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_groups$
@@ -241,6 +239,8 @@ below for more information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 
     # Encryption requests
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/query$
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/changes$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/claim
     ^/_matrix/client/(api/v1|r0|v3|unstable)/room_keys
 
