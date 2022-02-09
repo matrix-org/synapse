@@ -5824,7 +5824,7 @@ formatters:
 handlers:
     console:
         class: logging.StreamHandler
-        location: ext://sys.stdout
+        stream: ext://sys.stdout
     file:
         class: logging.FileHandler
         formatter: json
