@@ -48,7 +48,6 @@ from synapse.events.spamcheck import (
     CHECK_USERNAME_FOR_SPAM_CALLBACK,
     USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
     USER_MAY_CREATE_ROOM_CALLBACK,
-    USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK,
     USER_MAY_INVITE_CALLBACK,
     USER_MAY_JOIN_ROOM_CALLBACK,
     USER_MAY_PUBLISH_ROOM_CALLBACK,
@@ -217,9 +216,6 @@ class ModuleApi:
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
         user_may_create_room: Optional[USER_MAY_CREATE_ROOM_CALLBACK] = None,
-        user_may_create_room_with_invites: Optional[
-            USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK
-        ] = None,
         user_may_create_room_alias: Optional[
             USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
         ] = None,
@@ -240,7 +236,6 @@ class ModuleApi:
             user_may_invite=user_may_invite,
             user_may_send_3pid_invite=user_may_send_3pid_invite,
             user_may_create_room=user_may_create_room,
-            user_may_create_room_with_invites=user_may_create_room_with_invites,
             user_may_create_room_alias=user_may_create_room_alias,
             user_may_publish_room=user_may_publish_room,
             check_username_for_spam=check_username_for_spam,
