@@ -74,6 +74,7 @@ class CapabilitiesRestServlet(RestServlet):
 
         # Must be removed in later versions.
         # Is only included for migration.
+        # Also the parts in `synapse/config/experimental.py`.
         if self.config.experimental.msc3283_enabled:
             response["capabilities"]["org.matrix.msc3283.set_displayname"] = {
                 "enabled": self.config.registration.enable_set_displayname
