@@ -336,7 +336,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         # But we DO await the result before the current log context (request)
         # finishes, so don't need to run it as a background process.
         request_deferred = run_in_background(_the_request)
-        observable_deferred = ObservableDeferred(request_deferred)
+        observable_deferred = ObservableDeferred(request_deferred, consumeErrors=True)
 
         # Insert the ObservableDeferred into the cache
         group_request_dict = self._state_group_inflight_requests.setdefault(group, {})
