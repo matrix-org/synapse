@@ -42,7 +42,11 @@ from synapse.storage.types import Cursor
 from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import MutableStateMap, StateKey, StateMap
 from synapse.util import unwrapFirstError
-from synapse.util.async_helpers import ObservableDeferred, yieldable_gather_results
+from synapse.util.async_helpers import (
+    AbstractObservableDeferred,
+    ObservableDeferred,
+    yieldable_gather_results,
+)
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.dictionary_cache import DictionaryCache
 
@@ -122,7 +126,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         # Current ongoing get_state_for_groups in-flight requests
         # {group ID -> {StateFilter -> ObservableDeferred}}
         self._state_group_inflight_requests: Dict[
-            int, Dict[StateFilter, ObservableDeferred[StateMap[str]]]
+            int, Dict[StateFilter, AbstractObservableDeferred[StateMap[str]]]
         ] = {}
 
         def get_max_state_group_txn(txn: Cursor) -> int:
@@ -249,7 +253,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
     def _get_state_for_group_gather_inflight_requests(
         self, group: int, state_filter: StateFilter
-    ) -> Tuple[Sequence[ObservableDeferred[StateMap[str]]], StateFilter]:
+    ) -> Tuple[Sequence[AbstractObservableDeferred[StateMap[str]]], StateFilter]:
         """
         Attempts to gather in-flight requests and re-use them to retrieve state
         for the given state group, filtered with the given state filter.
