@@ -2,10 +2,10 @@
 
 New releases of Synapse nominally follow a two week release cycle:
 
-* Day 0: Synapse N - 1 is released.
-* Day 7: Synapse N release candidate 1 is released.
-* Days 7 - 13: Synapse N release candidates 2+ are released, if bugs are found.
-* Day 14: Synapse N is released.
+* Day 0: Synapse `N - 1` is released.
+* Day 7: Synapse `N` release candidate 1 is released.
+* Days 7 - 13: Synapse `N` release candidates 2+ are released, if bugs are found.
+* Day 14: Synapse `N` is released.
 
 Note that this schedule might be modified depending on the availability of the
 Synapse team, e.g. releases may be skipped to avoid holidays.
