@@ -1,6 +1,7 @@
 # Synapse Release Cycle
 
-New releases of Synapse nominally follow a two week release cycle:
+Releases of Synapse follow a two week release cycle with new releases usually
+occurring on Tuesdays:
 
 * Day 0: Synapse `N - 1` is released.
 * Day 7: Synapse `N` release candidate 1 is released.
@@ -9,6 +10,9 @@ New releases of Synapse nominally follow a two week release cycle:
 
 Note that this schedule might be modified depending on the availability of the
 Synapse team, e.g. releases may be skipped to avoid holidays.
+
+Release announcements can be found in the
+[release category of the Matrix blog](https://matrix.org/blog/category/releases).
 
 ## Bugfix releases
 
@@ -30,4 +34,4 @@ be held to be released together.
 
 In some cases, a pre-disclosure of a security release will be issued as a notice
 to Synapse operators that there is an upcoming security release. These can be
-found on the [security category of the Matrix blog](https://matrix.org/blog/category/security).
+found in the [security category of the Matrix blog](https://matrix.org/blog/category/security).
