@@ -15,6 +15,8 @@
 import os
 import re
 import threading
+import logging
+
 from typing import Callable, Dict, Optional
 
 import attr
@@ -22,6 +24,8 @@ import attr
 from synapse.python_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
+
+logger = logging.getLogger(__name__)
 
 # The prefix for all cache factor-related environment variables
 _CACHE_PREFIX = "SYNAPSE_CACHE_FACTOR"
@@ -232,7 +236,14 @@ class CacheConfig(Config):
 
         # Backwards compatibility support for the now-removed "expiry_time" config flag.
         expiry_time = cache_config.get("expiry_time")
+
+        if expiry_time and expire_caches:
+            logger.warning("You have set two incompatible flags, expiry_time and expire_caches. Please only use the "
+                           "expire_caches and cache_entry_ttl flags and delete the expiry_time flag as it is "
+                           "deprecated.")
         if expiry_time:
+            logger.warning("Expiry_time is a deprecated flag, please use the expire_caches and cache_entry_ttl flags "
+                           "instead.")
             self.expiry_time_msec = self.parse_duration(expiry_time)
 
         self.sync_response_cache_duration = self.parse_duration(
