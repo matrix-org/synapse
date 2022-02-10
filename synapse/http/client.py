@@ -734,13 +734,13 @@ class SimpleHttpClient:
             )
 
         if is_allowed_content_type and b"Content-Type" in resp_headers:
-            content_type = resp_headers[b"Content-Type"][0]
-            if not is_allowed_content_type(content_type.decode("ascii")):
+            content_type = resp_headers[b"Content-Type"][0].decode("ascii")
+            if not is_allowed_content_type(content_type):
                 raise SynapseError(
                     HTTPStatus.BAD_GATEWAY,
                     (
                         "Requested file's content type not allowed for this operation: %s"
-                        % content_type.decode(errors="ignore")
+                        % content_type
                     ),
                 )
 
