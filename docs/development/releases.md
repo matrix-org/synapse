@@ -12,7 +12,7 @@ Synapse team, e.g. releases may be skipped to avoid holidays.
 
 ## Bugfix releases
 
-If a bug is found after release that is deemed to severe enough (by a combination
+If a bug is found after release that is deemed severe enough (by a combination
 of the impacted users and the impact on those users) then a bugfix release may
 be issued. This may be at any point in the release cycle.
 
