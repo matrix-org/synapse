@@ -1,0 +1,1 @@
+Fix a long-standing bug where pagination tokens from `/sync` and `/messages` could not be provided to the `/relations` API.

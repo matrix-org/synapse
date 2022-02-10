@@ -13,12 +13,15 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import attr
 
 from synapse.api.errors import SynapseError
 from synapse.types import JsonDict
+
+if TYPE_CHECKING:
+    from synapse.storage.databases.main import DataStore
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +42,14 @@ class PaginationChunk:
     next_batch: Optional[Any] = None
     prev_batch: Optional[Any] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    async def to_dict(self, store: "DataStore") -> Dict[str, Any]:
         d = {"chunk": self.chunk}
 
         if self.next_batch:
-            d["next_batch"] = self.next_batch.to_string()
+            d["next_batch"] = await self.next_batch.to_string(store)
 
         if self.prev_batch:
-            d["prev_batch"] = self.prev_batch.to_string()
+            d["prev_batch"] = await self.prev_batch.to_string(store)
 
         return d
 
@@ -75,7 +78,7 @@ class RelationPaginationToken:
         except ValueError:
             raise SynapseError(400, "Invalid relation pagination token")
 
-    def to_string(self) -> str:
+    async def to_string(self, store: "DataStore") -> str:
         return "%d-%d" % (self.topological, self.stream)
 
     def as_tuple(self) -> Tuple[Any, ...]:
@@ -105,7 +108,7 @@ class AggregationPaginationToken:
         except ValueError:
             raise SynapseError(400, "Invalid aggregation pagination token")
 
-    def to_string(self) -> str:
+    async def to_string(self, store: "DataStore") -> str:
         return "%d-%d" % (self.count, self.stream)
 
     def as_tuple(self) -> Tuple[Any, ...]:
