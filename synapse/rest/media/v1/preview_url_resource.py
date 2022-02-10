@@ -403,7 +403,7 @@ class PreviewUrlResource(DirectServeJsonResource):
                 output_stream=output_stream,
                 max_size=self.max_spider_size,
                 headers={"Accept-Language": self.url_preview_accept_language},
-                is_allowed_content_type=_is_not_av_media,
+                is_allowed_content_type=_is_previewable,
             )
         except SynapseError:
             # Pass SynapseErrors through directly, so that the servlet
@@ -764,9 +764,14 @@ def _is_json(content_type: str) -> bool:
     return content_type.lower().startswith("application/json")
 
 
-def _is_not_av_media(content_type: bytes) -> bool:
-    """Returns False if the content type is audio or video."""
+def _is_previewable(content_type: bytes) -> bool:
+    """Returns True for content types for which we will perform URL preview and False
+    otherwise."""
+
     content_type = content_type.lower()
-    return not content_type.startswith(b"video/") and not content_type.startswith(
-        b"audio/"
+    return (
+        content_type.startswith(b"text/html")
+        or content_type.startswith(b"application/xhtml")
+        or content_type.startswith(b"image/")
+        or content_type.startswith(b"application/json")
     )
