@@ -1,1 +1,1 @@
-Changed readme: Fixed broken link to adminAPI password reset doc in readme which was causes by the doc conversion from .rst do .md
+Fix broken link in the README to the admin API for password reset.
