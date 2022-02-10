@@ -72,7 +72,7 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
 
         # on the first call, we should get run with the default background update size
         self.update_handler.assert_called_once_with(
-            {"my_key": 1}, self.updates.MINIMUM_BACKGROUND_BATCH_SIZE
+            {"my_key": 1}, self.updates.minimum_background_batch_size
         )
 
         # second step: complete the update
