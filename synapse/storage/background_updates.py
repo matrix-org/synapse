@@ -60,18 +60,19 @@ class _BackgroundUpdateHandler:
 
 
 class _BackgroundUpdateContextManager:
-    BACKGROUND_UPDATE_INTERVAL_MS = 1000
-    BACKGROUND_UPDATE_DURATION_MS = 100
-
-    def __init__(self, sleep: bool, clock: Clock):
+    def __init__(
+        self, sleep: bool, clock: Clock, sleep_duration_ms: int, update_duration: int
+    ):
         self._sleep = sleep
         self._clock = clock
+        self._sleep_duration_ms = sleep_duration_ms
+        self._update_duration_ms = update_duration
 
     async def __aenter__(self) -> int:
         if self._sleep:
-            await self._clock.sleep(self.BACKGROUND_UPDATE_INTERVAL_MS / 1000)
+            await self._clock.sleep(self._sleep_duration_ms / 1000)
 
-        return self.BACKGROUND_UPDATE_DURATION_MS
+        return self._update_duration_ms
 
     async def __aexit__(self, *exc) -> None:
         pass
@@ -131,9 +132,6 @@ class BackgroundUpdater:
     process and autotuning the batch size.
     """
 
-    MINIMUM_BACKGROUND_BATCH_SIZE = 1
-    DEFAULT_BACKGROUND_BATCH_SIZE = 100
-
     def __init__(self, hs: "HomeServer", database: "DatabasePool"):
         self._clock = hs.get_clock()
         self.db_pool = database
@@ -157,6 +155,14 @@ class BackgroundUpdater:
         # Whether background updates are enabled. This allows us to
         # enable/disable background updates via the admin API.
         self.enabled = True
+
+        self.minimum_background_batch_size = hs.config.background_updates.min_batch_size
+        self.default_background_batch_size = (
+            hs.config.background_updates.default_batch_size
+        )
+        self.update_duration_ms = hs.config.background_updates.update_duration_ms
+        self.sleep_duration_ms = hs.config.background_updates.sleep_duration_ms
+        self.sleep_enabled = hs.config.background_updates.sleep_enabled
 
     def register_update_controller_callbacks(
         self,
@@ -214,7 +220,9 @@ class BackgroundUpdater:
         if self._on_update_callback is not None:
             return self._on_update_callback(update_name, database_name, oneshot)
 
-        return _BackgroundUpdateContextManager(sleep, self._clock)
+        return _BackgroundUpdateContextManager(
+            sleep, self._clock, self.sleep_duration_ms, self.update_duration_ms
+        )
 
     async def _default_batch_size(self, update_name: str, database_name: str) -> int:
         """The batch size to use for the first iteration of a new background
@@ -223,7 +231,7 @@ class BackgroundUpdater:
         if self._default_batch_size_callback is not None:
             return await self._default_batch_size_callback(update_name, database_name)
 
-        return self.DEFAULT_BACKGROUND_BATCH_SIZE
+        return self.default_background_batch_size
 
     async def _min_batch_size(self, update_name: str, database_name: str) -> int:
         """A lower bound on the batch size of a new background update.
@@ -233,7 +241,7 @@ class BackgroundUpdater:
         if self._min_batch_size_callback is not None:
             return await self._min_batch_size_callback(update_name, database_name)
 
-        return self.MINIMUM_BACKGROUND_BATCH_SIZE
+        return self.minimum_background_batch_size
 
     def get_current_update(self) -> Optional[BackgroundUpdatePerformance]:
         """Returns the current background update, if any."""
@@ -252,9 +260,12 @@ class BackgroundUpdater:
         if self.enabled:
             # if we start a new background update, not all updates are done.
             self._all_done = False
-            run_as_background_process("background_updates", self.run_background_updates)
+            sleep = self.sleep_enabled
+            run_as_background_process(
+                "background_updates", self.run_background_updates, sleep
+            )
 
-    async def run_background_updates(self, sleep: bool = True) -> None:
+    async def run_background_updates(self, sleep: bool) -> None:
         if self._running or not self.enabled:
             return
 
