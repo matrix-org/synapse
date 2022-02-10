@@ -173,12 +173,11 @@ class UserRestServletV2(RestServlet):
         if not self.hs.is_mine(target_user):
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only look up local users")
 
-        ret = await self.admin_handler.get_user(target_user)
-
-        if not ret:
+        user_info_dict = await self.admin_handler.get_user(target_user)
+        if not user_info_dict:
             raise NotFoundError("User not found")
 
-        return HTTPStatus.OK, ret
+        return HTTPStatus.OK, user_info_dict
 
     async def on_PUT(
         self, request: SynapseRequest, user_id: str
@@ -399,10 +398,10 @@ class UserRestServletV2(RestServlet):
                     target_user, requester, body["avatar_url"], True
                 )
 
-            user = await self.admin_handler.get_user(target_user)
-            assert user is not None
+            user_info_dict = await self.admin_handler.get_user(target_user)
+            assert user_info_dict is not None
 
-            return 201, user
+            return HTTPStatus.CREATED, user_info_dict
 
 
 class UserRegisterServlet(RestServlet):
@@ -1121,3 +1120,33 @@ class RateLimitRestServlet(RestServlet):
         await self.store.delete_ratelimit_for_user(user_id)
 
         return HTTPStatus.OK, {}
+
+
+class AccountDataRestServlet(RestServlet):
+    """Retrieve the given user's account data"""
+
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/accountdata")
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastore()
+        self._is_mine_id = hs.is_mine_id
+
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self._auth, request)
+
+        if not self._is_mine_id(user_id):
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only look up local users")
+
+        if not await self._store.get_user_by_id(user_id):
+            raise NotFoundError("User not found")
+
+        global_data, by_room_data = await self._store.get_account_data_for_user(user_id)
+        return HTTPStatus.OK, {
+            "account_data": {
+                "global": global_data,
+                "rooms": by_room_data,
+            },
+        }

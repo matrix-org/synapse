@@ -46,41 +46,41 @@ class RoomDisposition:
     UNSTABLE = "unstable"
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class RoomVersion:
     """An object which describes the unique attributes of a room version."""
 
-    identifier = attr.ib(type=str)  # the identifier for this version
-    disposition = attr.ib(type=str)  # one of the RoomDispositions
-    event_format = attr.ib(type=int)  # one of the EventFormatVersions
-    state_res = attr.ib(type=int)  # one of the StateResolutionVersions
-    enforce_key_validity = attr.ib(type=bool)
+    identifier: str  # the identifier for this version
+    disposition: str  # one of the RoomDispositions
+    event_format: int  # one of the EventFormatVersions
+    state_res: int  # one of the StateResolutionVersions
+    enforce_key_validity: bool
 
     # Before MSC2432, m.room.aliases had special auth rules and redaction rules
-    special_case_aliases_auth = attr.ib(type=bool)
+    special_case_aliases_auth: bool
     # Strictly enforce canonicaljson, do not allow:
     # * Integers outside the range of [-2 ^ 53 + 1, 2 ^ 53 - 1]
     # * Floats
     # * NaN, Infinity, -Infinity
-    strict_canonicaljson = attr.ib(type=bool)
+    strict_canonicaljson: bool
     # MSC2209: Check 'notifications' key while verifying
     # m.room.power_levels auth rules.
-    limit_notifications_power_levels = attr.ib(type=bool)
+    limit_notifications_power_levels: bool
     # MSC2174/MSC2176: Apply updated redaction rules algorithm.
-    msc2176_redaction_rules = attr.ib(type=bool)
+    msc2176_redaction_rules: bool
     # MSC3083: Support the 'restricted' join_rule.
-    msc3083_join_rules = attr.ib(type=bool)
+    msc3083_join_rules: bool
     # MSC3375: Support for the proper redaction rules for MSC3083. This mustn't
     #          be enabled if MSC3083 is not.
-    msc3375_redaction_rules = attr.ib(type=bool)
+    msc3375_redaction_rules: bool
     # MSC2403: Allows join_rules to be set to 'knock', changes auth rules to allow sending
     # m.room.membership event with membership 'knock'.
-    msc2403_knocking = attr.ib(type=bool)
+    msc2403_knocking: bool
     # MSC2716: Adds m.room.power_levels -> content.historical field to control
     # whether "insertion", "chunk", "marker" events can be sent
-    msc2716_historical = attr.ib(type=bool)
+    msc2716_historical: bool
     # MSC2716: Adds support for redacting "insertion", "chunk", and "marker" events
-    msc2716_redactions = attr.ib(type=bool)
+    msc2716_redactions: bool
 
 
 class RoomVersions:

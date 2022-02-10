@@ -1,0 +1,1 @@
+Ensure that `opentracing` scopes are activated and closed at the right time.

@@ -105,6 +105,87 @@ device ID), and the (now deactivated) access token.
 
 If multiple modules implement this callback, Synapse runs them all in order.
 
+### `get_username_for_registration`
+
+_First introduced in Synapse v1.52.0_
+
+```python
+async def get_username_for_registration(
+    uia_results: Dict[str, Any],
+    params: Dict[str, Any],
+) -> Optional[str]
+```
+
+Called when registering a new user. The module can return a username to set for the user
+being registered by returning it as a string, or `None` if it doesn't wish to force a
+username for this user. If a username is returned, it will be used as the local part of a
+user's full Matrix ID (e.g. it's `alice` in `@alice:example.com`).
+
+This callback is called once [User-Interactive Authentication](https://spec.matrix.org/latest/client-server-api/#user-interactive-authentication-api)
+has been completed by the user. It is not called when registering a user via SSO. It is
+passed two dictionaries, which include the information that the user has provided during
+the registration process.
+
+The first dictionary contains the results of the [User-Interactive Authentication](https://spec.matrix.org/latest/client-server-api/#user-interactive-authentication-api)
+flow followed by the user. Its keys are the identifiers of every step involved in the flow,
+associated with either a boolean value indicating whether the step was correctly completed,
+or additional information (e.g. email address, phone number...). A list of most existing
+identifiers can be found in the [Matrix specification](https://spec.matrix.org/v1.1/client-server-api/#authentication-types).
+Here's an example featuring all currently supported keys:
+
+```python
+{
+    "m.login.dummy": True,  # Dummy authentication
+    "m.login.terms": True,  # User has accepted the terms of service for the homeserver
+    "m.login.recaptcha": True,  # User has completed the recaptcha challenge
+    "m.login.email.identity": {  # User has provided and verified an email address
+        "medium": "email",
+        "address": "alice@example.com",
+        "validated_at": 1642701357084,
+    },
+    "m.login.msisdn": {  # User has provided and verified a phone number
+        "medium": "msisdn",
+        "address": "33123456789",
+        "validated_at": 1642701357084,
+    },
+    "m.login.registration_token": "sometoken",  # User has registered through a registration token
+}
+```
+
+The second dictionary contains the parameters provided by the user's client in the request
+to `/_matrix/client/v3/register`. See the [Matrix specification](https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3register)
+for a complete list of these parameters.
+
+If the module cannot, or does not wish to, generate a username for this user, it must
+return `None`.
+
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `None`, Synapse falls through to the next one. The value of the first
+callback that does not return `None` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback. If every callback return `None`,
+the username provided by the user is used, if any (otherwise one is automatically
+generated).
+
+## `is_3pid_allowed`
+
+_First introduced in Synapse v1.53.0_
+
+```python
+async def is_3pid_allowed(self, medium: str, address: str, registration: bool) -> bool
+```
+
+Called when attempting to bind a third-party identifier (i.e. an email address or a phone
+number). The module is given the medium of the third-party identifier (which is `email` if
+the identifier is an email address, or `msisdn` if the identifier is a phone number) and
+its address, as well as a boolean indicating whether the attempt to bind is happening as
+part of registering a new user. The module must return a boolean indicating whether the
+identifier can be allowed to be bound to an account on the local homeserver.
+
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
 ## Example
 
 The example module below implements authentication checkers for two different login types: 

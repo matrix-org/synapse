@@ -71,6 +71,8 @@ from synapse.handlers.account_validity import (
 from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
     CHECK_AUTH_CALLBACK,
+    GET_USERNAME_FOR_REGISTRATION_CALLBACK,
+    IS_3PID_ALLOWED_CALLBACK,
     ON_LOGGED_OUT_CALLBACK,
     AuthHandler,
 )
@@ -177,6 +179,7 @@ class ModuleApi:
         self._presence_stream = hs.get_event_sources().sources.presence
         self._state = hs.get_state_handler()
         self._clock: Clock = hs.get_clock()
+        self._registration_handler = hs.get_registration_handler()
         self._send_email_handler = hs.get_send_email_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
 
@@ -310,6 +313,10 @@ class ModuleApi:
         auth_checkers: Optional[
             Dict[Tuple[str, Tuple[str, ...]], CHECK_AUTH_CALLBACK]
         ] = None,
+        is_3pid_allowed: Optional[IS_3PID_ALLOWED_CALLBACK] = None,
+        get_username_for_registration: Optional[
+            GET_USERNAME_FOR_REGISTRATION_CALLBACK
+        ] = None,
     ) -> None:
         """Registers callbacks for password auth provider capabilities.
 
@@ -318,7 +325,9 @@ class ModuleApi:
         return self._password_auth_provider.register_password_auth_provider_callbacks(
             check_3pid_auth=check_3pid_auth,
             on_logged_out=on_logged_out,
+            is_3pid_allowed=is_3pid_allowed,
             auth_checkers=auth_checkers,
+            get_username_for_registration=get_username_for_registration,
         )
 
     def register_background_update_controller_callbacks(
@@ -394,6 +403,32 @@ class ModuleApi:
         Added in Synapse v1.39.0.
         """
         return self._hs.config.email.email_app_name
+
+    @property
+    def server_name(self) -> str:
+        """The server name for the local homeserver.
+
+        Added in Synapse v1.53.0.
+        """
+        return self._server_name
+
+    @property
+    def worker_name(self) -> Optional[str]:
+        """The name of the worker this specific instance is running as per the
+        "worker_name" configuration setting, or None if it's the main process.
+
+        Added in Synapse v1.53.0.
+        """
+        return self._hs.config.worker.worker_name
+
+    @property
+    def worker_app(self) -> Optional[str]:
+        """The name of the worker app this specific instance is running as per the
+        "worker_app" configuration setting, or None if it's the main process.
+
+        Added in Synapse v1.53.0.
+        """
+        return self._hs.config.worker.worker_app
 
     async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:
         """Get user info by user_id
@@ -1201,6 +1236,22 @@ class ModuleApi:
             The return value of the function once ran in a thread.
         """
         return await defer_to_thread(self._hs.get_reactor(), f, *args, **kwargs)
+
+    async def check_username(self, username: str) -> None:
+        """Checks if the provided username uses the grammar defined in the Matrix
+        specification, and is already being used by an existing user.
+
+        Added in Synapse v1.52.0.
+
+        Args:
+            username: The username to check. This is the local part of the user's full
+                Matrix user ID, i.e. it's "alice" if the full user ID is "@alice:foo.com".
+
+        Raises:
+            SynapseError with the errcode "M_USER_IN_USE" if the username is already in
+            use.
+        """
+        await self._registration_handler.check_username(username)
 
 
 class PublicRoomListManager:

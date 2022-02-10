@@ -494,7 +494,7 @@ class PusherStore(PusherWorkerStore):
                 # invalidate, since we the user might not have had a pusher before
                 await self.db_pool.runInteraction(
                     "add_pusher",
-                    self._invalidate_cache_and_stream,  # type: ignore
+                    self._invalidate_cache_and_stream,  # type: ignore[attr-defined]
                     self.get_if_user_has_pusher,
                     (user_id,),
                 )
@@ -503,7 +503,7 @@ class PusherStore(PusherWorkerStore):
         self, app_id: str, pushkey: str, user_id: str
     ) -> None:
         def delete_pusher_txn(txn, stream_id):
-            self._invalidate_cache_and_stream(  # type: ignore
+            self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
                 txn, self.get_if_user_has_pusher, (user_id,)
             )
 
@@ -548,7 +548,7 @@ class PusherStore(PusherWorkerStore):
         pushers = list(await self.get_pushers_by_user_id(user_id))
 
         def delete_pushers_txn(txn, stream_ids):
-            self._invalidate_cache_and_stream(  # type: ignore
+            self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
                 txn, self.get_if_user_has_pusher, (user_id,)
             )
 
@@ -561,13 +561,9 @@ class PusherStore(PusherWorkerStore):
             self.db_pool.simple_insert_many_txn(
                 txn,
                 table="deleted_pushers",
+                keys=("stream_id", "app_id", "pushkey", "user_id"),
                 values=[
-                    {
-                        "stream_id": stream_id,
-                        "app_id": pusher.app_id,
-                        "pushkey": pusher.pushkey,
-                        "user_id": user_id,
-                    }
+                    (stream_id, pusher.app_id, pusher.pushkey, user_id)
                     for stream_id, pusher in zip(stream_ids, pushers)
                 ],
             )

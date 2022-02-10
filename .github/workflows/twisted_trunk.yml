@@ -25,7 +25,7 @@ jobs:
       - run: sudo apt-get -qq install xmlsec1
       - uses: actions/setup-python@v2
         with:
-          python-version: 3.6
+          python-version: 3.7
       - run: .ci/patch_for_twisted_trunk.sh
       - run: pip install tox
       - run: tox -e py

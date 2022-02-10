@@ -15,13 +15,14 @@
 import abc
 import re
 import string
-from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
     Dict,
+    List,
     Mapping,
+    Match,
     MutableMapping,
     Optional,
     Tuple,
@@ -80,7 +81,7 @@ class ISynapseReactor(
     """The interfaces necessary for Synapse to function."""
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class Requester:
     """
     Represents the user making a request
@@ -98,13 +99,13 @@ class Requester:
             "puppeting" the user.
     """
 
-    user = attr.ib(type="UserID")
-    access_token_id = attr.ib(type=Optional[int])
-    is_guest = attr.ib(type=bool)
-    shadow_banned = attr.ib(type=bool)
-    device_id = attr.ib(type=Optional[str])
-    app_service = attr.ib(type=Optional["ApplicationService"])
-    authenticated_entity = attr.ib(type=str)
+    user: "UserID"
+    access_token_id: Optional[int]
+    is_guest: bool
+    shadow_banned: bool
+    device_id: Optional[str]
+    app_service: Optional["ApplicationService"]
+    authenticated_entity: str
 
     def serialize(self):
         """Converts self to a type that can be serialized as JSON, and then
@@ -211,7 +212,7 @@ def get_localpart_from_id(string: str) -> str:
 DS = TypeVar("DS", bound="DomainSpecificString")
 
 
-@attr.s(slots=True, frozen=True, repr=False)
+@attr.s(slots=True, frozen=True, repr=False, auto_attribs=True)
 class DomainSpecificString(metaclass=abc.ABCMeta):
     """Common base class among ID/name strings that have a local part and a
     domain name, prefixed with a sigil.
@@ -224,11 +225,10 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
 
     SIGIL: ClassVar[str] = abc.abstractproperty()  # type: ignore
 
-    localpart = attr.ib(type=str)
-    domain = attr.ib(type=str)
+    localpart: str
+    domain: str
 
-    # Because this class is a namedtuple of strings and booleans, it is deeply
-    # immutable.
+    # Because this is a frozen class, it is deeply immutable.
     def __copy__(self):
         return self
 
@@ -382,7 +382,7 @@ def map_username_to_mxid_localpart(
             onto different mxids
 
     Returns:
-        unicode: string suitable for a mxid localpart
+        string suitable for a mxid localpart
     """
     if not isinstance(username, bytes):
         username = username.encode("utf-8")
@@ -390,29 +390,23 @@ def map_username_to_mxid_localpart(
     # first we sort out upper-case characters
     if case_sensitive:
 
-        def f1(m):
+        def f1(m: Match[bytes]) -> bytes:
             return b"_" + m.group().lower()
 
         username = UPPER_CASE_PATTERN.sub(f1, username)
     else:
         username = username.lower()
 
-    # then we sort out non-ascii characters
-    def f2(m):
-        g = m.group()[0]
-        if isinstance(g, str):
-            # on python 2, we need to do a ord(). On python 3, the
-            # byte itself will do.
-            g = ord(g)
-        return b"=%02x" % (g,)
+    # then we sort out non-ascii characters by converting to the hex equivalent.
+    def f2(m: Match[bytes]) -> bytes:
+        return b"=%02x" % (m.group()[0],)
 
     username = NON_MXID_CHARACTER_PATTERN.sub(f2, username)
 
     # we also do the =-escaping to mxids starting with an underscore.
     username = re.sub(b"^_", b"=5f", username)
 
-    # we should now only have ascii bytes left, so can decode back to a
-    # unicode.
+    # we should now only have ascii bytes left, so can decode back to a string.
     return username.decode("ascii")
 
 
@@ -468,14 +462,12 @@ class RoomStreamToken:
     attributes, must be hashable.
     """
 
-    topological = attr.ib(
-        type=Optional[int],
+    topological: Optional[int] = attr.ib(
         validator=attr.validators.optional(attr.validators.instance_of(int)),
     )
-    stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
+    stream: int = attr.ib(validator=attr.validators.instance_of(int))
 
-    instance_map = attr.ib(
-        type="frozendict[str, int]",
+    instance_map: "frozendict[str, int]" = attr.ib(
         factory=frozendict,
         validator=attr.validators.deep_mapping(
             key_validator=attr.validators.instance_of(str),
@@ -484,7 +476,7 @@ class RoomStreamToken:
         ),
     )
 
-    def __attrs_post_init__(self):
+    def __attrs_post_init__(self) -> None:
         """Validates that both `topological` and `instance_map` aren't set."""
 
         if self.instance_map and self.topological:
@@ -600,7 +592,7 @@ class RoomStreamToken:
             return "s%d" % (self.stream,)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class StreamToken:
     """A collection of positions within multiple streams.
 
@@ -608,20 +600,20 @@ class StreamToken:
     must be hashable.
     """
 
-    room_key = attr.ib(
-        type=RoomStreamToken, validator=attr.validators.instance_of(RoomStreamToken)
+    room_key: RoomStreamToken = attr.ib(
+        validator=attr.validators.instance_of(RoomStreamToken)
     )
-    presence_key = attr.ib(type=int)
-    typing_key = attr.ib(type=int)
-    receipt_key = attr.ib(type=int)
-    account_data_key = attr.ib(type=int)
-    push_rules_key = attr.ib(type=int)
-    to_device_key = attr.ib(type=int)
-    device_list_key = attr.ib(type=int)
-    groups_key = attr.ib(type=int)
+    presence_key: int
+    typing_key: int
+    receipt_key: int
+    account_data_key: int
+    push_rules_key: int
+    to_device_key: int
+    device_list_key: int
+    groups_key: int
 
     _SEPARATOR = "_"
-    START: "StreamToken"
+    START: ClassVar["StreamToken"]
 
     @classmethod
     async def from_string(cls, store: "DataStore", string: str) -> "StreamToken":
@@ -681,7 +673,7 @@ class StreamToken:
 StreamToken.START = StreamToken(RoomStreamToken(None, 0), 0, 0, 0, 0, 0, 0, 0, 0)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class PersistedEventPosition:
     """Position of a newly persisted event with instance that persisted it.
 
@@ -689,8 +681,8 @@ class PersistedEventPosition:
     RoomStreamToken.
     """
 
-    instance_name = attr.ib(type=str)
-    stream = attr.ib(type=int)
+    instance_name: str
+    stream: int
 
     def persisted_after(self, token: RoomStreamToken) -> bool:
         return token.get_stream_pos_for_instance(self.instance_name) < self.stream
@@ -708,16 +700,18 @@ class PersistedEventPosition:
         return RoomStreamToken(None, self.stream)
 
 
-class ThirdPartyInstanceID(
-    namedtuple("ThirdPartyInstanceID", ("appservice_id", "network_id"))
-):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class ThirdPartyInstanceID:
+    appservice_id: Optional[str]
+    network_id: Optional[str]
+
     # Deny iteration because it will bite you if you try to create a singleton
     # set by:
     #    users = set(user)
     def __iter__(self):
         raise ValueError("Attempted to iterate a %s" % (type(self).__name__,))
 
-    # Because this class is a namedtuple of strings, it is deeply immutable.
+    # Because this class is a frozen class, it is deeply immutable.
     def __copy__(self):
         return self
 
@@ -725,32 +719,28 @@ class ThirdPartyInstanceID(
         return self
 
     @classmethod
-    def from_string(cls, s):
+    def from_string(cls, s: str) -> "ThirdPartyInstanceID":
         bits = s.split("|", 2)
         if len(bits) != 2:
             raise SynapseError(400, "Invalid ID %r" % (s,))
 
         return cls(appservice_id=bits[0], network_id=bits[1])
 
-    def to_string(self):
+    def to_string(self) -> str:
         return "%s|%s" % (self.appservice_id, self.network_id)
 
     __str__ = to_string
 
-    @classmethod
-    def create(cls, appservice_id, network_id):
-        return cls(appservice_id=appservice_id, network_id=network_id)
 
-
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class ReadReceipt:
     """Information about a read-receipt"""
 
-    room_id = attr.ib()
-    receipt_type = attr.ib()
-    user_id = attr.ib()
-    event_ids = attr.ib()
-    data = attr.ib()
+    room_id: str
+    receipt_type: str
+    user_id: str
+    event_ids: List[str]
+    data: JsonDict
 
 
 def get_verify_key_from_cross_signing_key(key_info):

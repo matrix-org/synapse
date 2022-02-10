@@ -173,6 +173,7 @@ from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Pattern, Typ
 import attr
 
 from twisted.internet import defer
+from twisted.web.http import Request
 from twisted.web.http_headers import Headers
 
 from synapse.config import ConfigError
@@ -219,11 +220,12 @@ class _DummyTagNames:
 
 try:
     import opentracing
+    import opentracing.tags
 
     tags = opentracing.tags
 except ImportError:
-    opentracing = None
-    tags = _DummyTagNames
+    opentracing = None  # type: ignore[assignment]
+    tags = _DummyTagNames  # type: ignore[assignment]
 try:
     from jaeger_client import Config as JaegerConfig
 
@@ -245,11 +247,11 @@ try:
         class BaseReporter:  # type: ignore[no-redef]
             pass
 
-    @attr.s(slots=True, frozen=True)
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
     class _WrappedRustReporter(BaseReporter):
         """Wrap the reporter to ensure `report_span` never throws."""
 
-        _reporter = attr.ib(type=Reporter, default=attr.Factory(Reporter))
+        _reporter: Reporter = attr.Factory(Reporter)
 
         def set_process(self, *args, **kwargs):
             return self._reporter.set_process(*args, **kwargs)
@@ -366,7 +368,7 @@ def init_tracer(hs: "HomeServer"):
     global opentracing
     if not hs.config.tracing.opentracer_enabled:
         # We don't have a tracer
-        opentracing = None
+        opentracing = None  # type: ignore[assignment]
         return
 
     if not opentracing or not JaegerConfig:
@@ -441,10 +443,14 @@ def start_active_span(
     start_time=None,
     ignore_active_span=False,
     finish_on_close=True,
+    *,
+    tracer=None,
 ):
-    """Starts an active opentracing span. Note, the scope doesn't become active
-    until it has been entered, however, the span starts from the time this
-    message is called.
+    """Starts an active opentracing span.
+
+    Records the start time for the span, and sets it as the "active span" in the
+    scope manager.
+
     Args:
         See opentracing.tracer
     Returns:
@@ -452,9 +458,13 @@ def start_active_span(
     """
 
     if opentracing is None:
-        return noop_context_manager()
+        return noop_context_manager()  # type: ignore[unreachable]
 
-    return opentracing.tracer.start_active_span(
+    if tracer is None:
+        # use the global tracer by default
+        tracer = opentracing.tracer
+
+    return tracer.start_active_span(
         operation_name,
         child_of=child_of,
         references=references,
@@ -466,21 +476,42 @@ def start_active_span(
 
 
 def start_active_span_follows_from(
-    operation_name: str, contexts: Collection, inherit_force_tracing=False
+    operation_name: str,
+    contexts: Collection,
+    child_of=None,
+    start_time: Optional[float] = None,
+    *,
+    inherit_force_tracing=False,
+    tracer=None,
 ):
     """Starts an active opentracing span, with additional references to previous spans
 
     Args:
         operation_name: name of the operation represented by the new span
         contexts: the previous spans to inherit from
+
+        child_of: optionally override the parent span. If unset, the currently active
+           span will be the parent. (If there is no currently active span, the first
+           span in `contexts` will be the parent.)
+
+        start_time: optional override for the start time of the created span. Seconds
+            since the epoch.
+
         inherit_force_tracing: if set, and any of the previous contexts have had tracing
            forced, the new span will also have tracing forced.
+        tracer: override the opentracing tracer. By default the global tracer is used.
     """
     if opentracing is None:
-        return noop_context_manager()
+        return noop_context_manager()  # type: ignore[unreachable]
 
     references = [opentracing.follows_from(context) for context in contexts]
-    scope = start_active_span(operation_name, references=references)
+    scope = start_active_span(
+        operation_name,
+        child_of=child_of,
+        references=references,
+        start_time=start_time,
+        tracer=tracer,
+    )
 
     if inherit_force_tracing and any(
         is_context_forced_tracing(ctx) for ctx in contexts
@@ -488,48 +519,6 @@ def start_active_span_follows_from(
         force_tracing(scope.span)
 
     return scope
-
-
-def start_active_span_from_request(
-    request,
-    operation_name,
-    references=None,
-    tags=None,
-    start_time=None,
-    ignore_active_span=False,
-    finish_on_close=True,
-):
-    """
-    Extracts a span context from a Twisted Request.
-    args:
-        headers (twisted.web.http.Request)
-
-        For the other args see opentracing.tracer
-
-    returns:
-        span_context (opentracing.span.SpanContext)
-    """
-    # Twisted encodes the values as lists whereas opentracing doesn't.
-    # So, we take the first item in the list.
-    # Also, twisted uses byte arrays while opentracing expects strings.
-
-    if opentracing is None:
-        return noop_context_manager()
-
-    header_dict = {
-        k.decode(): v[0].decode() for k, v in request.requestHeaders.getAllRawHeaders()
-    }
-    context = opentracing.tracer.extract(opentracing.Format.HTTP_HEADERS, header_dict)
-
-    return opentracing.tracer.start_active_span(
-        operation_name,
-        child_of=context,
-        references=references,
-        tags=tags,
-        start_time=start_time,
-        ignore_active_span=ignore_active_span,
-        finish_on_close=finish_on_close,
-    )
 
 
 def start_active_span_from_edu(
@@ -553,7 +542,7 @@ def start_active_span_from_edu(
     references = references or []
 
     if opentracing is None:
-        return noop_context_manager()
+        return noop_context_manager()  # type: ignore[unreachable]
 
     carrier = json_decoder.decode(edu_content.get("context", "{}")).get(
         "opentracing", {}
@@ -594,18 +583,21 @@ def active_span():
 @ensure_active_span("set a tag")
 def set_tag(key, value):
     """Sets a tag on the active span"""
+    assert opentracing.tracer.active_span is not None
     opentracing.tracer.active_span.set_tag(key, value)
 
 
 @ensure_active_span("log")
 def log_kv(key_values, timestamp=None):
     """Log to the active span"""
+    assert opentracing.tracer.active_span is not None
     opentracing.tracer.active_span.log_kv(key_values, timestamp)
 
 
 @ensure_active_span("set the traces operation name")
 def set_operation_name(operation_name):
     """Sets the operation name of the active span"""
+    assert opentracing.tracer.active_span is not None
     opentracing.tracer.active_span.set_operation_name(operation_name)
 
 
@@ -674,6 +666,7 @@ def inject_header_dict(
     span = opentracing.tracer.active_span
 
     carrier: Dict[str, str] = {}
+    assert span is not None
     opentracing.tracer.inject(span.context, opentracing.Format.HTTP_HEADERS, carrier)
 
     for key, value in carrier.items():
@@ -716,6 +709,7 @@ def get_active_span_text_map(destination=None):
         return {}
 
     carrier: Dict[str, str] = {}
+    assert opentracing.tracer.active_span is not None
     opentracing.tracer.inject(
         opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
     )
@@ -731,10 +725,25 @@ def active_span_context_as_string():
     """
     carrier: Dict[str, str] = {}
     if opentracing:
+        assert opentracing.tracer.active_span is not None
         opentracing.tracer.inject(
             opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
         )
     return json_encoder.encode(carrier)
+
+
+def span_context_from_request(request: Request) -> "Optional[opentracing.SpanContext]":
+    """Extract an opentracing context from the headers on an HTTP request
+
+    This is useful when we have received an HTTP request from another part of our
+    system, and want to link our spans to those of the remote system.
+    """
+    if not opentracing:
+        return None
+    header_dict = {
+        k.decode(): v[0].decode() for k, v in request.requestHeaders.getAllRawHeaders()
+    }
+    return opentracing.tracer.extract(opentracing.Format.HTTP_HEADERS, header_dict)
 
 
 @only_if_tracing
@@ -773,7 +782,7 @@ def trace(func=None, opname=None):
 
     def decorator(func):
         if opentracing is None:
-            return func
+            return func  # type: ignore[unreachable]
 
         _opname = opname if opname else func.__name__
 
@@ -864,7 +873,7 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
     """
 
     if opentracing is None:
-        yield
+        yield  # type: ignore[unreachable]
         return
 
     request_tags = {
@@ -876,10 +885,13 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
     }
 
     request_name = request.request_metrics.name
-    if extract_context:
-        scope = start_active_span_from_request(request, request_name)
-    else:
-        scope = start_active_span(request_name)
+    context = span_context_from_request(request) if extract_context else None
+
+    # we configure the scope not to finish the span immediately on exit, and instead
+    # pass the span into the SynapseRequest, which will finish it once we've finished
+    # sending the response to the client.
+    scope = start_active_span(request_name, child_of=context, finish_on_close=False)
+    request.set_opentracing_span(scope.span)
 
     with scope:
         inject_response_headers(request.responseHeaders)

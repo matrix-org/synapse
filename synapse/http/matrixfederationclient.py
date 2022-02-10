@@ -123,37 +123,37 @@ class ByteParser(ByteWriteable, Generic[T], abc.ABC):
         pass
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class MatrixFederationRequest:
-    method = attr.ib(type=str)
+    method: str
     """HTTP method
     """
 
-    path = attr.ib(type=str)
+    path: str
     """HTTP path
     """
 
-    destination = attr.ib(type=str)
+    destination: str
     """The remote server to send the HTTP request to.
     """
 
-    json = attr.ib(default=None, type=Optional[JsonDict])
+    json: Optional[JsonDict] = None
     """JSON to send in the body.
     """
 
-    json_callback = attr.ib(default=None, type=Optional[Callable[[], JsonDict]])
+    json_callback: Optional[Callable[[], JsonDict]] = None
     """A callback to generate the JSON.
     """
 
-    query = attr.ib(default=None, type=Optional[dict])
+    query: Optional[dict] = None
     """Query arguments.
     """
 
-    txn_id = attr.ib(default=None, type=Optional[str])
+    txn_id: Optional[str] = None
     """Unique ID for this request (for logging)
     """
 
-    uri = attr.ib(init=False, type=bytes)
+    uri: bytes = attr.ib(init=False)
     """The URI of this request
     """
 

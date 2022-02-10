@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import abc
 import collections
 import inspect
 import itertools
@@ -57,7 +58,26 @@ logger = logging.getLogger(__name__)
 _T = TypeVar("_T")
 
 
-class ObservableDeferred(Generic[_T]):
+class AbstractObservableDeferred(Generic[_T], metaclass=abc.ABCMeta):
+    """Abstract base class defining the consumer interface of ObservableDeferred"""
+
+    __slots__ = ()
+
+    @abc.abstractmethod
+    def observe(self) -> "defer.Deferred[_T]":
+        """Add a new observer for this ObservableDeferred
+
+        This returns a brand new deferred that is resolved when the underlying
+        deferred is resolved. Interacting with the returned deferred does not
+        effect the underlying deferred.
+
+        Note that the returned Deferred doesn't follow the Synapse logcontext rules -
+        you will probably want to `make_deferred_yieldable` it.
+        """
+        ...
+
+
+class ObservableDeferred(Generic[_T], AbstractObservableDeferred[_T]):
     """Wraps a deferred object so that we can add observer deferreds. These
     observer deferreds do not affect the callback chain of the original
     deferred.
@@ -289,12 +309,12 @@ def gather_results(  # type: ignore[misc]
     return deferred.addCallback(tuple)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class _LinearizerEntry:
     # The number of things executing.
-    count = attr.ib(type=int)
+    count: int
     # Deferreds for the things blocked from executing.
-    deferreds = attr.ib(type=collections.OrderedDict)
+    deferreds: collections.OrderedDict
 
 
 class Linearizer:

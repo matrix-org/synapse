@@ -81,7 +81,7 @@ class LoginType:
     TERMS: Final = "m.login.terms"
     SSO: Final = "m.login.sso"
     DUMMY: Final = "m.login.dummy"
-    REGISTRATION_TOKEN: Final = "org.matrix.msc3231.login.registration_token"
+    REGISTRATION_TOKEN: Final = "m.login.registration_token"
 
 
 # This is used in the `type` parameter for /register when called by

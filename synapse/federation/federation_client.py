@@ -56,7 +56,6 @@ from synapse.api.room_versions import (
 from synapse.events import EventBase, builder
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.transport.client import SendJoinResponse
-from synapse.logging.utils import log_function
 from synapse.types import JsonDict, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -119,7 +118,8 @@ class FederationClient(FederationBase):
         # It is a map of (room ID, suggested-only) -> the response of
         # get_room_hierarchy.
         self._get_room_hierarchy_cache: ExpiringCache[
-            Tuple[str, bool], Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]
+            Tuple[str, bool],
+            Tuple[JsonDict, Sequence[JsonDict], Sequence[JsonDict], Sequence[str]],
         ] = ExpiringCache(
             cache_name="get_room_hierarchy_cache",
             clock=self._clock,
@@ -144,7 +144,6 @@ class FederationClient(FederationBase):
             if destination_dict:
                 self.pdu_destination_tried[event_id] = destination_dict
 
-    @log_function
     async def make_query(
         self,
         destination: str,
@@ -178,7 +177,6 @@ class FederationClient(FederationBase):
             ignore_backoff=ignore_backoff,
         )
 
-    @log_function
     async def query_client_keys(
         self, destination: str, content: JsonDict, timeout: int
     ) -> JsonDict:
@@ -196,7 +194,6 @@ class FederationClient(FederationBase):
             destination, content, timeout
         )
 
-    @log_function
     async def query_user_devices(
         self, destination: str, user_id: str, timeout: int = 30000
     ) -> JsonDict:
@@ -208,7 +205,6 @@ class FederationClient(FederationBase):
             destination, user_id, timeout
         )
 
-    @log_function
     async def claim_client_keys(
         self, destination: str, content: JsonDict, timeout: int
     ) -> JsonDict:
@@ -265,14 +261,11 @@ class FederationClient(FederationBase):
 
         room_version = await self.store.get_room_version(room_id)
 
-        pdus = [
-            event_from_pdu_json(p, room_version, outlier=False)
-            for p in transaction_data_pdus
-        ]
+        pdus = [event_from_pdu_json(p, room_version) for p in transaction_data_pdus]
 
         # Check signatures and hash of pdus, removing any from the list that fail checks
         pdus[:] = await self._check_sigs_and_hash_and_fetch(
-            dest, pdus, outlier=True, room_version=room_version
+            dest, pdus, room_version=room_version
         )
 
         return pdus
@@ -282,7 +275,6 @@ class FederationClient(FederationBase):
         destination: str,
         event_id: str,
         room_version: RoomVersion,
-        outlier: bool = False,
         timeout: Optional[int] = None,
     ) -> Optional[EventBase]:
         """Requests the PDU with given origin and ID from the remote home
@@ -292,9 +284,6 @@ class FederationClient(FederationBase):
             destination: Which homeserver to query
             event_id: event to fetch
             room_version: version of the room
-            outlier: Indicates whether the PDU is an `outlier`, i.e. if
-                it's from an arbitrary point in the context as opposed to part
-                of the current block of PDUs. Defaults to `False`
             timeout: How long to try (in ms) each destination for before
                 moving to the next destination. None indicates no timeout.
 
@@ -316,8 +305,7 @@ class FederationClient(FederationBase):
         )
 
         pdu_list: List[EventBase] = [
-            event_from_pdu_json(p, room_version, outlier=outlier)
-            for p in transaction_data["pdus"]
+            event_from_pdu_json(p, room_version) for p in transaction_data["pdus"]
         ]
 
         if pdu_list and pdu_list[0]:
@@ -334,7 +322,6 @@ class FederationClient(FederationBase):
         destinations: Iterable[str],
         event_id: str,
         room_version: RoomVersion,
-        outlier: bool = False,
         timeout: Optional[int] = None,
     ) -> Optional[EventBase]:
         """Requests the PDU with given origin and ID from the remote home
@@ -347,9 +334,6 @@ class FederationClient(FederationBase):
             destinations: Which homeservers to query
             event_id: event to fetch
             room_version: version of the room
-            outlier: Indicates whether the PDU is an `outlier`, i.e. if
-                it's from an arbitrary point in the context as opposed to part
-                of the current block of PDUs. Defaults to `False`
             timeout: How long to try (in ms) each destination for before
                 moving to the next destination. None indicates no timeout.
 
@@ -377,7 +361,6 @@ class FederationClient(FederationBase):
                     destination=destination,
                     event_id=event_id,
                     room_version=room_version,
-                    outlier=outlier,
                     timeout=timeout,
                 )
 
@@ -435,7 +418,6 @@ class FederationClient(FederationBase):
         origin: str,
         pdus: Collection[EventBase],
         room_version: RoomVersion,
-        outlier: bool = False,
     ) -> List[EventBase]:
         """Takes a list of PDUs and checks the signatures and hashes of each
         one. If a PDU fails its signature check then we check if we have it in
@@ -451,7 +433,6 @@ class FederationClient(FederationBase):
             origin
             pdu
             room_version
-            outlier: Whether the events are outliers or not
 
         Returns:
             A list of PDUs that have valid signatures and hashes.
@@ -466,7 +447,6 @@ class FederationClient(FederationBase):
             valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
                 pdu=pdu,
                 origin=origin,
-                outlier=outlier,
                 room_version=room_version,
             )
 
@@ -482,7 +462,6 @@ class FederationClient(FederationBase):
         pdu: EventBase,
         origin: str,
         room_version: RoomVersion,
-        outlier: bool = False,
     ) -> Optional[EventBase]:
         """Takes a PDU and checks its signatures and hashes. If the PDU fails
         its signature check then we check if we have it in the database and if
@@ -494,9 +473,6 @@ class FederationClient(FederationBase):
             origin
             pdu
             room_version
-            outlier: Whether the events are outliers or not
-            include_none: Whether to include None in the returned list
-                for events that have failed their checks
 
         Returns:
             The PDU (possibly redacted) if it has valid signatures and hashes.
@@ -521,7 +497,6 @@ class FederationClient(FederationBase):
                     destinations=[pdu_origin],
                     event_id=pdu.event_id,
                     room_version=room_version,
-                    outlier=outlier,
                     timeout=10000,
                 )
             except SynapseError:
@@ -541,13 +516,10 @@ class FederationClient(FederationBase):
 
         room_version = await self.store.get_room_version(room_id)
 
-        auth_chain = [
-            event_from_pdu_json(p, room_version, outlier=True)
-            for p in res["auth_chain"]
-        ]
+        auth_chain = [event_from_pdu_json(p, room_version) for p in res["auth_chain"]]
 
         signed_auth = await self._check_sigs_and_hash_and_fetch(
-            destination, auth_chain, outlier=True, room_version=room_version
+            destination, auth_chain, room_version=room_version
         )
 
         return signed_auth
@@ -816,7 +788,6 @@ class FederationClient(FederationBase):
                 valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
                     pdu=event,
                     origin=destination,
-                    outlier=True,
                     room_version=room_version,
                 )
 
@@ -864,7 +835,6 @@ class FederationClient(FederationBase):
                 valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
                     pdu=pdu,
                     origin=destination,
-                    outlier=True,
                     room_version=room_version,
                 )
 
@@ -1235,7 +1205,7 @@ class FederationClient(FederationBase):
             ]
 
             signed_events = await self._check_sigs_and_hash_and_fetch(
-                destination, events, outlier=False, room_version=room_version
+                destination, events, room_version=room_version
             )
         except HttpResponseException as e:
             if not e.code == 400:
@@ -1364,7 +1334,7 @@ class FederationClient(FederationBase):
         destinations: Iterable[str],
         room_id: str,
         suggested_only: bool,
-    ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]:
+    ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[JsonDict], Sequence[str]]:
         """
         Call other servers to get a hierarchy of the given room.
 
@@ -1379,7 +1349,8 @@ class FederationClient(FederationBase):
 
         Returns:
             A tuple of:
-                The room as a JSON dictionary.
+                The room as a JSON dictionary, without a "children_state" key.
+                A list of `m.space.child` state events.
                 A list of children rooms, as JSON dictionaries.
                 A list of inaccessible children room IDs.
 
@@ -1394,7 +1365,7 @@ class FederationClient(FederationBase):
 
         async def send_request(
             destination: str,
-        ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]:
+        ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[JsonDict], Sequence[str]]:
             try:
                 res = await self.transport_layer.get_room_hierarchy(
                     destination=destination,
@@ -1423,7 +1394,7 @@ class FederationClient(FederationBase):
                 raise InvalidResponseError("'room' must be a dict")
 
             # Validate children_state of the room.
-            children_state = room.get("children_state", [])
+            children_state = room.pop("children_state", [])
             if not isinstance(children_state, Sequence):
                 raise InvalidResponseError("'room.children_state' must be a list")
             if any(not isinstance(e, dict) for e in children_state):
@@ -1452,7 +1423,7 @@ class FederationClient(FederationBase):
                     "Invalid room ID in 'inaccessible_children' list"
                 )
 
-            return room, children, inaccessible_children
+            return room, children_state, children, inaccessible_children
 
         try:
             result = await self._try_destination_list(
@@ -1500,8 +1471,6 @@ class FederationClient(FederationBase):
                 if event.room_id == room_id:
                     children_events.append(event.data)
                     children_room_ids.add(event.state_key)
-            # And add them under the requested room.
-            requested_room["children_state"] = children_events
 
             # Find the children rooms.
             children = []
@@ -1511,7 +1480,7 @@ class FederationClient(FederationBase):
 
             # It isn't clear from the response whether some of the rooms are
             # not accessible.
-            result = (requested_room, children, ())
+            result = (requested_room, children_events, children, ())
 
         # Cache the result to avoid fetching data over federation every time.
         self._get_room_hierarchy_cache[(room_id, suggested_only)] = result

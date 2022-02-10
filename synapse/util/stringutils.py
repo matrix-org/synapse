@@ -16,8 +16,7 @@ import itertools
 import re
 import secrets
 import string
-from collections.abc import Iterable
-from typing import Optional, Tuple
+from typing import Iterable, Optional, Tuple
 
 from netaddr import valid_ipv6
 
@@ -197,7 +196,7 @@ def shortstr(iterable: Iterable, maxitems: int = 5) -> str:
     """If iterable has maxitems or fewer, return the stringification of a list
     containing those items.
 
-    Otherwise, return the stringification of a a list with the first maxitems items,
+    Otherwise, return the stringification of a list with the first maxitems items,
     followed by "...".
 
     Args:
