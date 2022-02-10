@@ -694,7 +694,7 @@ class SimpleHttpClient:
         output_stream: BinaryIO,
         max_size: Optional[int] = None,
         headers: Optional[RawHeaders] = None,
-        is_allowed_content_type: Optional[Callable[[bytes], bool]] = None,
+        is_allowed_content_type: Optional[Callable[[str], bool]] = None,
     ) -> Tuple[int, Dict[bytes, List[bytes]], str, int]:
         """GETs a file from a given URL
         Args:
@@ -735,7 +735,7 @@ class SimpleHttpClient:
 
         if is_allowed_content_type and b"Content-Type" in resp_headers:
             content_type = resp_headers[b"Content-Type"][0]
-            if not is_allowed_content_type(content_type):
+            if not is_allowed_content_type(content_type.decode("ascii")):
                 raise SynapseError(
                     HTTPStatus.BAD_GATEWAY,
                     (

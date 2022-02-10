@@ -764,14 +764,8 @@ def _is_json(content_type: str) -> bool:
     return content_type.lower().startswith("application/json")
 
 
-def _is_previewable(content_type: bytes) -> bool:
+def _is_previewable(content_type: str) -> bool:
     """Returns True for content types for which we will perform URL preview and False
     otherwise."""
 
-    content_type = content_type.lower()
-    return (
-        content_type.startswith(b"text/html")
-        or content_type.startswith(b"application/xhtml")
-        or content_type.startswith(b"image/")
-        or content_type.startswith(b"application/json")
-    )
+    return _is_html(content_type) or _is_media(content_type) or _is_json(content_type)
