@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
 import re
 import threading
-import logging
-
 from typing import Callable, Dict, Optional
 
 import attr
@@ -238,12 +237,16 @@ class CacheConfig(Config):
         expiry_time = cache_config.get("expiry_time")
 
         if expiry_time and expire_caches:
-            logger.warning("You have set two incompatible flags, expiry_time and expire_caches. Please only use the "
-                           "expire_caches and cache_entry_ttl flags and delete the expiry_time flag as it is "
-                           "deprecated.")
+            logger.warning(
+                "You have set two incompatible flags, expiry_time and expire_caches. Please only use the "
+                "expire_caches and cache_entry_ttl flags and delete the expiry_time flag as it is "
+                "deprecated."
+            )
         if expiry_time:
-            logger.warning("Expiry_time is a deprecated flag, please use the expire_caches and cache_entry_ttl flags "
-                           "instead.")
+            logger.warning(
+                "Expiry_time is a deprecated flag, please use the expire_caches and cache_entry_ttl flags "
+                "instead."
+            )
             self.expiry_time_msec = self.parse_duration(expiry_time)
 
         self.sync_response_cache_duration = self.parse_duration(
