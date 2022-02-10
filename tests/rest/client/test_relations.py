@@ -318,8 +318,8 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             annotation_id, [ev["event_id"] for ev in channel.json_body["chunk"]]
         )
 
-        # Request /relations with the pagination token from the /sync and /messages
-        # requests above.
+        # Request /relations with the pagination tokens received from both the
+        # /sync and /messages responses above, in turn.
         #
         # This is a tiny bit silly since the client wouldn't know the parent ID
         # from the requests above; consider the parent ID to be known from a
