@@ -117,7 +117,7 @@ In this example, we define three jobs:
 Note that this example is tailored to show different configurations and
 features slightly more jobs than it's probably necessary (in practice, a
 server admin would probably consider it better to replace the two last
-jobs with one that runs once a day and handles rooms which which
+jobs with one that runs once a day and handles rooms which
 policy's `max_lifetime` is greater than 3 days).
 
 Keep in mind, when configuring these jobs, that a purge job can become
