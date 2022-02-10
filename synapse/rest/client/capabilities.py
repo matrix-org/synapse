@@ -72,6 +72,19 @@ class CapabilitiesRestServlet(RestServlet):
                 "org.matrix.msc3244.room_capabilities"
             ] = MSC3244_CAPABILITIES
 
+        # Must be removed in later versions.
+        # Is only included for migration.
+        if self.config.experimental.msc3283_enabled:
+            response["capabilities"]["org.matrix.msc3283.set_displayname"] = {
+                "enabled": self.config.registration.enable_set_displayname
+            }
+            response["capabilities"]["org.matrix.msc3283.set_avatar_url"] = {
+                "enabled": self.config.registration.enable_set_avatar_url
+            }
+            response["capabilities"]["org.matrix.msc3283.3pid_changes"] = {
+                "enabled": self.config.registration.enable_3pid_changes
+            }
+
         if self.config.experimental.msc3440_enabled:
             response["capabilities"]["io.element.thread"] = {"enabled": True}
 
