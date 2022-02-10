@@ -278,16 +278,16 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         found_event_ids.reverse()
         self.assertEquals(found_event_ids, expected_event_ids)
 
-    def test_pagination_from_sync_messages(self):
-        """Pagination tokens from sync and messages should work."""
+    def test_pagination_from_sync_and_messages(self):
+        """Pagination tokens from /sync and /messages can be used to paginate /relations."""
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "A")
         self.assertEquals(200, channel.code, channel.json_body)
         annotation_id = channel.json_body["event_id"]
         # Send an event after the relation events.
         self.helper.send(self.room, body="Latest event", tok=self.user_token)
 
-        # Request sync, but limit the timeline to get a pagination token before
-        # the reaction.
+        # Request /sync, limiting it such that only the latest event is returned
+        # (and not the relation).
         filter = urllib.parse.quote_plus(
             '{"room": {"timeline": {"limit": 1}}}'.encode()
         )
@@ -298,11 +298,13 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
         sync_prev_batch = room_timeline["prev_batch"]
         self.assertIsNotNone(sync_prev_batch)
-        # Ensure the event above is not in the batch.
+        # Ensure the relation event is not in the batch returned from /sync.
         self.assertNotIn(
             annotation_id, [ev["event_id"] for ev in room_timeline["events"]]
         )
 
+        # Request /messages, limiting it such that only the latest event is
+        # returned (and not the relation).
         channel = self.make_request(
             "GET",
             f"/rooms/{self.room}/messages?dir=b&limit=1",
@@ -311,14 +313,17 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.json_body)
         messages_end = channel.json_body["end"]
         self.assertIsNotNone(messages_end)
-        # Ensure the event above is not in the chunk.
+        # Ensure the relation event is not in the chunk returned from /messages.
         self.assertNotIn(
             annotation_id, [ev["event_id"] for ev in channel.json_body["chunk"]]
         )
 
-        # Request the relations with the token from sync/messages -- this is a
-        # tiny bit silly since how do we know the parent ID? Just assume we had
-        # it from an earlier sync and the above are gappy.
+        # Request /relations with the pagination token from the /sync and /messages
+        # requests above.
+        #
+        # This is a tiny bit silly since the client wouldn't know the parent ID
+        # from the requests above; consider the parent ID to be known from a
+        # previous /sync.
         for from_token in (sync_prev_batch, messages_end):
             channel = self.make_request(
                 "GET",
@@ -327,7 +332,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             )
             self.assertEquals(200, channel.code, channel.json_body)
 
-            # The relation should be in the above.
+            # The relation should be in the returned chunk.
             self.assertIn(
                 annotation_id, [ev["event_id"] for ev in channel.json_body["chunk"]]
             )
