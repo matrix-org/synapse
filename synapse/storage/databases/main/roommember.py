@@ -549,7 +549,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                     AND {clause}
             """
 
-        txn.execute(sql, [Membership.JOIN] + list(args))
+        txn.execute(sql, [Membership.JOIN] + args)
 
         result = {user_id: set() for user_id in user_ids}
         for user_id, room_id, instance, stream_id in txn:
