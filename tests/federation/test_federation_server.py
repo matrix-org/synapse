@@ -248,6 +248,57 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         )
         self.assertEqual(r[("m.room.member", joining_user)].membership, "join")
 
+    @override_config({"experimental_features": {"msc3706_enabled": True}})
+    def test_send_join_partial_state(self):
+        """When MSC3706 support is enabled, /send_join should return partial state"""
+        joining_user = "@misspiggy:" + self.OTHER_SERVER_NAME
+        join_result = self._make_join(joining_user)
+
+        join_event_dict = join_result["event"]
+        add_hashes_and_signatures(
+            KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
+            join_event_dict,
+            signature_name=self.OTHER_SERVER_NAME,
+            signing_key=self.OTHER_SERVER_SIGNATURE_KEY,
+        )
+        channel = self.make_signed_federation_request(
+            "PUT",
+            f"/_matrix/federation/v2/send_join/{self._room_id}/x?org.matrix.msc3706.partial_state=true",
+            content=join_event_dict,
+        )
+        self.assertEquals(channel.code, 200, channel.json_body)
+
+        # expect a reduced room state
+        returned_state = [
+            (ev["type"], ev["state_key"]) for ev in channel.json_body["state"]
+        ]
+        self.assertCountEqual(
+            returned_state,
+            [
+                ("m.room.create", ""),
+                ("m.room.power_levels", ""),
+                ("m.room.join_rules", ""),
+                ("m.room.history_visibility", ""),
+            ],
+        )
+
+        # the auth chain should not include anything already in "state"
+        returned_auth_chain_events = [
+            (ev["type"], ev["state_key"]) for ev in channel.json_body["auth_chain"]
+        ]
+        self.assertCountEqual(
+            returned_auth_chain_events,
+            [
+                ("m.room.member", "@kermit:test"),
+            ],
+        )
+
+        # the room should show that the new user is a member
+        r = self.get_success(
+            self.hs.get_state_handler().get_current_state(self._room_id)
+        )
+        self.assertEqual(r[("m.room.member", joining_user)].membership, "join")
+
 
 def _create_acl_event(content):
     return make_event_from_dict(

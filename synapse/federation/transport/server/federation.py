@@ -412,6 +412,16 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
 
     PREFIX = FEDERATION_V2_PREFIX
 
+    def __init__(
+        self,
+        hs: "HomeServer",
+        authenticator: Authenticator,
+        ratelimiter: FederationRateLimiter,
+        server_name: str,
+    ):
+        super().__init__(hs, authenticator, ratelimiter, server_name)
+        self._msc3706_enabled = hs.config.experimental.msc3706_enabled
+
     async def on_PUT(
         self,
         origin: str,
@@ -422,7 +432,15 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
     ) -> Tuple[int, JsonDict]:
         # TODO(paul): assert that event_id parsed from path actually
         #   match those given in content
-        result = await self.handler.on_send_join_request(origin, content, room_id)
+
+        partial_state = False
+        if self._msc3706_enabled:
+            partial_state = parse_boolean_from_args(
+                query, "org.matrix.msc3706.partial_state", default=False
+            )
+        result = await self.handler.on_send_join_request(
+            origin, content, room_id, caller_supports_partial_state=partial_state
+        )
         return 200, result
 
 
