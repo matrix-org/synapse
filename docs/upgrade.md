@@ -111,6 +111,13 @@ to:
 
 Please update any relevant reverse proxy or firewall configurations appropriately.
 
+## Time-based cache expiry is now enabled by default
+
+Formerly, entries in the cache were not evicted regardless of whether they were accessed after storing.
+This behavior has now changed. By default entries in the cache are now evicted after 30m of not being accessed. 
+To change the default behavior, go to the `caches` section of the config and change the `expire_caches` and 
+`cache_entry_ttl` flags as necessary. Please note that these flags replace the `expiry_time` flag in the config.  
+
 ## Deprecation of `capability` `org.matrix.msc3283.*`
 
 The `capabilities` of MSC3283 from the REST API `/_matrix/client/r0/capabilities`
