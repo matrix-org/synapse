@@ -464,6 +464,7 @@ class Notifier:
                     stream_key,
                     new_token,
                     users,
+                    rooms,
                 )
             except Exception:
                 logger.exception(
