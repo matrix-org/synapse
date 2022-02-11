@@ -186,6 +186,7 @@ class BulkPushRuleEvaluator:
         """
         rules_by_user = await self._get_rules_for_event(event, context)
         actions_by_user: Dict[str, List[Union[dict, str]]] = {}
+        count_as_unread_by_user: Dict[str, bool] = {}
 
         room_members = await self.store.get_joined_users_from_context(event, context)
 
@@ -237,9 +238,9 @@ class BulkPushRuleEvaluator:
 
             # Beeper: Need to calculate this per user as whether it should count as unread or not depends on who the
             # current user is
-            count_as_unread = _should_count_as_unread(event, context, room_members, uid, related_event)
+            count_as_unread_by_user[uid] = _should_count_as_unread(event, context, room_members, uid, related_event)
 
-            if count_as_unread:
+            if count_as_unread_by_user[uid]:
                 # Add an element for the current user if the event needs to be marked as
                 # unread, so that add_push_actions_to_staging iterates over it.
                 # If the event shouldn't be marked as unread but should notify the
@@ -266,7 +267,7 @@ class BulkPushRuleEvaluator:
         await self.store.add_push_actions_to_staging(
             event.event_id,
             actions_by_user,
-            count_as_unread,
+            count_as_unread_by_user,
         )
 
 

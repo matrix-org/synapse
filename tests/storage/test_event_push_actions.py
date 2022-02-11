@@ -78,7 +78,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 self.store.add_push_actions_to_staging(
                     event.event_id,
                     {user_id: action},
-                    False,
+                    {user_id: False},
                 )
             )
             self.get_success(

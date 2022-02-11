@@ -32,7 +32,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 DEFAULT_NOTIF_ACTION: List[Union[dict, str]] = [
     "notify",
     {"set_tweak": "highlight", "value": False},
@@ -527,7 +526,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         self,
         event_id: str,
         user_id_actions: Dict[str, List[Union[dict, str]]],
-        count_as_unread: bool,
+        count_as_unread_by_user: Dict[str, bool],
     ) -> None:
         """Add the push actions for the event to the push action staging area.
 
@@ -553,7 +552,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 _serialize_action(actions, bool(is_highlight)),  # actions column
                 notif,  # notif column
                 is_highlight,  # highlight column
-                int(count_as_unread),  # unread column
+                int(count_as_unread_by_user[user_id]),  # unread column
             )
 
         def _add_push_actions_to_staging_txn(txn: LoggingTransaction) -> None:
