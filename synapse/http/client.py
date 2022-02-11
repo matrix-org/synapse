@@ -322,20 +322,19 @@ class SimpleHttpClient:
         self._ip_whitelist = ip_whitelist
         self._ip_blacklist = ip_blacklist
         self._extra_treq_args = treq_args or {}
-
-        self.user_agent = hs.version_string
         self.clock = hs.get_clock()
+
+        user_agent = hs.version_string
         if hs.config.server.user_agent_suffix:
-            self.user_agent = "%s %s" % (
-                self.user_agent,
+            user_agent = "%s %s" % (
+                user_agent,
                 hs.config.server.user_agent_suffix,
             )
+        self.user_agent = user_agent.encode("ascii")
 
         # We use this for our body producers to ensure that they use the correct
         # reactor.
         self._cooperator = Cooperator(scheduler=_make_scheduler(hs.get_reactor()))
-
-        self.user_agent = self.user_agent.encode("ascii")
 
         if self._ip_blacklist:
             # If we have an IP blacklist, we need to use a DNS resolver which
