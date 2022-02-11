@@ -41,7 +41,7 @@ The general interaction of the classes are:
                     v |
             +-------------+
             | Protocols   |
-            | (TCP/redis) |
+            | (Redis)     |
             +-------------+
 
 Where the ReplicationDataHandler (or subclasses) handles incoming stream
