@@ -208,7 +208,8 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # Request the relations again, but with a different direction.
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1&dir=f",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations"
+            f"/{self.parent_id}?limit=1&org.matrix.msc3715.dir=f",
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)
