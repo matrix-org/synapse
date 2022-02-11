@@ -100,6 +100,25 @@ to:
 
 Please update any relevant reverse proxy or firewall configurations appropriately.
 
+## Deprecation of `capability` `org.matrix.msc3283.*`
+
+The `capabilities` of MSC3283 from the REST API `/_matrix/client/r0/capabilities`
+becomes stable.
+
+The old `capabilities`
+- `org.matrix.msc3283.set_displayname`,
+- `org.matrix.msc3283.set_avatar_url` and
+- `org.matrix.msc3283.3pid_changes`
+
+are deprecated and scheduled to be removed in Synapse v1.(next+1).0.
+
+The new `capabilities`
+- `m.set_displayname`,
+- `m.set_avatar_url` and
+- `m.3pid_changes`
+
+are now active by default.
+
 # Upgrading to v1.53.0
 
 ## Dropping support for `webclient` listeners and non-HTTP(S) `web_client_location`
