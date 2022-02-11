@@ -87,6 +87,16 @@ process, for example:
 
 # Upgrading to v1.53.0
 
+## Dropping support for `webclient` listeners and non-HTTP(S) `web_client_location`
+
+Per the deprecation notice in Synapse v1.51.0, listeners of type  `webclient`
+are no longer supported and configuring them is a now a configuration error.
+
+Configuring a non-HTTP(S) `web_client_location` configuration is is now a
+configuration error. Since the `webclient` listener is no longer supported, this
+setting only applies to the root path `/` of Synapse's web server and no longer
+the `/_matrix/client/` path.
+
 ## Stablisation of MSC3231
 
 The unstable validity-check endpoint for the 
@@ -101,15 +111,24 @@ to:
 
 Please update any relevant reverse proxy or firewall configurations appropriately.
 
-## Dropping support for `webclient` listeners and non-HTTP(S) `web_client_location`
+## Deprecation of `capability` `org.matrix.msc3283.*`
 
-Per the deprecation notice in Synapse v1.51.0, listeners of type  `webclient`
-are no longer supported and configuring them is a now a configuration error.
+The `capabilities` of MSC3283 from the REST API `/_matrix/client/r0/capabilities`
+becomes stable.
 
-Configuring a non-HTTP(S) `web_client_location` configuration is is now a
-configuration error. Since the `webclient` listener is no longer supported, this
-setting only applies to the root path `/` of Synapse's web server and no longer
-the `/_matrix/client/` path.
+The old `capabilities`
+- `org.matrix.msc3283.set_displayname`,
+- `org.matrix.msc3283.set_avatar_url` and
+- `org.matrix.msc3283.3pid_changes`
+
+are deprecated and scheduled to be removed in Synapse v1.(next+1).0.
+
+The new `capabilities`
+- `m.set_displayname`,
+- `m.set_avatar_url` and
+- `m.3pid_changes`
+
+are now active by default.
 
 ## Removal of `user_may_create_room_with_invites`
 
