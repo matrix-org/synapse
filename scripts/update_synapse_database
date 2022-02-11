@@ -18,15 +18,14 @@ import logging
 import sys
 
 import yaml
+from matrix_common.versionstring import get_distribution_version_string
 
 from twisted.internet import defer, reactor
 
-import synapse
 from synapse.config.homeserver import HomeServerConfig
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.server import HomeServer
 from synapse.storage import DataStore
-from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("update_database")
 
@@ -39,7 +38,9 @@ class MockHomeserver(HomeServer):
             config.server.server_name, reactor=reactor, config=config, **kwargs
         )
 
-        self.version_string = "Synapse/" + get_version_string(synapse)
+        self.version_string = "Synapse/" + get_distribution_version_string(
+            "matrix-synapse"
+        )
 
 
 def run_background_updates(hs):

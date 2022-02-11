@@ -34,6 +34,7 @@ from typing import (
 )
 
 import attr
+from matrix_common.versionstring import get_distribution_version_string
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, Metric
 from prometheus_client.core import (
     REGISTRY,
@@ -50,7 +51,6 @@ from synapse.metrics._exposition import (
     start_http_server,
 )
 from synapse.metrics._gc import MIN_TIME_BETWEEN_GCS, install_gc_manager
-from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
 
@@ -417,7 +417,7 @@ build_info = Gauge(
 )
 build_info.labels(
     " ".join([platform.python_implementation(), platform.python_version()]),
-    get_version_string(synapse),
+    get_distribution_version_string("matrix-synapse"),
     " ".join([platform.system(), platform.release()]),
 ).set(1)
 

@@ -24,9 +24,9 @@ from typing import (
     Union,
 )
 
+from matrix_common.versionstring import get_distribution_version_string
 from typing_extensions import Literal
 
-import synapse
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import FEDERATION_UNSTABLE_PREFIX, FEDERATION_V2_PREFIX
@@ -42,7 +42,6 @@ from synapse.http.servlet import (
 )
 from synapse.types import JsonDict
 from synapse.util.ratelimitutils import FederationRateLimiter
-from synapse.util.versionstring import get_version_string
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -598,7 +597,12 @@ class FederationVersionServlet(BaseFederationServlet):
     ) -> Tuple[int, JsonDict]:
         return (
             200,
-            {"server": {"name": "Synapse", "version": get_version_string(synapse)}},
+            {
+                "server": {
+                    "name": "Synapse",
+                    "version": get_distribution_version_string("matrix-synapse"),
+                }
+            },
         )
 
 
