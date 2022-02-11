@@ -359,8 +359,9 @@ class ApplicationServiceTransactionWorkerStore(
 
         events = await self.get_events_as_list(event_ids)
 
-        # TODO: should we recalculate one-time key counts and unused fallback
-        #       key counts here?
+        # TODO: to-device messages, one-time key counts and unused fallback keys
+        #       are not yet populated for catch-up transactions.
+        #       We likely want to populate those for reliability.
         return AppServiceTransaction(
             service=service,
             id=entry["txn_id"],
