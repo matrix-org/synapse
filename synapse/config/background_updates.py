@@ -35,7 +35,7 @@ class BackgroundUpdateConfig(Config):
 
         # Whether to sleep between updates. Defaults to True. Uncomment to change the default.
         #
-        #sleep: false
+        #sleep_enabled: false
 
         # If sleeping between updates, how long in milliseconds to sleep for. Defaults to 1000. Uncomment
         # and set a duration to change the default.
@@ -56,7 +56,7 @@ class BackgroundUpdateConfig(Config):
     def read_config(self, config, **kwargs) -> None:
         self.update_duration_ms = config.get("background_update_duration_ms", 100)
 
-        self.sleep_enabled = config.get("sleep", True)
+        self.sleep_enabled = config.get("sleep_enabled", True)
 
         self.sleep_duration_ms = config.get("sleep_duration_ms", 1000)
 
