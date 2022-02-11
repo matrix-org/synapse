@@ -511,6 +511,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     async def get_rooms_for_users_with_stream_ordering(
         self, user_ids: Collection[str]
     ) -> Dict[str, FrozenSet[GetRoomsForUserWithStreamOrdering]]:
+        """A batched version of `get_rooms_for_user_with_stream_ordering`.
+
+        Returns:
+            Map from user_id to set of rooms that is currently in.
+        """
         return await self.db_pool.runInteraction(
             "get_rooms_for_users_with_stream_ordering",
             self._get_rooms_for_users_with_stream_ordering_txn,
