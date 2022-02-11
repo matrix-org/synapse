@@ -211,6 +211,7 @@ class ModuleApi:
 
     def register_spam_checker_callbacks(
         self,
+        *,
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
         user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
@@ -245,6 +246,7 @@ class ModuleApi:
 
     def register_account_validity_callbacks(
         self,
+        *,
         is_user_expired: Optional[IS_USER_EXPIRED_CALLBACK] = None,
         on_user_registration: Optional[ON_USER_REGISTRATION_CALLBACK] = None,
         on_legacy_send_mail: Optional[ON_LEGACY_SEND_MAIL_CALLBACK] = None,
@@ -265,6 +267,7 @@ class ModuleApi:
 
     def register_third_party_rules_callbacks(
         self,
+        *,
         check_event_allowed: Optional[CHECK_EVENT_ALLOWED_CALLBACK] = None,
         on_create_room: Optional[ON_CREATE_ROOM_CALLBACK] = None,
         check_threepid_can_be_invited: Optional[
@@ -289,6 +292,7 @@ class ModuleApi:
 
     def register_presence_router_callbacks(
         self,
+        *,
         get_users_for_states: Optional[GET_USERS_FOR_STATES_CALLBACK] = None,
         get_interested_users: Optional[GET_INTERESTED_USERS_CALLBACK] = None,
     ) -> None:
@@ -303,6 +307,7 @@ class ModuleApi:
 
     def register_password_auth_provider_callbacks(
         self,
+        *,
         check_3pid_auth: Optional[CHECK_3PID_AUTH_CALLBACK] = None,
         on_logged_out: Optional[ON_LOGGED_OUT_CALLBACK] = None,
         auth_checkers: Optional[
@@ -327,6 +332,7 @@ class ModuleApi:
 
     def register_background_update_controller_callbacks(
         self,
+        *,
         on_update: ON_UPDATE_CALLBACK,
         default_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
         min_batch_size: Optional[MIN_BATCH_SIZE_CALLBACK] = None,
