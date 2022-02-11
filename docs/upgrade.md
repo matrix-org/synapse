@@ -132,7 +132,7 @@ are now active by default.
 
 ## Removal of `user_may_create_room_with_invites`
 
-As announced with the release of [Synapse 1.47.0](https://matrix-org.github.io/synapse/latest/upgrade#deprecation-of-the-user_may_create_room_with_invites-module-callback),
+As announced with the release of [Synapse 1.47.0](#deprecation-of-the-user_may_create_room_with_invites-module-callback),
 the deprecated `user_may_create_room_with_invites` module callback has been removed.
 
 Modules relying on it can instead implement [`user_may_invite`](https://matrix-org.github.io/synapse/latest/modules/spam_checker_callbacks.html#user_may_invite)
