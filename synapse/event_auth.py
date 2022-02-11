@@ -771,7 +771,9 @@ def get_named_level(auth_events: StateMap["EventBase"], name: str, default: int)
         return default
 
 
-def _verify_third_party_invite(event: "EventBase", auth_events: StateMap["EventBase"]):
+def _verify_third_party_invite(
+    event: "EventBase", auth_events: StateMap["EventBase"]
+) -> bool:
     """
     Validates that the invite event is authorized by a previous third-party invite.
 

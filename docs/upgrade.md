@@ -100,6 +100,25 @@ to:
 
 Please update any relevant reverse proxy or firewall configurations appropriately.
 
+## Deprecation of `capability` `org.matrix.msc3283.*`
+
+The `capabilities` of MSC3283 from the REST API `/_matrix/client/r0/capabilities`
+becomes stable.
+
+The old `capabilities`
+- `org.matrix.msc3283.set_displayname`,
+- `org.matrix.msc3283.set_avatar_url` and
+- `org.matrix.msc3283.3pid_changes`
+
+are deprecated and scheduled to be removed in Synapse v1.(next+1).0.
+
+The new `capabilities`
+- `m.set_displayname`,
+- `m.set_avatar_url` and
+- `m.3pid_changes`
+
+are now active by default.
+
 # Upgrading to v1.53.0
 
 ## Dropping support for `webclient` listeners and non-HTTP(S) `web_client_location`
@@ -112,6 +131,18 @@ configuration error. Since the `webclient` listener is no longer supported, this
 setting only applies to the root path `/` of Synapse's web server and no longer
 the `/_matrix/client/` path.
 
+
+# Upgrading to v1.52.0
+
+## Twisted security release
+
+Note that [Twisted 22.1.0](https://github.com/twisted/twisted/releases/tag/twisted-22.1.0)
+has recently been released, which fixes a [security issue](https://github.com/twisted/twisted/security/advisories/GHSA-92x2-jw7w-xvvx)
+within the Twisted library. We do not believe Synapse is affected by this vulnerability,
+though we advise server administrators who installed Synapse via pip to upgrade Twisted
+with `pip install --upgrade Twisted` as a matter of good practice. The Docker image
+`matrixdotorg/synapse` and the Debian packages from `packages.matrix.org` are using the
+updated library.
 
 # Upgrading to v1.51.0
 

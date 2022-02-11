@@ -113,7 +113,7 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
         room_1 = self.helper.create_room_as(u1, tok=u1_token)
         self.inject_room_member(room_1, "@user:other.example.com", "join")
 
-        channel = self.make_request(
+        channel = self.make_signed_federation_request(
             "GET", "/_matrix/federation/v1/state/%s" % (room_1,)
         )
         self.assertEquals(200, channel.code, channel.result)
@@ -145,7 +145,7 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
 
         room_1 = self.helper.create_room_as(u1, tok=u1_token)
 
-        channel = self.make_request(
+        channel = self.make_signed_federation_request(
             "GET", "/_matrix/federation/v1/state/%s" % (room_1,)
         )
         self.assertEquals(403, channel.code, channel.result)
