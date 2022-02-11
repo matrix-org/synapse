@@ -943,11 +943,16 @@ caches:
   per_cache_factors:
     #get_users_who_share_room_with_user: 2.0
 
-  # Controls how long an entry can be in a cache without having been
-  # accessed before being evicted. Defaults to None, which means
-  # entries are never evicted based on time.
+  # Controls whether cache entries are evicted after a specified time
+  # period. Defaults to true. Uncomment to disable this feature.
   #
-  #expiry_time: 30m
+  #expire_caches: false
+
+  # If expire_caches is enabled, this flag controls how long an entry can
+  # be in a cache without having been accessed before being evicted.
+  # Defaults to 30m. Uncomment to set a different time to live for cache entries.
+  #
+  #cache_entry_ttl: 30m
 
   # Controls how long the results of a /sync request are cached for after
   # a successful response is returned. A higher duration can help clients with
