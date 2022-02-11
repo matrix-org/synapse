@@ -1315,9 +1315,8 @@ class SyncHandler:
                     # Check if the changed user shares any rooms with the user,
                     # or if the changed user is the syncing user (as we always
                     # want to include device list updates of their own devices).
-                    if (
-                        user_id == changed_user_id
-                        or any(e.room_id in joined_rooms for e in entries)
+                    if user_id == changed_user_id or any(
+                        e.room_id in joined_rooms for e in entries
                     ):
                         users_that_have_changed.add(changed_user_id)
             else:
