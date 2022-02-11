@@ -14,7 +14,6 @@
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from twisted.internet.address import IPv4Address
 from twisted.internet.protocol import Protocol
 from twisted.web.resource import Resource
 
@@ -22,12 +21,6 @@ from synapse.app.generic_worker import GenericWorkerServer
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.replication.http import ReplicationRestResource
 from synapse.replication.tcp.client import ReplicationDataHandler
-from synapse.replication.tcp.handler import ReplicationCommandHandler
-from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
-from synapse.replication.tcp.resource import (
-    ReplicationStreamProtocolFactory,
-    ServerReplicationStreamProtocol,
-)
 from synapse.server import HomeServer
 
 from tests import unittest
@@ -56,13 +49,10 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         # build a replication server
-        server_factory = ReplicationStreamProtocolFactory(hs)
         self.streamer = hs.get_replication_streamer()
-        self.server: ServerReplicationStreamProtocol = server_factory.buildProtocol(
-            IPv4Address("TCP", "127.0.0.1", 0)
-        )
 
         # Fake in memory Redis server that servers can connect to.
+        self._redis_protocols = []
         self._redis_server = FakeRedisPubSubServer()
 
         # We may have an attempt to connect to redis for the external cache already.
@@ -70,6 +60,15 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
         # Make a new HomeServer object for the worker
         self.reactor.lookups["testserv"] = "1.2.3.4"
+        self.reactor.lookups["localhost"] = "127.0.0.1"
+
+        # Handle attempts to connect to fake redis server.
+        self.reactor.add_tcp_client_callback(
+            "localhost",
+            6379,
+            self.connect_any_redis_attempts,
+        )
+
         self.worker_hs = self.setup_test_homeserver(
             federation_http_client=None,
             homeserver_to_use=GenericWorkerServer,
@@ -92,17 +91,10 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         self.test_handler = self._build_replication_data_handler()
         self.worker_hs._replication_data_handler = self.test_handler  # type: ignore[attr-defined]
 
-        repl_handler = ReplicationCommandHandler(self.worker_hs)
-        self.client = ClientReplicationStreamProtocol(
-            self.worker_hs,
-            "client",
-            "test",
-            clock,
-            repl_handler,
+        self.hs.get_replication_command_handler().start_replication(self.hs)
+        self.worker_hs.get_replication_command_handler().start_replication(
+            self.worker_hs
         )
-
-        self._client_transport = None
-        self._server_transport = None
 
     def create_resource_dict(self) -> Dict[str, Resource]:
         d = super().create_resource_dict()
@@ -120,26 +112,15 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         return TestReplicationDataHandler(self.worker_hs)
 
     def reconnect(self):
-        if self._client_transport:
-            self.client.close()
-
-        if self._server_transport:
-            self.server.close()
-
-        self._client_transport = FakeTransport(self.server, self.reactor)
-        self.client.makeConnection(self._client_transport)
-
-        self._server_transport = FakeTransport(self.client, self.reactor)
-        self.server.makeConnection(self._server_transport)
+        pass
+        # self.disconnect()
+        # self.connect_any_redis_attempts()
 
     def disconnect(self):
-        if self._client_transport:
-            self._client_transport = None
-            self.client.close()
-
-        if self._server_transport:
-            self._server_transport = None
-            self.server.close()
+        pass
+        # for client_protocol, server_protocol in self._redis_protocols:
+        #     client_protocol.loseConnection()
+        #     server_protocol.loseConnection()
 
     def replicate(self):
         """Tell the master side of replication that something has happened, and then
@@ -237,6 +218,9 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
             client_protocol = client_factory.buildProtocol(None)
             server_protocol = self._redis_server.buildProtocol(None)
 
+            # Store for potentially disconnecting.
+            self._redis_protocols.append((client_protocol, server_protocol))
+
             client_to_server_transport = FakeTransport(
                 server_protocol, self.reactor, client_protocol
             )
@@ -263,8 +247,6 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
     def setUp(self):
         super().setUp()
 
-        # build a replication server
-        self.server_factory = ReplicationStreamProtocolFactory(self.hs)
         self.streamer = self.hs.get_replication_streamer()
 
         # Fake in memory Redis server that servers can connect to.
@@ -283,15 +265,14 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         # handling inbound HTTP requests to that instance.
         self._hs_to_site = {self.hs: self.site}
 
-        if self.hs.config.redis.redis_enabled:
-            # Handle attempts to connect to fake redis server.
-            self.reactor.add_tcp_client_callback(
-                "localhost",
-                6379,
-                self.connect_any_redis_attempts,
-            )
+        # Handle attempts to connect to fake redis server.
+        self.reactor.add_tcp_client_callback(
+            "localhost",
+            6379,
+            self.connect_any_redis_attempts,
+        )
 
-            self.hs.get_replication_command_handler().start_replication(self.hs)
+        self.hs.get_replication_command_handler().start_replication(self.hs)
 
         # When we see a connection attempt to the master replication listener we
         # automatically set up the connection. This is so that tests don't
@@ -375,27 +356,6 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         store = worker_hs.get_datastores().main
         store.db_pool._db_pool = self.database_pool._db_pool
 
-        # Set up TCP replication between master and the new worker if we don't
-        # have Redis support enabled.
-        if not worker_hs.config.redis.redis_enabled:
-            repl_handler = ReplicationCommandHandler(worker_hs)
-            client = ClientReplicationStreamProtocol(
-                worker_hs,
-                "client",
-                "test",
-                self.clock,
-                repl_handler,
-            )
-            server = self.server_factory.buildProtocol(
-                IPv4Address("TCP", "127.0.0.1", 0)
-            )
-
-            client_transport = FakeTransport(server, self.reactor)
-            client.makeConnection(client_transport)
-
-            server_transport = FakeTransport(client, self.reactor)
-            server.makeConnection(server_transport)
-
         # Set up a resource for the worker
         resource = ReplicationRestResource(worker_hs)
 
@@ -414,8 +374,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             reactor=self.reactor,
         )
 
-        if worker_hs.config.redis.redis_enabled:
-            worker_hs.get_replication_command_handler().start_replication(worker_hs)
+        worker_hs.get_replication_command_handler().start_replication(worker_hs)
 
         return worker_hs
 
@@ -464,7 +423,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
 
         # Note: at this point we've wired everything up, but we need to return
         # before the data starts flowing over the connections as this is called
-        # inside `connecTCP` before the connection has been passed back to the
+        # inside `connectTCP` before the connection has been passed back to the
         # code that requested the TCP connection.
 
     def connect_any_redis_attempts(self):
