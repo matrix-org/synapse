@@ -720,7 +720,6 @@ class FederationVersionsRestServlet(BaseFederationServlet):
             200,
             {
                 "versions": [
-                    "r0.1.4",
                     "v1.1",
                 ],
             },
