@@ -518,7 +518,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
             txn.execute(sql % (clause,), args)
             latest_event_ids = {}
-            for parent_event_id, child_event_id in txn.fetchall():
+            for parent_event_id, child_event_id in txn:
                 # Only consider the latest threaded reply (by topological ordering).
                 if parent_event_id not in latest_event_ids:
                     latest_event_ids[parent_event_id] = child_event_id
