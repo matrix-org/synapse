@@ -57,8 +57,13 @@ push_rules_delta_state_cache_metric = register_cache(
 # Regex pattern for detecting a bridge bot (cached here for performance)
 BOT_PATTERN = re.compile(r"^@_.*_bot\:.*")
 
+
 def _should_count_as_unread(
-    event: EventBase, context: EventContext, room_members: Dict[str, ProfileInfo]
+    event: EventBase,
+    context: EventContext,
+    room_members: Dict[str, ProfileInfo],
+    current_user: str,
+    related_event: Optional[EventBase]
 ) -> bool:
     # Exclude rejected and soft-failed events.
     if context.rejected or event.internal_metadata.is_soft_failed():
@@ -76,8 +81,10 @@ def _should_count_as_unread(
         elif event.type == EventTypes.Message:
             body = event.content.get("body")
             return isinstance(body, str) and bool(body)
+        # Beeper: We want reactions to only count as unread if they're reactions to the current user in rooms that
+        # have fewer than 20 users.
         elif event.type == "m.reaction":
-            return len(room_members) < 20
+            return related_event.sender == current_user and len(room_members) < 20
 
     return False
 
@@ -182,8 +189,6 @@ class BulkPushRuleEvaluator:
 
         room_members = await self.store.get_joined_users_from_context(event, context)
 
-        count_as_unread = _should_count_as_unread(event, context, room_members)
-
         (
             power_levels,
             sender_power_level,
@@ -195,7 +200,8 @@ class BulkPushRuleEvaluator:
         )
 
         non_bot_room_members = [x for x in room_members if not BOT_PATTERN.match(x)]
-        logger.debug("Evaluating Push Rule - room_members: %r, non_bot_room_members: %r", len(room_members), len(non_bot_room_members))
+        logger.debug("Evaluating Push Rule - room_members: %r, non_bot_room_members: %r",
+                     len(room_members), len(non_bot_room_members))
 
         evaluator = PushRuleEvaluatorForEvent(
             event, len(non_bot_room_members), sender_power_level, power_levels, related_event
@@ -228,6 +234,10 @@ class BulkPushRuleEvaluator:
                     display_name = event.content.get("displayname", None)
                     if not isinstance(display_name, str):
                         display_name = None
+
+            # Beeper: Need to calculate this per user as whether it should count as unread or not depends on who the
+            # current user is
+            count_as_unread = _should_count_as_unread(event, context, room_members, uid, related_event)
 
             if count_as_unread:
                 # Add an element for the current user if the event needs to be marked as
