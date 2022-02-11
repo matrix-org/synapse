@@ -107,6 +107,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         return hs
 
     def prepare(self, reactor, clock, homeserver):
+        super().prepare(reactor, clock, homeserver)
         # Create some users and a room to play with during the tests
         self.user_id = self.register_user("kermit", "monkey")
         self.invitee = self.register_user("invitee", "hackme")
@@ -473,8 +474,6 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
     def _send_event_over_federation(self) -> None:
         """Send a dummy event over federation and check that the request succeeds."""
         body = {
-            "origin": self.hs.config.server.server_name,
-            "origin_server_ts": self.clock.time_msec(),
             "pdus": [
                 {
                     "sender": self.user_id,
@@ -492,11 +491,10 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             ],
         }
 
-        channel = self.make_request(
+        channel = self.make_signed_federation_request(
             method="PUT",
             path="/_matrix/federation/v1/send/1",
             content=body,
-            federation_auth_origin=self.hs.config.server.server_name.encode("utf8"),
         )
 
         self.assertEqual(channel.code, 200, channel.result)

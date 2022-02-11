@@ -1,0 +1,1 @@
+Use the proper type for the Content-Length header in the `UploadResource`.
