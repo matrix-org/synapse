@@ -49,6 +49,11 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
     if not hiredis:
         skip = "Requires hiredis"
 
+    def default_config(self):
+        config = super().default_config()
+        config["redis"] = {"enabled": True}
+        return config
+
     def prepare(self, reactor, clock, hs):
         # build a replication server
         server_factory = ReplicationStreamProtocolFactory(hs)
@@ -56,6 +61,12 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         self.server: ServerReplicationStreamProtocol = server_factory.buildProtocol(
             IPv4Address("TCP", "127.0.0.1", 0)
         )
+
+        # Fake in memory Redis server that servers can connect to.
+        self._redis_server = FakeRedisPubSubServer()
+
+        # We may have an attempt to connect to redis for the external cache already.
+        self.connect_any_redis_attempts()
 
         # Make a new HomeServer object for the worker
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -212,6 +223,30 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(request.method, b"GET")
 
+    def connect_any_redis_attempts(self):
+        """If redis is enabled we need to deal with workers connecting to a
+        redis server. We don't want to use a real Redis server so we use a
+        fake one.
+        """
+        clients = self.reactor.tcpClients
+        while clients:
+            (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
+            self.assertEqual(host, "localhost")
+            self.assertEqual(port, 6379)
+
+            client_protocol = client_factory.buildProtocol(None)
+            server_protocol = self._redis_server.buildProtocol(None)
+
+            client_to_server_transport = FakeTransport(
+                server_protocol, self.reactor, client_protocol
+            )
+            client_protocol.makeConnection(client_to_server_transport)
+
+            server_to_client_transport = FakeTransport(
+                client_protocol, self.reactor, server_protocol
+            )
+            server_protocol.makeConnection(server_to_client_transport)
+
 
 class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
     """Base class for tests running multiple workers.
@@ -219,6 +254,11 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
     Automatically handle HTTP replication requests from workers to master,
     unlike `BaseStreamTestCase`.
     """
+
+    def default_config(self):
+        config = super().default_config()
+        config["redis"] = {"enabled": True}
+        return config
 
     def setUp(self):
         super().setUp()

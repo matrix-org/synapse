@@ -549,7 +549,6 @@ class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
 
     def default_config(self):
         conf = super().default_config()
-        conf["redis"] = {"enabled": "true"}
         conf["stream_writers"] = {"presence": ["presence_writer"]}
         conf["instance_map"] = {
             "presence_writer": {"host": "testserv", "port": 1001},
