@@ -571,7 +571,7 @@ class FederationServer(FederationBase):
     ) -> JsonDict:
         state_ids = await self.handler.get_state_ids_for_pdu(room_id, event_id)
         auth_chain_ids = await self.store.get_auth_chain_ids(room_id, state_ids)
-        return {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids}
+        return {"pdu_ids": state_ids, "auth_chain_ids": list(auth_chain_ids)}
 
     async def _on_context_state_request_compute(
         self, room_id: str, event_id: Optional[str]
