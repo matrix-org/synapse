@@ -114,9 +114,8 @@ class ReplicationCommandHandler:
         self._streams_to_replicate: List[Stream] = []
 
         for stream in self._streams.values():
-            if hs.config.redis.redis_enabled and stream.NAME == CachesStream.NAME:
-                # All workers can write to the cache invalidation stream when
-                # using redis.
+            if stream.NAME == CachesStream.NAME:
+                # All workers can write to the cache invalidation stream.
                 self._streams_to_replicate.append(stream)
                 continue
 
@@ -236,14 +235,9 @@ class ReplicationCommandHandler:
         if self._is_master:
             self._server_notices_sender = hs.get_server_notices_sender()
 
-        if hs.config.redis.redis_enabled:
-            # If we're using Redis, it's the background worker that should
-            # receive USER_IP commands and store the relevant client IPs.
-            self._should_insert_client_ips = hs.config.worker.run_background_tasks
-        else:
-            # If we're NOT using Redis, this must be handled by the master
-            self._should_insert_client_ips = hs.get_instance_name() == "master"
-
+        # The worker assigned background tasks should handle client IPs.
+        # receive USER_IP commands and store the relevant client IPs.
+        self._should_insert_client_ips = hs.config.worker.run_background_tasks
         if self._is_master or self._should_insert_client_ips:
             self.subscribe_to_channel("USER_IP")
 
