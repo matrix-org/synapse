@@ -238,13 +238,13 @@ class CacheConfig(Config):
 
         if expiry_time and expire_caches:
             logger.warning(
-                "You have set two incompatible flags, expiry_time and expire_caches. Please only use the "
-                "expire_caches and cache_entry_ttl flags and delete the expiry_time flag as it is "
+                "You have set two incompatible options, expiry_time and expire_caches. Please only use the "
+                "expire_caches and cache_entry_ttl options and delete the expiry_time option as it is "
                 "deprecated."
             )
         if expiry_time:
             logger.warning(
-                "Expiry_time is a deprecated flag, please use the expire_caches and cache_entry_ttl flags "
+                "Expiry_time is a deprecated option, please use the expire_caches and cache_entry_ttl options "
                 "instead."
             )
             self.expiry_time_msec = self.parse_duration(expiry_time)

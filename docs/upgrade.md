@@ -84,8 +84,10 @@ process, for example:
     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
-# Upgrading to v1.(next)
 
+
+
+# Upgrading to v1.53.0
 
 ## Stablisation of MSC3231
 
@@ -100,8 +102,6 @@ to:
 `/_matrix/client/v1/register/m.login.registration_token/validity`
 
 Please update any relevant reverse proxy or firewall configurations appropriately.
-
-# Upgrading to v1.53.0
 
 ## Time-based cache expiry is now enabled by default
 
