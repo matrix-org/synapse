@@ -703,6 +703,30 @@ class FederationRoomHierarchyServlet(BaseFederationServlet):
         )
 
 
+class FederationVersionsRestServlet(BaseFederationServlet):
+    PATH = "/versions"
+
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc3723"
+
+    REQUIRE_AUTH = False
+
+    def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Mapping[bytes, Sequence[bytes]],
+    ) -> Tuple[int, JsonDict]:
+        return (
+            200,
+            {
+                "versions": [
+                    "r0.1.4",
+                    "v1.1",
+                ],
+            },
+        )
+
+
 class FederationRoomHierarchyUnstableServlet(FederationRoomHierarchyServlet):
     PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc2946"
 
@@ -775,4 +799,5 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationRoomHierarchyUnstableServlet,
     FederationV1SendKnockServlet,
     FederationMakeKnockServlet,
+    FederationVersionsRestServlet,
 )
