@@ -222,9 +222,9 @@ class _ServiceQueuer:
                     self._msc3202_transaction_extensions_enabled
                     and service.msc3202_transaction_extensions
                 ):
-                    # Lazily compute the one-time key counts and fallback key
-                    # usage states for the users which are mentioned in this
-                    # transaction, as well as the appservice's sender.
+                    # Compute the one-time key counts and fallback key usage states
+                    # for the users which are mentioned in this transaction,
+                    # as well as the appservice's sender.
                     interesting_users = await self._determine_interesting_users_for_msc3202_otk_counts_and_fallback_keys(
                         service, events, ephemeral, to_device_messages_to_send
                     )
