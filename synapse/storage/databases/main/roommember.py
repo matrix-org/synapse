@@ -551,9 +551,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         txn.execute(sql, [Membership.JOIN] + list(args))
 
-        result = {}
+        result = {user_id: set() for user_id in user_ids}
         for user_id, room_id, instance, stream_id in txn:
-            result.setdefault(user_id, set()).add(
+            result[user_id].add(
                 GetRoomsForUserWithStreamOrdering(
                     room_id, PersistedEventPosition(instance, stream_id)
                 )
