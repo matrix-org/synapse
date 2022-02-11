@@ -652,19 +652,27 @@ class FederationServer(FederationBase):
         )
 
         prev_state_ids = await context.get_prev_state_ids()
-        state_ids = list(prev_state_ids.values())
-        auth_chain = await self.store.get_auth_chain(room_id, state_ids)
-        state = await self.store.get_events(state_ids)
+        state_event_ids = prev_state_ids.values()
 
+        auth_chain_event_ids = await self.store.get_auth_chain_ids(
+            room_id, state_event_ids
+        )
+
+        auth_chain_events = await self.store.get_events_as_list(auth_chain_event_ids)
+        state_events = await self.store.get_events_as_list(state_event_ids)
+
+        # we try to do all the async stuff before this point, so that time_now is as
+        # accurate as possible.
         time_now = self._clock.time_msec()
-        event_json = event.get_pdu_json()
-        return {
+        event_json = event.get_pdu_json(time_now)
+        resp = {
             # TODO Remove the unstable prefix when servers have updated.
             "org.matrix.msc3083.v2.event": event_json,
             "event": event_json,
-            "state": [p.get_pdu_json(time_now) for p in state.values()],
-            "auth_chain": [p.get_pdu_json(time_now) for p in auth_chain],
+            "state": [p.get_pdu_json(time_now) for p in state_events],
+            "auth_chain": [p.get_pdu_json(time_now) for p in auth_chain_events],
         }
+        return resp
 
     async def on_make_leave_request(
         self, origin: str, room_id: str, user_id: str
