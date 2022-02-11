@@ -707,7 +707,7 @@ class Notifier:
             s = self.room_to_user_streams.setdefault(room, set())
             s.add(user_stream)
 
-    def _user_joined_room(self, user_id: str, room_id: str):
+    def _user_joined_room(self, user_id: str, room_id: str) -> None:
         new_user_stream = self.user_to_user_stream.get(user_id)
         if new_user_stream is not None:
             room_streams = self.room_to_user_streams.setdefault(room_id, set())
