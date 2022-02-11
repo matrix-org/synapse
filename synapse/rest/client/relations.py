@@ -111,6 +111,9 @@ class RelationPaginationServlet(RestServlet):
             raise SynapseError(404, "Unknown parent event.")
 
         limit = parse_integer(request, "limit", default=5)
+        direction = parse_string(
+            request, "org.matrix.msc3715.dir", default="b", allowed_values=["f", "b"]
+        )
         from_token_str = parse_string(request, "from")
         to_token_str = parse_string(request, "to")
 
@@ -128,6 +131,7 @@ class RelationPaginationServlet(RestServlet):
                 relation_type=relation_type,
                 event_type=event_type,
                 limit=limit,
+                direction=direction,
                 from_token=from_token,
                 to_token=to_token,
             )
