@@ -1,1 +1,0 @@
-Fix to-device messages being dropped during limited sync when using SQLite.
