@@ -148,10 +148,7 @@ class BasePresenceHandler(abc.ABC):
         self._busy_presence_enabled = hs.config.experimental.msc3026_enabled
 
         active_presence = self.store.take_presence_startup_info()
-        if active_presence:
-            self.user_to_current_state = {
-                state.user_id: state for state in active_presence
-            }
+        self.user_to_current_state = {state.user_id: state for state in active_presence}
 
     @abc.abstractmethod
     async def user_syncing(
