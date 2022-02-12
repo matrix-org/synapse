@@ -43,6 +43,7 @@ from typing import (
     Tuple,
     Type,
     Union,
+    cast,
 )
 
 from prometheus_client import Counter
@@ -147,7 +148,10 @@ class BasePresenceHandler(abc.ABC):
         self._busy_presence_enabled = hs.config.experimental.msc3026_enabled
 
         active_presence = self.store.take_presence_startup_info()
-        self.user_to_current_state = {state.user_id: state for state in active_presence}
+        if active_presence:
+            self.user_to_current_state = {
+                state.user_id: state for state in active_presence
+            }
 
     @abc.abstractmethod
     async def user_syncing(
@@ -224,7 +228,9 @@ class BasePresenceHandler(abc.ABC):
                 states.update(new)
                 self.user_to_current_state.update(new)
 
-        return states
+        # mypy does not realize that is Dict[str, UserPresenceState]]
+        # and not Dict[str, Optional[UserPresenceState]]]
+        return cast(Dict[str, UserPresenceState], states)
 
     @abc.abstractmethod
     async def set_state(
