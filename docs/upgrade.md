@@ -117,6 +117,7 @@ Formerly, entries in the cache were not evicted regardless of whether they were 
 This behavior has now changed. By default entries in the cache are now evicted after 30m of not being accessed. 
 To change the default behavior, go to the `caches` section of the config and change the `expire_caches` and 
 `cache_entry_ttl` flags as necessary. Please note that these flags replace the `expiry_time` flag in the config.  
+The `expiry_time` flag will still continue to work, but it has been deprecated and will be removed in the future.
 
 ## Deprecation of `capability` `org.matrix.msc3283.*`
 
