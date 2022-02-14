@@ -1,0 +1,1 @@
+Unpin frozendict but exclude the known bad version 2.1.2.
