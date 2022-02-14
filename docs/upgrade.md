@@ -129,7 +129,7 @@ The old `capabilities`
 - `org.matrix.msc3283.set_avatar_url` and
 - `org.matrix.msc3283.3pid_changes`
 
-are deprecated and scheduled to be removed in Synapse v1.(next+1).0.
+are deprecated and scheduled to be removed in Synapse v1.54.0.
 
 The new `capabilities`
 - `m.set_displayname`,
