@@ -280,7 +280,8 @@ feature has been stabilised and moved from:</p>
 <p>Formerly, entries in the cache were not evicted regardless of whether they were accessed after storing.
 This behavior has now changed. By default entries in the cache are now evicted after 30m of not being accessed. 
 To change the default behavior, go to the <code>caches</code> section of the config and change the <code>expire_caches</code> and 
-<code>cache_entry_ttl</code> flags as necessary. Please note that these flags replace the <code>expiry_time</code> flag in the config.</p>
+<code>cache_entry_ttl</code> flags as necessary. Please note that these flags replace the <code>expiry_time</code> flag in the config.<br />
+The <code>expiry_time</code> flag will still continue to work, but it has been deprecated and will be removed in the future.</p>
 <h2 id="deprecation-of-capability-orgmatrixmsc3283"><a class="header" href="#deprecation-of-capability-orgmatrixmsc3283">Deprecation of <code>capability</code> <code>org.matrix.msc3283.*</code></a></h2>
 <p>The <code>capabilities</code> of MSC3283 from the REST API <code>/_matrix/client/r0/capabilities</code>
 becomes stable.</p>
