@@ -22,6 +22,7 @@ from string import Template
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import yaml
+from matrix_common.versionstring import get_distribution_version_string
 from zope.interface import implementer
 
 from twisted.logger import (
@@ -32,11 +33,9 @@ from twisted.logger import (
     globalLogBeginner,
 )
 
-import synapse
 from synapse.logging._structured import setup_structured_logging
 from synapse.logging.context import LoggingContextFilter
 from synapse.logging.filter import MetadataFilter
-from synapse.util.versionstring import get_version_string
 
 from ._base import Config, ConfigError
 
@@ -347,6 +346,10 @@ def setup_logging(
 
     # Log immediately so we can grep backwards.
     logging.warning("***** STARTING SERVER *****")
-    logging.warning("Server %s version %s", sys.argv[0], get_version_string(synapse))
+    logging.warning(
+        "Server %s version %s",
+        sys.argv[0],
+        get_distribution_version_string("matrix-synapse"),
+    )
     logging.info("Server hostname: %s", config.server.server_name)
     logging.info("Instance name: %s", hs.get_instance_name())

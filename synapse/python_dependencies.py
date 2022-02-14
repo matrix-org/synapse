@@ -88,7 +88,7 @@ REQUIREMENTS = [
     # with the latest security patches.
     "cryptography>=3.4.7",
     "ijson>=3.1",
-    "matrix-common==1.0.0",
+    "matrix-common~=1.1.0",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
