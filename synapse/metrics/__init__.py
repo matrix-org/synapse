@@ -44,7 +44,8 @@ from prometheus_client.core import (
 
 from twisted.python.threadpool import ThreadPool
 
-import synapse.metrics._reactor_metrics
+# This module is imported for its side effects; flake8 needn't warn that it's unused.
+import synapse.metrics._reactor_metrics  # noqa: F401
 from synapse.metrics._exposition import (
     MetricsResource,
     generate_latest,
