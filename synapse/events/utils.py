@@ -490,13 +490,22 @@ class EventClientSerializer:
 
         # If this event is the start of a thread, include a summary of the replies.
         if aggregations.thread:
+            thread = aggregations.thread
+
+            # Don't bundle aggregations as this could recurse forever.
+            serialized_latest_event = self.serialize_event(
+                thread.latest_event, time_now, bundle_aggregations=None
+            )
+            # Manually apply an edit, if one exists.
+            if thread.latest_edit:
+                self._apply_edit(
+                    thread.latest_event, serialized_latest_event, thread.latest_edit
+                )
+
             serialized_aggregations[RelationTypes.THREAD] = {
-                # Don't bundle aggregations as this could recurse forever.
-                "latest_event": self.serialize_event(
-                    aggregations.thread.latest_event, time_now, bundle_aggregations=None
-                ),
-                "count": aggregations.thread.count,
-                "current_user_participated": aggregations.thread.current_user_participated,
+                "latest_event": serialized_latest_event,
+                "count": thread.count,
+                "current_user_participated": thread.current_user_participated,
             }
 
         # Include the bundled aggregations in the event.
