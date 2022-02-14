@@ -402,7 +402,12 @@ class PreviewUrlResource(DirectServeJsonResource):
                 url,
                 output_stream=output_stream,
                 max_size=self.max_spider_size,
-                headers={"Accept-Language": self.url_preview_accept_language},
+                headers={
+                    b"Accept-Language": self.url_preview_accept_language,
+                    b"User-Agent": [
+                        "Synapse (bot; +https://github.com/matrix-org/synapse)"
+                    ],
+                },
                 is_allowed_content_type=_is_previewable,
             )
         except SynapseError:
