@@ -1812,7 +1812,7 @@ class PersistEventsStore:
             # potentially error-prone) so it is always invalidated.
             txn.call_after(
                 self.store.get_thread_participated.invalidate,
-                (parent_id, event.room_id, event.sender),
+                (parent_id, event.sender),
             )
 
     def _handle_insertion_event(self, txn: LoggingTransaction, event: EventBase):

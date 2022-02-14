@@ -84,7 +84,18 @@ process, for example:
     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
-# Upgrading to v1.(next)
+
+# Upgrading to v1.53.0
+
+## Dropping support for `webclient` listeners and non-HTTP(S) `web_client_location`
+
+Per the deprecation notice in Synapse v1.51.0, listeners of type  `webclient`
+are no longer supported and configuring them is a now a configuration error.
+
+Configuring a non-HTTP(S) `web_client_location` configuration is is now a
+configuration error. Since the `webclient` listener is no longer supported, this
+setting only applies to the root path `/` of Synapse's web server and no longer
+the `/_matrix/client/` path.
 
 ## Stablisation of MSC3231
 
@@ -99,6 +110,13 @@ to:
 `/_matrix/client/v1/register/m.login.registration_token/validity`
 
 Please update any relevant reverse proxy or firewall configurations appropriately.
+
+## Time-based cache expiry is now enabled by default
+
+Formerly, entries in the cache were not evicted regardless of whether they were accessed after storing.
+This behavior has now changed. By default entries in the cache are now evicted after 30m of not being accessed. 
+To change the default behavior, go to the `caches` section of the config and change the `expire_caches` and 
+`cache_entry_ttl` flags as necessary. Please note that these flags replace the `expiry_time` flag in the config.  
 
 ## Deprecation of `capability` `org.matrix.msc3283.*`
 
@@ -119,17 +137,15 @@ The new `capabilities`
 
 are now active by default.
 
-# Upgrading to v1.53.0
+## Removal of `user_may_create_room_with_invites`
 
-## Dropping support for `webclient` listeners and non-HTTP(S) `web_client_location`
+As announced with the release of [Synapse 1.47.0](#deprecation-of-the-user_may_create_room_with_invites-module-callback),
+the deprecated `user_may_create_room_with_invites` module callback has been removed.
 
-Per the deprecation notice in Synapse v1.51.0, listeners of type  `webclient`
-are no longer supported and configuring them is a now a configuration error.
-
-Configuring a non-HTTP(S) `web_client_location` configuration is is now a
-configuration error. Since the `webclient` listener is no longer supported, this
-setting only applies to the root path `/` of Synapse's web server and no longer
-the `/_matrix/client/` path.
+Modules relying on it can instead implement [`user_may_invite`](https://matrix-org.github.io/synapse/latest/modules/spam_checker_callbacks.html#user_may_invite)
+and use the [`get_room_state`](https://github.com/matrix-org/synapse/blob/872f23b95fa980a61b0866c1475e84491991fa20/synapse/module_api/__init__.py#L869-L876)
+module API to infer whether the invite is happening while creating a room (see [this function](https://github.com/matrix-org/synapse-domain-rule-checker/blob/e7d092dd9f2a7f844928771dbfd9fd24c2332e48/synapse_domain_rule_checker/__init__.py#L56-L89)
+as an example). Alternately, modules can also implement [`on_create_room`](https://matrix-org.github.io/synapse/latest/modules/third_party_rules_callbacks.html#on_create_room).
 
 
 # Upgrading to v1.52.0
