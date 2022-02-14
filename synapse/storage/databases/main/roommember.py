@@ -543,7 +543,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                     AND {clause}
             """
         else:
-            sql = """
+            sql = f"""
                 SELECT c.state_key, room_id, e.instance_name, e.stream_ordering
                 FROM current_state_events AS c
                 INNER JOIN room_memberships AS m USING (room_id, event_id)
