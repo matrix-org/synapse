@@ -62,5 +62,8 @@ class ExperimentalConfig(Config):
             "msc2409_to_device_messages_enabled", False
         )
 
+        # MSC3706 (server-side support for partial state in /send_join responses)
+        self.msc3706_enabled: bool = experimental.get("msc3706_enabled", False)
+
         # MSC3720 (Account status endpoint)
         self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)

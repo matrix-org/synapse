@@ -334,12 +334,11 @@ class MatrixFederationHttpClient:
         user_agent = hs.version_string
         if hs.config.server.user_agent_suffix:
             user_agent = "%s %s" % (user_agent, hs.config.server.user_agent_suffix)
-        user_agent = user_agent.encode("ascii")
 
         federation_agent = MatrixFederationAgent(
             self.reactor,
             tls_client_options_factory,
-            user_agent,
+            user_agent.encode("ascii"),
             hs.config.server.federation_ip_range_whitelist,
             hs.config.server.federation_ip_range_blacklist,
         )
