@@ -117,6 +117,7 @@ Formerly, entries in the cache were not evicted regardless of whether they were 
 This behavior has now changed. By default entries in the cache are now evicted after 30m of not being accessed. 
 To change the default behavior, go to the `caches` section of the config and change the `expire_caches` and 
 `cache_entry_ttl` flags as necessary. Please note that these flags replace the `expiry_time` flag in the config.  
+The `expiry_time` flag will still continue to work, but it has been deprecated and will be removed in the future.
 
 ## Deprecation of `capability` `org.matrix.msc3283.*`
 
@@ -128,7 +129,7 @@ The old `capabilities`
 - `org.matrix.msc3283.set_avatar_url` and
 - `org.matrix.msc3283.3pid_changes`
 
-are deprecated and scheduled to be removed in Synapse v1.(next+1).0.
+are deprecated and scheduled to be removed in Synapse v1.54.0.
 
 The new `capabilities`
 - `m.set_displayname`,
