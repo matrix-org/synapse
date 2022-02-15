@@ -43,6 +43,8 @@ class SearchHandler:
         self.state_store = self.storage.state
         self.auth = hs.get_auth()
 
+        self._msc3666_enabled = hs.config.experimental.msc3666_enabled
+
     async def get_old_rooms_from_upgraded_room(self, room_id: str) -> Iterable[str]:
         """Retrieves room IDs of old rooms in the history of an upgraded room.
 
@@ -238,8 +240,6 @@ class SearchHandler:
 
             results = search_result["results"]
 
-            results_map = {r["event"].event_id: r for r in results}
-
             rank_map.update({r["event"].event_id: r["rank"] for r in results})
 
             filtered_events = await search_filter.filter([r["event"] for r in results])
@@ -420,12 +420,29 @@ class SearchHandler:
 
         time_now = self.clock.time_msec()
 
+        aggregations = None
+        if self._msc3666_enabled:
+            aggregations = await self.store.get_bundled_aggregations(
+                # Generate an iterable of EventBase for all the events that will be
+                # returned, including contextual events.
+                itertools.chain(
+                    # The events_before and events_after for each context.
+                    itertools.chain.from_iterable(
+                        itertools.chain(context["events_before"], context["events_after"])  # type: ignore[arg-type]
+                        for context in contexts.values()
+                    ),
+                    # The returned events.
+                    allowed_events,
+                ),
+                user.to_string(),
+            )
+
         for context in contexts.values():
             context["events_before"] = self._event_serializer.serialize_events(
-                context["events_before"], time_now  # type: ignore[arg-type]
+                context["events_before"], time_now, bundle_aggregations=aggregations  # type: ignore[arg-type]
             )
             context["events_after"] = self._event_serializer.serialize_events(
-                context["events_after"], time_now  # type: ignore[arg-type]
+                context["events_after"], time_now, bundle_aggregations=aggregations  # type: ignore[arg-type]
             )
 
         state_results = {}
@@ -442,7 +459,9 @@ class SearchHandler:
             results.append(
                 {
                     "rank": rank_map[e.event_id],
-                    "result": self._event_serializer.serialize_event(e, time_now),
+                    "result": self._event_serializer.serialize_event(
+                        e, time_now, bundle_aggregations=aggregations
+                    ),
                     "context": contexts.get(e.event_id, {}),
                 }
             )

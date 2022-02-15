@@ -57,7 +57,7 @@ class SQLBaseStore(metaclass=ABCMeta):
         pass
 
     def _invalidate_state_caches(
-        self, room_id: str, members_changed: Iterable[str]
+        self, room_id: str, members_changed: Collection[str]
     ) -> None:
         """Invalidates caches that are based on the current state, but does
         not stream invalidations down replication.
@@ -66,11 +66,16 @@ class SQLBaseStore(metaclass=ABCMeta):
             room_id: Room where state changed
             members_changed: The user_ids of members that have changed
         """
+        # If there were any membership changes, purge the appropriate caches.
         for host in {get_domain_from_id(u) for u in members_changed}:
             self._attempt_to_invalidate_cache("is_host_joined", (room_id, host))
+        if members_changed:
+            self._attempt_to_invalidate_cache("get_users_in_room", (room_id,))
+            self._attempt_to_invalidate_cache(
+                "get_users_in_room_with_profiles", (room_id,)
+            )
 
-        self._attempt_to_invalidate_cache("get_users_in_room", (room_id,))
-        self._attempt_to_invalidate_cache("get_users_in_room_with_profiles", (room_id,))
+        # Purge other caches based on room state.
         self._attempt_to_invalidate_cache("get_room_summary", (room_id,))
         self._attempt_to_invalidate_cache("get_current_state_ids", (room_id,))
 

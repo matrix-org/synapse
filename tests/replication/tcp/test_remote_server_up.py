@@ -14,6 +14,7 @@
 
 from typing import Tuple
 
+from twisted.internet.address import IPv4Address
 from twisted.internet.interfaces import IProtocol
 from twisted.test.proto_helpers import StringTransport
 
@@ -29,7 +30,7 @@ class RemoteServerUpTestCase(HomeserverTestCase):
     def _make_client(self) -> Tuple[IProtocol, StringTransport]:
         """Create a new direct TCP replication connection"""
 
-        proto = self.factory.buildProtocol(("127.0.0.1", 0))
+        proto = self.factory.buildProtocol(IPv4Address("TCP", "127.0.0.1", 0))
         transport = StringTransport()
         proto.makeConnection(transport)
 
