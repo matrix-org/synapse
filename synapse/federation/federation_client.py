@@ -53,10 +53,11 @@ from synapse.api.room_versions import (
     RoomVersion,
     RoomVersions,
 )
+from synapse.api.urls import FEDERATION_UNSTABLE_PREFIX
 from synapse.events import EventBase, builder
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.transport.client import SendJoinResponse
-from synapse.types import JsonDict, get_domain_from_id
+from synapse.types import JsonDict, UserID, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.retryutils import NotRetryingDestination
@@ -1525,6 +1526,54 @@ class FederationClient(FederationBase):
             return TimestampToEventResponse.from_json_dict(remote_response)
         except ValueError as e:
             raise InvalidResponseError(str(e))
+
+    async def get_account_status(
+        self, destination: str, user_ids: List[str]
+    ) -> Tuple[JsonDict, List[str]]:
+        """Retrieves account statuses for a given list of users on a given remote
+        homeserver.
+
+        If the request fails for any reason, all user IDs for this destination are marked
+        as failed.
+
+        Args:
+            destination: the destination to contact
+            user_ids: the user ID(s) for which to request account status(es)
+
+        Returns:
+            The account statuses, as well as the list of user IDs for which it was not
+            possible to retrieve a status.
+        """
+        try:
+            res = await self.transport_layer.make_query(
+                destination=destination,
+                query_type="account_status",
+                args={"user_id": user_ids},
+                retry_on_dns_fail=True,
+                prefix=FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc3720",
+            )
+        except Exception:
+            # If the query failed for any reason, mark all the users as failed.
+            return {}, user_ids
+
+        statuses = res.get("account_statuses", {})
+        failures = res.get("failures", [])
+
+        if not isinstance(statuses, dict) or not isinstance(failures, list):
+            # Make sure we're not feeding back malformed data back to the caller.
+            logger.warning(
+                "Destination %s responded with malformed data to account_status query",
+                destination,
+            )
+            return {}, user_ids
+
+        for user_id in user_ids:
+            # Any account whose status is missing is a user we failed to receive the
+            # status of.
+            if user_id not in statuses:
+                failures.append(user_id)
+
+        return statuses, failures
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)
