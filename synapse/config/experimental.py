@@ -61,3 +61,6 @@ class ExperimentalConfig(Config):
         self.msc2409_to_device_messages_enabled: bool = experimental.get(
             "msc2409_to_device_messages_enabled", False
         )
+
+        # MSC3720 (Account status endpoint)
+        self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)
