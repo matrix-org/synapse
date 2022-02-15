@@ -325,13 +325,7 @@ class SearchHandler:
             # We should never get here due to the guard earlier.
             raise NotImplementedError()
 
-        count = search_result.count
-        rank_map = search_result.rank_map
-        allowed_events = search_result.allowed_events
-        room_groups = search_result.room_groups
-        highlights = search_result.highlights
-
-        logger.info("Found %d events to return", len(allowed_events))
+        logger.info("Found %d events to return", len(search_result.allowed_events))
 
         # If client has asked for "context" for each event (i.e. some surrounding
         # events and state), fetch that
@@ -341,7 +335,11 @@ class SearchHandler:
             assert after_limit is not None
 
             contexts = await self._calculate_event_contexts(
-                user, allowed_events, before_limit, after_limit, include_profile
+                user,
+                search_result.allowed_events,
+                before_limit,
+                after_limit,
+                include_profile,
             )
         else:
             contexts = {}
@@ -350,7 +348,7 @@ class SearchHandler:
 
         state_results = {}
         if include_state:
-            for room_id in {e.room_id for e in allowed_events}:
+            for room_id in {e.room_id for e in search_result.allowed_events}:
                 state = await self.state_handler.get_current_state(room_id)
                 state_results[room_id] = list(state.values())
 
@@ -371,7 +369,7 @@ class SearchHandler:
                         for context in contexts.values()
                     ),
                     # The returned events.
-                    allowed_events,
+                    search_result.allowed_events,
                 ),
                 user.to_string(),
             )
@@ -386,19 +384,19 @@ class SearchHandler:
 
         results = [
             {
-                "rank": rank_map[e.event_id],
+                "rank": search_result.rank_map[e.event_id],
                 "result": self._event_serializer.serialize_event(
                     e, time_now, bundle_aggregations=aggregations
                 ),
                 "context": contexts.get(e.event_id, {}),
             }
-            for e in allowed_events
+            for e in search_result.allowed_events
         ]
 
         rooms_cat_res: JsonDict = {
             "results": results,
-            "count": count,
-            "highlights": list(highlights),
+            "count": search_result.count,
+            "highlights": list(search_result.highlights),
         }
 
         if state_results:
@@ -407,8 +405,10 @@ class SearchHandler:
                 for room_id, state_events in state_results.items()
             }
 
-        if room_groups and "room_id" in group_keys:
-            rooms_cat_res.setdefault("groups", {})["room_id"] = room_groups
+        if search_result.room_groups and "room_id" in group_keys:
+            rooms_cat_res.setdefault("groups", {})[
+                "room_id"
+            ] = search_result.room_groups
 
         if sender_group and "sender" in group_keys:
             rooms_cat_res.setdefault("groups", {})["sender"] = sender_group
