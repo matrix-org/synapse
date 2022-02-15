@@ -404,6 +404,9 @@ class PreviewUrlResource(DirectServeJsonResource):
                 max_size=self.max_spider_size,
                 headers={
                     b"Accept-Language": self.url_preview_accept_language,
+                    # Use a custom user agent for the preview because some sites will only return
+                    # openGraph metadata to crawler user agents. We specifically omit the version
+                    # string to avoid leaking the this information.
                     b"User-Agent": [
                         "Synapse (bot; +https://github.com/matrix-org/synapse)"
                     ],
