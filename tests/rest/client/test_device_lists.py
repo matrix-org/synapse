@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest.mock import Mock
-
 from synapse.rest import admin, devices, room, sync
 from synapse.rest.client import account, login, register
 
@@ -51,16 +49,6 @@ class DeviceListsTestCase(unittest.HomeserverTestCase):
             alice_user_id, is_public=True, tok=alice_access_token
         )
         self.assertIsNotNone(new_room_id)
-
-        # Pretend that Bob joined this room on a previous homeserver startup.
-        #
-        # There is a quirk; if Bob has joined the room since the last homeserver
-        # restart, then an additional mechanism is employed to ensure Bob will start
-        # receiving device list updates for that room.
-        # In order to test the case where Bob has previously been joined to the room,
-        # instead of restarting Synapse, we can just stub out the notifier machinery
-        # that is triggered when a user joins a room.
-        self.hs.get_notifier()._user_joined_room = Mock(return_value=None)
 
         # Have Bob join the room
         self.helper.invite(
