@@ -16,6 +16,7 @@ import itertools
 import logging
 from typing import TYPE_CHECKING, Collection, Dict, Iterable, List, Optional, Set, Tuple
 
+import attr
 from unpaddedbase64 import decode_base64, encode_base64
 
 from synapse.api.constants import EventTypes, Membership
@@ -30,6 +31,20 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _SearchResult:
+    # The count of results.
+    count: int
+    # A mapping of event ID to the rank of that event.
+    rank_map: Dict[str, int]
+    # A list of the resulting events.
+    allowed_events: List[EventBase]
+    # A map of room ID to results.
+    room_groups: Dict[str, JsonDict]
+    # A set of event IDs to highlight.
+    highlights: Set[str]
 
 
 class SearchHandler:
@@ -288,28 +303,13 @@ class SearchHandler:
         sender_group: Optional[Dict[str, JsonDict]]
 
         if order_by == "rank":
-            (
-                count,
-                rank_map,
-                allowed_events,
-                room_groups,
-                highlights,
-                sender_group,
-            ) = await self._search_by_rank(
+            search_result, sender_group = await self._search_by_rank(
                 user, room_ids, search_term, keys, search_filter
             )
             # Unused return values for rank search.
             global_next_batch = None
-
         elif order_by == "recent":
-            (
-                count,
-                rank_map,
-                allowed_events,
-                room_groups,
-                highlights,
-                global_next_batch,
-            ) = await self._search_by_recent(
+            search_result, global_next_batch = await self._search_by_recent(
                 user,
                 room_ids,
                 search_term,
@@ -321,10 +321,15 @@ class SearchHandler:
             )
             # Unused return values for recent search.
             sender_group = None
-
         else:
             # We should never get here due to the guard earlier.
             raise NotImplementedError()
+
+        count = search_result.count
+        rank_map = search_result.rank_map
+        allowed_events = search_result.allowed_events
+        room_groups = search_result.room_groups
+        highlights = search_result.highlights
 
         logger.info("Found %d events to return", len(allowed_events))
 
@@ -420,14 +425,7 @@ class SearchHandler:
         search_term: str,
         keys: Iterable[str],
         search_filter: Filter,
-    ) -> Tuple[
-        int,
-        Dict[str, int],
-        List[EventBase],
-        Dict[str, JsonDict],
-        Set[str],
-        Dict[str, JsonDict],
-    ]:
+    ) -> Tuple[_SearchResult, Dict[str, JsonDict]]:
         """
         Performs a full text search for a user ordering by rank.
 
@@ -441,11 +439,7 @@ class SearchHandler:
 
         Returns:
             A tuple of:
-                The count of results.
-                A mapping of event ID to the rank of that event.
-                A list of the resulting events.
-                A map of room ID to results.
-                A set of event IDs to highlight.
+                The search results.
                 A map of sender ID to results.
         """
         rank_map = {}  # event_id -> rank of event
@@ -487,11 +481,13 @@ class SearchHandler:
             s["results"].append(e.event_id)
 
         return (
-            search_result["count"],
-            rank_map,
-            allowed_events,
-            room_groups,
-            highlights,
+            _SearchResult(
+                search_result["count"],
+                rank_map,
+                allowed_events,
+                room_groups,
+                highlights,
+            ),
             sender_group,
         )
 
@@ -505,14 +501,7 @@ class SearchHandler:
         batch_group: Optional[str],
         batch_group_key: Optional[str],
         batch_token: Optional[str],
-    ) -> Tuple[
-        int,
-        Dict[str, int],
-        List[EventBase],
-        Dict[str, JsonDict],
-        Set[str],
-        Optional[str],
-    ]:
+    ) -> Tuple[_SearchResult, Optional[str]]:
         """
         Performs a full text search for a user ordering by recent.
 
@@ -529,11 +518,7 @@ class SearchHandler:
 
         Returns:
             A tuple of:
-                The count of results.
-                A mapping of event ID to the rank of that event.
-                A list of the resulting events.
-                A map of room ID to results.
-                A set of event IDs to highlight.
+                The search results.
                 Optionally, a pagination token.
         """
         rank_map = {}  # event_id -> rank of event
@@ -619,11 +604,7 @@ class SearchHandler:
                 )
 
         return (
-            count,
-            rank_map,
-            room_events,
-            room_groups,
-            highlights,
+            _SearchResult(count, rank_map, room_events, room_groups, highlights),
             global_next_batch,
         )
 
