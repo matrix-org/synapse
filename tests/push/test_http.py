@@ -11,7 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import hashlib
+import hmac
+import json
 from unittest.mock import Mock
+
+import unpaddedbase64
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.primitives.asymmetric.x25519 import (
+    X25519PrivateKey,
+    X25519PublicKey,
+)
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from twisted.internet.defer import Deferred
 
@@ -197,6 +208,197 @@ class HTTPPusherTests(HomeserverTestCase):
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertTrue(pushers[0].last_stream_ordering > last_stream_ordering)
+
+    @override_config({"experimental_features": {"msc3013_enabled": True}})
+    def test_sends_encrypted_push(self):
+        """
+        The HTTP pusher will send an encrypted push message if the pusher
+        has been configured with a public key and the corresponding algorithm
+        """
+        private_key = "ocE2RWd/yExYEk0JCAx3100//WQkmM3syidCVFsndS0="
+        public_key = "odb+sBwaK0bZtaAqzcuFR3UVg5Wa1cW7ZMwJY1SnDng"
+
+        # Register the user who gets notified
+        user_id = self.register_user("user", "pass")
+        access_token = self.login("user", "pass")
+
+        # Register the user who sends the message
+        other_user_id = self.register_user("otheruser", "pass")
+        other_access_token = self.login("otheruser", "pass")
+
+        # Register the pusher
+        user_tuple = self.get_success(
+            self.hs.get_datastore().get_user_by_access_token(access_token)
+        )
+        token_id = user_tuple.token_id
+
+        self.get_success(
+            self.hs.get_pusherpool().add_pusher(
+                user_id=user_id,
+                access_token=token_id,
+                kind="http",
+                app_id="m.http",
+                app_display_name="HTTP Push Notifications",
+                device_display_name="pushy push",
+                pushkey="a@example.com",
+                lang=None,
+                data={
+                    "url": "http://example.com/_matrix/push/v1/notify",
+                    "algorithm": "com.famedly.curve25519-aes-sha2",
+                    "public_key": public_key,
+                },
+            )
+        )
+
+        # Create a room
+        room = self.helper.create_room_as(user_id, tok=access_token)
+
+        # The other user joins
+        self.helper.join(room=room, user=other_user_id, tok=other_access_token)
+
+        # The other user sends some messages
+        self.helper.send(room, body="Foxes are cute!", tok=other_access_token)
+
+        # Advance time a bit, so the pusher will register something has happened
+        self.pump()
+
+        # Make the push succeed
+        self.push_attempts[0][0].callback({})
+        self.pump()
+
+        # One push was attempted to be sent -- it'll be the first message
+        self.assertEqual(len(self.push_attempts), 1)
+        self.assertEqual(
+            self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
+        )
+        self.assertEqual(
+            self.push_attempts[0][2]["notification"]["devices"][0]["data"]["algorithm"],
+            "com.famedly.curve25519-aes-sha2",
+        )
+        ephemeral = unpaddedbase64.decode_base64(
+            self.push_attempts[0][2]["notification"]["ephemeral"]
+        )
+        mac = unpaddedbase64.decode_base64(
+            self.push_attempts[0][2]["notification"]["mac"]
+        )
+        ciphertext = unpaddedbase64.decode_base64(
+            self.push_attempts[0][2]["notification"]["ciphertext"]
+        )
+
+        # do the exchange
+        exchanged = X25519PrivateKey.from_private_bytes(
+            unpaddedbase64.decode_base64(private_key)
+        ).exchange(X25519PublicKey.from_public_bytes(ephemeral))
+        # expand with HKDF
+        zerosalt = bytes([0] * 32)
+        prk = hmac.new(zerosalt, exchanged, hashlib.sha256).digest()
+        aes_key = hmac.new(prk, bytes([1]), hashlib.sha256).digest()
+        mac_key = hmac.new(prk, aes_key + bytes([2]), hashlib.sha256).digest()
+        aes_iv = hmac.new(prk, mac_key + bytes([3]), hashlib.sha256).digest()[0:16]
+        # create the cleartext with AES-CBC-256
+        decryptor = Cipher(algorithms.AES(aes_key), modes.CBC(aes_iv)).decryptor()
+        # AES blocksize is always 128 bits
+        unpadder = padding.PKCS7(128).unpadder()
+        cleartext = json.loads(
+            (
+                unpadder.update(decryptor.update(ciphertext) + decryptor.finalize())
+                + unpadder.finalize()
+            ).decode("utf-8")
+        )
+        # create the mac
+        calculated_mac = hmac.new(mac_key, ciphertext, hashlib.sha256).digest()[0:8]
+
+        # test if we decrypted everything correctly
+        self.assertEqual(calculated_mac, mac)
+        self.assertEqual(cleartext["content"]["body"], "Foxes are cute!")
+
+    @override_config({"experimental_features": {"msc3013_enabled": True}})
+    def tests_encrypted_push_counts_only_none(self):
+        """
+        The HTTP pusher will not add any extra fields to encrypted push frames if the counts_only_type
+        is none.
+        """
+        # Set up the counts-only push
+        self._test_push_unread_count(
+            pusher_data={
+                "url": "http://example.com/_matrix/push/v1/notify",
+                "algorithm": "com.famedly.curve25519-aes-sha2",
+                "public_key": "odb+sBwaK0bZtaAqzcuFR3UVg5Wa1cW7ZMwJY1SnDng",
+            },
+            perform_checks=False,
+        )
+
+        # counts-only push frame
+        self.assertEqual("counts" in self.push_attempts[1][2]["notification"], False)
+        self.assertEqual(
+            "is_counts_only" in self.push_attempts[1][2]["notification"], False
+        )
+
+        # normal push frame
+        self.assertEqual("counts" in self.push_attempts[5][2]["notification"], False)
+        self.assertEqual(
+            "is_counts_only" in self.push_attempts[5][2]["notification"], False
+        )
+
+    @override_config({"experimental_features": {"msc3013_enabled": True}})
+    def tests_encrypted_push_counts_only_boolean(self):
+        """
+        The HTTP pusher will add the is_counts_only field to encrypted push frames if the counts_only_type
+        is boolean.
+        """
+        # Set up the counts-only push
+        self._test_push_unread_count(
+            pusher_data={
+                "url": "http://example.com/_matrix/push/v1/notify",
+                "algorithm": "com.famedly.curve25519-aes-sha2",
+                "public_key": "odb+sBwaK0bZtaAqzcuFR3UVg5Wa1cW7ZMwJY1SnDng",
+                "counts_only_type": "boolean",
+            },
+            perform_checks=False,
+        )
+
+        # counts-only push frame
+        self.assertEqual("counts" in self.push_attempts[1][2]["notification"], False)
+        self.assertEqual(
+            self.push_attempts[1][2]["notification"]["is_counts_only"], True
+        )
+
+        # normal push frame
+        self.assertEqual("counts" in self.push_attempts[5][2]["notification"], False)
+        self.assertEqual(
+            "is_counts_only" in self.push_attempts[5][2]["notification"], False
+        )
+
+    @override_config({"experimental_features": {"msc3013_enabled": True}})
+    def tests_encrypted_push_counts_only_full(self):
+        """
+        The HTTP pusher will add the counts dict to encrypted push frames if the counts_only_type
+        is full.
+        """
+        # Set up the counts-only push
+        self._test_push_unread_count(
+            pusher_data={
+                "url": "http://example.com/_matrix/push/v1/notify",
+                "algorithm": "com.famedly.curve25519-aes-sha2",
+                "public_key": "odb+sBwaK0bZtaAqzcuFR3UVg5Wa1cW7ZMwJY1SnDng",
+                "counts_only_type": "full",
+            },
+            perform_checks=False,
+        )
+
+        # counts-only push frame
+        self.assertEqual(
+            self.push_attempts[1][2]["notification"]["counts"]["unread"], 0
+        )
+        self.assertEqual(
+            "is_counts_only" in self.push_attempts[1][2]["notification"], False
+        )
+
+        # normal push frame
+        self.assertEqual("counts" in self.push_attempts[5][2]["notification"], False)
+        self.assertEqual(
+            "is_counts_only" in self.push_attempts[5][2]["notification"], False
+        )
 
     def test_sends_high_priority_for_encrypted(self):
         """
@@ -591,7 +793,7 @@ class HTTPPusherTests(HomeserverTestCase):
             self.push_attempts[5][2]["notification"]["counts"]["unread"], 4
         )
 
-    def _test_push_unread_count(self):
+    def _test_push_unread_count(self, pusher_data=None, perform_checks=True):
         """
         Tests that the correct unread count appears in sent push notifications
 
@@ -620,6 +822,9 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         token_id = user_tuple.token_id
 
+        if pusher_data is None:
+            pusher_data = {"url": "http://example.com/_matrix/push/v1/notify"}
+
         self.get_success(
             self.hs.get_pusherpool().add_pusher(
                 user_id=user_id,
@@ -630,7 +835,7 @@ class HTTPPusherTests(HomeserverTestCase):
                 device_display_name="pushy push",
                 pushkey="a@example.com",
                 lang=None,
-                data={"url": "http://example.com/_matrix/push/v1/notify"},
+                data=pusher_data,
             )
         )
 
@@ -647,18 +852,19 @@ class HTTPPusherTests(HomeserverTestCase):
         self.push_attempts[0][0].callback({})
         self.pump()
 
-        # Check our push made it
-        self.assertEqual(len(self.push_attempts), 1)
-        self.assertEqual(
-            self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
-        )
+        if perform_checks:
+            # Check our push made it
+            self.assertEqual(len(self.push_attempts), 1)
+            self.assertEqual(
+                self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
+            )
 
-        # Check that the unread count for the room is 0
-        #
-        # The unread count is zero as the user has no read receipt in the room yet
-        self.assertEqual(
-            self.push_attempts[0][2]["notification"]["counts"]["unread"], 0
-        )
+            # Check that the unread count for the room is 0
+            #
+            # The unread count is zero as the user has no read receipt in the room yet
+            self.assertEqual(
+                self.push_attempts[0][2]["notification"]["counts"]["unread"], 0
+            )
 
         # Now set the user's read receipt position to the first event
         #
@@ -677,11 +883,12 @@ class HTTPPusherTests(HomeserverTestCase):
         self.push_attempts[1][0].callback({})
         self.pump()
 
-        # Unread count is still zero as we've read the only message in the room
-        self.assertEqual(len(self.push_attempts), 2)
-        self.assertEqual(
-            self.push_attempts[1][2]["notification"]["counts"]["unread"], 0
-        )
+        if perform_checks:
+            # Unread count is still zero as we've read the only message in the room
+            self.assertEqual(len(self.push_attempts), 2)
+            self.assertEqual(
+                self.push_attempts[1][2]["notification"]["counts"]["unread"], 0
+            )
 
         # Send another message
         self.helper.send(
@@ -692,12 +899,13 @@ class HTTPPusherTests(HomeserverTestCase):
         self.push_attempts[2][0].callback({})
         self.pump()
 
-        # This push should contain an unread count of 1 as there's now been one
-        # message since our last read receipt
-        self.assertEqual(len(self.push_attempts), 3)
-        self.assertEqual(
-            self.push_attempts[2][2]["notification"]["counts"]["unread"], 1
-        )
+        if perform_checks:
+            # This push should contain an unread count of 1 as there's now been one
+            # message since our last read receipt
+            self.assertEqual(len(self.push_attempts), 3)
+            self.assertEqual(
+                self.push_attempts[2][2]["notification"]["counts"]["unread"], 1
+            )
 
         # Since we're grouping by room, sending more messages shouldn't increase the
         # unread count, as they're all being sent in the same room

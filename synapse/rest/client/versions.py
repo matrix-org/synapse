@@ -95,6 +95,8 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc2285": self.config.experimental.msc2285_enabled,
                     # Adds support for importing historical messages as per MSC2716
                     "org.matrix.msc2716": self.config.experimental.msc2716_enabled,
+                    # Adds support for encrypted push as per MSC3013
+                    "com.famedly.msc3013": self.config.experimental.msc3013_enabled,
                     # Adds support for jump to date endpoints (/timestamp_to_event) as per MSC3030
                     "org.matrix.msc3030": self.config.experimental.msc3030_enabled,
                 },

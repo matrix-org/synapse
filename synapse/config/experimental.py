@@ -47,6 +47,9 @@ class ExperimentalConfig(Config):
         # MSC3266 (room summary api)
         self.msc3266_enabled: bool = experimental.get("msc3266_enabled", False)
 
+        # MSC3013 (encrypted push)
+        self.msc3013_enabled: bool = experimental.get("msc3013_enabled", False)
+
         # MSC3030 (Jump to date API endpoint)
         self.msc3030_enabled: bool = experimental.get("msc3030_enabled", False)
 
