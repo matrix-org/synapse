@@ -344,7 +344,7 @@ class InvalideUsersInRoomCacheTestCase(HomeserverTestCase):
         self.store = self.hs.get_datastore()
 
     def test_remote_user_cache_invalidated(self):
-        """Test that if the server leaves a room the `get_users_in_room` cache
+        """Test that if the server leaves a room the `get_rooms_for_user` cache
         is invalidated for remote users.
         """
 
@@ -379,7 +379,7 @@ class InvalideUsersInRoomCacheTestCase(HomeserverTestCase):
         context = self.get_success(self.state.compute_event_context(remote_event_1))
         self.get_success(self.persistence.persist_event(remote_event_1, context))
 
-        # Call `get_users_in_room` to add the remote user to the cache
+        # Call `get_rooms_for_user` to add the remote user to the cache
         rooms = self.get_success(self.store.get_rooms_for_user(remote_user))
         self.assertEqual(set(rooms), {room_id})
 

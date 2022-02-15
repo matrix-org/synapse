@@ -1004,8 +1004,8 @@ class PersistEventsStore:
                 """
                 txn.execute(sql, (stream_id, self._instance_name, room_id))
 
-                # We also want to invalidate the membership caches for remote
-                # users that were in the room.
+                # We also want to invalidate the membership caches for users
+                # that were in the room.
                 users_in_room = self.store.get_users_in_room_txn(txn, room_id)
                 members_changed.update(users_in_room)
 
