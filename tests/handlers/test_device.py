@@ -18,9 +18,8 @@ from typing import Optional
 
 from twisted.test.proto_helpers import MemoryReactor
 
-import synapse.api.errors
-import synapse.handlers.device
-import synapse.storage
+from synapse.api.errors import NotFoundError, SynapseError
+from synapse.handlers.device import MAX_DEVICE_DISPLAY_NAME_LEN
 from synapse.server import HomeServer
 from synapse.util import Clock
 
@@ -46,10 +45,9 @@ class DeviceTestCase(unittest.HomeserverTestCase):
             self.handler.check_device_registered(
                 user_id="@boris:foo",
                 device_id="foo",
-                initial_device_display_name="a"
-                * (synapse.handlers.device.MAX_DEVICE_DISPLAY_NAME_LEN + 1),
+                initial_device_display_name="a" * (MAX_DEVICE_DISPLAY_NAME_LEN + 1),
             ),
-            synapse.api.errors.SynapseError,
+            SynapseError,
         )
 
     def test_device_is_created_if_doesnt_exist(self) -> None:
@@ -159,9 +157,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         self.get_success(self.handler.delete_device(user1, "abc"))
 
         # check the device was deleted
-        self.get_failure(
-            self.handler.get_device(user1, "abc"), synapse.api.errors.NotFoundError
-        )
+        self.get_failure(self.handler.get_device(user1, "abc"), NotFoundError)
 
         # we'd like to check the access token was invalidated, but that's a
         # bit of a PITA.
@@ -211,13 +207,10 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         self._record_users()
 
         # Request to update a device display name with a new value that is longer than allowed.
-        update = {
-            "display_name": "a"
-            * (synapse.handlers.device.MAX_DEVICE_DISPLAY_NAME_LEN + 1)
-        }
+        update = {"display_name": "a" * (MAX_DEVICE_DISPLAY_NAME_LEN + 1)}
         self.get_failure(
             self.handler.update_device(user1, "abc", update),
-            synapse.api.errors.SynapseError,
+            SynapseError,
         )
 
         # Ensure the display name was not updated.
@@ -228,7 +221,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         update = {"display_name": "new_display"}
         self.get_failure(
             self.handler.update_device("user_id", "unknown_device_id", update),
-            synapse.api.errors.NotFoundError,
+            NotFoundError,
         )
 
     def _record_users(self) -> None:
@@ -314,7 +307,7 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
                 access_token=access_token,
                 device_id="not the right device ID",
             ),
-            synapse.api.errors.NotFoundError,
+            NotFoundError,
         )
 
         # dehydrating the right devices should succeed and change our device ID
@@ -342,7 +335,7 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         # make sure that the device ID that we were initially assigned no longer exists
         self.get_failure(
             self.handler.get_device(user_id, device_id),
-            synapse.api.errors.NotFoundError,
+            NotFoundError,
         )
 
         # make sure that there's no device available for dehydrating now
