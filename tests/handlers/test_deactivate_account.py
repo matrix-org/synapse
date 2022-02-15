@@ -39,7 +39,7 @@ class DeactivateAccountTestCase(HomeserverTestCase):
         self.user = self.register_user("user", "pass")
         self.token = self.login("user", "pass")
 
-    def _deactivate_my_account(self):
+    def _deactivate_my_account(self) -> None:
         """
         Deactivates the account `self.user` using `self.token` and asserts
         that it returns a 200 success code.
