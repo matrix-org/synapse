@@ -235,8 +235,9 @@ class TransportLayerClient:
         args: dict,
         retry_on_dns_fail: bool,
         ignore_backoff: bool = False,
+        prefix: str = FEDERATION_V1_PREFIX,
     ) -> JsonDict:
-        path = _create_v1_path("/query/%s", query_type)
+        path = _create_path(prefix, "/query/%s", query_type)
 
         return await self.client.get_json(
             destination=destination,
