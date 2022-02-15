@@ -16,7 +16,7 @@
 import logging
 import random
 from http import HTTPStatus
-from typing import TYPE_CHECKING, List, Optional, Tuple, Dict, Any
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from twisted.web.server import Request
