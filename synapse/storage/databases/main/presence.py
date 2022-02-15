@@ -64,9 +64,10 @@ class PresenceStore(PresenceBackgroundUpdateStore):
         hs: "HomeServer",
     ) -> None:
         super().__init__(database, db_conn, hs)
+        self._instance_name = hs.get_instance_name()
 
         self._can_persist_presence = (
-            hs.get_instance_name() in hs.config.worker.writers.presence
+            self._instance_name in hs.config.worker.writers.presence
         )
 
         self._presence_id_gen: AbstractStreamIdGenerator
@@ -76,7 +77,7 @@ class PresenceStore(PresenceBackgroundUpdateStore):
                 db_conn=db_conn,
                 db=database,
                 stream_name="presence_stream",
-                instance_name=self._instance_name,  # type: ignore[attr-defined]
+                instance_name=self._instance_name,
                 tables=[("presence_stream", "instance_name", "stream_id")],
                 sequence_name="presence_stream_sequence",
                 writers=hs.config.worker.writers.presence,
@@ -162,7 +163,7 @@ class PresenceStore(PresenceBackgroundUpdateStore):
                     state.last_user_sync_ts,
                     state.status_msg,
                     state.currently_active,
-                    self._instance_name,  # type: ignore[attr-defined]
+                    self._instance_name,
                 )
                 for stream_id, state in zip(stream_orderings, presence_states)
             ],
