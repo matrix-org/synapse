@@ -16,7 +16,7 @@
 import logging
 import random
 from http import HTTPStatus
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple, Dict, Any
 from urllib.parse import urlparse
 
 from twisted.web.server import Request
@@ -910,12 +910,13 @@ class AccountStatusRestServlet(RestServlet):
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await self._auth.get_user_by_req(request)
 
-        if b"user_id" not in request.args:
+        args: Dict[bytes, List[bytes]] = request.args  # type: ignore[assignment]
+        if b"user_id" not in args:
             raise SynapseError(
                 400, "Required parameter 'user_id' is missing", Codes.MISSING_PARAM
             )
 
-        user_ids: List[bytes] = request.args[b"user_id"]
+        user_ids: List[bytes] = args[b"user_id"]
         statuses, failures = await self._account_handler.get_account_statuses(
             user_ids,
             allow_remote=True,

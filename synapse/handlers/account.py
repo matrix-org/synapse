@@ -54,13 +54,14 @@ class AccountHandler:
         failures = []
         remote_users: List[UserID] = []
 
-        for raw_user_id in user_ids:
+        for user_id_bytes in user_ids:
             try:
-                user_id = UserID.from_string(raw_user_id.decode("ascii"))
+                raw_user_id = user_id_bytes.decode("ascii")
+                user_id = UserID.from_string(raw_user_id)
             except (AttributeError, SynapseError):
                 raise SynapseError(
                     400,
-                    f"Not a valid Matrix user ID: {raw_user_id}",
+                    f"Not a valid Matrix user ID: {user_id_bytes.decode('utf8')}",
                     Codes.INVALID_PARAM,
                 )
 
