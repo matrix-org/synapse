@@ -38,8 +38,7 @@ use_presence: false
 # joins a new remote room. If it is above the complexity limit, the server will
 # disallow joining, or will instantly leave.
 limit_remote_rooms:
-  # Uncomment to enable room complexity checking.
-  #enabled: true
+  enabled: true
   complexity: 3.0
 
 # Database configuration
