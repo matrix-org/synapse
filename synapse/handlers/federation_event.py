@@ -1735,9 +1735,9 @@ class FederationEventHandler:
         logger.info("/event_auth returned %i events", len(remote_events))
 
         # `event` may be returned, but we should not yet process it.
-        remote_events = (e for e in remote_events if e.event_id != event_id)
+        remote_auth_events = (e for e in remote_events if e.event_id != event_id)
 
-        await self._auth_and_persist_outliers(room_id, remote_events)
+        await self._auth_and_persist_outliers(room_id, remote_auth_events)
 
     async def _update_context_for_auth_events(
         self, event: EventBase, context: EventContext, auth_events: StateMap[EventBase]
