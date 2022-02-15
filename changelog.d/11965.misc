@@ -1,1 +1,0 @@
-Fix an import cycle in `synapse.event_auth`.

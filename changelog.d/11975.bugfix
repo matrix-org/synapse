@@ -1,1 +1,0 @@
-Require that modules register their callbacks using keyword arguments.
