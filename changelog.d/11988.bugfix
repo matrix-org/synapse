@@ -1,1 +1,0 @@
-Fix a long-standing bug where `M_WRONG_ROOM_KEYS_VERSION` errors would not include the specced `current_version` field.
