@@ -16,7 +16,7 @@
 import logging
 import random
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from twisted.web.server import Request
@@ -894,6 +894,36 @@ class WhoamiRestServlet(RestServlet):
         return 200, response
 
 
+class AccountStatusRestServlet(RestServlet):
+    PATTERNS = client_patterns(
+        "/org.matrix.msc3720/account_status$", unstable=True, releases=()
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastore()
+        self._is_mine = hs.is_mine
+        self._federation_client = hs.get_federation_client()
+        self._account_handler = hs.get_account_handler()
+
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        await self._auth.get_user_by_req(request)
+
+        if b"user_id" not in request.args:
+            raise SynapseError(
+                400, "Required parameter 'user_id' is missing", Codes.MISSING_PARAM
+            )
+
+        user_ids: List[bytes] = request.args[b"user_id"]
+        statuses, failures = await self._account_handler.get_account_statuses(
+            user_ids,
+            allow_remote=True,
+        )
+
+        return 200, {"account_statuses": statuses, "failures": failures}
+
+
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     EmailPasswordRequestTokenRestServlet(hs).register(http_server)
     PasswordRestServlet(hs).register(http_server)
@@ -908,3 +938,6 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ThreepidUnbindRestServlet(hs).register(http_server)
     ThreepidDeleteRestServlet(hs).register(http_server)
     WhoamiRestServlet(hs).register(http_server)
+
+    if hs.config.experimental.msc3720_enabled:
+        AccountStatusRestServlet(hs).register(http_server)
