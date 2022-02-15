@@ -352,11 +352,6 @@ class SearchHandler:
                 state = await self.state_handler.get_current_state(room_id)
                 state_results[room_id] = list(state.values())
 
-        # We're now about to serialize the events. We should not make any
-        # blocking calls after this. Otherwise the 'age' will be wrong
-
-        time_now = self.clock.time_msec()
-
         aggregations = None
         if self._msc3666_enabled:
             aggregations = await self.store.get_bundled_aggregations(
@@ -373,6 +368,11 @@ class SearchHandler:
                 ),
                 user.to_string(),
             )
+
+        # We're now about to serialize the events. We should not make any
+        # blocking calls after this. Otherwise, the 'age' will be wrong.
+
+        time_now = self.clock.time_msec()
 
         for context in contexts.values():
             context["events_before"] = self._event_serializer.serialize_events(
