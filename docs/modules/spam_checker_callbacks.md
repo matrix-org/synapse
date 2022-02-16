@@ -176,9 +176,9 @@ async def check_username_for_spam(user_profile: Dict[str, str]) -> bool
 ```
 
 Called when computing search results in the user directory. The module must return a
-`bool` indicating whether the given user profile can appear in search results. Return
-`True` to indicate that the user is spammy and exclude them from search results;
-otherwise return `False`.
+`bool` indicating whether the given user should be excluded from user directory 
+searches. Return `True` to indicate that the user is spammy and exclude them from 
+search results; otherwise return `False`.
 
 The profile is represented as a dictionary with the following keys:
 
@@ -239,8 +239,8 @@ async def check_media_file_for_spam(
 ```
 
 Called when storing a local or remote file. The module must return a `bool` indicating
-whether the given file can be stored in the homeserver's media store. Return `False` if 
-to prevent this file from being stored; otherwise return `True`.
+whether the given file should be excluded from the homeserver's media store. Return
+`True` to prevent this file from being stored; otherwise return `False`.
 
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `False`, Synapse falls through to the next one. The value of the first
