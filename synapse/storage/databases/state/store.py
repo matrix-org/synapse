@@ -252,7 +252,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         return state_filter.filter_state(state_dict_ids), not missing_types
 
     def _get_state_for_group_gather_inflight_requests(
-        self, group: int, state_filter: StateFilter
+        self, group: int, state_filter_left_over: StateFilter
     ) -> Tuple[Sequence[AbstractObservableDeferred[StateMap[str]]], StateFilter]:
         """
         Attempts to gather in-flight requests and re-use them to retrieve state
@@ -267,18 +267,19 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         inflight_requests = self._state_group_inflight_requests.get(group)
         if inflight_requests is None:
             # no requests for this group, need to retrieve it all ourselves
-            return (), state_filter
+            return (), state_filter_left_over
 
-        state_filter_left_over = state_filter
         # The list of ongoing requests which will help narrow the current request.
         reusable_requests = []
         for (request_state_filter, request_deferred) in inflight_requests.items():
             new_state_filter_left_over = state_filter_left_over.approx_difference(
                 request_state_filter
             )
-            if new_state_filter_left_over != state_filter_left_over:
-                # reusing this request narrows our StateFilter down a bit.
-                reusable_requests.append(request_deferred)
+            if new_state_filter_left_over == state_filter_left_over:
+                # Reusing this request would not gain us anything, so don't bother.
+                continue
+
+            reusable_requests.append(request_deferred)
             state_filter_left_over = new_state_filter_left_over
             if state_filter_left_over == StateFilter.none():
                 # we have managed to collect enough of the in-flight requests
