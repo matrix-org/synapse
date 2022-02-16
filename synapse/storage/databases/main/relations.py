@@ -489,7 +489,7 @@ class RelationsWorkerStore(SQLBaseStore):
             # TODO Should this only allow m.room.message events.
             if isinstance(self.database_engine, PostgresEngine):
                 # The `DISTINCT ON` clause will pick the *first* row it encounters,
-                # so ordering by topologica ordering + stream ordering desc will
+                # so ordering by topological ordering + stream ordering desc will
                 # ensure we get the latest event in the thread.
                 sql = """
                     SELECT DISTINCT ON (parent.event_id) parent.event_id, child.event_id FROM events AS child
