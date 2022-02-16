@@ -429,13 +429,15 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         if not incomplete_groups:
             return state
 
+        incomplete_groups_list = list(incomplete_groups)
+
         results_from_requests = await yieldable_gather_results(
             self._get_state_for_group_using_inflight_cache,
-            incomplete_groups,
+            incomplete_groups_list,
             state_filter,
         )
 
-        for group, group_result in zip(incomplete_groups, results_from_requests):
+        for group, group_result in zip(incomplete_groups_list, results_from_requests):
             state[group] = group_result
 
         return state
