@@ -64,13 +64,13 @@ class PresenceStore(PresenceBackgroundUpdateStore):
         hs: "HomeServer",
     ) -> None:
         super().__init__(database, db_conn, hs)
+
         self._instance_name = hs.get_instance_name()
+        self._presence_id_gen: AbstractStreamIdGenerator
 
         self._can_persist_presence = (
             self._instance_name in hs.config.worker.writers.presence
         )
-
-        self._presence_id_gen: AbstractStreamIdGenerator
 
         if isinstance(database.engine, PostgresEngine):
             self._presence_id_gen = MultiWriterIdGenerator(
