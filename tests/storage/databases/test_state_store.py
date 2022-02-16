@@ -85,6 +85,16 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
         d.callback(result)
 
     def test_duplicate_requests_deduplicated(self) -> None:
+        """
+        Tests that duplicate requests for state are deduplicated.
+
+        This test:
+        - requests some state (state group 42, 'all' state filter)
+        - requests it again, before the first request finishes
+        - checks to see that only one database query was made
+        - completes the database query
+        - checks that both requests see the same retrieved state
+        """
         req1 = ensureDeferred(
             self.state_datastore._get_state_for_group_using_inflight_cache(
                 42, StateFilter.all()
