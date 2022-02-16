@@ -270,6 +270,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             return (), state_filter
 
         state_filter_left_over = state_filter
+        # The list of ongoing requests which will help narrow the current request.
         reusable_requests = []
         for (
             request_state_filter,
