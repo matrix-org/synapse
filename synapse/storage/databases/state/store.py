@@ -272,10 +272,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         state_filter_left_over = state_filter
         # The list of ongoing requests which will help narrow the current request.
         reusable_requests = []
-        for (
-            request_state_filter,
-            request_deferred,
-        ) in inflight_requests.items():
+        for (request_state_filter, request_deferred) in inflight_requests.items():
             new_state_filter_left_over = state_filter_left_over.approx_difference(
                 request_state_filter
             )
