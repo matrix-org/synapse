@@ -180,8 +180,7 @@ Called when computing search results in the user directory. The module must retu
 `True` to indicate that the user is spammy and exclude them user from search results;
 otherwise return `False`.
 
-The profile
-is represented as a dictionary with the following keys:
+The profile is represented as a dictionary with the following keys:
 
 * `user_id`: The Matrix ID for this user.
 * `display_name`: The user's display name.
