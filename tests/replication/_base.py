@@ -52,7 +52,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         self.streamer = hs.get_replication_streamer()
 
         # Fake in memory Redis server that servers can connect to.
-        self._redis_protocols = []
+        self._redis_transports = []
         self._redis_server = FakeRedisPubSubServer()
 
         # We may have an attempt to connect to redis for the external cache already.
@@ -112,15 +112,33 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         return TestReplicationDataHandler(self.worker_hs)
 
     def reconnect(self):
-        pass
-        # self.disconnect()
-        # self.connect_any_redis_attempts()
+        self.disconnect()
+
+        # TODO: The following fail as nothing has called on
+        # `clientConnectionLost` on the factories. I can't figure out *what* is
+        # meant to call them though. The `txredisapi.HiRedisProtocol` doesn't
+        # seem to do it, but I don't know if it's *meant* to.
+        #
+        # (...time passes...)
+        #
+        # After some spelunking it appears that `connectTCP` creates an
+        # `IConnector`, which is responsible for calling the factory
+        # `clientConnectionLost`. The reconnecting factory then calls
+        # `IConnector.connect` to attempt a reconnection. The transport is meant
+        # to call `connectionLost` on the `IConnector`. So I *think* we need to
+        # make a `FakeConnector` and pass that to `FakeTransport`?
+        self.hs.get_replication_command_handler()._factory.retry()
+        self.worker_hs.get_replication_command_handler()._factory.retry()
+
+        self.connect_any_redis_attempts()
 
     def disconnect(self):
-        pass
-        # for client_protocol, server_protocol in self._redis_protocols:
-        #     client_protocol.loseConnection()
-        #     server_protocol.loseConnection()
+        for (
+            client_to_server_transport,
+            server_to_client_transport,
+        ) in self._redis_transports:
+            client_to_server_transport.loseConnection()
+            server_to_client_transport.loseConnection()
 
     def replicate(self):
         """Tell the master side of replication that something has happened, and then
@@ -218,9 +236,6 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
             client_protocol = client_factory.buildProtocol(None)
             server_protocol = self._redis_server.buildProtocol(None)
 
-            # Store for potentially disconnecting.
-            self._redis_protocols.append((client_protocol, server_protocol))
-
             client_to_server_transport = FakeTransport(
                 server_protocol, self.reactor, client_protocol
             )
@@ -230,6 +245,11 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
                 client_protocol, self.reactor, server_protocol
             )
             server_protocol.makeConnection(server_to_client_transport)
+
+            # Store for potentially disconnecting.
+            self._redis_transports.append(
+                (client_to_server_transport, server_to_client_transport)
+            )
 
 
 class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):

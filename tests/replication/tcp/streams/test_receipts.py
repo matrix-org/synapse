@@ -28,7 +28,7 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
         return Mock(wraps=super()._build_replication_data_handler())
 
     def test_receipt(self):
-        self.reconnect()
+        # self.reconnect()
 
         # tell the master to send a new receipt
         self.get_success(
