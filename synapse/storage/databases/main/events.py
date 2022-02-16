@@ -2152,6 +2152,23 @@ class PersistEventsStore:
 
             state_groups[event.event_id] = context.state_group
 
+        # if we have partial state for these events, record the fact. (This happens
+        # here rather than in _store_event_txn because it also needs to happen when
+        # we de-outlier an event.)
+        self.db_pool.simple_insert_many_txn(
+            txn,
+            table="partial_state_events",
+            keys=("room_id", "event_id"),
+            values=[
+                (
+                    event.room_id,
+                    event.event_id,
+                )
+                for event, ctx in events_and_contexts
+                if ctx.partial_state
+            ],
+        )
+
         self.db_pool.simple_upsert_many_txn(
             txn,
             table="event_to_state_groups",
