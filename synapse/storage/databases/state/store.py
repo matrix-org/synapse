@@ -258,6 +258,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         Attempts to gather in-flight requests and re-use them to retrieve state
         for the given state group, filtered with the given state filter.
 
+        Used as part of _get_state_for_group_using_inflight_cache.
+
         Returns:
             Tuple of two values:
                 A sequence of ObservableDeferreds to observe
@@ -297,6 +299,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         This request will be tracked in the in-flight request cache and automatically
         removed when it is finished.
+
+        Used as part of _get_state_for_group_using_inflight_cache.
 
         Args:
             group: ID of the state group for which we want to get state
@@ -349,6 +353,11 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         """
         Gets the state at a state group, potentially filtering by type and/or
         state key.
+
+        1. Calls _get_state_for_group_gather_inflight_requests to gather any
+           ongoing requests which might overlap with the current request.
+        2. Fires a new request, using _get_state_for_group_fire_request,
+           for any state which cannot be gathered from ongoing requests.
 
         Args:
             group: ID of the state group for which we want to get state
