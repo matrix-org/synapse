@@ -1,0 +1,1 @@
+Remove support for the legacy structured logging configuration (using `structured: true` in the Synapse configuration).
