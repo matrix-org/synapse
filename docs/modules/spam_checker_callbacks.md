@@ -50,7 +50,7 @@ context of a room creation.
 
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `True`, Synapse falls through to the next one. The value of the first
-callback that does not return `True` will be used. If this happens, Synapse will not call 
+callback that does not return `True` will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.
 
 ### `user_may_invite`
@@ -64,7 +64,7 @@ async def user_may_invite(inviter: str, invitee: str, room_id: str) -> bool
 Called when processing an invitation. The module must return a `bool` indicating whether
 the inviter can invite the invitee to the given room. Both inviter and invitee are
 represented by their Matrix user ID (e.g. `@alice:example.com`). Return `False` to prevent
-the invitation; otherwise return `True` to permit it;
+the invitation; otherwise return `True` to permit it.
 
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `True`, Synapse falls through to the next one. The value of the first
@@ -177,7 +177,7 @@ async def check_username_for_spam(user_profile: Dict[str, str]) -> bool
 
 Called when computing search results in the user directory. The module must return a
 `bool` indicating whether the given user profile can appear in search results. Return
-`True` to indicate that the user is spammy and exclude them user from search results;
+`True` to indicate that the user is spammy and exclude them from search results;
 otherwise return `False`.
 
 The profile is represented as a dictionary with the following keys:
