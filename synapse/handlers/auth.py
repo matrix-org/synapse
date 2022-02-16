@@ -2064,6 +2064,10 @@ GET_USERNAME_FOR_REGISTRATION_CALLBACK = Callable[
     [JsonDict, JsonDict],
     Awaitable[Optional[str]],
 ]
+GET_DISPLAY_NAME_FOR_REGISTRATION_CALLBACK = Callable[
+    [JsonDict, JsonDict],
+    Awaitable[Optional[str]],
+]
 IS_3PID_ALLOWED_CALLBACK = Callable[[str, str, bool], Awaitable[bool]]
 
 
@@ -2079,6 +2083,9 @@ class PasswordAuthProvider:
         self.on_logged_out_callbacks: List[ON_LOGGED_OUT_CALLBACK] = []
         self.get_username_for_registration_callbacks: List[
             GET_USERNAME_FOR_REGISTRATION_CALLBACK
+        ] = []
+        self.get_display_name_for_registration_callbacks: List[
+            GET_DISPLAY_NAME_FOR_REGISTRATION_CALLBACK
         ] = []
         self.is_3pid_allowed_callbacks: List[IS_3PID_ALLOWED_CALLBACK] = []
 
@@ -2098,6 +2105,9 @@ class PasswordAuthProvider:
         ] = None,
         get_username_for_registration: Optional[
             GET_USERNAME_FOR_REGISTRATION_CALLBACK
+        ] = None,
+        get_display_name_for_registration: Optional[
+            GET_DISPLAY_NAME_FOR_REGISTRATION_CALLBACK
         ] = None,
     ) -> None:
         # Register check_3pid_auth callback
@@ -2146,6 +2156,11 @@ class PasswordAuthProvider:
         if get_username_for_registration is not None:
             self.get_username_for_registration_callbacks.append(
                 get_username_for_registration,
+            )
+
+        if get_display_name_for_registration is not None:
+            self.get_display_name_for_registration_callbacks.append(
+                get_display_name_for_registration,
             )
 
         if is_3pid_allowed is not None:
@@ -2344,6 +2359,49 @@ class PasswordAuthProvider:
             except Exception as e:
                 logger.error(
                     "Module raised an exception in get_username_for_registration: %s",
+                    e,
+                )
+                raise SynapseError(code=500, msg="Internal Server Error")
+
+        return None
+
+    async def get_display_name_for_registration(
+        self,
+        uia_results: JsonDict,
+        params: JsonDict,
+    ) -> Optional[str]:
+        """Defines the profile information to use when registering the user, using the
+        credentials and parameters provided during the UIA flow.
+
+        Stops at the first callback that returns a tuple containing at least one string.
+
+        Args:
+            uia_results: The credentials provided during the UIA flow.
+            params: The parameters provided by the registration request.
+
+        Returns:
+            A tuple which first element is the display name, and the second is an MXC URL
+            to the user's avatar.
+        """
+        for callback in self.get_display_name_for_registration_callbacks:
+            try:
+                res = await callback(uia_results, params)
+
+                if isinstance(res, str):
+                    return res
+                elif res is not None:
+                    # mypy complains that this line is unreachable because it assumes the
+                    # data returned by the module fits the expected type. We just want
+                    # to make sure this is the case.
+                    logger.warning(  # type: ignore[unreachable]
+                        "Ignoring non-string value returned by"
+                        " get_display_name_for_registration callback %s: %s",
+                        callback,
+                        res,
+                    )
+            except Exception as e:
+                logger.error(
+                    "Module raised an exception in get_profile_for_registration: %s",
                     e,
                 )
                 raise SynapseError(code=500, msg="Internal Server Error")

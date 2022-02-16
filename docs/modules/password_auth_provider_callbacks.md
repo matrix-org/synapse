@@ -166,6 +166,34 @@ any of the subsequent implementations of this callback. If every callback return
 the username provided by the user is used, if any (otherwise one is automatically
 generated).
 
+### `get_display_name_for_registration`
+
+_First introduced in Synapse v1.54.0_
+
+```python
+async def get_display_name_for_registration(
+    uia_results: Dict[str, Any],
+    params: Dict[str, Any],
+) -> Optional[str]
+```
+
+Called when registering a new user. The module can return a display name to set for the
+user being registered by returning it as a string, or `None` if it doesn't wish to force a
+display name for this user.
+
+This callback is called once [User-Interactive Authentication](https://spec.matrix.org/latest/client-server-api/#user-interactive-authentication-api)
+has been completed by the user. It is not called when registering a user via SSO. It is
+passed two dictionaries, which include the information that the user has provided during
+the registration process. These dictionaries are identical to the ones passed to
+[`get_username_for_registration`](#get_username_for_registration), so refer to the
+documentation of this callback for more information about them.
+
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `None`, Synapse falls through to the next one. The value of the first
+callback that does not return `None` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback. If every callback return `None`,
+the username will be used (e.g. `alice` if the user being registered is `@alice:example.com`).
+
 ## `is_3pid_allowed`
 
 _First introduced in Synapse v1.53.0_
@@ -195,7 +223,6 @@ The example module below implements authentication checkers for two different lo
 - `m.login.password` (defined in [the spec](https://matrix.org/docs/spec/client_server/latest#password-based))
     - Expects a `password` field to be sent to `/login`
     - Is checked by the method: `self.check_pass` 
-
 
 ```python
 from typing import Awaitable, Callable, Optional, Tuple
