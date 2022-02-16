@@ -11,36 +11,42 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import typing
 from typing import Dict, List, Sequence, Tuple
 from unittest.mock import patch
 
 from twisted.internet.defer import Deferred, ensureDeferred
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.storage.state import StateFilter
 from synapse.types import MutableStateMap, StateMap
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
+if typing.TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 
 class StateGroupInflightCachingTestCase(HomeserverTestCase):
-    def setUp(self) -> None:
-        super().setUp()
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: "HomeServer"
+    ) -> None:
+        self.state_storage = homeserver.get_storage().state
+        self.state_datastore = homeserver.get_datastores().state
         # Patch out the `_get_state_groups_from_groups`.
         # This is useful because it lets us pretend we have a slow database.
-        get_state_groups_patch = patch(
-            "synapse.storage.databases.state.store.StateGroupDataStore._get_state_groups_from_groups",
+        get_state_groups_patch = patch.object(
+            self.state_datastore,
+            "_get_state_groups_from_groups",
             self._fake_get_state_groups_from_groups,
         )
         get_state_groups_patch.start()
+
         self.addCleanup(get_state_groups_patch.stop)
         self.get_state_group_calls: List[
             Tuple[Tuple[int, ...], StateFilter, Deferred[Dict[int, StateMap[str]]]]
         ] = []
-
-    def prepare(self, reactor, clock, homeserver) -> None:
-        self.state_storage = homeserver.get_storage().state
-        self.state_datastore = homeserver.get_datastores().state
 
     def _fake_get_state_groups_from_groups(
         self, groups: Sequence[int], state_filter: StateFilter
