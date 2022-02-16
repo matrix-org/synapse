@@ -505,6 +505,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if requester.app_service:
             as_id = requester.app_service.id
 
+        # We first linearise by the application service (to try to limit concurrent joins
+        # by application services), and then by room ID.
         with (await self.member_as_limiter.queue(as_id)):
             with (await self.member_linearizer.queue(key)):
                 result = await self.update_membership_locked(
