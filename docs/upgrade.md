@@ -85,6 +85,15 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.54.0
+
+## Legacy structured logging configuration removal
+
+This release removes support for the `structured: true` logging configuration
+which was deprecated in Synapse v1.23.0. If your logging configuration  contains
+`structured: true` then it should be modified based on the
+[structured logging documentation](structured_logging.md).
+
 # Upgrading to v1.53.0
 
 ## Dropping support for `webclient` listeners and non-HTTP(S) `web_client_location`
