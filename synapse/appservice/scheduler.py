@@ -225,14 +225,11 @@ class _ServiceQueuer:
                     # Compute the one-time key counts and fallback key usage states
                     # for the users which are mentioned in this transaction,
                     # as well as the appservice's sender.
-                    interesting_users = await self._determine_interesting_users_for_msc3202_otk_counts_and_fallback_keys(
-                        service, events, ephemeral, to_device_messages_to_send
-                    )
                     (
                         one_time_key_counts,
                         unused_fallback_keys,
                     ) = await self._compute_msc3202_otk_counts_and_fallback_keys(
-                        interesting_users
+                        service, events, ephemeral, to_device_messages_to_send
                     )
 
                 try:
@@ -249,22 +246,27 @@ class _ServiceQueuer:
         finally:
             self.requests_in_flight.discard(service.id)
 
-    async def _determine_interesting_users_for_msc3202_otk_counts_and_fallback_keys(
+    async def _compute_msc3202_otk_counts_and_fallback_keys(
         self,
         service: ApplicationService,
         events: Iterable[EventBase],
         ephemerals: Iterable[JsonDict],
         to_device_messages: Iterable[JsonDict],
-    ) -> Set[str]:
+    ) -> Tuple[TransactionOneTimeKeyCounts, TransactionUnusedFallbackKeys]:
         """
         Given a list of the events, ephemeral messages and to-device messages,
-        compute a list of application services users that may have interesting
-        updates to the one-time key counts or fallback key usage.
+        - first computes a list of application services users that may have
+          interesting updates to the one-time key counts or fallback key usage.
+        - then computes one-time key counts and fallback key usages for those users.
+        Given a list of application service users that are interesting,
+        compute one-time key counts and fallback key usages for the users.
         """
-        interesting_users: Set[str] = set()
+
+        # Set of 'interesting' users who may have updates
+        users: Set[str] = set()
 
         # The sender is always included
-        interesting_users.add(service.sender)
+        users.add(service.sender)
 
         # All AS users that would receive the PDUs or EDUs sent to these rooms
         # are classed as 'interesting'.
@@ -278,25 +280,15 @@ class _ServiceQueuer:
 
         # Look up the AS users in those rooms
         for room_id in rooms_of_interesting_users:
-            interesting_users.update(
+            users.update(
                 await self._store.get_app_service_users_in_room(room_id, service)
             )
 
         # Add recipients of to-device messages.
         # device_message["user_id"] is the ID of the recipient.
-        interesting_users.update(
-            device_message["user_id"] for device_message in to_device_messages
-        )
+        users.update(device_message["user_id"] for device_message in to_device_messages)
 
-        return interesting_users
-
-    async def _compute_msc3202_otk_counts_and_fallback_keys(
-        self, users: Set[str]
-    ) -> Tuple[TransactionOneTimeKeyCounts, TransactionUnusedFallbackKeys]:
-        """
-        Given a list of application service users that are interesting,
-        compute one-time key counts and fallback key usages for the users.
-        """
+        # Compute and return the counts / fallback key usage states
         otk_counts = await self._store.count_bulk_e2e_one_time_keys_for_as(users)
         unused_fbks = await self._store.get_e2e_bulk_unused_fallback_key_types(users)
         return otk_counts, unused_fbks
