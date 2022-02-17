@@ -166,12 +166,12 @@ any of the subsequent implementations of this callback. If every callback return
 the username provided by the user is used, if any (otherwise one is automatically
 generated).
 
-### `get_display_name_for_registration`
+### `get_displayname_for_registration`
 
 _First introduced in Synapse v1.54.0_
 
 ```python
-async def get_display_name_for_registration(
+async def get_displayname_for_registration(
     uia_results: Dict[str, Any],
     params: Dict[str, Any],
 ) -> Optional[str]

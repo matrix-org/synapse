@@ -807,7 +807,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self._test_3pid_allowed("kitay", True)
 
     def test_displayname(self):
-        """Tests that the get_display_name_for_registration callback can define the
+        """Tests that the get_displayname_for_registration callback can define the
         display name of a user when registering.
         """
         self._setup_get_name_for_registration(
