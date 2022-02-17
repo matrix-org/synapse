@@ -90,7 +90,7 @@ process, for example:
 ## Legacy structured logging configuration removal
 
 This release removes support for the `structured: true` logging configuration
-which was deprecated in Synapse v1.23.0. If your logging configuration  contains
+which was deprecated in Synapse v1.23.0. If your logging configuration contains
 `structured: true` then it should be modified based on the
 [structured logging documentation](structured_logging.md).
 

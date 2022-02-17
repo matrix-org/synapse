@@ -140,7 +140,7 @@ removed in Synapse 1.3.0. You should instead set up a separate log configuration
 STRUCTURED_ERROR = """\
 Support for the structured configuration option was removed in Synapse 1.54.0.
 You should instead use the standard logging configuration. See
-https://matrix-org.github.io/synapse/v1.52/structured_logging.html
+https://matrix-org.github.io/synapse/v1.54/structured_logging.html
 """
 
 
