@@ -45,8 +45,6 @@ one of the following:
  - or set 'caches.global_factor' in the homeserver config.
 --------------------------------------------------------------------------------"""
 
-logger = logging.getLogger(__name__)
-
 
 def pid_running(pid):
     try:
@@ -238,7 +236,7 @@ def main():
     start_stop_synapse = True
 
     if cache_factor:
-        logger.warning(SYNCTL_CACHE_FACTOR_WARNING)
+        write(SYNCTL_CACHE_FACTOR_WARNING)
         os.environ["SYNAPSE_CACHE_FACTOR"] = str(cache_factor)
 
     cache_factors = config.get("synctl_cache_factors", {})
