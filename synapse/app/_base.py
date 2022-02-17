@@ -37,6 +37,7 @@ from typing import (
 )
 
 from cryptography.utils import CryptographyDeprecationWarning
+from matrix_common.versionstring import get_distribution_version_string
 
 import twisted
 from twisted.internet import defer, error, reactor as _reactor
@@ -67,7 +68,6 @@ from synapse.util.caches.lrucache import setup_expire_lru_cache_entries
 from synapse.util.daemonize import daemonize_process
 from synapse.util.gai_resolver import GAIResolver
 from synapse.util.rlimit import change_resource_limit
-from synapse.util.versionstring import get_version_string
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -487,7 +487,8 @@ def setup_sentry(hs: "HomeServer") -> None:
     import sentry_sdk
 
     sentry_sdk.init(
-        dsn=hs.config.metrics.sentry_dsn, release=get_version_string(synapse)
+        dsn=hs.config.metrics.sentry_dsn,
+        release=get_distribution_version_string("matrix-synapse"),
     )
 
     # We set some default tags that give some context to this instance

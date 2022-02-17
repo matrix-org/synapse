@@ -98,8 +98,6 @@ COPY --from=builder /install /usr/local
 COPY ./docker/start.py /start.py
 COPY ./docker/conf /conf
 
-VOLUME ["/data"]
-
 EXPOSE 8008/tcp 8009/tcp 8448/tcp
 
 ENTRYPOINT ["/start.py"]

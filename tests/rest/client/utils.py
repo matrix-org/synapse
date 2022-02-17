@@ -110,12 +110,17 @@ class RestHelper:
                 default room version.
             tok: The access token to use in the request.
             expect_code: The expected HTTP response code.
+            extra_content: Extra keys to include in the body of the /createRoom request.
+                Note that if is_public is set, the "visibility" key will be overridden.
+                If room_version is set, the "room_version" key will be overridden.
+            custom_headers: HTTP headers to include in the request.
             appservice_user_id: The `user_id` URL parameter to pass.
                 This allows driving an application service user
                 using an application service access token in `tok`.
 
+
         Returns:
-            The ID of the newly created room.
+            The ID of the newly created room, or None if the request failed.
         """
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
@@ -272,7 +277,11 @@ class RestHelper:
         temp_id = self.auth_user_id
         self.auth_user_id = src
 
-        path = "/_matrix/client/r0/rooms/%s/state/m.room.member/%s" % (room, targ)
+        path = f"/_matrix/client/r0/rooms/{room}/state/m.room.member/{targ}"
+        url_params: Dict[str, str] = {}
+
+        if tok:
+            url_params["access_token"] = tok
 
         path = self._append_query_params(
             path,

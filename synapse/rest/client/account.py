@@ -385,7 +385,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
-        if not check_3pid_allowed(self.hs, "email", email):
+        if not await check_3pid_allowed(self.hs, "email", email):
             raise SynapseError(
                 403,
                 "Your email domain is not authorized on this server",
@@ -468,7 +468,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
 
         msisdn = phone_number_to_msisdn(country, phone_number)
 
-        if not check_3pid_allowed(self.hs, "msisdn", msisdn):
+        if not await check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
                 403,
                 "Account phone numbers are not authorized on this server",

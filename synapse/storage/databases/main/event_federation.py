@@ -121,7 +121,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         room_id: str,
         event_ids: Collection[str],
         include_given: bool = False,
-    ) -> List[str]:
+    ) -> Set[str]:
         """Get auth events for given event_ids. The events *must* be state events.
 
         Args:
@@ -130,7 +130,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             include_given: include the given events in result
 
         Returns:
-            list of event_ids
+            set of event_ids
         """
 
         # Check if we have indexed the room so we can use the chain cover
@@ -159,7 +159,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
     def _get_auth_chain_ids_using_cover_index_txn(
         self, txn: Cursor, room_id: str, event_ids: Collection[str], include_given: bool
-    ) -> List[str]:
+    ) -> Set[str]:
         """Calculates the auth chain IDs using the chain index."""
 
         # First we look up the chain ID/sequence numbers for the given events.
@@ -272,11 +272,11 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
                 txn.execute(sql, (chain_id, max_no))
                 results.update(r for r, in txn)
 
-        return list(results)
+        return results
 
     def _get_auth_chain_ids_txn(
         self, txn: LoggingTransaction, event_ids: Collection[str], include_given: bool
-    ) -> List[str]:
+    ) -> Set[str]:
         """Calculates the auth chain IDs.
 
         This is used when we don't have a cover index for the room.
@@ -331,7 +331,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             front = new_front
             results.update(front)
 
-        return list(results)
+        return results
 
     async def get_auth_chain_difference(
         self, room_id: str, state_sets: List[Set[str]]

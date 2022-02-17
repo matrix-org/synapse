@@ -81,14 +81,12 @@ remote endpoint at 10.1.2.3:9999.
 
 ## Upgrading from legacy structured logging configuration
 
-Versions of Synapse prior to v1.23.0 included a custom structured logging
-configuration which is deprecated. It used a `structured: true` flag and
-configured `drains` instead of ``handlers`` and `formatters`.
+Versions of Synapse prior to v1.54.0 automatically converted the legacy
+structured logging configuration, which was deprecated in v1.23.0, to the standard
+library logging configuration.
 
-Synapse currently automatically converts the old configuration to the new
-configuration, but this will be removed in a future version of Synapse. The
-following reference can be used to update your configuration. Based on the drain
-`type`, we can pick a new handler:
+The following reference can be used to update your configuration. Based on the
+drain `type`, we can pick a new handler:
 
 1. For a type of `console`, `console_json`, or `console_json_terse`: a handler
    with a class of `logging.StreamHandler` and a `stream` of `ext://sys.stdout`
@@ -141,7 +139,7 @@ formatters:
 handlers:
     console:
         class: logging.StreamHandler
-        location: ext://sys.stdout
+        stream: ext://sys.stdout
     file:
         class: logging.FileHandler
         formatter: json

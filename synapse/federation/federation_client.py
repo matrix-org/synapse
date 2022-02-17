@@ -1,4 +1,4 @@
-# Copyright 2015-2021 The Matrix.org Foundation C.I.C.
+# Copyright 2015-2022 The Matrix.org Foundation C.I.C.
 # Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -88,6 +88,12 @@ class SendJoinResult:
     origin: str
     state: List[EventBase]
     auth_chain: List[EventBase]
+
+    # True if 'state' elides non-critical membership events
+    partial_state: bool
+
+    # if 'partial_state' is set, a list of the servers in the room (otherwise empty)
+    servers_in_room: List[str]
 
 
 class FederationClient(FederationBase):
@@ -876,11 +882,18 @@ class FederationClient(FederationBase):
                     % (auth_chain_create_events,)
                 )
 
+            if response.partial_state and not response.servers_in_room:
+                raise InvalidResponseError(
+                    "partial_state was set, but no servers were listed in the room"
+                )
+
             return SendJoinResult(
                 event=event,
                 state=signed_state,
                 auth_chain=signed_auth,
                 origin=destination,
+                partial_state=response.partial_state,
+                servers_in_room=response.servers_in_room or [],
             )
 
         # MSC3083 defines additional error codes for room joins.
