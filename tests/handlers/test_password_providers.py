@@ -84,7 +84,8 @@ class CustomAuthProvider:
 
     def __init__(self, config, api: ModuleApi):
         api.register_password_auth_provider_callbacks(
-            auth_checkers={("test.login_type", ("test_field",)): self.check_auth})
+            auth_checkers={("test.login_type", ("test_field",)): self.check_auth}
+        )
 
     def check_auth(self, *args):
         return mock_password_provider.check_auth(*args)
@@ -117,10 +118,12 @@ class PasswordCustomAuthProvider:
         pass
 
     def __init__(self, config, api: ModuleApi):
-        api.register_password_auth_provider_callbacks(auth_checkers={
-            ("test.login_type", ("test_field",)): self.check_auth,
-            ("m.login.password", ("password",)): self.check_auth,
-        })
+        api.register_password_auth_provider_callbacks(
+            auth_checkers={
+                ("test.login_type", ("test_field",)): self.check_auth,
+                ("m.login.password", ("password",)): self.check_auth,
+            }
+        )
         pass
 
     def check_auth(self, *args):
