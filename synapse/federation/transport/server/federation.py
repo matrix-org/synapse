@@ -767,8 +767,8 @@ class RoomComplexityServlet(BaseFederationServlet):
 
 
 class AccountStatusServlet(BaseFederationServerServlet):
-    PATH = "/org.matrix.msc3720/query/account_status"
-    PREFIX = FEDERATION_UNSTABLE_PREFIX
+    PATH = "/query/account_status"
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc3720"
 
     def __init__(
         self,
