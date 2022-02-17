@@ -85,7 +85,7 @@ If the authentication is unsuccessful, the module must return `None`.
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `None`, Synapse falls through to the next one. The value of the first
 callback that does not return `None` will be used. If this happens, Synapse will not call
-any of the subsequent implementations of this callback. If every callback return `None`,
+any of the subsequent implementations of this callback. If every callback returns `None`,
 the authentication is denied.
 
 ### `on_logged_out`
@@ -162,7 +162,7 @@ return `None`.
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `None`, Synapse falls through to the next one. The value of the first
 callback that does not return `None` will be used. If this happens, Synapse will not call
-any of the subsequent implementations of this callback. If every callback return `None`,
+any of the subsequent implementations of this callback. If every callback returns `None`,
 the username provided by the user is used, if any (otherwise one is automatically
 generated).
 
@@ -191,7 +191,7 @@ documentation of this callback for more information about them.
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `None`, Synapse falls through to the next one. The value of the first
 callback that does not return `None` will be used. If this happens, Synapse will not call
-any of the subsequent implementations of this callback. If every callback return `None`,
+any of the subsequent implementations of this callback. If every callback returns `None`,
 the username will be used (e.g. `alice` if the user being registered is `@alice:example.com`).
 
 ## `is_3pid_allowed`
@@ -222,7 +222,7 @@ The example module below implements authentication checkers for two different lo
     - Is checked by the method: `self.check_my_login`
 - `m.login.password` (defined in [the spec](https://matrix.org/docs/spec/client_server/latest#password-based))
     - Expects a `password` field to be sent to `/login`
-    - Is checked by the method: `self.check_pass` 
+    - Is checked by the method: `self.check_pass`
 
 ```python
 from typing import Awaitable, Callable, Optional, Tuple

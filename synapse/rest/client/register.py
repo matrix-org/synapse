@@ -694,10 +694,9 @@ class RegisterRestServlet(RestServlet):
                 session_id
             )
 
-            desired_display_name = await (
-                self.password_auth_provider.get_display_name_for_registration(
-                    auth_result,
-                    params,
+            display_name = await (
+                self.password_auth_provider.get_displayname_for_registration(
+                    auth_result, params
                 )
             )
 
@@ -706,7 +705,7 @@ class RegisterRestServlet(RestServlet):
                 password_hash=password_hash,
                 guest_access_token=guest_access_token,
                 threepid=threepid,
-                default_display_name=desired_display_name,
+                default_display_name=display_name,
                 address=client_addr,
                 user_agent_ips=entries,
             )
