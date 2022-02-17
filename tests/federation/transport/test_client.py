@@ -65,7 +65,7 @@ class SendJoinParserTestCase(TestCase):
         self.assertFalse(parsed_response.partial_state, parsed_response)
         self.assertEqual(parsed_response.servers_in_room, None, parsed_response)
 
-    def test_lazy_load(self) -> None:
+    def test_partial_state(self) -> None:
         """Check that the partial_state flag is correctly parsed"""
         parser = SendJoinParser(RoomVersions.V1, False)
         response = {
