@@ -455,31 +455,12 @@ class FederationClient(FederationBase):
             len(auth_event_map),
         )
 
-        valid_state_events: List[EventBase] = []
-        valid_auth_events: List[EventBase] = []
-
-        async def _append_valid_events_to_list(
-            pdu: EventBase,
-            target_list: List[EventBase],
-        ) -> None:
-            valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
-                pdu=pdu,
-                origin=destination,
-                room_version=room_version,
-            )
-
-            if valid_pdu:
-                target_list.append(valid_pdu)
-
-        await concurrently_execute(
-            partial(_append_valid_events_to_list, target_list=valid_state_events),
-            state_events,
-            10000,
+        valid_auth_events = await self._check_sigs_and_hash_and_fetch(
+            destination, auth_events, room_version
         )
-        await concurrently_execute(
-            partial(_append_valid_events_to_list, target_list=valid_auth_events),
-            state_events,
-            10000,
+
+        valid_state_events = await self._check_sigs_and_hash_and_fetch(
+            destination, state_events, room_version
         )
 
         return valid_state_events, valid_auth_events
