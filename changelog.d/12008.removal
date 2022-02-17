@@ -1,1 +1,1 @@
-Remove support for the legacy structured logging configuration (using `structured: true` in the Synapse configuration).
+Remove support for the legacy structured logging configuration (please see the the [upgrade notes](https://matrix-org.github.io/synapse/develop/upgrade#legacy-structured-logging-configuration-removal) if you are using `structured: true` in the Synapse configuration).
