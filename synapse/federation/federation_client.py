@@ -424,6 +424,14 @@ class FederationClient(FederationBase):
         """Calls the /state endpoint to fetch the state at a particular point
         in the room.
 
+        Any invalid events (those with incorrect or unverifiable signatures or hashes)
+        are filtered out from the response, and any duplicate events are removed.
+
+        (Size limits and other event-format checks are *not* performed.)
+
+        Note that the result is not ordered, so callers must be careful to process
+        the events in an order that handles dependencies.
+
         Returns:
             a tuple of (state events, auth events)
         """
@@ -437,7 +445,7 @@ class FederationClient(FederationBase):
         auth_events = result.auth_events
 
         # we may as well filter out any duplicates from the response, to save
-        # processing them multiple times. (In particular, events may be present in 
+        # processing them multiple times. (In particular, events may be present in
         # `auth_events` as well as `state`, which is redundant).
         #
         # We don't rely on the sort order of the events, so we can just stick them
