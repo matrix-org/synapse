@@ -622,7 +622,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     ) -> None:
         """Record a mapping from an external user id to a mxid
 
-        See notes in _record_user_external_id_txn about what constitutes validate data.
+        See notes in _record_user_external_id_txn about what constitutes valid data.
 
         Args:
             auth_provider: identifier for the remote auth provider
@@ -705,7 +705,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         """Replace mappings from external user ids to a mxid in a single transaction.
         All mappings are deleted and the new ones are created.
 
-        See notes in _record_user_external_id_txn about what constitutes validate data.
+        See notes in _record_user_external_id_txn about what constitutes valid data.
 
         Args:
             record_external_ids:
