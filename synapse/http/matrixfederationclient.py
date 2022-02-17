@@ -978,13 +978,13 @@ class MatrixFederationHttpClient:
         self,
         destination: str,
         path: str,
-        args: Optional[QueryArgs] = None,
-        retry_on_dns_fail: bool = True,
-        timeout: Optional[int] = None,
-        ignore_backoff: bool = False,
-        try_trailing_slash_on_400: bool = False,
-        parser: Optional[ByteParser[T]] = None,
-        max_response_size: Optional[int] = None,
+        args: Optional[QueryArgs] = ...,
+        retry_on_dns_fail: bool = ...,
+        timeout: Optional[int] = ...,
+        ignore_backoff: bool = ...,
+        try_trailing_slash_on_400: bool = ...,
+        parser: ByteParser[T] = ...,
+        max_response_size: Optional[int] = ...,
     ) -> T:
         ...
 
