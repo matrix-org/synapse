@@ -440,7 +440,8 @@ class FederationClient(FederationBase):
         # processing them multiple times. (In particular, events may be present in 
         # `auth_events` as well as `state`, which is redundant).
         #
-        # We don't rely on the sort order of either of them, which makes it easier
+        # We don't rely on the sort order of the events, so we can just stick them
+        # in a dict.
         state_event_map = {event.event_id: event for event in state_events}
         auth_event_map = {
             event.event_id: event
