@@ -13,12 +13,23 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+    cast,
+)
 
 import attr
 from frozendict import frozendict
 
-from synapse.api.constants import EventTypes, RelationTypes
+from synapse.api.constants import RelationTypes
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
@@ -28,24 +39,27 @@ from synapse.storage.database import (
     make_in_list_sql_clause,
 )
 from synapse.storage.databases.main.stream import generate_pagination_where_clause
-from synapse.storage.relations import (
-    AggregationPaginationToken,
-    PaginationChunk,
-    RelationPaginationToken,
-)
-from synapse.types import JsonDict
-from synapse.util.caches.descriptors import cached
+from synapse.storage.engines import PostgresEngine
+from synapse.storage.relations import AggregationPaginationToken, PaginationChunk
+from synapse.types import JsonDict, RoomStreamToken, StreamToken
+from synapse.util.caches.descriptors import cached, cachedList
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+    from synapse.storage.databases.main import DataStore
 
 logger = logging.getLogger(__name__)
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class _ThreadAggregation:
+    # The latest event in the thread.
     latest_event: EventBase
+    # The latest edit to the latest event in the thread.
+    latest_edit: Optional[EventBase]
+    # The total number of events in the thread.
     count: int
+    # True if the current user has sent an event to the thread.
     current_user_participated: bool
 
 
@@ -75,7 +89,6 @@ class RelationsWorkerStore(SQLBaseStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        self._msc1849_enabled = hs.config.experimental.msc1849_enabled
         self._msc3440_enabled = hs.config.experimental.msc3440_enabled
 
     @cached(tree=True)
@@ -88,8 +101,8 @@ class RelationsWorkerStore(SQLBaseStore):
         aggregation_key: Optional[str] = None,
         limit: int = 5,
         direction: str = "b",
-        from_token: Optional[RelationPaginationToken] = None,
-        to_token: Optional[RelationPaginationToken] = None,
+        from_token: Optional[StreamToken] = None,
+        to_token: Optional[StreamToken] = None,
     ) -> PaginationChunk:
         """Get a list of relations for an event, ordered by topological ordering.
 
@@ -128,8 +141,10 @@ class RelationsWorkerStore(SQLBaseStore):
         pagination_clause = generate_pagination_where_clause(
             direction=direction,
             column_names=("topological_ordering", "stream_ordering"),
-            from_token=attr.astuple(from_token) if from_token else None,  # type: ignore[arg-type]
-            to_token=attr.astuple(to_token) if to_token else None,  # type: ignore[arg-type]
+            from_token=from_token.room_key.as_historical_tuple()
+            if from_token
+            else None,
+            to_token=to_token.room_key.as_historical_tuple() if to_token else None,
             engine=self.database_engine,
         )
 
@@ -167,12 +182,27 @@ class RelationsWorkerStore(SQLBaseStore):
                 last_topo_id = row[1]
                 last_stream_id = row[2]
 
-            next_batch = None
+            # If there are more events, generate the next pagination key.
+            next_token = None
             if len(events) > limit and last_topo_id and last_stream_id:
-                next_batch = RelationPaginationToken(last_topo_id, last_stream_id)
+                next_key = RoomStreamToken(last_topo_id, last_stream_id)
+                if from_token:
+                    next_token = from_token.copy_and_replace("room_key", next_key)
+                else:
+                    next_token = StreamToken(
+                        room_key=next_key,
+                        presence_key=0,
+                        typing_key=0,
+                        receipt_key=0,
+                        account_data_key=0,
+                        push_rules_key=0,
+                        to_device_key=0,
+                        device_list_key=0,
+                        groups_key=0,
+                    )
 
             return PaginationChunk(
-                chunk=list(events[:limit]), next_batch=next_batch, prev_batch=from_token
+                chunk=list(events[:limit]), next_batch=next_token, prev_batch=from_token
             )
 
         return await self.db_pool.runInteraction(
@@ -341,20 +371,24 @@ class RelationsWorkerStore(SQLBaseStore):
         )
 
     @cached()
-    async def get_applicable_edit(
-        self, event_id: str, room_id: str
-    ) -> Optional[EventBase]:
+    def get_applicable_edit(self, event_id: str) -> Optional[EventBase]:
+        raise NotImplementedError()
+
+    @cachedList(cached_method_name="get_applicable_edit", list_name="event_ids")
+    async def _get_applicable_edits(
+        self, event_ids: Collection[str]
+    ) -> Dict[str, Optional[EventBase]]:
         """Get the most recent edit (if any) that has happened for the given
-        event.
+        events.
 
         Correctly handles checking whether edits were allowed to happen.
 
         Args:
-            event_id: The original event ID
-            room_id: The original event's room ID
+            event_ids: The original event IDs
 
         Returns:
-            The most recent edit, if any.
+            A map of the most recent edit for each event. If there are no edits,
+            the event will map to None.
         """
 
         # We only allow edits for `m.room.message` events that have the same sender
@@ -363,138 +397,243 @@ class RelationsWorkerStore(SQLBaseStore):
 
         # Fetches latest edit that has the same type and sender as the
         # original, and is an `m.room.message`.
-        sql = """
-            SELECT edit.event_id FROM events AS edit
-            INNER JOIN event_relations USING (event_id)
-            INNER JOIN events AS original ON
-                original.event_id = relates_to_id
-                AND edit.type = original.type
-                AND edit.sender = original.sender
-            WHERE
-                relates_to_id = ?
-                AND relation_type = ?
-                AND edit.room_id = ?
-                AND edit.type = 'm.room.message'
-            ORDER by edit.origin_server_ts DESC, edit.event_id DESC
-            LIMIT 1
-        """
-
-        def _get_applicable_edit_txn(txn: LoggingTransaction) -> Optional[str]:
-            txn.execute(sql, (event_id, RelationTypes.REPLACE, room_id))
-            row = txn.fetchone()
-            if row:
-                return row[0]
-            return None
-
-        edit_id = await self.db_pool.runInteraction(
-            "get_applicable_edit", _get_applicable_edit_txn
-        )
-
-        if not edit_id:
-            return None
-
-        return await self.get_event(edit_id, allow_none=True)  # type: ignore[attr-defined]
-
-    @cached()
-    async def get_thread_summary(
-        self, event_id: str, room_id: str
-    ) -> Tuple[int, Optional[EventBase]]:
-        """Get the number of threaded replies and the latest reply (if any) for the given event.
-
-        Args:
-            event_id: Summarize the thread related to this event ID.
-            room_id: The room the event belongs to.
-
-        Returns:
-            The number of items in the thread and the most recent response, if any.
-        """
-
-        def _get_thread_summary_txn(
-            txn: LoggingTransaction,
-        ) -> Tuple[int, Optional[str]]:
-            # Fetch the latest event ID in the thread.
-            # TODO Should this only allow m.room.message events.
+        if isinstance(self.database_engine, PostgresEngine):
+            # The `DISTINCT ON` clause will pick the *first* row it encounters,
+            # so ordering by origin server ts + event ID desc will ensure we get
+            # the latest edit.
             sql = """
-                SELECT event_id
-                FROM event_relations
-                INNER JOIN events USING (event_id)
+                SELECT DISTINCT ON (original.event_id) original.event_id, edit.event_id FROM events AS edit
+                INNER JOIN event_relations USING (event_id)
+                INNER JOIN events AS original ON
+                    original.event_id = relates_to_id
+                    AND edit.type = original.type
+                    AND edit.sender = original.sender
+                    AND edit.room_id = original.room_id
                 WHERE
-                    relates_to_id = ?
-                    AND room_id = ?
+                    %s
                     AND relation_type = ?
-                ORDER BY topological_ordering DESC, stream_ordering DESC
-                LIMIT 1
+                    AND edit.type = 'm.room.message'
+                ORDER by original.event_id DESC, edit.origin_server_ts DESC, edit.event_id DESC
+            """
+        else:
+            # SQLite uses a simplified query which returns all edits for an
+            # original event. The results are then de-duplicated when turned into
+            # a dict. Due to the chosen ordering, the latest edit stomps on
+            # earlier edits.
+            sql = """
+                SELECT original.event_id, edit.event_id FROM events AS edit
+                INNER JOIN event_relations USING (event_id)
+                INNER JOIN events AS original ON
+                    original.event_id = relates_to_id
+                    AND edit.type = original.type
+                    AND edit.sender = original.sender
+                    AND edit.room_id = original.room_id
+                WHERE
+                    %s
+                    AND relation_type = ?
+                    AND edit.type = 'm.room.message'
+                ORDER by edit.origin_server_ts, edit.event_id
             """
 
-            txn.execute(sql, (event_id, room_id, RelationTypes.THREAD))
-            row = txn.fetchone()
-            if row is None:
-                return 0, None
+        def _get_applicable_edits_txn(txn: LoggingTransaction) -> Dict[str, str]:
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "relates_to_id", event_ids
+            )
+            args.append(RelationTypes.REPLACE)
 
-            latest_event_id = row[0]
+            txn.execute(sql % (clause,), args)
+            return dict(cast(Iterable[Tuple[str, str]], txn.fetchall()))
+
+        edit_ids = await self.db_pool.runInteraction(
+            "get_applicable_edits", _get_applicable_edits_txn
+        )
+
+        edits = await self.get_events(edit_ids.values())  # type: ignore[attr-defined]
+
+        # Map to the original event IDs to the edit events.
+        #
+        # There might not be an edit event due to there being no edits or
+        # due to the event not being known, either case is treated the same.
+        return {
+            original_event_id: edits.get(edit_ids.get(original_event_id))
+            for original_event_id in event_ids
+        }
+
+    @cached()
+    def get_thread_summary(self, event_id: str) -> Optional[Tuple[int, EventBase]]:
+        raise NotImplementedError()
+
+    @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")
+    async def _get_thread_summaries(
+        self, event_ids: Collection[str]
+    ) -> Dict[str, Optional[Tuple[int, EventBase, Optional[EventBase]]]]:
+        """Get the number of threaded replies, the latest reply (if any), and the latest edit for that reply for the given event.
+
+        Args:
+            event_ids: Summarize the thread related to this event ID.
+
+        Returns:
+            A map of the thread summary each event. A missing event implies there
+            are no threaded replies.
+
+            Each summary is a tuple of:
+                The number of events in the thread.
+                The most recent event in the thread.
+                The most recent edit to the most recent event in the thread, if applicable.
+        """
+
+        def _get_thread_summaries_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[Dict[str, int], Dict[str, str]]:
+            # Fetch the count of threaded events and the latest event ID.
+            # TODO Should this only allow m.room.message events.
+            if isinstance(self.database_engine, PostgresEngine):
+                # The `DISTINCT ON` clause will pick the *first* row it encounters,
+                # so ordering by topological ordering + stream ordering desc will
+                # ensure we get the latest event in the thread.
+                sql = """
+                    SELECT DISTINCT ON (parent.event_id) parent.event_id, child.event_id FROM events AS child
+                    INNER JOIN event_relations USING (event_id)
+                    INNER JOIN events AS parent ON
+                        parent.event_id = relates_to_id
+                        AND parent.room_id = child.room_id
+                    WHERE
+                        %s
+                        AND relation_type = ?
+                    ORDER BY parent.event_id, child.topological_ordering DESC, child.stream_ordering DESC
+                """
+            else:
+                # SQLite uses a simplified query which returns all entries for a
+                # thread. The first result for each thread is chosen to and subsequent
+                # results for a thread are ignored.
+                sql = """
+                    SELECT parent.event_id, child.event_id FROM events AS child
+                    INNER JOIN event_relations USING (event_id)
+                    INNER JOIN events AS parent ON
+                        parent.event_id = relates_to_id
+                        AND parent.room_id = child.room_id
+                    WHERE
+                        %s
+                        AND relation_type = ?
+                    ORDER BY child.topological_ordering DESC, child.stream_ordering DESC
+                """
+
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "relates_to_id", event_ids
+            )
+            args.append(RelationTypes.THREAD)
+
+            txn.execute(sql % (clause,), args)
+            latest_event_ids = {}
+            for parent_event_id, child_event_id in txn:
+                # Only consider the latest threaded reply (by topological ordering).
+                if parent_event_id not in latest_event_ids:
+                    latest_event_ids[parent_event_id] = child_event_id
+
+            # If no threads were found, bail.
+            if not latest_event_ids:
+                return {}, latest_event_ids
 
             # Fetch the number of threaded replies.
             sql = """
-                SELECT COUNT(event_id)
-                FROM event_relations
-                INNER JOIN events USING (event_id)
+                SELECT parent.event_id, COUNT(child.event_id) FROM events AS child
+                INNER JOIN event_relations USING (event_id)
+                INNER JOIN events AS parent ON
+                    parent.event_id = relates_to_id
+                    AND parent.room_id = child.room_id
                 WHERE
-                    relates_to_id = ?
-                    AND room_id = ?
+                    %s
                     AND relation_type = ?
+                GROUP BY parent.event_id
             """
-            txn.execute(sql, (event_id, room_id, RelationTypes.THREAD))
-            count = cast(Tuple[int], txn.fetchone())[0]
 
-            return count, latest_event_id
+            # Regenerate the arguments since only threads found above could
+            # possibly have any replies.
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "relates_to_id", latest_event_ids.keys()
+            )
+            args.append(RelationTypes.THREAD)
 
-        count, latest_event_id = await self.db_pool.runInteraction(
-            "get_thread_summary", _get_thread_summary_txn
+            txn.execute(sql % (clause,), args)
+            counts = dict(cast(List[Tuple[str, int]], txn.fetchall()))
+
+            return counts, latest_event_ids
+
+        counts, latest_event_ids = await self.db_pool.runInteraction(
+            "get_thread_summaries", _get_thread_summaries_txn
         )
 
-        latest_event = None
-        if latest_event_id:
-            latest_event = await self.get_event(latest_event_id, allow_none=True)  # type: ignore[attr-defined]
+        latest_events = await self.get_events(latest_event_ids.values())  # type: ignore[attr-defined]
 
-        return count, latest_event
+        # Check to see if any of those events are edited.
+        latest_edits = await self._get_applicable_edits(latest_event_ids.values())
+
+        # Map to the event IDs to the thread summary.
+        #
+        # There might not be a summary due to there not being a thread or
+        # due to the latest event not being known, either case is treated the same.
+        summaries = {}
+        for parent_event_id, latest_event_id in latest_event_ids.items():
+            latest_event = latest_events.get(latest_event_id)
+
+            summary = None
+            if latest_event:
+                latest_edit = latest_edits.get(latest_event_id)
+                summary = (counts[parent_event_id], latest_event, latest_edit)
+            summaries[parent_event_id] = summary
+
+        return summaries
 
     @cached()
-    async def get_thread_participated(
-        self, event_id: str, room_id: str, user_id: str
-    ) -> bool:
-        """Get whether the requesting user participated in a thread.
+    def get_thread_participated(self, event_id: str, user_id: str) -> bool:
+        raise NotImplementedError()
 
-        This is separate from get_thread_summary since that can be cached across
-        all users while this value is specific to the requeser.
+    @cachedList(cached_method_name="get_thread_participated", list_name="event_ids")
+    async def _get_threads_participated(
+        self, event_ids: Collection[str], user_id: str
+    ) -> Dict[str, bool]:
+        """Get whether the requesting user participated in the given threads.
+
+        This is separate from get_thread_summaries since that can be cached across
+        all users while this value is specific to the requester.
 
         Args:
-            event_id: The thread related to this event ID.
-            room_id: The room the event belongs to.
+            event_ids: The thread related to these event IDs.
             user_id: The user requesting the summary.
 
         Returns:
-            True if the requesting user participated in the thread, otherwise false.
+            A map of event ID to a boolean which represents if the requesting
+            user participated in that event's thread, otherwise false.
         """
 
-        def _get_thread_summary_txn(txn: LoggingTransaction) -> bool:
+        def _get_thread_summary_txn(txn: LoggingTransaction) -> Set[str]:
             # Fetch whether the requester has participated or not.
             sql = """
-                SELECT 1
-                FROM event_relations
-                INNER JOIN events USING (event_id)
+                SELECT DISTINCT relates_to_id
+                FROM events AS child
+                INNER JOIN event_relations USING (event_id)
+                INNER JOIN events AS parent ON
+                    parent.event_id = relates_to_id
+                    AND parent.room_id = child.room_id
                 WHERE
-                    relates_to_id = ?
-                    AND room_id = ?
+                    %s
                     AND relation_type = ?
-                    AND sender = ?
+                    AND child.sender = ?
             """
 
-            txn.execute(sql, (event_id, room_id, RelationTypes.THREAD, user_id))
-            return bool(txn.fetchone())
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "relates_to_id", event_ids
+            )
+            args.extend((RelationTypes.THREAD, user_id))
 
-        return await self.db_pool.runInteraction(
+            txn.execute(sql % (clause,), args)
+            return {row[0] for row in txn.fetchall()}
+
+        participated_threads = await self.db_pool.runInteraction(
             "get_thread_summary", _get_thread_summary_txn
         )
+
+        return {event_id: event_id in participated_threads for event_id in event_ids}
 
     async def events_have_relations(
         self,
@@ -613,9 +752,6 @@ class RelationsWorkerStore(SQLBaseStore):
             The bundled aggregations for an event, if bundled aggregations are
             enabled and the event can have bundled aggregations.
         """
-        # State events and redacted events do not get bundled aggregations.
-        if event.is_state() or event.internal_metadata.is_redacted():
-            return None
 
         # Do not bundle aggregations for an event which represents an edit or an
         # annotation. It does not make sense for them to have related events.
@@ -635,43 +771,21 @@ class RelationsWorkerStore(SQLBaseStore):
 
         annotations = await self.get_aggregation_groups_for_event(event_id, room_id)
         if annotations.chunk:
-            aggregations.annotations = annotations.to_dict()
+            aggregations.annotations = await annotations.to_dict(
+                cast("DataStore", self)
+            )
 
         references = await self.get_relations_for_event(
             event_id, room_id, RelationTypes.REFERENCE, direction="f"
         )
         if references.chunk:
-            aggregations.references = references.to_dict()
-
-        edit = None
-        if event.type == EventTypes.Message:
-            edit = await self.get_applicable_edit(event_id, room_id)
-
-        if edit:
-            aggregations.replace = edit
-
-        # If this event is the start of a thread, include a summary of the replies.
-        if self._msc3440_enabled:
-            thread_count, latest_thread_event = await self.get_thread_summary(
-                event_id, room_id
-            )
-            participated = await self.get_thread_participated(
-                event_id, room_id, user_id
-            )
-            if latest_thread_event:
-                aggregations.thread = _ThreadAggregation(
-                    latest_event=latest_thread_event,
-                    count=thread_count,
-                    current_user_participated=participated,
-                )
+            aggregations.references = await references.to_dict(cast("DataStore", self))
 
         # Store the bundled aggregations in the event metadata for later use.
         return aggregations
 
     async def get_bundled_aggregations(
-        self,
-        events: Iterable[EventBase],
-        user_id: str,
+        self, events: Iterable[EventBase], user_id: str
     ) -> Dict[str, BundledAggregations]:
         """Generate bundled aggregations for events.
 
@@ -683,16 +797,59 @@ class RelationsWorkerStore(SQLBaseStore):
             A map of event ID to the bundled aggregation for the event. Not all
             events may have bundled aggregations in the results.
         """
-        # If bundled aggregations are disabled, nothing to do.
-        if not self._msc1849_enabled:
-            return {}
+        # The already processed event IDs. Tracked separately from the result
+        # since the result omits events which do not have bundled aggregations.
+        seen_event_ids = set()
 
-        # TODO Parallelize.
-        results = {}
+        # State events and redacted events do not get bundled aggregations.
+        events = [
+            event
+            for event in events
+            if not event.is_state() and not event.internal_metadata.is_redacted()
+        ]
+
+        # event ID -> bundled aggregation in non-serialized form.
+        results: Dict[str, BundledAggregations] = {}
+
+        # Fetch other relations per event.
         for event in events:
+            # De-duplicate events by ID to handle the same event requested multiple
+            # times. The caches that _get_bundled_aggregation_for_event use should
+            # capture this, but best to reduce work.
+            if event.event_id in seen_event_ids:
+                continue
+            seen_event_ids.add(event.event_id)
+
             event_result = await self._get_bundled_aggregation_for_event(event, user_id)
             if event_result:
                 results[event.event_id] = event_result
+
+        # Fetch any edits.
+        edits = await self._get_applicable_edits(seen_event_ids)
+        for event_id, edit in edits.items():
+            results.setdefault(event_id, BundledAggregations()).replace = edit
+
+        # Fetch thread summaries.
+        if self._msc3440_enabled:
+            summaries = await self._get_thread_summaries(seen_event_ids)
+            # Only fetch participated for a limited selection based on what had
+            # summaries.
+            participated = await self._get_threads_participated(
+                summaries.keys(), user_id
+            )
+            for event_id, summary in summaries.items():
+                if summary:
+                    thread_count, latest_thread_event, edit = summary
+                    results.setdefault(
+                        event_id, BundledAggregations()
+                    ).thread = _ThreadAggregation(
+                        latest_event=latest_thread_event,
+                        latest_edit=edit,
+                        count=thread_count,
+                        # If there's a thread summary it must also exist in the
+                        # participated dictionary.
+                        current_user_participated=participated[event_id],
+                    )
 
         return results
 

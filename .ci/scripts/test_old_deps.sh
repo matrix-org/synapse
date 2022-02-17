@@ -8,11 +8,13 @@ export DEBIAN_FRONTEND=noninteractive
 set -ex
 
 apt-get update
-apt-get install -y python3 python3-dev python3-pip libxml2-dev libxslt-dev xmlsec1 zlib1g-dev tox libjpeg-dev libwebp-dev
+apt-get install -y \
+        python3 python3-dev python3-pip python3-venv \
+        libxml2-dev libxslt-dev xmlsec1 zlib1g-dev tox libjpeg-dev libwebp-dev
 
 export LANG="C.UTF-8"
 
 # Prevent virtualenv from auto-updating pip to an incompatible version
 export VIRTUALENV_NO_DOWNLOAD=1
 
-exec tox -e py3-old,combine
+exec tox -e py3-old

@@ -1,0 +1,1 @@
+Configure `tox` to use `venv` rather than `virtualenv`.

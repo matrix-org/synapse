@@ -30,9 +30,11 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
 )
 
 import attr
+from matrix_common.versionstring import get_distribution_version_string
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, Metric
 from prometheus_client.core import (
     REGISTRY,
@@ -42,14 +44,14 @@ from prometheus_client.core import (
 
 from twisted.python.threadpool import ThreadPool
 
-import synapse.metrics._reactor_metrics
+# This module is imported for its side effects; flake8 needn't warn that it's unused.
+import synapse.metrics._reactor_metrics  # noqa: F401
 from synapse.metrics._exposition import (
     MetricsResource,
     generate_latest,
     start_http_server,
 )
 from synapse.metrics._gc import MIN_TIME_BETWEEN_GCS, install_gc_manager
-from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
 
@@ -60,12 +62,19 @@ all_gauges: "Dict[str, Union[LaterGauge, InFlightGauge]]" = {}
 HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 
 
-class RegistryProxy:
+class _RegistryProxy:
     @staticmethod
     def collect() -> Iterable[Metric]:
         for metric in REGISTRY.collect():
             if not metric.name.startswith("__"):
                 yield metric
+
+
+# A little bit nasty, but collect() above is static so a Protocol doesn't work.
+# _RegistryProxy matches the signature of a CollectorRegistry instance enough
+# for it to be usable in the contexts in which we use it.
+# TODO Do something nicer about this.
+RegistryProxy = cast(CollectorRegistry, _RegistryProxy)
 
 
 @attr.s(slots=True, hash=True, auto_attribs=True)
@@ -409,7 +418,7 @@ build_info = Gauge(
 )
 build_info.labels(
     " ".join([platform.python_implementation(), platform.python_version()]),
-    get_version_string(synapse),
+    get_distribution_version_string("matrix-synapse"),
     " ".join([platform.system(), platform.release()]),
 ).set(1)
 

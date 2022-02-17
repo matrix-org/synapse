@@ -62,3 +62,35 @@ class SendJoinParserTestCase(TestCase):
         self.assertEqual(len(parsed_response.state), 1, parsed_response)
         self.assertEqual(parsed_response.event_dict, {}, parsed_response)
         self.assertIsNone(parsed_response.event, parsed_response)
+        self.assertFalse(parsed_response.partial_state, parsed_response)
+        self.assertEqual(parsed_response.servers_in_room, None, parsed_response)
+
+    def test_partial_state(self) -> None:
+        """Check that the partial_state flag is correctly parsed"""
+        parser = SendJoinParser(RoomVersions.V1, False)
+        response = {
+            "org.matrix.msc3706.partial_state": True,
+        }
+
+        serialised_response = json.dumps(response).encode()
+
+        # Send data to the parser
+        parser.write(serialised_response)
+
+        # Retrieve and check the parsed SendJoinResponse
+        parsed_response = parser.finish()
+        self.assertTrue(parsed_response.partial_state)
+
+    def test_servers_in_room(self) -> None:
+        """Check that the servers_in_room field is correctly parsed"""
+        parser = SendJoinParser(RoomVersions.V1, False)
+        response = {"org.matrix.msc3706.servers_in_room": ["hs1", "hs2"]}
+
+        serialised_response = json.dumps(response).encode()
+
+        # Send data to the parser
+        parser.write(serialised_response)
+
+        # Retrieve and check the parsed SendJoinResponse
+        parsed_response = parser.finish()
+        self.assertEqual(parsed_response.servers_in_room, ["hs1", "hs2"])

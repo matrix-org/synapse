@@ -15,6 +15,7 @@
 import functools
 import logging
 import re
+import time
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, Tuple, cast
 
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
@@ -24,8 +25,10 @@ from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
+    active_span,
     set_tag,
     span_context_from_request,
+    start_active_span,
     start_active_span_follows_from,
     whitelisted_homeserver,
 )
@@ -265,9 +268,10 @@ class BaseFederationServlet:
                 content = parse_json_object_from_request(request)
 
             try:
-                origin: Optional[str] = await authenticator.authenticate_request(
-                    request, content
-                )
+                with start_active_span("authenticate_request"):
+                    origin: Optional[str] = await authenticator.authenticate_request(
+                        request, content
+                    )
             except NoAuthenticationError:
                 origin = None
                 if self.REQUIRE_AUTH:
@@ -282,32 +286,57 @@ class BaseFederationServlet:
             # update the active opentracing span with the authenticated entity
             set_tag("authenticated_entity", origin)
 
-            # if the origin is authenticated and whitelisted, link to its span context
+            # if the origin is authenticated and whitelisted, use its span context
+            # as the parent.
             context = None
             if origin and whitelisted_homeserver(origin):
                 context = span_context_from_request(request)
 
-            scope = start_active_span_follows_from(
-                "incoming-federation-request", contexts=(context,) if context else ()
-            )
+            if context:
+                servlet_span = active_span()
+                # a scope which uses the origin's context as a parent
+                processing_start_time = time.time()
+                scope = start_active_span_follows_from(
+                    "incoming-federation-request",
+                    child_of=context,
+                    contexts=(servlet_span,),
+                    start_time=processing_start_time,
+                )
 
-            with scope:
-                if origin and self.RATELIMIT:
-                    with ratelimiter.ratelimit(origin) as d:
-                        await d
-                        if request._disconnected:
-                            logger.warning(
-                                "client disconnected before we started processing "
-                                "request"
+            else:
+                # just use our context as a parent
+                scope = start_active_span(
+                    "incoming-federation-request",
+                )
+
+            try:
+                with scope:
+                    if origin and self.RATELIMIT:
+                        with ratelimiter.ratelimit(origin) as d:
+                            await d
+                            if request._disconnected:
+                                logger.warning(
+                                    "client disconnected before we started processing "
+                                    "request"
+                                )
+                                return None
+                            response = await func(
+                                origin, content, request.args, *args, **kwargs
                             )
-                            return None
+                    else:
                         response = await func(
                             origin, content, request.args, *args, **kwargs
                         )
-                else:
-                    response = await func(
-                        origin, content, request.args, *args, **kwargs
+            finally:
+                # if we used the origin's context as the parent, add a new span using
+                # the servlet span as a parent, so that we have a link
+                if context:
+                    scope2 = start_active_span_follows_from(
+                        "process-federation_request",
+                        contexts=(scope.span,),
+                        start_time=processing_start_time,
                     )
+                    scope2.close()
 
             return response
 

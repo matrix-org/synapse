@@ -198,3 +198,43 @@ class SendToDeviceTestCase(HomeserverTestCase):
                 "content": {"idx": 3},
             },
         )
+
+    def test_limited_sync(self):
+        """If a limited sync for to-devices happens the next /sync should respond immediately."""
+
+        self.register_user("u1", "pass")
+        user1_tok = self.login("u1", "pass", "d1")
+
+        user2 = self.register_user("u2", "pass")
+        user2_tok = self.login("u2", "pass", "d2")
+
+        # Do an initial sync
+        channel = self.make_request("GET", "/sync", access_token=user2_tok)
+        self.assertEqual(channel.code, 200, channel.result)
+        sync_token = channel.json_body["next_batch"]
+
+        # Send 150 to-device messages. We limit to 100 in `/sync`
+        for i in range(150):
+            test_msg = {"foo": "bar"}
+            chan = self.make_request(
+                "PUT",
+                f"/_matrix/client/r0/sendToDevice/m.test/1234-{i}",
+                content={"messages": {user2: {"d2": test_msg}}},
+                access_token=user1_tok,
+            )
+            self.assertEqual(chan.code, 200, chan.result)
+
+        channel = self.make_request(
+            "GET", f"/sync?since={sync_token}&timeout=300000", access_token=user2_tok
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        messages = channel.json_body.get("to_device", {}).get("events", [])
+        self.assertEqual(len(messages), 100)
+        sync_token = channel.json_body["next_batch"]
+
+        channel = self.make_request(
+            "GET", f"/sync?since={sync_token}&timeout=300000", access_token=user2_tok
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        messages = channel.json_body.get("to_device", {}).get("events", [])
+        self.assertEqual(len(messages), 50)

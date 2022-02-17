@@ -48,7 +48,6 @@ from synapse.events.spamcheck import (
     CHECK_USERNAME_FOR_SPAM_CALLBACK,
     USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
     USER_MAY_CREATE_ROOM_CALLBACK,
-    USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK,
     USER_MAY_INVITE_CALLBACK,
     USER_MAY_JOIN_ROOM_CALLBACK,
     USER_MAY_PUBLISH_ROOM_CALLBACK,
@@ -71,7 +70,9 @@ from synapse.handlers.account_validity import (
 from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
     CHECK_AUTH_CALLBACK,
+    GET_DISPLAYNAME_FOR_REGISTRATION_CALLBACK,
     GET_USERNAME_FOR_REGISTRATION_CALLBACK,
+    IS_3PID_ALLOWED_CALLBACK,
     ON_LOGGED_OUT_CALLBACK,
     AuthHandler,
 )
@@ -211,14 +212,12 @@ class ModuleApi:
 
     def register_spam_checker_callbacks(
         self,
+        *,
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
         user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
         user_may_create_room: Optional[USER_MAY_CREATE_ROOM_CALLBACK] = None,
-        user_may_create_room_with_invites: Optional[
-            USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK
-        ] = None,
         user_may_create_room_alias: Optional[
             USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
         ] = None,
@@ -239,7 +238,6 @@ class ModuleApi:
             user_may_invite=user_may_invite,
             user_may_send_3pid_invite=user_may_send_3pid_invite,
             user_may_create_room=user_may_create_room,
-            user_may_create_room_with_invites=user_may_create_room_with_invites,
             user_may_create_room_alias=user_may_create_room_alias,
             user_may_publish_room=user_may_publish_room,
             check_username_for_spam=check_username_for_spam,
@@ -249,6 +247,7 @@ class ModuleApi:
 
     def register_account_validity_callbacks(
         self,
+        *,
         is_user_expired: Optional[IS_USER_EXPIRED_CALLBACK] = None,
         on_user_registration: Optional[ON_USER_REGISTRATION_CALLBACK] = None,
         on_legacy_send_mail: Optional[ON_LEGACY_SEND_MAIL_CALLBACK] = None,
@@ -269,6 +268,7 @@ class ModuleApi:
 
     def register_third_party_rules_callbacks(
         self,
+        *,
         check_event_allowed: Optional[CHECK_EVENT_ALLOWED_CALLBACK] = None,
         on_create_room: Optional[ON_CREATE_ROOM_CALLBACK] = None,
         check_threepid_can_be_invited: Optional[
@@ -293,6 +293,7 @@ class ModuleApi:
 
     def register_presence_router_callbacks(
         self,
+        *,
         get_users_for_states: Optional[GET_USERS_FOR_STATES_CALLBACK] = None,
         get_interested_users: Optional[GET_INTERESTED_USERS_CALLBACK] = None,
     ) -> None:
@@ -307,13 +308,18 @@ class ModuleApi:
 
     def register_password_auth_provider_callbacks(
         self,
+        *,
         check_3pid_auth: Optional[CHECK_3PID_AUTH_CALLBACK] = None,
         on_logged_out: Optional[ON_LOGGED_OUT_CALLBACK] = None,
         auth_checkers: Optional[
             Dict[Tuple[str, Tuple[str, ...]], CHECK_AUTH_CALLBACK]
         ] = None,
+        is_3pid_allowed: Optional[IS_3PID_ALLOWED_CALLBACK] = None,
         get_username_for_registration: Optional[
             GET_USERNAME_FOR_REGISTRATION_CALLBACK
+        ] = None,
+        get_displayname_for_registration: Optional[
+            GET_DISPLAYNAME_FOR_REGISTRATION_CALLBACK
         ] = None,
     ) -> None:
         """Registers callbacks for password auth provider capabilities.
@@ -323,12 +329,15 @@ class ModuleApi:
         return self._password_auth_provider.register_password_auth_provider_callbacks(
             check_3pid_auth=check_3pid_auth,
             on_logged_out=on_logged_out,
+            is_3pid_allowed=is_3pid_allowed,
             auth_checkers=auth_checkers,
             get_username_for_registration=get_username_for_registration,
+            get_displayname_for_registration=get_displayname_for_registration,
         )
 
     def register_background_update_controller_callbacks(
         self,
+        *,
         on_update: ON_UPDATE_CALLBACK,
         default_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
         min_batch_size: Optional[MIN_BATCH_SIZE_CALLBACK] = None,
@@ -400,6 +409,32 @@ class ModuleApi:
         Added in Synapse v1.39.0.
         """
         return self._hs.config.email.email_app_name
+
+    @property
+    def server_name(self) -> str:
+        """The server name for the local homeserver.
+
+        Added in Synapse v1.53.0.
+        """
+        return self._server_name
+
+    @property
+    def worker_name(self) -> Optional[str]:
+        """The name of the worker this specific instance is running as per the
+        "worker_name" configuration setting, or None if it's the main process.
+
+        Added in Synapse v1.53.0.
+        """
+        return self._hs.config.worker.worker_name
+
+    @property
+    def worker_app(self) -> Optional[str]:
+        """The name of the worker app this specific instance is running as per the
+        "worker_app" configuration setting, or None if it's the main process.
+
+        Added in Synapse v1.53.0.
+        """
+        return self._hs.config.worker.worker_app
 
     async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:
         """Get user info by user_id

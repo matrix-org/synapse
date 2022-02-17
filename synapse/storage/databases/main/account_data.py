@@ -106,6 +106,11 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
             "AccountDataAndTagsChangeCache", account_max
         )
 
+        self.db_pool.updates.register_background_update_handler(
+            "delete_account_data_for_deactivated_users",
+            self._delete_account_data_for_deactivated_users,
+        )
+
     def get_max_account_data_stream_id(self) -> int:
         """Get the current max stream ID for account data stream
 
@@ -549,71 +554,120 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
 
     async def purge_account_data_for_user(self, user_id: str) -> None:
         """
-        Removes the account data for a user.
+        Removes ALL the account data for a user.
+        Intended to be used upon user deactivation.
 
-        This is intended to be used upon user deactivation and also removes any
-        derived information from account data (e.g. push rules and ignored users).
-
-        Args:
-            user_id: The user ID to remove data for.
+        Also purges the user from the ignored_users cache table
+        and the push_rules cache tables.
         """
-
-        def purge_account_data_for_user_txn(txn: LoggingTransaction) -> None:
-            # Purge from the primary account_data tables.
-            self.db_pool.simple_delete_txn(
-                txn, table="account_data", keyvalues={"user_id": user_id}
-            )
-
-            self.db_pool.simple_delete_txn(
-                txn, table="room_account_data", keyvalues={"user_id": user_id}
-            )
-
-            # Purge from ignored_users where this user is the ignorer.
-            # N.B. We don't purge where this user is the ignoree, because that
-            #      interferes with other users' account data.
-            #      It's also not this user's data to delete!
-            self.db_pool.simple_delete_txn(
-                txn, table="ignored_users", keyvalues={"ignorer_user_id": user_id}
-            )
-
-            # Remove the push rules
-            self.db_pool.simple_delete_txn(
-                txn, table="push_rules", keyvalues={"user_name": user_id}
-            )
-            self.db_pool.simple_delete_txn(
-                txn, table="push_rules_enable", keyvalues={"user_name": user_id}
-            )
-            self.db_pool.simple_delete_txn(
-                txn, table="push_rules_stream", keyvalues={"user_id": user_id}
-            )
-
-            # Invalidate caches as appropriate
-            self._invalidate_cache_and_stream(
-                txn, self.get_account_data_for_room_and_type, (user_id,)
-            )
-            self._invalidate_cache_and_stream(
-                txn, self.get_account_data_for_user, (user_id,)
-            )
-            self._invalidate_cache_and_stream(
-                txn, self.get_global_account_data_by_type_for_user, (user_id,)
-            )
-            self._invalidate_cache_and_stream(
-                txn, self.get_account_data_for_room, (user_id,)
-            )
-            self._invalidate_cache_and_stream(
-                txn, self.get_push_rules_for_user, (user_id,)
-            )
-            self._invalidate_cache_and_stream(
-                txn, self.get_push_rules_enabled_for_user, (user_id,)
-            )
-            # This user might be contained in the ignored_by cache for other users,
-            # so we have to invalidate it all.
-            self._invalidate_all_cache_and_stream(txn, self.ignored_by)
 
         await self.db_pool.runInteraction(
             "purge_account_data_for_user_txn",
-            purge_account_data_for_user_txn,
+            self._purge_account_data_for_user_txn,
+            user_id,
         )
+
+    def _purge_account_data_for_user_txn(
+        self, txn: LoggingTransaction, user_id: str
+    ) -> None:
+        """
+        See `purge_account_data_for_user`.
+        """
+        # Purge from the primary account_data tables.
+        self.db_pool.simple_delete_txn(
+            txn, table="account_data", keyvalues={"user_id": user_id}
+        )
+
+        self.db_pool.simple_delete_txn(
+            txn, table="room_account_data", keyvalues={"user_id": user_id}
+        )
+
+        # Purge from ignored_users where this user is the ignorer.
+        # N.B. We don't purge where this user is the ignoree, because that
+        #      interferes with other users' account data.
+        #      It's also not this user's data to delete!
+        self.db_pool.simple_delete_txn(
+            txn, table="ignored_users", keyvalues={"ignorer_user_id": user_id}
+        )
+
+        # Remove the push rules
+        self.db_pool.simple_delete_txn(
+            txn, table="push_rules", keyvalues={"user_name": user_id}
+        )
+        self.db_pool.simple_delete_txn(
+            txn, table="push_rules_enable", keyvalues={"user_name": user_id}
+        )
+        self.db_pool.simple_delete_txn(
+            txn, table="push_rules_stream", keyvalues={"user_id": user_id}
+        )
+
+        # Invalidate caches as appropriate
+        self._invalidate_cache_and_stream(
+            txn, self.get_account_data_for_room_and_type, (user_id,)
+        )
+        self._invalidate_cache_and_stream(
+            txn, self.get_account_data_for_user, (user_id,)
+        )
+        self._invalidate_cache_and_stream(
+            txn, self.get_global_account_data_by_type_for_user, (user_id,)
+        )
+        self._invalidate_cache_and_stream(
+            txn, self.get_account_data_for_room, (user_id,)
+        )
+        self._invalidate_cache_and_stream(txn, self.get_push_rules_for_user, (user_id,))
+        self._invalidate_cache_and_stream(
+            txn, self.get_push_rules_enabled_for_user, (user_id,)
+        )
+        # This user might be contained in the ignored_by cache for other users,
+        # so we have to invalidate it all.
+        self._invalidate_all_cache_and_stream(txn, self.ignored_by)
+
+    async def _delete_account_data_for_deactivated_users(
+        self, progress: dict, batch_size: int
+    ) -> int:
+        """
+        Retroactively purges account data for users that have already been deactivated.
+        Gets run as a background update caused by a schema delta.
+        """
+
+        last_user: str = progress.get("last_user", "")
+
+        def _delete_account_data_for_deactivated_users_txn(
+            txn: LoggingTransaction,
+        ) -> int:
+            sql = """
+                SELECT name FROM users
+                WHERE deactivated = ? and name > ?
+                ORDER BY name ASC
+                LIMIT ?
+            """
+
+            txn.execute(sql, (1, last_user, batch_size))
+            users = [row[0] for row in txn]
+
+            for user in users:
+                self._purge_account_data_for_user_txn(txn, user_id=user)
+
+            if users:
+                self.db_pool.updates._background_update_progress_txn(
+                    txn,
+                    "delete_account_data_for_deactivated_users",
+                    {"last_user": users[-1]},
+                )
+
+            return len(users)
+
+        number_deleted = await self.db_pool.runInteraction(
+            "_delete_account_data_for_deactivated_users",
+            _delete_account_data_for_deactivated_users_txn,
+        )
+
+        if number_deleted < batch_size:
+            await self.db_pool.updates._end_background_update(
+                "delete_account_data_for_deactivated_users"
+            )
+
+        return number_deleted
 
 
 class AccountDataStore(AccountDataWorkerStore):
