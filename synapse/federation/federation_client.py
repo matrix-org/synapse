@@ -436,8 +436,9 @@ class FederationClient(FederationBase):
         state_events = result.state
         auth_events = result.auth_events
 
-        # we may as filter out any duplicates from the response, which avoids some
-        # potential failure modes later.
+        # we may as well filter out any duplicates from the response, to save
+        # processing them multiple times. (In particular, events may be present in 
+        # `auth_events` as well as `state`, which is redundant).
         #
         # We don't rely on the sort order of either of them, which makes it easier
         state_event_map = {event.event_id: event for event in state_events}
