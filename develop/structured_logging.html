@@ -252,13 +252,11 @@ loggers:
 with the SQL layer at 'WARNING', and will log JSON formatted messages to a
 remote endpoint at 10.1.2.3:9999.</p>
 <h2 id="upgrading-from-legacy-structured-logging-configuration"><a class="header" href="#upgrading-from-legacy-structured-logging-configuration">Upgrading from legacy structured logging configuration</a></h2>
-<p>Versions of Synapse prior to v1.23.0 included a custom structured logging
-configuration which is deprecated. It used a <code>structured: true</code> flag and
-configured <code>drains</code> instead of <code>handlers</code> and <code>formatters</code>.</p>
-<p>Synapse currently automatically converts the old configuration to the new
-configuration, but this will be removed in a future version of Synapse. The
-following reference can be used to update your configuration. Based on the drain
-<code>type</code>, we can pick a new handler:</p>
+<p>Versions of Synapse prior to v1.54.0 automatically converted the legacy
+structured logging configuration, which was deprecated in v1.23.0, to the standard
+library logging configuration.</p>
+<p>The following reference can be used to update your configuration. Based on the
+drain <code>type</code>, we can pick a new handler:</p>
 <ol>
 <li>For a type of <code>console</code>, <code>console_json</code>, or <code>console_json_terse</code>: a handler
 with a class of <code>logging.StreamHandler</code> and a <code>stream</code> of <code>ext://sys.stdout</code>

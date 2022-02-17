@@ -1638,6 +1638,12 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1540"><a class="header" href="#upgrading-to-v1540">Upgrading to v1.54.0</a></h1>
+<h2 id="legacy-structured-logging-configuration-removal"><a class="header" href="#legacy-structured-logging-configuration-removal">Legacy structured logging configuration removal</a></h2>
+<p>This release removes support for the <code>structured: true</code> logging configuration
+which was deprecated in Synapse v1.23.0. If your logging configuration contains
+<code>structured: true</code> then it should be modified based on the
+<a href="structured_logging.html">structured logging documentation</a>.</p>
 <h1 id="upgrading-to-v1530"><a class="header" href="#upgrading-to-v1530">Upgrading to v1.53.0</a></h1>
 <h2 id="dropping-support-for-webclient-listeners-and-non-https-web_client_location"><a class="header" href="#dropping-support-for-webclient-listeners-and-non-https-web_client_location">Dropping support for <code>webclient</code> listeners and non-HTTP(S) <code>web_client_location</code></a></h2>
 <p>Per the deprecation notice in Synapse v1.51.0, listeners of type  <code>webclient</code>
@@ -5805,13 +5811,11 @@ loggers:
 with the SQL layer at 'WARNING', and will log JSON formatted messages to a
 remote endpoint at 10.1.2.3:9999.</p>
 <h2 id="upgrading-from-legacy-structured-logging-configuration"><a class="header" href="#upgrading-from-legacy-structured-logging-configuration">Upgrading from legacy structured logging configuration</a></h2>
-<p>Versions of Synapse prior to v1.23.0 included a custom structured logging
-configuration which is deprecated. It used a <code>structured: true</code> flag and
-configured <code>drains</code> instead of <code>handlers</code> and <code>formatters</code>.</p>
-<p>Synapse currently automatically converts the old configuration to the new
-configuration, but this will be removed in a future version of Synapse. The
-following reference can be used to update your configuration. Based on the drain
-<code>type</code>, we can pick a new handler:</p>
+<p>Versions of Synapse prior to v1.54.0 automatically converted the legacy
+structured logging configuration, which was deprecated in v1.23.0, to the standard
+library logging configuration.</p>
+<p>The following reference can be used to update your configuration. Based on the
+drain <code>type</code>, we can pick a new handler:</p>
 <ol>
 <li>For a type of <code>console</code>, <code>console_json</code>, or <code>console_json_terse</code>: a handler
 with a class of <code>logging.StreamHandler</code> and a <code>stream</code> of <code>ext://sys.stdout</code>
