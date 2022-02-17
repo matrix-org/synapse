@@ -486,6 +486,8 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
             {
                 "user_id": user_id,
                 "device_id": device_id,
+                # MSC3069 entered spec in Matrix 1.2 but maintained compatibility
+                "org.matrix.msc3069.is_guest": False,
                 "is_guest": False,
             },
         )
@@ -504,6 +506,8 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
             {
                 "user_id": user_id,
                 "device_id": device_id,
+                # MSC3069 entered spec in Matrix 1.2 but maintained compatibility
+                "org.matrix.msc3069.is_guest": True,
                 "is_guest": True,
             },
         )
@@ -526,6 +530,8 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
             whoami,
             {
                 "user_id": user_id,
+                # MSC3069 entered spec in Matrix 1.2 but maintained compatibility
+                "org.matrix.msc3069.is_guest": False,
                 "is_guest": False,
             },
         )
