@@ -648,7 +648,11 @@ class ModuleApi:
         Added in Synapse v1.9.0.
 
         Args:
-            auth_provider: identifier for the remote auth provider
+            auth_provider: identifier for the remote auth provider, see `sso` and
+                `oidc_providers` in the homeserver configuration.
+
+                Note that no error is raised if the provided value is not in the
+                homeserver configuration.
             external_id: id on that system
             user_id: complete mxid that it is mapped to
         """
