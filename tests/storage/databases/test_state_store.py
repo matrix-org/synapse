@@ -15,10 +15,10 @@ import typing
 from typing import Dict, List, Sequence, Tuple
 from unittest.mock import patch
 
-from synapse.api.constants import EventTypes
 from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.api.constants import EventTypes
 from synapse.storage.state import StateFilter
 from synapse.types import StateMap
 from synapse.util import Clock
@@ -30,9 +30,7 @@ if typing.TYPE_CHECKING:
 
 # StateFilter for ALL non-m.room.member state events
 ALL_NON_MEMBERS_STATE_FILTER = StateFilter.freeze(
-    types={
-        EventTypes.Member: set()
-    },
+    types={EventTypes.Member: set()},
     include_others=True,
 )
 
@@ -42,8 +40,9 @@ FAKE_STATE = {
     (EventTypes.Member, "@charlie:test"): "invite",
     ("test.type", "a"): "AAA",
     ("test.type", "b"): "BBB",
-    ("other.event.type", "state.key"): "123"
+    ("other.event.type", "state.key"): "123",
 }
+
 
 class StateGroupInflightCachingTestCase(HomeserverTestCase):
     def prepare(
@@ -83,10 +82,7 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
         """
 
         # Return a filtered copy of the fake state
-        d.callback({
-            group: state_filter.filter_state(FAKE_STATE)
-            for group in groups
-        })
+        d.callback({group: state_filter.filter_state(FAKE_STATE) for group in groups})
 
     def test_duplicate_requests_deduplicated(self) -> None:
         """
@@ -129,13 +125,8 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
         # Now we can complete the request
         self._complete_request_fake(groups, sf, d)
 
-        self.assertEqual(
-            self.get_success(req1), FAKE_STATE
-        )
-        self.assertEqual(
-            self.get_success(req2), FAKE_STATE
-        )
-
+        self.assertEqual(self.get_success(req1), FAKE_STATE)
+        self.assertEqual(self.get_success(req2), FAKE_STATE)
 
     def test_smaller_request_deduplicated(self) -> None:
         """
@@ -182,8 +173,69 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
         self._complete_request_fake(groups, sf, d)
 
         self.assertEqual(
-            self.get_success(req1), {("test.type", "a"): "AAA", ("test.type", "b"): "BBB"}
+            self.get_success(req1),
+            {("test.type", "a"): "AAA", ("test.type", "b"): "BBB"},
         )
+        self.assertEqual(self.get_success(req2), {("test.type", "b"): "BBB"})
+
+    def test_partially_overlapping_request_deduplicated(self) -> None:
+        """
+        Tests that partially-overlapping requests are partially deduplicated.
+
+        This test:
+        - requests a single type of wildcard state
+          (This is internally expanded to be all non-member state)
+        - requests the entire state in parallel
+        - checks to see that two database queries were made, but that the second
+          one is only for member state.
+        - completes the database queries
+        - checks that both requests have the correct result.
+        """
+
+        req1 = ensureDeferred(
+            self.state_datastore._get_state_for_group_using_inflight_cache(
+                42, StateFilter.from_types((("test.type", None),))
+            )
+        )
+        self.pump(by=0.1)
+
+        # This should have gone to the database
+        self.assertEqual(len(self.get_state_group_calls), 1)
+        self.assertFalse(req1.called)
+
+        req2 = ensureDeferred(
+            self.state_datastore._get_state_for_group_using_inflight_cache(
+                42, StateFilter.all()
+            )
+        )
+        self.pump(by=0.1)
+
+        # Because it only partially overlaps, this also went to the database
+        self.assertEqual(len(self.get_state_group_calls), 2)
+        self.assertFalse(req1.called)
+        self.assertFalse(req2.called)
+
+        # First request:
+        groups, sf, d = self.get_state_group_calls[0]
+        self.assertEqual(groups, (42,))
+        # The state filter is expanded internally for increased cache hit rate,
+        # so we the database sees a wider state filter than requested.
+        self.assertEqual(sf, ALL_NON_MEMBERS_STATE_FILTER)
+        self._complete_request_fake(groups, sf, d)
+
+        # Second request:
+        groups, sf, d = self.get_state_group_calls[1]
+        self.assertEqual(groups, (42,))
+        # The state filter is narrowed to only request membership state, because
+        # the remainder of the state is already being queried in the first request!
         self.assertEqual(
-            self.get_success(req2), {("test.type", "b"): "BBB"}
+            sf, StateFilter.freeze({EventTypes.Member: None}, include_others=False)
         )
+        self._complete_request_fake(groups, sf, d)
+
+        # Check the results are correct
+        self.assertEqual(
+            self.get_success(req1),
+            {("test.type", "a"): "AAA", ("test.type", "b"): "BBB"},
+        )
+        self.assertEqual(self.get_success(req2), FAKE_STATE)
