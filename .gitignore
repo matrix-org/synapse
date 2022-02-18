@@ -30,6 +30,9 @@ __pycache__/
 /media_store/
 /uploads
 
+# For direnv uses
+/.envrc
+
 # IDEs
 /.idea/
 /.ropeproject/
