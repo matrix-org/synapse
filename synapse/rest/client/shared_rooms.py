@@ -48,13 +48,6 @@ class UserSharedRoomsServlet(RestServlet):
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
 
-        if not self.user_directory_active:
-            raise SynapseError(
-                code=400,
-                msg="The user directory is disabled on this server. Cannot determine shared rooms.",
-                errcode=Codes.FORBIDDEN,
-            )
-
         UserID.from_string(user_id)
 
         requester = await self.auth.get_user_by_req(request)
