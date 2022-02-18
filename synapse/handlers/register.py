@@ -539,10 +539,9 @@ class RegistrationHandler:
                             event_id, allow_none=True
                         )
                         if join_rules_event:
-                            # TODO: Use is_join_rule utility
-                            join_rule = join_rules_event.content.get("join_rule", None)
-                            requires_invite = (
-                                join_rule and join_rule != JoinRules.PUBLIC
+                            room_version = await self.store.get_room_version(r)
+                            requires_invite = not is_join_rule(
+                                room_version, join_rules_event, JoinRules.PUBLIC,
                             )
 
                 # Send the invite, if necessary.

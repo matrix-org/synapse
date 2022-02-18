@@ -307,9 +307,11 @@ class RoomListHandler:
 
         join_rules_event = current_state.get((EventTypes.JoinRules, ""))
         if join_rules_event:
-            # TODO: Use is_join_rule utility
-            join_rule = join_rules_event.content.get("join_rule", None)
-            if not allow_private and join_rule and join_rule != JoinRules.PUBLIC:
+            room_version = await self.store.get_room_version(room_id)
+            is_public = is_join_rule(
+                room_version, join_rules_event, JoinRules.PUBLIC,
+            )
+            if not allow_private and not is_public:
                 return None
 
         # Return whether this room is open to federation users or not

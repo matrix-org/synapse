@@ -1420,7 +1420,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if room_create_event:
             room_type = room_create_event.content.get(EventContentFields.ROOM_TYPE)
 
-        # TODO: Use is_join_rule utility
+        # Note: for email invites we use the backwards compatible `join_rule`
+        # as it is meant to represent the "most semantically relevant" join
+        # rule for the room. See MSC2613 for details.
         room_join_rules = ""
         join_rules_event = room_state.get((EventTypes.JoinRules, ""))
         if join_rules_event:

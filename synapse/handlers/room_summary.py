@@ -952,6 +952,10 @@ class RoomSummaryHandler:
         """
         # The API doesn't return the room version so assume that a
         # join rule of knock is valid.
+        #
+        # Note: We're relying on the backwards compatible `join_rule`
+        # for the room as it is meant to reference the "most semantically
+        # relevant" join rule. See MSC3613 for details.
         if (
             # TODO: Use is_join_rule utility
             room.get("join_rules") in (JoinRules.PUBLIC, JoinRules.KNOCK)

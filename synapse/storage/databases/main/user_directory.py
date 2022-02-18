@@ -27,6 +27,7 @@ from typing import (
 )
 
 from synapse.api.errors import StoreError
+from synapse.util.join_rules import is_join_rule
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -439,11 +440,10 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
         join_rules_id = current_state_ids.get((EventTypes.JoinRules, ""))
         if join_rules_id:
-            # TODO: Use is_join_rule utility
             join_rule_ev = await self.get_event(join_rules_id, allow_none=True)
-            if join_rule_ev:
-                if join_rule_ev.content.get("join_rule") == JoinRules.PUBLIC:
-                    return True
+            room_version = await self.hs.get_datastore().get_room_version(room_id)
+            if is_join_rule(room_version, join_rule_ev, JoinRules.PUBLIC):
+                return True
 
         hist_vis_id = current_state_ids.get((EventTypes.RoomHistoryVisibility, ""))
         if hist_vis_id:

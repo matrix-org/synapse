@@ -36,6 +36,7 @@ from synapse.rest.admin._base import (
 from synapse.storage.databases.main.room import RoomSortOrder
 from synapse.types import JsonDict, RoomID, UserID, create_requester
 from synapse.util import json_decoder
+from synapse.util.join_rules import is_join_rule
 
 if TYPE_CHECKING:
     from synapse.api.auth import Auth
@@ -439,6 +440,7 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
         self.state_handler = hs.get_state_handler()
+        self.store = hs.get_datastore()
         self.is_mine = hs.is_mine
 
     async def on_POST(
@@ -479,23 +481,22 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
             target_user, authenticated_entity=requester.authenticated_entity
         )
 
-        # send invite if room has "JoinRules.INVITE"
+        # send invite if room has invite-requiring join rules
         room_state = await self.state_handler.get_current_state(room_id)
-        # TODO: Use is_join_rule utility
+        room_version = await self.store.get_room_version(room_id)
         join_rules_event = room_state.get((EventTypes.JoinRules, ""))
-        if join_rules_event:
-            if not (join_rules_event.content.get("join_rule") == JoinRules.PUBLIC):
-                # update_membership with an action of "invite" can raise a
-                # ShadowBanError. This is not handled since it is assumed that
-                # an admin isn't going to call this API with a shadow-banned user.
-                await self.room_member_handler.update_membership(
-                    requester=requester,
-                    target=fake_requester.user,
-                    room_id=room_id,
-                    action="invite",
-                    remote_room_hosts=remote_room_hosts,
-                    ratelimit=False,
-                )
+        if not is_join_rule(room_version, join_rules_event, JoinRules.PUBLIC):
+            # update_membership with an action of "invite" can raise a
+            # ShadowBanError. This is not handled since it is assumed that
+            # an admin isn't going to call this API with a shadow-banned user.
+            await self.room_member_handler.update_membership(
+                requester=requester,
+                target=fake_requester.user,
+                room_id=room_id,
+                action="invite",
+                remote_room_hosts=remote_room_hosts,
+                ratelimit=False,
+            )
 
         await self.room_member_handler.update_membership(
             requester=fake_requester,
@@ -636,11 +637,9 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         if is_joined:
             return HTTPStatus.OK, {}
 
-        # TODO: Use is_join_rule utility
         join_rules = room_state.get((EventTypes.JoinRules, ""))
-        is_public = False
-        if join_rules:
-            is_public = join_rules.content.get("join_rule") == JoinRules.PUBLIC
+        room_version = await self.store.get_room_version(room_id)
+        is_public = is_join_rule(room_version, join_rules, JoinRules.PUBLIC)
 
         if is_public:
             return HTTPStatus.OK, {}
