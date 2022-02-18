@@ -1475,6 +1475,7 @@ class RoomShutdownHandler:
         self.room_member_handler = hs.get_room_member_handler()
         self._room_creation_handler = hs.get_room_creation_handler()
         self._replication = hs.get_replication_data_handler()
+        self._third_party_rules = hs.get_third_party_event_rules()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.store = hs.get_datastore()
 
@@ -1547,6 +1548,13 @@ class RoomShutdownHandler:
 
         if not RoomID.is_valid(room_id):
             raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
+
+        if not await self._third_party_rules.check_can_shutdown_room(
+            requester_user_id, room_id
+        ):
+            raise SynapseError(
+                403, "Shutdown of this room is forbidden", Codes.FORBIDDEN
+            )
 
         # Action the block first (even if the room doesn't exist yet)
         if block:

@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Optional
 
 from synapse.api.errors import SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import Requester, UserID, create_requester
+from synapse.types import Codes, Requester, UserID, create_requester
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -76,9 +76,12 @@ class DeactivateAccountHandler:
         """
 
         # Check if this user can be deactivated
-        if not await self._third_party_rules.check_can_deactivate_user(requester, user_id):
-            raise SynapseError(403, "Deactivation of this user is forbidden", Codes.FORBIDDEN)
-
+        if not await self._third_party_rules.check_can_deactivate_user(
+            requester, user_id
+        ):
+            raise SynapseError(
+                403, "Deactivation of this user is forbidden", Codes.FORBIDDEN
+            )
 
         # FIXME: Theoretically there is a race here wherein user resets
         # password using threepid.
