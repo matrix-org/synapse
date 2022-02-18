@@ -14,7 +14,7 @@
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
-from synapse.rest.client import login, room, mutual_rooms
+from synapse.rest.client import login, mutual_rooms, room
 from synapse.server import HomeServer
 from synapse.util import Clock
 
