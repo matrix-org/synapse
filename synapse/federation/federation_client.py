@@ -17,7 +17,6 @@
 import copy
 import itertools
 import logging
-from functools import partial
 from typing import (
     TYPE_CHECKING,
     Awaitable,
