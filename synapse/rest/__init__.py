@@ -49,7 +49,7 @@ from synapse.rest.client import (
     room_keys,
     room_upgrade_rest_servlet,
     sendtodevice,
-    shared_rooms,
+    mutual_rooms,
     sync,
     tags,
     thirdparty,
@@ -132,4 +132,4 @@ class ClientRestResource(JsonResource):
         admin.register_servlets_for_client_rest_resource(hs, client_resource)
 
         # unstable
-        shared_rooms.register_servlets(hs, client_resource)
+        mutual_rooms.register_servlets(hs, client_resource)

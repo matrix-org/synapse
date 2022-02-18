@@ -28,13 +28,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class UserSharedRoomsServlet(RestServlet):
+class UserMutualRoomsServlet(RestServlet):
     """
-    GET /uk.half-shot.msc2666/user/shared_rooms/{user_id} HTTP/1.1
+    GET /uk.half-shot.msc2666/user/mutual_rooms/{user_id} HTTP/1.1
     """
 
     PATTERNS = client_patterns(
-        "/uk.half-shot.msc2666/user/shared_rooms/(?P<user_id>[^/]*)",
+        "/uk.half-shot.msc2666/user/mutual_rooms/(?P<user_id>[^/]*)",
         releases=(),  # This is an unstable feature
     )
 
@@ -64,7 +64,8 @@ class UserSharedRoomsServlet(RestServlet):
                 msg="You cannot request a list of shared rooms with yourself",
                 errcode=Codes.FORBIDDEN,
             )
-        rooms = await self.store.get_shared_rooms_for_users(
+
+        rooms = await self.store.get_mutual_rooms_for_users(
             requester.user.to_string(), user_id
         )
 
@@ -72,4 +73,4 @@ class UserSharedRoomsServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    UserSharedRoomsServlet(hs).register(http_server)
+    UserMutualRoomsServlet(hs).register(http_server)

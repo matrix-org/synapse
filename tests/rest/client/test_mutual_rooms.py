@@ -14,7 +14,7 @@
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
-from synapse.rest.client import login, room, shared_rooms
+from synapse.rest.client import login, room, mutual_rooms
 from synapse.server import HomeServer
 from synapse.util import Clock
 
@@ -22,16 +22,16 @@ from tests import unittest
 from tests.server import FakeChannel
 
 
-class UserSharedRoomsTest(unittest.HomeserverTestCase):
+class UserMutualRoomsTest(unittest.HomeserverTestCase):
     """
-    Tests the UserSharedRoomsServlet.
+    Tests the UserMutualRoomsServlet.
     """
 
     servlets = [
         login.register_servlets,
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
-        shared_rooms.register_servlets,
+        mutual_rooms.register_servlets,
     ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
@@ -43,10 +43,10 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         self.store = hs.get_datastores().main
         self.handler = hs.get_user_directory_handler()
 
-    def _get_shared_rooms(self, token: str, other_user: str) -> FakeChannel:
+    def _get_mutual_rooms(self, token: str, other_user: str) -> FakeChannel:
         return self.make_request(
             "GET",
-            "/_matrix/client/unstable/uk.half-shot.msc2666/user/shared_rooms/%s"
+            "/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms/%s"
             % other_user,
             access_token=token,
         )
@@ -56,14 +56,14 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         A room should show up in the shared list of rooms between two users
         if it is public.
         """
-        self._check_shared_rooms_with(room_one_is_public=True, room_two_is_public=True)
+        self._check_mutual_rooms_with(room_one_is_public=True, room_two_is_public=True)
 
     def test_shared_room_list_private(self) -> None:
         """
         A room should show up in the shared list of rooms between two users
         if it is private.
         """
-        self._check_shared_rooms_with(
+        self._check_mutual_rooms_with(
             room_one_is_public=False, room_two_is_public=False
         )
 
@@ -72,9 +72,9 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         The shared room list between two users should contain both public and private
         rooms.
         """
-        self._check_shared_rooms_with(room_one_is_public=True, room_two_is_public=False)
+        self._check_mutual_rooms_with(room_one_is_public=True, room_two_is_public=False)
 
-    def _check_shared_rooms_with(
+    def _check_mutual_rooms_with(
         self, room_one_is_public: bool, room_two_is_public: bool
     ) -> None:
         """Checks that shared public or private rooms between two users appear in
@@ -94,7 +94,7 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
 
         # Check shared rooms from user1's perspective.
         # We should see the one room in common
-        channel = self._get_shared_rooms(u1_token, u2)
+        channel = self._get_mutual_rooms(u1_token, u2)
         self.assertEqual(200, channel.code, channel.result)
         self.assertEqual(len(channel.json_body["joined"]), 1)
         self.assertEqual(channel.json_body["joined"][0], room_id_one)
@@ -107,7 +107,7 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         self.helper.join(room_id_two, user=u2, tok=u2_token)
 
         # Check shared rooms again. We should now see both rooms.
-        channel = self._get_shared_rooms(u1_token, u2)
+        channel = self._get_mutual_rooms(u1_token, u2)
         self.assertEqual(200, channel.code, channel.result)
         self.assertEqual(len(channel.json_body["joined"]), 2)
         for room_id_id in channel.json_body["joined"]:
@@ -128,7 +128,7 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         self.helper.join(room, user=u2, tok=u2_token)
 
         # Assert user directory is not empty
-        channel = self._get_shared_rooms(u1_token, u2)
+        channel = self._get_mutual_rooms(u1_token, u2)
         self.assertEqual(200, channel.code, channel.result)
         self.assertEqual(len(channel.json_body["joined"]), 1)
         self.assertEqual(channel.json_body["joined"][0], room)
@@ -136,11 +136,11 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         self.helper.leave(room, user=u1, tok=u1_token)
 
         # Check user1's view of shared rooms with user2
-        channel = self._get_shared_rooms(u1_token, u2)
+        channel = self._get_mutual_rooms(u1_token, u2)
         self.assertEqual(200, channel.code, channel.result)
         self.assertEqual(len(channel.json_body["joined"]), 0)
 
         # Check user2's view of shared rooms with user1
-        channel = self._get_shared_rooms(u2_token, u1)
+        channel = self._get_mutual_rooms(u2_token, u1)
         self.assertEqual(200, channel.code, channel.result)
         self.assertEqual(len(channel.json_body["joined"]), 0)
