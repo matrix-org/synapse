@@ -963,6 +963,21 @@ class PersistEventsStore:
                 values=to_insert,
             )
 
+    async def update_current_state(
+        self,
+        room_id: str,
+        state_delta: DeltaState,
+        stream_id: int,
+    ) -> None:
+        """Update the current state stored in the datatabase for the given room"""
+
+        await self.db_pool.runInteraction(
+            "update_current_state",
+            self._update_current_state_txn,
+            state_delta_by_room={room_id: state_delta},
+            stream_id=stream_id,
+        )
+
     def _update_current_state_txn(
         self,
         txn: LoggingTransaction,

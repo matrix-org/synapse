@@ -1077,6 +1077,37 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             get_rooms_for_retention_period_in_range_txn,
         )
 
+    async def clear_partial_state_room(self, room_id: str) -> bool:
+        # this can race with incoming events, so we watch out for FK errors.
+        # todo: this still doesn't completely fix the race, since the persist process
+        #   is not atomic. I fear we need an application-level lock.
+        try:
+            await self.db_pool.runInteraction(
+                "clear_partial_state_room", self._clear_partial_state_room_txn, room_id
+            )
+            return True
+        except self.db_pool.engine.module.DatabaseError as e:
+            # todo: how do we distinguish between FK errors and other errors?
+            logger.warning(
+                "Exception while clearing lazy partial-state-room %s, retrying: %s",
+                room_id,
+                e,
+            )
+            return False
+
+    @staticmethod
+    def _clear_partial_state_room_txn(txn: LoggingTransaction, room_id: str) -> None:
+        DatabasePool.simple_delete_txn(
+            txn,
+            table="partial_state_rooms_servers",
+            keyvalues={"room_id": room_id},
+        )
+        DatabasePool.simple_delete_one_txn(
+            txn,
+            table="partial_state_rooms",
+            keyvalues={"room_id": room_id},
+        )
+
 
 class _BackgroundUpdates:
     REMOVE_TOMESTONED_ROOMS_BG_UPDATE = "remove_tombstoned_rooms_from_directory"
