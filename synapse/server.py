@@ -17,7 +17,7 @@
 # homeservers; either as a full homeserver as a real application, or a small
 # partial one for unit test mocking.
 
-# Imports required for the default HomeServer() implementation
+
 import abc
 import functools
 import logging
@@ -133,7 +133,7 @@ from synapse.server_notices.worker_server_notices_sender import (
     WorkerServerNoticesSender,
 )
 from synapse.state import StateHandler, StateResolutionHandler
-from synapse.storage import Databases, DataStore, Storage
+from synapse.storage import Databases, Storage
 from synapse.streams.events import EventSources
 from synapse.types import DomainSpecificString, ISynapseReactor
 from synapse.util import Clock
