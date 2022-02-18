@@ -47,7 +47,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         self.other_access_token = self.login("otheruser", "pass")
 
         self.room_creator = self.hs.get_room_creation_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     def default_config(self):
         conf = super().default_config()
@@ -99,7 +99,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         persisted_on_1 = False
         persisted_on_2 = False
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         user_id = self.register_user("user", "pass")
         access_token = self.login("user", "pass")
@@ -166,7 +166,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         user_id = self.register_user("user", "pass")
         access_token = self.login("user", "pass")
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         # Create two room on the different workers.
         self._create_room(room_id1, user_id, access_token)
@@ -194,7 +194,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
         #
         # Worker2's event stream position will not advance until we call
         # __aexit__ again.
-        worker_store2 = worker_hs2.get_datastore()
+        worker_store2 = worker_hs2.get_datastores().main
         assert isinstance(worker_store2._stream_id_gen, MultiWriterIdGenerator)
 
         actx = worker_store2._stream_id_gen.get_next()

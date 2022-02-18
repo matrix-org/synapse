@@ -31,7 +31,7 @@ import tests.utils
 
 class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     def test_get_prev_events_for_room(self):
         room_id = "@ROOM:local"

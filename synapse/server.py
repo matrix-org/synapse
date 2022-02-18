@@ -224,7 +224,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     # This is overridden in derived application classes
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
-    # instantiated during setup() for future return by get_datastore()
+    # instantiated during setup() for future return by get_datastores()
     DATASTORE_CLASS = abc.abstractproperty()
 
     tls_server_context_factory: Optional[IOpenSSLContextFactory]
@@ -354,12 +354,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_clock(self) -> Clock:
         return Clock(self._reactor)
 
-    def get_datastore(self) -> DataStore:
-        if not self.datastores:
-            raise Exception("HomeServer.setup must be called before getting datastores")
-
-        return self.datastores.main
-
     def get_datastores(self) -> Databases:
         if not self.datastores:
             raise Exception("HomeServer.setup must be called before getting datastores")
@@ -373,7 +367,7 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_registration_ratelimiter(self) -> Ratelimiter:
         return Ratelimiter(
-            store=self.get_datastore(),
+            store=self.get_datastores().main,
             clock=self.get_clock(),
             rate_hz=self.config.ratelimiting.rc_registration.per_second,
             burst_count=self.config.ratelimiting.rc_registration.burst_count,
@@ -842,7 +836,7 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_request_ratelimiter(self) -> RequestRatelimiter:
         return RequestRatelimiter(
-            self.get_datastore(),
+            self.get_datastores().main,
             self.get_clock(),
             self.config.ratelimiting.rc_message,
             self.config.ratelimiting.rc_admin_redaction,

@@ -75,7 +75,7 @@ class MessageHandler:
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.state = hs.get_state_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
@@ -397,7 +397,7 @@ class EventCreationHandler:
         self.hs = hs
         self.auth = hs.get_auth()
         self._event_auth_handler = hs.get_event_auth_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()

@@ -351,7 +351,7 @@ class MatrixFederationHttpClient:
         )
 
         self.clock = hs.get_clock()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self.version_string_bytes = hs.version_string.encode("ascii")
         self.default_timeout = 60
 

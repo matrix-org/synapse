@@ -189,7 +189,7 @@ class EventBuilderFactory:
         self.hostname = hs.hostname
         self.signing_key = hs.signing_key
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
 

@@ -76,7 +76,7 @@ class PerDestinationQueue:
     ):
         self._server_name = hs.hostname
         self._clock = hs.get_clock()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._transaction_manager = transaction_manager
         self._instance_name = hs.get_instance_name()
         self._federation_shard_config = hs.config.worker.federation_shard_config

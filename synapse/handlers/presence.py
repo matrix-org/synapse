@@ -133,7 +133,7 @@ class BasePresenceHandler(abc.ABC):
 
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.presence_router = hs.get_presence_router()
         self.state = hs.get_state_handler()
         self.is_mine_id = hs.is_mine_id
@@ -1539,7 +1539,7 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
         self.get_presence_handler = hs.get_presence_handler
         self.get_presence_router = hs.get_presence_router
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def get_new_events(
         self,

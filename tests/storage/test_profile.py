@@ -22,7 +22,7 @@ from tests import unittest
 
 class ProfileStoreTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.u_frank = UserID.from_string("@frank:test")
 

@@ -60,7 +60,7 @@ class Auth:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state = hs.get_state_handler()
         self._account_validity_handler = hs.get_account_validity_handler()
 

@@ -36,7 +36,7 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         return self.setup_test_homeserver(config=config)
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.handler = hs.get_user_directory_handler()
 
     def _get_shared_rooms(self, token, other_user) -> FakeChannel:

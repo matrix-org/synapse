@@ -179,7 +179,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         kr = keyring.Keyring(self.hs)
 
         key1 = signedjson.key.generate_signing_key(1)
-        r = self.hs.get_datastore().store_server_verify_keys(
+        r = self.hs.get_datastores().main.store_server_verify_keys(
             "server9",
             time.time() * 1000,
             [("server9", get_key_id(key1), FetchKeyResult(get_verify_key(key1), 1000))],
@@ -272,7 +272,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         )
 
         key1 = signedjson.key.generate_signing_key(1)
-        r = self.hs.get_datastore().store_server_verify_keys(
+        r = self.hs.get_datastores().main.store_server_verify_keys(
             "server9",
             time.time() * 1000,
             [("server9", get_key_id(key1), FetchKeyResult(get_verify_key(key1), None))],
@@ -448,7 +448,7 @@ class ServerKeyFetcherTestCase(unittest.HomeserverTestCase):
         # check that the perspectives store is correctly updated
         lookup_triplet = (SERVER_NAME, testverifykey_id, None)
         key_json = self.get_success(
-            self.hs.get_datastore().get_server_keys_json([lookup_triplet])
+            self.hs.get_datastores().main.get_server_keys_json([lookup_triplet])
         )
         res = key_json[lookup_triplet]
         self.assertEqual(len(res), 1)
@@ -564,7 +564,7 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         # check that the perspectives store is correctly updated
         lookup_triplet = (SERVER_NAME, testverifykey_id, None)
         key_json = self.get_success(
-            self.hs.get_datastore().get_server_keys_json([lookup_triplet])
+            self.hs.get_datastores().main.get_server_keys_json([lookup_triplet])
         )
         res = key_json[lookup_triplet]
         self.assertEqual(len(res), 1)
@@ -683,7 +683,7 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         # check that the perspectives store is correctly updated
         lookup_triplet = (SERVER_NAME, testverifykey_id, None)
         key_json = self.get_success(
-            self.hs.get_datastore().get_server_keys_json([lookup_triplet])
+            self.hs.get_datastores().main.get_server_keys_json([lookup_triplet])
         )
         res = key_json[lookup_triplet]
         self.assertEqual(len(res), 1)

@@ -56,7 +56,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             sender="@as:test",
         )
 
-        self.hs.get_datastore().services_cache.append(appservice)
+        self.hs.get_datastores().main.services_cache.append(appservice)
         request_data = json.dumps(
             {"username": "as_user_kermit", "type": APP_SERVICE_REGISTRATION_TYPE}
         )
@@ -80,7 +80,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             sender="@as:test",
         )
 
-        self.hs.get_datastore().services_cache.append(appservice)
+        self.hs.get_datastores().main.services_cache.append(appservice)
         request_data = json.dumps({"username": "as_user_kermit"})
 
         channel = self.make_request(
@@ -210,7 +210,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         username = "kermit"
         device_id = "frogfone"
         token = "abcd"
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.get_success(
             store.db_pool.simple_insert(
                 "registration_tokens",
@@ -316,7 +316,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
     @override_config({"registration_requires_token": True})
     def test_POST_registration_token_limit_uses(self):
         token = "abcd"
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         # Create token that can be used once
         self.get_success(
             store.db_pool.simple_insert(
@@ -391,7 +391,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
     def test_POST_registration_token_expiry(self):
         token = "abcd"
         now = self.hs.get_clock().time_msec()
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         # Create token that expired yesterday
         self.get_success(
             store.db_pool.simple_insert(
@@ -439,7 +439,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
     def test_POST_registration_token_session_expiry(self):
         """Test `pending` is decremented when an uncompleted session expires."""
         token = "abcd"
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.get_success(
             store.db_pool.simple_insert(
                 "registration_tokens",
@@ -530,7 +530,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         3. Expire the session
         """
         token = "abcd"
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.get_success(
             store.db_pool.simple_insert(
                 "registration_tokens",
@@ -657,7 +657,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         # Add a threepid
         self.get_success(
-            self.hs.get_datastore().user_add_threepid(
+            self.hs.get_datastores().main.user_add_threepid(
                 user_id=user_id,
                 medium="email",
                 address=email,
@@ -941,7 +941,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         self.email_attempts = []
         self.hs.get_send_email_handler()._sendmail = sendmail
 
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
 
         return self.hs
 
@@ -1126,10 +1126,10 @@ class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
         # We need to set these directly, instead of in the homeserver config dict above.
         # This is due to account validity-related config options not being read by
         # Synapse when account_validity.enabled is False.
-        self.hs.get_datastore()._account_validity_period = self.validity_period
-        self.hs.get_datastore()._account_validity_startup_job_max_delta = self.max_delta
+        self.hs.get_datastores().main._account_validity_period = self.validity_period
+        self.hs.get_datastores().main._account_validity_startup_job_max_delta = self.max_delta
 
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
 
         return self.hs
 
@@ -1163,7 +1163,7 @@ class RegistrationTokenValidityRestServletTestCase(unittest.HomeserverTestCase):
 
     def test_GET_token_valid(self):
         token = "abcd"
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.get_success(
             store.db_pool.simple_insert(
                 "registration_tokens",

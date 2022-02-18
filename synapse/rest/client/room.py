@@ -477,7 +477,7 @@ class RoomMemberListRestServlet(RestServlet):
         super().__init__()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
@@ -553,7 +553,7 @@ class RoomMessageListRestServlet(RestServlet):
         self._hs = hs
         self.pagination_handler = hs.get_pagination_handler()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
@@ -621,7 +621,7 @@ class RoomInitialSyncRestServlet(RestServlet):
         super().__init__()
         self.initial_sync_handler = hs.get_initial_sync_handler()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
@@ -642,7 +642,7 @@ class RoomEventServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.clock = hs.get_clock()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self.event_handler = hs.get_event_handler()
         self._event_serializer = hs.get_event_client_serializer()
         self.auth = hs.get_auth()
@@ -1027,7 +1027,7 @@ class JoinedRoomsRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
@@ -1116,7 +1116,7 @@ class TimestampLookupRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self._auth = hs.get_auth()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self.timestamp_lookup_handler = hs.get_timestamp_lookup_handler()
 
     async def on_GET(

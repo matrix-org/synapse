@@ -20,7 +20,7 @@ from tests.unittest import HomeserverTestCase
 
 class TransactionStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
+        self.store = homeserver.get_datastores().main
 
     def test_get_set_transactions(self):
         """Tests that we can successfully get a non-existent entry for

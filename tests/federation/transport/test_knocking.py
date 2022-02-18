@@ -198,7 +198,7 @@ class FederationKnockingTestCase(
     ]
 
     def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
+        self.store = homeserver.get_datastores().main
 
         # We're not going to be properly signing events as our remote homeserver is fake,
         # therefore disable event signature checks.

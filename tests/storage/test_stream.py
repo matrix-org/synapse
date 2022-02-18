@@ -115,7 +115,7 @@ class PaginationTestCase(HomeserverTestCase):
         )
 
         events, next_key = self.get_success(
-            self.hs.get_datastore().paginate_room_events(
+            self.hs.get_datastores().main.paginate_room_events(
                 room_id=self.room_id,
                 from_key=from_token.room_key,
                 to_key=None,

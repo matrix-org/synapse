@@ -49,7 +49,7 @@ class _SearchResult:
 
 class SearchHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state_handler = hs.get_state_handler()
         self.clock = hs.get_clock()
         self.hs = hs

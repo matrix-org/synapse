@@ -65,7 +65,7 @@ class RoomBase(unittest.HomeserverTestCase):
         async def _insert_client_ip(*args, **kwargs):
             return None
 
-        self.hs.get_datastore().insert_client_ip = _insert_client_ip
+        self.hs.get_datastores().main.insert_client_ip = _insert_client_ip
 
         return self.hs
 
@@ -667,7 +667,7 @@ class RoomsCreateTestCase(RoomBase):
 
         # Add the current user to the ratelimit overrides, allowing them no ratelimiting.
         self.get_success(
-            self.hs.get_datastore().set_ratelimit_for_user(self.user_id, 0, 0)
+            self.hs.get_datastores().main.set_ratelimit_for_user(self.user_id, 0, 0)
         )
 
         # Test that the invites aren't ratelimited anymore.
@@ -1060,7 +1060,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
         user_id = self.register_user("testuser", "password")
 
         # Check that the new user successfully joined the four rooms
-        rooms = self.get_success(self.hs.get_datastore().get_rooms_for_user(user_id))
+        rooms = self.get_success(self.hs.get_datastores().main.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 4)
 
 
@@ -1184,7 +1184,7 @@ class RoomMessageListTestCase(RoomBase):
         self.assertTrue("end" in channel.json_body)
 
     def test_room_messages_purge(self):
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         pagination_handler = self.hs.get_pagination_handler()
 
         # Send a first message in the room, which will be removed by the purge.

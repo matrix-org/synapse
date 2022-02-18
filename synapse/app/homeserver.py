@@ -372,7 +372,7 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
 
         await _base.start(hs)
 
-        hs.get_datastore().db_pool.updates.start_doing_background_updates()
+        hs.get_datastores().main.db_pool.updates.start_doing_background_updates()
 
     register_start(start)
 

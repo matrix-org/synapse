@@ -46,7 +46,7 @@ class EventSources:
         self.sources = _EventSourcesInner(
             *(attribute.type(hs) for attribute in _EventSourcesInner.__attrs_attrs__)  # type: ignore[attr-defined]
         )
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     def get_current_token(self) -> StreamToken:
         push_rules_key = self.store.get_max_push_rules_stream_id()

@@ -68,7 +68,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
         # Since we use sqlite in memory databases we need to make sure the
         # databases objects are the same.
-        self.worker_hs.get_datastore().db_pool = hs.get_datastore().db_pool
+        self.worker_hs.get_datastores().main.db_pool = hs.get_datastores().main.db_pool
 
         # Normally we'd pass in the handler to `setup_test_homeserver`, which would
         # eventually hit "Install @cache_in_self attributes" in tests/utils.py.
@@ -233,7 +233,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         # We may have an attempt to connect to redis for the external cache already.
         self.connect_any_redis_attempts()
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.database_pool = store.db_pool
 
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -332,7 +332,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
                 lambda: self._handle_http_replication_attempt(worker_hs, port),
             )
 
-        store = worker_hs.get_datastore()
+        store = worker_hs.get_datastores().main
         store.db_pool._db_pool = self.database_pool._db_pool
 
         # Set up TCP replication between master and the new worker if we don't
