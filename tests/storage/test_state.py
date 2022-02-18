@@ -1050,14 +1050,14 @@ class StateFilterTestCase(TestCase):
             ),
         )
 
-        # Member-only state filters stay the same
+        # Wildcard member-only state filters stay the same
         self.assertEqual(
             StateFilter.freeze(
-                {EventTypes.Member: {"@wombat:test", "@alicia:test"}},
+                {EventTypes.Member: None},
                 include_others=False,
             ).return_expanded(),
             StateFilter.freeze(
-                {EventTypes.Member: {"@wombat:test", "@alicia:test"}},
+                {EventTypes.Member: None},
                 include_others=False,
             ),
         )
