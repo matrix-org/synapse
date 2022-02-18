@@ -22,10 +22,9 @@ class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
         """Test that unauthenticated requests to the public rooms directory 403 when
         allow_public_rooms_over_federation is False.
         """
-        channel = self.make_request(
+        channel = self.make_signed_federation_request(
             "GET",
             "/_matrix/federation/v1/publicRooms",
-            federation_auth_origin=b"example.com",
         )
         self.assertEquals(403, channel.code)
 
@@ -34,9 +33,8 @@ class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
         """Test that unauthenticated requests to the public rooms directory 200 when
         allow_public_rooms_over_federation is True.
         """
-        channel = self.make_request(
+        channel = self.make_signed_federation_request(
             "GET",
             "/_matrix/federation/v1/publicRooms",
-            federation_auth_origin=b"example.com",
         )
         self.assertEquals(200, channel.code)

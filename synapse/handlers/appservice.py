@@ -649,7 +649,7 @@ class ApplicationServicesHandler:
         """Retrieve a list of application services interested in this event.
 
         Args:
-            event: The event to check. Can be None if alias_list is not.
+            event: The event to check.
         Returns:
             A list of services interested in this event based on the service regex.
         """

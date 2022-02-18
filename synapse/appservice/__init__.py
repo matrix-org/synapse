@@ -165,22 +165,15 @@ class ApplicationService:
             return namespace.exclusive
         return False
 
-    async def _matches_user(
-        self, event: Optional[EventBase], store: Optional["DataStore"] = None
-    ) -> bool:
-        if not event:
-            return False
-
+    async def _matches_user(self, event: EventBase, store: "DataStore") -> bool:
         if self.is_interested_in_user(event.sender):
             return True
+
         # also check m.room.member state key
         if event.type == EventTypes.Member and self.is_interested_in_user(
             event.state_key
         ):
             return True
-
-        if not store:
-            return False
 
         does_match = await self.matches_user_in_member_list(event.room_id, store)
         return does_match
@@ -216,21 +209,15 @@ class ApplicationService:
             return self.is_interested_in_room(event.room_id)
         return False
 
-    async def _matches_aliases(
-        self, event: EventBase, store: Optional["DataStore"] = None
-    ) -> bool:
-        if not store or not event:
-            return False
-
+    async def _matches_aliases(self, event: EventBase, store: "DataStore") -> bool:
         alias_list = await store.get_aliases_for_room(event.room_id)
         for alias in alias_list:
             if self.is_interested_in_alias(alias):
                 return True
+
         return False
 
-    async def is_interested(
-        self, event: EventBase, store: Optional["DataStore"] = None
-    ) -> bool:
+    async def is_interested(self, event: EventBase, store: "DataStore") -> bool:
         """Check if this service is interested in this event.
 
         Args:
