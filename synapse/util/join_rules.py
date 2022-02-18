@@ -1,7 +1,21 @@
+# Copyright 2021-2022 The Matrix.org Foundation C.I.C.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+import logging
+
 from synapse.api.constants import JoinRules
 from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +52,10 @@ def get_all_allow_lists(room_version: RoomVersion, event: EventBase) -> list:
     Returns:
         list: The allow lists from the event, merged
     """
-    # TODO: Don't query top level `allow` if the event is using an array of join rules
-    allow_list = event.content.get("allow", [])
-    if not allow_list or not isinstance(allow_list, list):
-        allow_list = []
-    allow_list = allow_list[:]  # clone to prevent mutation
+    allow_list = []
+    is_using_msc3613 = False
     if room_version.msc3613_simplified_join_rules:
+        is_using_msc3613 = True
         rules = event.content.get("join_rules", [])
         if rules and isinstance(rules, list):
             for rule in rules:
@@ -51,4 +63,14 @@ def get_all_allow_lists(room_version: RoomVersion, event: EventBase) -> list:
                     secondary = rule.get("allow", [])
                     if secondary and isinstance(secondary, list):
                         allow_list.extend(secondary)
+
+    # Only look at the top level `allow` list if the event doesn't specify
+    # multiple join rules.
+    is_restricted = event.get("join_rule", None) == JoinRules.RESTRICTED
+    if not is_using_msc3613 and is_restricted:
+        allow_list = event.content.get("allow", [])
+        if not allow_list or not isinstance(allow_list, list):
+            allow_list = []
+
+    allow_list = allow_list[:]  # clone to prevent mutation
     return allow_list

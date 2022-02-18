@@ -232,29 +232,6 @@ def check_auth_rules_for_event(
 
     _check_event_sender_in_room(event, auth_dict)
 
-    # MSC3613: Combination join rules
-    if event.type == EventTypes.JoinRules and room_version_obj.msc3613_simplified_join_rules:
-        if not event.is_state():
-            raise AuthError(403, "Join rules event must be a state event")
-        if event.state_key != "":
-            raise AuthError(403, "Join rules event must have empty state_key")
-
-        # TODO: Function-ize this?
-
-        if not event.content.get("join_rule", None):
-            raise AuthError(403, "A join_rule must be specified")
-
-        arr = event.content.get("join_rules", [])
-        if arr and not isinstance(arr, list):
-            raise AuthError(403, "join_rules must be an array")
-        if arr:
-            for rule in arr:
-                if not rule.get("join_rule"):
-                    raise AuthError(403, "A join_rule must be specified for each rule")
-
-        # pass
-        return
-
     # Special case to allow m.room.third_party_invite events wherever
     # a user is allowed to issue invites.  Fixes
     # https://github.com/vector-im/vector-web/issues/1208 hopefully
@@ -398,7 +375,7 @@ def _is_membership_change_allowed(
 
     # Require the user to be in the room for membership changes other than join/knock.
     if Membership.JOIN != membership and (
-        room_version.msc2403_knocking and Membership.KNOCK != membership
+        RoomVersion.msc2403_knocking and Membership.KNOCK != membership
     ):
         # If the user has been invited or has knocked, they are allowed to change their
         # membership event to leave

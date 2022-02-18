@@ -1,0 +1,1 @@
+Add support for [MSC3613](https://github.com/matrix-org/matrix-doc/pull/3613): Combined join rules.
