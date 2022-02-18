@@ -66,3 +66,185 @@ multi_line_output = 3
 include_trailing_comma = true
 combine_as_imports = true
 
+[tool.poetry]
+name = "matrix-synapse"
+version = "1.54.0rc1"
+description = "Homeserver for the Matrix decentralised comms protocol"
+authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
+license = "Apache-2.0"
+readme = "README.rst"
+repository = "https://github.com/matrix-org/synapse"
+packages = [
+    { include = "synapse" },
+    { include = "synmark" },
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Topic :: Communications :: Chat",
+]
+include = [
+    { path = "AUTHORS.rst", format = "sdist" },
+    { path = "book.toml", format = "sdist" },
+    { path = "changelog.d", format = "sdist" },
+    { path = "CHANGES.md", format = "sdist" },
+    { path = "CONTRIBUTING.md", format = "sdist" },
+    { path = "demo", format = "sdist" },
+    { path = "docs", format = "sdist" },
+    { path = "INSTALL.md", format = "sdist" },
+    { path = "mypy.ini", format = "sdist" },
+    { path = "scripts-dev", format = "sdist" },
+    { path = "sytest-blacklist", format = "sdist" },
+    { path = "tests", format = "sdist" },
+    { path = "tox.ini", format = "sdist" },
+    { path = "UPGRADE.rst", format = "sdist" },
+]
+
+[tool.poetry.scripts]
+synapse_homeserver = "synapse.app.homeserver:main"
+synapse_worker = "synapse.app.generic_worker:main"
+
+export_signing_key = "synapse._scripts.export_signing_key:main"
+generate_config = "synapse._scripts.generate_config:main"
+generate_log_config = "synapse._scripts.generate_log_config:main"
+generate_signing_key = "synapse._scripts.generate_signing_key:main"
+hash_password = "synapse._scripts.hash_password:main"
+register_new_matrix_user = "synapse._scripts.register_new_matrix_user:main"
+synapse_port_db = "synapse._scripts.synapse_port_db:main"
+synapse_review_recent_signups = "synapse._scripts.review_recent_signups:main"
+update_synapse_database = "synapse._scripts.update_synapse_database:main"
+
+[tool.poetry.dependencies]
+python = "^3.7"
+
+# Mandatory Dependencies
+# ----------------------
+# we use the TYPE_CHECKER.redefine method added in jsonschema 3.0.0
+jsonschema = ">=3.0.0"
+# frozendict 2.1.2 is broken on Debian 10: https://github.com/Marco-Sulla/python-frozendict/issues/41
+frozendict = ">=1,!=2.1.2"
+# We require 2.1.0 or higher for type hints. Previous guard was >= 1.1.0
+unpaddedbase64 = ">=2.1.0"
+canonicaljson = ">=1.4.0"
+# we use the type definitions added in signedjson 1.1.
+signedjson = ">=1.1.0"
+PyNaCl = ">=1.2.1"
+idna = ">=2.5"
+# validating SSL certs for IP addresses requires service_identity 18.1.
+service-identity = ">=18.1.0"
+# Twisted 18.9 introduces some logger improvements that the structured
+# logger utilises
+Twisted = ">=18.9.0"
+treq = ">=15.1"
+# Twisted has required pyopenssl 16.0 since about Twisted 16.6.
+pyOpenSSL = ">=16.0.0"
+PyYAML = ">=3.11"
+pyasn1 = ">=0.1.9"
+pyasn1-modules = ">=0.0.7"
+bcrypt = ">=3.1.0"
+Pillow = ">=5.4.0"
+sortedcontainers = ">=1.4.4"
+pymacaroons = ">=0.13.0"
+msgpack = ">=0.5.2"
+phonenumbers = ">=8.2.0"
+# we use GaugeHistogramMetric, which was added in prom-client 0.4.0.
+prometheus-client = ">=0.4.0"
+# we use `order`, which arrived in attrs 19.2.0.
+# Note: 21.1.0 broke `/sync`, see #9936
+attrs = ">=19.2.0,!=21.1.0"
+netaddr = ">=0.7.18"
+# We require 3.x or higher for type hints. Previous guard was >= 2.9.
+Jinja2 = ">=3.0.0"
+bleach = ">=1.4.3"
+# We use `ParamSpec`, which was added in `typing-extensions` 3.10.0.0.
+typing-extensions = ">=3.10.0"
+# We enforce that we have a `cryptography` version that bundles an `openssl`
+# with the latest security patches.
+cryptography = ">=3.4.7"
+# ijson 3.1.4 fixes a bug with "." in property names
+ijson = ">=3.1.4"
+matrix-common = "~=1.1.0"
+# We need packaging.requirements.Requirement, added in 16.1.
+packaging = ">=16.1"
+
+
+# Optional Dependencies
+# ---------------------
+matrix-synapse-ldap3 = { version = ">=0.1", optional = true }
+psycopg2 = { version = ">=2.8", markers = "platform_python_implementation != 'PyPy'", optional = true }
+psycopg2cffi = { version = ">=2.8", markers = "platform_python_implementation == 'PyPy'", optional = true }
+psycopg2cffi-compat = { version = "==1.1", markers = "platform_python_implementation == 'PyPy'", optional = true }
+pysaml2 = { version = ">=4.5.0", optional = true }
+authlib = { version = ">=0.14.0", optional = true }
+systemd-python = { version = ">=231", optional = true }
+lxml = { version = ">=4.2.0", optional = true }
+sentry-sdk = { version = ">=0.7.2", optional = true }
+opentracing = { version = ">=2.2.0", optional = true }
+jaeger-client = { version = ">=4.0.0", optional = true }
+pyjwt = { version = ">=1.6.4", optional = true }
+txredisapi = { version = ">=1.4.7", optional = true }
+hiredis = { version = "*", optional = true }
+Pympler = { version = "*", optional = true }
+
+## Developer dependencies should not get included in "all".
+##
+[tool.poetry.extras]
+matrix-synapse-ldap3 = ["matrix-synapse-ldap3"]
+postgres = ["psycopg2", "psycopg2cffi", "psycopg2cffi-compat"]
+saml2 = ["pysaml2"]
+oidc = ["authlib"]
+# systemd-python is necessary for logging to the systemd journal via
+# `systemd.journal.JournalHandler`, as is documented in
+# `contrib/systemd/log_config.yaml`.
+systemd = ["systemd-python"]
+url_preview = ["lxml"]
+sentry = ["sentry-sdk"]
+opentracing = ["jaeger-client", "opentracing"]
+jwt = ["pyjwt"]
+# hiredis is not a *strict* dependency, but it makes things much faster.
+# (if it is not installed, we fall back to slow code.)
+redis = ["txredisapi", "hiredis"]
+# Required to use experimental `caches.track_memory_usage` config option.
+cache_memory = ["pympler"]
+
+# TODO: is there a better way to avoid the duplication here?
+# See also https://github.com/python-poetry/poetry/issues/3413#issue-750319958
+all = ["matrix-synapse-ldap3", "postgres", "saml2", "oidc", "systemd", "url_preview", "sentry", "opentracing", "jwt", "redis", "cache_memory"]
+
+[tool.poetry.dev-dependencies]
+## We pin black so that our tests don't start failing on new releases.
+isort = "==5.7.0"
+black = "==21.12b0"
+flake8-comprehensions = "*"
+flake8-bugbear = "==21.3.2"
+flake8 = "*"
+
+# Typechecking
+mypy = "==0.931"
+mypy-zope = "==0.3.5"
+types-bleach = ">=4.1.0"
+types-jsonschema = ">=3.2.0"
+types-opentracing = ">=2.4.2"
+types-Pillow = ">=8.3.4"
+types-pyOpenSSL = ">=20.0.7"
+types-PyYAML = ">=5.4.10"
+types-requests = ">=2.26.0"
+types-setuptools = ">=57.4.0"
+
+# Dependencies which are exclusively required by unit test code. This is
+# NOT a list of all modules that are necessary to run the unit tests.
+# Tests assume that all optional dependencies are installed.
+parameterized = ">=0.7.0"
+
+# The following are used by the release script
+click = "==7.1.2"
+redbaron = "==0.9.2"
+GitPython = "==3.1.14"
+commonmark = "==0.9.1"
+pygithub = "==1.55"
+# The following are executed as commands by the release script.
+twine = "*"
+towncrier = "*"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
