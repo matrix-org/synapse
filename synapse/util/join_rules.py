@@ -39,7 +39,7 @@ def is_join_rule(
     if room_version.msc3613_simplified_join_rules:
         arr = event.content.get("join_rules", [])
         if arr and isinstance(arr, list):
-            return expected_rule in list(r.get("join_rule", None) for r in arr)
+            return expected_rule in (r.get("join_rule", None) for r in arr)
 
     return event.content.get("join_rule", None) == expected_rule
 
