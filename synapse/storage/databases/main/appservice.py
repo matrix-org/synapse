@@ -26,6 +26,7 @@ from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
+from synapse.storage.engines._base import IsolationLevel
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 
@@ -294,7 +295,9 @@ class ApplicationServiceTransactionWorkerStore(
             )
 
         await self.db_pool.runInteraction(
-            "complete_appservice_txn", _complete_appservice_txn
+            "complete_appservice_txn",
+            _complete_appservice_txn,
+            isolation_level=IsolationLevel.READ_COMMITTED,
         )
 
     async def get_oldest_unsent_txn(
