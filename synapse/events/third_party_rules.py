@@ -38,6 +38,7 @@ CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK = Callable[
 ]
 ON_NEW_EVENT_CALLBACK = Callable[[EventBase, StateMap[EventBase]], Awaitable]
 
+CHECK_CAN_DEACTIVATE_USER_CALLBACK = Callable[[Requester, string], Awaitable[bool]]
 
 def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
     """Wrapper that loads a third party event rules module configured using the old
@@ -154,6 +155,7 @@ class ThirdPartyEventRules:
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = []
         self._on_new_event_callbacks: List[ON_NEW_EVENT_CALLBACK] = []
+        self._check_can_deactivate_user: List[CHECK_CAN_DEACTIVATE_USER_CALLBACK] = []
 
     def register_third_party_rules_callbacks(
         self,
@@ -166,6 +168,7 @@ class ThirdPartyEventRules:
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = None,
         on_new_event: Optional[ON_NEW_EVENT_CALLBACK] = None,
+        check_can_deactivate_user: Optional[CHECK_CAN_DEACTIVATE_USER_CALLBACK] = None,
     ) -> None:
         """Register callbacks from modules for each hook."""
         if check_event_allowed is not None:
@@ -186,6 +189,9 @@ class ThirdPartyEventRules:
 
         if on_new_event is not None:
             self._on_new_event_callbacks.append(on_new_event)
+
+        if _check_can_deactivate_user is not None:
+            self._check_can_deactivate_user.append(check_can_deactivate_user)
 
     async def check_event_allowed(
         self, event: EventBase, context: EventContext
@@ -352,6 +358,26 @@ class ThirdPartyEventRules:
                 logger.exception(
                     "Failed to run module API callback %s: %s", callback, e
                 )
+
+    async def check_can_deactivate_user(self, requester: Requester, user_id: str) -> None:
+        """Intercept requests to deactivate a user to maybe deny it by returning False.
+
+        Args:
+            requester
+            user_id: The ID of the room.
+
+        Raises:
+            ModuleFailureError if a callback raised any exception.
+        """
+        for callback in self._check_can_deactivate_user:
+            try:
+                if await callback(requester, user_id) is False:
+                    return False
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
+        return True
 
     async def _get_state_map_for_room(self, room_id: str) -> StateMap[EventBase]:
         """Given a room ID, return the state events of that room.

@@ -41,6 +41,7 @@ class DeactivateAccountHandler:
 
         # Flag that indicates whether the process to part users from rooms is running
         self._user_parter_running = False
+        self._third_party_rules = hs.get_third_party_event_rules()
 
         # Start the user parter loop so it can resume parting users from rooms where
         # it left off (if it has work left to do).
@@ -73,6 +74,12 @@ class DeactivateAccountHandler:
         Returns:
             True if identity server supports removing threepids, otherwise False.
         """
+
+        # Check if this user can be deactivated
+        if not await self._third_party_rules.check_can_deactivate_user(requester, user_id):
+            raise SynapseError(403, "Deactivation of this user is forbidden", Codes.FORBIDDEN)
+
+
         # FIXME: Theoretically there is a race here wherein user resets
         # password using threepid.
 

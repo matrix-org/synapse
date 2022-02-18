@@ -278,6 +278,7 @@ class ModuleApi:
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = None,
         on_new_event: Optional[ON_NEW_EVENT_CALLBACK] = None,
+        check_can_deactivate_user: Optional[CHECK_CAN_DEACTIVATE_USER_CALLBACK] = None,
     ) -> None:
         """Registers callbacks for third party event rules capabilities.
 
@@ -289,6 +290,7 @@ class ModuleApi:
             check_threepid_can_be_invited=check_threepid_can_be_invited,
             check_visibility_can_be_modified=check_visibility_can_be_modified,
             on_new_event=on_new_event,
+            check_can_deactivate_user=check_can_deactivate_user,
         )
 
     def register_presence_router_callbacks(
