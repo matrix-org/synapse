@@ -15,6 +15,7 @@
 
 """Contains handlers for federation events."""
 
+import itertools
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
@@ -51,6 +52,7 @@ from synapse.logging.context import (
     preserve_fn,
     run_in_background,
 )
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
@@ -516,7 +518,7 @@ class FederationHandler:
             await self.store.upsert_room_on_join(
                 room_id=room_id,
                 room_version=room_version_obj,
-                auth_events=auth_chain,
+                state_events=state,
             )
 
             max_stream_id = await self._federation_event_handler.process_remote_join(

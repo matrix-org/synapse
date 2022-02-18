@@ -870,13 +870,15 @@ class FederationClient(FederationBase):
             for s in signed_state:
                 s.internal_metadata = copy.deepcopy(s.internal_metadata)
 
-            # double-check that the same create event has ended up in the auth chain
+            # double-check that the auth chain doesn't include a different create event
             auth_chain_create_events = [
                 e.event_id
                 for e in signed_auth
                 if (e.type, e.state_key) == (EventTypes.Create, "")
             ]
-            if auth_chain_create_events != [create_event.event_id]:
+            if auth_chain_create_events and auth_chain_create_events != [
+                create_event.event_id
+            ]:
                 raise InvalidResponseError(
                     "Unexpected create event(s) in auth chain: %s"
                     % (auth_chain_create_events,)
