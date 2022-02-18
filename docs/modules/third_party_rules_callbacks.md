@@ -148,6 +148,50 @@ deny an incoming event, see [`check_event_for_spam`](spam_checker_callbacks.md#c
 
 If multiple modules implement this callback, Synapse runs them all in order.
 
+### `check_can_shutdown_room`
+
+_First introduced in Synapse v1.5X.0_
+
+```python
+async def check_can_shutdown_room(
+    user_id: str
+    room_id: str,
+) -> bool:
+```
+
+Called when a user requests the shutdown of a room. The module must return a
+boolean indicating whether the shutdown can go through. If the callback returns `False`,
+the shutdown will not proceed and the caller will see a `M_FOBIDDEN` error.
+
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
+### `check_can_deactivate_user`
+
+_First introduced in Synapse v1.5X.0_
+
+```python
+async def check_can_deactivate_user(
+    requester: "synapse.types.Requester",
+    user_id: str,
+) -> bool:
+```
+
+Called when a user requests the deactivation of a user. User deactivation may be
+performed by an admin or the user themselves, so developers are encouraged to check the
+requester when implementing this callback. The module must return a
+boolean indicating whether the deactivation can go through. If the callback returns `False`,
+the deactivation will not proceed and the caller will see a `M_FOBIDDEN` error.
+
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `True`, Synapse falls through to the next one. The value of the first
+callback that does not return `True` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
+
+
 ## Example
 
 The example below is a module that implements the third-party rules callback
