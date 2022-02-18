@@ -890,7 +890,9 @@ class RoomSummaryHandler:
                 state_ids, room_version
             ):
                 allowed_rooms = (
-                    await self._event_auth_handler.get_rooms_that_allow_join(state_ids, room_version)
+                    await self._event_auth_handler.get_rooms_that_allow_join(
+                        state_ids, room_version
+                    )
                 )
                 if await self._event_auth_handler.is_user_in_rooms(
                     allowed_rooms, requester
@@ -912,7 +914,9 @@ class RoomSummaryHandler:
                 state_ids, room_version
             ):
                 allowed_rooms = (
-                    await self._event_auth_handler.get_rooms_that_allow_join(state_ids, room_version)
+                    await self._event_auth_handler.get_rooms_that_allow_join(
+                        state_ids, room_version
+                    )
                 )
                 for space_id in allowed_rooms:
                     if await self._event_auth_handler.check_host_in_room(
@@ -1028,8 +1032,7 @@ class RoomSummaryHandler:
             ):
                 allowed_rooms = (
                     await self._event_auth_handler.get_rooms_that_allow_join(
-                        current_state_ids,
-                        room_version
+                        current_state_ids, room_version
                     )
                 )
                 if allowed_rooms:

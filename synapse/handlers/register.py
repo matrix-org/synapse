@@ -541,7 +541,9 @@ class RegistrationHandler:
                         if join_rules_event:
                             room_version = await self.store.get_room_version(r)
                             requires_invite = not is_join_rule(
-                                room_version, join_rules_event, JoinRules.PUBLIC,
+                                room_version,
+                                join_rules_event,
+                                JoinRules.PUBLIC,
                             )
 
                 # Send the invite, if necessary.

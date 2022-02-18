@@ -20,7 +20,9 @@ from synapse.events import EventBase
 logger = logging.getLogger(__name__)
 
 
-def is_join_rule(room_version: RoomVersion, event: EventBase, expected_rule: JoinRules) -> bool:
+def is_join_rule(
+    room_version: RoomVersion, event: EventBase, expected_rule: JoinRules
+) -> bool:
     """Returns whether the join rule event matches the expected join rule.
 
     Args:

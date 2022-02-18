@@ -245,7 +245,9 @@ class EventAuthHandler:
         return is_join_rule(room_version, join_rules_event, JoinRules.RESTRICTED)
 
     async def get_rooms_that_allow_join(
-        self, state_ids: StateMap[str], room_version: RoomVersion,
+        self,
+        state_ids: StateMap[str],
+        room_version: RoomVersion,
     ) -> Collection[str]:
         """
         Generate a list of rooms in which membership allows access to a room.

@@ -309,7 +309,9 @@ class RoomListHandler:
         if join_rules_event:
             room_version = await self.store.get_room_version(room_id)
             is_public = is_join_rule(
-                room_version, join_rules_event, JoinRules.PUBLIC,
+                room_version,
+                join_rules_event,
+                JoinRules.PUBLIC,
             )
             if not allow_private and not is_public:
                 return None
