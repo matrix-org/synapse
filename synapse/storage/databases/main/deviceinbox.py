@@ -362,7 +362,10 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             # intended for each device.
             last_processed_stream_pos = to_stream_id
             recipient_device_to_messages: Dict[Tuple[str, str], List[JsonDict]] = {}
+            rowcount = 0
             for row in txn:
+                rowcount += 1
+
                 last_processed_stream_pos = row[0]
                 recipient_user_id = row[1]
                 recipient_device_id = row[2]
@@ -373,7 +376,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                     (recipient_user_id, recipient_device_id), []
                 ).append(message_dict)
 
-            if limit is not None and txn.rowcount == limit:
+            if limit is not None and rowcount == limit:
                 # We ended up bumping up against the message limit. There may be more messages
                 # to retrieve. Return what we have, as well as the last stream position that
                 # was processed.
