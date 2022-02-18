@@ -434,16 +434,12 @@ class ApplicationServiceTransactionWorkerStore(
                 % (stream_type,)
             )
 
-        def set_appservice_stream_type_pos_txn(txn):
-            stream_id_type = "%s_stream_id" % stream_type
-            txn.execute(
-                "UPDATE application_services_state SET %s = ? WHERE as_id=?"
-                % stream_id_type,
-                (pos, service.id),
-            )
+        stream_id_type = "%s_stream_id" % stream_type
 
-        await self.db_pool.runInteraction(
-            "set_appservice_stream_type_pos", set_appservice_stream_type_pos_txn
+        await self.db_pool.simple_update_one(
+            "application_services_state",
+            {"as_id": service.id},
+            {stream_id_type: pos},
         )
 
 
