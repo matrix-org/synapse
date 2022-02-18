@@ -15,11 +15,12 @@ import typing
 from typing import Dict, List, Sequence, Tuple
 from unittest.mock import patch
 
+from synapse.api.constants import EventTypes
 from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.storage.state import StateFilter
-from synapse.types import MutableStateMap, StateMap
+from synapse.types import StateMap
 from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
@@ -27,6 +28,15 @@ from tests.unittest import HomeserverTestCase
 if typing.TYPE_CHECKING:
     from synapse.server import HomeServer
 
+
+FAKE_STATE = {
+    (EventTypes.Member, "@alice:test"): "join",
+    (EventTypes.Member, "@bob:test"): "leave",
+    (EventTypes.Member, "@charlie:test"): "invite",
+    ("test.type", "a"): "AAA",
+    ("test.type", "b"): "BBB",
+    ("other.event.type", "state.key"): "123"
+}
 
 class StateGroupInflightCachingTestCase(HomeserverTestCase):
     def prepare(
@@ -65,24 +75,11 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
         Assemble a fake database response and complete the database request.
         """
 
-        result: Dict[int, StateMap[str]] = {}
-
-        for group in groups:
-            group_result: MutableStateMap[str] = {}
-            result[group] = group_result
-
-            for state_type, state_keys in state_filter.types.items():
-                if state_keys is None:
-                    group_result[(state_type, "a")] = "xyz"
-                    group_result[(state_type, "b")] = "xyz"
-                else:
-                    for state_key in state_keys:
-                        group_result[(state_type, state_key)] = "abc"
-
-            if state_filter.include_others:
-                group_result[("other.event.type", "state.key")] = "123"
-
-        d.callback(result)
+        # Return a filtered copy of the fake state
+        d.callback({
+            group: state_filter.filter_state(FAKE_STATE)
+            for group in groups
+        })
 
     def test_duplicate_requests_deduplicated(self) -> None:
         """
@@ -126,8 +123,8 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
         self._complete_request_fake(groups, sf, d)
 
         self.assertEqual(
-            self.get_success(req1), {("other.event.type", "state.key"): "123"}
+            self.get_success(req1), FAKE_STATE
         )
         self.assertEqual(
-            self.get_success(req2), {("other.event.type", "state.key"): "123"}
+            self.get_success(req2), FAKE_STATE
         )
