@@ -446,7 +446,7 @@ class TypingWriterHandler(FollowerTypingHandler):
 
 class TypingNotificationEventSource(EventSource[int, JsonDict]):
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
+        self._main_store = hs.get_datastore()
         self.clock = hs.get_clock()
         # We can't call get_typing_handler here because there's a cycle:
         #
@@ -487,7 +487,7 @@ class TypingNotificationEventSource(EventSource[int, JsonDict]):
                     continue
 
                 if not await service.matches_user_in_member_list(
-                    room_id, handler.store
+                    room_id, self._main_store
                 ):
                     continue
 

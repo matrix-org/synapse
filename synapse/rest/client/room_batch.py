@@ -131,6 +131,14 @@ class RoomBatchSendEventRestServlet(RestServlet):
             prev_event_ids_from_query
         )
 
+        if not auth_event_ids:
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "No auth events found for given prev_event query parameter. The prev_event=%s probably does not exist."
+                % prev_event_ids_from_query,
+                errcode=Codes.INVALID_PARAM,
+            )
+
         state_event_ids_at_start = []
         # Create and persist all of the state events that float off on their own
         # before the batch. These will most likely be all of the invite/member
@@ -197,21 +205,12 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 EventContentFields.MSC2716_NEXT_BATCH_ID
             ]
 
-        # Also connect the historical event chain to the end of the floating
-        # state chain, which causes the HS to ask for the state at the start of
-        # the batch later. If there is no state chain to connect to, just make
-        # the insertion event float itself.
-        prev_event_ids = []
-        if len(state_event_ids_at_start):
-            prev_event_ids = [state_event_ids_at_start[-1]]
-
         # Create and persist all of the historical events as well as insertion
         # and batch meta events to make the batch navigable in the DAG.
         event_ids, next_batch_id = await self.room_batch_handler.handle_batch_of_events(
             events_to_create=events_to_create,
             room_id=room_id,
             batch_id_to_connect_to=batch_id_to_connect_to,
-            initial_prev_event_ids=prev_event_ids,
             inherited_depth=inherited_depth,
             auth_event_ids=auth_event_ids,
             app_service_requester=requester,

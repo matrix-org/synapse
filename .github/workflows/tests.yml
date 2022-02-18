@@ -141,7 +141,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Test with old deps
-        uses: docker://ubuntu:bionic # For old python and sqlite
+        uses: docker://ubuntu:focal # For old python and sqlite
         with:
           workdir: /github/workspace
           entrypoint: .ci/scripts/test_old_deps.sh
@@ -213,15 +213,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - sytest-tag: bionic
+          - sytest-tag: focal
 
-          - sytest-tag: bionic
+          - sytest-tag: focal
             postgres: postgres
 
           - sytest-tag: testing
             postgres: postgres
 
-          - sytest-tag: bionic
+          - sytest-tag: focal
             postgres: multi-postgres
             workers: workers
 
@@ -323,24 +323,29 @@ jobs:
     if: ${{ !failure() && !cancelled() }}
     needs: linting-done
     runs-on: ubuntu-latest
-    container:
-      # https://github.com/matrix-org/complement/blob/master/dockerfiles/ComplementCIBuildkite.Dockerfile
-      image: matrixdotorg/complement:latest
-      env:
-        CI: true
-      ports:
-        - 8448:8448
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
 
     steps:
+      # The path is set via a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on the path to run Complement.
+      # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-system-path
+      - name: "Set Go Version"
+        run: |
+          # Add Go 1.17 to the PATH: see https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md#environment-variables-2
+          echo "$GOROOT_1_17_X64/bin" >> $GITHUB_PATH
+          # Add the Go path to the PATH: We need this so we can call gotestfmt
+          echo "~/go/bin" >> $GITHUB_PATH
+
+      - name: "Install Complement Dependencies"
+        run: |
+          sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
+          go get -v github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@latest
+
       - name: Run actions/checkout@v2 for synapse
         uses: actions/checkout@v2
         with:
           path: synapse
 
       # Attempt to check out the same branch of Complement as the PR. If it
-      # doesn't exist, fallback to master.
+      # doesn't exist, fallback to HEAD.
       - name: Checkout complement
         shell: bash
         run: |
@@ -353,8 +358,8 @@ jobs:
           #    for pull requests, otherwise GITHUB_REF).
           # 2. Attempt to use the base branch, e.g. when merging into release-vX.Y
           #    (GITHUB_BASE_REF for pull requests).
-          # 3. Use the default complement branch ("master").
-          for BRANCH_NAME in "$GITHUB_HEAD_REF" "$GITHUB_BASE_REF" "${GITHUB_REF#refs/heads/}" "master"; do
+          # 3. Use the default complement branch ("HEAD").
+          for BRANCH_NAME in "$GITHUB_HEAD_REF" "$GITHUB_BASE_REF" "${GITHUB_REF#refs/heads/}" "HEAD"; do
             # Skip empty branch names and merge commits.
             if [[ -z "$BRANCH_NAME" || $BRANCH_NAME =~ ^refs/pull/.* ]]; then
               continue
@@ -366,6 +371,8 @@ jobs:
       # Build initial Synapse image
       - run: docker build -t matrixdotorg/synapse:latest -f docker/Dockerfile .
         working-directory: synapse
+        env:
+          DOCKER_BUILDKIT: 1
 
       # Build a ready-to-run Synapse image based on the initial image above.
       # This new image includes a config file, keys for signing and TLS, and
@@ -374,7 +381,11 @@ jobs:
         working-directory: complement/dockerfiles
 
       # Run Complement
-      - run: go test -v -tags synapse_blacklist,msc2403 ./tests/...
+      - run: |
+          set -o pipefail
+          go test -v -json -p 1 -tags synapse_blacklist,msc2403 ./tests/... 2>&1 | gotestfmt
+        shell: bash
+        name: Run Complement Tests
         env:
           COMPLEMENT_BASE_IMAGE: complement-synapse:latest
         working-directory: complement

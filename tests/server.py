@@ -14,6 +14,8 @@
 import hashlib
 import json
 import logging
+import os
+import os.path
 import time
 import uuid
 import warnings
@@ -71,6 +73,7 @@ from tests.utils import (
     POSTGRES_HOST,
     POSTGRES_PASSWORD,
     POSTGRES_USER,
+    SQLITE_PERSIST_DB,
     USE_POSTGRES_FOR_TESTS,
     MockClock,
     default_config,
@@ -310,7 +313,7 @@ def make_request(
     req = request(channel, site)
     req.content = BytesIO(content)
     # Twisted expects to be at the end of the content when parsing the request.
-    req.content.seek(SEEK_END)
+    req.content.seek(0, SEEK_END)
 
     if access_token:
         req.requestHeaders.addRawHeader(
@@ -739,9 +742,23 @@ def setup_test_homeserver(
             },
         }
     else:
+        if SQLITE_PERSIST_DB:
+            # The current working directory is in _trial_temp, so this gets created within that directory.
+            test_db_location = os.path.abspath("test.db")
+            logger.debug("Will persist db to %s", test_db_location)
+            # Ensure each test gets a clean database.
+            try:
+                os.remove(test_db_location)
+            except FileNotFoundError:
+                pass
+            else:
+                logger.debug("Removed existing DB at %s", test_db_location)
+        else:
+            test_db_location = ":memory:"
+
         database_config = {
             "name": "sqlite3",
-            "args": {"database": ":memory:", "cp_min": 1, "cp_max": 1},
+            "args": {"database": test_db_location, "cp_min": 1, "cp_max": 1},
         }
 
     if "db_txn_limit" in kwargs:

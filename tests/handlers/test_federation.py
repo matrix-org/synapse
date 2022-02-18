@@ -373,9 +373,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             destination: str, room_id: str, event_id: str
         ) -> List[EventBase]:
             return [
-                event_from_pdu_json(
-                    ae.get_pdu_json(), room_version=room_version, outlier=True
-                )
+                event_from_pdu_json(ae.get_pdu_json(), room_version=room_version)
                 for ae in auth_events
             ]
 

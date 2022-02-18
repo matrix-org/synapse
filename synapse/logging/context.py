@@ -193,7 +193,7 @@ class ContextResourceUsage:
         return res
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class ContextRequest:
     """
     A bundle of attributes from the SynapseRequest object.
@@ -205,15 +205,15 @@ class ContextRequest:
       their children.
     """
 
-    request_id = attr.ib(type=str)
-    ip_address = attr.ib(type=str)
-    site_tag = attr.ib(type=str)
-    requester = attr.ib(type=Optional[str])
-    authenticated_entity = attr.ib(type=Optional[str])
-    method = attr.ib(type=str)
-    url = attr.ib(type=str)
-    protocol = attr.ib(type=str)
-    user_agent = attr.ib(type=str)
+    request_id: str
+    ip_address: str
+    site_tag: str
+    requester: Optional[str]
+    authenticated_entity: Optional[str]
+    method: str
+    url: str
+    protocol: str
+    user_agent: str
 
 
 LoggingContextOrSentinel = Union["LoggingContext", "_Sentinel"]

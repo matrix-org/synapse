@@ -105,8 +105,10 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 GROUP BY room_id
             """
             txn.execute(sql)
-            rooms = [{"room_id": x[0], "events": x[1]} for x in txn.fetchall()]
-            self.db_pool.simple_insert_many_txn(txn, TEMP_TABLE + "_rooms", rooms)
+            rooms = list(txn.fetchall())
+            self.db_pool.simple_insert_many_txn(
+                txn, TEMP_TABLE + "_rooms", keys=("room_id", "events"), values=rooms
+            )
             del rooms
 
             sql = (
@@ -117,9 +119,11 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             txn.execute(sql)
 
             txn.execute("SELECT name FROM users")
-            users = [{"user_id": x[0]} for x in txn.fetchall()]
+            users = list(txn.fetchall())
 
-            self.db_pool.simple_insert_many_txn(txn, TEMP_TABLE + "_users", users)
+            self.db_pool.simple_insert_many_txn(
+                txn, TEMP_TABLE + "_users", keys=("user_id",), values=users
+            )
 
         new_pos = await self.get_max_stream_id_in_current_state_deltas()
         await self.db_pool.runInteraction(

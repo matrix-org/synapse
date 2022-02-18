@@ -56,6 +56,7 @@ response_cache_total = Gauge("synapse_util_caches_response_cache:total", "", ["n
 class EvictionReason(Enum):
     size = auto()
     time = auto()
+    invalidation = auto()
 
 
 @attr.s(slots=True, auto_attribs=True)
