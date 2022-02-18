@@ -269,7 +269,7 @@ class EventAuthHandler:
 
         # If allowed is of the wrong form, then only allow invited users.
         allow_list = get_all_allow_lists(room_version, join_rules_event)
-        if not isinstance(allow_list, list):
+        if allow_list is None:
             return ()
 
         # Pull out the other room IDs, invalid data gets filtered.

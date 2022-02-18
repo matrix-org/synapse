@@ -340,7 +340,7 @@ def _is_membership_change_allowed(
     target_banned = target and target.membership == Membership.BAN
 
     key = (EventTypes.JoinRules, "")
-    join_rule_event: EventBase = auth_events.get(key)
+    join_rule_event: Optional[EventBase] = auth_events.get(key)
 
     def is_join_rule(rule: JoinRules) -> bool:
         return is_join_rule_in_version(room_version, join_rule_event, rule)

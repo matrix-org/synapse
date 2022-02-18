@@ -11,23 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import logging
-
 from synapse.api.constants import JoinRules
 from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase
-
-logger = logging.getLogger(__name__)
+from typing import Optional
 
 
 def is_join_rule(
-    room_version: RoomVersion, event: EventBase, expected_rule: JoinRules
+    room_version: RoomVersion, event: Optional[EventBase], expected_rule: JoinRules
 ) -> bool:
     """Returns whether the join rule event matches the expected join rule.
 
     Args:
-        room_version: The RoomVersion the event is in
-        event: The join rules event
+        room_version: The RoomVersion the event is meant to be in
+        event: The join rules event, if known
         expected_rule: The anticipated rule
 
     Returns:
@@ -44,15 +41,19 @@ def is_join_rule(
     return event.content.get("join_rule", None) == expected_rule
 
 
-def get_all_allow_lists(room_version: RoomVersion, event: EventBase) -> list:
+def get_all_allow_lists(
+    room_version: RoomVersion, event: Optional[EventBase]
+) -> Optional[list]:
     """Returns the combination of all 'allow' lists in the join rules.
 
+    If the allow list is wholly invalid, None is returned instead.
+
     Args:
-        room_version: The RoomVersion the event is in
-        event: The join rules event
+        room_version: The RoomVersion the event is meant to be in
+        event: The join rules event (if known)
 
     Returns:
-        list: The allow lists from the event, merged
+        Optional[list]: The allow lists from the event, merged
     """
     allow_list = []
     is_using_msc3613 = False
@@ -63,6 +64,7 @@ def get_all_allow_lists(room_version: RoomVersion, event: EventBase) -> list:
             for rule in rules:
                 if rule.get("join_rule", None) == JoinRules.RESTRICTED:
                     secondary = rule.get("allow", [])
+                    # Ignore invalid values, but process valid ones.
                     if secondary and isinstance(secondary, list):
                         allow_list.extend(secondary)
 
@@ -72,7 +74,6 @@ def get_all_allow_lists(room_version: RoomVersion, event: EventBase) -> list:
     if not is_using_msc3613 and is_restricted:
         allow_list = event.content.get("allow", [])
         if not allow_list or not isinstance(allow_list, list):
-            allow_list = []
+            return None  # invalid
 
-    allow_list = allow_list[:]  # clone to prevent mutation
-    return allow_list
+    return allow_list[:]  # clone to prevent mutation
