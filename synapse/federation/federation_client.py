@@ -464,11 +464,11 @@ class FederationClient(FederationBase):
         )
 
         valid_auth_events = await self._check_sigs_and_hash_and_fetch(
-            destination, auth_events, room_version
+            destination, auth_event_map.values(), room_version
         )
 
         valid_state_events = await self._check_sigs_and_hash_and_fetch(
-            destination, state_events, room_version
+            destination, state_event_map.values(), room_version
         )
 
         return valid_state_events, valid_auth_events
