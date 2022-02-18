@@ -1,0 +1,1 @@
+Fix a long-standing bug where integers could get into the `event_search` table when using sqlite and prevent migration to PostgreSQL.

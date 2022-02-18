@@ -1954,19 +1954,19 @@ class PersistEventsStore:
         )
 
     def _store_room_topic_txn(self, txn, event):
-        if hasattr(event, "content") and "topic" in event.content:
+        if hasattr(event, "content") and isinstance(event.content.get("topic"), str):
             self.store_event_search_txn(
                 txn, event, "content.topic", event.content["topic"]
             )
 
     def _store_room_name_txn(self, txn, event):
-        if hasattr(event, "content") and "name" in event.content:
+        if hasattr(event, "content") and isinstance(event.content.get("name"), str):
             self.store_event_search_txn(
                 txn, event, "content.name", event.content["name"]
             )
 
     def _store_room_message_txn(self, txn, event):
-        if hasattr(event, "content") and "body" in event.content:
+        if hasattr(event, "content") and isinstance(event.content.get("body"), str):
             self.store_event_search_txn(
                 txn, event, "content.body", event.content["body"]
             )
