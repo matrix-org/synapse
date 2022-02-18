@@ -325,7 +325,7 @@ class HttpPusher(Pusher):
         # This was checked in the __init__, but mypy doesn't seem to know that.
         assert self.data is not None
         if self.data.get("format") == "event_id_only":
-            d = {
+            d: Dict[str, Any] = {
                 "notification": {
                     "event_id": event.event_id,
                     "room_id": event.room_id,
