@@ -1127,7 +1127,9 @@ class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
         # This is due to account validity-related config options not being read by
         # Synapse when account_validity.enabled is False.
         self.hs.get_datastores().main._account_validity_period = self.validity_period
-        self.hs.get_datastores().main._account_validity_startup_job_max_delta = self.max_delta
+        self.hs.get_datastores().main._account_validity_startup_job_max_delta = (
+            self.max_delta
+        )
 
         self.store = self.hs.get_datastores().main
 

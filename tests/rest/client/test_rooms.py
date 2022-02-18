@@ -1060,7 +1060,9 @@ class RoomJoinRatelimitTestCase(RoomBase):
         user_id = self.register_user("testuser", "password")
 
         # Check that the new user successfully joined the four rooms
-        rooms = self.get_success(self.hs.get_datastores().main.get_rooms_for_user(user_id))
+        rooms = self.get_success(
+            self.hs.get_datastores().main.get_rooms_for_user(user_id)
+        )
         self.assertEqual(len(rooms), 4)
 
 

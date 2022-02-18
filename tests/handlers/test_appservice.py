@@ -355,7 +355,9 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
 
         # Mock out application services, and allow defining our own in tests
         self._services: List[ApplicationService] = []
-        self.hs.get_datastores().main.get_app_services = Mock(return_value=self._services)
+        self.hs.get_datastores().main.get_app_services = Mock(
+            return_value=self._services
+        )
 
         # A user on the homeserver.
         self.local_user_device_id = "local_device"

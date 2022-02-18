@@ -144,7 +144,9 @@ class PhoneHomeTestCase(HomeserverTestCase):
             self.helper.send(room_id, "I'm still here", tok=access_token)
 
             # Notice that the user *still* does not contribute to R30!
-            r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
+            r30_results = self.get_success(
+                self.hs.get_datastores().main.count_r30_users()
+            )
             self.assertEqual(r30_results, {"all": 0})
 
         self.reactor.advance(ONE_DAY_IN_SECONDS)

@@ -56,7 +56,9 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
 
         # Figure out what the most recent event is
         most_recent = self.get_success(
-            self.homeserver.get_datastores().main.get_latest_event_ids_in_room(self.room_id)
+            self.homeserver.get_datastores().main.get_latest_event_ids_in_room(
+                self.room_id
+            )
         )[0]
 
         join_event = make_event_from_dict(

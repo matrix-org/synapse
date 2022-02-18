@@ -216,7 +216,9 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
 
         # let's also clear any backoffs
         self.get_success(
-            self.hs.get_datastores().main.set_destination_retry_timings("host2", None, 0, 0)
+            self.hs.get_datastores().main.set_destination_retry_timings(
+                "host2", None, 0, 0
+            )
         )
 
         # bring the remote online and clear the received pdu list

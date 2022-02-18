@@ -170,10 +170,14 @@ def start_phone_stats_home(hs: "HomeServer") -> None:
     # Rather than update on per session basis, batch up the requests.
     # If you increase the loop period, the accuracy of user_daily_visits
     # table will decrease
-    clock.looping_call(hs.get_datastores().main.generate_user_daily_visits, 5 * 60 * 1000)
+    clock.looping_call(
+        hs.get_datastores().main.generate_user_daily_visits, 5 * 60 * 1000
+    )
 
     # monthly active user limiting functionality
-    clock.looping_call(hs.get_datastores().main.reap_monthly_active_users, 1000 * 60 * 60)
+    clock.looping_call(
+        hs.get_datastores().main.reap_monthly_active_users, 1000 * 60 * 60
+    )
     hs.get_datastores().main.reap_monthly_active_users()
 
     @wrap_as_background_process("generate_monthly_active_users")

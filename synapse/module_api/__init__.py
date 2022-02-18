@@ -172,7 +172,9 @@ class ModuleApi:
 
         # TODO: Fix this type hint once the types for the data stores have been ironed
         #       out.
-        self._store: Union[DataStore, "GenericWorkerSlavedStore"] = hs.get_datastores().main
+        self._store: Union[
+            DataStore, "GenericWorkerSlavedStore"
+        ] = hs.get_datastores().main
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
         self._server_name = hs.hostname

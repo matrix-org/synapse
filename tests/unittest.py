@@ -726,7 +726,9 @@ class HomeserverTestCase(TestCase):
             )
         )
 
-        self.hs.get_datastores().main.get_latest_event_ids_in_room.invalidate((room_id,))
+        self.hs.get_datastores().main.get_latest_event_ids_in_room.invalidate(
+            (room_id,)
+        )
 
     def attempt_wrong_password_login(self, username, password):
         """Attempts to login as the user with the given password, asserting
