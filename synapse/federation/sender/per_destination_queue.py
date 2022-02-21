@@ -381,9 +381,8 @@ class PerDestinationQueue:
                 )
             )
 
-        last_successful_stream_ordering = self._last_successful_stream_ordering
-
-        if last_successful_stream_ordering is None:
+        _tmp_last_successful_stream_ordering = self._last_successful_stream_ordering
+        if _tmp_last_successful_stream_ordering is None:
             # if it's still None, then this means we don't have the information
             # in our database ­ we haven't successfully sent a PDU to this server
             # (at least since the introduction of the feature tracking
@@ -392,6 +391,8 @@ class PerDestinationQueue:
             # needs catching up — so catching up is futile; let's stop.
             self._catching_up = False
             return
+
+        last_successful_stream_ordering: int = _tmp_last_successful_stream_ordering
 
         # get at most 50 catchup room/PDUs
         while True:
