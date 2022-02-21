@@ -1,1 +1,1 @@
-Fetch images when previewing Twitter URLs. Contributed by @AndrewRyanChama
+Fetch images when previewing Twitter URLs. Contributed by @AndrewRyanChama.
