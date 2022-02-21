@@ -42,7 +42,9 @@ class FederationClientTest(FederatingHomeserverTestCase):
         creator = f"@creator:{self.OTHER_SERVER_NAME}"
         test_room_id = "!room_id"
 
-        # mock up some events to use in the response
+        # mock up some events to use in the response.
+        # In real life, these would have things in `prev_events` and `auth_events`, but that's
+        # a bit annoying to mock up, and the code under test doesn't care, so we don't bother.
         create_event_dict = self.add_hashes_and_signatures(
             {
                 "room_id": test_room_id,
