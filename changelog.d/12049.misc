@@ -1,0 +1,1 @@
+Use poetry to manage Synapse's dependencies.
