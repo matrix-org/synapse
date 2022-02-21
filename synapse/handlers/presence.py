@@ -221,10 +221,10 @@ class BasePresenceHandler(abc.ABC):
 
             for user_id in missing:
                 # if user has no state in database, create the state
-                if not res.get(user_id, None):
-                    new = {user_id: UserPresenceState.default(user_id)}
-                    states.update(new)
-                    self.user_to_current_state.update(new)
+                if user_id not in res:
+                    new_state = UserPresenceState.default(user_id)
+                    states[user_id] = new_state
+                    self.user_to_current_state[user_id] = new_state
 
         return states
 
