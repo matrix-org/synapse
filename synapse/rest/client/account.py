@@ -35,7 +35,7 @@ from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
-    parse_string,
+    parse_string, parse_strings_from_args,
 )
 from synapse.http.site import SynapseRequest
 from synapse.metrics import threepid_send_requests
@@ -907,18 +907,17 @@ class AccountStatusRestServlet(RestServlet):
         self._federation_client = hs.get_federation_client()
         self._account_handler = hs.get_account_handler()
 
-    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await self._auth.get_user_by_req(request)
 
-        args: Dict[bytes, List[bytes]] = request.args  # type: ignore[assignment]
-        if b"user_id" not in args:
+        body = parse_json_object_from_request(request)
+        if "user_ids" not in body:
             raise SynapseError(
-                400, "Required parameter 'user_id' is missing", Codes.MISSING_PARAM
+                400, "Required parameter 'user_ids' is missing", Codes.MISSING_PARAM
             )
 
-        user_ids: List[bytes] = args[b"user_id"]
         statuses, failures = await self._account_handler.get_account_statuses(
-            user_ids,
+            body["user_ids"],
             allow_remote=True,
         )
 

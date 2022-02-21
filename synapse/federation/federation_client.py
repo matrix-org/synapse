@@ -57,7 +57,7 @@ from synapse.api.urls import FEDERATION_UNSTABLE_PREFIX
 from synapse.events import EventBase, builder
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.transport.client import SendJoinResponse
-from synapse.types import JsonDict, get_domain_from_id
+from synapse.types import JsonDict, get_domain_from_id, UserID
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.retryutils import NotRetryingDestination
@@ -1545,13 +1545,7 @@ class FederationClient(FederationBase):
             possible to retrieve a status.
         """
         try:
-            res = await self.transport_layer.make_query(
-                destination=destination,
-                query_type="account_status",
-                args={"user_id": user_ids},
-                retry_on_dns_fail=True,
-                prefix=FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc3720",
-            )
+            res = await self.transport_layer.get_account_status(destination, user_ids)
         except Exception:
             # If the query failed for any reason, mark all the users as failed.
             return {}, user_ids
@@ -1570,10 +1564,23 @@ class FederationClient(FederationBase):
         for user_id in user_ids:
             # Any account whose status is missing is a user we failed to receive the
             # status of.
-            if user_id not in statuses:
+            if user_id not in statuses and user_id not in failures:
                 failures.append(user_id)
 
-        return statuses, failures
+        # Filter out any user ID that doesn't belong to the remote server that sent its
+        # status.
+        def filter_status(item: Tuple[str, JsonDict]) -> bool:
+            # item is a (key, value) tuple.
+            user_id = item[0]
+            try:
+                return UserID.from_string(user_id).domain == destination
+            except SynapseError:
+                # If the user ID doesn't parse, ignore it.
+                return False
+
+        filtered_statuses = dict(filter(filter_status, statuses.items()))
+
+        return filtered_statuses, failures
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)

@@ -766,7 +766,7 @@ class RoomComplexityServlet(BaseFederationServlet):
         return 200, complexity
 
 
-class AccountStatusServlet(BaseFederationServerServlet):
+class FederationAccountStatusServlet(BaseFederationServerServlet):
     PATH = "/query/account_status"
     PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc3720"
 
@@ -780,23 +780,20 @@ class AccountStatusServlet(BaseFederationServerServlet):
         super().__init__(hs, authenticator, ratelimiter, server_name)
         self._account_handler = hs.get_account_handler()
 
-    async def on_GET(
+    async def on_POST(
         self,
         origin: str,
-        content: Literal[None],
-        query: Dict[bytes, List[bytes]],
+        content: JsonDict,
+        query: Mapping[bytes, Sequence[bytes]],
+        room_id: str,
     ) -> Tuple[int, JsonDict]:
-        # Handle MSC3720 account statuses requests.
-        # TODO: when the MSC has released into the spec, this handler should be moved
-        #  to a query handler
-        if b"user_id" not in query:
+        if "user_ids" not in content:
             raise SynapseError(
-                400, "Required parameter 'user_id' is missing", Codes.MISSING_PARAM
+                400, "Required parameter 'user_ids' is missing", Codes.MISSING_PARAM
             )
 
-        user_ids: List[bytes] = query[b"user_id"]
         statuses, failures = await self._account_handler.get_account_statuses(
-            user_ids,
+            content["user_ids"],
             allow_remote=False,
         )
 
@@ -834,5 +831,5 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationRoomHierarchyUnstableServlet,
     FederationV1SendKnockServlet,
     FederationMakeKnockServlet,
-    AccountStatusServlet,
+    FederationAccountStatusServlet,
 )

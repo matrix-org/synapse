@@ -1142,9 +1142,10 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
             "@unknown:" + self.hs.config.server.server_name,
             "@deactivated:remote",
             "@failed:otherremote",
+            "@bad:badremote"
         ]
 
-        async def get_json(destination, path, args, *a, **kwa):
+        async def post_json(destination, path, data, *a, **kwa):
             if destination == "remote":
                 return {
                     "account_statuses": {
@@ -1156,9 +1157,23 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
                 }
             if destination == "otherremote":
                 return {}
+            if destination == "badremote":
+                # badremote tries to overwrite the status of a user that doesn't belong
+                # to it (i.e. users[1]) with false data, which Synapse is expected to
+                # ignore.
+                return {
+                    "account_statuses": {
+                        users[3]: {
+                            "exists": False,
+                        },
+                        users[1]: {
+                            "exists": False,
+                        }
+                    }
+                }
 
         # Register a mock that will return the expected result depending on the remote.
-        self.hs.get_federation_http_client().get_json = Mock(side_effect=get_json)
+        self.hs.get_federation_http_client().post_json = Mock(side_effect=post_json)
 
         # Check that we've got the correct response from the client-side endpoint.
         self._test_status(
@@ -1170,6 +1185,9 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
                 users[1]: {
                     "exists": True,
                     "deactivated": True,
+                },
+                users[3]: {
+                    "exists": False,
                 },
             },
             expected_failures=[users[2]],
@@ -1194,14 +1212,14 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
             expected_failures: The expected failures, if any.
             expected_errcode: The expected Matrix error code, if any.
         """
-        if users is None:
-            url = self.url
-        else:
-            url = self.url + "?user_id=" + "&user_id=".join(users)
+        content = {}
+        if users is not None:
+            content["user_ids"] = users
 
         channel = self.make_request(
-            method="GET",
-            path=url,
+            method="POST",
+            path=self.url,
+            content=content,
             access_token=self.requester_tok,
         )
 
