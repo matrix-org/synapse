@@ -37,14 +37,16 @@ class _EventSourcesInner:
     account_data: AccountDataEventSource
 
     def get_sources(self) -> Iterator[Tuple[str, EventSource]]:
-        for attribute in _EventSourcesInner.__attrs_attrs__:  # type: ignore[attr-defined]
+        for attribute in attr.fields(_EventSourcesInner):
             yield attribute.name, getattr(self, attribute.name)
 
 
 class EventSources:
     def __init__(self, hs: "HomeServer"):
         self.sources = _EventSourcesInner(
-            *(attribute.type(hs) for attribute in _EventSourcesInner.__attrs_attrs__)  # type: ignore[attr-defined]
+            # mypy thinks attribute.type is `Optional`, but we know it's never `None` here since
+            # all the attributes of `_EventSourcesInner` are annotated.
+            *(attribute.type(hs) for attribute in attr.fields(_EventSourcesInner))  # type: ignore[misc]
         )
         self.store = hs.get_datastore()
 

@@ -14,7 +14,7 @@
 
 import functools
 import sys
-from typing import Any, Callable, Generator, List, TypeVar
+from typing import Any, Callable, Generator, List, TypeVar, cast
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
@@ -174,7 +174,9 @@ def _check_yield_points(
                         )
                     )
                     changes.append(err)
-                return getattr(e, "value", None)
+                # The `StopIteration` or `_DefGen_Return` contains the return value from the
+                # generator.
+                return cast(T, e.value)
 
             frame = gen.gi_frame
 

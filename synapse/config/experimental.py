@@ -41,9 +41,6 @@ class ExperimentalConfig(Config):
         # MSC3244 (room version capabilities)
         self.msc3244_enabled: bool = experimental.get("msc3244_enabled", True)
 
-        # MSC3283 (set displayname, avatar_url and change 3pid capabilities)
-        self.msc3283_enabled: bool = experimental.get("msc3283_enabled", False)
-
         # MSC3266 (room summary api)
         self.msc3266_enabled: bool = experimental.get("msc3266_enabled", False)
 
@@ -64,6 +61,10 @@ class ExperimentalConfig(Config):
 
         # MSC3706 (server-side support for partial state in /send_join responses)
         self.msc3706_enabled: bool = experimental.get("msc3706_enabled", False)
+
+        # experimental support for faster joins over federation (msc2775, msc3706)
+        # requires a target server with msc3706_enabled enabled.
+        self.faster_joins_enabled: bool = experimental.get("faster_joins", False)
 
         # MSC3720 (Account status endpoint)
         self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)

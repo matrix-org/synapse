@@ -654,7 +654,7 @@ class SearchHandler:
                 self.storage, user.to_string(), res.events_after
             )
 
-            context = {
+            context: JsonDict = {
                 "events_before": events_before,
                 "events_after": events_after,
                 "start": await now_token.copy_and_replace(

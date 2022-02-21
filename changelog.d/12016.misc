@@ -1,0 +1,1 @@
+Fix bug in `StateFilter.return_expanded()` and add some tests.

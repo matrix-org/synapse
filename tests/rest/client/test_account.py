@@ -490,8 +490,9 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
             {
                 "user_id": user_id,
                 "device_id": device_id,
-                # Unstable until MSC3069 enters spec
+                # MSC3069 entered spec in Matrix 1.2 but maintained compatibility
                 "org.matrix.msc3069.is_guest": False,
+                "is_guest": False,
             },
         )
 
@@ -509,8 +510,9 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
             {
                 "user_id": user_id,
                 "device_id": device_id,
-                # Unstable until MSC3069 enters spec
+                # MSC3069 entered spec in Matrix 1.2 but maintained compatibility
                 "org.matrix.msc3069.is_guest": True,
+                "is_guest": True,
             },
         )
 
@@ -532,8 +534,9 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
             whoami,
             {
                 "user_id": user_id,
-                # Unstable until MSC3069 enters spec
+                # MSC3069 entered spec in Matrix 1.2 but maintained compatibility
                 "org.matrix.msc3069.is_guest": False,
+                "is_guest": False,
             },
         )
         self.assertFalse(hasattr(whoami, "device_id"))
