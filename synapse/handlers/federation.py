@@ -49,8 +49,8 @@ from synapse.logging.context import (
     make_deferred_yieldable,
     nested_logging_context,
     preserve_fn,
-    run_in_background,
 )
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
