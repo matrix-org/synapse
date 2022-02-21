@@ -516,7 +516,7 @@ class FederationHandler:
             await self.store.upsert_room_on_join(
                 room_id=room_id,
                 room_version=room_version_obj,
-                auth_events=auth_chain,
+                state_events=state,
             )
 
             max_stream_id = await self._federation_event_handler.process_remote_join(
