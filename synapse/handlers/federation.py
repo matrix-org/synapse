@@ -15,7 +15,6 @@
 
 """Contains handlers for federation events."""
 
-import itertools
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
@@ -52,7 +51,6 @@ from synapse.logging.context import (
     preserve_fn,
     run_in_background,
 )
-from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
