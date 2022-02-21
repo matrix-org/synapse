@@ -27,7 +27,6 @@ jobs:
           - "check_codestyle"
           - "check_isort"
           - "mypy"
-          - "packaging"
 
     steps:
       - uses: actions/checkout@v2

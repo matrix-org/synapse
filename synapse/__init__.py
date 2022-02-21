@@ -70,9 +70,6 @@ except ImportError:
 
 __version__ = "1.55.2"
 
-if bool(os.environ.get("SYNAPSE_TEST_PATCH_LOG_CONTEXTS", False)):
-    # We import here so that we don't have to install a bunch of deps when
-    # running the packaging tox test.
-    from synapse.util.patch_inline_callbacks import do_patch
+from synapse.util.patch_inline_callbacks import do_patch
 
-    do_patch()
+do_patch()
