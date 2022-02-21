@@ -16,7 +16,7 @@
 import logging
 import random
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 from urllib.parse import urlparse
 
 from twisted.web.server import Request
@@ -35,7 +35,7 @@ from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
-    parse_string, parse_strings_from_args,
+    parse_string,
 )
 from synapse.http.site import SynapseRequest
 from synapse.metrics import threepid_send_requests

@@ -1239,9 +1239,7 @@ class TransportLayerClient:
         )
 
         return await self.client.post_json(
-            destination=destination,
-            path=path,
-            data={"user_ids": user_ids}
+            destination=destination, path=path, data={"user_ids": user_ids}
         )
 
 

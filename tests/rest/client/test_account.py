@@ -1145,7 +1145,7 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
             "@unknown:" + self.hs.config.server.server_name,
             "@deactivated:remote",
             "@failed:otherremote",
-            "@bad:badremote"
+            "@bad:badremote",
         ]
 
         async def post_json(destination, path, data, *a, **kwa):
@@ -1171,7 +1171,7 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
                         },
                         users[1]: {
                             "exists": False,
-                        }
+                        },
                     }
                 }
 

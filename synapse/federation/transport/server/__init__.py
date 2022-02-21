@@ -24,7 +24,8 @@ from synapse.federation.transport.server._base import (
 )
 from synapse.federation.transport.server.federation import (
     FEDERATION_SERVLET_CLASSES,
-    FederationTimestampLookupServlet, FederationAccountStatusServlet,
+    FederationAccountStatusServlet,
+    FederationTimestampLookupServlet,
 )
 from synapse.federation.transport.server.groups_local import GROUP_LOCAL_SERVLET_CLASSES
 from synapse.federation.transport.server.groups_server import (
