@@ -7,7 +7,7 @@ on:
   # of things breaking (but only build one set of debs)
   pull_request:
   push:
-    branches: ["develop"]
+    branches: ["develop", "release-*"]
 
     # we do the full build on tags.
     tags: ["v*"]
