@@ -1,3 +1,10 @@
+matrix-synapse-py3 (1.55.2+nmu1) UNRELEASED; urgency=medium
+
+  * Non-maintainer upload.
+  * Use poetry to manage the bundled virtualenv included with this package.
+
+ -- Synapse Packaging Team <packages@matrix.org>  Wed, 30 Mar 2022 12:21:43 +0100
+
 matrix-synapse-py3 (1.55.2) stable; urgency=medium
 
   * New synapse release 1.55.2.
