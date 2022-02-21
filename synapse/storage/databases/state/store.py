@@ -294,13 +294,15 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 # to cover our StateFilter and give us the state we need.
                 break
 
-        if state_filter_left_over != StateFilter.none():
-            if len(inflight_requests) >= MAX_INFLIGHT_REQUESTS_PER_GROUP:
-                # There are too many requests for this group.
-                # To prevent even more from building up, we request the whole
-                # state filter to guarantee that we can be reused by any subsequent
-                # requests for this state group.
-                return (), StateFilter.all()
+        if (
+            state_filter_left_over != StateFilter.none()
+            and len(inflight_requests) >= MAX_INFLIGHT_REQUESTS_PER_GROUP
+        ):
+            # There are too many requests for this group.
+            # To prevent even more from building up, we request the whole
+            # state filter to guarantee that we can be reused by any subsequent
+            # requests for this state group.
+            return (), StateFilter.all()
 
         return reusable_requests, state_filter_left_over
 
