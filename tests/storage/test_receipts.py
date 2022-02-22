@@ -120,13 +120,18 @@ class ReceiptTestCase(HomeserverTestCase):
         # Send public read receipt for the first event
         self.get_success(
             self.store.insert_receipt(
-                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_1_id], {}
+                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_1_id], None, {}
             )
         )
         # Send private read receipt for the second event
         self.get_success(
             self.store.insert_receipt(
-                self.room_id1, ReceiptTypes.READ_PRIVATE, OUR_USER_ID, [event1_2_id], {}
+                self.room_id1,
+                ReceiptTypes.READ_PRIVATE,
+                OUR_USER_ID,
+                [event1_2_id],
+                None,
+                {},
             )
         )
 
@@ -153,7 +158,7 @@ class ReceiptTestCase(HomeserverTestCase):
         # Test receipt updating
         self.get_success(
             self.store.insert_receipt(
-                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_2_id], {}
+                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_2_id], None, {}
             )
         )
         res = self.get_success(
@@ -169,7 +174,12 @@ class ReceiptTestCase(HomeserverTestCase):
         # Test new room is reflected in what the method returns
         self.get_success(
             self.store.insert_receipt(
-                self.room_id2, ReceiptTypes.READ_PRIVATE, OUR_USER_ID, [event2_1_id], {}
+                self.room_id2,
+                ReceiptTypes.READ_PRIVATE,
+                OUR_USER_ID,
+                [event2_1_id],
+                None,
+                {},
             )
         )
         res = self.get_success(
@@ -191,13 +201,18 @@ class ReceiptTestCase(HomeserverTestCase):
         # Send public read receipt for the first event
         self.get_success(
             self.store.insert_receipt(
-                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_1_id], {}
+                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_1_id], None, {}
             )
         )
         # Send private read receipt for the second event
         self.get_success(
             self.store.insert_receipt(
-                self.room_id1, ReceiptTypes.READ_PRIVATE, OUR_USER_ID, [event1_2_id], {}
+                self.room_id1,
+                ReceiptTypes.READ_PRIVATE,
+                OUR_USER_ID,
+                [event1_2_id],
+                None,
+                {},
             )
         )
 
@@ -230,7 +245,7 @@ class ReceiptTestCase(HomeserverTestCase):
         # Test receipt updating
         self.get_success(
             self.store.insert_receipt(
-                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_2_id], {}
+                self.room_id1, ReceiptTypes.READ, OUR_USER_ID, [event1_2_id], None, {}
             )
         )
         res = self.get_success(
@@ -248,7 +263,12 @@ class ReceiptTestCase(HomeserverTestCase):
         # Test new room is reflected in what the method returns
         self.get_success(
             self.store.insert_receipt(
-                self.room_id2, ReceiptTypes.READ_PRIVATE, OUR_USER_ID, [event2_1_id], {}
+                self.room_id2,
+                ReceiptTypes.READ_PRIVATE,
+                OUR_USER_ID,
+                [event2_1_id],
+                None,
+                {},
             )
         )
         res = self.get_success(

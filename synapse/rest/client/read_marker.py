@@ -81,6 +81,7 @@ class ReadMarkerRestServlet(RestServlet):
                     receipt_type,
                     user_id=requester.user.to_string(),
                     event_id=event_id,
+                    thread_id=None,  # TODO
                 )
 
         return 200, {}

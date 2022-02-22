@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from synapse.api.constants import ReceiptTypes
 from synapse.api.errors import SynapseError
@@ -34,7 +34,8 @@ class ReceiptRestServlet(RestServlet):
     PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)"
         "/receipt/(?P<receipt_type>[^/]*)"
-        "/(?P<event_id>[^/]*)$"
+        "/(?P<event_id>[^/]*)"
+        "(/(?P<thread_id>[^/]*))?$"
     )
 
     def __init__(self, hs: "HomeServer"):
@@ -51,7 +52,12 @@ class ReceiptRestServlet(RestServlet):
             )
 
     async def on_POST(
-        self, request: SynapseRequest, room_id: str, receipt_type: str, event_id: str
+        self,
+        request: SynapseRequest,
+        room_id: str,
+        receipt_type: str,
+        event_id: str,
+        thread_id: Optional[str],
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
@@ -77,6 +83,7 @@ class ReceiptRestServlet(RestServlet):
                 receipt_type,
                 user_id=requester.user.to_string(),
                 event_id=event_id,
+                thread_id=thread_id,
             )
 
         return 200, {}
