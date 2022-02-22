@@ -24,10 +24,10 @@ import traceback
 from typing import Dict, Iterable, Optional, Set
 
 import yaml
+from matrix_common.versionstring import get_distribution_version_string
 
 from twisted.internet import defer, reactor
 
-import synapse
 from synapse.config.database import DatabaseConnectionConfig
 from synapse.config.homeserver import HomeServerConfig
 from synapse.logging.context import (
@@ -36,6 +36,8 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.storage.database import DatabasePool, make_conn
+from synapse.storage.databases.main import PushRuleStore
+from synapse.storage.databases.main.account_data import AccountDataWorkerStore
 from synapse.storage.databases.main.client_ips import ClientIpBackgroundUpdateStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxBackgroundUpdateStore
 from synapse.storage.databases.main.devices import DeviceBackgroundUpdateStore
@@ -65,7 +67,6 @@ from synapse.storage.databases.state.bg_updates import StateBackgroundUpdateStor
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.util import Clock
-from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse_port_db")
 
@@ -180,6 +181,8 @@ class Store(
     UserDirectoryBackgroundUpdateStore,
     EndToEndKeyBackgroundStore,
     StatsStore,
+    AccountDataWorkerStore,
+    PushRuleStore,
     PusherWorkerStore,
     PresenceBackgroundUpdateStore,
     GroupServerWorkerStore,
@@ -218,7 +221,9 @@ class MockHomeserver:
         self.clock = Clock(reactor)
         self.config = config
         self.hostname = config.server.server_name
-        self.version_string = "Synapse/" + get_version_string(synapse)
+        self.version_string = "Synapse/" + get_distribution_version_string(
+            "matrix-synapse"
+        )
 
     def get_clock(self):
         return self.clock

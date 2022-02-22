@@ -13,7 +13,6 @@
 
 # Upgrading
   - [Upgrading between Synapse Versions](upgrade.md)
-  - [Upgrading from pre-Synapse 1.0](MSC1711_certificates_FAQ.md)
 
 # Usage
   - [Federation](federate.md)
@@ -72,7 +71,7 @@
     - [Understanding Synapse Through Grafana Graphs](usage/administration/understanding_synapse_through_grafana_graphs.md)
     - [Useful SQL for Admins](usage/administration/useful_sql_for_admins.md)
     - [Database Maintenance Tools](usage/administration/database_maintenance_tools.md)
-    - [State Groups](usage/administration/state_groups.md) 
+    - [State Groups](usage/administration/state_groups.md)
     - [Request log format](usage/administration/request_log.md)
     - [Admin FAQ](usage/administration/admin_faq.md)
     - [Scripts]()
@@ -80,6 +79,7 @@
 # Development
   - [Contributing Guide](development/contributing_guide.md)
   - [Code Style](code_style.md)
+  - [Release Cycle](development/releases.md)
   - [Git Usage](development/git.md)
   - [Testing]()
   - [OpenTracing](opentracing.md)

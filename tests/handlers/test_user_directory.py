@@ -169,7 +169,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # Register an AS user.
         user = self.register_user("user", "pass")
         token = self.login(user, "pass")
-        as_user = self.register_appservice_user("as_user_potato", self.appservice.token)
+        as_user, _ = self.register_appservice_user(
+            "as_user_potato", self.appservice.token
+        )
 
         # Join the AS user to rooms owned by the normal user.
         public, private = self._create_rooms_and_inject_memberships(
@@ -388,7 +390,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     def test_handle_local_profile_change_with_appservice_user(self) -> None:
         # create user
-        as_user_id = self.register_appservice_user(
+        as_user_id, _ = self.register_appservice_user(
             "as_user_alice", self.appservice.token
         )
 

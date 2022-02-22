@@ -1154,7 +1154,7 @@ class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
 
 class RegistrationTokenValidityRestServletTestCase(unittest.HomeserverTestCase):
     servlets = [register.register_servlets]
-    url = "/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity"
+    url = "/_matrix/client/v1/register/m.login.registration_token/validity"
 
     def default_config(self):
         config = super().default_config()
