@@ -1681,7 +1681,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 user_id=row[1],
                 device_id=row[2],
                 next_token_id=row[3],
-                has_next_refresh_token_been_refreshed=row[4],
+                # SQLite returns 0 or 1 for false/true, so convert to a bool.
+                has_next_refresh_token_been_refreshed=bool(row[4]),
                 # This column is nullable, ensure it's a boolean
                 has_next_access_token_been_used=(row[5] or False),
                 expiry_ts=row[6],
