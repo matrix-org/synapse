@@ -155,7 +155,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         self.http_client = Mock(spec=["get_json"])
         self.http_client.get_json.side_effect = get_json
-        self.http_client.user_agent = "Synapse Test"
+        self.http_client.user_agent = b"Synapse Test"
 
         hs = self.setup_test_homeserver(proxied_http_client=self.http_client)
 
@@ -438,12 +438,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
         state = "state"
         nonce = "nonce"
         client_redirect_url = "http://client/redirect"
-        user_agent = "Browser"
         ip_address = "10.0.0.1"
         session = self._generate_oidc_session_token(state, nonce, client_redirect_url)
-        request = _build_callback_request(
-            code, state, session, user_agent=user_agent, ip_address=ip_address
-        )
+        request = _build_callback_request(code, state, session, ip_address=ip_address)
 
         self.get_success(self.handler.handle_oidc_callback(request))
 
@@ -1274,7 +1271,6 @@ def _build_callback_request(
     code: str,
     state: str,
     session: str,
-    user_agent: str = "Browser",
     ip_address: str = "10.0.0.1",
 ):
     """Builds a fake SynapseRequest to mock the browser callback
@@ -1289,7 +1285,6 @@ def _build_callback_request(
            query param. Should be the same as was embedded in the session in
            _build_oidc_session.
         session: the "session" which would have been passed around in the cookie.
-        user_agent: the user-agent to present
         ip_address: the IP address to pretend the request came from
     """
     request = Mock(

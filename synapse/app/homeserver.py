@@ -18,6 +18,8 @@ import os
 import sys
 from typing import Dict, Iterable, Iterator, List
 
+from matrix_common.versionstring import get_distribution_version_string
+
 from twisted.internet.tcp import Port
 from twisted.web.resource import EncodingResourceWrapper, Resource
 from twisted.web.server import GzipEncoderFactory
@@ -70,7 +72,6 @@ from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.module_loader import load_module
-from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -350,7 +351,7 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
     hs = SynapseHomeServer(
         config.server.server_name,
         config=config,
-        version_string="Synapse/" + get_version_string(synapse),
+        version_string="Synapse/" + get_distribution_version_string("matrix-synapse"),
     )
 
     synapse.config.logger.setup_logging(hs, config, use_worker_options=False)

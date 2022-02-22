@@ -62,6 +62,7 @@ from synapse.federation.sender import AbstractFederationSender, FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
+from synapse.handlers.account import AccountHandler
 from synapse.handlers.account_data import AccountDataHandler
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.admin import AdminHandler
@@ -233,8 +234,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         self,
         hostname: str,
         config: HomeServerConfig,
-        reactor=None,
-        version_string="Synapse",
+        reactor: Optional[ISynapseReactor] = None,
+        version_string: str = "Synapse",
     ):
         """
         Args:
@@ -244,7 +245,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         if not reactor:
             from twisted.internet import reactor as _reactor
 
-            reactor = _reactor
+            reactor = cast(ISynapseReactor, _reactor)
 
         self._reactor = reactor
         self.hostname = hostname
@@ -264,7 +265,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         self._module_web_resources: Dict[str, Resource] = {}
         self._module_web_resources_consumed = False
 
-    def register_module_web_resource(self, path: str, resource: Resource):
+    def register_module_web_resource(self, path: str, resource: Resource) -> None:
         """Allows a module to register a web resource to be served at the given path.
 
         If multiple modules register a resource for the same path, the module that
@@ -806,6 +807,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_external_cache(self) -> ExternalCache:
         return ExternalCache(self)
+
+    @cache_in_self
+    def get_account_handler(self) -> AccountHandler:
+        return AccountHandler(self)
 
     @cache_in_self
     def get_outbound_redis_connection(self) -> "RedisProtocol":

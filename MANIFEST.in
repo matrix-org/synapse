@@ -45,6 +45,7 @@ include book.toml
 include pyproject.toml
 recursive-include changelog.d *
 
+include .flake8
 prune .circleci
 prune .github
 prune .ci

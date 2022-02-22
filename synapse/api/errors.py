@@ -406,6 +406,9 @@ class RoomKeysVersionError(SynapseError):
         super().__init__(403, "Wrong room_keys version", Codes.WRONG_ROOM_KEYS_VERSION)
         self.current_version = current_version
 
+    def error_dict(self) -> "JsonDict":
+        return cs_error(self.msg, self.errcode, current_version=self.current_version)
+
 
 class UnsupportedRoomVersionError(SynapseError):
     """The client's request to create a room used a room version that the server does

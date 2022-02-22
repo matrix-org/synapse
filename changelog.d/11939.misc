@@ -1,1 +1,0 @@
-Remove an unnecessary ignoring of type hints due to fixes in upstream packages.

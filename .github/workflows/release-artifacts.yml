@@ -7,7 +7,7 @@ on:
   # of things breaking (but only build one set of debs)
   pull_request:
   push:
-    branches: ["develop"]
+    branches: ["develop", "release-*"]
 
     # we do the full build on tags.
     tags: ["v*"]
@@ -91,17 +91,7 @@ jobs:
 
   build-sdist:
     name: "Build pypi distribution files"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-      - run: pip install wheel
-      - run: |
-          python setup.py sdist bdist_wheel
-      - uses: actions/upload-artifact@v2
-        with:
-          name: python-dist
-          path: dist/*
+    uses: "matrix-org/backend-meta/.github/workflows/packaging.yml@v1"
 
   # if it's a tag, create a release and attach the artifacts to it
   attach-assets:

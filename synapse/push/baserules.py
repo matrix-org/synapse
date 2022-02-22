@@ -130,7 +130,9 @@ def make_base_prepend_rules(
     return rules
 
 
-BASE_APPEND_CONTENT_RULES = [
+# We have to annotate these types, otherwise mypy infers them as
+# `List[Dict[str, Sequence[Collection[str]]]]`.
+BASE_APPEND_CONTENT_RULES: List[Dict[str, Any]] = [
     {
         "rule_id": "global/content/.m.rule.contains_user_name",
         "conditions": [
@@ -149,7 +151,7 @@ BASE_APPEND_CONTENT_RULES = [
 ]
 
 
-BASE_PREPEND_OVERRIDE_RULES = [
+BASE_PREPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
     {
         "rule_id": "global/override/.m.rule.master",
         "enabled": False,
@@ -159,7 +161,7 @@ BASE_PREPEND_OVERRIDE_RULES = [
 ]
 
 
-BASE_APPEND_OVERRIDE_RULES = [
+BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
     {
         "rule_id": "global/override/.m.rule.suppress_notices",
         "conditions": [
@@ -278,7 +280,7 @@ BASE_APPEND_OVERRIDE_RULES = [
 ]
 
 
-BASE_APPEND_UNDERRIDE_RULES = [
+BASE_APPEND_UNDERRIDE_RULES: List[Dict[str, Any]] = [
     {
         "rule_id": "global/underride/.m.rule.call",
         "conditions": [
