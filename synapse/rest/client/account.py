@@ -883,7 +883,9 @@ class WhoamiRestServlet(RestServlet):
         response = {
             "user_id": requester.user.to_string(),
             # MSC: https://github.com/matrix-org/matrix-doc/pull/3069
+            # Entered spec in Matrix 1.2
             "org.matrix.msc3069.is_guest": bool(requester.is_guest),
+            "is_guest": bool(requester.is_guest),
         }
 
         # Appservices and similar accounts do not have device IDs
@@ -892,6 +894,36 @@ class WhoamiRestServlet(RestServlet):
             response["device_id"] = requester.device_id
 
         return 200, response
+
+
+class AccountStatusRestServlet(RestServlet):
+    PATTERNS = client_patterns(
+        "/org.matrix.msc3720/account_status$", unstable=True, releases=()
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastore()
+        self._is_mine = hs.is_mine
+        self._federation_client = hs.get_federation_client()
+        self._account_handler = hs.get_account_handler()
+
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        await self._auth.get_user_by_req(request)
+
+        body = parse_json_object_from_request(request)
+        if "user_ids" not in body:
+            raise SynapseError(
+                400, "Required parameter 'user_ids' is missing", Codes.MISSING_PARAM
+            )
+
+        statuses, failures = await self._account_handler.get_account_statuses(
+            body["user_ids"],
+            allow_remote=True,
+        )
+
+        return 200, {"account_statuses": statuses, "failures": failures}
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
@@ -908,3 +940,6 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ThreepidUnbindRestServlet(hs).register(http_server)
     ThreepidDeleteRestServlet(hs).register(http_server)
     WhoamiRestServlet(hs).register(http_server)
+
+    if hs.config.experimental.msc3720_enabled:
+        AccountStatusRestServlet(hs).register(http_server)

@@ -65,13 +65,12 @@ class TransportLayerClient:
     async def get_room_state_ids(
         self, destination: str, room_id: str, event_id: str
     ) -> JsonDict:
-        """Requests all state for a given room from the given server at the
-        given event. Returns the state's event_id's
+        """Requests the IDs of all state for a given room at the given event.
 
         Args:
             destination: The host name of the remote homeserver we want
                 to get the state from.
-            context: The name of the context we want the state of
+            room_id: the room we want the state of
             event_id: The event we want the context at.
 
         Returns:
@@ -85,6 +84,29 @@ class TransportLayerClient:
             path=path,
             args={"event_id": event_id},
             try_trailing_slash_on_400=True,
+        )
+
+    async def get_room_state(
+        self, room_version: RoomVersion, destination: str, room_id: str, event_id: str
+    ) -> "StateRequestResponse":
+        """Requests the full state for a given room at the given event.
+
+        Args:
+            room_version: the version of the room (required to build the event objects)
+            destination: The host name of the remote homeserver we want
+                to get the state from.
+            room_id: the room we want the state of
+            event_id: The event we want the context at.
+
+        Returns:
+            Results in a dict received from the remote homeserver.
+        """
+        path = _create_v1_path("/state/%s", room_id)
+        return await self.client.get_json(
+            destination,
+            path=path,
+            args={"event_id": event_id},
+            parser=_StateParser(room_version),
         )
 
     async def get_event(
@@ -236,8 +258,9 @@ class TransportLayerClient:
         args: dict,
         retry_on_dns_fail: bool,
         ignore_backoff: bool = False,
+        prefix: str = FEDERATION_V1_PREFIX,
     ) -> JsonDict:
-        path = _create_v1_path("/query/%s", query_type)
+        path = _create_path(prefix, "/query/%s", query_type)
 
         return await self.client.get_json(
             destination=destination,
@@ -1225,6 +1248,22 @@ class TransportLayerClient:
             args={"suggested_only": "true" if suggested_only else "false"},
         )
 
+    async def get_account_status(
+        self, destination: str, user_ids: List[str]
+    ) -> JsonDict:
+        """
+        Args:
+            destination: The remote server.
+            user_ids: The user ID(s) for which to request account status(es).
+        """
+        path = _create_path(
+            FEDERATION_UNSTABLE_PREFIX, "/org.matrix.msc3720/account_status"
+        )
+
+        return await self.client.post_json(
+            destination=destination, path=path, data={"user_ids": user_ids}
+        )
+
 
 def _create_path(federation_prefix: str, path: str, *args: str) -> str:
     """
@@ -1282,6 +1321,14 @@ class SendJoinResponse:
 
     # List of servers in the room
     servers_in_room: Optional[List[str]] = None
+
+
+@attr.s(slots=True, auto_attribs=True)
+class StateRequestResponse:
+    """The parsed response of a `/state` request."""
+
+    auth_events: List[EventBase]
+    state: List[EventBase]
 
 
 @ijson.coroutine
@@ -1410,4 +1457,38 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
             self._response.event = make_event_from_dict(
                 self._response.event_dict, self._room_version
             )
+        return self._response
+
+
+class _StateParser(ByteParser[StateRequestResponse]):
+    """A parser for the response to `/state` requests.
+
+    Args:
+        room_version: The version of the room.
+    """
+
+    CONTENT_TYPE = "application/json"
+
+    def __init__(self, room_version: RoomVersion):
+        self._response = StateRequestResponse([], [])
+        self._room_version = room_version
+        self._coros = [
+            ijson.items_coro(
+                _event_list_parser(room_version, self._response.state),
+                "pdus.item",
+                use_float=True,
+            ),
+            ijson.items_coro(
+                _event_list_parser(room_version, self._response.auth_events),
+                "auth_chain.item",
+                use_float=True,
+            ),
+        ]
+
+    def write(self, data: bytes) -> int:
+        for c in self._coros:
+            c.send(data)
+        return len(data)
+
+    def finish(self) -> StateRequestResponse:
         return self._response

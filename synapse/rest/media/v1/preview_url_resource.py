@@ -402,7 +402,15 @@ class PreviewUrlResource(DirectServeJsonResource):
                 url,
                 output_stream=output_stream,
                 max_size=self.max_spider_size,
-                headers={"Accept-Language": self.url_preview_accept_language},
+                headers={
+                    b"Accept-Language": self.url_preview_accept_language,
+                    # Use a custom user agent for the preview because some sites will only return
+                    # Open Graph metadata to crawler user agents. Omit the Synapse version
+                    # string to avoid leaking information.
+                    b"User-Agent": [
+                        "Synapse (bot; +https://github.com/matrix-org/synapse)"
+                    ],
+                },
                 is_allowed_content_type=_is_previewable,
             )
         except SynapseError:
