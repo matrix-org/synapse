@@ -62,7 +62,7 @@ class AuthRestServlet(RestServlet):
         if stagetype == LoginType.RECAPTCHA:
             html = self.recaptcha_template.render(
                 session=session,
-                myurl="%s/r0/auth/%s/fallback/web"
+                myurl="%s/v3/auth/%s/fallback/web"
                 % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
                 sitekey=self.hs.config.captcha.recaptcha_public_key,
             )
@@ -74,7 +74,7 @@ class AuthRestServlet(RestServlet):
                     self.hs.config.server.public_baseurl,
                     self.hs.config.consent.user_consent_version,
                 ),
-                myurl="%s/r0/auth/%s/fallback/web"
+                myurl="%s/v3/auth/%s/fallback/web"
                 % (CLIENT_API_PREFIX, LoginType.TERMS),
             )
 
@@ -118,7 +118,7 @@ class AuthRestServlet(RestServlet):
                 # Authentication failed, let user try again
                 html = self.recaptcha_template.render(
                     session=session,
-                    myurl="%s/r0/auth/%s/fallback/web"
+                    myurl="%s/v3/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
                     sitekey=self.hs.config.captcha.recaptcha_public_key,
                     error=e.msg,
@@ -143,7 +143,7 @@ class AuthRestServlet(RestServlet):
                         self.hs.config.server.public_baseurl,
                         self.hs.config.consent.user_consent_version,
                     ),
-                    myurl="%s/r0/auth/%s/fallback/web"
+                    myurl="%s/v3/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.TERMS),
                     error=e.msg,
                 )
