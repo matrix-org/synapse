@@ -171,7 +171,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         if send_receipt:
             self.get_success(
                 self.master_store.insert_receipt(
-                    ROOM_ID, ReceiptTypes.READ, USER_ID_2, [event1.event_id], {}
+                    ROOM_ID, ReceiptTypes.READ, USER_ID_2, [event1.event_id], None, {}
                 )
             )
 

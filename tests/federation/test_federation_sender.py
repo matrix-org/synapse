@@ -49,7 +49,12 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
 
         sender = self.hs.get_federation_sender()
         receipt = ReadReceipt(
-            "room_id", "m.read", "user_id", ["event_id"], {"ts": 1234}
+            "room_id",
+            "m.read",
+            "user_id",
+            ["event_id"],
+            thread_id=None,
+            data={"ts": 1234},
         )
         self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
 
@@ -89,7 +94,12 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
 
         sender = self.hs.get_federation_sender()
         receipt = ReadReceipt(
-            "room_id", "m.read", "user_id", ["event_id"], {"ts": 1234}
+            "room_id",
+            "m.read",
+            "user_id",
+            ["event_id"],
+            thread_id=None,
+            data={"ts": 1234},
         )
         self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
 
@@ -121,7 +131,12 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
 
         # send the second RR
         receipt = ReadReceipt(
-            "room_id", "m.read", "user_id", ["other_id"], {"ts": 1234}
+            "room_id",
+            "m.read",
+            "user_id",
+            ["other_id"],
+            thread_id=None,
+            data={"ts": 1234},
         )
         self.successResultOf(defer.ensureDeferred(sender.send_read_receipt(receipt)))
         self.pump()

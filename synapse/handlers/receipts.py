@@ -97,6 +97,7 @@ class ReceiptsHandler:
                             receipt_type=receipt_type,
                             user_id=user_id,
                             event_ids=user_values["event_ids"],
+                            thread_id=None,  # TODO
                             data=user_values.get("data", {}),
                         )
                     )
@@ -114,6 +115,7 @@ class ReceiptsHandler:
                 receipt.receipt_type,
                 receipt.user_id,
                 receipt.event_ids,
+                receipt.thread_id,
                 receipt.data,
             )
 
@@ -146,7 +148,12 @@ class ReceiptsHandler:
         return True
 
     async def received_client_receipt(
-        self, room_id: str, receipt_type: str, user_id: str, event_id: str
+        self,
+        room_id: str,
+        receipt_type: str,
+        user_id: str,
+        event_id: str,
+        thread_id: Optional[str],
     ) -> None:
         """Called when a client tells us a local user has read up to the given
         event_id in the room.
@@ -156,6 +163,7 @@ class ReceiptsHandler:
             receipt_type=receipt_type,
             user_id=user_id,
             event_ids=[event_id],
+            thread_id=thread_id,
             data={"ts": int(self.clock.time_msec())},
         )
 

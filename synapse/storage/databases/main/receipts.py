@@ -613,6 +613,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         receipt_type: str,
         user_id: str,
         event_id: str,
+        thread_id: Optional[str],
         data: JsonDict,
         stream_id: int,
     ) -> Optional[int]:
@@ -636,15 +637,18 @@ class ReceiptsWorkerStore(SQLBaseStore):
         stream_ordering = int(res["stream_ordering"]) if res else None
         rx_ts = res["received_ts"] if res else 0
 
+        # Convert None to a blank string.
+        thread_id = thread_id or ""
+
         # We don't want to clobber receipts for more recent events, so we
         # have to compare orderings of existing receipts
         if stream_ordering is not None:
             sql = (
                 "SELECT stream_ordering, event_id FROM events"
-                " INNER JOIN receipts_linearized AS r USING (event_id, room_id)"
-                " WHERE r.room_id = ? AND r.receipt_type = ? AND r.user_id = ?"
+                " INNER JOIN receipts_linearized as r USING (event_id, room_id)"
+                " WHERE r.room_id = ? AND r.receipt_type = ? AND r.user_id = ? AND r.thread_id = ?"
             )
-            txn.execute(sql, (room_id, receipt_type, user_id))
+            txn.execute(sql, (room_id, receipt_type, user_id, thread_id))
 
             for so, eid in txn:
                 if int(so) >= stream_ordering:
@@ -656,6 +660,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                     )
                     return None
 
+        # TODO
         txn.call_after(
             self.invalidate_caches_for_receipt, room_id, receipt_type, user_id
         )
@@ -671,6 +676,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 "room_id": room_id,
                 "receipt_type": receipt_type,
                 "user_id": user_id,
+                "thread_id": thread_id,
             },
             values={
                 "stream_id": stream_id,
@@ -678,7 +684,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 "data": json_encoder.encode(data),
             },
             # receipts_linearized has a unique constraint on
-            # (user_id, room_id, receipt_type), so no need to lock
+            # (user_id, room_id, receipt_type, key), so no need to lock
             lock=False,
         )
 
@@ -728,6 +734,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         receipt_type: str,
         user_id: str,
         event_ids: List[str],
+        thread_id: Optional[str],
         data: dict,
     ) -> Optional[Tuple[int, int]]:
         """Insert a receipt, either from local client or remote server.
@@ -760,6 +767,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 receipt_type,
                 user_id,
                 linearized_event_id,
+                thread_id,
                 data,
                 stream_id=stream_id,
                 # Read committed is actually beneficial here because we check for a receipt with
@@ -774,7 +782,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         now = self._clock.time_msec()
         logger.debug(
-            "RR for event %s in %s (%i ms old)",
+            "Receipt %s for event %s in %s (%i ms old)",
+            receipt_type,
             linearized_event_id,
             room_id,
             now - event_ts,
@@ -787,6 +796,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             receipt_type,
             user_id,
             event_ids,
+            thread_id,
             data,
         )
 
@@ -801,6 +811,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         receipt_type: str,
         user_id: str,
         event_ids: List[str],
+        thread_id: Optional[str],
         data: JsonDict,
     ) -> None:
         assert self._can_write_to_receipts
@@ -812,6 +823,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
         # FIXME: This shouldn't invalidate the whole cache
         txn.call_after(self._get_linearized_receipts_for_room.invalidate, (room_id,))
 
+        # Convert None to a blank string.
+        thread_id = thread_id or ""
+
         self.db_pool.simple_delete_txn(
             txn,
             table="receipts_graph",
@@ -819,6 +833,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 "room_id": room_id,
                 "receipt_type": receipt_type,
                 "user_id": user_id,
+                "thread_id": thread_id,
             },
         )
         self.db_pool.simple_insert_txn(
@@ -829,6 +844,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 "receipt_type": receipt_type,
                 "user_id": user_id,
                 "event_ids": json_encoder.encode(event_ids),
+                "thread_id": thread_id,
                 "data": json_encoder.encode(data),
             },
         )
