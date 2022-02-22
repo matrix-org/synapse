@@ -71,6 +71,8 @@ class ProfileHandler:
 
         self.server_name = hs.config.server.server_name
 
+        self._third_party_rules = hs.get_third_party_event_rules()
+
         if hs.config.worker.run_background_tasks:
             self.clock.looping_call(
                 self._update_remote_profile_cache, self.PROFILE_UPDATE_MS
@@ -227,6 +229,10 @@ class ProfileHandler:
             target_user.to_string(), profile
         )
 
+        await self._third_party_rules.on_profile_update(
+            target_user.to_string(), profile, by_admin
+        )
+
         await self._update_join_states(requester, target_user)
 
     async def get_avatar_url(self, target_user: UserID) -> Optional[str]:
@@ -313,6 +319,10 @@ class ProfileHandler:
         profile = await self.store.get_profileinfo(target_user.localpart)
         await self.user_directory_handler.handle_local_profile_change(
             target_user.to_string(), profile
+        )
+
+        await self._third_party_rules.on_profile_update(
+            target_user.to_string(), profile, by_admin
         )
 
         await self._update_join_states(requester, target_user)

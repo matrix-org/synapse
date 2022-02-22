@@ -38,6 +38,7 @@ class DeactivateAccountHandler:
         self._profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
         self._server_name = hs.hostname
+        self._third_party_rules = hs.get_third_party_event_rules()
 
         # Flag that indicates whether the process to part users from rooms is running
         self._user_parter_running = False
@@ -159,6 +160,9 @@ class DeactivateAccountHandler:
 
         # Remove account data (including ignored users and push rules).
         await self.store.purge_account_data_for_user(user_id)
+
+        # Let modules know the user has been deactivated.
+        await self._third_party_rules.on_deactivation(user_id, by_admin)
 
         return identity_server_supports_unbinding
 
