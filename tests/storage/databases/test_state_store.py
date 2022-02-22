@@ -143,7 +143,8 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
           rewriting one of the filters as the 'all' state filter
         - requests after that one do not cause any additional queries
         """
-        CAP_COUNT = 5
+        # 5 at the time of writing.
+        CAP_COUNT = MAX_INFLIGHT_REQUESTS_PER_GROUP
 
         reqs = []
 
