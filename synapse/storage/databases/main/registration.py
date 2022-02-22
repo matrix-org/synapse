@@ -1698,12 +1698,15 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         Set the successor of a refresh token, removing the existing successor
         if any.
 
+        This also deletes the predecessor refresh and access tokens,
+        since they cannot be valid anymore.
+
         Args:
             token_id: ID of the refresh token to update.
             next_token_id: ID of its successor.
         """
 
-        def _replace_refresh_token_txn(txn) -> None:
+        def _replace_refresh_token_txn(txn: LoggingTransaction) -> None:
             # First check if there was an existing refresh token
             old_next_token_id = self.db_pool.simple_select_one_onecol_txn(
                 txn,
@@ -1728,6 +1731,16 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                     "refresh_tokens",
                     {"id": old_next_token_id},
                 )
+
+            # Delete the previous refresh token, since we only want to keep the
+            # last 2 refresh tokens in the database.
+            # (The predecessor of the latest refresh token is still useful in
+            # case the refresh was interrupted and the client re-uses the old
+            # one.)
+            # This cascades to delete the associated access token.
+            self.db_pool.simple_delete_txn(
+                txn, "refresh_tokens", {"next_token_id": token_id}
+            )
 
         await self.db_pool.runInteraction(
             "replace_refresh_token", _replace_refresh_token_txn
