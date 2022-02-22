@@ -227,22 +227,22 @@ below for more information.
     ^/_matrix/client/unstable/org.matrix.msc2946/rooms/.*/spaces$
     ^/_matrix/client/(v1|unstable/org.matrix.msc2946)/rooms/.*/hierarchy$
     ^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/account/3pid$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/devices$
+    ^/_matrix/client/(r0|v3|unstable)/account/3pid$
+    ^/_matrix/client/(r0|v3|unstable)/devices$
     ^/_matrix/client/versions$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_groups$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/publicised_groups$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/publicised_groups/
+    ^/_matrix/client/(r0|v3|unstable)/joined_groups$
+    ^/_matrix/client/(r0|v3|unstable)/publicised_groups$
+    ^/_matrix/client/(r0|v3|unstable)/publicised_groups/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 
     # Encryption requests
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/query$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/changes$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/claim
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/room_keys
+    ^/_matrix/client/(r0|v3|unstable)/keys/query$
+    ^/_matrix/client/(r0|v3|unstable)/keys/changes$
+    ^/_matrix/client/(r0|v3|unstable)/keys/claim
+    ^/_matrix/client/(r0|v3|unstable)/room_keys
 
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/login$
@@ -261,15 +261,15 @@ below for more information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing
 
     # Device requests
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/sendToDevice/
+    ^/_matrix/client/(r0|v3|unstable)/sendToDevice/
 
     # Account data requests
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/tags
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/account_data
+    ^/_matrix/client/(r0|v3|unstable)/.*/tags
+    ^/_matrix/client/(r0|v3|unstable)/.*/account_data
 
     # Receipts requests
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/receipt
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/read_markers
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/receipt
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/read_markers
 
     # Presence requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
