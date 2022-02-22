@@ -48,24 +48,10 @@ jobs:
         env:
           PULL_REQUEST_NUMBER: ${{ github.event.number }}
 
-  lint-sdist:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-        with:
-          python-version: "3.x"
-      - run: pip install wheel
-      - run: python setup.py sdist bdist_wheel
-      - uses: actions/upload-artifact@v2
-        with:
-          name: Python Distributions
-          path: dist/*
-
   # Dummy step to gate other tests on without repeating the whole list
   linting-done:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
-    needs: [lint, lint-crlf, lint-newsfile, lint-sdist]
+    needs: [lint, lint-crlf, lint-newsfile]
     runs-on: ubuntu-latest
     steps:
       - run: "true"
@@ -397,7 +383,6 @@ jobs:
       - lint
       - lint-crlf
       - lint-newsfile
-      - lint-sdist
       - trial
       - trial-olddeps
       - sytest
