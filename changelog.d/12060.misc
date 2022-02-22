@@ -1,0 +1,1 @@
+Fix error message when a worker process fails to talk to another worker process.
