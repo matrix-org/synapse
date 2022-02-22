@@ -82,7 +82,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.event_auth_handler = hs.get_event_auth_handler()
 
         self.member_linearizer: Linearizer = Linearizer(name="member")
-        self.member_limiter = Linearizer(max_count=10, name="member_as_limiter")
+        self.member_as_limiter = Linearizer(max_count=10, name="member_as_limiter")
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
@@ -507,7 +507,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         then = self.clock.time_msec()
 
-        with (await self.member_limiter.queue(as_id)):
+        # We first linearise by the application service (to try to limit concurrent joins
+        # by application services), and then by room ID.
+        with (await self.member_as_limiter.queue(as_id)):
             diff = self.clock.time_msec() - then
 
             if diff > 80 * 1000:

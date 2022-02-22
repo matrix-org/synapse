@@ -106,9 +106,13 @@ class RestHelper:
                 default room version.
             tok: The access token to use in the request.
             expect_code: The expected HTTP response code.
+            extra_content: Extra keys to include in the body of the /createRoom request.
+                Note that if is_public is set, the "visibility" key will be overridden.
+                If room_version is set, the "room_version" key will be overridden.
+            custom_headers: HTTP headers to include in the request.
 
         Returns:
-            The ID of the newly created room.
+            The ID of the newly created room, or None if the request failed.
         """
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
