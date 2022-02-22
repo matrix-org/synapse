@@ -1593,9 +1593,7 @@ class FederationClient(FederationBase):
             filter(lambda item: filter_user_id(item[0]), statuses.items())
         )
 
-        filtered_failures = list(
-            filter(filter_user_id, failures)
-        )
+        filtered_failures = list(filter(filter_user_id, failures))
 
         return filtered_statuses, filtered_failures
 
