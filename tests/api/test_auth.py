@@ -16,7 +16,7 @@ from unittest.mock import Mock
 
 import pymacaroons
 
-from twisted.internet.testing import MemoryReactor
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
