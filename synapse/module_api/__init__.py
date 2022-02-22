@@ -145,6 +145,7 @@ __all__ = [
     "JsonDict",
     "EventBase",
     "StateMap",
+    "ProfileInfo",
 ]
 
 logger = logging.getLogger(__name__)

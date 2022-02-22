@@ -148,6 +148,44 @@ deny an incoming event, see [`check_event_for_spam`](spam_checker_callbacks.md#c
 
 If multiple modules implement this callback, Synapse runs them all in order.
 
+### `on_profile_update`
+
+_First introduced in Synapse v1.5X.0_
+
+```python
+async def on_profile_update(
+    user_id: str,
+    new_profile: "synapse.module_api.ProfileInfo",
+    by_admin: bool,
+) -> None:
+```
+
+Called after updating a local user's profile. The update can be triggered either by the
+user themselves or a server admin. The update can also be triggered by a user being
+deactivated (in which case their display name is set to an empty string (`""`) and the
+avatar URL is set to `None`). The module is passed the Matrix ID of the user whose profile
+has been updated, their new profile, as well as a boolean that is `True` if the update
+was triggered by a server admin (and `False` otherwise). Note that this boolean is also
+`True` if the profile change happens as a result of the user logging through Single
+Sing-On, and if a server admin updates their own profile.
+
+If multiple modules implement this callback, Synapse runs them all in order.
+
+### `on_deactivation`
+
+_First introduced in Synapse v1.5X.0_
+
+```python
+async def on_deactivation(user_id: str, by_admin: bool) -> None:
+```
+
+Called after deactivating a local user. The deactivation can be triggered either by the
+user themselves or a server admin. The module is passed the Matrix ID of the user that's
+been deactivated, as well as a boolean that is `True` if the deactivation was triggered
+by a server admin (and `False` otherwise).
+
+If multiple modules implement this callback, Synapse runs them all in order.
+
 ## Example
 
 The example below is a module that implements the third-party rules callback
