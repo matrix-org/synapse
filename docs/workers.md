@@ -257,9 +257,6 @@ to the [stream writers](#stream-writers) section below for further information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/join/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/profile/
 
-    # Typing requests
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing
-
     # Device requests
     ^/_matrix/client/(r0|v3|unstable)/sendToDevice/
 
