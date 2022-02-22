@@ -15,12 +15,12 @@ import threading
 from typing import TYPE_CHECKING, Dict, Optional, Tuple
 from unittest.mock import Mock
 
-from synapse.api.constants import EventTypes, Membership, LoginType
+from synapse.api.constants import EventTypes, LoginType, Membership
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.rest import admin
-from synapse.rest.client import login, room, profile, account
+from synapse.rest.client import account, login, profile, room
 from synapse.types import JsonDict, Requester, StateMap
 from synapse.util.frozenutils import unfreeze
 
@@ -586,9 +586,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         # Check that we've got the right profile data.
         profile_info = args[1]
         self.assertEqual(profile_info.display_name, displayname)
-        self.assertEqual(
-            profile_info.avatar_url, avatar_url
-        )
+        self.assertEqual(profile_info.avatar_url, avatar_url)
 
     def test_on_profile_update_admin(self):
         """Tests that the on_profile_update module callback is correctly called on
@@ -628,9 +626,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         # Check that we've got the right profile data.
         profile_info = args[1]
         self.assertEqual(profile_info.display_name, displayname)
-        self.assertEqual(
-            profile_info.avatar_url, avatar_url
-        )
+        self.assertEqual(profile_info.avatar_url, avatar_url)
 
     def test_on_deactivation(self):
         """Tests that the on_deactivation module callback is called correctly when
