@@ -365,12 +365,9 @@ stream_writers:
     events: event_persister1
 ```
 
-Each of the streams have associated endpoints which should have `POST` and `PUT`
-requests routed to the workers handling that stream. Otherwise, those requests
-will be proxied to the proper worker.
-
-See below for the currently supported streams and the endpoints associated with
-them:
+Each of the streams have associated endpoints which should have requests routed
+to the workers handling that stream. See below for the currently supported streams
+and the endpoints associated with them:
 
 ##### The `events` stream
 
