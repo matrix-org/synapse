@@ -1580,19 +1580,24 @@ class FederationClient(FederationBase):
                 failures.append(user_id)
 
         # Filter out any user ID that doesn't belong to the remote server that sent its
-        # status.
-        def filter_status(item: Tuple[str, JsonDict]) -> bool:
-            # item is a (key, value) tuple.
-            user_id = item[0]
+        # status (or failure).
+        def filter_user_id(user_id: str) -> bool:
             try:
                 return UserID.from_string(user_id).domain == destination
             except SynapseError:
                 # If the user ID doesn't parse, ignore it.
                 return False
 
-        filtered_statuses = dict(filter(filter_status, statuses.items()))
+        filtered_statuses = dict(
+            # item is a (key, value) tuple, so item[0] is the user ID.
+            filter(lambda item: filter_user_id(item[0]), statuses.items())
+        )
 
-        return filtered_statuses, failures
+        filtered_failures = list(
+            filter(filter_user_id, failures)
+        )
+
+        return filtered_statuses, filtered_failures
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)
