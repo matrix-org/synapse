@@ -56,6 +56,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MAX_STATE_DELTA_HOPS = 100
+MAX_INFLIGHT_REQUESTS_PER_GROUP = 5
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -258,6 +259,11 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         Attempts to gather in-flight requests and re-use them to retrieve state
         for the given state group, filtered with the given state filter.
 
+        If there are more than MAX_INFLIGHT_REQUESTS_PER_GROUP in-flight requests,
+        and there *still* isn't enough information to complete the request by solely
+        reusing others, a full state filter will be requested to ensure that subsequent
+        requests can reuse this request.
+
         Used as part of _get_state_for_group_using_inflight_cache.
 
         Returns:
@@ -287,6 +293,16 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 # we have managed to collect enough of the in-flight requests
                 # to cover our StateFilter and give us the state we need.
                 break
+
+        if (
+            state_filter_left_over != StateFilter.none()
+            and len(inflight_requests) >= MAX_INFLIGHT_REQUESTS_PER_GROUP
+        ):
+            # There are too many requests for this group.
+            # To prevent even more from building up, we request the whole
+            # state filter to guarantee that we can be reused by any subsequent
+            # requests for this state group.
+            return (), StateFilter.all()
 
         return reusable_requests, state_filter_left_over
 
