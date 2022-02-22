@@ -115,6 +115,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
     EVENT_SEARCH_ORDER_UPDATE_NAME = "event_search_order"
     EVENT_SEARCH_USE_GIST_POSTGRES_NAME = "event_search_postgres_gist"
     EVENT_SEARCH_USE_GIN_POSTGRES_NAME = "event_search_postgres_gin"
+    EVENT_SEARCH_DELETE_NON_STRINGS = "event_search_sqlite_delete_non_strings"
 
     def __init__(
         self,
@@ -145,6 +146,10 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
         self.db_pool.updates.register_background_update_handler(
             self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME, self._background_reindex_gin_search
+        )
+
+        self.db_pool.updates.register_background_update_handler(
+            self.EVENT_SEARCH_DELETE_NON_STRINGS, self._background_delete_non_strings
         )
 
     async def _background_reindex_search(self, progress, batch_size):
@@ -371,6 +376,28 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
             )
 
         return num_rows
+
+    async def _background_delete_non_strings(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Deletes rows with non-string `value`s from `event_search` if using sqlite.
+
+        Prior to Synapse 1.44.0, malformed events received over federation could cause integers
+        to be inserted into the `event_search` table when using sqlite.
+        """
+
+        def delete_non_strings_txn(txn: LoggingTransaction) -> None:
+            txn.execute("DELETE FROM event_search WHERE typeof(value) != 'text'")
+
+        if isinstance(self.database_engine, Sqlite3Engine):
+            await self.db_pool.runInteraction(
+                self.EVENT_SEARCH_DELETE_NON_STRINGS, delete_non_strings_txn
+            )
+
+        await self.db_pool.updates._end_background_update(
+            self.EVENT_SEARCH_DELETE_NON_STRINGS
+        )
+        return 1
 
 
 class SearchStore(SearchBackgroundUpdateStore):

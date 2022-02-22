@@ -140,3 +140,45 @@ class EventSearchInsertionTest(HomeserverTestCase):
             StoreError,
         )
         self.assertEqual(f.value.code, 404)
+
+    @skip_unless(not USE_POSTGRES_FOR_TESTS, "requires sqlite")
+    def test_sqlite_non_string_deletion_background_update(self):
+        """Test the background update to delete bad rows from `event_search`."""
+        store = self.hs.get_datastore()
+
+        # Populate `event_search` with dummy data
+        self.get_success(
+            store.db_pool.simple_insert_many(
+                "event_search",
+                keys=["event_id", "room_id", "key", "value"],
+                values=[
+                    ("event1", "room_id", "content.body", "hi"),
+                    ("event2", "room_id", "content.body", "2"),
+                    ("event3", "room_id", "content.body", 3),
+                ],
+                desc="populate_event_search",
+            )
+        )
+
+        # Run the background update
+        store.db_pool.updates._all_done = False
+        self.get_success(
+            store.db_pool.simple_insert(
+                "background_updates",
+                {
+                    "update_name": "event_search_sqlite_delete_non_strings",
+                    "progress_json": "{}",
+                },
+            )
+        )
+        self.wait_for_background_updates()
+
+        # The non-string `value`s ought to be gone now.
+        values = self.get_success(
+            store.db_pool.simple_select_onecol(
+                "event_search",
+                {"room_id": "room_id"},
+                "value",
+            ),
+        )
+        self.assertCountEqual(values, ["hi", "2"])
