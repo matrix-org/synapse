@@ -179,9 +179,9 @@ recommend the use of `systemd` where available: for information on setting up
 ### `synapse.app.generic_worker`
 
 This worker can handle API requests matching the following regular expressions.
-`GET` requests will be handled directly while `POST` and `PUT` requests will be
-proxied to the proper worker. See the [stream writers](#stream-writers) section
-below for more information.
+These endpoints can be routed to any worker. If a worker is set up to handle a
+stream then additional endpoints may be required to route to said worker, refer
+to the [stream writers](#stream-writers) section below for further information.
 
     # Sync requests
     ^/_matrix/client/(v2_alpha|r0|v3)/sync$
