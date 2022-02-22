@@ -11,7 +11,7 @@ Features
 --------
 
 - Add experimental support for sending to-device messages to application services, as specified by [MSC2409](https://github.com/matrix-org/matrix-doc/pull/2409). ([\#11215](https://github.com/matrix-org/synapse/issues/11215), [\#11966](https://github.com/matrix-org/synapse/issues/11966))
-- Remove account data (including client config, push rules and ignored users) upon user deactivation. ([\#11655](https://github.com/matrix-org/synapse/issues/11655))
+- Add a background database update to purge account data for deactivated users. ([\#11655](https://github.com/matrix-org/synapse/issues/11655))
 - Experimental support for [MSC3666](https://github.com/matrix-org/matrix-doc/pull/3666): including bundled aggregations in server side search results. ([\#11837](https://github.com/matrix-org/synapse/issues/11837))
 - Enable cache time-based expiry by default. The `expiry_time` config flag has been superseded by `expire_caches` and `cache_entry_ttl`. ([\#11849](https://github.com/matrix-org/synapse/issues/11849))
 - Add a callback to allow modules to allow or forbid a 3PID (email address, phone number) from being associated to a local account. ([\#11854](https://github.com/matrix-org/synapse/issues/11854))
@@ -273,7 +273,7 @@ Bugfixes
 Synapse 1.50.0 (2022-01-18)
 ===========================
 
-**This release contains a critical bug that may prevent clients from being able to connect. 
+**This release contains a critical bug that may prevent clients from being able to connect.
 As such, it is not recommended to upgrade to 1.50.0. Instead, please upgrade straight to
 to 1.50.1. Further details are available in [this issue](https://github.com/matrix-org/synapse/issues/11763).**
 
