@@ -374,9 +374,9 @@ def _is_membership_change_allowed(
         return
 
     # Require the user to be in the room for membership changes other than join/knock.
-    if Membership.JOIN != membership and (
-        room_version.msc2403_knocking and Membership.KNOCK != membership
-    ):
+    # Note that the room version check for knocking is done implicitly by `caller_knocked`
+    # and the ability to set a membership of `knock` in the first place.
+    if Membership.JOIN != membership and Membership.KNOCK != membership:
         # If the user has been invited or has knocked, they are allowed to change their
         # membership event to leave
         if (
