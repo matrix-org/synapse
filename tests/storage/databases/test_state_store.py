@@ -18,6 +18,7 @@ from unittest.mock import patch
 from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.storage.databases.state.store import MAX_INFLIGHT_REQUESTS_PER_GROUP
 from synapse.storage.state import StateFilter
 from synapse.types import MutableStateMap, StateMap
 from synapse.util import Clock
@@ -161,7 +162,7 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
         self.pump(by=0.1)
 
         # There should only be 6 calls to the database, not 7.
-        self.assertEqual(len(self.get_state_group_calls), 6)
+        self.assertEqual(len(self.get_state_group_calls), CAP_COUNT + 1)
 
         # Assert that the first 5 are exact requests for the individual pieces
         # wanted
@@ -175,7 +176,7 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
             )
 
         # The 6th request should be the 'all' state filter
-        groups, sf, d = self.get_state_group_calls[5]
+        groups, sf, d = self.get_state_group_calls[CAP_COUNT]
         self.assertEqual(sf, StateFilter.all())
 
         # Complete the queries and check which requests complete as a result
@@ -191,9 +192,9 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
 
         # Now complete the final query; the last 2 requests should complete
         # as a result
-        self.assertFalse(reqs[5].called)
-        self.assertFalse(reqs[6].called)
-        groups, sf, d = self.get_state_group_calls[5]
+        self.assertFalse(reqs[CAP_COUNT].called)
+        self.assertFalse(reqs[CAP_COUNT + 1].called)
+        groups, sf, d = self.get_state_group_calls[CAP_COUNT]
         self._complete_request_fake(groups, sf, d)
-        self.assertTrue(reqs[5].called)
-        self.assertTrue(reqs[6].called)
+        self.assertTrue(reqs[CAP_COUNT].called)
+        self.assertTrue(reqs[CAP_COUNT + 1].called)
