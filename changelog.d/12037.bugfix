@@ -1,1 +1,1 @@
-Fix a long-standing bug where integers could get into the `event_search` table when using sqlite and prevent migration to PostgreSQL.
+Clean up after a long-standing bug that was fixed by accident in Synapse 1.44.0 where integers could be inserted into the `event_search` table when using sqlite.
