@@ -1,7 +1,7 @@
 Synapse 1.53.0 (2022-02-22)
 ===========================
 
-No significant changes.
+No significant changes since 1.53.0rc1.
 
 
 Synapse 1.53.0rc1 (2022-02-15)
