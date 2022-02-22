@@ -473,9 +473,7 @@ class Porter(object):
                     rows_dict = []
                     for row in rows:
                         d = dict(zip(headers, row))
-                        if not isinstance(d["value"], str) or "\0" in d["value"]:
-                            # `value` must be a string and contain no null characters.
-                            # Previous versions of Synapse allowed integers to slip into the column.
+                        if "\0" in d["value"]:
                             logger.warning("dropping search row %s", d)
                         else:
                             rows_dict.append(d)
