@@ -38,7 +38,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_as_api = Mock()
         self.mock_scheduler = Mock()
         hs = Mock()
-        hs.get_datastore.return_value = self.mock_store
+        hs.get_datastores.return_value = Mock(main=self.mock_store)
         self.mock_store.get_received_ts.return_value = make_awaitable(0)
         self.mock_store.set_appservice_last_pos.return_value = make_awaitable(None)
         self.mock_store.set_appservice_stream_type_pos.return_value = make_awaitable(
