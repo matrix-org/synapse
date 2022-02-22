@@ -706,11 +706,6 @@ class RoomCreationHandler:
 
         if not is_requester_admin and not (
             await self.spam_checker.user_may_create_room(user_id)
-            and await self.spam_checker.user_may_create_room_with_invites(
-                user_id,
-                invite_list,
-                invite_3pid_list,
-            )
         ):
             raise SynapseError(
                 403, "You are not permitted to create rooms", Codes.FORBIDDEN
