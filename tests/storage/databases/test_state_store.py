@@ -138,7 +138,8 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
         Tests that the number of in-flight requests is capped to 5.
 
         - requests several pieces of state separately
-          (5 to hit the limit, 1 to 'shunt out', another that
+          (5 to hit the limit, 1 to 'shunt out', another that comes after the
+          group has been 'shunted out')
         - checks to see that the torrent of requests is shunted out by
           rewriting one of the filters as the 'all' state filter
         - requests after that one do not cause any additional queries
