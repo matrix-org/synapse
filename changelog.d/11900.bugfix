@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse 1.37.0rc1 (when knocking was added) where event authorization could fail on valid knocks to a room.
