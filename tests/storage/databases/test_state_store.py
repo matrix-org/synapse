@@ -148,7 +148,7 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
 
         reqs = []
 
-        # Request 7 different keys (1..=7) of the `some.state` type.
+        # Request 7 different keys (1 to 7) of the `some.state` type.
         for req_id in range(CAP_COUNT + 2):
             reqs.append(
                 ensureDeferred(
