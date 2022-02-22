@@ -766,6 +766,40 @@ class RoomComplexityServlet(BaseFederationServlet):
         return 200, complexity
 
 
+class FederationAccountStatusServlet(BaseFederationServerServlet):
+    PATH = "/query/account_status"
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc3720"
+
+    def __init__(
+        self,
+        hs: "HomeServer",
+        authenticator: Authenticator,
+        ratelimiter: FederationRateLimiter,
+        server_name: str,
+    ):
+        super().__init__(hs, authenticator, ratelimiter, server_name)
+        self._account_handler = hs.get_account_handler()
+
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Mapping[bytes, Sequence[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
+        if "user_ids" not in content:
+            raise SynapseError(
+                400, "Required parameter 'user_ids' is missing", Codes.MISSING_PARAM
+            )
+
+        statuses, failures = await self._account_handler.get_account_statuses(
+            content["user_ids"],
+            allow_remote=False,
+        )
+
+        return 200, {"account_statuses": statuses, "failures": failures}
+
+
 FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationSendServlet,
     FederationEventServlet,
@@ -797,4 +831,5 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationRoomHierarchyUnstableServlet,
     FederationV1SendKnockServlet,
     FederationMakeKnockServlet,
+    FederationAccountStatusServlet,
 )

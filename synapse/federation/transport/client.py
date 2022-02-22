@@ -258,8 +258,9 @@ class TransportLayerClient:
         args: dict,
         retry_on_dns_fail: bool,
         ignore_backoff: bool = False,
+        prefix: str = FEDERATION_V1_PREFIX,
     ) -> JsonDict:
-        path = _create_v1_path("/query/%s", query_type)
+        path = _create_path(prefix, "/query/%s", query_type)
 
         return await self.client.get_json(
             destination=destination,
@@ -1245,6 +1246,22 @@ class TransportLayerClient:
             destination=destination,
             path=path,
             args={"suggested_only": "true" if suggested_only else "false"},
+        )
+
+    async def get_account_status(
+        self, destination: str, user_ids: List[str]
+    ) -> JsonDict:
+        """
+        Args:
+            destination: The remote server.
+            user_ids: The user ID(s) for which to request account status(es).
+        """
+        path = _create_path(
+            FEDERATION_UNSTABLE_PREFIX, "/org.matrix.msc3720/account_status"
+        )
+
+        return await self.client.post_json(
+            destination=destination, path=path, data={"user_ids": user_ids}
         )
 
 

@@ -62,6 +62,7 @@ from synapse.federation.sender import AbstractFederationSender, FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
+from synapse.handlers.account import AccountHandler
 from synapse.handlers.account_data import AccountDataHandler
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.admin import AdminHandler
@@ -806,6 +807,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_external_cache(self) -> ExternalCache:
         return ExternalCache(self)
+
+    @cache_in_self
+    def get_account_handler(self) -> AccountHandler:
+        return AccountHandler(self)
 
     @cache_in_self
     def get_outbound_redis_connection(self) -> "RedisProtocol":
