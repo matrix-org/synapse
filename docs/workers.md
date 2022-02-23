@@ -241,7 +241,7 @@ to the [stream writers](#stream-writers) section below for further information.
     # Encryption requests
     ^/_matrix/client/(r0|v3|unstable)/keys/query$
     ^/_matrix/client/(r0|v3|unstable)/keys/changes$
-    ^/_matrix/client/(r0|v3|unstable)/keys/claim
+    ^/_matrix/client/(r0|v3|unstable)/keys/claim$
     ^/_matrix/client/(r0|v3|unstable)/room_keys
 
     # Registration/login requests
