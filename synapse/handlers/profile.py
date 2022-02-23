@@ -54,7 +54,7 @@ class ProfileHandler:
     PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.hs = hs
 

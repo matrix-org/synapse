@@ -47,7 +47,7 @@ events_processed_counter = Counter("synapse_handlers_appservice_events_processed
 
 class ApplicationServicesHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.is_mine_id = hs.is_mine_id
         self.appservice_api = hs.get_application_service_api()
         self.scheduler = hs.get_application_service_scheduler()

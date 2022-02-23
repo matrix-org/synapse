@@ -22,7 +22,7 @@ class DataStoreTestCase(unittest.HomeserverTestCase):
     def setUp(self) -> None:
         super(DataStoreTestCase, self).setUp()
 
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
 
         self.user = UserID.from_string("@abcde:test")
         self.displayname = "Frank"

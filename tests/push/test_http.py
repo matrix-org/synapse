@@ -62,7 +62,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Register the pusher
         user_tuple = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_tuple.token_id
 
@@ -108,7 +108,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Register the pusher
         user_tuple = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_tuple.token_id
 
@@ -138,7 +138,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Get the stream ordering before it gets sent
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by({"user_name": user_id})
+            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
@@ -149,7 +149,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # It hasn't succeeded yet, so the stream ordering shouldn't have moved
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by({"user_name": user_id})
+            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
@@ -170,7 +170,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # The stream ordering has increased
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by({"user_name": user_id})
+            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
@@ -192,7 +192,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # The stream ordering has increased, again
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by({"user_name": user_id})
+            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
@@ -224,7 +224,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Register the pusher
         user_tuple = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_tuple.token_id
 
@@ -344,7 +344,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Register the pusher
         user_tuple = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_tuple.token_id
 
@@ -430,7 +430,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Register the pusher
         user_tuple = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_tuple.token_id
 
@@ -507,7 +507,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Register the pusher
         user_tuple = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_tuple.token_id
 
@@ -613,7 +613,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Register the pusher
         user_tuple = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_tuple.token_id
 

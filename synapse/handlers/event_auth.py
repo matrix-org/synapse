@@ -43,7 +43,7 @@ class EventAuthHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._server_name = hs.hostname
 
     async def check_auth_rules_from_context(

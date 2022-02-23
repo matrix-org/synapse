@@ -167,7 +167,7 @@ class StateTestCase(unittest.TestCase):
         hs = Mock(
             spec_set=[
                 "config",
-                "get_datastore",
+                "get_datastores",
                 "get_storage",
                 "get_auth",
                 "get_state_handler",
@@ -178,7 +178,7 @@ class StateTestCase(unittest.TestCase):
             ]
         )
         hs.config = default_config("tesths", True)
-        hs.get_datastore.return_value = self.dummy_store
+        hs.get_datastores.return_value = Mock(main=self.dummy_store)
         hs.get_state_handler.return_value = None
         hs.get_clock.return_value = MockClock()
         hs.get_auth.return_value = Auth(hs)

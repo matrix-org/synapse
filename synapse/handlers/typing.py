@@ -57,7 +57,7 @@ class FollowerTypingHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.server_name = hs.config.server.server_name
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
@@ -446,7 +446,7 @@ class TypingWriterHandler(FollowerTypingHandler):
 
 class TypingNotificationEventSource(EventSource[int, JsonDict]):
     def __init__(self, hs: "HomeServer"):
-        self._main_store = hs.get_datastore()
+        self._main_store = hs.get_datastores().main
         self.clock = hs.get_clock()
         # We can't call get_typing_handler here because there's a cycle:
         #

@@ -1499,7 +1499,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         self._event_reports_id_gen = IdGenerator(db_conn, "event_reports", "id")
 
     async def upsert_room_on_join(
-        self, room_id: str, room_version: RoomVersion, auth_events: List[EventBase]
+        self, room_id: str, room_version: RoomVersion, state_events: List[EventBase]
     ) -> None:
         """Ensure that the room is stored in the table
 
@@ -1512,7 +1512,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         has_auth_chain_index = await self.has_auth_chain_index(room_id)
 
         create_event = None
-        for e in auth_events:
+        for e in state_events:
             if (e.type, e.state_key) == (EventTypes.Create, ""):
                 create_event = e
                 break

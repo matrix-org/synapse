@@ -34,7 +34,7 @@ class _ShadowBannedBase(unittest.HomeserverTestCase):
         self.banned_user_id = self.register_user("banned", "test")
         self.banned_access_token = self.login("banned", "test")
 
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
 
         self.get_success(
             self.store.set_shadow_banned(UserID.from_string(self.banned_user_id), True)

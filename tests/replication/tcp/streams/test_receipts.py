@@ -32,7 +32,7 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
 
         # tell the master to send a new receipt
         self.get_success(
-            self.hs.get_datastore().insert_receipt(
+            self.hs.get_datastores().main.insert_receipt(
                 "!room:blue", "m.read", USER_ID, ["$event:blue"], {"a": 1}
             )
         )
@@ -56,7 +56,7 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
         self.test_handler.on_rdata.reset_mock()
 
         self.get_success(
-            self.hs.get_datastore().insert_receipt(
+            self.hs.get_datastores().main.insert_receipt(
                 "!room2:blue", "m.read", USER_ID, ["$event2:foo"], {"a": 2}
             )
         )

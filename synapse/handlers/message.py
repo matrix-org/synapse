@@ -75,7 +75,7 @@ class MessageHandler:
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.state = hs.get_state_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
@@ -397,7 +397,7 @@ class EventCreationHandler:
         self.hs = hs
         self.auth = hs.get_auth()
         self._event_auth_handler = hs.get_event_auth_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
@@ -550,10 +550,11 @@ class EventCreationHandler:
 
         if event_dict["type"] == EventTypes.Create and event_dict["state_key"] == "":
             room_version_id = event_dict["content"]["room_version"]
-            room_version_obj = KNOWN_ROOM_VERSIONS.get(room_version_id)
-            if not room_version_obj:
+            maybe_room_version_obj = KNOWN_ROOM_VERSIONS.get(room_version_id)
+            if not maybe_room_version_obj:
                 # this can happen if support is withdrawn for a room version
                 raise UnsupportedRoomVersionError(room_version_id)
+            room_version_obj = maybe_room_version_obj
         else:
             try:
                 room_version_obj = await self.store.get_room_version(
@@ -1145,12 +1146,13 @@ class EventCreationHandler:
             room_version_id = event.content.get(
                 "room_version", RoomVersions.V1.identifier
             )
-            room_version_obj = KNOWN_ROOM_VERSIONS.get(room_version_id)
-            if not room_version_obj:
+            maybe_room_version_obj = KNOWN_ROOM_VERSIONS.get(room_version_id)
+            if not maybe_room_version_obj:
                 raise UnsupportedRoomVersionError(
                     "Attempt to create a room with unsupported room version %s"
                     % (room_version_id,)
                 )
+            room_version_obj = maybe_room_version_obj
         else:
             room_version_obj = await self.store.get_room_version(event.room_id)
 

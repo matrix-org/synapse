@@ -20,7 +20,7 @@ from tests import unittest
 
 class UpsertManyTests(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
-        self.storage = hs.get_datastore()
+        self.storage = hs.get_datastores().main
 
         self.table_name = "table_" + secrets.token_hex(6)
         self.get_success(

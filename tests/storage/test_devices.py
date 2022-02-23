@@ -19,7 +19,7 @@ from tests.unittest import HomeserverTestCase
 
 class DeviceStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     def test_store_new_device(self):
         self.get_success(

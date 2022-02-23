@@ -40,7 +40,7 @@ def MockEvent(**kwargs):
 class FilteringTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.filtering = hs.get_filtering()
-        self.datastore = hs.get_datastore()
+        self.datastore = hs.get_datastores().main
 
     def test_errors_on_invalid_filters(self):
         invalid_filters = [

@@ -204,13 +204,16 @@ class StateFilter:
         if get_all_members:
             # We want to return everything.
             return StateFilter.all()
-        else:
+        elif EventTypes.Member in self.types:
             # We want to return all non-members, but only particular
             # memberships
             return StateFilter(
                 types=frozendict({EventTypes.Member: self.types[EventTypes.Member]}),
                 include_others=True,
             )
+        else:
+            # We want to return all non-members
+            return _ALL_NON_MEMBER_STATE_FILTER
 
     def make_sql_filter_clause(self) -> Tuple[str, List[str]]:
         """Converts the filter to an SQL clause.
@@ -528,6 +531,9 @@ class StateFilter:
 
 
 _ALL_STATE_FILTER = StateFilter(types=frozendict(), include_others=True)
+_ALL_NON_MEMBER_STATE_FILTER = StateFilter(
+    types=frozendict({EventTypes.Member: frozenset()}), include_others=True
+)
 _NONE_STATE_FILTER = StateFilter(types=frozendict(), include_others=False)
 
 

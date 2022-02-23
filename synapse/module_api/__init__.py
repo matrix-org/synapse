@@ -70,6 +70,7 @@ from synapse.handlers.account_validity import (
 from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
     CHECK_AUTH_CALLBACK,
+    GET_DISPLAYNAME_FOR_REGISTRATION_CALLBACK,
     GET_USERNAME_FOR_REGISTRATION_CALLBACK,
     IS_3PID_ALLOWED_CALLBACK,
     ON_LOGGED_OUT_CALLBACK,
@@ -171,7 +172,9 @@ class ModuleApi:
 
         # TODO: Fix this type hint once the types for the data stores have been ironed
         #       out.
-        self._store: Union[DataStore, "GenericWorkerSlavedStore"] = hs.get_datastore()
+        self._store: Union[
+            DataStore, "GenericWorkerSlavedStore"
+        ] = hs.get_datastores().main
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
@@ -317,6 +320,9 @@ class ModuleApi:
         get_username_for_registration: Optional[
             GET_USERNAME_FOR_REGISTRATION_CALLBACK
         ] = None,
+        get_displayname_for_registration: Optional[
+            GET_DISPLAYNAME_FOR_REGISTRATION_CALLBACK
+        ] = None,
     ) -> None:
         """Registers callbacks for password auth provider capabilities.
 
@@ -328,6 +334,7 @@ class ModuleApi:
             is_3pid_allowed=is_3pid_allowed,
             auth_checkers=auth_checkers,
             get_username_for_registration=get_username_for_registration,
+            get_displayname_for_registration=get_displayname_for_registration,
         )
 
     def register_background_update_controller_callbacks(
@@ -648,7 +655,11 @@ class ModuleApi:
         Added in Synapse v1.9.0.
 
         Args:
-            auth_provider: identifier for the remote auth provider
+            auth_provider: identifier for the remote auth provider, see `sso` and
+                `oidc_providers` in the homeserver configuration.
+
+                Note that no error is raised if the provided value is not in the
+                homeserver configuration.
             external_id: id on that system
             user_id: complete mxid that it is mapped to
         """
@@ -917,7 +928,7 @@ class ModuleApi:
         )
 
         # Try to retrieve the resulting event.
-        event = await self._hs.get_datastore().get_event(event_id)
+        event = await self._hs.get_datastores().main.get_event(event_id)
 
         # update_membership is supposed to always return after the event has been
         # successfully persisted.
@@ -1261,7 +1272,7 @@ class PublicRoomListManager:
     """
 
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
     async def room_is_in_public_room_list(self, room_id: str) -> bool:
         """Checks whether a room is in the public room list.

@@ -150,7 +150,7 @@ def matrix_user_id_validator(user_id_str: str) -> UserID:
 class Filtering:
     def __init__(self, hs: "HomeServer"):
         self._hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.DEFAULT_FILTER_COLLECTION = FilterCollection(hs, {})
 
@@ -294,7 +294,7 @@ class FilterCollection:
 class Filter:
     def __init__(self, hs: "HomeServer", filter_json: JsonDict):
         self._hs = hs
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self.filter_json = filter_json
 
         self.limit = filter_json.get("limit", 10)

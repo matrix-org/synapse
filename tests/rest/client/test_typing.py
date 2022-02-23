@@ -57,7 +57,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
         async def _insert_client_ip(*args, **kwargs):
             return None
 
-        hs.get_datastore().insert_client_ip = _insert_client_ip
+        hs.get_datastores().main.insert_client_ip = _insert_client_ip
 
         return hs
 
