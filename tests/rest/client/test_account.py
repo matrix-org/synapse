@@ -1119,7 +1119,9 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
         """Tests that the account status endpoint correctly reports a deactivated user."""
         user = self.register_user("someuser", "password")
         self.get_success(
-            self.hs.get_datastore().set_user_deactivated_status(user, deactivated=True)
+            self.hs.get_datastores().main.set_user_deactivated_status(
+                user, deactivated=True
+            )
         )
 
         self._test_status(
