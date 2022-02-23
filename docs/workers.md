@@ -180,7 +180,7 @@ recommend the use of `systemd` where available: for information on setting up
 
 This worker can handle API requests matching the following regular expressions.
 These endpoints can be routed to any worker. If a worker is set up to handle a
-stream then additional endpoints may be required to route to said worker, refer
+stream then additional endpoints may be required to route to said worker: refer
 to the [stream writers](#stream-writers) section below for further information.
 
     # Sync requests
@@ -365,7 +365,7 @@ stream_writers:
     events: event_persister1
 ```
 
-Each of the streams have associated endpoints which should have requests routed
+Some of the streams have associated endpoints which should have requests routed
 to the workers handling that stream. See below for the currently supported streams
 and the endpoints associated with them:
 
