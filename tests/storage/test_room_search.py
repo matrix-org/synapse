@@ -76,9 +76,12 @@ class EventSearchInsertionTest(HomeserverTestCase):
         if isinstance(store.database_engine, PostgresEngine):
             self.assertIn("alice", result.get("highlights"))
 
-    @skip_unless(not USE_POSTGRES_FOR_TESTS, "requires sqlite")
-    def test_sqlite_non_string(self):
-        """Test that non-string `value`s are not inserted into `event_search` on sqlite.
+    def test_non_string(self):
+        """Test that non-string `value`s are not inserted into `event_search`.
+
+        This is particularly important when using sqlite, since a sqlite column can hold
+        both strings and integers. When using Postgres, integers are automatically
+        converted to strings.
 
         Regression test for #11918.
         """
