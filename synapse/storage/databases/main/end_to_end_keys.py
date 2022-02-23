@@ -496,6 +496,8 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
         Return structure is of the shape:
           user_id -> device_id -> algorithms
+          Empty lists are created for devices if there are no unused fallback
+          keys. This matches the response structure of MSC3202.
         """
         if len(user_ids) == 0:
             return {}
@@ -524,6 +526,11 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             result: TransactionUnusedFallbackKeys = {}
 
             for user_id, device_id, algorithm in txn:
+                # We deliberately construct empty dictionaries and lists for
+                # users and devices without any unused fallback keys.
+                # We *could* omit these empty dicts if there have been no
+                # changes since the last transaction, but we currently don't
+                # do any change tracking!
                 device_unused_keys = result.setdefault(user_id, {}).setdefault(
                     device_id, []
                 )
