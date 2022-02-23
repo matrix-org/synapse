@@ -82,7 +82,7 @@ class EventSearchInsertionTest(HomeserverTestCase):
 
         Regression test for #11918.
         """
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         # Register a user and create a room
         user_id = self.register_user("alice", "password")
@@ -144,7 +144,7 @@ class EventSearchInsertionTest(HomeserverTestCase):
     @skip_unless(not USE_POSTGRES_FOR_TESTS, "requires sqlite")
     def test_sqlite_non_string_deletion_background_update(self):
         """Test the background update to delete bad rows from `event_search`."""
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         # Populate `event_search` with dummy data
         self.get_success(
