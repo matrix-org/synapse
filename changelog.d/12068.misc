@@ -1,0 +1,1 @@
+Add some logging to `/sync` to try and track down #11916.
