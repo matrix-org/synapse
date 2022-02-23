@@ -138,7 +138,7 @@ class EventSearchInsertionTest(HomeserverTestCase):
             store.db_pool.simple_select_one_onecol(
                 "event_search",
                 {"room_id": room_id, "event_id": event.event_id},
-                "value",
+                "event_id",
             ),
             StoreError,
         )
