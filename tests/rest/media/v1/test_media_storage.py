@@ -243,7 +243,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         media_resource = hs.get_media_repository_resource()
         self.download_resource = media_resource.children[b"download"]
         self.thumbnail_resource = media_resource.children[b"thumbnail"]
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.media_repo = hs.get_media_repository()
 
         self.media_id = "example.com/12345"

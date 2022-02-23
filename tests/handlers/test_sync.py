@@ -41,7 +41,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs: HomeServer):
         self.sync_handler = self.hs.get_sync_handler()
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
 
         # AuthBlocking reads from the hs' config on initialization. We need to
         # modify its config instead of the hs'
@@ -248,7 +248,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         # the prev_events used when creating the join event, such that the ban does not
         # precede the join.
         mocked_get_prev_events = patch.object(
-            self.hs.get_datastore(),
+            self.hs.get_datastores().main,
             "get_prev_events_for_room",
             new_callable=MagicMock,
             return_value=make_awaitable([last_room_creation_event_id]),

@@ -46,7 +46,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
         self.handler = hs.get_directory_handler()
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.my_room = RoomAlias.from_string("#my-room:test")
         self.your_room = RoomAlias.from_string("#your-room:test")
@@ -174,7 +174,7 @@ class TestDeleteAlias(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.handler = hs.get_directory_handler()
         self.state_handler = hs.get_state_handler()
 
@@ -289,7 +289,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.handler = hs.get_directory_handler()
         self.state_handler = hs.get_state_handler()
 

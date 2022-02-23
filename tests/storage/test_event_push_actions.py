@@ -30,7 +30,7 @@ HIGHLIGHT = [
 
 class EventPushActionsStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.persist_events_store = hs.get_datastores().persist_events
 
     def test_get_unread_push_actions_for_user_in_range_for_http(self):

@@ -77,7 +77,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.submit_token_resource = PasswordResetSubmitTokenResource(hs)
 
     def test_basic_password_reset(self):
@@ -398,7 +398,7 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
 
         self.deactivate(user_id, tok)
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         # Check that the user has been marked as deactivated.
         self.assertTrue(self.get_success(store.get_user_deactivated_status(user_id)))
@@ -409,7 +409,7 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
 
     def test_pending_invites(self):
         """Tests that deactivating a user rejects every pending invite for them."""
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         inviter_id = self.register_user("inviter", "test")
         inviter_tok = self.login("inviter", "test")
@@ -527,7 +527,7 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
             namespaces={"users": [{"regex": user_id, "exclusive": True}]},
             sender=user_id,
         )
-        self.hs.get_datastore().services_cache.append(appservice)
+        self.hs.get_datastores().main.services_cache.append(appservice)
 
         whoami = self._whoami(as_token)
         self.assertEqual(
@@ -586,7 +586,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         return self.hs
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.user_id = self.register_user("kermit", "test")
         self.user_id_tok = self.login("kermit", "test")

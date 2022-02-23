@@ -35,7 +35,7 @@ class NotificationsServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()

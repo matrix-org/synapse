@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 class AdminHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
 

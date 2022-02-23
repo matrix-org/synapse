@@ -305,7 +305,7 @@ class SyncKnockTestCase(
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.url = "/sync?since=%s"
         self.next_batch = "s0"
 

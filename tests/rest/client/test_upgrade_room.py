@@ -32,7 +32,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.creator = self.register_user("creator", "pass")
         self.creator_token = self.login(self.creator, "pass")

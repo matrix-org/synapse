@@ -1113,8 +1113,8 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        self.hs.get_datastore().services_cache.append(self.service)
-        self.hs.get_datastore().services_cache.append(self.another_service)
+        self.hs.get_datastores().main.services_cache.append(self.service)
+        self.hs.get_datastores().main.services_cache.append(self.another_service)
         return self.hs
 
     def test_login_appservice_user(self) -> None:

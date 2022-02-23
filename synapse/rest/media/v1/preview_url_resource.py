@@ -134,7 +134,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         self.filepaths = media_repo.filepaths
         self.max_spider_size = hs.config.media.max_spider_size
         self.server_name = hs.hostname
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.client = SimpleHttpClient(
             hs,
             treq_args={"browser_like_redirects": True},

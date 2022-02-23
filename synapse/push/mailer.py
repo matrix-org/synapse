@@ -112,7 +112,7 @@ class Mailer:
         self.template_text = template_text
 
         self.send_email_handler = hs.get_send_email_handler()
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.state_store = self.hs.get_storage().state
         self.macaroon_gen = self.hs.get_macaroon_generator()
         self.state_handler = self.hs.get_state_handler()

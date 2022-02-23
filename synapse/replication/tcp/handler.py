@@ -95,7 +95,7 @@ class ReplicationCommandHandler:
     def __init__(self, hs: "HomeServer"):
         self._replication_data_handler = hs.get_replication_data_handler()
         self._presence_handler = hs.get_presence_handler()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._notifier = hs.get_notifier()
         self._clock = hs.get_clock()
         self._instance_id = hs.get_instance_id()

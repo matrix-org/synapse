@@ -53,7 +53,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         return config
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.user_id, self.user_token = self._create_user("alice")
         self.user2_id, self.user2_token = self._create_user("bob")
@@ -107,7 +107,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         # Unless that event is referenced from another event!
         self.get_success(
-            self.hs.get_datastore().db_pool.simple_insert(
+            self.hs.get_datastores().main.db_pool.simple_insert(
                 table="event_relations",
                 values={
                     "event_id": "bar",

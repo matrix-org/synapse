@@ -95,7 +95,7 @@ class FederationEventHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._storage = hs.get_storage()
         self._state_store = self._storage.state
 

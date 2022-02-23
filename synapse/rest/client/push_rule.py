@@ -57,7 +57,7 @@ class PushRuleRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self._is_worker = hs.config.worker.worker_app is not None
 

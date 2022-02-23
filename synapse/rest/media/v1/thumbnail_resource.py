@@ -50,7 +50,7 @@ class ThumbnailResource(DirectServeJsonResource):
     ):
         super().__init__()
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.media_repo = media_repo
         self.media_storage = media_storage
         self.dynamic_thumbnails = hs.config.media.dynamic_thumbnails
