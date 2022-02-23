@@ -697,6 +697,15 @@ class SyncHandler:
         else:
             # no events in this room - so presumably no state
             state = {}
+
+            # (erikj) This should be rarely hit, but we've had some reports that
+            # we get more state down gappy syncs than we should, so let's add
+            # some logging.
+            logger.info(
+                "Failed to find any events in room %s at %s",
+                room_id,
+                stream_position.room_key,
+            )
         return state
 
     async def compute_summary(
