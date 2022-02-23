@@ -634,7 +634,7 @@ class ApplicationServicesHandlerOtkCountsTestCase(unittest.HomeserverTestCase):
             },
             msc3202_transaction_extensions=True,
         )
-        self.hs.get_datastore().services_cache = [self._service]
+        self.hs.get_datastores().main.services_cache = [self._service]
 
         # Register some appservice users
         self._sender_user, self._sender_device = self.register_appservice_user(
@@ -655,7 +655,7 @@ class ApplicationServicesHandlerOtkCountsTestCase(unittest.HomeserverTestCase):
         Add some dummy keys. It doesn't matter if they're not a real algorithm;
         that should be opaque to the server anyway.
         """
-        await self.hs.get_datastore().add_e2e_one_time_keys(
+        await self.hs.get_datastores().main.add_e2e_one_time_keys(
             user_id,
             device_id,
             self.clock.time_msec(),
@@ -669,7 +669,7 @@ class ApplicationServicesHandlerOtkCountsTestCase(unittest.HomeserverTestCase):
         Adds a fake fallback key to a device, optionally marking it as used
         right away.
         """
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         await store.set_e2e_fallback_keys(user_id, device_id, {"algo:fk": "fall back!"})
         if used is True:
             # Mark the key as used
@@ -705,7 +705,7 @@ class ApplicationServicesHandlerOtkCountsTestCase(unittest.HomeserverTestCase):
 
             # Register a device for the real user, too, so that we can later ensure
             # that we don't leak information to the AS about the non-AS user.
-            await self.hs.get_datastore().store_device(
+            await self.hs.get_datastores().main.store_device(
                 self._real_user, "REALDEV", "UltraMatrix 3000"
             )
             await self._add_otks_for_device(self._real_user, "REALDEV", 50)

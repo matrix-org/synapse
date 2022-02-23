@@ -177,7 +177,7 @@ class _ServiceQueuer:
         self._msc3202_transaction_extensions_enabled: bool = (
             hs.config.experimental.msc3202_transaction_extensions
         )
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
     def start_background_request(self, service: ApplicationService) -> None:
         # start a sender for this appservice if we don't already have one
