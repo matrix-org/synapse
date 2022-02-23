@@ -77,7 +77,7 @@ class CasHandlerTestCase(HomeserverTestCase):
 
     def test_map_cas_user_to_existing_user(self):
         """Existing users can log in with CAS account."""
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.get_success(
             store.register_user(user_id="@test_user:test", password_hash=None)
         )

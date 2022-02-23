@@ -129,7 +129,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
     def test_mau_limits_exceeded_large(self):
         self.auth_blocking._limit_usage_by_mau = True
-        self.hs.get_datastore().get_monthly_active_count = Mock(
+        self.hs.get_datastores().main.get_monthly_active_count = Mock(
             return_value=make_awaitable(self.large_number_of_users)
         )
 
@@ -140,7 +140,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             ResourceLimitError,
         )
 
-        self.hs.get_datastore().get_monthly_active_count = Mock(
+        self.hs.get_datastores().main.get_monthly_active_count = Mock(
             return_value=make_awaitable(self.large_number_of_users)
         )
         self.get_failure(
@@ -156,7 +156,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.auth_blocking._limit_usage_by_mau = True
 
         # Set the server to be at the edge of too many users.
-        self.hs.get_datastore().get_monthly_active_count = Mock(
+        self.hs.get_datastores().main.get_monthly_active_count = Mock(
             return_value=make_awaitable(self.auth_blocking._max_mau_value)
         )
 
@@ -175,7 +175,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
 
         # If in monthly active cohort
-        self.hs.get_datastore().user_last_seen_monthly_active = Mock(
+        self.hs.get_datastores().main.user_last_seen_monthly_active = Mock(
             return_value=make_awaitable(self.clock.time_msec())
         )
         self.get_success(
@@ -192,7 +192,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
     def test_mau_limits_not_exceeded(self):
         self.auth_blocking._limit_usage_by_mau = True
 
-        self.hs.get_datastore().get_monthly_active_count = Mock(
+        self.hs.get_datastores().main.get_monthly_active_count = Mock(
             return_value=make_awaitable(self.small_number_of_users)
         )
         # Ensure does not raise exception
@@ -202,7 +202,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.hs.get_datastore().get_monthly_active_count = Mock(
+        self.hs.get_datastores().main.get_monthly_active_count = Mock(
             return_value=make_awaitable(self.small_number_of_users)
         )
         self.get_success(

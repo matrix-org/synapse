@@ -90,7 +90,7 @@ class RoomSummaryHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._event_auth_handler = hs.get_event_auth_handler()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._event_serializer = hs.get_event_client_serializer()
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()

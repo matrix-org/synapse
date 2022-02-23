@@ -20,7 +20,7 @@ from tests.unittest import HomeserverTestCase
 
 class RegistrationStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.user_id = "@my-user:test"
         self.tokens = ["AbCdEfGhIjKlMnOpQrStUvWxYz", "BcDeFgHiJkLmNoPqRsTuVwXyZa"]

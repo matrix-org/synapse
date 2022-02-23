@@ -44,7 +44,7 @@ class DirectoryHandler:
         self.state = hs.get_state_handler()
         self.appservice_handler = hs.get_application_service_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.config = hs.config
         self.enable_room_list_search = hs.config.roomdirectory.enable_room_list_search
         self.require_membership = hs.config.server.require_membership_for_aliases

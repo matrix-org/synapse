@@ -48,7 +48,7 @@ class ListDestinationsRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self._auth, request)
@@ -105,7 +105,7 @@ class DestinationRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
     async def on_GET(
         self, request: SynapseRequest, destination: str
@@ -165,7 +165,7 @@ class DestinationMembershipRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
     async def on_GET(
         self, request: SynapseRequest, destination: str
@@ -221,7 +221,7 @@ class DestinationResetConnectionRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._authenticator = Authenticator(hs)
 
     async def on_POST(

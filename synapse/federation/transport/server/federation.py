@@ -746,7 +746,7 @@ class RoomComplexityServlet(BaseFederationServlet):
         server_name: str,
     ):
         super().__init__(hs, authenticator, ratelimiter, server_name)
-        self._store = self.hs.get_datastore()
+        self._store = self.hs.get_datastores().main
 
     async def on_GET(
         self,

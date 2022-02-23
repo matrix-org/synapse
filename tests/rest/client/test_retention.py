@@ -51,7 +51,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         self.user_id = self.register_user("user", "password")
         self.token = self.login("user", "password")
 
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.serializer = self.hs.get_event_client_serializer()
         self.clock = self.hs.get_clock()
 
@@ -114,7 +114,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         """Tests that synapse.visibility.filter_events_for_client correctly filters out
         outdated events
         """
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         storage = self.hs.get_storage()
         room_id = self.helper.create_room_as(self.user_id, tok=self.token)
         events = []

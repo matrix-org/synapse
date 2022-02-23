@@ -242,7 +242,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         return c
 
     def prepare(self, reactor, clock, hs):
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.server_notices_sender = self.hs.get_server_notices_sender()
         self.server_notices_manager = self.hs.get_server_notices_manager()
         self.event_source = self.hs.get_event_sources()

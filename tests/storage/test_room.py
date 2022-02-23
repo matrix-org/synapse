@@ -23,7 +23,7 @@ class RoomStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         # We can't test RoomStore on its own without the DirectoryStore, for
         # management of the 'room_aliases' table
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.room = RoomID.from_string("!abcde:test")
         self.alias = RoomAlias.from_string("#a-room-name:test")
@@ -71,7 +71,7 @@ class RoomEventsStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         # Room events need the full datastore, for persist_event() and
         # get_room_state()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.event_factory = hs.get_event_factory()
 

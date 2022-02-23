@@ -16,6 +16,8 @@ from unittest.mock import Mock
 
 import pymacaroons
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
 from synapse.api.errors import (
@@ -26,8 +28,10 @@ from synapse.api.errors import (
     ResourceLimitError,
 )
 from synapse.appservice import ApplicationService
+from synapse.server import HomeServer
 from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import Requester
+from synapse.util import Clock
 
 from tests import unittest
 from tests.test_utils import simple_async_mock
@@ -36,10 +40,10 @@ from tests.utils import mock_getRawHeaders
 
 
 class AuthTestCase(unittest.HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
         self.store = Mock()
 
-        hs.get_datastore = Mock(return_value=self.store)
+        hs.datastores.main = self.store
         hs.get_auth_handler().store = self.store
         self.auth = Auth(hs)
 

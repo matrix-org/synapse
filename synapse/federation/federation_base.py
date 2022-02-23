@@ -39,7 +39,7 @@ class FederationBase:
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
         self.spam_checker = hs.get_spam_checker()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self._clock = hs.get_clock()
 
     async def _check_sigs_and_hash(
