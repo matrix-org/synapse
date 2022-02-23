@@ -180,8 +180,9 @@ recommend the use of `systemd` where available: for information on setting up
 
 This worker can handle API requests matching the following regular expressions.
 These endpoints can be routed to any worker. If a worker is set up to handle a
-stream then, for maximum efficiency, additional endpoints should be routed to that worker: refer
-to the [stream writers](#stream-writers) section below for further information.
+stream then, for maximum efficiency, additional endpoints should be routed to that
+worker: refer to the [stream writers](#stream-writers) section below for further
+information.
 
     # Sync requests
     ^/_matrix/client/(v2_alpha|r0|v3)/sync$
@@ -365,9 +366,9 @@ stream_writers:
     events: event_persister1
 ```
 
-Some of the streams have associated endpoints which, for maximum efficiency, should be routed
-to the workers handling that stream. See below for the currently supported streams
-and the endpoints associated with them:
+Some of the streams have associated endpoints which, for maximum efficiency, should
+be routed to the workers handling that stream. See below for the currently supported
+streams and the endpoints associated with them:
 
 ##### The `events` stream
 
