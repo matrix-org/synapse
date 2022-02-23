@@ -292,7 +292,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
                 properties are "mimetype" (for the file's type) and "size" (for the
                 file's size).
         """
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         for name, props in names_and_props.items():
             self.get_success(

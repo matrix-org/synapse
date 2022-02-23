@@ -43,7 +43,7 @@ class DeviceMessageHandler:
         Args:
             hs: server
         """
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self.is_mine = hs.is_mine
 

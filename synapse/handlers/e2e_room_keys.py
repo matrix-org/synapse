@@ -45,7 +45,7 @@ class E2eRoomKeysHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         # Used to lock whenever a client is uploading key data.  This prevents collisions
         # between clients trying to upload the details of a new session, given all

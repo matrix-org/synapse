@@ -72,7 +72,7 @@ class ReplicationStreamer:
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self._instance_name = hs.get_instance_name()

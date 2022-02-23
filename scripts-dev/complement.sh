@@ -5,7 +5,7 @@
 # It makes a Synapse image which represents the current checkout,
 # builds a synapse-complement image on top, then runs tests with it.
 #
-# By default the script will fetch the latest Complement master branch and
+# By default the script will fetch the latest Complement main branch and
 # run tests with that. This can be overridden to use a custom Complement
 # checkout by setting the COMPLEMENT_DIR environment variable to the
 # filepath of a local Complement checkout or by setting the COMPLEMENT_REF
@@ -32,7 +32,7 @@ cd "$(dirname $0)/.."
 
 # Check for a user-specified Complement checkout
 if [[ -z "$COMPLEMENT_DIR" ]]; then
-  COMPLEMENT_REF=${COMPLEMENT_REF:-master}
+  COMPLEMENT_REF=${COMPLEMENT_REF:-main}
   echo "COMPLEMENT_DIR not set. Fetching Complement checkout from ${COMPLEMENT_REF}..."
   wget -Nq https://github.com/matrix-org/complement/archive/${COMPLEMENT_REF}.tar.gz
   tar -xzf ${COMPLEMENT_REF}.tar.gz

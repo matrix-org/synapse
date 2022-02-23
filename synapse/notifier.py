@@ -222,7 +222,7 @@ class Notifier:
         self.hs = hs
         self.storage = hs.get_storage()
         self.event_sources = hs.get_event_sources()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.pending_new_room_events: List[_PendingRoomEventEntry] = []
 
         # Called when there are new things to stream over replication

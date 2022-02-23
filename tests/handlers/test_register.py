@@ -154,7 +154,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.handler = self.hs.get_registration_handler()
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.lots_of_users = 100
         self.small_number_of_users = 1
 
@@ -172,7 +172,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.assertGreater(len(result_token), 20)
 
     def test_if_user_exists(self):
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         frank = UserID.from_string("@frank:test")
         self.get_success(
             store.register_user(user_id=frank.to_string(), password_hash=None)
@@ -760,7 +760,7 @@ class RemoteAutoJoinTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.handler = self.hs.get_registration_handler()
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
 
     @override_config({"auto_join_rooms": ["#room:remotetest"]})
     def test_auto_create_auto_join_remote_room(self):

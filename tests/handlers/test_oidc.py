@@ -856,7 +856,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         auth_handler.complete_sso_login.reset_mock()
 
         # Test if the mxid is already taken
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         user3 = UserID.from_string("@test_user_3:test")
         self.get_success(
             store.register_user(user_id=user3.to_string(), password_hash=None)
@@ -872,7 +872,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
     @override_config({"oidc_config": {**DEFAULT_CONFIG, "allow_existing_users": True}})
     def test_map_userinfo_to_existing_user(self):
         """Existing users can log in with OpenID Connect when allow_existing_users is True."""
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         user = UserID.from_string("@test_user:test")
         self.get_success(
             store.register_user(user_id=user.to_string(), password_hash=None)
@@ -996,7 +996,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         auth_handler = self.hs.get_auth_handler()
         auth_handler.complete_sso_login = simple_async_mock()
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.get_success(
             store.register_user(user_id="@test_user:test", password_hash=None)
         )

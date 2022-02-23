@@ -49,7 +49,7 @@ class EventSearchInsertionTest(HomeserverTestCase):
             self.assertIn("event_id", response)
 
         # Check that search works for the message where the null byte was replaced
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         result = self.get_success(
             store.search_msgs([room_id], "hi bob", ["content.body"])
         )

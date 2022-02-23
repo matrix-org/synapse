@@ -48,7 +48,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor, clock, hs: HomeServer):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.frank = UserID.from_string("@1234abcd:test")
         self.bob = UserID.from_string("@4567:test")
@@ -325,7 +325,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
                 properties are "mimetype" (for the file's type) and "size" (for the
                 file's size).
         """
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         for name, props in names_and_props.items():
             self.get_success(

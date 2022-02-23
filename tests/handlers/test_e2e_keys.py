@@ -34,7 +34,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.handler = hs.get_e2e_keys_handler()
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
 
     def test_query_local_devices_no_devices(self):
         """If the user has no devices, we expect an empty list."""

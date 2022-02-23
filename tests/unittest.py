@@ -51,7 +51,10 @@ from twisted.web.server import Request
 
 from synapse import events
 from synapse.api.constants import EventTypes, Membership
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.config.homeserver import HomeServerConfig
+from synapse.config.server import DEFAULT_ROOM_VERSION
+from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest, SynapseSite
@@ -277,7 +280,7 @@ class HomeserverTestCase(TestCase):
 
                 # We need a valid token ID to satisfy foreign key constraints.
                 token_id = self.get_success(
-                    self.hs.get_datastore().add_access_token_to_user(
+                    self.hs.get_datastores().main.add_access_token_to_user(
                         self.helper.auth_user_id,
                         "some_fake_token",
                         None,
@@ -334,7 +337,7 @@ class HomeserverTestCase(TestCase):
 
     def wait_for_background_updates(self) -> None:
         """Block until all background database updates have completed."""
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         while not self.get_success(
             store.db_pool.updates.has_completed_background_updates()
         ):
@@ -501,7 +504,7 @@ class HomeserverTestCase(TestCase):
                 self.get_success(stor.db_pool.updates.run_background_updates(False))
 
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
-        stor = hs.get_datastore()
+        stor = hs.get_datastores().main
 
         # Run the database background updates, when running against "master".
         if hs.__class__.__name__ == "TestHomeServer":
@@ -719,14 +722,16 @@ class HomeserverTestCase(TestCase):
         Add the given event as an extremity to the room.
         """
         self.get_success(
-            self.hs.get_datastore().db_pool.simple_insert(
+            self.hs.get_datastores().main.db_pool.simple_insert(
                 table="event_forward_extremities",
                 values={"room_id": room_id, "event_id": event_id},
                 desc="test_add_extremity",
             )
         )
 
-        self.hs.get_datastore().get_latest_event_ids_in_room.invalidate((room_id,))
+        self.hs.get_datastores().main.get_latest_event_ids_in_room.invalidate(
+            (room_id,)
+        )
 
     def attempt_wrong_password_login(self, username, password):
         """Attempts to login as the user with the given password, asserting
@@ -772,7 +777,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
         verify_key_id = "%s:%s" % (verify_key.alg, verify_key.version)
 
         self.get_success(
-            hs.get_datastore().store_server_verify_keys(
+            hs.get_datastores().main.store_server_verify_keys(
                 from_server=self.OTHER_SERVER_NAME,
                 ts_added_ms=clock.time_msec(),
                 verify_keys=[
@@ -838,6 +843,24 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
             custom_headers=custom_headers,
             client_ip=client_ip,
         )
+
+    def add_hashes_and_signatures(
+        self,
+        event_dict: JsonDict,
+        room_version: RoomVersion = KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
+    ) -> JsonDict:
+        """Adds hashes and signatures to the given event dict
+
+        Returns:
+             The modified event dict, for convenience
+        """
+        add_hashes_and_signatures(
+            room_version,
+            event_dict,
+            signature_name=self.OTHER_SERVER_NAME,
+            signing_key=self.OTHER_SERVER_SIGNATURE_KEY,
+        )
+        return event_dict
 
 
 def _auth_header_for_request(

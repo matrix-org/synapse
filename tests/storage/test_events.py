@@ -32,7 +32,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
         self.state = self.hs.get_state_handler()
         self.persistence = self.hs.get_storage().persistence
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
 
         self.register_user("user", "pass")
         self.token = self.login("user", "pass")
@@ -341,7 +341,7 @@ class InvalideUsersInRoomCacheTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
         self.state = self.hs.get_state_handler()
         self.persistence = self.hs.get_storage().persistence
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
 
     def test_remote_user_rooms_cache_invalidated(self):
         """Test that if the server leaves a room the `get_rooms_for_user` cache

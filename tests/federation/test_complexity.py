@@ -55,7 +55,7 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         self.assertTrue(complexity > 0, complexity)
 
         # Artificially raise the complexity
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         store.get_current_state_event_counts = lambda x: make_awaitable(500 * 1.23)
 
         # Get the room complexity again -- make sure it's our artificial value
@@ -149,7 +149,7 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         )
 
         # Artificially raise the complexity
-        self.hs.get_datastore().get_current_state_event_counts = (
+        self.hs.get_datastores().main.get_current_state_event_counts = (
             lambda x: make_awaitable(600)
         )
 

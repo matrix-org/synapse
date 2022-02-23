@@ -112,7 +112,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         for tp in self.hs.config.server.mau_limits_reserved_threepids[
             : self.hs.config.server.max_mau_value
         ]:
-            user_id = await self.hs.get_datastore().get_user_id_by_threepid(
+            user_id = await self.hs.get_datastores().main.get_user_id_by_threepid(
                 tp["medium"], canonicalise_email(tp["address"])
             )
             if user_id:
