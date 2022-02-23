@@ -617,7 +617,7 @@ class FederationClient(FederationBase):
         #
         # Dendrite returns a 404 (with no body); synapse returns a 400
         # with M_UNRECOGNISED.
-        return e.code == 404 or (
+        return (e.code == 404 and not e.response) or (
             e.code == 400 and synapse_error.errcode == Codes.UNRECOGNIZED
         )
 
