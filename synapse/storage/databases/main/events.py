@@ -2142,6 +2142,14 @@ class PersistEventsStore:
         state_groups = {}
         for event, context in events_and_contexts:
             if event.internal_metadata.is_outlier():
+                # double-check that we don't have any events that claim to be outliers
+                # *and* have partial state (which is meaningless: we should have no
+                # state at all for an outlier)
+                if context.partial_state:
+                    raise ValueError(
+                        "Outlier event %s claims to have partial state", event.event_id
+                    )
+
                 continue
 
             # if the event was rejected, just give it the same state as its
