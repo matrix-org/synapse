@@ -1473,10 +1473,10 @@ class PersistEventsStore:
 
     def _update_metadata_tables_txn(
         self,
-        txn,
+        txn: LoggingTransaction,
         *,
-        events_and_contexts,
-        all_events_and_contexts,
+        events_and_contexts: List[Tuple[EventBase, EventContext]],
+        all_events_and_contexts: List[Tuple[EventBase, EventContext]],
         inhibit_local_membership_updates: bool = False,
     ):
         """Update all the miscellaneous tables for new events
@@ -1953,20 +1953,20 @@ class PersistEventsStore:
             txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
         )
 
-    def _store_room_topic_txn(self, txn, event):
-        if hasattr(event, "content") and isinstance(event.content.get("topic"), str):
+    def _store_room_topic_txn(self, txn: LoggingTransaction, event: EventBase):
+        if isinstance(event.content.get("topic"), str):
             self.store_event_search_txn(
                 txn, event, "content.topic", event.content["topic"]
             )
 
-    def _store_room_name_txn(self, txn, event):
-        if hasattr(event, "content") and isinstance(event.content.get("name"), str):
+    def _store_room_name_txn(self, txn: LoggingTransaction, event: EventBase):
+        if isinstance(event.content.get("name"), str):
             self.store_event_search_txn(
                 txn, event, "content.name", event.content["name"]
             )
 
-    def _store_room_message_txn(self, txn, event):
-        if hasattr(event, "content") and isinstance(event.content.get("body"), str):
+    def _store_room_message_txn(self, txn: LoggingTransaction, event: EventBase):
+        if isinstance(event.content.get("body"), str):
             self.store_event_search_txn(
                 txn, event, "content.body", event.content["body"]
             )
