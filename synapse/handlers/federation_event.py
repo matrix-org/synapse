@@ -704,6 +704,8 @@ class FederationEventHandler:
 
         try:
             state = await self._resolve_state_at_missing_prevs(origin, event)
+            # TODO(faster_joins): make sure that _resolve_state_at_missing_prevs does
+            #   not return partial state
             await self._process_received_pdu(
                 origin, event, state=state, backfilled=backfilled
             )
