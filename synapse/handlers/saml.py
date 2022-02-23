@@ -52,7 +52,7 @@ class Saml2SessionData:
 
 class SamlHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
         self._saml_client = Saml2Client(hs.config.saml2.saml2_sp_config)

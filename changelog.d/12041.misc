@@ -1,0 +1,1 @@
+After joining a room, create a dedicated logcontext to process the queued events.

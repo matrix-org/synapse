@@ -30,7 +30,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
     """
 
     def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
+        self.store = homeserver.get_datastores().main
         self.room_creator = homeserver.get_room_creation_handler()
 
         # Create a test user and room
@@ -242,7 +242,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         return self.setup_test_homeserver(config=config)
 
     def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
+        self.store = homeserver.get_datastores().main
         self.room_creator = homeserver.get_room_creation_handler()
         self.event_creator_handler = homeserver.get_event_creation_handler()
 

@@ -32,7 +32,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.filtering = hs.get_filtering()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     def test_add_filter(self):
         channel = self.make_request(

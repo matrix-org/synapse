@@ -198,7 +198,7 @@ class FederationKnockingTestCase(
     ]
 
     def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
+        self.store = homeserver.get_datastores().main
 
         # We're not going to be properly signing events as our remote homeserver is fake,
         # therefore disable event signature checks.
@@ -245,7 +245,7 @@ class FederationKnockingTestCase(
             self.hs, room_id, user_id
         )
 
-        channel = self.make_request(
+        channel = self.make_signed_federation_request(
             "GET",
             "/_matrix/federation/v1/make_knock/%s/%s?ver=%s"
             % (
@@ -288,7 +288,7 @@ class FederationKnockingTestCase(
         )
 
         # Send the signed knock event into the room
-        channel = self.make_request(
+        channel = self.make_signed_federation_request(
             "PUT",
             "/_matrix/federation/v1/send_knock/%s/%s"
             % (room_id, signed_knock_event.event_id),

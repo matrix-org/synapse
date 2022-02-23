@@ -180,7 +180,7 @@ class SsoHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._server_name = hs.hostname
         self._registration_handler = hs.get_registration_handler()
         self._auth_handler = hs.get_auth_handler()

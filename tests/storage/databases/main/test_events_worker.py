@@ -37,7 +37,7 @@ from tests import unittest
 
 class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
-        self.store: EventsWorkerStore = hs.get_datastore()
+        self.store: EventsWorkerStore = hs.get_datastores().main
 
         # insert some test data
         for rid in ("room1", "room2"):
@@ -122,7 +122,7 @@ class EventCacheTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.store: EventsWorkerStore = hs.get_datastore()
+        self.store: EventsWorkerStore = hs.get_datastores().main
 
         self.user = self.register_user("user", "pass")
         self.token = self.login(self.user, "pass")
@@ -163,7 +163,7 @@ class DatabaseOutageTestCase(unittest.HomeserverTestCase):
     """Test event fetching during a database outage."""
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
-        self.store: EventsWorkerStore = hs.get_datastore()
+        self.store: EventsWorkerStore = hs.get_datastores().main
 
         self.room_id = f"!room:{hs.hostname}"
         self.event_ids = [f"event{i}" for i in range(20)]

@@ -43,7 +43,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
     servlets = [admin.register_servlets]
 
     def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
+        self.store = homeserver.get_datastores().main
 
     def test_offline_to_online(self):
         wheel_timer = Mock()
@@ -891,7 +891,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         # self.event_builder_for_2 = EventBuilderFactory(hs)
         # self.event_builder_for_2.hostname = "test2"
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
 

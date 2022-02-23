@@ -16,10 +16,12 @@ _First introduced in Synapse v1.37.0_
 async def check_event_for_spam(event: "synapse.events.EventBase") -> Union[bool, str]
 ```
 
-Called when receiving an event from a client or via federation. The module can return
-either a `bool` to indicate whether the event must be rejected because of spam, or a `str`
-to indicate the event must be rejected because of spam and to give a rejection reason to
-forward to clients.
+Called when receiving an event from a client or via federation. The callback must return
+either:
+- an error message string, to indicate the event must be rejected because of spam and 
+  give a rejection reason to forward to clients;
+- the boolean `True`, to indicate that the event is spammy, but not provide further details; or
+- the booelan `False`, to indicate that the event is not considered spammy.
 
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `False`, Synapse falls through to the next one. The value of the first
@@ -35,7 +37,10 @@ async def user_may_join_room(user: str, room: str, is_invited: bool) -> bool
 ```
 
 Called when a user is trying to join a room. The module must return a `bool` to indicate
-whether the user can join the room. The user is represented by their Matrix user ID (e.g.
+whether the user can join the room. Return `False` to prevent the user from joining the
+room; otherwise return `True` to permit the joining.
+
+The user is represented by their Matrix user ID (e.g.
 `@alice:example.com`) and the room is represented by its Matrix ID (e.g.
 `!room:example.com`). The module is also given a boolean to indicate whether the user
 currently has a pending invite in the room.
@@ -58,7 +63,8 @@ async def user_may_invite(inviter: str, invitee: str, room_id: str) -> bool
 
 Called when processing an invitation. The module must return a `bool` indicating whether
 the inviter can invite the invitee to the given room. Both inviter and invitee are
-represented by their Matrix user ID (e.g. `@alice:example.com`).
+represented by their Matrix user ID (e.g. `@alice:example.com`). Return `False` to prevent
+the invitation; otherwise return `True` to permit it.
 
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `True`, Synapse falls through to the next one. The value of the first
@@ -80,7 +86,8 @@ async def user_may_send_3pid_invite(
 
 Called when processing an invitation using a third-party identifier (also called a 3PID,
 e.g. an email address or a phone number). The module must return a `bool` indicating
-whether the inviter can invite the invitee to the given room.
+whether the inviter can invite the invitee to the given room. Return `False` to prevent
+the invitation; otherwise return `True` to permit it.
 
 The inviter is represented by their Matrix user ID (e.g. `@alice:example.com`), and the
 invitee is represented by its medium (e.g. "email") and its address
@@ -117,6 +124,7 @@ async def user_may_create_room(user: str) -> bool
 
 Called when processing a room creation request. The module must return a `bool` indicating
 whether the given user (represented by their Matrix user ID) is allowed to create a room.
+Return `False` to prevent room creation; otherwise return `True` to permit it.
 
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `True`, Synapse falls through to the next one. The value of the first
@@ -133,7 +141,8 @@ async def user_may_create_room_alias(user: str, room_alias: "synapse.types.RoomA
 
 Called when trying to associate an alias with an existing room. The module must return a
 `bool` indicating whether the given user (represented by their Matrix user ID) is allowed
-to set the given alias.
+to set the given alias. Return `False` to prevent the alias creation; otherwise return 
+`True` to permit it.
 
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `True`, Synapse falls through to the next one. The value of the first
@@ -150,7 +159,8 @@ async def user_may_publish_room(user: str, room_id: str) -> bool
 
 Called when trying to publish a room to the homeserver's public rooms directory. The
 module must return a `bool` indicating whether the given user (represented by their
-Matrix user ID) is allowed to publish the given room.
+Matrix user ID) is allowed to publish the given room. Return `False` to prevent the
+room from being published; otherwise return `True` to permit its publication.
 
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `True`, Synapse falls through to the next one. The value of the first
@@ -166,8 +176,11 @@ async def check_username_for_spam(user_profile: Dict[str, str]) -> bool
 ```
 
 Called when computing search results in the user directory. The module must return a
-`bool` indicating whether the given user profile can appear in search results. The profile
-is represented as a dictionary with the following keys:
+`bool` indicating whether the given user should be excluded from user directory 
+searches. Return `True` to indicate that the user is spammy and exclude them from 
+search results; otherwise return `False`.
+
+The profile is represented as a dictionary with the following keys:
 
 * `user_id`: The Matrix ID for this user.
 * `display_name`: The user's display name.
@@ -225,8 +238,9 @@ async def check_media_file_for_spam(
 ) -> bool
 ```
 
-Called when storing a local or remote file. The module must return a boolean indicating
-whether the given file can be stored in the homeserver's media store.
+Called when storing a local or remote file. The module must return a `bool` indicating
+whether the given file should be excluded from the homeserver's media store. Return
+`True` to prevent this file from being stored; otherwise return `False`.
 
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `False`, Synapse falls through to the next one. The value of the first

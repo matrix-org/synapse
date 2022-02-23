@@ -99,7 +99,7 @@ class ApplicationServiceScheduler:
 
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.as_api = hs.get_application_service_api()
 
         self.txn_ctrl = _TransactionController(self.clock, self.store, self.as_api)

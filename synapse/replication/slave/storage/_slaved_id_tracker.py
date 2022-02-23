@@ -40,7 +40,7 @@ class SlavedIdTracker(AbstractStreamIdTracker):
             for table, column in extra_tables:
                 self.advance(None, _load_current_id(db_conn, table, column))
 
-    def advance(self, instance_name: Optional[str], new_id: int):
+    def advance(self, instance_name: Optional[str], new_id: int) -> None:
         self._current = (max if self.step > 0 else min)(self._current, new_id)
 
     def get_current_token(self) -> int:

@@ -228,7 +228,7 @@ class FederationSender(AbstractFederationSender):
         self.hs = hs
         self.server_name = hs.hostname
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state = hs.get_state_handler()
 
         self.clock = hs.get_clock()

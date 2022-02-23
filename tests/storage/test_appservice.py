@@ -467,7 +467,7 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
         self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
     ) -> None:
         self.service = Mock(id="foo")
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.get_success(
             self.store.set_appservice_state(self.service, ApplicationServiceState.UP)
         )

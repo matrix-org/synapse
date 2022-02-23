@@ -142,7 +142,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
     @override_config({"saml2_config": {"grandfathered_mxid_source_attribute": "mxid"}})
     def test_map_saml_response_to_existing_user(self):
         """Existing users can log in with SAML account."""
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.get_success(
             store.register_user(user_id="@test_user:test", password_hash=None)
         )
@@ -217,7 +217,7 @@ class SamlHandlerTestCase(HomeserverTestCase):
         sso_handler.render_error = Mock(return_value=None)
 
         # register a user to occupy the first-choice MXID
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.get_success(
             store.register_user(user_id="@test_user:test", password_hash=None)
         )

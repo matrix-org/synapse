@@ -66,7 +66,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.config = hs.config
@@ -82,6 +82,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.event_auth_handler = hs.get_event_auth_handler()
 
         self.member_linearizer: Linearizer = Linearizer(name="member")
+        self.member_as_limiter = Linearizer(max_count=10, name="member_as_limiter")
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
@@ -268,7 +269,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         target: UserID,
         room_id: str,
         membership: str,
-        prev_event_ids: List[str],
+        allow_no_prev_events: bool = False,
+        prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
         txn_id: Optional[str] = None,
         ratelimit: bool = True,
@@ -286,8 +288,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             target:
             room_id:
             membership:
-            prev_event_ids: The event IDs to use as the prev events
 
+            allow_no_prev_events: Whether to allow this event to be created an empty
+                list of prev_events. Normally this is prohibited just because most
+                events should have a prev_event and we should only use this in special
+                cases like MSC2716.
+            prev_event_ids: The event IDs to use as the prev events
             auth_event_ids:
                 The event ids to use as the auth_events for the new event.
                 Should normally be left as None, which will cause them to be calculated
@@ -344,6 +350,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 "membership": membership,
             },
             txn_id=txn_id,
+            allow_no_prev_events=allow_no_prev_events,
             prev_event_ids=prev_event_ids,
             auth_event_ids=auth_event_ids,
             require_consent=require_consent,
@@ -446,6 +453,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         require_consent: bool = True,
         outlier: bool = False,
         historical: bool = False,
+        allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
@@ -470,6 +478,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             historical: Indicates whether the message is being inserted
                 back in time around some existing events. This is used to skip
                 a few checks and mark the event as backfilled.
+            allow_no_prev_events: Whether to allow this event to be created an empty
+                list of prev_events. Normally this is prohibited just because most
+                events should have a prev_event and we should only use this in special
+                cases like MSC2716.
             prev_event_ids: The event IDs to use as the prev events
             auth_event_ids:
                 The event ids to use as the auth_events for the new event.
@@ -489,24 +501,32 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         key = (room_id,)
 
-        with (await self.member_linearizer.queue(key)):
-            result = await self.update_membership_locked(
-                requester,
-                target,
-                room_id,
-                action,
-                txn_id=txn_id,
-                remote_room_hosts=remote_room_hosts,
-                third_party_signed=third_party_signed,
-                ratelimit=ratelimit,
-                content=content,
-                new_room=new_room,
-                require_consent=require_consent,
-                outlier=outlier,
-                historical=historical,
-                prev_event_ids=prev_event_ids,
-                auth_event_ids=auth_event_ids,
-            )
+        as_id = object()
+        if requester.app_service:
+            as_id = requester.app_service.id
+
+        # We first linearise by the application service (to try to limit concurrent joins
+        # by application services), and then by room ID.
+        with (await self.member_as_limiter.queue(as_id)):
+            with (await self.member_linearizer.queue(key)):
+                result = await self.update_membership_locked(
+                    requester,
+                    target,
+                    room_id,
+                    action,
+                    txn_id=txn_id,
+                    remote_room_hosts=remote_room_hosts,
+                    third_party_signed=third_party_signed,
+                    ratelimit=ratelimit,
+                    content=content,
+                    new_room=new_room,
+                    require_consent=require_consent,
+                    outlier=outlier,
+                    historical=historical,
+                    allow_no_prev_events=allow_no_prev_events,
+                    prev_event_ids=prev_event_ids,
+                    auth_event_ids=auth_event_ids,
+                )
 
         return result
 
@@ -525,6 +545,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         require_consent: bool = True,
         outlier: bool = False,
         historical: bool = False,
+        allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
@@ -551,6 +572,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             historical: Indicates whether the message is being inserted
                 back in time around some existing events. This is used to skip
                 a few checks and mark the event as backfilled.
+            allow_no_prev_events: Whether to allow this event to be created an empty
+                list of prev_events. Normally this is prohibited just because most
+                events should have a prev_event and we should only use this in special
+                cases like MSC2716.
             prev_event_ids: The event IDs to use as the prev events
             auth_event_ids:
                 The event ids to use as the auth_events for the new event.
@@ -680,6 +705,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 membership=effective_membership_state,
                 txn_id=txn_id,
                 ratelimit=ratelimit,
+                allow_no_prev_events=allow_no_prev_events,
                 prev_event_ids=prev_event_ids,
                 auth_event_ids=auth_event_ids,
                 content=content,

@@ -46,7 +46,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_as_api = Mock()
         self.mock_scheduler = Mock()
         hs = Mock()
-        hs.get_datastore.return_value = self.mock_store
+        hs.get_datastores.return_value = Mock(main=self.mock_store)
         self.mock_store.get_received_ts.return_value = make_awaitable(0)
         self.mock_store.set_appservice_last_pos.return_value = make_awaitable(None)
         self.mock_store.set_appservice_stream_type_pos.return_value = make_awaitable(
@@ -363,7 +363,9 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
 
         # Mock out application services, and allow defining our own in tests
         self._services: List[ApplicationService] = []
-        self.hs.get_datastore().get_app_services = Mock(return_value=self._services)
+        self.hs.get_datastores().main.get_app_services = Mock(
+            return_value=self._services
+        )
 
         # A user on the homeserver.
         self.local_user_device_id = "local_device"
@@ -509,7 +511,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         # Create a fake device per message. We can't send to-device messages to
         # a device that doesn't exist.
         self.get_success(
-            self.hs.get_datastore().db_pool.simple_insert_many(
+            self.hs.get_datastores().main.db_pool.simple_insert_many(
                 desc="test_application_services_receive_burst_of_to_device",
                 table="devices",
                 keys=("user_id", "device_id"),
@@ -525,7 +527,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
 
         # Seed the device_inbox table with our fake messages
         self.get_success(
-            self.hs.get_datastore().add_messages_to_device_inbox(messages, {})
+            self.hs.get_datastores().main.add_messages_to_device_inbox(messages, {})
         )
 
         # Now have local_user send a final to-device message to exclusive_as_user. All unsent
