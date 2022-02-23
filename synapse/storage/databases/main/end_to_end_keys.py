@@ -453,6 +453,8 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
         Return structure is of the shape:
           user_id -> device_id -> algorithm -> count
+          Empty algorithm -> count dicts are created if needed to represent a
+          lack of unused one-time keys.
         """
 
         def _count_bulk_e2e_one_time_keys_txn(
@@ -473,6 +475,11 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             result: TransactionOneTimeKeyCounts = {}
 
             for user_id, device_id, algorithm, count in txn:
+                # We deliberately construct empty dictionaries for
+                # users and devices without any unused one-time keys.
+                # We *could* omit these empty dicts if there have been no
+                # changes since the last transaction, but we currently don't
+                # do any change tracking!
                 device_count_by_algo = result.setdefault(user_id, {}).setdefault(
                     device_id, {}
                 )
