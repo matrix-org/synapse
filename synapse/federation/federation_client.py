@@ -615,11 +615,15 @@ class FederationClient(FederationBase):
             synapse_error = e.to_synapse_error()
         # There is no good way to detect an "unknown" endpoint.
         #
-        # Dendrite returns a 404 (with no body); synapse returns a 400
+        # Dendrite returns a 404 (with a body of "404 page not found");
+        # Conduit returns a 404 (with no body); and Synapse returns a 400
         # with M_UNRECOGNISED.
-        return (e.code == 404 and not e.response) or (
-            e.code == 400 and synapse_error.errcode == Codes.UNRECOGNIZED
-        )
+        #
+        # This needs to be rather specific as some endpoints truly do return 404
+        # errors.
+        return (
+            e.code == 404 and (not e.response or e.response == b"404 page not found")
+        ) or (e.code == 400 and synapse_error.errcode == Codes.UNRECOGNIZED)
 
     async def _try_destination_list(
         self,
