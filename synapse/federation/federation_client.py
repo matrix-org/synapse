@@ -1002,7 +1002,7 @@ class FederationClient(FederationBase):
             )
         except HttpResponseException as e:
             # If an error is received that is due to an unrecognised endpoint,
-            # fallback to the v1 endpoint. Otherwise consider it a legitmate error
+            # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
             # and raise.
             if not self._is_unknown_endpoint(e):
                 raise
@@ -1071,7 +1071,7 @@ class FederationClient(FederationBase):
         except HttpResponseException as e:
             # If an error is received that is due to an unrecognised endpoint,
             # fallback to the v1 endpoint if the room uses old-style event IDs.
-            # Otherwise consider it a legitmate error and raise.
+            # Otherwise, consider it a legitimate error and raise.
             err = e.to_synapse_error()
             if self._is_unknown_endpoint(e, err):
                 if room_version.event_format != EventFormatVersions.V1:
@@ -1132,7 +1132,7 @@ class FederationClient(FederationBase):
             )
         except HttpResponseException as e:
             # If an error is received that is due to an unrecognised endpoint,
-            # fallback to the v1 endpoint. Otherwise consider it a legitmate error
+            # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
             # and raise.
             if not self._is_unknown_endpoint(e):
                 raise
@@ -1458,8 +1458,8 @@ class FederationClient(FederationBase):
                 )
             except HttpResponseException as e:
                 # If an error is received that is due to an unrecognised endpoint,
-                # fallback to the unstable endpoint. Otherwise consider it a
-                # legitmate error and raise.
+                # fallback to the unstable endpoint. Otherwise, consider it a
+                # legitimate error and raise.
                 if not self._is_unknown_endpoint(e):
                     raise
 
