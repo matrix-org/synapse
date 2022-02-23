@@ -15,11 +15,16 @@ import typing
 from typing import Dict, List, Sequence, Tuple
 from unittest.mock import patch
 
+from parameterized import parameterized
+
 from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes
-from synapse.storage.databases.state.store import MAX_INFLIGHT_REQUESTS_PER_GROUP
+from synapse.storage.databases.state.store import (
+    MAX_INFLIGHT_REQUESTS_PER_GROUP,
+    state_filter_rough_size_comparator,
+)
 from synapse.storage.state import StateFilter
 from synapse.types import StateMap
 from synapse.util import Clock
@@ -350,3 +355,98 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
         self._complete_request_fake(groups, sf, d)
         self.assertTrue(reqs[CAP_COUNT].called)
         self.assertTrue(reqs[CAP_COUNT + 1].called)
+
+    @parameterized.expand([(False,), (True,)])
+    def test_ordering_of_request_reuse(self, reverse: bool) -> None:
+        """
+        Tests that 'larger' in-flight requests are ordered first.
+
+        This is mostly a design decision in order to prevent a request from
+        hanging on to multiple queries when it would have been sufficient to
+        hang on to only one bigger query.
+
+        The 'size' of a state filter is a rough heuristic.
+
+        - requests two pieces of state, one 'larger' than the other, but each
+          spawning a query
+        - requests a third piece of state
+        - completes the larger of the first two queries
+        - checks that the third request gets completed (and doesn't needlessly
+          wait for the other query)
+
+        Parameters:
+            reverse: whether to reverse the order of the initial requests, to ensure
+                     that the effect doesn't depend on the order of request submission.
+        """
+
+        # We add in an extra state type to make sure that both requests spawn
+        # queries which are not optimised out.
+        state_filters = [
+            StateFilter.freeze(
+                {"state.type": {"A"}, "other.state.type": {"a"}}, include_others=False
+            ),
+            StateFilter.freeze(
+                {
+                    "state.type": None,
+                    "other.state.type": {"b"},
+                    # The current rough size comparator uses the number of state types
+                    # as an indicator of size.
+                    # To influence it to make this state filter bigger than the previous one,
+                    # we add another dummy state type.
+                    "extra.state.type": {"c"},
+                },
+                include_others=False,
+            ),
+        ]
+
+        if reverse:
+            # For fairness, we perform one test run with the list reversed.
+            state_filters.reverse()
+            smallest_state_filter_idx = 1
+            biggest_state_filter_idx = 0
+        else:
+            smallest_state_filter_idx = 0
+            biggest_state_filter_idx = 1
+
+        # This assertion is for our own sanity more than anything else.
+        self.assertGreater(
+            state_filter_rough_size_comparator(state_filters[biggest_state_filter_idx]),
+            state_filter_rough_size_comparator(
+                state_filters[smallest_state_filter_idx]
+            ),
+            "Test invalid: bigger state filter is not actually bigger.",
+        )
+
+        # Spawn the initial two requests
+        for state_filter in state_filters:
+            ensureDeferred(
+                self.state_datastore._get_state_for_group_using_inflight_cache(
+                    42,
+                    state_filter,
+                )
+            )
+
+        # Spawn a third request
+        req = ensureDeferred(
+            self.state_datastore._get_state_for_group_using_inflight_cache(
+                42,
+                StateFilter.freeze(
+                    {
+                        "state.type": {"A"},
+                    },
+                    include_others=False,
+                ),
+            )
+        )
+        self.pump(by=0.1)
+
+        self.assertFalse(req.called)
+
+        # Complete the largest request's query to make sure that the final request
+        # only waits for that one (and doesn't needlessly wait for both queries)
+        self._complete_request_fake(
+            *self.get_state_group_calls[biggest_state_filter_idx]
+        )
+
+        # That should have been sufficient to complete the third request
+        self.assertTrue(req.called)
