@@ -460,14 +460,13 @@ class EventsPersistenceStorage:
                         )
 
                     for room_id, ev_ctx_rm in events_by_room.items():
-                        latest_event_ids = (
+                        latest_event_ids = set(
                             await self.main_store.get_latest_event_ids_in_room(room_id)
                         )
                         new_latest_event_ids = await self._calculate_new_extremities(
                             room_id, ev_ctx_rm, latest_event_ids
                         )
 
-                        latest_event_ids = set(latest_event_ids)
                         if new_latest_event_ids == latest_event_ids:
                             # No change in extremities, so no change in state
                             continue
@@ -567,7 +566,7 @@ class EventsPersistenceStorage:
                             )
                             if not is_still_joined:
                                 logger.info("Server no longer in room %s", room_id)
-                                latest_event_ids = []
+                                latest_event_ids = set()
                                 current_state = {}
                                 delta.no_longer_in_room = True
 
@@ -906,9 +905,9 @@ class EventsPersistenceStorage:
             # Ideally we'd figure out a way of still being able to drop old
             # dummy events that reference local events, but this is good enough
             # as a first cut.
-            events_to_check = [event]
+            events_to_check: Collection[EventBase] = [event]
             while events_to_check:
-                new_events = set()
+                new_events: Set[str] = set()
                 for event_to_check in events_to_check:
                     if self.is_mine_id(event_to_check.sender):
                         if event_to_check.type != EventTypes.Dummy:
