@@ -14,12 +14,14 @@
 
 from unittest.mock import Mock
 
+import yaml
 from twisted.internet.defer import Deferred, ensureDeferred
 
 from synapse.storage.background_updates import BackgroundUpdater
 
 from tests import unittest
 from tests.test_utils import make_awaitable, simple_async_mock
+from tests.unittest import override_config
 
 
 class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
@@ -99,6 +101,55 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         self.assertTrue(result)
         self.assertFalse(self.update_handler.called)
 
+    # test that background update sleeps when asked and doesn't sleep when asked and uses proper duration
+    # test that background update is run with specified default batch size
+    # test that background update is run with specified duration
+    @override_config(
+        yaml.safe_load(
+            """
+            min_batch_size: 5
+            """
+        )
+    )
+    def test_do_background_update_with_min_batch_set_by_config(self):
+        """
+        Test that the background update is run with the min_batch_size set by the config
+        """
+        # the time we claim it takes to update one item when running the update
+        duration_ms = 10
+
+        store = self.hs.get_datastore()
+        self.get_success(
+            store.db_pool.simple_insert(
+                "background_updates",
+                values={"update_name": "test_update", "progress_json": '{"my_key": 1}'},
+            )
+        )
+
+        # first step: make a bit of progress
+        async def update(progress, count):
+            await self.clock.sleep((count * duration_ms) / 1000)
+            progress = {"my_key": progress["my_key"] + 1}
+            await store.db_pool.runInteraction(
+                "update_progress",
+                self.updates._background_update_progress_txn,
+                "test_update",
+                progress,
+            )
+            return count
+
+        self.update_handler.side_effect = update
+        self.update_handler.reset_mock()
+        res = self.get_success(
+            self.updates.do_next_background_update(False),
+            by=0.01,
+        )
+        self.assertFalse(res)
+
+        # on the first call, we should get run with the minimum background update size specified in the config
+        self.update_handler.assert_called_once_with(
+            {"my_key": 1}, 5
+        )
 
 class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
