@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import AsyncContextManager, Callable, Tuple
+
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
 
@@ -32,58 +34,71 @@ class ReadWriteLockTestCase(unittest.TestCase):
 
     def test_rwlock(self):
         rwlock = ReadWriteLock()
+        key = "key"
 
-        key = object()
+        def start_reader_or_writer(
+            read_or_write: Callable[[str], AsyncContextManager]
+        ) -> Tuple["Deferred[None]", "Deferred[None]"]:
+            acquired_d: "Deferred[None]" = Deferred()
+            release_d: "Deferred[None]" = Deferred()
+
+            async def action():
+                async with read_or_write(key):
+                    acquired_d.callback(None)
+                    await release_d
+
+            defer.ensureDeferred(action())
+            return acquired_d, release_d
 
         ds = [
-            rwlock.read(key),  # 0
-            rwlock.read(key),  # 1
-            rwlock.write(key),  # 2
-            rwlock.write(key),  # 3
-            rwlock.read(key),  # 4
-            rwlock.read(key),  # 5
-            rwlock.write(key),  # 6
+            start_reader_or_writer(rwlock.read),  # 0
+            start_reader_or_writer(rwlock.read),  # 1
+            start_reader_or_writer(rwlock.write),  # 2
+            start_reader_or_writer(rwlock.write),  # 3
+            start_reader_or_writer(rwlock.read),  # 4
+            start_reader_or_writer(rwlock.read),  # 5
+            start_reader_or_writer(rwlock.write),  # 6
         ]
-        ds = [defer.ensureDeferred(d) for d in ds]
+        # `Deferred`s that resolve when each reader or writer acquires the lock.
+        acquired_ds = [acquired_d for acquired_d, _release_d in ds]
+        # `Deferred`s that will trigger the release of locks when resolved.
+        release_ds = [release_d for _acquired_d, release_d in ds]
 
-        self._assert_called_before_not_after(ds, 2)
+        self._assert_called_before_not_after(acquired_ds, 2)
 
-        with ds[0].result:
-            self._assert_called_before_not_after(ds, 2)
-        self._assert_called_before_not_after(ds, 2)
+        self._assert_called_before_not_after(acquired_ds, 2)
+        release_ds[0].callback(None)
+        self._assert_called_before_not_after(acquired_ds, 2)
 
-        with ds[1].result:
-            self._assert_called_before_not_after(ds, 2)
-        self._assert_called_before_not_after(ds, 3)
+        self._assert_called_before_not_after(acquired_ds, 2)
+        release_ds[1].callback(None)
+        self._assert_called_before_not_after(acquired_ds, 3)
 
-        with ds[2].result:
-            self._assert_called_before_not_after(ds, 3)
-        self._assert_called_before_not_after(ds, 4)
+        self._assert_called_before_not_after(acquired_ds, 3)
+        release_ds[2].callback(None)
+        self._assert_called_before_not_after(acquired_ds, 4)
 
-        with ds[3].result:
-            self._assert_called_before_not_after(ds, 4)
-        self._assert_called_before_not_after(ds, 6)
+        self._assert_called_before_not_after(acquired_ds, 4)
+        release_ds[3].callback(None)
+        self._assert_called_before_not_after(acquired_ds, 6)
 
-        with ds[5].result:
-            self._assert_called_before_not_after(ds, 6)
-        self._assert_called_before_not_after(ds, 6)
+        self._assert_called_before_not_after(acquired_ds, 6)
+        release_ds[5].callback(None)
+        self._assert_called_before_not_after(acquired_ds, 6)
 
-        with ds[4].result:
-            self._assert_called_before_not_after(ds, 6)
-        self._assert_called_before_not_after(ds, 7)
+        self._assert_called_before_not_after(acquired_ds, 6)
+        release_ds[4].callback(None)
+        self._assert_called_before_not_after(acquired_ds, 7)
 
-        with ds[6].result:
-            pass
+        release_ds[6].callback(None)
 
-        d = defer.ensureDeferred(rwlock.write(key))
-        self.assertTrue(d.called)
-        with d.result:
-            pass
+        acquired_d, release_d = start_reader_or_writer(rwlock.write)
+        self.assertTrue(acquired_d.called)
+        release_d.callback(None)
 
-        d = defer.ensureDeferred(rwlock.read(key))
-        self.assertTrue(d.called)
-        with d.result:
-            pass
+        acquired_d, release_d = start_reader_or_writer(rwlock.read)
+        self.assertTrue(acquired_d.called)
+        release_d.callback(None)
 
     def test_lock_handoff_to_nonblocking_writer(self):
         """Test a writer handing the lock to another writer that completes instantly."""
@@ -93,11 +108,11 @@ class ReadWriteLockTestCase(unittest.TestCase):
         unblock: "Deferred[None]" = Deferred()
 
         async def blocking_write():
-            with await rwlock.write(key):
+            async with rwlock.write(key):
                 await unblock
 
         async def nonblocking_write():
-            with await rwlock.write(key):
+            async with rwlock.write(key):
                 pass
 
         d1 = defer.ensureDeferred(blocking_write())
