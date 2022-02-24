@@ -73,13 +73,9 @@ class _GetStateGroupDelta:
         return len(self.delta_ids) if self.delta_ids else 0
 
 
-# Return type of state_filter_rough_size_comparator. Must be comparable.
-StateFilterRoughSizeComparator = Tuple[int, int]
-
-
 def state_filter_rough_size_comparator(
     state_filter: StateFilter,
-) -> StateFilterRoughSizeComparator:
+) -> Tuple[int, int]:
     """
     Returns a comparable value that roughly indicates the relative size of this
     state filter compared to others.
