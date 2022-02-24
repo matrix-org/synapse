@@ -545,7 +545,10 @@ class ReadWriteLock:
             finally:
                 with PreserveLoggingContext():
                     new_defer.callback(None)
-                if self.key_to_current_writer[key] == new_defer:
+                # `self.key_to_current_writer[key]` may be missing if there was another
+                # writer waiting for us and it completed entirely within the
+                # `new_defer.callback()` call above.
+                if self.key_to_current_writer.get(key) == new_defer:
                     self.key_to_current_writer.pop(key)
 
         return _ctx_manager()
