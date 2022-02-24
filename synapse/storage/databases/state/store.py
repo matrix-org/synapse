@@ -73,20 +73,22 @@ class _GetStateGroupDelta:
         return len(self.delta_ids) if self.delta_ids else 0
 
 
-def state_filter_rough_size_comparator(
+def state_filter_rough_priority_comparator(
     state_filter: StateFilter,
 ) -> Tuple[int, int]:
     """
     Returns a comparable value that roughly indicates the relative size of this
     state filter compared to others.
+    'Larger' state filters should sort first when using ascending order, so
+    this is essentially the opposite of 'size'.
     It should be treated as a rough guide only and should not be interpreted to
     have any particular meaning. The representation may also change
 
     The current implementation returns a tuple of the form:
-        * 1 for include_others, 0 otherwise
-        * number of entries in state_filter.types
+        * -1 for include_others, -0 otherwise
+        * -(number of entries in state_filter.types)
     """
-    return int(state_filter.include_others), len(state_filter.types)
+    return -int(state_filter.include_others), -len(state_filter.types)
 
 
 class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
@@ -298,9 +300,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         reusable_requests = []
 
         # Iterate over existing requests in roughly biggest-first order.
-        # reversed(inflight_requests) has an efficient iterator implementation,
-        # but reversed(inflight_requests.items()) does not, sadly.
-        for request_state_filter in reversed(inflight_requests):
+        for request_state_filter in inflight_requests:
             request_deferred = inflight_requests[request_state_filter]
             new_state_filter_left_over = state_filter_left_over.approx_difference(
                 request_state_filter
@@ -381,7 +381,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         # Insert the ObservableDeferred into the cache
         group_request_dict = self._state_group_inflight_requests.setdefault(
-            group, SortedDict(state_filter_rough_size_comparator)
+            group, SortedDict(state_filter_rough_priority_comparator)
         )
         group_request_dict[db_state_filter] = observable_deferred
 

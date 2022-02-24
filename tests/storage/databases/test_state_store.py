@@ -23,7 +23,7 @@ from twisted.test.proto_helpers import MemoryReactor
 from synapse.api.constants import EventTypes
 from synapse.storage.databases.state.store import (
     MAX_INFLIGHT_REQUESTS_PER_GROUP,
-    state_filter_rough_size_comparator,
+    state_filter_rough_priority_comparator,
 )
 from synapse.storage.state import StateFilter
 from synapse.types import StateMap
@@ -409,9 +409,11 @@ class StateGroupInflightCachingTestCase(HomeserverTestCase):
             biggest_state_filter_idx = 1
 
         # This assertion is for our own sanity more than anything else.
-        self.assertGreater(
-            state_filter_rough_size_comparator(state_filters[biggest_state_filter_idx]),
-            state_filter_rough_size_comparator(
+        self.assertLess(
+            state_filter_rough_priority_comparator(
+                state_filters[biggest_state_filter_idx]
+            ),
+            state_filter_rough_priority_comparator(
                 state_filters[smallest_state_filter_idx]
             ),
             "Test invalid: bigger state filter is not actually bigger.",
