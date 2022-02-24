@@ -11,11 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from http import HTTPStatus
+
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.errors import Codes
 from synapse.events.utils import CANONICALJSON_MAX_INT, CANONICALJSON_MIN_INT
 from synapse.rest import admin
 from synapse.rest.client import login, room, sync
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
@@ -30,12 +35,12 @@ class PowerLevelsTestCase(HomeserverTestCase):
         sync.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
 
         return self.setup_test_homeserver(config=config)
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         # register a room admin, moderator and regular user
         self.admin_user_id = self.register_user("admin", "pass")
         self.admin_access_token = self.login("admin", "pass")
@@ -88,7 +93,7 @@ class PowerLevelsTestCase(HomeserverTestCase):
             tok=self.admin_access_token,
         )
 
-    def test_non_admins_cannot_enable_room_encryption(self):
+    def test_non_admins_cannot_enable_room_encryption(self) -> None:
         # have the mod try to enable room encryption
         self.helper.send_state(
             self.room_id,
@@ -104,10 +109,10 @@ class PowerLevelsTestCase(HomeserverTestCase):
             "m.room.encryption",
             {"algorithm": "m.megolm.v1.aes-sha2"},
             tok=self.user_access_token,
-            expect_code=403,  # expect failure
+            expect_code=HTTPStatus.FORBIDDEN,  # expect failure
         )
 
-    def test_non_admins_cannot_send_server_acl(self):
+    def test_non_admins_cannot_send_server_acl(self) -> None:
         # have the mod try to send a server ACL
         self.helper.send_state(
             self.room_id,
@@ -118,7 +123,7 @@ class PowerLevelsTestCase(HomeserverTestCase):
                 "deny": ["*.evil.com", "evil.com"],
             },
             tok=self.mod_access_token,
-            expect_code=403,  # expect failure
+            expect_code=HTTPStatus.FORBIDDEN,  # expect failure
         )
 
         # have the user try to send a server ACL
@@ -131,10 +136,10 @@ class PowerLevelsTestCase(HomeserverTestCase):
                 "deny": ["*.evil.com", "evil.com"],
             },
             tok=self.user_access_token,
-            expect_code=403,  # expect failure
+            expect_code=HTTPStatus.FORBIDDEN,  # expect failure
         )
 
-    def test_non_admins_cannot_tombstone_room(self):
+    def test_non_admins_cannot_tombstone_room(self) -> None:
         # Create another room that will serve as our "upgraded room"
         self.upgraded_room_id = self.helper.create_room_as(
             self.admin_user_id, tok=self.admin_access_token
@@ -149,7 +154,7 @@ class PowerLevelsTestCase(HomeserverTestCase):
                 "replacement_room": self.upgraded_room_id,
             },
             tok=self.mod_access_token,
-            expect_code=403,  # expect failure
+            expect_code=HTTPStatus.FORBIDDEN,  # expect failure
         )
 
         # have the user try to send a tombstone event
@@ -164,17 +169,17 @@ class PowerLevelsTestCase(HomeserverTestCase):
             expect_code=403,  # expect failure
         )
 
-    def test_admins_can_enable_room_encryption(self):
+    def test_admins_can_enable_room_encryption(self) -> None:
         # have the admin try to enable room encryption
         self.helper.send_state(
             self.room_id,
             "m.room.encryption",
             {"algorithm": "m.megolm.v1.aes-sha2"},
             tok=self.admin_access_token,
-            expect_code=200,  # expect success
+            expect_code=HTTPStatus.OK,  # expect success
         )
 
-    def test_admins_can_send_server_acl(self):
+    def test_admins_can_send_server_acl(self) -> None:
         # have the admin try to send a server ACL
         self.helper.send_state(
             self.room_id,
@@ -185,10 +190,10 @@ class PowerLevelsTestCase(HomeserverTestCase):
                 "deny": ["*.evil.com", "evil.com"],
             },
             tok=self.admin_access_token,
-            expect_code=200,  # expect success
+            expect_code=HTTPStatus.OK,  # expect success
         )
 
-    def test_admins_can_tombstone_room(self):
+    def test_admins_can_tombstone_room(self) -> None:
         # Create another room that will serve as our "upgraded room"
         self.upgraded_room_id = self.helper.create_room_as(
             self.admin_user_id, tok=self.admin_access_token
@@ -203,10 +208,10 @@ class PowerLevelsTestCase(HomeserverTestCase):
                 "replacement_room": self.upgraded_room_id,
             },
             tok=self.admin_access_token,
-            expect_code=200,  # expect success
+            expect_code=HTTPStatus.OK,  # expect success
         )
 
-    def test_cannot_set_string_power_levels(self):
+    def test_cannot_set_string_power_levels(self) -> None:
         room_power_levels = self.helper.get_state(
             self.room_id,
             "m.room.power_levels",
@@ -221,7 +226,7 @@ class PowerLevelsTestCase(HomeserverTestCase):
             "m.room.power_levels",
             room_power_levels,
             tok=self.admin_access_token,
-            expect_code=400,  # expect failure
+            expect_code=HTTPStatus.BAD_REQUEST,  # expect failure
         )
 
         self.assertEqual(
@@ -230,7 +235,7 @@ class PowerLevelsTestCase(HomeserverTestCase):
             body,
         )
 
-    def test_cannot_set_unsafe_large_power_levels(self):
+    def test_cannot_set_unsafe_large_power_levels(self) -> None:
         room_power_levels = self.helper.get_state(
             self.room_id,
             "m.room.power_levels",
@@ -247,7 +252,7 @@ class PowerLevelsTestCase(HomeserverTestCase):
             "m.room.power_levels",
             room_power_levels,
             tok=self.admin_access_token,
-            expect_code=400,  # expect failure
+            expect_code=HTTPStatus.BAD_REQUEST,  # expect failure
         )
 
         self.assertEqual(
@@ -256,7 +261,7 @@ class PowerLevelsTestCase(HomeserverTestCase):
             body,
         )
 
-    def test_cannot_set_unsafe_small_power_levels(self):
+    def test_cannot_set_unsafe_small_power_levels(self) -> None:
         room_power_levels = self.helper.get_state(
             self.room_id,
             "m.room.power_levels",
@@ -273,7 +278,7 @@ class PowerLevelsTestCase(HomeserverTestCase):
             "m.room.power_levels",
             room_power_levels,
             tok=self.admin_access_token,
-            expect_code=400,  # expect failure
+            expect_code=HTTPStatus.BAD_REQUEST,  # expect failure
         )
 
         self.assertEqual(

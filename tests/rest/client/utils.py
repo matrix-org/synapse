@@ -19,6 +19,7 @@ import json
 import re
 import time
 import urllib.parse
+from http import HTTPStatus
 from typing import (
     Any,
     AnyStr,
@@ -89,7 +90,7 @@ class RestHelper:
         is_public: Optional[bool] = None,
         room_version: Optional[str] = None,
         tok: Optional[str] = None,
-        expect_code: int = 200,
+        expect_code: int = HTTPStatus.OK,
         extra_content: Optional[Dict] = None,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
     ) -> Optional[str]:
@@ -137,12 +138,19 @@ class RestHelper:
         assert channel.result["code"] == b"%d" % expect_code, channel.result
         self.auth_user_id = temp_id
 
-        if expect_code == 200:
+        if expect_code == HTTPStatus.OK:
             return channel.json_body["room_id"]
         else:
             return None
 
-    def invite(self, room=None, src=None, targ=None, expect_code=200, tok=None):
+    def invite(
+        self,
+        room: Optional[str] = None,
+        src: Optional[str] = None,
+        targ: Optional[str] = None,
+        expect_code: int = HTTPStatus.OK,
+        tok: Optional[str] = None,
+    ) -> None:
         self.change_membership(
             room=room,
             src=src,
@@ -156,7 +164,7 @@ class RestHelper:
         self,
         room: str,
         user: Optional[str] = None,
-        expect_code: int = 200,
+        expect_code: int = HTTPStatus.OK,
         tok: Optional[str] = None,
         appservice_user_id: Optional[str] = None,
     ) -> None:
@@ -170,7 +178,14 @@ class RestHelper:
             expect_code=expect_code,
         )
 
-    def knock(self, room=None, user=None, reason=None, expect_code=200, tok=None):
+    def knock(
+        self,
+        room: Optional[str] = None,
+        user: Optional[str] = None,
+        reason: Optional[str] = None,
+        expect_code: int = HTTPStatus.OK,
+        tok: Optional[str] = None,
+    ) -> None:
         temp_id = self.auth_user_id
         self.auth_user_id = user
         path = "/knock/%s" % room
@@ -199,7 +214,13 @@ class RestHelper:
 
         self.auth_user_id = temp_id
 
-    def leave(self, room=None, user=None, expect_code=200, tok=None):
+    def leave(
+        self,
+        room: Optional[str] = None,
+        user: Optional[str] = None,
+        expect_code: int = HTTPStatus.OK,
+        tok: Optional[str] = None,
+    ) -> None:
         self.change_membership(
             room=room,
             src=user,
@@ -209,7 +230,7 @@ class RestHelper:
             expect_code=expect_code,
         )
 
-    def ban(self, room: str, src: str, targ: str, **kwargs: object):
+    def ban(self, room: str, src: str, targ: str, **kwargs: object) -> None:
         """A convenience helper: `change_membership` with `membership` preset to "ban"."""
         self.change_membership(
             room=room,
@@ -228,7 +249,7 @@ class RestHelper:
         extra_data: Optional[dict] = None,
         tok: Optional[str] = None,
         appservice_user_id: Optional[str] = None,
-        expect_code: int = 200,
+        expect_code: int = HTTPStatus.OK,
         expect_errcode: Optional[str] = None,
     ) -> None:
         """
@@ -294,13 +315,13 @@ class RestHelper:
 
     def send(
         self,
-        room_id,
-        body=None,
-        txn_id=None,
-        tok=None,
-        expect_code=200,
+        room_id: str,
+        body: Optional[str] = None,
+        txn_id: Optional[str] = None,
+        tok: Optional[str] = None,
+        expect_code: int = HTTPStatus.OK,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
-    ):
+    ) -> JsonDict:
         if body is None:
             body = "body_text_here"
 
@@ -318,14 +339,14 @@ class RestHelper:
 
     def send_event(
         self,
-        room_id,
-        type,
+        room_id: str,
+        type: str,
         content: Optional[dict] = None,
-        txn_id=None,
-        tok=None,
-        expect_code=200,
+        txn_id: Optional[str] = None,
+        tok: Optional[str] = None,
+        expect_code: int = HTTPStatus.OK,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
-    ):
+    ) -> JsonDict:
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
 
@@ -358,10 +379,10 @@ class RestHelper:
         event_type: str,
         body: Optional[Dict[str, Any]],
         tok: str,
-        expect_code: int = 200,
+        expect_code: int = HTTPStatus.OK,
         state_key: str = "",
         method: str = "GET",
-    ) -> Dict:
+    ) -> JsonDict:
         """Read or write some state from a given room
 
         Args:
@@ -410,9 +431,9 @@ class RestHelper:
         room_id: str,
         event_type: str,
         tok: str,
-        expect_code: int = 200,
+        expect_code: int = HTTPStatus.OK,
         state_key: str = "",
-    ):
+    ) -> JsonDict:
         """Gets some state from a room
 
         Args:
@@ -438,9 +459,9 @@ class RestHelper:
         event_type: str,
         body: Dict[str, Any],
         tok: str,
-        expect_code: int = 200,
+        expect_code: int = HTTPStatus.OK,
         state_key: str = "",
-    ):
+    ) -> JsonDict:
         """Set some state in a room
 
         Args:
@@ -467,8 +488,8 @@ class RestHelper:
         image_data: bytes,
         tok: str,
         filename: str = "test.png",
-        expect_code: int = 200,
-    ) -> dict:
+        expect_code: int = HTTPStatus.OK,
+    ) -> JsonDict:
         """Upload a piece of test media to the media repo
         Args:
             resource: The resource that will handle the upload request
@@ -513,7 +534,7 @@ class RestHelper:
         channel = self.auth_via_oidc({"sub": remote_user_id}, client_redirect_url)
 
         # expect a confirmation page
-        assert channel.code == 200, channel.result
+        assert channel.code == HTTPStatus.OK, channel.result
 
         # fish the matrix login token out of the body of the confirmation page
         m = re.search(
@@ -532,7 +553,7 @@ class RestHelper:
             "/login",
             content={"type": "m.login.token", "token": login_token},
         )
-        assert channel.code == 200
+        assert channel.code == HTTPStatus.OK
         return channel.json_body
 
     def auth_via_oidc(
@@ -641,7 +662,7 @@ class RestHelper:
             (expected_uri, resp_obj) = expected_requests.pop(0)
             assert uri == expected_uri
             resp = FakeResponse(
-                code=200,
+                code=HTTPStatus.OK,
                 phrase=b"OK",
                 body=json.dumps(resp_obj).encode("utf-8"),
             )
@@ -739,7 +760,7 @@ class RestHelper:
             self.hs.get_reactor(), self.site, "GET", sso_redirect_endpoint
         )
         # that should serve a confirmation page
-        assert channel.code == 200, channel.text_body
+        assert channel.code == HTTPStatus.OK, channel.text_body
         channel.extract_cookies(cookies)
 
         # parse the confirmation page to fish out the link.

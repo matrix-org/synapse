@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from http import HTTPStatus
+
 from synapse.rest import admin, devices, room, sync
 from synapse.rest.client import account, login, register
 
@@ -30,7 +32,7 @@ class DeviceListsTestCase(unittest.HomeserverTestCase):
         devices.register_servlets,
     ]
 
-    def test_receiving_local_device_list_changes(self):
+    def test_receiving_local_device_list_changes(self) -> None:
         """Tests that a local users that share a room receive each other's device list
         changes.
         """
@@ -84,7 +86,7 @@ class DeviceListsTestCase(unittest.HomeserverTestCase):
             },
             access_token=alice_access_token,
         )
-        self.assertEqual(channel.code, 200, channel.json_body)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
 
         # Check that bob's incremental sync contains the updated device list.
         # If not, the client would only receive the device list update on the
@@ -97,7 +99,7 @@ class DeviceListsTestCase(unittest.HomeserverTestCase):
         )
         self.assertIn(alice_user_id, changed_device_lists, bob_sync_channel.json_body)
 
-    def test_not_receiving_local_device_list_changes(self):
+    def test_not_receiving_local_device_list_changes(self) -> None:
         """Tests a local users DO NOT receive device updates from each other if they do not
         share a room.
         """
@@ -119,7 +121,7 @@ class DeviceListsTestCase(unittest.HomeserverTestCase):
             "/sync",
             access_token=bob_access_token,
         )
-        self.assertEqual(channel.code, 200, channel.json_body)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
         next_batch_token = channel.json_body["next_batch"]
 
         # ...and then an incremental sync. This should block until the sync stream is woken up,
@@ -141,11 +143,13 @@ class DeviceListsTestCase(unittest.HomeserverTestCase):
             },
             access_token=alice_access_token,
         )
-        self.assertEqual(channel.code, 200, channel.json_body)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
 
         # Check that bob's incremental sync does not contain the updated device list.
         bob_sync_channel.await_result()
-        self.assertEqual(bob_sync_channel.code, 200, bob_sync_channel.json_body)
+        self.assertEqual(
+            bob_sync_channel.code, HTTPStatus.OK, bob_sync_channel.json_body
+        )
 
         changed_device_lists = bob_sync_channel.json_body.get("device_lists", {}).get(
             "changed", []
