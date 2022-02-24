@@ -250,8 +250,6 @@ class RoomSummaryHandler:
                     None,
                     room_id,
                     suggested_only,
-                    # Do not limit the maximum children.
-                    max_children=None,
                 )
 
             # Otherwise, attempt to use information for federation.
@@ -363,7 +361,7 @@ class RoomSummaryHandler:
             The JSON hierarchy dictionary.
         """
         root_room_entry = await self._summarize_local_room(
-            None, origin, requested_room_id, suggested_only, max_children=None
+            None, origin, requested_room_id, suggested_only
         )
         if root_room_entry is None:
             # Room is inaccessible to the requesting server.
@@ -384,7 +382,7 @@ class RoomSummaryHandler:
                 continue
 
             room_entry = await self._summarize_local_room(
-                None, origin, room_id, suggested_only, max_children=0
+                None, origin, room_id, suggested_only, include_children=False
             )
             # If the room is accessible, include it in the results.
             #
@@ -410,7 +408,7 @@ class RoomSummaryHandler:
         origin: Optional[str],
         room_id: str,
         suggested_only: bool,
-        max_children: Optional[int],
+        include_children: bool = True,
     ) -> Optional["_RoomEntry"]:
         """
         Generate a room entry and a list of event entries for a given room.
@@ -425,9 +423,8 @@ class RoomSummaryHandler:
             room_id: The room ID to summarize.
             suggested_only: True if only suggested children should be returned.
                 Otherwise, all children are returned.
-            max_children:
-                The maximum number of children rooms to include. A value of None
-                means no limit.
+            include_children:
+                Whether to include the events of any children.
 
         Returns:
             A room entry if the room should be returned. None, otherwise.
@@ -437,9 +434,8 @@ class RoomSummaryHandler:
 
         room_entry = await self._build_room_entry(room_id, for_federation=bool(origin))
 
-        # If the room is not a space or the children don't matter, return just
-        # the room information.
-        if room_entry.get("room_type") != RoomTypes.SPACE or max_children == 0:
+        # If the room is not a space return just the room information.
+        if room_entry.get("room_type") != RoomTypes.SPACE or not include_children:
             return _RoomEntry(room_id, room_entry)
 
         # Otherwise, look for child rooms/spaces.
@@ -448,14 +444,6 @@ class RoomSummaryHandler:
         if suggested_only:
             # we only care about suggested children
             child_events = filter(_is_suggested_child_event, child_events)
-
-        # TODO max_children is legacy code for the /spaces endpoint.
-        if max_children is not None:
-            child_iter: Iterable[EventBase] = itertools.islice(
-                child_events, max_children
-            )
-        else:
-            child_iter = child_events
 
         stripped_events: List[JsonDict] = [
             {
@@ -466,7 +454,7 @@ class RoomSummaryHandler:
                 "sender": e.sender,
                 "origin_server_ts": e.origin_server_ts,
             }
-            for e in child_iter
+            for e in child_events
         ]
         return _RoomEntry(room_id, room_entry, stripped_events)
 
@@ -805,7 +793,7 @@ class RoomSummaryHandler:
                 room_id,
                 # Suggested-only doesn't matter since no children are requested.
                 suggested_only=False,
-                max_children=0,
+                include_children=False,
             )
 
             if not room_entry:
