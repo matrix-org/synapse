@@ -672,9 +672,8 @@ class RoomSummaryHandler:
         ):
             return True
 
-        # Check if the user is a member of any of the allowed spaces
-        # from the response.
-        allowed_rooms = room.get("allowed_room_ids") or room.get("allowed_spaces")
+        # Check if the user is a member of any of the allowed rooms from the response.
+        allowed_rooms = room.get("allowed_room_ids")
         if allowed_rooms and isinstance(allowed_rooms, list):
             if await self._event_auth_handler.is_user_in_rooms(
                 allowed_rooms, requester
@@ -742,8 +741,6 @@ class RoomSummaryHandler:
                 )
                 if allowed_rooms:
                     entry["allowed_room_ids"] = allowed_rooms
-                    # TODO Remove this key once the API is stable.
-                    entry["allowed_spaces"] = allowed_rooms
 
         # Filter out Nones – rather omit the field altogether
         room_entry = {k: v for k, v in entry.items() if v is not None}
