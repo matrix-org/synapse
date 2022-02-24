@@ -904,9 +904,6 @@ class AccountStatusRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self._auth = hs.get_auth()
-        self._store = hs.get_datastores().main
-        self._is_mine = hs.is_mine
-        self._federation_client = hs.get_federation_client()
         self._account_handler = hs.get_account_handler()
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:

@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 class AccountHandler:
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastores().main
+        self._main_store = hs.get_datastores().main
         self._is_mine = hs.is_mine
         self._federation_client = hs.get_federation_client()
 
@@ -98,7 +98,7 @@ class AccountHandler:
         """
         status = {"exists": False}
 
-        userinfo = await self._store.get_userinfo_by_id(user_id.to_string())
+        userinfo = await self._main_store.get_userinfo_by_id(user_id.to_string())
 
         if userinfo is not None:
             status = {
