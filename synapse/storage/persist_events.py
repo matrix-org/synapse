@@ -427,21 +427,21 @@ class EventsPersistenceStorage:
             # NB: Assumes that we are only persisting events for one room
             # at a time.
 
-            # map room_id->list[event_ids] giving the new forward
+            # map room_id->set[event_ids] giving the new forward
             # extremities in each room
-            new_forward_extremeties = {}
+            new_forward_extremities: Dict[str, Set[str]] = {}
 
             # map room_id->(type,state_key)->event_id tracking the full
             # state in each room after adding these events.
             # This is simply used to prefill the get_current_state_ids
             # cache
-            current_state_for_room = {}
+            current_state_for_room: Dict[str, StateMap[str]] = {}
 
             # map room_id->(to_delete, to_insert) where to_delete is a list
             # of type/state keys to remove from current state, and to_insert
             # is a map (type,key)->event_id giving the state delta in each
             # room
-            state_delta_for_room = {}
+            state_delta_for_room: Dict[str, DeltaState] = {}
 
             # Set of remote users which were in rooms the server has left. We
             # should check if we still share any rooms and if not we mark their
@@ -477,7 +477,7 @@ class EventsPersistenceStorage:
                         # extremities, so we'll `continue` above and skip this bit.)
                         assert new_latest_event_ids, "No forward extremities left!"
 
-                        new_forward_extremeties[room_id] = new_latest_event_ids
+                        new_forward_extremities[room_id] = new_latest_event_ids
 
                         len_1 = (
                             len(latest_event_ids) == 1
@@ -532,7 +532,7 @@ class EventsPersistenceStorage:
                             # extremities, so we'll `continue` above and skip this bit.)
                             assert new_latest_event_ids, "No forward extremities left!"
 
-                            new_forward_extremeties[room_id] = new_latest_event_ids
+                            new_forward_extremities[room_id] = new_latest_event_ids
 
                         # If either are not None then there has been a change,
                         # and we need to work out the delta (or use that
@@ -581,7 +581,7 @@ class EventsPersistenceStorage:
                 chunk,
                 current_state_for_room=current_state_for_room,
                 state_delta_for_room=state_delta_for_room,
-                new_forward_extremeties=new_forward_extremeties,
+                new_forward_extremities=new_forward_extremities,
                 use_negative_stream_ordering=backfilled,
                 inhibit_local_membership_updates=backfilled,
             )
@@ -595,7 +595,7 @@ class EventsPersistenceStorage:
         room_id: str,
         event_contexts: List[Tuple[EventBase, EventContext]],
         latest_event_ids: Collection[str],
-    ):
+    ) -> Set[str]:
         """Calculates the new forward extremities for a room given events to
         persist.
 
