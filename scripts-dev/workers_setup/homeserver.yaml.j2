@@ -1,0 +1,42 @@
+
+instance_map:
+{% for worker in all_workers %}
+  {{ worker.name }}:
+    host: {{ worker.ip }}
+    port: 9090
+{% endfor %}
+
+ stream_writers:
+  events:
+{% for worker in all_workers %}
+{% if worker.kind == "event_persister" %}
+    - {{ worker.name }}
+{% endif %}
+
+  typing:
+{% for worker in all_workers %}
+{% if worker.kind == "typing" %}
+    - {{ worker.name }}
+{% endif %}
+
+
+start_pushers: false
+
+pusher_instances:
+{% if worker.kind == "pusher" %}
+    - {{ worker.name }}
+{% endif %}
+
+notify_appservices: False
+
+federation_sender_instances:
+{% if worker.kind == "federation_sender" %}
+    - {{ worker.name }}
+{% endif %}
+
+enable_media_repo: False
+
+media_instance_running_background_jobs: "media1"
+
+update_user_directory: False
+

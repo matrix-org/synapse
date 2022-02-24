@@ -1,0 +1,26 @@
+{# TODO worker apps! #}
+{% if worker.kind == "main" %}
+worker_app: synapse.app.homeserver
+{% else %}
+worker_app: synapse.app.generic_worker
+worker_name: {{ worker_name }}
+ # The replication listener on the main synapse process.
+worker_replication_host: {{ worker_ip }}
+worker_replication_http_port: 9090
+ worker_listeners:
+  - type: http
+    port: 8080
+    resources:
+    - names:
+    - client
+    - federation
+{% if worker.kind == "media" %}
+    - media
+{% endif %}
+
+worker_log_config: '{{ workers_dir }}/{{ worker_name }}.logging.yaml'
+worker_pid_file: '{{ logs_dir }}/{{ worker_name }}.pid'
+{% endif %}
+
+{% set main_worker = workers_by_name.main %}
+worker_main_http_uri: http://{{ main_worker.ip }}:8080

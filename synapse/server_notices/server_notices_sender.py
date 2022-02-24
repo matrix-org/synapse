@@ -54,6 +54,8 @@ class ServerNoticesSender(WorkerServerNoticesSender):
         Args:
             user_id: mxid
         """
+        # TODO this will need to run on the user IP handler, at least in a
+        #      stubbed capacity!
         # The synchrotrons use a stubbed version of ServerNoticesSender, so
         # we check for notices to send to the user in on_user_ip as well as
         # in on_user_syncing

@@ -227,6 +227,8 @@ class ReplicationCommandHandler:
 
         self._is_master = hs.config.worker.worker_app is None
 
+        self._is_user_ip_handler = self._is_master # TODO
+
         self._federation_sender = None
         if self._is_master and not hs.config.worker.send_federation:
             self._federation_sender = hs.get_federation_sender()
@@ -403,7 +405,7 @@ class ReplicationCommandHandler:
     ) -> Optional[Awaitable[None]]:
         user_ip_cache_counter.inc()
 
-        if self._is_master:
+        if self._is_user_ip_handler:
             return self._handle_user_ip(cmd)
         else:
             return None
