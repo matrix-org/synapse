@@ -31,6 +31,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Type for the `device_one_time_key_counts` field in an appservice transaction
+#   user ID -> {device ID -> {algorithm -> count}}
+TransactionOneTimeKeyCounts = Dict[str, Dict[str, Dict[str, int]]]
+
+# Type for the `device_unused_fallback_keys` field in an appservice transaction
+#   user ID -> {device ID -> [algorithm]}
+TransactionUnusedFallbackKeys = Dict[str, Dict[str, List[str]]]
+
 
 class ApplicationServiceState(Enum):
     DOWN = "down"
@@ -72,6 +80,7 @@ class ApplicationService:
         rate_limited: bool = True,
         ip_range_whitelist: Optional[IPSet] = None,
         supports_ephemeral: bool = False,
+        msc3202_transaction_extensions: bool = False,
     ):
         self.token = token
         self.url = (
@@ -84,6 +93,7 @@ class ApplicationService:
         self.id = id
         self.ip_range_whitelist = ip_range_whitelist
         self.supports_ephemeral = supports_ephemeral
+        self.msc3202_transaction_extensions = msc3202_transaction_extensions
 
         if "|" in self.id:
             raise Exception("application service ID cannot contain '|' character")
@@ -339,12 +349,16 @@ class AppServiceTransaction:
         events: List[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
+        one_time_key_counts: TransactionOneTimeKeyCounts,
+        unused_fallback_keys: TransactionUnusedFallbackKeys,
     ):
         self.service = service
         self.id = id
         self.events = events
         self.ephemeral = ephemeral
         self.to_device_messages = to_device_messages
+        self.one_time_key_counts = one_time_key_counts
+        self.unused_fallback_keys = unused_fallback_keys
 
     async def send(self, as_api: "ApplicationServiceApi") -> bool:
         """Sends this transaction using the provided AS API interface.
@@ -359,6 +373,8 @@ class AppServiceTransaction:
             events=self.events,
             ephemeral=self.ephemeral,
             to_device_messages=self.to_device_messages,
+            one_time_key_counts=self.one_time_key_counts,
+            unused_fallback_keys=self.unused_fallback_keys,
             txn_id=self.id,
         )
 
