@@ -1,7 +1,7 @@
 ## Welcome
 
 This is intended as a guide to the synapse configuration-each config option is documented, including instructions
-on how to change the default and what sort of behavior to expect if the default is changed, and an example
+on how to change the default and what sort of behavior to expect if the default is changed. Also included is an example
 configuration. If you don't want to spend a lot of time thinking about options, the config as generated sets sensible defaults
 for most values. [which values must you fill in? server name, ports?, public base url?]
 
@@ -9,17 +9,25 @@ for most values. [which values must you fill in? server name, ports?, public bas
 
 Configuration options that take a time period can be set using a number
 followed by a letter. Letters have the following meanings:
+
 s = second
+
 m = minute
+
 h = hour
+
 d = day
+
 w = week
+
 y = year
-For example, setting redaction_retention_period: 5m would remove redacted
+
+For example, setting `redaction_retention_period: 5m` would remove redacted
 messages from the database after 5 minutes, rather than 5 months.
 
 ## List of config options in the order in which they are found in the real config 
 
+---
 Config option: `modules`
 
 Server admins can expand Synapse's functionality with external modules.
@@ -501,177 +509,248 @@ max_mau_value: 50
 ---
 Config option: `mau_trial_days`
 
-# 'mau_trial_days' is a means to add a grace period for active users. It
-# means that users must be active for this number of days before they
-# can be considered active and guards against the case where lots of users
-# sign up in a short space of time never to return after their initial
-# session.
-#
-# 'mau_limit_alerting' is a means of limiting client side alerting
-# should the mau limit be reached. This is useful for small instances
-# where the admin has 5 mau seats (say) for 5 specific people and no
-# interest increasing the mau limit further. Defaults to True, which
-# means that alerting is enabled
-#
-#limit_usage_by_mau: false
-#max_mau_value: 50
-#mau_trial_days: 2
-#mau_limit_alerting: false
+The option `mau_trial_days` is a means to add a grace period for active users. It
+means that users must be active for the specified number of days before they
+can be considered active and guards against the case where lots of users
+sign up in a short space of time never to return after their initial
+session.
 
-# If enabled, the metrics for the number of monthly active users will
-# be populated, however no one will be limited. If limit_usage_by_mau
-# is true, this is implied to be true.
-#
-#mau_stats_only: false
+Example configuration:
+```
+mau_trial_days: 5
+```
+---
+Config option: `mau_limit_alerting`
 
-# Sometimes the server admin will want to ensure certain accounts are
-# never blocked by mau checking. These accounts are specified here.
-#
-#mau_limit_reserved_threepids:
-#  - medium: 'email'
-#    address: 'reserved_user@example.com'
+The option `mau_limit_alerting` is a means of limiting client-side alerting
+should the mau limit be reached. This is useful for small instances
+where the admin has 5 mau seats (say) for 5 specific people and no
+interest increasing the mau limit further. Defaults to True, which
+means that alerting is enabled.
 
-# Used by phonehome stats to group together related servers.
-#server_context: context
+Example configuration:
+```
+mau_limit_alerting: false
+```
+---
+Config option: `mau_stats_only`
 
-# Resource-constrained homeserver settings
-#
-# When this is enabled, the room "complexity" will be checked before a user
-# joins a new remote room. If it is above the complexity limit, the server will
-# disallow joining, or will instantly leave.
-#
-# Room complexity is an arbitrary measure based on factors such as the number of
-# users in the room.
-#
+If enabled, the metrics for the number of monthly active users will
+be populated, however no one will be limited based on these numbers. If `limit_usage_by_mau`
+is true, this is implied to be true. Defaults to false. 
+
+Example configuration:
+```
+mau_stats_only: true
+```
+---
+Config option: `mau_limit_reserved_threepids`
+
+Sometimes the server admin will want to ensure certain accounts are
+never blocked by mau checking. These accounts are specified by this option.
+Defaults to none. Uncomment and add users to enable.  
+
+Example configuration:
+```
+mau_limit_reserved_threepids:
+  - medium: 'email'
+    address: 'reserved_user@example.com'
+```
+---
+Config option: `server_context`
+
+This option is used by phonehome stats to group together related servers.
+Defaults to none. Uncomment and add a context to enable. 
+
+Example configuration:
+```
+server_context: context
+```
+---
+Config option: `limit_remote_rooms`
+
+When this option is enabled, the room "complexity" will be checked before a user
+joins a new remote room. If it is above the complexity limit, the server will
+disallow joining, or will instantly leave. This is useful for homeservers that are
+resource-constrained. Uncomment to set the options as illustrated below.
+
+Room complexity is an arbitrary measure based on factors such as the number of
+users in the room.
+
+Example configuration:
+```
 limit_remote_rooms:
-  # Uncomment to enable room complexity checking.
-  #
-  #enabled: true
+  # Enables room complexity checking.
+  enabled: true
 
   # the limit above which rooms cannot be joined. The default is 1.0.
-  #
-  #complexity: 0.5
+  complexity: 0.5
 
   # override the error which is returned when the room is too complex.
-  #
-  #complexity_error: "This room is too complex."
+  complexity_error: "This room is too complex."
 
   # allow server admins to join complex rooms. Default is false.
-  #
-  #admins_can_join: true
+  admins_can_join: true
+```
+---
+Config option: `require_membership_for_aliases`
 
-# Whether to require a user to be in the room to add an alias to it.
-# Defaults to 'true'.
-#
-#require_membership_for_aliases: false
+Whether to require a user to be in the room to add an alias to it.
+Defaults to 'true'.
 
-# Whether to allow per-room membership profiles through the send of membership
-# events with profile information that differ from the target's global profile.
-# Defaults to 'true'.
-#
-#allow_per_room_profiles: false
+Example configuration:
+```
+require_membership_for_aliases: false
+```
+---
+Config option: `allow_per_room_profiles`
 
-# The largest allowed file size for a user avatar. Defaults to no restriction.
-#
-# Note that user avatar changes will not work if this is set without
-# using Synapse's media repository.
-#
-#max_avatar_size: 10M
+Whether to allow per-room membership profiles through the sending of membership
+events with profile information that differs from the target's global profile.
+Defaults to true.
 
-# The MIME types allowed for user avatars. Defaults to no restriction.
-#
-# Note that user avatar changes will not work if this is set without
-# using Synapse's media repository.
-#
-#allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
+Example configuration:
+```
+allow_per_room_profiles: false
+```
+---
+Config option: `max_avatar_size`
 
-# How long to keep redacted events in unredacted form in the database. After
-# this period redacted events get replaced with their redacted form in the DB.
-#
-# Defaults to `7d`. Set to `null` to disable.
-#
-#redaction_retention_period: 28d
+The largest permissible file size in bytes for a user avatar. Defaults to no restriction.
+Use M for MB and K for KB. 
 
-# How long to track users' last seen time and IPs in the database.
-#
-# Defaults to `28d`. Set to `null` to disable clearing out of old rows.
-#
-#user_ips_max_age: 14d
+Note that user avatar changes will not work if this is set without using Synapse's media repository.
 
-# Inhibits the /requestToken endpoints from returning an error that might leak
-# information about whether an e-mail address is in use or not on this
-# homeserver.
-# Note that for some endpoints the error situation is the e-mail already being
-# used, and for others the error is entering the e-mail being unused.
-# If this option is enabled, instead of returning an error, these endpoints will
-# act as if no error happened and return a fake session ID ('sid') to clients.
-#
-#request_token_inhibit_3pid_errors: true
+Example configuration:
+```
+max_avatar_size: 10M
+```
+---
+Config option: `allowed_avatar_mimetypes`
 
-# A list of domains that the domain portion of 'next_link' parameters
-# must match.
-#
-# This parameter is optionally provided by clients while requesting
-# validation of an email or phone number, and maps to a link that
-# users will be automatically redirected to after validation
-# succeeds. Clients can make use this parameter to aid the validation
-# process.
-#
-# The whitelist is applied whether the homeserver or an
-# identity server is handling validation.
-#
-# The default value is no whitelist functionality; all domains are
-# allowed. Setting this value to an empty list will instead disallow
-# all domains.
-#
-#next_link_domain_whitelist: ["matrix.org"]
+The MIME types allowed for user avatars. Defaults to no restriction.
 
-# Templates to use when generating email or HTML page contents.
-#
+
+Note that user avatar changes will not work if this is set without
+using Synapse's media repository.
+
+Example configuration:
+```
+allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
+```
+---
+Config option: `redaction_retention_period`
+
+How long to keep redacted events in unredacted form in the database. After
+this period redacted events get replaced with their redacted form in the DB.
+
+Defaults to `7d`. Uncomment and set to `null` to disable.
+
+Example configuration:
+```
+redaction_retention_period: 28d
+```
+---
+Config option: `user_ips_max_age` 
+
+How long to track users' last seen time and IPs in the database.
+
+Defaults to `28d`. Uncomment and set to `null` to disable clearing out of old rows.
+
+Example configuration:
+```
+user_ips_max_age: 14d
+```
+---
+Config option: `request_token_inhibit_3pid_errors`
+
+Inhibits the /requestToken endpoints from returning an error that might leak
+information about whether an e-mail address is in use or not on this
+homeserver. Defaults to false. 
+Note that for some endpoints the error situation is the e-mail already being
+used, and for others the error is entering the e-mail being unused.
+If this option is enabled, instead of returning an error, these endpoints will
+act as if no error happened and return a fake session ID ('sid') to clients.
+
+Example configuration:
+```
+request_token_inhibit_3pid_errors: true
+```
+---
+Config option: `next_link_domain_whitelist`
+
+A list of domains that the domain portion of 'next_link' parameters
+must match.
+
+This parameter is optionally provided by clients while requesting
+validation of an email or phone number, and maps to a link that
+users will be automatically redirected to after validation
+succeeds. Clients can make use this parameter to aid the validation
+process.
+
+The whitelist is applied whether the homeserver or an identity server is handling validation.
+
+The default value is no whitelist functionality; all domains are
+allowed. Setting this value to an empty list will instead disallow
+all domains.
+
+Example configuration:
+```
+next_link_domain_whitelist: ["matrix.org"]
+```
+---
+Config option: `templates` and `custom_template_directory`
+
+Templates to use when generating email or HTML page contents. The `custom_template_directory` 
+determines which directory Synapse will try to find template files in to use to generate email or HTML page contents.
+If not set, or a file is not found within the template directory, a default 
+template from within the Synapse package will be used.
+
+See https://matrix-org.github.io/synapse/latest/templates.html for more
+information about using custom templates.
+
+Example configuration:
+```
 templates:
-  # Directory in which Synapse will try to find template files to use to generate
-  # email or HTML page contents.
-  # If not set, or a file is not found within the template directory, a default
-  # template from within the Synapse package will be used.
-  #
-  # See https://matrix-org.github.io/synapse/latest/templates.html for more
-  # information about using custom templates.
-  #
-  #custom_template_directory: /path/to/custom/templates/
+  custom_template_directory: /path/to/custom/templates/
+```
+---
+Config option: `retention`
 
+This option and the associated options determine message retention policy at the
+server level.
 
-# Message retention policy at the server level.
-#
-# Room admins and mods can define a retention period for their rooms using the
-# 'm.room.retention' state event, and server admins can cap this period by setting
-# the 'allowed_lifetime_min' and 'allowed_lifetime_max' config options.
-#
-# If this feature is enabled, Synapse will regularly look for and purge events
-# which are older than the room's maximum retention period. Synapse will also
-# filter events received over federation so that events that should have been
-# purged are ignored and not stored again.
-#
+Room admins and mods can define a retention period for their rooms using the
+`m.room.retention` state event, and server admins can cap this period by setting
+the `allowed_lifetime_min` and `allowed_lifetime_max` config options.
+
+If this feature is enabled, Synapse will regularly look for and purge events
+which are older than the room's maximum retention period. Synapse will also
+filter events received over federation so that events that should have been 
+purged are ignored and not stored again. 
+
+The message retention policies feature is disabled by default.
+
+Example configuration:
+```
 retention:
-  # The message retention policies feature is disabled by default. Uncomment the
-  # following line to enable it.
-  #
-  #enabled: true
+  enabled: true
 
   # Default retention policy. If set, Synapse will apply it to rooms that lack the
   # 'm.room.retention' state event. Currently, the value of 'min_lifetime' doesn't
   # matter much because Synapse doesn't take it into account yet.
   #
-  #default_policy:
-  #  min_lifetime: 1d
-  #  max_lifetime: 1y
+  default_policy:
+    min_lifetime: 1d
+    max_lifetime: 1y
 
   # Retention policy limits. If set, and the state of a room contains a
   # 'm.room.retention' event in its state which contains a 'min_lifetime' or a
   # 'max_lifetime' that's out of these bounds, Synapse will cap the room's policy
   # to these limits when running purge jobs.
-  #
-  #allowed_lifetime_min: 1d
-  #allowed_lifetime_max: 1y
+ 
+  allowed_lifetime_min: 1d
+  allowed_lifetime_max: 1y
 
   # Server admins can define the settings of the background jobs purging the
   # events which lifetime has expired under the 'purge_jobs' section.
@@ -702,124 +781,173 @@ retention:
   # room's policy to these values is done after the policies are retrieved from
   # Synapse's database (which is done using the range specified in a purge job's
   # configuration).
-  #
-  #purge_jobs:
-  #  - longest_max_lifetime: 3d
-  #    interval: 12h
-  #  - shortest_max_lifetime: 3d
-  #    interval: 1d
+  
+  purge_jobs:
+    - longest_max_lifetime: 3d
+      interval: 12h
+    - shortest_max_lifetime: 3d
+      interval: 1d
+```
+---
+Config option: `tls_certificate_path`
 
+This option specifies a PEM-encoded X509 certificate for TLS.
+This certificate, as of Synapse 1.0, will need to be a valid and verifiable
+certificate, signed by a recognised Certificate Authority.
 
-## TLS ##
+Be sure to use a `.pem` file that includes the full certificate chain including
+any intermediate certificates (for instance, if using certbot, use
+`fullchain.pem` as your certificate, not `cert.pem`).
 
-# PEM-encoded X509 certificate for TLS.
-# This certificate, as of Synapse 1.0, will need to be a valid and verifiable
-# certificate, signed by a recognised Certificate Authority.
-#
-# Be sure to use a `.pem` file that includes the full certificate chain including
-# any intermediate certificates (for instance, if using certbot, use
-# `fullchain.pem` as your certificate, not `cert.pem`).
-#
-#tls_certificate_path: "CONFDIR/SERVERNAME.tls.crt"
+Example configuration:
+```
+tls_certificate_path: "CONFDIR/SERVERNAME.tls.crt"
+```
+---
+Config option: `tls_private_key_path`
 
-# PEM-encoded private key for TLS
-#
-#tls_private_key_path: "CONFDIR/SERVERNAME.tls.key"
+PEM-encoded private key for TLS.
 
-# Whether to verify TLS server certificates for outbound federation requests.
-#
-# Defaults to `true`. To disable certificate verification, uncomment the
-# following line.
-#
-#federation_verify_certificates: false
+Example configuration:
+```
+tls_private_key_path: "CONFDIR/SERVERNAME.tls.key"
+```
+---
+Config option: `federation_verify_certificates`
+Whether to verify TLS server certificates for outbound federation requests.
 
-# The minimum TLS version that will be used for outbound federation requests.
-#
-# Defaults to `1`. Configurable to `1`, `1.1`, `1.2`, or `1.3`. Note
-# that setting this value higher than `1.2` will prevent federation to most
-# of the public Matrix network: only configure it to `1.3` if you have an
-# entirely private federation setup and you can ensure TLS 1.3 support.
-#
-#federation_client_minimum_tls_version: 1.2
+Defaults to `true`. To disable certificate verification, uncomment the option.
 
-# Skip federation certificate verification on the following whitelist
-# of domains.
-#
-# This setting should only be used in very specific cases, such as
-# federation over Tor hidden services and similar. For private networks
-# of homeservers, you likely want to use a private CA instead.
-#
-# Only effective if federation_verify_certicates is `true`.
-#
-#federation_certificate_verification_whitelist:
-#  - lon.example.com
-#  - "*.domain.com"
-#  - "*.onion"
+Example configuration:
+```
+federation_verify_certificates: false
+```
+---
+Config option: `federation_client_minimum_tls_version`
 
-# List of custom certificate authorities for federation traffic.
-#
-# This setting should only normally be used within a private network of
-# homeservers.
-#
-# Note that this list will replace those that are provided by your
-# operating environment. Certificates must be in PEM format.
-#
-#federation_custom_ca_list:
-#  - myCA1.pem
-#  - myCA2.pem
-#  - myCA3.pem
+The minimum TLS version that will be used for outbound federation requests.
 
+Defaults to `1`. Configurable to `1`, `1.1`, `1.2`, or `1.3`. Note
+that setting this value higher than `1.2` will prevent federation to most
+of the public Matrix network: only configure it to `1.3` if you have an
+entirely private federation setup and you can ensure TLS 1.3 support.
 
-## Federation ##
+Example configuration:
+```
+federation_client_minimum_tls_version: 1.2
+```
+---
+Config option: `federation_certificate_verification_whitelist`
 
-# Restrict federation to the following whitelist of domains.
-# N.B. we recommend also firewalling your federation listener to limit
-# inbound federation traffic as early as possible, rather than relying
-# purely on this application-layer restriction.  If not specified, the
-# default is to whitelist everything.
-#
-#federation_domain_whitelist:
-#  - lon.example.com
-#  - nyc.example.com
-#  - syd.example.com
+Skip federation certificate verification on a given whitelist
+of domains.
 
-# Report prometheus metrics on the age of PDUs being sent to and received from
-# the following domains. This can be used to give an idea of "delay" on inbound
-# and outbound federation, though be aware that any delay can be due to problems
-# at either end or with the intermediate network.
-#
-# By default, no domains are monitored in this way.
-#
-#federation_metrics_domains:
-#  - matrix.org
-#  - example.com
+This setting should only be used in very specific cases, such as
+federation over Tor hidden services and similar. For private networks
+of homeservers, you likely want to use a private CA instead.
 
-# Uncomment to disable profile lookup over federation. By default, the
-# Federation API allows other homeservers to obtain profile data of any user
-# on this homeserver. Defaults to 'true'.
-#
-#allow_profile_lookup_over_federation: false
+Only effective if `federation_verify_certicates` is `true`.
 
-# Uncomment to disable device display name lookup over federation. By default, the
-# Federation API allows other homeservers to obtain device display names of any user
-# on this homeserver. Defaults to 'true'.
-#
-#allow_device_name_lookup_over_federation: false
+Example configuration:
+```
+federation_certificate_verification_whitelist:
+  - lon.example.com
+  - "*.domain.com"
+  - "*.onion"
+```
+---
+Config option: `federation_custom_ca_list`
 
+List of custom certificate authorities for federation traffic.
 
-## Caching ##
+This setting should only normally be used within a private network of
+homeservers.
 
-# Caching can be configured through the following options.
-#
-# A cache 'factor' is a multiplier that can be applied to each of
-# Synapse's caches in order to increase or decrease the maximum
-# number of entries that can be stored.
+Note that this list will replace those that are provided by your
+operating environment. Certificates must be in PEM format.
 
-# The number of events to cache in memory. Not affected by
-# caches.global_factor.
-#
-#event_cache_size: 10K
+Example configuration:
+```
+federation_custom_ca_list:
+  - myCA1.pem
+  - myCA2.pem
+  - myCA3.pem
+```
+---
+Config option: `federation_domain_whitelist`
 
+Restrict federation to the given whitelist of domains.
+N.B. we recommend also firewalling your federation listener to limit
+inbound federation traffic as early as possible, rather than relying
+purely on this application-layer restriction.  If not specified, the
+default is to whitelist everything.
+
+Example configuration:
+```
+federation_domain_whitelist:
+  - lon.example.com
+  - nyc.example.com
+  - syd.example.com
+```
+---
+Config option: `federation_metrics_domains`
+
+Report prometheus metrics on the age of PDUs being sent to and received from
+the given domains. This can be used to give an idea of "delay" on inbound
+and outbound federation, though be aware that any delay can be due to problems
+at either end or with the intermediate network.
+
+By default, no domains are monitored in this way.
+
+Example configuration:
+```
+federation_metrics_domains:
+  - matrix.org
+  - example.com
+```
+---
+Config option: `allow_profile_lookup_over_federation`
+
+Uncomment to disable profile lookup over federation. By default, the
+Federation API allows other homeservers to obtain profile data of any user
+on this homeserver. Defaults to 'true'.
+
+Example configuration:
+```
+allow_profile_lookup_over_federation: false
+```
+---
+Config option: `allow_device_name_lookup_over_federation`
+
+Uncomment this option to disable device display name lookup over federation. By default, the
+Federation API allows other homeservers to obtain device display names of any user
+on this homeserver. Defaults to 'true'.
+
+Example configuration:
+```
+allow_device_name_lookup_over_federation: false
+```
+---
+Config option: `event_cache_size`
+
+The number of events to cache in memory. Not affected by
+`caches.global_factor`.
+
+Example configuration:
+```
+event_cache_size: 10K
+```
+---
+Config option: `cache` and associated values
+
+Caching can be configured through the following options.
+
+A cache 'factor' is a multiplier that can be applied to each of
+Synapse's caches in order to increase or decrease the maximum
+number of entries that can be stored.
+
+Example configuration:
+```
 caches:
   # Controls the global cache factor, which is the default cache factor
   # for all caches if a specific factor for that cache is not otherwise
@@ -831,7 +959,7 @@ caches:
   #
   # Defaults to 0.5, which will half the size of all caches.
   #
-  #global_factor: 1.0
+  global_factor: 1.0
 
   # A dictionary of cache name to cache factor for that individual
   # cache. Overrides the global cache factor for a given cache.
@@ -849,13 +977,13 @@ caches:
   # variable would be `SYNAPSE_CACHE_FACTOR_STATEGROUPCACHE=2.0`.
   #
   per_cache_factors:
-    #get_users_who_share_room_with_user: 2.0
+    get_users_who_share_room_with_user: 2.0
 
   # Controls how long an entry can be in a cache without having been
   # accessed before being evicted. Defaults to None, which means
   # entries are never evicted based on time.
   #
-  #expiry_time: 30m
+  expiry_time: 30m
 
   # Controls how long the results of a /sync request are cached for after
   # a successful response is returned. A higher duration can help clients with
@@ -864,476 +992,649 @@ caches:
   # By default, this is zero, which means that sync responses are not cached
   # at all.
   #
-  #sync_response_cache_duration: 2m
+  sync_response_cache_duration: 2m
+```
+---
+Config option: `database`
 
+The 'database' setting defines the database that synapse uses to store all of
+its data.
 
-## Database ##
+'name' gives the database engine to use: either 'sqlite3' (for SQLite) or
+'psycopg2' (for PostgreSQL).
 
-# The 'database' setting defines the database that synapse uses to store all of
-# its data.
-#
-# 'name' gives the database engine to use: either 'sqlite3' (for SQLite) or
-# 'psycopg2' (for PostgreSQL).
-#
-# 'txn_limit' gives the maximum number of transactions to run per connection
-# before reconnecting. Defaults to 0, which means no limit.
-#
-# 'args' gives options which are passed through to the database engine,
-# except for options starting 'cp_', which are used to configure the Twisted
-# connection pool. For a reference to valid arguments, see:
-#   * for sqlite: https://docs.python.org/3/library/sqlite3.html#sqlite3.connect
-#   * for postgres: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS
-#   * for the connection pool: https://twistedmatrix.com/documents/current/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__
-#
-#
-# Example SQLite configuration:
-#
-#database:
-#  name: sqlite3
-#  args:
-#    database: /path/to/homeserver.db
-#
-#
-# Example Postgres configuration:
-#
-#database:
-#  name: psycopg2
-#  txn_limit: 10000
-#  args:
-#    user: synapse_user
-#    password: secretpassword
-#    database: synapse
-#    host: localhost
-#    port: 5432
-#    cp_min: 5
-#    cp_max: 10
-#
-# For more information on using Synapse with Postgres,
-# see https://matrix-org.github.io/synapse/latest/postgres.html.
-#
+'txn_limit' gives the maximum number of transactions to run per connection
+before reconnecting. Defaults to 0, which means no limit.
+
+'args' gives options which are passed through to the database engine,
+except for options starting 'cp_', which are used to configure the Twisted
+connection pool. For a reference to valid arguments, see:
+* for sqlite: https://docs.python.org/3/library/sqlite3.html#sqlite3.connect
+* for postgres: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS
+* for the connection pool: https://twistedmatrix.com/documents/current/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__
+
+For more information on using Synapse with Postgres,
+see https://matrix-org.github.io/synapse/latest/postgres.html.
+
+Example SQLite configuration:
+```
 database:
   name: sqlite3
   args:
-    database: DATADIR/homeserver.db
+    database: /path/to/homeserver.db
+```
 
+Example Postgres configuration:
+```
+database:
+  name: psycopg2
+  txn_limit: 10000
+  args:
+    user: synapse_user
+    password: secretpassword
+    database: synapse
+    host: localhost
+    port: 5432
+    cp_min: 5
+    cp_max: 10
+```
+---
+Config option: `log_config`
 
-## Logging ##
+A yaml python logging config file as described by
+https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
 
-# A yaml python logging config file as described by
-# https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
-#
+Example configuration:
+```
 log_config: "CONFDIR/SERVERNAME.log.config"
+```
+---
+# Ratelimiting
+Each ratelimiting configuration is made of two parameters:
+   - per_second: number of requests a client can send per second.
+   - burst_count: number of requests a client can send before being throttled.
+---
+Config option: `rc_message`
 
 
-## Ratelimiting ##
+Ratelimiting settings for client messaging.
+   
+This is a ratelimiting option for messages that ratelimits sending based on the account the client
+is using. It defaults to: `per_second: 0.2`, `burst_count: 10`. Uncomment and set 
+to change the default. 
 
-# Ratelimiting settings for client actions (registration, login, messaging).
-#
-# Each ratelimiting configuration is made of two parameters:
-#   - per_second: number of requests a client can send per second.
-#   - burst_count: number of requests a client can send before being throttled.
-#
-# Synapse currently uses the following configurations:
-#   - one for messages that ratelimits sending based on the account the client
-#     is using
-#   - one for registration that ratelimits registration requests based on the
-#     client's IP address.
-#   - one for checking the validity of registration tokens that ratelimits
-#     requests based on the client's IP address.
-#   - one for login that ratelimits login requests based on the client's IP
-#     address.
-#   - one for login that ratelimits login requests based on the account the
-#     client is attempting to log into.
-#   - one for login that ratelimits login requests based on the account the
-#     client is attempting to log into, based on the amount of failed login
-#     attempts for this account.
-#   - one for ratelimiting redactions by room admins. If this is not explicitly
-#     set then it uses the same ratelimiting as per rc_message. This is useful
-#     to allow room admins to deal with abuse quickly.
-#   - two for ratelimiting number of rooms a user can join, "local" for when
-#     users are joining rooms the server is already in (this is cheap) vs
-#     "remote" for when users are trying to join rooms not on the server (which
-#     can be more expensive)
-#   - one for ratelimiting how often a user or IP can attempt to validate a 3PID.
-#   - two for ratelimiting how often invites can be sent in a room or to a
-#     specific user.
-#   - one for ratelimiting 3PID invites (i.e. invites sent to a third-party ID
-#     such as an email address or a phone number) based on the account that's
-#     sending the invite.
-#
-# The defaults are as shown below.
-#
-#rc_message:
-#  per_second: 0.2
-#  burst_count: 10
-#
-#rc_registration:
-#  per_second: 0.17
-#  burst_count: 3
-#
-#rc_registration_token_validity:
-#  per_second: 0.1
-#  burst_count: 5
-#
-#rc_login:
-#  address:
-#    per_second: 0.17
-#    burst_count: 3
-#  account:
-#    per_second: 0.17
-#    burst_count: 3
-#  failed_attempts:
-#    per_second: 0.17
-#    burst_count: 3
-#
-#rc_admin_redaction:
-#  per_second: 1
-#  burst_count: 50
-#
-#rc_joins:
-#  local:
-#    per_second: 0.1
-#    burst_count: 10
-#  remote:
-#    per_second: 0.01
-#    burst_count: 10
-#
-#rc_3pid_validation:
-#  per_second: 0.003
-#  burst_count: 5
-#
-#rc_invites:
-#  per_room:
-#    per_second: 0.3
-#    burst_count: 10
-#  per_user:
-#    per_second: 0.003
-#    burst_count: 5
-#
-#rc_third_party_invite:
-#  per_second: 0.2
-#  burst_count: 10
+Example configuration:
+```
+rc_message:
+  per_second: 0.5
+  burst_count: 15
+```
+---
+Config option: `rc_registration`
 
-# Ratelimiting settings for incoming federation
-#
-# The rc_federation configuration is made up of the following settings:
-#   - window_size: window size in milliseconds
-#   - sleep_limit: number of federation requests from a single server in
-#     a window before the server will delay processing the request.
-#   - sleep_delay: duration in milliseconds to delay processing events
-#     from remote servers by if they go over the sleep limit.
-#   - reject_limit: maximum number of concurrent federation requests
-#     allowed from a single server
-#   - concurrent: number of federation requests to concurrently process
-#     from a single server
-#
-# The defaults are as shown below.
-#
-#rc_federation:
-#  window_size: 1000
-#  sleep_limit: 10
-#  sleep_delay: 500
-#  reject_limit: 50
-#  concurrent: 3
+This option ratelimits registration requests based on the client's IP address.
+It defaults to `per_second: 0.17`, `burst_count: 3`. Uncomment and set to change
+the default. 
 
-# Target outgoing federation transaction frequency for sending read-receipts,
-# per-room.
-#
-# If we end up trying to send out more read-receipts, they will get buffered up
-# into fewer transactions.
-#
-#federation_rr_transactions_per_room_per_second: 50
+Example configuration:
+```
+rc_registration:
+  per_second: 0.15
+  burst_count: 2
+```
+---
+Config option: `rc_registration_token_validity`
 
+This option checks the validity of registration tokens that ratelimits requests based on the client's IP address.
+Defaults to `per_second: 0.1`, `burst_count: 5`. Uncomment and set to change the default.
 
+Example configuration:
+```
+rc_registration_token_validity:
+  per_second: 0.3
+  burst_count: 6
+```   
+---
+Config option: `rc_login`
 
-## Media Store ##
+This option specifies several limits  for login
+   - one that ratelimits login requests based on the client's IP
+     address. Defaults to `per_second: 0.17`, `burst_count: 3`.
+   - one that ratelimits login requests based on the account the
+     client is attempting to log into. Defaults to `per_second: 0.17`,
+    `burst_count: 3`.
+   - one that ratelimits login requests based on the account the
+     client is attempting to log into, based on the amount of failed login
+     attempts for this account. Defaults to `per_second: 0.17`, `burst_count: 3`.
 
-# Enable the media store service in the Synapse master. Uncomment the
-# following if you are using a separate media store worker.
-#
-#enable_media_repo: false
+Example configuration:
+```
+rc_login:
+  address:
+    per_second: 0.15
+    burst_count: 5
+  account:
+    per_second: 0.18
+    burst_count: 4
+  failed_attempts:
+    per_second: 0.19
+    burst_count: 7
+```
+---
+Config option: `rc_admin_redaction`
 
-# Directory where uploaded images and attachments are stored.
-#
+This option sets ratelimiting redactions by room admins. If this is not explicitly 
+set then it uses the same ratelimiting as per `rc_message`. This is useful
+to allow room admins to deal with abuse quickly. Uncomment to explicitly set and change
+the default. 
+
+Example configuration:
+```
+rc_admin_redaction:
+  per_second: 1
+  burst_count: 50
+```
+---
+Config option: `rc_joins`
+
+This option allows for for ratelimiting number of rooms a user can join. `local` for when
+users are joining rooms the server is already in (this is cheap) vs
+`remote` for when users are trying to join rooms not on the server (which
+can be more expensive). `local` defaults to `per_second: 0.1`, `burst_count: 10`.
+
+Example configuration:
+```
+rc_joins:
+  local:
+    per_second: 0.2
+    burst_count: 15
+  remote:
+    per_second: 0.03
+    burst_count: 12
+```
+---
+Config option: `rc_3pid_validation`
+
+This option ratelimits how often a user or IP can attempt to validate a 3PID.
+Defaults to `per_second: 0.003`, `burst_count: 5`. Uncomment and set to change the default.
+
+Example configuration:
+```
+rc_3pid_validation:
+  per_second: 0.003
+  burst_count: 5
+```
+---
+Config option: `rc_invites`
+
+This option sets ratelimiting how often invites can be sent in a room or to a 
+specific user. `per_room` defaults to `per_second: 0.3`, `burst_count: 10` and
+`per_user` defaults to `per_second: 0.003`, `burst_count: 5`. Uncomment and set to change
+the default.
+
+Example configuration:
+```
+rc_invites:
+  per_room:
+    per_second: 0.5
+    burst_count: 5
+  per_user:
+    per_second: 0.004
+    burst_count: 3
+```
+---
+Config option: `rc_third_party_invite`
+
+This option ratelimits 3PID invites (i.e. invites sent to a third-party ID
+such as an email address or a phone number) based on the account that's
+sending the invite. Defaults to `per_second: 0.2`, `burst_count: 10`. Uncomment to set
+and change the default. 
+
+Example configuration:
+```
+rc_third_party_invite:
+  per_second: 0.2
+  burst_count: 10
+```
+---
+Config option: `rc_federation`
+
+The rc_federation configuration is made up of the following settings:
+   - `window_size`: window size in milliseconds. Defaults to 1000.
+   - `sleep_limit`: number of federation requests from a single server in
+     a window before the server will delay processing the request. Defaults to 10.
+   - `sleep_delay`: duration in milliseconds to delay processing events
+     from remote servers by if they go over the sleep limit. Defaults to 500.
+   - `reject_limit`: maximum number of concurrent federation requests
+     allowed from a single server. Defaults to 50.
+   - `concurrent`: number of federation requests to concurrently process
+     from a single server. Defaults to 3.
+
+Example configuration:
+```
+rc_federation:
+  window_size: 750
+  sleep_limit: 15
+  sleep_delay: 400
+  reject_limit: 40
+  concurrent: 5
+```
+---
+Config option: `federation_rr_transactions_per_room_per_second`
+
+Target outgoing federation transaction frequency for sending read-receipts,
+per-room.
+
+If we end up trying to send out more read-receipts, they will get buffered up
+into fewer transactions. Defaults to 50. 
+
+Example configuration:
+```
+federation_rr_transactions_per_room_per_second: 40
+```
+---
+Config option: `enable_media_store` 
+
+Enable the media store service in the Synapse master. Defaults to true. 
+Uncomment and set to false if you are using a separate media store worker.
+
+Example configuration:
+```
+enable_media_repo: false
+```
+---
+Config option: `media_store_path`
+
+Directory where uploaded images and attachments are stored.
+
+Example configuration:
+```
 media_store_path: "DATADIR/media_store"
+```
+---
+Config option: `media_storage_providers`
 
-# Media storage providers allow media to be stored in different
-# locations.
-#
-#media_storage_providers:
-#  - module: file_system
-#    # Whether to store newly uploaded local files
-#    store_local: false
-#    # Whether to store newly downloaded remote files
-#    store_remote: false
-#    # Whether to wait for successful storage for local uploads
-#    store_synchronous: false
-#    config:
-#       directory: /mnt/some/other/directory
+Media storage providers allow media to be stored in different
+locations.
 
-# The largest allowed upload size in bytes
-#
-# If you are using a reverse proxy you may also need to set this value in
-# your reverse proxy's config. Notably Nginx has a small max body size by default.
-# See https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
-#
-#max_upload_size: 50M
+Example configuration:
+```
+media_storage_providers:
+  - module: file_system
+    
+    # Whether to store newly uploaded local files
+    store_local: false
+    
+    # Whether to store newly downloaded remote files
+    store_remote: false
+    
+    # Whether to wait for successful storage for local uploads
+    store_synchronous: false
+    config:
+       directory: /mnt/some/other/directory
+```
+---
+Config option: `max_upload_size`
 
-# Maximum number of pixels that will be thumbnailed
-#
-#max_image_pixels: 32M
+The largest allowed upload size in bytes
 
-# Whether to generate new thumbnails on the fly to precisely match
-# the resolution requested by the client. If true then whenever
-# a new resolution is requested by the client the server will
-# generate a new thumbnail. If false the server will pick a thumbnail
-# from a precalculated list.
-#
-#dynamic_thumbnails: false
+If you are using a reverse proxy you may also need to set this value in
+your reverse proxy's config. Defaults to 50M. Notably Nginx has a small max body size by default.
+See https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
 
-# List of thumbnails to precalculate when an image is uploaded.
-#
-#thumbnail_sizes:
-#  - width: 32
-#    height: 32
-#    method: crop
-#  - width: 96
-#    height: 96
-#    method: crop
-#  - width: 320
-#    height: 240
-#    method: scale
-#  - width: 640
-#    height: 480
-#    method: scale
-#  - width: 800
-#    height: 600
-#    method: scale
+Example configuration:
+```
+max_upload_size: 60M
+```
+---
+Config option: `max_image_pixels`
 
-# Is the preview URL API enabled?
-#
-# 'false' by default: uncomment the following to enable it (and specify a
-# url_preview_ip_range_blacklist blacklist).
-#
-#url_preview_enabled: true
+Maximum number of pixels that will be thumbnailed. Defaults to 32M.
 
-# List of IP address CIDR ranges that the URL preview spider is denied
-# from accessing.  There are no defaults: you must explicitly
-# specify a list for URL previewing to work.  You should specify any
-# internal services in your network that you do not want synapse to try
-# to connect to, otherwise anyone in any Matrix room could cause your
-# synapse to issue arbitrary GET requests to your internal services,
-# causing serious security issues.
-#
-# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
-# listed here, since they correspond to unroutable addresses.)
-#
-# This must be specified if url_preview_enabled is set. It is recommended that
-# you uncomment the following list as a starting point.
-#
-# Note: The value is ignored when an HTTP proxy is in use
-#
-#url_preview_ip_range_blacklist:
-#  - '127.0.0.0/8'
-#  - '10.0.0.0/8'
-#  - '172.16.0.0/12'
-#  - '192.168.0.0/16'
-#  - '100.64.0.0/10'
-#  - '192.0.0.0/24'
-#  - '169.254.0.0/16'
-#  - '192.88.99.0/24'
-#  - '198.18.0.0/15'
-#  - '192.0.2.0/24'
-#  - '198.51.100.0/24'
-#  - '203.0.113.0/24'
-#  - '224.0.0.0/4'
-#  - '::1/128'
-#  - 'fe80::/10'
-#  - 'fc00::/7'
-#  - '2001:db8::/32'
-#  - 'ff00::/8'
-#  - 'fec0::/10'
+Example configuration:
+```
+max_image_pixels: 35M
+```
+---
+Config option: `dynamic_thumbnails`
 
-# List of IP address CIDR ranges that the URL preview spider is allowed
-# to access even if they are specified in url_preview_ip_range_blacklist.
-# This is useful for specifying exceptions to wide-ranging blacklisted
-# target IP ranges - e.g. for enabling URL previews for a specific private
-# website only visible in your network.
-#
-#url_preview_ip_range_whitelist:
-#   - '192.168.1.1'
+Whether to generate new thumbnails on the fly to precisely match
+the resolution requested by the client. If true then whenever
+a new resolution is requested by the client the server will
+generate a new thumbnail. If false the server will pick a thumbnail
+from a precalculated list. Defaults to false. 
 
-# Optional list of URL matches that the URL preview spider is
-# denied from accessing.  You should use url_preview_ip_range_blacklist
-# in preference to this, otherwise someone could define a public DNS
-# entry that points to a private IP address and circumvent the blacklist.
-# This is more useful if you know there is an entire shape of URL that
-# you know that will never want synapse to try to spider.
-#
-# Each list entry is a dictionary of url component attributes as returned
-# by urlparse.urlsplit as applied to the absolute form of the URL.  See
-# https://docs.python.org/2/library/urlparse.html#urlparse.urlsplit
-# The values of the dictionary are treated as an filename match pattern
-# applied to that component of URLs, unless they start with a ^ in which
-# case they are treated as a regular expression match.  If all the
-# specified component matches for a given list item succeed, the URL is
-# blacklisted.
-#
-#url_preview_url_blacklist:
-#  # blacklist any URL with a username in its URI
-#  - username: '*'
-#
-#  # blacklist all *.google.com URLs
-#  - netloc: 'google.com'
-#  - netloc: '*.google.com'
-#
-#  # blacklist all plain HTTP URLs
-#  - scheme: 'http'
-#
-#  # blacklist http(s)://www.acme.com/foo
-#  - netloc: 'www.acme.com'
-#    path: '/foo'
-#
-#  # blacklist any URL with a literal IPv4 address
-#  - netloc: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
+Example configuration:
+```
+dynamic_thumbnails: true
+```
+---
+Config option: `thumbnail_sizes`  
 
-# The largest allowed URL preview spidering size in bytes
-#
-#max_spider_size: 10M
+List of thumbnails to precalculate when an image is uploaded. The example configuration shows the 
+default values, uncomment and set to change these defaults.
 
-# A list of values for the Accept-Language HTTP header used when
-# downloading webpages during URL preview generation. This allows
-# Synapse to specify the preferred languages that URL previews should
-# be in when communicating with remote servers.
-#
-# Each value is a IETF language tag; a 2-3 letter identifier for a
-# language, optionally followed by subtags separated by '-', specifying
-# a country or region variant.
-#
-# Multiple values can be provided, and a weight can be added to each by
-# using quality value syntax (;q=). '*' translates to any language.
-#
-# Defaults to "en".
-#
-# Example:
-#
-# url_preview_accept_language:
-#   - en-UK
-#   - en-US;q=0.9
-#   - fr;q=0.8
-#   - *;q=0.7
-#
-url_preview_accept_language:
-#   - en
+Example configuration:
+```
+thumbnail_sizes:
+  - width: 32
+    height: 32
+    method: crop
+  - width: 96
+    height: 96
+    method: crop
+  - width: 320
+    height: 240
+    method: scale
+  - width: 640
+    height: 480
+    method: scale
+  - width: 800
+    height: 600
+    method: scale
+```
+Config option: `url_preview_enabled`
+
+This setting determines whether the preview URL API is enabled.
+It is 'false' by default: uncomment and set to 'true' to enable it (and specify a
+`url_preview_ip_range_blacklist` blacklist).
+
+Example configuration:
+```
+url_preview_enabled: true
+```
+---
+Config option: `url_preview_ip_range_blacklist`
+
+List of IP address CIDR ranges that the URL preview spider is denied
+from accessing.  There are no defaults: you must explicitly
+specify a list for URL previewing to work.  You should specify any
+internal services in your network that you do not want synapse to try
+to connect to, otherwise anyone in any Matrix room could cause your
+synapse to issue arbitrary GET requests to your internal services,
+causing serious security issues.
+
+(0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+listed here, since they correspond to unroutable addresses.)
+
+This must be specified if `url_preview_enabled` is set. It is recommended that
+you uncomment and use the following list as a starting point.
+
+Note: The value is ignored when an HTTP proxy is in use
+
+Example configuration:
+```
+url_preview_ip_range_blacklist:
+  - '127.0.0.0/8'
+  - '10.0.0.0/8'
+  - '172.16.0.0/12'
+  - '192.168.0.0/16'
+  - '100.64.0.0/10'
+  - '192.0.0.0/24'
+  - '169.254.0.0/16'
+  - '192.88.99.0/24'
+  - '198.18.0.0/15'
+  - '192.0.2.0/24'
+  - '198.51.100.0/24'
+  - '203.0.113.0/24'
+  - '224.0.0.0/4'
+  - '::1/128'
+  - 'fe80::/10'
+  - 'fc00::/7'
+  - '2001:db8::/32'
+  - 'ff00::/8'
+  - 'fec0::/10'
+```
+----
+Config option: `url_preview_ip_range_whitelist`
+
+This option sets a list of IP address CIDR ranges that the URL preview spider is allowed
+to access even if they are specified in url_preview_ip_range_blacklist.
+This is useful for specifying exceptions to wide-ranging blacklisted
+target IP ranges - e.g. for enabling URL previews for a specific private
+website only visible in your network.
+
+Example configuration:
+```
+url_preview_ip_range_whitelist:
+   - '192.168.1.1'
+```
+---
+Config option: `url_preview_url_blacklist`
+
+Optional list of URL matches that the URL preview spider is
+denied from accessing.  You should use url_preview_ip_range_blacklist
+in preference to this, otherwise someone could define a public DNS
+entry that points to a private IP address and circumvent the blacklist.
+This is more useful if you know there is an entire shape of URL that
+you know that will never want synapse to try to spider.
 
 
-# oEmbed allows for easier embedding content from a website. It can be
-# used for generating URLs previews of services which support it.
-#
+Each list entry is a dictionary of url component attributes as returned
+by urlparse.urlsplit as applied to the absolute form of the URL.  See
+https://docs.python.org/2/library/urlparse.html#urlparse.urlsplit
+The values of the dictionary are treated as an filename match pattern
+applied to that component of URLs, unless they start with a ^ in which
+case they are treated as a regular expression match.  If all the
+specified component matches for a given list item succeed, the URL is
+blacklisted.
+
+Example configuration:
+```
+url_preview_url_blacklist:
+  # blacklist any URL with a username in its URI
+  - username: '*'
+
+  # blacklist all *.google.com URLs
+  - netloc: 'google.com'
+  - netloc: '*.google.com'
+
+  # blacklist all plain HTTP URLs
+  - scheme: 'http'
+
+  # blacklist http(s)://www.acme.com/foo
+  - netloc: 'www.acme.com'
+    path: '/foo'
+
+  # blacklist any URL with a literal IPv4 address
+  - netloc: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
+```
+---
+Config option: `max_spider_size`
+
+The largest allowed URL preview spidering size in bytes. Defaults to 10M.
+
+Example configuration:
+```
+max_spider_size: 8M
+```
+---
+Config option: `url_preview_language`
+
+A list of values for the Accept-Language HTTP header used when
+downloading webpages during URL preview generation. This allows
+Synapse to specify the preferred languages that URL previews should
+be in when communicating with remote servers.
+
+Each value is a IETF language tag; a 2-3 letter identifier for a
+language, optionally followed by subtags separated by '-', specifying
+a country or region variant.
+
+Multiple values can be provided, and a weight can be added to each by
+using quality value syntax (;q=). '*' translates to any language.
+
+Defaults to "en".
+
+Example configuration:
+```
+ url_preview_accept_language:
+   - en-UK
+   - en-US;q=0.9
+   - fr;q=0.8
+   - *;q=0.7
+```
+----
+Config option: `oembed`
+
+oEmbed allows for easier embedding content from a website. It can be
+used for generating URLs previews of services which support it. A default list of oEmbed providers
+is included with Synapse. Uncomment `disable_default_providers` and set to `true` to disable using
+these default oEmbed URLs. Use `additional_providers` to specify additional files with oEmbed configuration (each 
+should be in the form of providers.json). By default this list is empty. 
+
+Example configuration:
+```
 oembed:
-  # A default list of oEmbed providers is included with Synapse.
-  #
-  # Uncomment the following to disable using these default oEmbed URLs.
-  # Defaults to 'false'.
-  #
-  #disable_default_providers: true
+  disable_default_providers: true
 
-  # Additional files with oEmbed configuration (each should be in the
-  # form of providers.json).
-  #
-  # By default, this list is empty (so only the default providers.json
-  # is used).
-  #
-  #additional_providers:
-  #  - oembed/my_providers.json
+  additional_providers:
+    - oembed/my_providers.json
+```
+---
+# Captcha
 
+See docs/CAPTCHA_SETUP.md for full details of configuring captcha.
 
-## Captcha ##
-# See docs/CAPTCHA_SETUP.md for full details of configuring this.
+---
+Config option: `recaptcha_public_key`
 
-# This homeserver's ReCAPTCHA public key. Must be specified if
-# enable_registration_captcha is enabled.
-#
-#recaptcha_public_key: "YOUR_PUBLIC_KEY"
+This homeserver's ReCAPTCHA public key. Must be specified if `enable_registration_captcha` is 
+enabled.
 
-# This homeserver's ReCAPTCHA private key. Must be specified if
-# enable_registration_captcha is enabled.
-#
-#recaptcha_private_key: "YOUR_PRIVATE_KEY"
+Example configuration:
+```
+recaptcha_public_key: "YOUR_PUBLIC_KEY"
+```
+---
+Config option: `recaptcha_private_key` 
 
-# Uncomment to enable ReCaptcha checks when registering, preventing signup
-# unless a captcha is answered. Requires a valid ReCaptcha
-# public/private key. Defaults to 'false'.
-#
-#enable_registration_captcha: true
+This homeserver's ReCAPTCHA private key. Must be specified if `enable_registration_captcha` is 
+enabled.
 
-# The API endpoint to use for verifying m.login.recaptcha responses.
-# Defaults to "https://www.recaptcha.net/recaptcha/api/siteverify".
-#
-#recaptcha_siteverify_api: "https://my.recaptcha.site"
+Example configuration:
+```
+recaptcha_private_key: "YOUR_PRIVATE_KEY"
+```
+---
+Config option: `enable_registration_captcha`
 
+Uncomment to enable ReCaptcha checks when registering, preventing signup
+unless a captcha is answered. Requires a valid ReCaptcha public/private key. Defaults to 'false'.
 
-## TURN ##
+Example configuration:
+```
+enable_registration_captcha: true
+```
+---
+Config option: `recaptcha_siteverify_api`
 
-# The public URIs of the TURN server to give to clients
-#
-#turn_uris: []
+The API endpoint to use for verifying `m.login.recaptcha` responses.
+Defaults to "https://www.recaptcha.net/recaptcha/api/siteverify".
 
-# The shared secret used to compute passwords for the TURN server
-#
-#turn_shared_secret: "YOUR_SHARED_SECRET"
+Example configuration:
+```
+recaptcha_siteverify_api: "https://my.recaptcha.site"
+```
+---
+# TURN
 
-# The Username and password if the TURN server needs them and
-# does not use a token
-#
-#turn_username: "TURNSERVER_USERNAME"
-#turn_password: "TURNSERVER_PASSWORD"
+---
+Config option: `turn_uris`
 
-# How long generated TURN credentials last
-#
-#turn_user_lifetime: 1h
+The public URIs of the TURN server to give to clients
 
-# Whether guests should be allowed to use the TURN server.
-# This defaults to True, otherwise VoIP will be unreliable for guests.
-# However, it does introduce a slight security risk as it allows users to
-# connect to arbitrary endpoints without having first signed up for a
-# valid account (e.g. by passing a CAPTCHA).
-#
-#turn_allow_guests: true
+Example configuration:
+```
+turn_uris: [turn:example.org]
+```
+---
+Config option: `turn_shared_secret`
 
+The shared secret used to compute passwords for the TURN server.
 
-## Registration ##
-#
-# Registration can be rate-limited using the parameters in the "Ratelimiting"
-# section of this file.
+Example configuration:
+```
+turn_shared_secret: "YOUR_SHARED_SECRET"
+```
+----
+Config options: `turn_username` and `turn_password`
 
-# Enable registration for new users.
-#
-#enable_registration: false
+The Username and password if the TURN server needs them and does not use a token.
 
-# Time that a user's session remains valid for, after they log in.
-#
-# Note that this is not currently compatible with guest logins.
-#
-# Note also that this is calculated at login time: changes are not applied
-# retrospectively to users who have already logged in.
-#
-# By default, this is infinite.
-#
-#session_lifetime: 24h
+Example configuration:
+```
+turn_username: "TURNSERVER_USERNAME"
+turn_password: "TURNSERVER_PASSWORD"
+```
+---
+Config option: `turn_user_lifetime`
 
-# Time that an access token remains valid for, if the session is
-# using refresh tokens.
-# For more information about refresh tokens, please see the manual.
-# Note that this only applies to clients which advertise support for
-# refresh tokens.
-#
-# Note also that this is calculated at login time and refresh time:
-# changes are not applied to existing sessions until they are refreshed.
-#
-# By default, this is 5 minutes.
-#
-#refreshable_access_token_lifetime: 5m
+How long generated TURN credentials last. Defaults to 1h.
+
+Example configuration:
+```
+turn_user_lifetime: 2h
+```
+---
+Config option: `turn_allow_guests`
+
+Whether guests should be allowed to use the TURN server. This defaults to True, otherwise VoIP will be unreliable for guests.
+However, it does introduce a slight security risk as it allows users to connect to arbitrary endpoints without having 
+first signed up for a valid account (e.g. by passing a CAPTCHA).
+
+Example usage:
+```
+turn_allow_guests: false
+```
+---
+# Registration
+
+Registration can be rate-limited using the parameters in the "Ratelimiting" section of this manual.
+[add a link here]
+---
+Config option: `enable_registration`
+
+Enable registration for new users. Defaults to 'false'.
+
+Example usage:
+```
+enable_registration: true
+```
+---
+Config option: `session_lifetime`
+
+Time that a user's session remains valid for, after they log in.
+
+Note that this is not currently compatible with guest logins.
+
+Note also that this is calculated at login time: changes are not applied retrospectively to users who have already 
+logged in.
+
+By default, this is infinite.
+
+Example usage:
+```
+session_lifetime: 24h
+```
+----
+Config option: `refresh_access_token_lifetime`
+
+Time that an access token remains valid for, if the session is using refresh tokens.
+
+For more information about refresh tokens, please see the manual. [add link]
+
+Note that this only applies to clients which advertise support for refresh tokens.
+
+Note also that this is calculated at login time and refresh time: changes are not applied to 
+existing sessions until they are refreshed.
+
+By default, this is 5 minutes.
+
+Example usage:
+```
+refreshable_access_token_lifetime: 10m
+```
+---
 
 # Time that a refresh token remains valid for (provided that it is not
 # exchanged for another one first).
