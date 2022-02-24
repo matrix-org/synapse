@@ -349,7 +349,7 @@ class PaginationHandler:
         """
         self._purges_in_progress_by_room.add(room_id)
         try:
-            with await self.pagination_lock.write(room_id):
+            async with self.pagination_lock.write(room_id):
                 await self.storage.purge_events.purge_history(
                     room_id, token, delete_local_events
                 )
@@ -405,7 +405,7 @@ class PaginationHandler:
             room_id: room to be purged
             force: set true to skip checking for joined users.
         """
-        with await self.pagination_lock.write(room_id):
+        async with self.pagination_lock.write(room_id):
             # first check that we have no users in this room
             if not force:
                 joined = await self.store.is_host_joined(room_id, self._server_name)
@@ -447,7 +447,7 @@ class PaginationHandler:
 
         room_token = from_token.room_key
 
-        with await self.pagination_lock.read(room_id):
+        async with self.pagination_lock.read(room_id):
             (
                 membership,
                 member_event_id,
@@ -612,7 +612,7 @@ class PaginationHandler:
 
         self._purges_in_progress_by_room.add(room_id)
         try:
-            with await self.pagination_lock.write(room_id):
+            async with self.pagination_lock.write(room_id):
                 self._delete_by_id[delete_id].status = DeleteStatus.STATUS_SHUTTING_DOWN
                 self._delete_by_id[
                     delete_id
