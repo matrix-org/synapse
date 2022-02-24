@@ -61,3 +61,8 @@ class ExperimentalConfig(Config):
         self.msc2409_to_device_messages_enabled: bool = experimental.get(
             "msc2409_to_device_messages_enabled", False
         )
+
+        # MSC2174 (Move the 'redacts' key) and MSC2244 (Mass Redactions)
+        self.msc2174_msc2244_enabled: bool = experimental.get(
+            "msc2174_msc2244_enabled", False
+        )
