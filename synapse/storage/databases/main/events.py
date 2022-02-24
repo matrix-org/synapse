@@ -335,7 +335,7 @@ class PersistEventsStore:
         inhibit_local_membership_updates: bool = False,
         state_delta_for_room: Optional[Dict[str, DeltaState]] = None,
         new_forward_extremities: Optional[Dict[str, Set[str]]] = None,
-    ):
+    ) -> None:
         """Insert some number of room events into the necessary database tables.
 
         Rejected events are only inserted into the events table, the events_json table,
