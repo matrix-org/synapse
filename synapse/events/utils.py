@@ -390,18 +390,29 @@ class EventClientSerializer:
         event: Union[JsonDict, EventBase],
         time_now: int,
         *,
+        as_client_event: bool = True,
+        event_format: Callable[[JsonDict], JsonDict] = format_event_for_client_v1,
+        token_id: Optional[str] = None,
+        only_event_fields: Optional[List[str]] = None,
+        include_stripped_room_state: bool = False,
         bundle_aggregations: Optional[Dict[str, "BundledAggregations"]] = None,
-        **kwargs: Any,
     ) -> JsonDict:
         """Serializes a single event.
 
         Args:
             event: The event being serialized.
             time_now: The current time in milliseconds
+            as_client_event
+            event_format
+            token_id
+            only_event_fields
+            include_stripped_room_state: Some events can have stripped room state
+                stored in the `unsigned` field. This is required for invite and knock
+                functionality. If this option is False, that state will be removed from the
+                event before it is returned. Otherwise, it will be kept.
             bundle_aggregations: Whether to include the bundled aggregations for this
                 event. Only applies to non-state events. (State events never include
                 bundled aggregations.)
-            **kwargs: Arguments to pass to `serialize_event`
 
         Returns:
             The serialized event
@@ -410,7 +421,15 @@ class EventClientSerializer:
         if not isinstance(event, EventBase):
             return event
 
-        serialized_event = serialize_event(event, time_now, **kwargs)
+        serialized_event = serialize_event(
+            event,
+            time_now,
+            as_client_event=as_client_event,
+            event_format=event_format,
+            token_id=token_id,
+            only_event_fields=only_event_fields,
+            include_stripped_room_state=include_stripped_room_state,
+        )
 
         # Check if there are any bundled aggregations to include with the event.
         if bundle_aggregations:
@@ -515,20 +534,49 @@ class EventClientSerializer:
             )
 
     def serialize_events(
-        self, events: Iterable[Union[JsonDict, EventBase]], time_now: int, **kwargs: Any
+        self,
+        events: Iterable[Union[JsonDict, EventBase]],
+        time_now: int,
+        *,
+        as_client_event: bool = True,
+        event_format: Callable[[JsonDict], JsonDict] = format_event_for_client_v1,
+        token_id: Optional[str] = None,
+        only_event_fields: Optional[List[str]] = None,
+        include_stripped_room_state: bool = False,
+        bundle_aggregations: Optional[Dict[str, "BundledAggregations"]] = None,
     ) -> List[JsonDict]:
         """Serializes multiple events.
 
         Args:
             event
             time_now: The current time in milliseconds
-            **kwargs: Arguments to pass to `serialize_event`
+            as_client_event
+            event_format
+            token_id
+            only_event_fields
+            include_stripped_room_state: Some events can have stripped room state
+                stored in the `unsigned` field. This is required for invite and knock
+                functionality. If this option is False, that state will be removed from the
+                event before it is returned. Otherwise, it will be kept.
+            bundle_aggregations: Whether to include the bundled aggregations for this
+                event. Only applies to non-state events. (State events never include
+                bundled aggregations.)
 
         Returns:
             The list of serialized events
         """
         return [
-            self.serialize_event(event, time_now=time_now, **kwargs) for event in events
+            self.serialize_event(
+                event,
+                time_now,
+                as_client_event=as_client_event,
+                event_format=event_format,
+                token_id=token_id,
+                only_event_fields=only_event_fields,
+                include_stripped_room_state=include_stripped_room_state,
+                bundle_aggregations=bundle_aggregations,
+            )
+            for event in events
         ]
 
 
