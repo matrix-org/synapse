@@ -33,6 +33,10 @@ class RegistrationConfig(Config):
                 str(config["disable_registration"])
             )
 
+        self.enable_registration_without_verification = strtobool(
+            str(config.get("enable_registration_without_verification", False))
+        )
+
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
         self.enable_3pid_lookup = config.get("enable_3pid_lookup", True)
@@ -207,9 +211,17 @@ class RegistrationConfig(Config):
         # Registration can be rate-limited using the parameters in the "Ratelimiting"
         # section of this file.
 
-        # Enable registration for new users.
+        # Enable registration for new users. Defaults to 'false'. It is highly recommended that if you enable registration,
+        # you use either captcha or email verification to verify that new users are not bots. In order to enable registration
+        # without captcha or email verification, you must also set `enable_registration_without_verification`, found below.
         #
         #enable_registration: false
+
+        # Enable registration without email or captcha verification. Note: this option is *not* recommended,
+        # as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect 
+        # unless `enable_registration` is also enabled.
+        #
+        #enable_registration_without_verification: true
 
         # Time that a user's session remains valid for, after they log in.
         #
