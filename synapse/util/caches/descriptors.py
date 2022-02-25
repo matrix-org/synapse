@@ -346,10 +346,10 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
     """Wraps an existing cache to support bulk fetching of keys.
 
     Given an iterable of keys it looks in the cache to find any hits, then passes
-    the tuple of missing keys to the wrapped function.
+    the set of missing keys to the wrapped function.
 
-    Once wrapped, the function returns a Deferred which resolves to the list
-    of results.
+    Once wrapped, the function returns a Deferred which resolves to a Dict mapping from
+    input key to output value.
     """
 
     def __init__(
@@ -452,14 +452,14 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
                     # the wrapped function has completed. It returns a dict.
                     # We can now update our own result map, and then resolve the
                     # observable deferreds in the cache.
-                    for e in missing:
+                    for e, d1 in deferreds_map.items():
                         val = res.get(e, None)
                         # make sure we update the results map before running the
                         # deferreds, because as soon as we run the last deferred, the
                         # gatherResults() below will complete and return the result
                         # dict to our caller.
                         results[e] = val
-                        deferreds_map[e].callback(val)
+                        d1.callback(val)
 
                 def errback_all(f: Failure) -> None:
                     # the wrapped function has failed. Propagate the failure into
@@ -470,9 +470,7 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
                         d1.errback(f)
 
                 args_to_call = dict(arg_dict)
-                # copy the missing set before sending it to the callee, to guard against
-                # modification.
-                args_to_call[self.list_name] = tuple(missing)
+                args_to_call[self.list_name] = missing
 
                 # dispatch the call, and attach the two handlers
                 defer.maybeDeferred(
