@@ -11,8 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from twisted.test.proto_helpers import MemoryReactor
+
 import synapse.rest.admin
 from synapse.rest.client import login, room, shared_rooms
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 from tests.server import FakeChannel
@@ -30,16 +34,16 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         shared_rooms.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
         config["update_user_directory"] = True
         return self.setup_test_homeserver(config=config)
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
         self.handler = hs.get_user_directory_handler()
 
-    def _get_shared_rooms(self, token, other_user) -> FakeChannel:
+    def _get_shared_rooms(self, token: str, other_user: str) -> FakeChannel:
         return self.make_request(
             "GET",
             "/_matrix/client/unstable/uk.half-shot.msc2666/user/shared_rooms/%s"
@@ -47,14 +51,14 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
             access_token=token,
         )
 
-    def test_shared_room_list_public(self):
+    def test_shared_room_list_public(self) -> None:
         """
         A room should show up in the shared list of rooms between two users
         if it is public.
         """
         self._check_shared_rooms_with(room_one_is_public=True, room_two_is_public=True)
 
-    def test_shared_room_list_private(self):
+    def test_shared_room_list_private(self) -> None:
         """
         A room should show up in the shared list of rooms between two users
         if it is private.
@@ -63,7 +67,7 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
             room_one_is_public=False, room_two_is_public=False
         )
 
-    def test_shared_room_list_mixed(self):
+    def test_shared_room_list_mixed(self) -> None:
         """
         The shared room list between two users should contain both public and private
         rooms.
@@ -72,7 +76,7 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
 
     def _check_shared_rooms_with(
         self, room_one_is_public: bool, room_two_is_public: bool
-    ):
+    ) -> None:
         """Checks that shared public or private rooms between two users appear in
         their shared room lists
         """
@@ -109,7 +113,7 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         for room_id_id in channel.json_body["joined"]:
             self.assertIn(room_id_id, [room_id_one, room_id_two])
 
-    def test_shared_room_list_after_leave(self):
+    def test_shared_room_list_after_leave(self) -> None:
         """
         A room should no longer be considered shared if the other
         user has left it.
