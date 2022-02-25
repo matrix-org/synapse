@@ -1358,8 +1358,12 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertEqual(200, channel.code, channel.json_body)
 
     def test_redact_relation_annotation(self) -> None:
-        """Test that annotations of an event are properly handled after the
+        """
+        Test that annotations of an event are properly handled after the
         annotation is redacted.
+
+        The redacted relation should not be included in bundled aggregations or
+        the response to relations.
         """
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
         self.assertEqual(200, channel.code, channel.json_body)
@@ -1369,11 +1373,34 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
             RelationTypes.ANNOTATION, "m.reaction", "a", access_token=self.user2_token
         )
         self.assertEqual(200, channel.code, channel.json_body)
+        unredacted_event_id = channel.json_body["event_id"]
 
         # Redact one of the reactions.
         self._redact(to_redact_event_id)
 
-        # Ensure that the aggregations are correct.
+        # The unredacted relation should still exist.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        event_ids = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEquals(event_ids, [unredacted_event_id])
+
+        # The unredacted relation should appear in the bundled aggregation.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/event/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertEquals(
+            channel.json_body["unsigned"]["m.relations"]["m.annotation"],
+            {"chunk": [{"type": "m.reaction", "key": "a", "count": 1}]},
+        )
+
+        # The unredacted aggregation should still exist.
         channel = self.make_request(
             "GET",
             f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}",
@@ -1406,8 +1433,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         # Check the relation is returned
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations"
-            f"/{self.parent_id}/m.replace/m.room.message",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -1418,18 +1444,24 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         # Redact the original event
         self._redact(self.parent_id)
 
-        # Try to check for remaining m.replace relations
+        # The relations are not returned.
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations"
-            f"/{self.parent_id}/m.replace/m.room.message",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
-
-        # Check that no relations are returned
         self.assertIn("chunk", channel.json_body)
         self.assertEqual(channel.json_body["chunk"], [])
+
+        # The relations should not appear in the bundled aggregation.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/event/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertNotIn("m.relations", channel.json_body["unsigned"])
 
     def test_redact_parent(self) -> None:
         """Test that annotations of an event are redacted when the original event
@@ -1442,6 +1474,25 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         # Redact the original event.
         self._redact(self.parent_id)
 
+        # The relations are not returned.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertIn("chunk", channel.json_body)
+        self.assertEqual(channel.json_body["chunk"], [])
+
+        # The relations should not appear in the bundled aggregation.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/event/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        self.assertNotIn("m.relations", channel.json_body["unsigned"])
+
         # Check that aggregations returns zero
         channel = self.make_request(
             "GET",
@@ -1449,6 +1500,5 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
-
         self.assertIn("chunk", channel.json_body)
         self.assertEqual(channel.json_body["chunk"], [])
