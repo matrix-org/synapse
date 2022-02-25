@@ -65,13 +65,13 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET", "/events?access_token=%s" % ("invalid" + self.token,)
         )
-        self.assertEquals(channel.code, 401, msg=channel.result)
+        self.assertEqual(channel.code, 401, msg=channel.result)
 
         # valid token, expect content
         channel = self.make_request(
             "GET", "/events?access_token=%s&timeout=0" % (self.token,)
         )
-        self.assertEquals(channel.code, 200, msg=channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
         self.assertTrue("chunk" in channel.json_body)
         self.assertTrue("start" in channel.json_body)
         self.assertTrue("end" in channel.json_body)
@@ -89,10 +89,10 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET", "/events?access_token=%s&timeout=0" % (self.token,)
         )
-        self.assertEquals(channel.code, 200, msg=channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
         # We may get a presence event for ourselves down
-        self.assertEquals(
+        self.assertEqual(
             0,
             len(
                 [
@@ -153,4 +153,4 @@ class GetEventsTestCase(unittest.HomeserverTestCase):
             "/events/" + event_id,
             access_token=self.token,
         )
-        self.assertEquals(channel.code, 200, msg=channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)

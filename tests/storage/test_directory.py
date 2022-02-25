@@ -31,7 +31,7 @@ class DirectoryStoreTestCase(HomeserverTestCase):
             )
         )
 
-        self.assertEquals(
+        self.assertEqual(
             ["#my-room:test"],
             (self.get_success(self.store.get_aliases_for_room(self.room.to_string()))),
         )

@@ -94,7 +94,7 @@ class MediaStorageTests(unittest.HomeserverTestCase):
         self.assertTrue(os.path.exists(local_path))
 
         # Asserts the file is under the expected local cache directory
-        self.assertEquals(
+        self.assertEqual(
             os.path.commonprefix([self.primary_base_path, local_path]),
             self.primary_base_path,
         )

@@ -91,9 +91,9 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         # Check shared rooms from user1's perspective.
         # We should see the one room in common
         channel = self._get_shared_rooms(u1_token, u2)
-        self.assertEquals(200, channel.code, channel.result)
-        self.assertEquals(len(channel.json_body["joined"]), 1)
-        self.assertEquals(channel.json_body["joined"][0], room_id_one)
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(len(channel.json_body["joined"]), 1)
+        self.assertEqual(channel.json_body["joined"][0], room_id_one)
 
         # Create another room and invite user2 to it
         room_id_two = self.helper.create_room_as(
@@ -104,8 +104,8 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
 
         # Check shared rooms again. We should now see both rooms.
         channel = self._get_shared_rooms(u1_token, u2)
-        self.assertEquals(200, channel.code, channel.result)
-        self.assertEquals(len(channel.json_body["joined"]), 2)
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(len(channel.json_body["joined"]), 2)
         for room_id_id in channel.json_body["joined"]:
             self.assertIn(room_id_id, [room_id_one, room_id_two])
 
@@ -125,18 +125,18 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
 
         # Assert user directory is not empty
         channel = self._get_shared_rooms(u1_token, u2)
-        self.assertEquals(200, channel.code, channel.result)
-        self.assertEquals(len(channel.json_body["joined"]), 1)
-        self.assertEquals(channel.json_body["joined"][0], room)
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(len(channel.json_body["joined"]), 1)
+        self.assertEqual(channel.json_body["joined"][0], room)
 
         self.helper.leave(room, user=u1, tok=u1_token)
 
         # Check user1's view of shared rooms with user2
         channel = self._get_shared_rooms(u1_token, u2)
-        self.assertEquals(200, channel.code, channel.result)
-        self.assertEquals(len(channel.json_body["joined"]), 0)
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(len(channel.json_body["joined"]), 0)
 
         # Check user2's view of shared rooms with user1
         channel = self._get_shared_rooms(u2_token, u1)
-        self.assertEquals(200, channel.code, channel.result)
-        self.assertEquals(len(channel.json_body["joined"]), 0)
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(len(channel.json_body["joined"]), 0)

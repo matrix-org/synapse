@@ -69,7 +69,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
             self.sync_handler.wait_for_sync_for_user(requester, sync_config),
             ResourceLimitError,
         )
-        self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+        self.assertEqual(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
         self.auth_blocking._hs_disabled = False
 
@@ -80,7 +80,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
             self.sync_handler.wait_for_sync_for_user(requester, sync_config),
             ResourceLimitError,
         )
-        self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+        self.assertEqual(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
     def test_unknown_room_version(self):
         """
@@ -122,7 +122,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
             b"{}",
             tok,
         )
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
 
         # The rooms should appear in the sync response.
         result = self.get_success(
