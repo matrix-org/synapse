@@ -961,7 +961,7 @@ class FederationHandler:
         # get_state_groups_ids should return exactly one result
         assert len(state_groups) == 1
 
-        _, state_map = list(state_groups.items()).pop()
+        state_map = next(iter(state_groups.values()))
 
         if event.is_state():
             # Get previous state
