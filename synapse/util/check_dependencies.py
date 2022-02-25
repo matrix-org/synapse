@@ -11,7 +11,7 @@ from packaging.requirements import Requirement
 
 class DependencyException(Exception):
     @property
-    def message(self):
+    def message(self) -> str:
         return "\n".join(
             [
                 "Missing Requirements: %s" % (", ".join(self.dependencies),),
@@ -22,7 +22,7 @@ class DependencyException(Exception):
         )
 
     @property
-    def dependencies(self):
+    def dependencies(self) -> Iterable[str]:
         for i in self.args[0]:
             yield '"' + i + '"'
 
