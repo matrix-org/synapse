@@ -83,6 +83,8 @@ REQUIREMENTS = [
     # ijson 3.1.4 fixes a bug with "." in property names
     "ijson>=3.1.4",
     "matrix-common~=1.1.0",
+    # For runtime introspection of our dependencies
+    "packaging~=21.3",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
