@@ -163,10 +163,12 @@ class RoomBatchHandler:
             state_events_at_start:
             room_id: Room where you want the events persisted in.
             initial_state_ids_at_event:
-                The base set of event ids for the full state of the batch. The state will
-                be stripped down to only what's necessary for the to auth a given event
-                and set as the auth_event_ids. Each event created afterwards will be added
-                to the list of auth events for the next state event created.
+                The base set of state of the historical batch. When persisting each of
+                the events in state_events_at_start, the state will be stripped down to
+                only what's necessary to auth the given event and set as the
+                auth_event_ids. After each state event is persisted, it will be added
+                to the ongoing list of state_event_ids for the next state event to be
+                persisted with.
             app_service_requester: The requester of an application service.
 
         Returns:
@@ -175,7 +177,7 @@ class RoomBatchHandler:
         assert app_service_requester.app_service
 
         state_event_ids_at_start = []
-        full_state_ids_at_event = initial_state_ids_at_event.copy()
+        state_event_ids = initial_state_ids_at_event.copy()
 
         # Make the state events float off on their own by specifying no
         # prev_events for the first one in the chain so we don't have a bunch of
@@ -188,9 +190,9 @@ class RoomBatchHandler:
             )
 
             logger.debug(
-                "RoomBatchSendEventRestServlet inserting state_event=%s, full_state_ids_at_event=%s",
+                "RoomBatchSendEventRestServlet inserting state_event=%s, state_event_ids=%s",
                 state_event,
-                full_state_ids_at_event,
+                state_event_ids,
             )
 
             event_dict = {
@@ -225,7 +227,7 @@ class RoomBatchHandler:
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
                     # reference and also update in the event when we append later.
-                    full_state_ids_at_event=full_state_ids_at_event.copy(),
+                    state_event_ids=state_event_ids.copy(),
                 )
             else:
                 # TODO: Add some complement tests that adds state that is not member joins
@@ -248,12 +250,12 @@ class RoomBatchHandler:
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
                     # reference and also update in the event when we append later.
-                    full_state_ids_at_event=full_state_ids_at_event.copy(),
+                    state_event_ids=state_event_ids.copy(),
                 )
                 event_id = event.event_id
 
             state_event_ids_at_start.append(event_id)
-            full_state_ids_at_event.append(event_id)
+            state_event_ids.append(event_id)
             # Connect all the state in a floating chain
             prev_event_ids_for_state_chain = [event_id]
 
@@ -264,7 +266,7 @@ class RoomBatchHandler:
         events_to_create: List[JsonDict],
         room_id: str,
         inherited_depth: int,
-        full_state_ids_at_event: List[str],
+        state_event_ids: List[str],
         app_service_requester: Requester,
     ) -> List[str]:
         """Create and persists all events provided sequentially. Handles the
@@ -280,12 +282,13 @@ class RoomBatchHandler:
             room_id: Room where you want the events persisted in.
             inherited_depth: The depth to create the events at (you will
                 probably by calling inherit_depth_from_prev_ids(...)).
-            full_state_ids_at_event:
-                The event ids for the full state at that event. We share the same
-                state across the whole batch. The state will be stripped down to only
-                what's necessary for the auth_event_ids. For insertion events, we will
-                add this as the explicit state so the rest of the histroical batch can
-                inherit the same state and state_group.
+            state_event_ids:
+                The full state at a given event. We share the same state across the whole
+                historical batch. The state events will be stripped down to only what's
+                necessary to auth a given event and set as the auth_event_ids. For
+                insertion events, we will add all of these state events as the explicit
+                state so the rest of the historical batch can inherit the same state and
+                state_group.
             app_service_requester: The requester of an application service.
 
         Returns:
@@ -328,7 +331,7 @@ class RoomBatchHandler:
                 # The rest should hang off each other in a chain.
                 allow_no_prev_events=index == 0,
                 prev_event_ids=event_dict.get("prev_events"),
-                full_state_ids_at_event=full_state_ids_at_event,
+                state_event_ids=state_event_ids,
                 historical=True,
                 depth=inherited_depth,
             )
@@ -346,10 +349,10 @@ class RoomBatchHandler:
             )
 
             logger.debug(
-                "RoomBatchSendEventRestServlet inserting event=%s, prev_event_ids=%s, full_state_ids_at_event=%s",
+                "RoomBatchSendEventRestServlet inserting event=%s, prev_event_ids=%s, state_event_ids=%s",
                 event,
                 prev_event_ids,
-                full_state_ids_at_event,
+                state_event_ids,
             )
 
             events_to_persist.append((event, context))
@@ -379,7 +382,7 @@ class RoomBatchHandler:
         room_id: str,
         batch_id_to_connect_to: str,
         inherited_depth: int,
-        full_state_ids_at_event: List[str],
+        state_event_ids: List[str],
         app_service_requester: Requester,
     ) -> Tuple[List[str], str]:
         """
@@ -394,12 +397,13 @@ class RoomBatchHandler:
                 want this batch to connect to.
             inherited_depth: The depth to create the events at (you will
                 probably by calling inherit_depth_from_prev_ids(...)).
-            full_state_ids_at_event:
-                The event ids for the full state at that event. We share the same
-                state across the whole batch. The state will be stripped down to only
-                what's necessary for the auth_event_ids. For insertion events, we will
-                add this as the explicit state so the rest of the histroical batch can
-                inherit the same state and state_group.
+            state_event_ids:
+                The full state at a given event. We share the same state across the whole
+                historical batch. The state events will be stripped down to only what's
+                necessary to auth a given event and set as the auth_event_ids. For
+                insertion events, we will add all of these state events as the explicit
+                state so the rest of the historical batch can inherit the same state and
+                state_group.
             app_service_requester: The requester of an application service.
 
         Returns:
@@ -445,7 +449,7 @@ class RoomBatchHandler:
             events_to_create=events_to_create,
             room_id=room_id,
             inherited_depth=inherited_depth,
-            full_state_ids_at_event=full_state_ids_at_event,
+            state_event_ids=state_event_ids,
             app_service_requester=app_service_requester,
         )
 
