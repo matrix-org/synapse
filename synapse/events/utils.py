@@ -440,6 +440,11 @@ class EventClientSerializer:
                     time_now,
                     bundle_aggregations[event.event_id],
                     serialized_event,
+                    as_client_event=as_client_event,
+                    event_format=event_format,
+                    token_id=token_id,
+                    only_event_fields=only_event_fields,
+                    include_stripped_room_state=include_stripped_room_state,
                 )
 
         return serialized_event
@@ -477,6 +482,11 @@ class EventClientSerializer:
         time_now: int,
         aggregations: "BundledAggregations",
         serialized_event: JsonDict,
+        as_client_event: bool,
+        event_format: Callable[[JsonDict], JsonDict],
+        token_id: Optional[str],
+        only_event_fields: Optional[List[str]],
+        include_stripped_room_state: bool,
     ) -> None:
         """Potentially injects bundled aggregations into the unsigned portion of the serialized event.
 
@@ -485,6 +495,14 @@ class EventClientSerializer:
             time_now: The current time in milliseconds
             aggregations: The bundled aggregation to serialize.
             serialized_event: The serialized event which may be modified.
+            as_client_event
+            event_format
+            token_id
+            only_event_fields
+            include_stripped_room_state: Some events can have stripped room state
+                stored in the `unsigned` field. This is required for invite and knock
+                functionality. If this option is False, that state will be removed from the
+                event before it is returned. Otherwise, it will be kept.
 
         """
         serialized_aggregations = {}
@@ -513,7 +531,14 @@ class EventClientSerializer:
 
             # Don't bundle aggregations as this could recurse forever.
             serialized_latest_event = self.serialize_event(
-                thread.latest_event, time_now, bundle_aggregations=None
+                thread.latest_event,
+                time_now,
+                as_client_event=as_client_event,
+                event_format=event_format,
+                token_id=token_id,
+                only_event_fields=only_event_fields,
+                include_stripped_room_state=include_stripped_room_state,
+                bundle_aggregations=None,
             )
             # Manually apply an edit, if one exists.
             if thread.latest_edit:

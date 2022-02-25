@@ -687,10 +687,8 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                         }
                     },
                     "event_id": thread_2,
-                    "room_id": self.room,
                     "sender": self.user_id,
                     "type": "m.room.test",
-                    "user_id": self.user_id,
                 },
                 relations_dict[RelationTypes.THREAD].get("latest_event"),
             )
