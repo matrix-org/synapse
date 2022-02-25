@@ -961,19 +961,18 @@ class FederationHandler:
         # get_state_groups_ids should return exactly one result
         assert len(state_groups) == 1
 
-        _, state = list(state_groups.items()).pop()
-        results = state
+        _, state_map = list(state_groups.items()).pop()
 
         if event.is_state():
             # Get previous state
             if "replaces_state" in event.unsigned:
                 prev_id = event.unsigned["replaces_state"]
                 if prev_id != event.event_id:
-                    results[(event.type, event.state_key)] = prev_id
+                    state_map[(event.type, event.state_key)] = prev_id
             else:
-                results.pop((event.type, event.state_key), None)
+                state_map.pop((event.type, event.state_key), None)
 
-        return list(results.values())
+        return list(state_map.values())
 
     async def on_backfill_request(
         self, origin: str, room_id: str, pdu_list: List[str], limit: int
