@@ -960,6 +960,11 @@ class EventCreationHandler:
         # Strip down the state_event_ids to only what we need to auth the event.
         # For example, we don't need extra m.room.member that don't match event.sender
         if state_event_ids is not None:
+            # Do a quick check to make sure that prev_event_ids is present to
+            # make the type-checking around `builder.build` happy.
+            # prev_event_ids could be an empty array though.
+            assert prev_event_ids is not None
+
             temp_event = await builder.build(
                 prev_event_ids=prev_event_ids,
                 auth_event_ids=state_event_ids,
@@ -974,11 +979,6 @@ class EventCreationHandler:
                 current_state_ids=state_map,
                 for_verification=False,
             )
-
-        if auth_event_ids is not None:
-            # If auth events are provided, prev events must be also.
-            # prev_event_ids could be an empty array though.
-            assert prev_event_ids is not None
 
         if prev_event_ids is not None:
             assert (
