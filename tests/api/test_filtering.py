@@ -526,4 +526,4 @@ class FilteringTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(filter.get_filter_json(), user_filter_json)
 
-        self.assertRegexpMatches(repr(filter), r"<FilterCollection \{.*\}>")
+        self.assertRegex(repr(filter), r"<FilterCollection \{.*\}>")

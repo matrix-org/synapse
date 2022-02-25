@@ -265,7 +265,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             found_event_ids.extend(e["event_id"] for e in channel.json_body["chunk"])
             next_batch = channel.json_body.get("next_batch")
 
-            self.assertNotEquals(prev_token, next_batch)
+            self.assertNotEqual(prev_token, next_batch)
             prev_token = next_batch
 
             if not prev_token:
@@ -293,7 +293,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             found_event_ids.extend(e["event_id"] for e in channel.json_body["chunk"])
             next_batch = channel.json_body.get("next_batch")
 
-            self.assertNotEquals(prev_token, next_batch)
+            self.assertNotEqual(prev_token, next_batch)
             prev_token = next_batch
 
             if not prev_token:
@@ -419,7 +419,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
             next_batch = channel.json_body.get("next_batch")
 
-            self.assertNotEquals(prev_token, next_batch)
+            self.assertNotEqual(prev_token, next_batch)
             prev_token = next_batch
 
             if not prev_token:
@@ -481,7 +481,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
             next_batch = channel.json_body.get("next_batch")
 
-            self.assertNotEquals(prev_token, next_batch)
+            self.assertNotEqual(prev_token, next_batch)
             prev_token = next_batch
 
             if not prev_token:
@@ -514,7 +514,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
             next_batch = channel.json_body.get("next_batch")
 
-            self.assertNotEquals(prev_token, next_batch)
+            self.assertNotEqual(prev_token, next_batch)
             prev_token = next_batch
 
             if not prev_token:
