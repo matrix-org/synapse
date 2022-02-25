@@ -529,9 +529,10 @@ class ReadWriteLock:
                 # We wait for the latest writer to finish writing. We can safely ignore
                 # any existing readers... as they're readers.
                 # May raise a `CancelledError` if the `Deferred` wrapping us is
-                # cancelled.
+                # cancelled. The `Deferred` we are waiting on must not be cancelled,
+                # since we do not own it.
                 if curr_writer:
-                    await make_deferred_yieldable(curr_writer)
+                    await make_deferred_yieldable(stop_cancellation(curr_writer))
                 yield
             finally:
                 with PreserveLoggingContext():
@@ -562,8 +563,9 @@ class ReadWriteLock:
             try:
                 # Wait for all current readers and the latest writer to finish.
                 # May raise a `CancelledError` if the `Deferred` wrapping us is
-                # cancelled.
-                await make_deferred_yieldable(to_wait_on_defer)
+                # cancelled. The `Deferred`s we are waiting on must not be cancelled,
+                # since we do not own them.
+                await make_deferred_yieldable(stop_cancellation(to_wait_on_defer))
                 yield
             finally:
 
