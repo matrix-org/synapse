@@ -963,14 +963,17 @@ class FederationHandler:
 
         state_map = next(iter(state_groups.values()))
 
-        if event.is_state():
-            # Get previous state
+        # we need the state *before* event.
+        state_key = event.get_state_key()
+        if (
+            state_key is not None
+            and state_map.get((event.type, state_key)) == event.event_id
+        ):
             if "replaces_state" in event.unsigned:
                 prev_id = event.unsigned["replaces_state"]
-                if prev_id != event.event_id:
-                    state_map[(event.type, event.state_key)] = prev_id
+                state_map[(event.type, state_key)] = prev_id
             else:
-                state_map.pop((event.type, event.state_key), None)
+                del state_map[(event.type, state_key)]
 
         return list(state_map.values())
 
