@@ -130,7 +130,7 @@ class PersistEventsStore:
         *,
         current_state_for_room: Dict[str, StateMap[str]],
         state_delta_for_room: Dict[str, DeltaState],
-        new_forward_extremeties: Dict[str, List[str]],
+        new_forward_extremities: Dict[str, Set[str]],
         use_negative_stream_ordering: bool = False,
         inhibit_local_membership_updates: bool = False,
     ) -> None:
@@ -143,7 +143,7 @@ class PersistEventsStore:
                 the room based on forward extremities
             state_delta_for_room: Map from room_id to the delta to apply to
                 room state
-            new_forward_extremities: Map from room_id to list of event IDs
+            new_forward_extremities: Map from room_id to set of event IDs
                 that are the new forward extremities of the room.
             use_negative_stream_ordering: Whether to start stream_ordering on
                 the negative side and decrement. This should be set as True
@@ -193,7 +193,7 @@ class PersistEventsStore:
                 events_and_contexts=events_and_contexts,
                 inhibit_local_membership_updates=inhibit_local_membership_updates,
                 state_delta_for_room=state_delta_for_room,
-                new_forward_extremeties=new_forward_extremeties,
+                new_forward_extremities=new_forward_extremities,
             )
             persist_event_counter.inc(len(events_and_contexts))
 
@@ -220,7 +220,7 @@ class PersistEventsStore:
             for room_id, new_state in current_state_for_room.items():
                 self.store.get_current_state_ids.prefill((room_id,), new_state)
 
-            for room_id, latest_event_ids in new_forward_extremeties.items():
+            for room_id, latest_event_ids in new_forward_extremities.items():
                 self.store.get_latest_event_ids_in_room.prefill(
                     (room_id,), list(latest_event_ids)
                 )
@@ -334,8 +334,8 @@ class PersistEventsStore:
         events_and_contexts: List[Tuple[EventBase, EventContext]],
         inhibit_local_membership_updates: bool = False,
         state_delta_for_room: Optional[Dict[str, DeltaState]] = None,
-        new_forward_extremeties: Optional[Dict[str, List[str]]] = None,
-    ):
+        new_forward_extremities: Optional[Dict[str, Set[str]]] = None,
+    ) -> None:
         """Insert some number of room events into the necessary database tables.
 
         Rejected events are only inserted into the events table, the events_json table,
@@ -353,13 +353,13 @@ class PersistEventsStore:
                 from the database. This is useful when retrying due to
                 IntegrityError.
             state_delta_for_room: The current-state delta for each room.
-            new_forward_extremetie: The new forward extremities for each room.
+            new_forward_extremities: The new forward extremities for each room.
                 For each room, a list of the event ids which are the forward
                 extremities.
 
         """
         state_delta_for_room = state_delta_for_room or {}
-        new_forward_extremeties = new_forward_extremeties or {}
+        new_forward_extremities = new_forward_extremities or {}
 
         all_events_and_contexts = events_and_contexts
 
@@ -372,7 +372,7 @@ class PersistEventsStore:
 
         self._update_forward_extremities_txn(
             txn,
-            new_forward_extremities=new_forward_extremeties,
+            new_forward_extremities=new_forward_extremities,
             max_stream_order=max_stream_order,
         )
 
@@ -1158,7 +1158,10 @@ class PersistEventsStore:
             )
 
     def _update_forward_extremities_txn(
-        self, txn, new_forward_extremities, max_stream_order
+        self,
+        txn: LoggingTransaction,
+        new_forward_extremities: Dict[str, Set[str]],
+        max_stream_order: int,
     ):
         for room_id in new_forward_extremities.keys():
             self.db_pool.simple_delete_txn(
