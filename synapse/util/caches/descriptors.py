@@ -444,39 +444,40 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
                     deferred: "defer.Deferred[Any]" = defer.Deferred()
                     deferreds_map[arg] = deferred
                     key = arg_to_cache_key(arg)
-                    cache.set(key, deferred, callback=invalidate_callback)
+                    cached_defers.append(
+                        cache.set(key, deferred, callback=invalidate_callback)
+                    )
 
                 def complete_all(res: Dict[Hashable, Any]) -> None:
-                    # the wrapped function has completed. It returns a
-                    # a dict. We can now resolve the observable deferreds in
-                    # the cache and update our own result map.
+                    # the wrapped function has completed. It returns a dict.
+                    # We can now update our own result map, and then resolve the
+                    # observable deferreds in the cache.
                     for e in missing:
                         val = res.get(e, None)
-                        deferreds_map[e].callback(val)
+                        # make sure we update the results map before running the
+                        # deferreds, because as soon as we run the last deferred, the
+                        # gatherResults() below will complete and return the result
+                        # dict to our caller.
                         results[e] = val
+                        deferreds_map[e].callback(val)
 
-                def errback(f: Failure) -> Failure:
-                    # the wrapped function has failed. Invalidate any cache
-                    # entries we're supposed to be populating, and fail
-                    # their deferreds.
-                    for e in missing:
-                        key = arg_to_cache_key(e)
-                        cache.invalidate(key)
-                        deferreds_map[e].errback(f)
-
-                    # return the failure, to propagate to our caller.
-                    return f
+                def errback_all(f: Failure) -> None:
+                    # the wrapped function has failed. Propagate the failure into
+                    # the cache, which will invalidate the entry, and cause the
+                    # relevant cached_deferreds to fail, which will propagate the
+                    # failure to our caller.
+                    for d1 in deferreds_map.values():
+                        d1.errback(f)
 
                 args_to_call = dict(arg_dict)
                 # copy the missing set before sending it to the callee, to guard against
                 # modification.
                 args_to_call[self.list_name] = tuple(missing)
 
-                cached_defers.append(
-                    defer.maybeDeferred(
-                        preserve_fn(self.orig), **args_to_call
-                    ).addCallbacks(complete_all, errback)
-                )
+                # dispatch the call, and attach the two handlers
+                defer.maybeDeferred(
+                    preserve_fn(self.orig), **args_to_call
+                ).addCallbacks(complete_all, errback_all)
 
             if cached_defers:
                 d = defer.gatherResults(cached_defers, consumeErrors=True).addCallbacks(
