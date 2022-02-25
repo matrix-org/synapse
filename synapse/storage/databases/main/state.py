@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Collection, Dict, Iterable, Optional, Set, Tuple
 
 from frozendict import frozendict
 
@@ -309,9 +309,13 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         num_args=1,
     )
     async def _get_state_group_for_events(
-        self, event_ids: Iterable[str]
+        self, event_ids: Collection[str]
     ) -> Dict[str, int]:
-        """Returns mapping event_id -> state_group"""
+        """Returns mapping event_id -> state_group.
+
+        Raises:
+             RuntimeError if the state is unknown at any of the given events
+        """
         rows = await self.db_pool.simple_select_many_batch(
             table="event_to_state_groups",
             column="event_id",
@@ -321,7 +325,11 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             desc="_get_state_group_for_events",
         )
 
-        return {row["event_id"]: row["state_group"] for row in rows}
+        res = {row["event_id"]: row["state_group"] for row in rows}
+        for e in event_ids:
+            if e not in res:
+                raise RuntimeError("No state group for unknown or outlier event %s" % e)
+        return res
 
     async def get_referenced_state_groups(
         self, state_groups: Iterable[int]
