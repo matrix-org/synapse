@@ -16,6 +16,7 @@ from synapse.api.constants import EventContentFields
 from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.events.utils import (
+    SerializeEventConfig,
     copy_power_levels_contents,
     prune_event,
     serialize_event,
@@ -392,7 +393,9 @@ class PruneEventTestCase(unittest.TestCase):
 
 class SerializeEventTestCase(unittest.TestCase):
     def serialize(self, ev, fields):
-        return serialize_event(ev, 1479807801915, only_event_fields=fields)
+        return serialize_event(
+            ev, 1479807801915, config=SerializeEventConfig(only_event_fields=fields)
+        )
 
     def test_event_fields_works_with_keys(self):
         self.assertEquals(

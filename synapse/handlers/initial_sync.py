@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, List, Optional, Tuple, cast
 from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
+from synapse.events.utils import SerializeEventConfig
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
 from synapse.handlers.receipts import ReceiptEventSource
@@ -156,6 +157,8 @@ class InitialSyncHandler:
         if limit is None:
             limit = 10
 
+        serializer_options = SerializeEventConfig(as_client_event=as_client_event)
+
         async def handle_room(event: RoomsForUser) -> None:
             d: JsonDict = {
                 "room_id": event.room_id,
@@ -173,7 +176,7 @@ class InitialSyncHandler:
                 d["invite"] = self._event_serializer.serialize_event(
                     invite_event,
                     time_now,
-                    as_client_event=as_client_event,
+                    config=serializer_options,
                 )
 
             rooms_ret.append(d)
@@ -225,7 +228,7 @@ class InitialSyncHandler:
                         self._event_serializer.serialize_events(
                             messages,
                             time_now=time_now,
-                            as_client_event=as_client_event,
+                            config=serializer_options,
                         )
                     ),
                     "start": await start_token.to_string(self.store),
@@ -235,7 +238,7 @@ class InitialSyncHandler:
                 d["state"] = self._event_serializer.serialize_events(
                     current_state.values(),
                     time_now=time_now,
-                    as_client_event=as_client_event,
+                    config=serializer_options,
                 )
 
                 account_data_events = []
