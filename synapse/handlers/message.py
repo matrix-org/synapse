@@ -493,6 +493,7 @@ class EventCreationHandler:
         allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
+        full_state_ids_at_event: Optional[List[str]] = None,
         require_consent: bool = True,
         outlier: bool = False,
         historical: bool = False,
@@ -526,6 +527,14 @@ class EventCreationHandler:
                 based on the room state at the prev_events.
 
                 If non-None, prev_event_ids must also be provided.
+
+            full_state_ids_at_event:
+                The event ids for the full state at that event. This is used
+                particularly by the MSC2716 /batch_send endpoint which shares the same
+                state across the whole batch. The state will be stripped down to only
+                what's necessary for the auth_event_ids. For insertion events, we will
+                add this as the explicit state so the rest of the histroical batch can
+                inherit the same state and state_group.
 
             require_consent: Whether to check if the requester has
                 consented to the privacy policy.
@@ -612,6 +621,7 @@ class EventCreationHandler:
             allow_no_prev_events=allow_no_prev_events,
             prev_event_ids=prev_event_ids,
             auth_event_ids=auth_event_ids,
+            full_state_ids_at_event=full_state_ids_at_event,
             depth=depth,
         )
 
@@ -772,6 +782,7 @@ class EventCreationHandler:
         allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
+        full_state_ids_at_event: Optional[List[str]] = None,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
@@ -801,6 +812,13 @@ class EventCreationHandler:
                 based on the room state at the prev_events.
 
                 If non-None, prev_event_ids must also be provided.
+            full_state_ids_at_event:
+                The event ids for the full state at that event. This is used
+                particularly by the MSC2716 /batch_send endpoint which shares the same
+                state across the whole batch. The state will be stripped down to only
+                what's necessary for the auth_event_ids. For insertion events, we will
+                add this as the explicit state so the rest of the histroical batch can
+                inherit the same state and state_group.
             ratelimit: Whether to rate limit this send.
             txn_id: The transaction ID.
             ignore_shadow_ban: True if shadow-banned users should be allowed to
@@ -856,8 +874,10 @@ class EventCreationHandler:
                 requester,
                 event_dict,
                 txn_id=txn_id,
+                allow_no_prev_events=allow_no_prev_events,
                 prev_event_ids=prev_event_ids,
                 auth_event_ids=auth_event_ids,
+                full_state_ids_at_event=full_state_ids_at_event,
                 outlier=outlier,
                 historical=historical,
                 depth=depth,
@@ -893,6 +913,7 @@ class EventCreationHandler:
         allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
+        full_state_ids_at_event: Optional[List[str]] = None,
         depth: Optional[int] = None,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
@@ -915,6 +936,14 @@ class EventCreationHandler:
                 Should normally be left as None, which will cause them to be calculated
                 based on the room state at the prev_events.
 
+            full_state_ids_at_event:
+                The event ids for the full state at that event. This is used
+                particularly by the MSC2716 /batch_send endpoint which shares the same
+                state across the whole batch. The state will be stripped down to only
+                what's necessary for the auth_event_ids. For insertion events, we will
+                add this as the explicit state so the rest of the histroical batch can
+                inherit the same state and state_group.
+
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
@@ -922,33 +951,28 @@ class EventCreationHandler:
         Returns:
             Tuple of created event, context
         """
-        # Strip down the auth_event_ids to only what we need to auth the event.
+        # Strip down the full_state_ids_at_event to only what we need to auth the event.
         # For example, we don't need extra m.room.member that don't match event.sender
-        full_state_ids_at_event = None
+        if full_state_ids_at_event is not None:
+            temp_event = await builder.build(
+                prev_event_ids=prev_event_ids,
+                auth_event_ids=full_state_ids_at_event,
+                depth=depth,
+            )
+            state_events = await self.store.get_events_as_list(full_state_ids_at_event)
+            # Create a StateMap[str]
+            state_map = {(e.type, e.state_key): e.event_id for e in state_events}
+            # Actually strip down and only use the necessary auth events
+            auth_event_ids = self._event_auth_handler.compute_auth_events(
+                event=temp_event,
+                current_state_ids=state_map,
+                for_verification=False,
+            )
+
         if auth_event_ids is not None:
             # If auth events are provided, prev events must be also.
             # prev_event_ids could be an empty array though.
             assert prev_event_ids is not None
-
-            # Copy the full auth state before it stripped down
-            full_state_ids_at_event = auth_event_ids.copy()
-
-            temp_event = await builder.build(
-                prev_event_ids=prev_event_ids,
-                auth_event_ids=auth_event_ids,
-                depth=depth,
-            )
-            auth_events = await self.store.get_events_as_list(auth_event_ids)
-            # Create a StateMap[str]
-            auth_event_state_map = {
-                (e.type, e.state_key): e.event_id for e in auth_events
-            }
-            # Actually strip down and use the necessary auth events
-            auth_event_ids = self._event_auth_handler.compute_auth_events(
-                event=temp_event,
-                current_state_ids=auth_event_state_map,
-                for_verification=False,
-            )
 
         if prev_event_ids is not None:
             assert (
