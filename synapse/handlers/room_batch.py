@@ -166,9 +166,9 @@ class RoomBatchHandler:
                 The base set of state of the historical batch. When persisting each of
                 the events in state_events_at_start, the state will be stripped down to
                 only what's necessary to auth the given event and set as the
-                auth_event_ids. After each state event is persisted, it will be added
-                to the ongoing list of state_event_ids for the next state event to be
-                persisted with.
+                auth_event_ids. After each state event from state_events_at_start is
+                persisted, it will be added to the ongoing list of state_event_ids for
+                the next state event to be persisted with.
             app_service_requester: The requester of an application service.
 
         Returns:
