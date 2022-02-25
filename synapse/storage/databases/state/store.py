@@ -85,7 +85,7 @@ def state_filter_rough_priority_comparator(
     have any particular meaning. The representation may also change
 
     The current implementation returns a tuple of the form:
-        * -1 for include_others, -0 otherwise
+        * -1 for include_others, 0 otherwise
         * -(number of entries in state_filter.types)
     """
     return -int(state_filter.include_others), -len(state_filter.types)
