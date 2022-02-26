@@ -387,7 +387,7 @@ class RestHelper:
         room_id: str,
         event_type: str,
         body: Optional[Dict[str, Any]],
-        tok: str,
+        tok: Optional[str],
         expect_code: int = HTTPStatus.OK,
         state_key: str = "",
         method: str = "GET",
@@ -467,7 +467,7 @@ class RestHelper:
         room_id: str,
         event_type: str,
         body: Dict[str, Any],
-        tok: str,
+        tok: Optional[str],
         expect_code: int = HTTPStatus.OK,
         state_key: str = "",
     ) -> JsonDict:
