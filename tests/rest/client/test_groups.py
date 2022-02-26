@@ -25,7 +25,7 @@ class GroupsTestCase(unittest.HomeserverTestCase):
     servlets = [room.register_servlets, groups.register_servlets]
 
     @override_config({"enable_group_creation": True})
-    def test_rooms_limited_by_visibility(self):
+    def test_rooms_limited_by_visibility(self) -> None:
         group_id = "+spqr:test"
 
         # Alice creates a group
