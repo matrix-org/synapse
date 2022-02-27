@@ -304,6 +304,29 @@ class ServerConfig(Config):
                 "public_baseurl cannot contain query parameters or a #-fragment"
             )
 
+        # Jitsi config - retrieve the jitsi server configuraiton - you can specify your own custom jit.si server
+        jitsi_url = config.get("jitsi_url")
+        if jitsi_url is None:
+            jitsi_url = f""
+            logger.info("Using default jitsi_url %s", jitsi_url)
+        else:
+            self.serve_client_wellknown = True
+            if jitsi_url[-1] != "/":
+                jitsi_url += "/"
+        self.jitsi_url = jitsi_url
+
+        # check that jitsi_url is valid. Only checking for  the domain name
+        try:
+            splits = urllib.parse.urlsplit(self.jitsi_url)
+        except Exception as e:
+            raise ConfigError(f"Unable to parse URL: {e}", ("jitsi_url",))
+
+        if splits.query or splits.fragment:
+            raise ConfigError(
+                "jitsi_url cannot contain query parameters or a #-fragment"
+            )
+
+
         # Whether to enable user presence.
         presence_config = config.get("presence") or {}
         self.use_presence = presence_config.get("enabled")
@@ -810,6 +833,10 @@ class ServerConfig(Config):
         # Defaults to 'https://<server_name>/'.
         #
         #public_baseurl: https://example.com/
+
+        # Jitsi config - uncomment and specify the custom jitsi domain. Do not include http or https string
+        # port numbers can be speficied, if needed
+        #jitsi_url: myjitsi.domain:9090
 
         # Uncomment the following to tell other servers to send federation traffic on
         # port 443.
