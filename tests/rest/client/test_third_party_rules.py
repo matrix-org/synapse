@@ -576,7 +576,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.json_body)
 
         # Check that the callback has been called once for our user.
-        m.assert_called_once()
+        self.assertEqual(m.call_count, 2)
         args = m.call_args[0]
         self.assertEqual(args[0], self.user_id)
 
