@@ -34,7 +34,7 @@ from tests.test_utils import make_awaitable
 from tests.test_utils.event_injection import inject_event
 
 
-class RelationsTestCase(unittest.HomeserverTestCase):
+class BaseRelationsTestCase(unittest.HomeserverTestCase):
     servlets = [
         relations.register_servlets,
         room.register_servlets,
@@ -66,6 +66,60 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         res = self.helper.send(self.room, body="Hi!", tok=self.user_token)
         self.parent_id = res["event_id"]
 
+    def _create_user(self, localpart: str) -> Tuple[str, str]:
+        user_id = self.register_user(localpart, "abc123")
+        access_token = self.login(localpart, "abc123")
+
+        return user_id, access_token
+
+    def _send_relation(
+        self,
+        relation_type: str,
+        event_type: str,
+        key: Optional[str] = None,
+        content: Optional[dict] = None,
+        access_token: Optional[str] = None,
+        parent_id: Optional[str] = None,
+    ) -> FakeChannel:
+        """Helper function to send a relation pointing at `self.parent_id`
+
+        Args:
+            relation_type: One of `RelationTypes`
+            event_type: The type of the event to create
+            key: The aggregation key used for m.annotation relation type.
+            content: The content of the created event. Will be modified to configure
+                the m.relates_to key based on the other provided parameters.
+            access_token: The access token used to send the relation, defaults
+                to `self.user_token`
+            parent_id: The event_id this relation relates to. If None, then self.parent_id
+
+        Returns:
+            FakeChannel
+        """
+        if not access_token:
+            access_token = self.user_token
+
+        original_id = parent_id if parent_id else self.parent_id
+
+        if content is None:
+            content = {}
+        content["m.relates_to"] = {
+            "event_id": original_id,
+            "rel_type": relation_type,
+        }
+        if key is not None:
+            content["m.relates_to"]["key"] = key
+
+        channel = self.make_request(
+            "POST",
+            f"/_matrix/client/v3/rooms/{self.room}/send/{event_type}",
+            content,
+            access_token=access_token,
+        )
+        return channel
+
+
+class RelationsTestCase(BaseRelationsTestCase):
     def test_send_relation(self) -> None:
         """Tests that sending a relation works."""
 
@@ -551,39 +605,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                     {"type": "m.reaction", "key": "b", "count": 1},
                 ]
             },
-        )
-
-    def test_aggregation_redactions(self) -> None:
-        """Test that annotations get correctly aggregated after a redaction."""
-
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
-        self.assertEqual(200, channel.code, channel.json_body)
-        to_redact_event_id = channel.json_body["event_id"]
-
-        channel = self._send_relation(
-            RelationTypes.ANNOTATION, "m.reaction", "a", access_token=self.user2_token
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-
-        # Now lets redact one of the 'a' reactions
-        channel = self.make_request(
-            "POST",
-            f"/_matrix/client/r0/rooms/{self.room}/redact/{to_redact_event_id}",
-            access_token=self.user_token,
-            content={},
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}",
-            access_token=self.user_token,
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-
-        self.assertEqual(
-            channel.json_body,
-            {"chunk": [{"type": "m.reaction", "key": "a", "count": 1}]},
         )
 
     def test_aggregation_must_be_annotation(self) -> None:
@@ -1207,6 +1228,159 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
         )
 
+    def test_unknown_relations(self) -> None:
+        """Unknown relations should be accepted."""
+        channel = self._send_relation("m.relation.test", "m.room.test")
+        self.assertEqual(200, channel.code, channel.json_body)
+        event_id = channel.json_body["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        # We expect to get back a single pagination result, which is the full
+        # relation event we sent above.
+        self.assertEqual(len(channel.json_body["chunk"]), 1, channel.json_body)
+        self.assert_dict(
+            {"event_id": event_id, "sender": self.user_id, "type": "m.room.test"},
+            channel.json_body["chunk"][0],
+        )
+
+        # We also expect to get the original event (the id of which is self.parent_id)
+        self.assertEqual(
+            channel.json_body["original_event"]["event_id"], self.parent_id
+        )
+
+        # When bundling the unknown relation is not included.
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/event/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        self.assertNotIn("m.relations", channel.json_body["unsigned"])
+
+        # But unknown relations can be directly queried.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}?limit=1",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        self.assertEqual(channel.json_body["chunk"], [])
+
+    def _find_event_in_chunk(self, events: List[JsonDict]) -> JsonDict:
+        """
+        Find the parent event in a chunk of events and assert that it has the proper bundled aggregations.
+        """
+        for event in events:
+            if event["event_id"] == self.parent_id:
+                return event
+
+        raise AssertionError(f"Event {self.parent_id} not found in chunk")
+
+    def test_background_update(self) -> None:
+        """Test the event_arbitrary_relations background update."""
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="👍")
+        self.assertEqual(200, channel.code, channel.json_body)
+        annotation_event_id_good = channel.json_body["event_id"]
+
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="A")
+        self.assertEqual(200, channel.code, channel.json_body)
+        annotation_event_id_bad = channel.json_body["event_id"]
+
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        self.assertEqual(200, channel.code, channel.json_body)
+        thread_event_id = channel.json_body["event_id"]
+
+        # Clean-up the table as if the inserts did not happen during event creation.
+        self.get_success(
+            self.store.db_pool.simple_delete_many(
+                table="event_relations",
+                column="event_id",
+                iterable=(annotation_event_id_bad, thread_event_id),
+                keyvalues={},
+                desc="RelationsTestCase.test_background_update",
+            )
+        )
+
+        # Only the "good" annotation should be found.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=10",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        self.assertEqual(
+            [ev["event_id"] for ev in channel.json_body["chunk"]],
+            [annotation_event_id_good],
+        )
+
+        # Insert and run the background update.
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                "background_updates",
+                {"update_name": "event_arbitrary_relations", "progress_json": "{}"},
+            )
+        )
+
+        # Ugh, have to reset this flag
+        self.store.db_pool.updates._all_done = False
+        self.wait_for_background_updates()
+
+        # The "good" annotation and the thread should be found, but not the "bad"
+        # annotation.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=10",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        self.assertCountEqual(
+            [ev["event_id"] for ev in channel.json_body["chunk"]],
+            [annotation_event_id_good, thread_event_id],
+        )
+
+
+class RelationRedactionTestCase(BaseRelationsTestCase):
+    """Test the behaviour of relations when the parent or child event is redacted."""
+
+    def test_aggregation_redactions(self) -> None:
+        """Test that annotations get correctly aggregated after a redaction."""
+
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
+        self.assertEqual(200, channel.code, channel.json_body)
+        to_redact_event_id = channel.json_body["event_id"]
+
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "a", access_token=self.user2_token
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        # Now lets redact one of the 'a' reactions
+        channel = self.make_request(
+            "POST",
+            f"/_matrix/client/r0/rooms/{self.room}/redact/{to_redact_event_id}",
+            access_token=self.user_token,
+            content={},
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        self.assertEqual(
+            channel.json_body,
+            {"chunk": [{"type": "m.reaction", "key": "a", "count": 1}]},
+        )
+
     def test_relations_redaction_redacts_edits(self) -> None:
         """Test that edits of an event are redacted when the original event
         is redacted.
@@ -1294,171 +1468,3 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         self.assertIn("chunk", channel.json_body)
         self.assertEqual(channel.json_body["chunk"], [])
-
-    def test_unknown_relations(self) -> None:
-        """Unknown relations should be accepted."""
-        channel = self._send_relation("m.relation.test", "m.room.test")
-        self.assertEqual(200, channel.code, channel.json_body)
-        event_id = channel.json_body["event_id"]
-
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1",
-            access_token=self.user_token,
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-
-        # We expect to get back a single pagination result, which is the full
-        # relation event we sent above.
-        self.assertEqual(len(channel.json_body["chunk"]), 1, channel.json_body)
-        self.assert_dict(
-            {"event_id": event_id, "sender": self.user_id, "type": "m.room.test"},
-            channel.json_body["chunk"][0],
-        )
-
-        # We also expect to get the original event (the id of which is self.parent_id)
-        self.assertEqual(
-            channel.json_body["original_event"]["event_id"], self.parent_id
-        )
-
-        # When bundling the unknown relation is not included.
-        channel = self.make_request(
-            "GET",
-            f"/rooms/{self.room}/event/{self.parent_id}",
-            access_token=self.user_token,
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-        self.assertNotIn("m.relations", channel.json_body["unsigned"])
-
-        # But unknown relations can be directly queried.
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}?limit=1",
-            access_token=self.user_token,
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-        self.assertEqual(channel.json_body["chunk"], [])
-
-    def _find_event_in_chunk(self, events: List[JsonDict]) -> JsonDict:
-        """
-        Find the parent event in a chunk of events and assert that it has the proper bundled aggregations.
-        """
-        for event in events:
-            if event["event_id"] == self.parent_id:
-                return event
-
-        raise AssertionError(f"Event {self.parent_id} not found in chunk")
-
-    def _send_relation(
-        self,
-        relation_type: str,
-        event_type: str,
-        key: Optional[str] = None,
-        content: Optional[dict] = None,
-        access_token: Optional[str] = None,
-        parent_id: Optional[str] = None,
-    ) -> FakeChannel:
-        """Helper function to send a relation pointing at `self.parent_id`
-
-        Args:
-            relation_type: One of `RelationTypes`
-            event_type: The type of the event to create
-            key: The aggregation key used for m.annotation relation type.
-            content: The content of the created event. Will be modified to configure
-                the m.relates_to key based on the other provided parameters.
-            access_token: The access token used to send the relation, defaults
-                to `self.user_token`
-            parent_id: The event_id this relation relates to. If None, then self.parent_id
-
-        Returns:
-            FakeChannel
-        """
-        if not access_token:
-            access_token = self.user_token
-
-        original_id = parent_id if parent_id else self.parent_id
-
-        if content is None:
-            content = {}
-        content["m.relates_to"] = {
-            "event_id": original_id,
-            "rel_type": relation_type,
-        }
-        if key is not None:
-            content["m.relates_to"]["key"] = key
-
-        channel = self.make_request(
-            "POST",
-            f"/_matrix/client/v3/rooms/{self.room}/send/{event_type}",
-            content,
-            access_token=access_token,
-        )
-        return channel
-
-    def _create_user(self, localpart: str) -> Tuple[str, str]:
-        user_id = self.register_user(localpart, "abc123")
-        access_token = self.login(localpart, "abc123")
-
-        return user_id, access_token
-
-    def test_background_update(self) -> None:
-        """Test the event_arbitrary_relations background update."""
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="👍")
-        self.assertEqual(200, channel.code, channel.json_body)
-        annotation_event_id_good = channel.json_body["event_id"]
-
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="A")
-        self.assertEqual(200, channel.code, channel.json_body)
-        annotation_event_id_bad = channel.json_body["event_id"]
-
-        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
-        self.assertEqual(200, channel.code, channel.json_body)
-        thread_event_id = channel.json_body["event_id"]
-
-        # Clean-up the table as if the inserts did not happen during event creation.
-        self.get_success(
-            self.store.db_pool.simple_delete_many(
-                table="event_relations",
-                column="event_id",
-                iterable=(annotation_event_id_bad, thread_event_id),
-                keyvalues={},
-                desc="RelationsTestCase.test_background_update",
-            )
-        )
-
-        # Only the "good" annotation should be found.
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=10",
-            access_token=self.user_token,
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-        self.assertEqual(
-            [ev["event_id"] for ev in channel.json_body["chunk"]],
-            [annotation_event_id_good],
-        )
-
-        # Insert and run the background update.
-        self.get_success(
-            self.store.db_pool.simple_insert(
-                "background_updates",
-                {"update_name": "event_arbitrary_relations", "progress_json": "{}"},
-            )
-        )
-
-        # Ugh, have to reset this flag
-        self.store.db_pool.updates._all_done = False
-        self.wait_for_background_updates()
-
-        # The "good" annotation and the thread should be found, but not the "bad"
-        # annotation.
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=10",
-            access_token=self.user_token,
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-        self.assertCountEqual(
-            [ev["event_id"] for ev in channel.json_body["chunk"]],
-            [annotation_event_id_good, thread_event_id],
-        )
