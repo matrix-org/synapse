@@ -1362,61 +1362,6 @@ class FederationClient(FederationBase):
         # server doesn't give it to us.
         return None
 
-    async def get_space_summary(
-        self,
-        destinations: Iterable[str],
-        room_id: str,
-        suggested_only: bool,
-        max_rooms_per_space: Optional[int],
-        exclude_rooms: List[str],
-    ) -> "FederationSpaceSummaryResult":
-        """
-        Call other servers to get a summary of the given space
-
-
-        Args:
-            destinations: The remote servers. We will try them in turn, omitting any
-                that have been blacklisted.
-
-            room_id: ID of the space to be queried
-
-            suggested_only:  If true, ask the remote server to only return children
-                with the "suggested" flag set
-
-            max_rooms_per_space: A limit on the number of children to return for each
-                space
-
-            exclude_rooms: A list of room IDs to tell the remote server to skip
-
-        Returns:
-            a parsed FederationSpaceSummaryResult
-
-        Raises:
-            SynapseError if we were unable to get a valid summary from any of the
-               remote servers
-        """
-
-        async def send_request(destination: str) -> FederationSpaceSummaryResult:
-            res = await self.transport_layer.get_space_summary(
-                destination=destination,
-                room_id=room_id,
-                suggested_only=suggested_only,
-                max_rooms_per_space=max_rooms_per_space,
-                exclude_rooms=exclude_rooms,
-            )
-
-            try:
-                return FederationSpaceSummaryResult.from_json_dict(res)
-            except ValueError as e:
-                raise InvalidResponseError(str(e))
-
-        return await self._try_destination_list(
-            "fetch space summary",
-            destinations,
-            send_request,
-            failover_on_unknown_endpoint=True,
-        )
-
     async def get_room_hierarchy(
         self,
         destinations: Iterable[str],
@@ -1488,10 +1433,8 @@ class FederationClient(FederationBase):
             if any(not isinstance(e, dict) for e in children_state):
                 raise InvalidResponseError("Invalid event in 'children_state' list")
             try:
-                [
-                    FederationSpaceSummaryEventResult.from_json_dict(e)
-                    for e in children_state
-                ]
+                for child_state in children_state:
+                    _validate_hierarchy_event(child_state)
             except ValueError as e:
                 raise InvalidResponseError(str(e))
 
@@ -1513,62 +1456,12 @@ class FederationClient(FederationBase):
 
             return room, children_state, children, inaccessible_children
 
-        try:
-            result = await self._try_destination_list(
-                "fetch room hierarchy",
-                destinations,
-                send_request,
-                failover_on_unknown_endpoint=True,
-            )
-        except SynapseError as e:
-            # If an unexpected error occurred, re-raise it.
-            if e.code != 502:
-                raise
-
-            logger.debug(
-                "Couldn't fetch room hierarchy, falling back to the spaces API"
-            )
-
-            # Fallback to the old federation API and translate the results if
-            # no servers implement the new API.
-            #
-            # The algorithm below is a bit inefficient as it only attempts to
-            # parse information for the requested room, but the legacy API may
-            # return additional layers.
-            legacy_result = await self.get_space_summary(
-                destinations,
-                room_id,
-                suggested_only,
-                max_rooms_per_space=None,
-                exclude_rooms=[],
-            )
-
-            # Find the requested room in the response (and remove it).
-            for _i, room in enumerate(legacy_result.rooms):
-                if room.get("room_id") == room_id:
-                    break
-            else:
-                # The requested room was not returned, nothing we can do.
-                raise
-            requested_room = legacy_result.rooms.pop(_i)
-
-            # Find any children events of the requested room.
-            children_events = []
-            children_room_ids = set()
-            for event in legacy_result.events:
-                if event.room_id == room_id:
-                    children_events.append(event.data)
-                    children_room_ids.add(event.state_key)
-
-            # Find the children rooms.
-            children = []
-            for room in legacy_result.rooms:
-                if room.get("room_id") in children_room_ids:
-                    children.append(room)
-
-            # It isn't clear from the response whether some of the rooms are
-            # not accessible.
-            result = (requested_room, children_events, children, ())
+        result = await self._try_destination_list(
+            "fetch room hierarchy",
+            destinations,
+            send_request,
+            failover_on_unknown_endpoint=True,
+        )
 
         # Cache the result to avoid fetching data over federation every time.
         self._get_room_hierarchy_cache[(room_id, suggested_only)] = result
@@ -1710,89 +1603,34 @@ class TimestampToEventResponse:
         return cls(event_id, origin_server_ts, d)
 
 
-@attr.s(frozen=True, slots=True, auto_attribs=True)
-class FederationSpaceSummaryEventResult:
-    """Represents a single event in the result of a successful get_space_summary call.
+def _validate_hierarchy_event(d: JsonDict) -> None:
+    """Validate an event within the result of a /hierarchy request
 
-    It's essentially just a serialised event object, but we do a bit of parsing and
-    validation in `from_json_dict` and store some of the validated properties in
-    object attributes.
+    Args:
+        d: json object to be parsed
+
+    Raises:
+        ValueError if d is not a valid event
     """
 
-    event_type: str
-    room_id: str
-    state_key: str
-    via: Sequence[str]
+    event_type = d.get("type")
+    if not isinstance(event_type, str):
+        raise ValueError("Invalid event: 'event_type' must be a str")
 
-    # the raw data, including the above keys
-    data: JsonDict
+    room_id = d.get("room_id")
+    if not isinstance(room_id, str):
+        raise ValueError("Invalid event: 'room_id' must be a str")
 
-    @classmethod
-    def from_json_dict(cls, d: JsonDict) -> "FederationSpaceSummaryEventResult":
-        """Parse an event within the result of a /spaces/ request
+    state_key = d.get("state_key")
+    if not isinstance(state_key, str):
+        raise ValueError("Invalid event: 'state_key' must be a str")
 
-        Args:
-            d: json object to be parsed
+    content = d.get("content")
+    if not isinstance(content, dict):
+        raise ValueError("Invalid event: 'content' must be a dict")
 
-        Raises:
-            ValueError if d is not a valid event
-        """
-
-        event_type = d.get("type")
-        if not isinstance(event_type, str):
-            raise ValueError("Invalid event: 'event_type' must be a str")
-
-        room_id = d.get("room_id")
-        if not isinstance(room_id, str):
-            raise ValueError("Invalid event: 'room_id' must be a str")
-
-        state_key = d.get("state_key")
-        if not isinstance(state_key, str):
-            raise ValueError("Invalid event: 'state_key' must be a str")
-
-        content = d.get("content")
-        if not isinstance(content, dict):
-            raise ValueError("Invalid event: 'content' must be a dict")
-
-        via = content.get("via")
-        if not isinstance(via, Sequence):
-            raise ValueError("Invalid event: 'via' must be a list")
-        if any(not isinstance(v, str) for v in via):
-            raise ValueError("Invalid event: 'via' must be a list of strings")
-
-        return cls(event_type, room_id, state_key, via, d)
-
-
-@attr.s(frozen=True, slots=True, auto_attribs=True)
-class FederationSpaceSummaryResult:
-    """Represents the data returned by a successful get_space_summary call."""
-
-    rooms: List[JsonDict]
-    events: Sequence[FederationSpaceSummaryEventResult]
-
-    @classmethod
-    def from_json_dict(cls, d: JsonDict) -> "FederationSpaceSummaryResult":
-        """Parse the result of a /spaces/ request
-
-        Args:
-            d: json object to be parsed
-
-        Raises:
-            ValueError if d is not a valid /spaces/ response
-        """
-        rooms = d.get("rooms")
-        if not isinstance(rooms, List):
-            raise ValueError("'rooms' must be a list")
-        if any(not isinstance(r, dict) for r in rooms):
-            raise ValueError("Invalid room in 'rooms' list")
-
-        events = d.get("events")
-        if not isinstance(events, Sequence):
-            raise ValueError("'events' must be a list")
-        if any(not isinstance(e, dict) for e in events):
-            raise ValueError("Invalid event in 'events' list")
-        parsed_events = [
-            FederationSpaceSummaryEventResult.from_json_dict(e) for e in events
-        ]
-
-        return cls(rooms, parsed_events)
+    via = content.get("via")
+    if not isinstance(via, Sequence):
+        raise ValueError("Invalid event: 'via' must be a list")
+    if any(not isinstance(v, str) for v in via):
+        raise ValueError("Invalid event: 'via' must be a list of strings")
