@@ -87,6 +87,7 @@ class RegistrationConfigTestCase(ConfigFileTestCase):
                 "enable_registration: true",
                 "registrations_require_3pid: false",
                 "enable_registration_captcha: false",
+                "registration_requires_token: false",
             ]
         )
 

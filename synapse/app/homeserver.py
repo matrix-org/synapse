@@ -355,11 +355,12 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
         if (
             not config.captcha.enable_registration_captcha
             and not config.registration.registrations_require_3pid
+            and not config.registration.registration_requires_token
         ):
 
             raise ConfigError(
                 "You have enabled open registration without any verification. This is a known vector for"
-                "spam and abuse. If you have enabled registration, please add email or capcha verification, or"
+                "spam and abuse. If you have enabled registration, please add email, capcha, or token-based verification, or"
                 "use the config option `enable_registration_without_verification` in conjunction with `enable_verification."
             )
             sys.exit(1)
