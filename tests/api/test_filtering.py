@@ -18,6 +18,7 @@
 from unittest.mock import patch
 
 import jsonschema
+from frozendict import frozendict
 
 from synapse.api.constants import EventContentFields
 from synapse.api.errors import SynapseError
@@ -326,6 +327,15 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertFalse(Filter(self.hs, definition)._check(event))
+
+        # check it works with frozendicts too
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content=frozendict({EventContentFields.LABELS: ["#fun"]}),
+        )
+        self.assertTrue(Filter(self.hs, definition)._check(event))
 
     def test_filter_not_labels(self):
         definition = {"org.matrix.not_labels": ["#fun"]}
