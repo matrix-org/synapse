@@ -67,9 +67,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.parent_id = res["event_id"]
 
     def test_send_relation(self) -> None:
-        """Tests that sending a relation using the new /send_relation works
-        creates the right shape of event.
-        """
+        """Tests that sending a relation works."""
 
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="👍")
         self.assertEqual(200, channel.code, channel.json_body)
