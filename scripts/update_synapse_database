@@ -44,7 +44,7 @@ class MockHomeserver(HomeServer):
 
 
 def run_background_updates(hs):
-    store = hs.get_datastore()
+    store = hs.get_datastores().main
 
     async def run_background_updates():
         await store.db_pool.updates.run_background_updates(sleep=False)

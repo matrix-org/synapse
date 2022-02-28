@@ -152,12 +152,12 @@ class TestCase(unittest.TestCase):
 
     def assertObjectHasAttributes(self, attrs, obj):
         """Asserts that the given object has each of the attributes given, and
-        that the value of each matches according to assertEquals."""
+        that the value of each matches according to assertEqual."""
         for key in attrs.keys():
             if not hasattr(obj, key):
                 raise AssertionError("Expected obj to have a '.%s'" % key)
             try:
-                self.assertEquals(attrs[key], getattr(obj, key))
+                self.assertEqual(attrs[key], getattr(obj, key))
             except AssertionError as e:
                 raise (type(e))(f"Assert error for '.{key}':") from e
 
@@ -169,7 +169,7 @@ class TestCase(unittest.TestCase):
             actual (dict): The test result. Extra keys will not be checked.
         """
         for key in required:
-            self.assertEquals(
+            self.assertEqual(
                 required[key], actual[key], msg="%s mismatch. %s" % (key, actual)
             )
 
@@ -280,7 +280,7 @@ class HomeserverTestCase(TestCase):
 
                 # We need a valid token ID to satisfy foreign key constraints.
                 token_id = self.get_success(
-                    self.hs.get_datastore().add_access_token_to_user(
+                    self.hs.get_datastores().main.add_access_token_to_user(
                         self.helper.auth_user_id,
                         "some_fake_token",
                         None,
@@ -337,7 +337,7 @@ class HomeserverTestCase(TestCase):
 
     def wait_for_background_updates(self) -> None:
         """Block until all background database updates have completed."""
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         while not self.get_success(
             store.db_pool.updates.has_completed_background_updates()
         ):
@@ -504,7 +504,7 @@ class HomeserverTestCase(TestCase):
                 self.get_success(stor.db_pool.updates.run_background_updates(False))
 
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
-        stor = hs.get_datastore()
+        stor = hs.get_datastores().main
 
         # Run the database background updates, when running against "master".
         if hs.__class__.__name__ == "TestHomeServer":
@@ -722,14 +722,16 @@ class HomeserverTestCase(TestCase):
         Add the given event as an extremity to the room.
         """
         self.get_success(
-            self.hs.get_datastore().db_pool.simple_insert(
+            self.hs.get_datastores().main.db_pool.simple_insert(
                 table="event_forward_extremities",
                 values={"room_id": room_id, "event_id": event_id},
                 desc="test_add_extremity",
             )
         )
 
-        self.hs.get_datastore().get_latest_event_ids_in_room.invalidate((room_id,))
+        self.hs.get_datastores().main.get_latest_event_ids_in_room.invalidate(
+            (room_id,)
+        )
 
     def attempt_wrong_password_login(self, username, password):
         """Attempts to login as the user with the given password, asserting
@@ -775,7 +777,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
         verify_key_id = "%s:%s" % (verify_key.alg, verify_key.version)
 
         self.get_success(
-            hs.get_datastore().store_server_verify_keys(
+            hs.get_datastores().main.store_server_verify_keys(
                 from_server=self.OTHER_SERVER_NAME,
                 ts_added_ms=clock.time_msec(),
                 verify_keys=[

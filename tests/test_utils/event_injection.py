@@ -85,7 +85,9 @@ async def create_event(
     **kwargs,
 ) -> Tuple[EventBase, EventContext]:
     if room_version is None:
-        room_version = await hs.get_datastore().get_room_version_id(kwargs["room_id"])
+        room_version = await hs.get_datastores().main.get_room_version_id(
+            kwargs["room_id"]
+        )
 
     builder = hs.get_event_builder_factory().for_room_version(
         KNOWN_ROOM_VERSIONS[room_version], kwargs

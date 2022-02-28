@@ -93,7 +93,9 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         events_to_filter.append(evt)
 
         # the erasey user gets erased
-        self.get_success(self.hs.get_datastore().mark_user_erased("@erased:local_hs"))
+        self.get_success(
+            self.hs.get_datastores().main.mark_user_erased("@erased:local_hs")
+        )
 
         # ... and the filtering happens.
         filtered = self.get_success(

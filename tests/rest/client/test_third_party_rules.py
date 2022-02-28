@@ -141,7 +141,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             {},
             access_token=self.tok,
         )
-        self.assertEquals(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.result["code"], b"200", channel.result)
 
         callback.assert_called_once()
 
@@ -159,7 +159,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             {},
             access_token=self.tok,
         )
-        self.assertEquals(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.result["code"], b"403", channel.result)
 
     def test_third_party_rules_workaround_synapse_errors_pass_through(self):
         """
@@ -195,7 +195,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             access_token=self.tok,
         )
         # Check the error code
-        self.assertEquals(channel.result["code"], b"429", channel.result)
+        self.assertEqual(channel.result["code"], b"429", channel.result)
         # Check the JSON body has had the `nasty` key injected
         self.assertEqual(
             channel.json_body,
@@ -331,10 +331,10 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             self.hs.get_module_api().create_and_send_event_into_room(event_dict)
         )
 
-        self.assertEquals(event.sender, self.user_id)
-        self.assertEquals(event.room_id, self.room_id)
-        self.assertEquals(event.type, "m.room.message")
-        self.assertEquals(event.content, content)
+        self.assertEqual(event.sender, self.user_id)
+        self.assertEqual(event.room_id, self.room_id)
+        self.assertEqual(event.type, "m.room.message")
+        self.assertEqual(event.content, content)
 
     @unittest.override_config(
         {

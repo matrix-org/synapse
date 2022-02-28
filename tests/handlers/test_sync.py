@@ -41,7 +41,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs: HomeServer):
         self.sync_handler = self.hs.get_sync_handler()
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
 
         # AuthBlocking reads from the hs' config on initialization. We need to
         # modify its config instead of the hs'
@@ -69,7 +69,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
             self.sync_handler.wait_for_sync_for_user(requester, sync_config),
             ResourceLimitError,
         )
-        self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+        self.assertEqual(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
         self.auth_blocking._hs_disabled = False
 
@@ -80,7 +80,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
             self.sync_handler.wait_for_sync_for_user(requester, sync_config),
             ResourceLimitError,
         )
-        self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+        self.assertEqual(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
     def test_unknown_room_version(self):
         """
@@ -122,7 +122,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
             b"{}",
             tok,
         )
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
 
         # The rooms should appear in the sync response.
         result = self.get_success(
@@ -248,7 +248,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         # the prev_events used when creating the join event, such that the ban does not
         # precede the join.
         mocked_get_prev_events = patch.object(
-            self.hs.get_datastore(),
+            self.hs.get_datastores().main,
             "get_prev_events_for_room",
             new_callable=MagicMock,
             return_value=make_awaitable([last_room_creation_event_id]),

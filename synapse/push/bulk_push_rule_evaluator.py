@@ -103,7 +103,7 @@ class BulkPushRuleEvaluator:
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self._event_auth_handler = hs.get_event_auth_handler()
 
         # Used by `RulesForRoom` to ensure only one thing mutates the cache at a
@@ -366,7 +366,7 @@ class RulesForRoom:
         """
         self.room_id = room_id
         self.is_mine_id = hs.is_mine_id
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.room_push_rule_cache_metrics = room_push_rule_cache_metrics
 
         # Used to ensure only one thing mutates the cache at a time. Keyed off

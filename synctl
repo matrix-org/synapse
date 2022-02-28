@@ -37,6 +37,13 @@ YELLOW = "\x1b[1;33m"
 RED = "\x1b[1;31m"
 NORMAL = "\x1b[m"
 
+SYNCTL_CACHE_FACTOR_WARNING = """\
+Setting 'synctl_cache_factor' in the config is deprecated. Instead, please do
+one of the following:
+ - Either set the environment variable 'SYNAPSE_CACHE_FACTOR'
+ - or set 'caches.global_factor' in the homeserver config.
+--------------------------------------------------------------------------------"""
+
 
 def pid_running(pid):
     try:
@@ -228,6 +235,7 @@ def main():
     start_stop_synapse = True
 
     if cache_factor:
+        write(SYNCTL_CACHE_FACTOR_WARNING)
         os.environ["SYNAPSE_CACHE_FACTOR"] = str(cache_factor)
 
     cache_factors = config.get("synctl_cache_factors", {})

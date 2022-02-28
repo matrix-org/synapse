@@ -69,7 +69,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.clock = hs.get_clock()
 

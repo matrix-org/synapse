@@ -32,7 +32,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.filtering = hs.get_filtering()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     def test_add_filter(self):
         channel = self.make_request(
@@ -45,7 +45,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body, {"filter_id": "0"})
         filter = self.store.get_user_filter(user_localpart="apple", filter_id=0)
         self.pump()
-        self.assertEquals(filter.result, self.EXAMPLE_FILTER)
+        self.assertEqual(filter.result, self.EXAMPLE_FILTER)
 
     def test_add_filter_for_other_user(self):
         channel = self.make_request(
@@ -55,7 +55,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(channel.result["code"], b"403")
-        self.assertEquals(channel.json_body["errcode"], Codes.FORBIDDEN)
+        self.assertEqual(channel.json_body["errcode"], Codes.FORBIDDEN)
 
     def test_add_filter_non_local_user(self):
         _is_mine = self.hs.is_mine
@@ -68,7 +68,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
 
         self.hs.is_mine = _is_mine
         self.assertEqual(channel.result["code"], b"403")
-        self.assertEquals(channel.json_body["errcode"], Codes.FORBIDDEN)
+        self.assertEqual(channel.json_body["errcode"], Codes.FORBIDDEN)
 
     def test_get_filter(self):
         filter_id = defer.ensureDeferred(
@@ -83,7 +83,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(channel.result["code"], b"200")
-        self.assertEquals(channel.json_body, self.EXAMPLE_FILTER)
+        self.assertEqual(channel.json_body, self.EXAMPLE_FILTER)
 
     def test_get_filter_non_existant(self):
         channel = self.make_request(
@@ -91,7 +91,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(channel.result["code"], b"404")
-        self.assertEquals(channel.json_body["errcode"], Codes.NOT_FOUND)
+        self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
 
     # Currently invalid params do not have an appropriate errcode
     # in errors.py
