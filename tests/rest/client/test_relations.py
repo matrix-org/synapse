@@ -1348,6 +1348,15 @@ class RelationsTestCase(BaseRelationsTestCase):
 class RelationRedactionTestCase(BaseRelationsTestCase):
     """Test the behaviour of relations when the parent or child event is redacted."""
 
+    def _redact(self, event_id: str) -> None:
+        channel = self.make_request(
+            "POST",
+            f"/_matrix/client/r0/rooms/{self.room}/redact/{event_id}",
+            access_token=self.user_token,
+            content={},
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
     def test_aggregation_redactions(self) -> None:
         """Test that annotations get correctly aggregated after a redaction."""
 
@@ -1361,13 +1370,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertEqual(200, channel.code, channel.json_body)
 
         # Now lets redact one of the 'a' reactions
-        channel = self.make_request(
-            "POST",
-            f"/_matrix/client/r0/rooms/{self.room}/redact/{to_redact_event_id}",
-            access_token=self.user_token,
-            content={},
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
+        self._redact(to_redact_event_id)
 
         channel = self.make_request(
             "GET",
@@ -1415,13 +1418,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertEqual(len(channel.json_body["chunk"]), 1)
 
         # Redact the original event
-        channel = self.make_request(
-            "PUT",
-            f"/rooms/{self.room}/redact/{original_event_id}/test_relations_redaction_redacts_edits",
-            access_token=self.user_token,
-            content="{}",
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
+        self._redact(original_event_id)
 
         # Try to check for remaining m.replace relations
         channel = self.make_request(
@@ -1450,13 +1447,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertEqual(200, channel.code, channel.json_body)
 
         # Redact the original
-        channel = self.make_request(
-            "PUT",
-            f"/rooms/{self.room}/redact/{original_event_id}/test_aggregations_redaction_prevents_access_to_aggregations",
-            access_token=self.user_token,
-            content="{}",
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
+        self._redact(original_event_id)
 
         # Check that aggregations returns zero
         channel = self.make_request(
