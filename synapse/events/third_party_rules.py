@@ -38,7 +38,7 @@ CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK = Callable[
     [str, StateMap[EventBase], str], Awaitable[bool]
 ]
 ON_NEW_EVENT_CALLBACK = Callable[[EventBase, StateMap[EventBase]], Awaitable]
-ON_PROFILE_UPDATE_CALLBACK = Callable[[str, ProfileInfo, bool], Awaitable]
+ON_PROFILE_UPDATE_CALLBACK = Callable[[str, ProfileInfo, bool, bool], Awaitable]
 ON_DEACTIVATION_CALLBACK = Callable[[str, bool], Awaitable]
 
 
@@ -382,7 +382,7 @@ class ThirdPartyEventRules:
         return state_events
 
     async def on_profile_update(
-        self, user_id: str, new_profile: ProfileInfo, by_admin: bool
+        self, user_id: str, new_profile: ProfileInfo, by_admin: bool, deactivation: bool
     ) -> None:
         """Called after the global profile of a user has been updated. Does not include
         per-room profile changes.
@@ -391,10 +391,11 @@ class ThirdPartyEventRules:
             user_id: The user whose profile was changed.
             new_profile: The updated profile for the user.
             by_admin: Whether the profile update was performed by a server admin.
+            deactivation: Whether this change was made while deactivating the user.
         """
         for callback in self._on_profile_update_callbacks:
             try:
-                await callback(user_id, new_profile, by_admin)
+                await callback(user_id, new_profile, by_admin, deactivation)
             except Exception as e:
                 logger.exception(
                     "Failed to run module API callback %s: %s", callback, e

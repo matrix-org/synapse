@@ -173,6 +173,7 @@ class ProfileHandler:
         requester: Requester,
         new_displayname: str,
         by_admin: bool = False,
+        deactivation: bool = False,
     ) -> None:
         """Set the displayname of a user
 
@@ -181,6 +182,7 @@ class ProfileHandler:
             requester: The user attempting to make this change.
             new_displayname: The displayname to give this user.
             by_admin: Whether this change was made by an administrator.
+            deactivation: Whether this change was made while deactivating the user.
         """
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this homeserver")
@@ -230,7 +232,7 @@ class ProfileHandler:
         )
 
         await self._third_party_rules.on_profile_update(
-            target_user.to_string(), profile, by_admin
+            target_user.to_string(), profile, by_admin, deactivation
         )
 
         await self._update_join_states(requester, target_user)
@@ -267,6 +269,7 @@ class ProfileHandler:
         requester: Requester,
         new_avatar_url: str,
         by_admin: bool = False,
+        deactivation: bool = False,
     ) -> None:
         """Set a new avatar URL for a user.
 
@@ -275,6 +278,7 @@ class ProfileHandler:
             requester: The user attempting to make this change.
             new_avatar_url: The avatar URL to give this user.
             by_admin: Whether this change was made by an administrator.
+            deactivation: Whether this change was made while deactivating the user.
         """
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this homeserver")
@@ -322,7 +326,7 @@ class ProfileHandler:
         )
 
         await self._third_party_rules.on_profile_update(
-            target_user.to_string(), profile, by_admin
+            target_user.to_string(), profile, by_admin, deactivation
         )
 
         await self._update_join_states(requester, target_user)

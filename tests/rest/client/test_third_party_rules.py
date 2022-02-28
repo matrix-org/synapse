@@ -560,6 +560,8 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
 
         # Test that by_admin is False.
         self.assertFalse(args[2])
+        # Test that deactivation is False.
+        self.assertFalse(args[3])
 
         # Check that we've got the right profile data.
         profile_info = args[1]
@@ -582,6 +584,8 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
 
         # Test that by_admin is False.
         self.assertFalse(args[2])
+        # Test that deactivation is False.
+        self.assertFalse(args[3])
 
         # Check that we've got the right profile data.
         profile_info = args[1]
@@ -622,6 +626,8 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
 
         # Check that by_admin is True.
         self.assertTrue(args[2])
+        # Test that deactivation is False.
+        self.assertFalse(args[3])
 
         # Check that we've got the right profile data.
         profile_info = args[1]
@@ -633,8 +639,17 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         processing a user's deactivation.
         """
         # Register a mocked callback.
-        m = Mock(return_value=make_awaitable(None))
-        self.hs.get_third_party_event_rules()._on_deactivation_callbacks.append(m)
+        deactivation_mock = Mock(return_value=make_awaitable(None))
+        self.hs.get_third_party_event_rules()._on_deactivation_callbacks.append(
+            deactivation_mock,
+        )
+        # Also register a mocked callback for profile updates, to check that the
+        # deactivation code calls it in a way that let modules know the user is being
+        # deactivated.
+        profile_mock = Mock(return_value=make_awaitable(None))
+        self.hs.get_third_party_event_rules()._on_profile_update_callbacks.append(
+            profile_mock,
+        )
 
         # Register a user that we'll deactivate.
         user_id = self.register_user("altan", "password")
@@ -652,20 +667,27 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
                         "type": "m.id.user",
                         "user": user_id,
                     },
-                }
+                },
+                "erase": True,
             },
             access_token=tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
 
         # Check that the mock was called once.
-        m.assert_called_once()
-        args = m.call_args[0]
+        deactivation_mock.assert_called_once()
+        args = deactivation_mock.call_args[0]
 
         # Check that the mock was called with the right user ID, and with a False
         # by_admin flag.
         self.assertEqual(args[0], user_id)
         self.assertFalse(args[1])
+
+        # Check that the profile update callback was called twice (once for the display
+        # name and once for the avatar URL), and that the "deactivation" boolean is true.
+        self.assertEqual(profile_mock.call_count, 2)
+        args = profile_mock.call_args[0]
+        self.assertTrue(args[3])
 
     def test_on_deactivation_admin(self):
         """Tests that the on_deactivation module callback is called correctly when
