@@ -191,7 +191,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         resp = self.helper.send(room_id=room_id, body="1", tok=self.token)
 
         expired_event_id = resp.get("event_id")
-        assert expired_event_id
+        assert expired_event_id is not None
 
         # Check that we can retrieve the event.
         expired_event = self.get_event(expired_event_id)
@@ -207,7 +207,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         resp = self.helper.send(room_id=room_id, body="2", tok=self.token)
 
         valid_event_id = resp.get("event_id")
-        assert valid_event_id
+        assert valid_event_id is not None
 
         # Advance the time again. Now our first event should have expired but our second
         # one should still be kept.
@@ -298,7 +298,7 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
         resp = self.helper.send(room_id=room_id, body="1", tok=self.token)
 
         first_event_id = resp.get("event_id")
-        assert first_event_id
+        assert first_event_id is not None
 
         # Check that we can retrieve the event.
         expired_event = self.get_event(room_id, first_event_id)
@@ -314,7 +314,7 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
         resp = self.helper.send(room_id=room_id, body="2", tok=self.token)
 
         second_event_id = resp.get("event_id")
-        assert second_event_id
+        assert second_event_id is not None
 
         # Advance the time by another month.
         self.reactor.advance(one_day_ms * 30 / 1000)

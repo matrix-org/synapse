@@ -49,15 +49,15 @@ from tests.test_utils import FakeResponse
 from tests.test_utils.html_parsers import TestHtmlParser
 
 
-@attr.s
+@attr.s(auto_attribs=True) 
 class RestHelper:
     """Contains extra helper functions to quickly and clearly perform a given
     REST action, which isn't the focus of the test.
     """
 
-    hs = attr.ib(type=HomeServer)
-    site = attr.ib(type=Site)
-    auth_user_id = attr.ib(type=Optional[str])
+    hs: HomeServer
+    site: Site
+    auth_user_id: str
 
     @overload
     def create_room_as(
