@@ -33,7 +33,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
             self.store.set_profile_displayname(self.u_frank.localpart, "Frank")
         )
 
-        self.assertEquals(
+        self.assertEqual(
             "Frank",
             (
                 self.get_success(
@@ -60,7 +60,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.assertEquals(
+        self.assertEqual(
             "http://my.site/here",
             (
                 self.get_success(
