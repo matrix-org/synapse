@@ -57,7 +57,7 @@ class RestHelper:
 
     hs: HomeServer
     site: Site
-    auth_user_id: str
+    auth_user_id: Optional[str]
 
     @overload
     def create_room_as(
