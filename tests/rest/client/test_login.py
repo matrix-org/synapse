@@ -136,10 +136,10 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             channel = self.make_request(b"POST", LOGIN_URL, params)
 
             if i == 5:
-                self.assertEquals(channel.result["code"], b"429", channel.result)
+                self.assertEqual(channel.result["code"], b"429", channel.result)
                 retry_after_ms = int(channel.json_body["retry_after_ms"])
             else:
-                self.assertEquals(channel.result["code"], b"200", channel.result)
+                self.assertEqual(channel.result["code"], b"200", channel.result)
 
         # Since we're ratelimiting at 1 request/min, retry_after_ms should be lower
         # than 1min.
@@ -154,7 +154,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         }
         channel = self.make_request(b"POST", LOGIN_URL, params)
 
-        self.assertEquals(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.result["code"], b"200", channel.result)
 
     @override_config(
         {
@@ -181,10 +181,10 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             channel = self.make_request(b"POST", LOGIN_URL, params)
 
             if i == 5:
-                self.assertEquals(channel.result["code"], b"429", channel.result)
+                self.assertEqual(channel.result["code"], b"429", channel.result)
                 retry_after_ms = int(channel.json_body["retry_after_ms"])
             else:
-                self.assertEquals(channel.result["code"], b"200", channel.result)
+                self.assertEqual(channel.result["code"], b"200", channel.result)
 
         # Since we're ratelimiting at 1 request/min, retry_after_ms should be lower
         # than 1min.
@@ -199,7 +199,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         }
         channel = self.make_request(b"POST", LOGIN_URL, params)
 
-        self.assertEquals(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.result["code"], b"200", channel.result)
 
     @override_config(
         {
@@ -226,10 +226,10 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             channel = self.make_request(b"POST", LOGIN_URL, params)
 
             if i == 5:
-                self.assertEquals(channel.result["code"], b"429", channel.result)
+                self.assertEqual(channel.result["code"], b"429", channel.result)
                 retry_after_ms = int(channel.json_body["retry_after_ms"])
             else:
-                self.assertEquals(channel.result["code"], b"403", channel.result)
+                self.assertEqual(channel.result["code"], b"403", channel.result)
 
         # Since we're ratelimiting at 1 request/min, retry_after_ms should be lower
         # than 1min.
@@ -244,7 +244,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         }
         channel = self.make_request(b"POST", LOGIN_URL, params)
 
-        self.assertEquals(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.result["code"], b"403", channel.result)
 
     @override_config({"session_lifetime": "24h"})
     def test_soft_logout(self) -> None:
@@ -252,8 +252,8 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         # we shouldn't be able to make requests without an access token
         channel = self.make_request(b"GET", TEST_URL)
-        self.assertEquals(channel.result["code"], b"401", channel.result)
-        self.assertEquals(channel.json_body["errcode"], "M_MISSING_TOKEN")
+        self.assertEqual(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_MISSING_TOKEN")
 
         # log in as normal
         params = {
@@ -263,22 +263,22 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         }
         channel = self.make_request(b"POST", LOGIN_URL, params)
 
-        self.assertEquals(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, 200, channel.result)
         access_token = channel.json_body["access_token"]
         device_id = channel.json_body["device_id"]
 
         # we should now be able to make requests with the access token
         channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
-        self.assertEquals(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, 200, channel.result)
 
         # time passes
         self.reactor.advance(24 * 3600)
 
         # ... and we should be soft-logouted
         channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
-        self.assertEquals(channel.code, 401, channel.result)
-        self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
-        self.assertEquals(channel.json_body["soft_logout"], True)
+        self.assertEqual(channel.code, 401, channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
+        self.assertEqual(channel.json_body["soft_logout"], True)
 
         #
         # test behaviour after deleting the expired device
@@ -290,17 +290,17 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         # more requests with the expired token should still return a soft-logout
         self.reactor.advance(3600)
         channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
-        self.assertEquals(channel.code, 401, channel.result)
-        self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
-        self.assertEquals(channel.json_body["soft_logout"], True)
+        self.assertEqual(channel.code, 401, channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
+        self.assertEqual(channel.json_body["soft_logout"], True)
 
         # ... but if we delete that device, it will be a proper logout
         self._delete_device(access_token_2, "kermit", "monkey", device_id)
 
         channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
-        self.assertEquals(channel.code, 401, channel.result)
-        self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
-        self.assertEquals(channel.json_body["soft_logout"], False)
+        self.assertEqual(channel.code, 401, channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
+        self.assertEqual(channel.json_body["soft_logout"], False)
 
     def _delete_device(
         self, access_token: str, user_id: str, password: str, device_id: str
@@ -309,7 +309,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             b"DELETE", "devices/" + device_id, access_token=access_token
         )
-        self.assertEquals(channel.code, 401, channel.result)
+        self.assertEqual(channel.code, 401, channel.result)
         # check it's a UI-Auth fail
         self.assertEqual(
             set(channel.json_body.keys()),
@@ -332,7 +332,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             access_token=access_token,
             content={"auth": auth},
         )
-        self.assertEquals(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, 200, channel.result)
 
     @override_config({"session_lifetime": "24h"})
     def test_session_can_hard_logout_after_being_soft_logged_out(self) -> None:
@@ -343,20 +343,20 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         # we should now be able to make requests with the access token
         channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
-        self.assertEquals(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, 200, channel.result)
 
         # time passes
         self.reactor.advance(24 * 3600)
 
         # ... and we should be soft-logouted
         channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
-        self.assertEquals(channel.code, 401, channel.result)
-        self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
-        self.assertEquals(channel.json_body["soft_logout"], True)
+        self.assertEqual(channel.code, 401, channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
+        self.assertEqual(channel.json_body["soft_logout"], True)
 
         # Now try to hard logout this session
         channel = self.make_request(b"POST", "/logout", access_token=access_token)
-        self.assertEquals(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.result["code"], b"200", channel.result)
 
     @override_config({"session_lifetime": "24h"})
     def test_session_can_hard_logout_all_sessions_after_being_soft_logged_out(
@@ -369,20 +369,20 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         # we should now be able to make requests with the access token
         channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
-        self.assertEquals(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, 200, channel.result)
 
         # time passes
         self.reactor.advance(24 * 3600)
 
         # ... and we should be soft-logouted
         channel = self.make_request(b"GET", TEST_URL, access_token=access_token)
-        self.assertEquals(channel.code, 401, channel.result)
-        self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
-        self.assertEquals(channel.json_body["soft_logout"], True)
+        self.assertEqual(channel.code, 401, channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
+        self.assertEqual(channel.json_body["soft_logout"], True)
 
         # Now try to hard log out all of the user's sessions
         channel = self.make_request(b"POST", "/logout/all", access_token=access_token)
-        self.assertEquals(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.result["code"], b"200", channel.result)
 
 
 @skip_unless(has_saml2 and HAS_OIDC, "Requires SAML2 and OIDC")
@@ -1129,7 +1129,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
             b"POST", LOGIN_URL, params, access_token=self.service.token
         )
 
-        self.assertEquals(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.result["code"], b"200", channel.result)
 
     def test_login_appservice_user_bot(self) -> None:
         """Test that the appservice bot can use /login"""
@@ -1143,7 +1143,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
             b"POST", LOGIN_URL, params, access_token=self.service.token
         )
 
-        self.assertEquals(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.result["code"], b"200", channel.result)
 
     def test_login_appservice_wrong_user(self) -> None:
         """Test that non-as users cannot login with the as token"""
@@ -1157,7 +1157,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
             b"POST", LOGIN_URL, params, access_token=self.service.token
         )
 
-        self.assertEquals(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.result["code"], b"403", channel.result)
 
     def test_login_appservice_wrong_as(self) -> None:
         """Test that as users cannot login with wrong as token"""
@@ -1171,7 +1171,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
             b"POST", LOGIN_URL, params, access_token=self.another_service.token
         )
 
-        self.assertEquals(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.result["code"], b"403", channel.result)
 
     def test_login_appservice_no_token(self) -> None:
         """Test that users must provide a token when using the appservice
@@ -1185,7 +1185,7 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
         }
         channel = self.make_request(b"POST", LOGIN_URL, params)
 
-        self.assertEquals(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.result["code"], b"401", channel.result)
 
 
 @skip_unless(HAS_OIDC, "requires OIDC")

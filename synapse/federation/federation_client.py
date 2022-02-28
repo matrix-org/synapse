@@ -615,11 +615,15 @@ class FederationClient(FederationBase):
             synapse_error = e.to_synapse_error()
         # There is no good way to detect an "unknown" endpoint.
         #
-        # Dendrite returns a 404 (with no body); synapse returns a 400
+        # Dendrite returns a 404 (with a body of "404 page not found");
+        # Conduit returns a 404 (with no body); and Synapse returns a 400
         # with M_UNRECOGNISED.
-        return e.code == 404 or (
-            e.code == 400 and synapse_error.errcode == Codes.UNRECOGNIZED
-        )
+        #
+        # This needs to be rather specific as some endpoints truly do return 404
+        # errors.
+        return (
+            e.code == 404 and (not e.response or e.response == b"404 page not found")
+        ) or (e.code == 400 and synapse_error.errcode == Codes.UNRECOGNIZED)
 
     async def _try_destination_list(
         self,
@@ -1002,7 +1006,7 @@ class FederationClient(FederationBase):
             )
         except HttpResponseException as e:
             # If an error is received that is due to an unrecognised endpoint,
-            # fallback to the v1 endpoint. Otherwise consider it a legitmate error
+            # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
             # and raise.
             if not self._is_unknown_endpoint(e):
                 raise
@@ -1071,7 +1075,7 @@ class FederationClient(FederationBase):
         except HttpResponseException as e:
             # If an error is received that is due to an unrecognised endpoint,
             # fallback to the v1 endpoint if the room uses old-style event IDs.
-            # Otherwise consider it a legitmate error and raise.
+            # Otherwise, consider it a legitimate error and raise.
             err = e.to_synapse_error()
             if self._is_unknown_endpoint(e, err):
                 if room_version.event_format != EventFormatVersions.V1:
@@ -1132,7 +1136,7 @@ class FederationClient(FederationBase):
             )
         except HttpResponseException as e:
             # If an error is received that is due to an unrecognised endpoint,
-            # fallback to the v1 endpoint. Otherwise consider it a legitmate error
+            # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
             # and raise.
             if not self._is_unknown_endpoint(e):
                 raise
@@ -1403,8 +1407,8 @@ class FederationClient(FederationBase):
                 )
             except HttpResponseException as e:
                 # If an error is received that is due to an unrecognised endpoint,
-                # fallback to the unstable endpoint. Otherwise consider it a
-                # legitmate error and raise.
+                # fallback to the unstable endpoint. Otherwise, consider it a
+                # legitimate error and raise.
                 if not self._is_unknown_endpoint(e):
                     raise
 

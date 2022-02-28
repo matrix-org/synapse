@@ -110,7 +110,7 @@ class FederationSendServlet(BaseFederationServerServlet):
             if issue_8631_logger.isEnabledFor(logging.DEBUG):
                 DEVICE_UPDATE_EDUS = ["m.device_list_update", "m.signing_key_update"]
                 device_list_updates = [
-                    edu.content
+                    edu.get("content", {})
                     for edu in transaction_data.get("edus", [])
                     if edu.get("edu_type") in DEVICE_UPDATE_EDUS
                 ]

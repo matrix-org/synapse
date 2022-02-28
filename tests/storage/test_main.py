@@ -38,12 +38,12 @@ class DataStoreTestCase(unittest.HomeserverTestCase):
             self.store.get_users_paginate(0, 10, name="bc", guests=False)
         )
 
-        self.assertEquals(1, total)
-        self.assertEquals(self.displayname, users.pop()["displayname"])
+        self.assertEqual(1, total)
+        self.assertEqual(self.displayname, users.pop()["displayname"])
 
         users, total = self.get_success(
             self.store.get_users_paginate(0, 10, name="BC", guests=False)
         )
 
-        self.assertEquals(1, total)
-        self.assertEquals(self.displayname, users.pop()["displayname"])
+        self.assertEqual(1, total)
+        self.assertEqual(self.displayname, users.pop()["displayname"])
