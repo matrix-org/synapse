@@ -49,7 +49,7 @@ from tests.test_utils import FakeResponse
 from tests.test_utils.html_parsers import TestHtmlParser
 
 
-@attr.s(auto_attribs=True) 
+@attr.s(auto_attribs=True)
 class RestHelper:
     """Contains extra helper functions to quickly and clearly perform a given
     REST action, which isn't the focus of the test.
