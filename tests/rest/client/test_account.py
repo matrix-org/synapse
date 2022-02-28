@@ -104,7 +104,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         client_secret = "foobar"
         session_id = self._request_token(email, client_secret)
 
-        self.assertEquals(len(self.email_attempts), 1)
+        self.assertEqual(len(self.email_attempts), 1)
         link = self._get_link_from_email()
 
         self._validate_token(link)
@@ -143,7 +143,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
             client_secret = "foobar"
             session_id = self._request_token(email, client_secret, ip)
 
-            self.assertEquals(len(self.email_attempts), 1)
+            self.assertEqual(len(self.email_attempts), 1)
             link = self._get_link_from_email()
 
             self._validate_token(link)
@@ -193,7 +193,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         client_secret = "foobar"
         session_id = self._request_token(email_passwort_reset, client_secret)
 
-        self.assertEquals(len(self.email_attempts), 1)
+        self.assertEqual(len(self.email_attempts), 1)
         link = self._get_link_from_email()
 
         self._validate_token(link)
@@ -230,7 +230,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         client_secret = "foobar"
         session_id = self._request_token(email, client_secret)
 
-        self.assertEquals(len(self.email_attempts), 1)
+        self.assertEqual(len(self.email_attempts), 1)
 
         # Attempt to reset password without clicking the link
         self._reset_password(new_password, session_id, client_secret, expected_code=401)
@@ -322,7 +322,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
             shorthand=False,
         )
 
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
 
         # Now POST to the same endpoint, mimicking the same behaviour as clicking the
         # password reset confirm button
@@ -337,7 +337,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
             shorthand=False,
             content_is_form=True,
         )
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
 
     def _get_link_from_email(self):
         assert self.email_attempts, "No emails have been sent"
@@ -376,7 +376,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
                 },
             },
         )
-        self.assertEquals(expected_code, channel.code, channel.result)
+        self.assertEqual(expected_code, channel.code, channel.result)
 
 
 class DeactivateTestCase(unittest.HomeserverTestCase):
@@ -676,7 +676,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         client_secret = "foobar"
         session_id = self._request_token(self.email, client_secret)
 
-        self.assertEquals(len(self.email_attempts), 1)
+        self.assertEqual(len(self.email_attempts), 1)
         link = self._get_link_from_email()
 
         self._validate_token(link)
@@ -780,7 +780,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         client_secret = "foobar"
         session_id = self._request_token(self.email, client_secret)
 
-        self.assertEquals(len(self.email_attempts), 1)
+        self.assertEqual(len(self.email_attempts), 1)
 
         # Attempt to add email without clicking the link
         channel = self.make_request(
@@ -981,7 +981,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         path = link.replace("https://example.com", "")
 
         channel = self.make_request("GET", path, shorthand=False)
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
 
     def _get_link_from_email(self):
         assert self.email_attempts, "No emails have been sent"
@@ -1010,7 +1010,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         client_secret = "foobar"
         session_id = self._request_token(request_email, client_secret)
 
-        self.assertEquals(len(self.email_attempts) - previous_email_attempts, 1)
+        self.assertEqual(len(self.email_attempts) - previous_email_attempts, 1)
         link = self._get_link_from_email()
 
         self._validate_token(link)

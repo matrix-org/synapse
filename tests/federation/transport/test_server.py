@@ -26,7 +26,7 @@ class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
             "GET",
             "/_matrix/federation/v1/publicRooms",
         )
-        self.assertEquals(403, channel.code)
+        self.assertEqual(403, channel.code)
 
     @override_config({"allow_public_rooms_over_federation": True})
     def test_open_public_room_list_over_federation(self):
@@ -37,7 +37,7 @@ class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
             "GET",
             "/_matrix/federation/v1/publicRooms",
         )
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)
 
     @DEBUG
     def test_edu_debugging_doesnt_explode(self):
@@ -53,4 +53,4 @@ class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
                 "pdus": [],
             },
         )
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)

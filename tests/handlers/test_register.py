@@ -167,7 +167,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         result_user_id, result_token = self.get_success(
             self.get_or_create_user(requester, frank.localpart, "Frankie")
         )
-        self.assertEquals(result_user_id, user_id)
+        self.assertEqual(result_user_id, user_id)
         self.assertIsInstance(result_token, str)
         self.assertGreater(len(result_token), 20)
 
@@ -183,7 +183,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         result_user_id, result_token = self.get_success(
             self.get_or_create_user(requester, local_part, None)
         )
-        self.assertEquals(result_user_id, user_id)
+        self.assertEqual(result_user_id, user_id)
         self.assertTrue(result_token is not None)
 
     @override_config({"limit_usage_by_mau": False})

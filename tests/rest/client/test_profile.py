@@ -80,7 +80,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def test_get_displayname_other(self):
         res = self._get_displayname(self.other)
-        self.assertEquals(res, "Bob")
+        self.assertEqual(res, "Bob")
 
     def test_set_displayname_other(self):
         channel = self.make_request(

@@ -65,7 +65,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         Upgrading a room should work fine.
         """
         channel = self._upgrade_room()
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
         self.assertIn("replacement_room", channel.json_body)
 
     def test_not_in_room(self):
@@ -77,7 +77,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         roomless_token = self.login(roomless, "pass")
 
         channel = self._upgrade_room(roomless_token)
-        self.assertEquals(403, channel.code, channel.result)
+        self.assertEqual(403, channel.code, channel.result)
 
     def test_power_levels(self):
         """
@@ -85,7 +85,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         """
         # The other user doesn't have the proper power level.
         channel = self._upgrade_room(self.other_token)
-        self.assertEquals(403, channel.code, channel.result)
+        self.assertEqual(403, channel.code, channel.result)
 
         # Increase the power levels so that this user can upgrade.
         power_levels = self.helper.get_state(
@@ -103,7 +103,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
 
         # The upgrade should succeed!
         channel = self._upgrade_room(self.other_token)
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
 
     def test_power_levels_user_default(self):
         """
@@ -111,7 +111,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         """
         # The other user doesn't have the proper power level.
         channel = self._upgrade_room(self.other_token)
-        self.assertEquals(403, channel.code, channel.result)
+        self.assertEqual(403, channel.code, channel.result)
 
         # Increase the power levels so that this user can upgrade.
         power_levels = self.helper.get_state(
@@ -129,7 +129,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
 
         # The upgrade should succeed!
         channel = self._upgrade_room(self.other_token)
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
 
     def test_power_levels_tombstone(self):
         """
@@ -137,7 +137,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         """
         # The other user doesn't have the proper power level.
         channel = self._upgrade_room(self.other_token)
-        self.assertEquals(403, channel.code, channel.result)
+        self.assertEqual(403, channel.code, channel.result)
 
         # Increase the power levels so that this user can upgrade.
         power_levels = self.helper.get_state(
@@ -155,7 +155,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
 
         # The upgrade should succeed!
         channel = self._upgrade_room(self.other_token)
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
 
         power_levels = self.helper.get_state(
             self.room_id,
@@ -197,7 +197,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
 
         # Upgrade the room!
         channel = self._upgrade_room(room_id=space_id)
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
         self.assertIn("replacement_room", channel.json_body)
 
         new_space_id = channel.json_body["replacement_room"]
