@@ -26,7 +26,7 @@ class SendToDeviceTestCase(HomeserverTestCase):
         sync.register_servlets,
     ]
 
-    def test_user_to_user(self):
+    def test_user_to_user(self) -> None:
         """A to-device message from one user to another should get delivered"""
 
         user1 = self.register_user("u1", "pass")
@@ -73,7 +73,7 @@ class SendToDeviceTestCase(HomeserverTestCase):
         self.assertEqual(channel.json_body.get("to_device", {}).get("events", []), [])
 
     @override_config({"rc_key_requests": {"per_second": 10, "burst_count": 2}})
-    def test_local_room_key_request(self):
+    def test_local_room_key_request(self) -> None:
         """m.room_key_request has special-casing; test from local user"""
         user1 = self.register_user("u1", "pass")
         user1_tok = self.login("u1", "pass", "d1")
@@ -128,7 +128,7 @@ class SendToDeviceTestCase(HomeserverTestCase):
         )
 
     @override_config({"rc_key_requests": {"per_second": 10, "burst_count": 2}})
-    def test_remote_room_key_request(self):
+    def test_remote_room_key_request(self) -> None:
         """m.room_key_request has special-casing; test from remote user"""
         user2 = self.register_user("u2", "pass")
         user2_tok = self.login("u2", "pass", "d2")
@@ -199,7 +199,7 @@ class SendToDeviceTestCase(HomeserverTestCase):
             },
         )
 
-    def test_limited_sync(self):
+    def test_limited_sync(self) -> None:
         """If a limited sync for to-devices happens the next /sync should respond immediately."""
 
         self.register_user("u1", "pass")

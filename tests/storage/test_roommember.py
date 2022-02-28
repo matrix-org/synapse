@@ -55,7 +55,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.assertEquals([self.room], [m.room_id for m in rooms_for_user])
+        self.assertEqual([self.room], [m.room_id for m in rooms_for_user])
 
     def test_count_known_servers(self):
         """

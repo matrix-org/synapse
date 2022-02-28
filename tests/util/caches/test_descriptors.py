@@ -434,8 +434,8 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
 
         a = A()
 
-        self.assertEquals((yield a.func("foo")), "foo")
-        self.assertEquals((yield a.func("bar")), "bar")
+        self.assertEqual((yield a.func("foo")), "foo")
+        self.assertEqual((yield a.func("bar")), "bar")
 
     @defer.inlineCallbacks
     def test_hit(self):
@@ -450,10 +450,10 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         a = A()
         yield a.func("foo")
 
-        self.assertEquals(callcount[0], 1)
+        self.assertEqual(callcount[0], 1)
 
-        self.assertEquals((yield a.func("foo")), "foo")
-        self.assertEquals(callcount[0], 1)
+        self.assertEqual((yield a.func("foo")), "foo")
+        self.assertEqual(callcount[0], 1)
 
     @defer.inlineCallbacks
     def test_invalidate(self):
@@ -468,13 +468,13 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         a = A()
         yield a.func("foo")
 
-        self.assertEquals(callcount[0], 1)
+        self.assertEqual(callcount[0], 1)
 
         a.func.invalidate(("foo",))
 
         yield a.func("foo")
 
-        self.assertEquals(callcount[0], 2)
+        self.assertEqual(callcount[0], 2)
 
     def test_invalidate_missing(self):
         class A:
@@ -499,7 +499,7 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         for k in range(0, 12):
             yield a.func(k)
 
-        self.assertEquals(callcount[0], 12)
+        self.assertEqual(callcount[0], 12)
 
         # There must have been at least 2 evictions, meaning if we calculate
         # all 12 values again, we must get called at least 2 more times
@@ -525,8 +525,8 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
 
         a.func.prefill(("foo",), 456)
 
-        self.assertEquals(a.func("foo").result, 456)
-        self.assertEquals(callcount[0], 0)
+        self.assertEqual(a.func("foo").result, 456)
+        self.assertEqual(callcount[0], 0)
 
     @defer.inlineCallbacks
     def test_invalidate_context(self):
@@ -547,19 +547,19 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         a = A()
         yield a.func2("foo")
 
-        self.assertEquals(callcount[0], 1)
-        self.assertEquals(callcount2[0], 1)
+        self.assertEqual(callcount[0], 1)
+        self.assertEqual(callcount2[0], 1)
 
         a.func.invalidate(("foo",))
         yield a.func("foo")
 
-        self.assertEquals(callcount[0], 2)
-        self.assertEquals(callcount2[0], 1)
+        self.assertEqual(callcount[0], 2)
+        self.assertEqual(callcount2[0], 1)
 
         yield a.func2("foo")
 
-        self.assertEquals(callcount[0], 2)
-        self.assertEquals(callcount2[0], 2)
+        self.assertEqual(callcount[0], 2)
+        self.assertEqual(callcount2[0], 2)
 
     @defer.inlineCallbacks
     def test_eviction_context(self):
@@ -581,22 +581,22 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         yield a.func2("foo")
         yield a.func2("foo2")
 
-        self.assertEquals(callcount[0], 2)
-        self.assertEquals(callcount2[0], 2)
+        self.assertEqual(callcount[0], 2)
+        self.assertEqual(callcount2[0], 2)
 
         yield a.func2("foo")
-        self.assertEquals(callcount[0], 2)
-        self.assertEquals(callcount2[0], 2)
+        self.assertEqual(callcount[0], 2)
+        self.assertEqual(callcount2[0], 2)
 
         yield a.func("foo3")
 
-        self.assertEquals(callcount[0], 3)
-        self.assertEquals(callcount2[0], 2)
+        self.assertEqual(callcount[0], 3)
+        self.assertEqual(callcount2[0], 2)
 
         yield a.func2("foo")
 
-        self.assertEquals(callcount[0], 4)
-        self.assertEquals(callcount2[0], 3)
+        self.assertEqual(callcount[0], 4)
+        self.assertEqual(callcount2[0], 3)
 
     @defer.inlineCallbacks
     def test_double_get(self):
@@ -619,30 +619,30 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
 
         yield a.func2("foo")
 
-        self.assertEquals(callcount[0], 1)
-        self.assertEquals(callcount2[0], 1)
+        self.assertEqual(callcount[0], 1)
+        self.assertEqual(callcount2[0], 1)
 
         a.func2.invalidate(("foo",))
-        self.assertEquals(a.func2.cache.cache.del_multi.call_count, 1)
+        self.assertEqual(a.func2.cache.cache.del_multi.call_count, 1)
 
         yield a.func2("foo")
         a.func2.invalidate(("foo",))
-        self.assertEquals(a.func2.cache.cache.del_multi.call_count, 2)
+        self.assertEqual(a.func2.cache.cache.del_multi.call_count, 2)
 
-        self.assertEquals(callcount[0], 1)
-        self.assertEquals(callcount2[0], 2)
+        self.assertEqual(callcount[0], 1)
+        self.assertEqual(callcount2[0], 2)
 
         a.func.invalidate(("foo",))
-        self.assertEquals(a.func2.cache.cache.del_multi.call_count, 3)
+        self.assertEqual(a.func2.cache.cache.del_multi.call_count, 3)
         yield a.func("foo")
 
-        self.assertEquals(callcount[0], 2)
-        self.assertEquals(callcount2[0], 2)
+        self.assertEqual(callcount[0], 2)
+        self.assertEqual(callcount2[0], 2)
 
         yield a.func2("foo")
 
-        self.assertEquals(callcount[0], 2)
-        self.assertEquals(callcount2[0], 3)
+        self.assertEqual(callcount[0], 2)
+        self.assertEqual(callcount2[0], 3)
 
 
 class CachedListDescriptorTestCase(unittest.TestCase):

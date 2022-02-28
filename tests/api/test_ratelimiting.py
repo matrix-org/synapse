@@ -14,19 +14,19 @@ class TestRatelimiter(unittest.HomeserverTestCase):
             limiter.can_do_action(None, key="test_id", _time_now_s=0)
         )
         self.assertTrue(allowed)
-        self.assertEquals(10.0, time_allowed)
+        self.assertEqual(10.0, time_allowed)
 
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_do_action(None, key="test_id", _time_now_s=5)
         )
         self.assertFalse(allowed)
-        self.assertEquals(10.0, time_allowed)
+        self.assertEqual(10.0, time_allowed)
 
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_do_action(None, key="test_id", _time_now_s=10)
         )
         self.assertTrue(allowed)
-        self.assertEquals(20.0, time_allowed)
+        self.assertEqual(20.0, time_allowed)
 
     def test_allowed_appservice_ratelimited_via_can_requester_do_action(self):
         appservice = ApplicationService(
@@ -45,19 +45,19 @@ class TestRatelimiter(unittest.HomeserverTestCase):
             limiter.can_do_action(as_requester, _time_now_s=0)
         )
         self.assertTrue(allowed)
-        self.assertEquals(10.0, time_allowed)
+        self.assertEqual(10.0, time_allowed)
 
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_do_action(as_requester, _time_now_s=5)
         )
         self.assertFalse(allowed)
-        self.assertEquals(10.0, time_allowed)
+        self.assertEqual(10.0, time_allowed)
 
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_do_action(as_requester, _time_now_s=10)
         )
         self.assertTrue(allowed)
-        self.assertEquals(20.0, time_allowed)
+        self.assertEqual(20.0, time_allowed)
 
     def test_allowed_appservice_via_can_requester_do_action(self):
         appservice = ApplicationService(
@@ -76,19 +76,19 @@ class TestRatelimiter(unittest.HomeserverTestCase):
             limiter.can_do_action(as_requester, _time_now_s=0)
         )
         self.assertTrue(allowed)
-        self.assertEquals(-1, time_allowed)
+        self.assertEqual(-1, time_allowed)
 
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_do_action(as_requester, _time_now_s=5)
         )
         self.assertTrue(allowed)
-        self.assertEquals(-1, time_allowed)
+        self.assertEqual(-1, time_allowed)
 
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_do_action(as_requester, _time_now_s=10)
         )
         self.assertTrue(allowed)
-        self.assertEquals(-1, time_allowed)
+        self.assertEqual(-1, time_allowed)
 
     def test_allowed_via_ratelimit(self):
         limiter = Ratelimiter(
@@ -246,7 +246,7 @@ class TestRatelimiter(unittest.HomeserverTestCase):
             limiter.can_do_action(None, key="test_id", n_actions=3, _time_now_s=0)
         )
         self.assertTrue(allowed)
-        self.assertEquals(10.0, time_allowed)
+        self.assertEqual(10.0, time_allowed)
 
         # Test that, after doing these 3 actions, we can't do any more action without
         # waiting.
@@ -254,7 +254,7 @@ class TestRatelimiter(unittest.HomeserverTestCase):
             limiter.can_do_action(None, key="test_id", n_actions=1, _time_now_s=0)
         )
         self.assertFalse(allowed)
-        self.assertEquals(10.0, time_allowed)
+        self.assertEqual(10.0, time_allowed)
 
         # Test that after waiting we can do only 1 action.
         allowed, time_allowed = self.get_success_or_raise(
@@ -269,7 +269,7 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         self.assertTrue(allowed)
         # The time allowed is the current time because we could still repeat the action
         # once.
-        self.assertEquals(10.0, time_allowed)
+        self.assertEqual(10.0, time_allowed)
 
         allowed, time_allowed = self.get_success_or_raise(
             limiter.can_do_action(None, key="test_id", n_actions=2, _time_now_s=10)
@@ -277,7 +277,7 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         self.assertFalse(allowed)
         # The time allowed doesn't change despite allowed being False because, while we
         # don't allow 2 actions, we could still do 1.
-        self.assertEquals(10.0, time_allowed)
+        self.assertEqual(10.0, time_allowed)
 
         # Test that after waiting a bit more we can do 2 actions.
         allowed, time_allowed = self.get_success_or_raise(
@@ -286,4 +286,4 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         self.assertTrue(allowed)
         # The time allowed is the current time because we could still repeat the action
         # once.
-        self.assertEquals(20.0, time_allowed)
+        self.assertEqual(20.0, time_allowed)

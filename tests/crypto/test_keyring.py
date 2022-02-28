@@ -76,7 +76,7 @@ class FakeRequest:
 @logcontext_clean
 class KeyringTestCase(unittest.HomeserverTestCase):
     def check_context(self, val, expected):
-        self.assertEquals(getattr(current_context(), "request", None), expected)
+        self.assertEqual(getattr(current_context(), "request", None), expected)
         return val
 
     def test_verify_json_objects_for_server_awaits_previous_requests(self):
@@ -96,7 +96,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         async def first_lookup_fetch(
             server_name: str, key_ids: List[str], minimum_valid_until_ts: int
         ) -> Dict[str, FetchKeyResult]:
-            # self.assertEquals(current_context().request.id, "context_11")
+            # self.assertEqual(current_context().request.id, "context_11")
             self.assertEqual(server_name, "server10")
             self.assertEqual(key_ids, [get_key_id(key1)])
             self.assertEqual(minimum_valid_until_ts, 0)
@@ -137,7 +137,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         async def second_lookup_fetch(
             server_name: str, key_ids: List[str], minimum_valid_until_ts: int
         ) -> Dict[str, FetchKeyResult]:
-            # self.assertEquals(current_context().request.id, "context_12")
+            # self.assertEqual(current_context().request.id, "context_12")
             return {get_key_id(key1): FetchKeyResult(get_verify_key(key1), 100)}
 
         mock_fetcher.get_keys.reset_mock()
