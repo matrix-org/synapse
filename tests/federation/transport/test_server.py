@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from tests import unittest
-from tests.unittest import override_config, DEBUG
+from tests.unittest import DEBUG, override_config
 
 
 class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
@@ -49,7 +49,9 @@ class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
             "PUT",
             "/_matrix/federation/v1/send/txn_id_1234/",
             content={
-                "edus": [{"edu_type": "m.device_list_update", "content": {"foo": "bar"}}],
+                "edus": [
+                    {"edu_type": "m.device_list_update", "content": {"foo": "bar"}}
+                ],
                 "pdus": [],
             },
         )
