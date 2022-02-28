@@ -402,8 +402,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
             channel = self.make_request(
                 "GET",
-                "/_matrix/client/unstable/rooms/%s/aggregations/%s?limit=1%s"
-                % (self.room, self.parent_id, from_token),
+                f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}?limit=1{from_token}",
                 access_token=self.user_token,
             )
             self.assertEqual(200, channel.code, channel.json_body)
@@ -542,8 +541,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "/_matrix/client/unstable/rooms/%s/aggregations/%s"
-            % (self.room, self.parent_id),
+            f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -596,8 +594,8 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "/_matrix/client/unstable/rooms/%s/aggregations/%s/%s?limit=1"
-            % (self.room, self.parent_id, RelationTypes.REPLACE),
+            f"/_matrix/client/unstable/rooms/{self.room}/aggregations"
+            f"/{self.parent_id}/{RelationTypes.REPLACE}?limit=1",
             access_token=self.user_token,
         )
         self.assertEqual(400, channel.code, channel.json_body)
@@ -1236,8 +1234,8 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # Check the relation is returned
         channel = self.make_request(
             "GET",
-            "/_matrix/client/unstable/rooms/%s/relations/%s/m.replace/m.room.message"
-            % (self.room, original_event_id),
+            f"/_matrix/client/unstable/rooms/{self.room}/relations"
+            f"/{original_event_id}/m.replace/m.room.message",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -1248,8 +1246,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # Redact the original event
         channel = self.make_request(
             "PUT",
-            "/rooms/%s/redact/%s/%s"
-            % (self.room, original_event_id, "test_relations_redaction_redacts_edits"),
+            f"/rooms/{self.room}/redact/{original_event_id}/test_relations_redaction_redacts_edits",
             access_token=self.user_token,
             content="{}",
         )
@@ -1258,8 +1255,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # Try to check for remaining m.replace relations
         channel = self.make_request(
             "GET",
-            "/_matrix/client/unstable/rooms/%s/relations/%s/m.replace/m.room.message"
-            % (self.room, original_event_id),
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{original_event_id}/m.replace/m.room.message",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -1285,12 +1281,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # Redact the original
         channel = self.make_request(
             "PUT",
-            "/rooms/%s/redact/%s/%s"
-            % (
-                self.room,
-                original_event_id,
-                "test_aggregations_redaction_prevents_access_to_aggregations",
-            ),
+            f"/rooms/{self.room}/redact/{original_event_id}/test_aggregations_redaction_prevents_access_to_aggregations",
             access_token=self.user_token,
             content="{}",
         )
@@ -1299,8 +1290,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # Check that aggregations returns zero
         channel = self.make_request(
             "GET",
-            "/_matrix/client/unstable/rooms/%s/aggregations/%s/m.annotation/m.reaction"
-            % (self.room, original_event_id),
+            f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{original_event_id}/m.annotation/m.reaction",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -1316,8 +1306,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "/_matrix/client/unstable/rooms/%s/relations/%s?limit=1"
-            % (self.room, self.parent_id),
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -1347,8 +1336,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # But unknown relations can be directly queried.
         channel = self.make_request(
             "GET",
-            "/_matrix/client/unstable/rooms/%s/aggregations/%s?limit=1"
-            % (self.room, self.parent_id),
+            f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}?limit=1",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
