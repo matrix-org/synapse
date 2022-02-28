@@ -15,7 +15,7 @@
 
 import itertools
 import urllib.parse
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import patch
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -45,7 +45,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
     ]
     hijack_auth = False
 
-    def default_config(self) -> dict:
+    def default_config(self) -> Dict[str, Any]:
         # We need to enable msc1849 support for aggregations
         config = super().default_config()
         config["experimental_msc1849_support_enabled"] = True
