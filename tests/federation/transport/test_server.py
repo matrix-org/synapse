@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from tests import unittest
-from tests.unittest import override_config
+from tests.unittest import DEBUG, override_config
 
 
 class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
@@ -36,5 +36,23 @@ class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
         channel = self.make_signed_federation_request(
             "GET",
             "/_matrix/federation/v1/publicRooms",
+        )
+        self.assertEqual(200, channel.code)
+
+    @DEBUG
+    def test_edu_debugging_doesnt_explode(self):
+        """Sanity check incoming federation succeeds with `synapse.debug_8631` enabled.
+
+        Remove this when we strip out issue_8631_logger.
+        """
+        channel = self.make_signed_federation_request(
+            "PUT",
+            "/_matrix/federation/v1/send/txn_id_1234/",
+            content={
+                "edus": [
+                    {"edu_type": "m.device_list_update", "content": {"foo": "bar"}}
+                ],
+                "pdus": [],
+            },
         )
         self.assertEqual(200, channel.code)
