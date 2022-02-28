@@ -41,7 +41,7 @@ class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
 
     @DEBUG
     def test_edu_debugging_doesnt_explode(self):
-        """Sanity check fed. RX succeeds with `synapse.debug_8631` logging enabled.
+        """Sanity check incoming federation succeeds with `synapse.debug_8631` enabled.
 
         Remove this when we strip out issue_8631_logger.
         """
