@@ -147,8 +147,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_as_api.query_alias.assert_called_once_with(
             interested_service, room_alias_str
         )
-        self.assertEquals(result.room_id, room_id)
-        self.assertEquals(result.servers, servers)
+        self.assertEqual(result.room_id, room_id)
+        self.assertEqual(result.servers, servers)
 
     def test_get_3pe_protocols_no_appservices(self):
         self.mock_store.get_app_services.return_value = []
@@ -156,7 +156,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             defer.ensureDeferred(self.handler.get_3pe_protocols("my-protocol"))
         )
         self.mock_as_api.get_3pe_protocol.assert_not_called()
-        self.assertEquals(response, {})
+        self.assertEqual(response, {})
 
     def test_get_3pe_protocols_no_protocols(self):
         service = self._mkservice(False, [])
@@ -165,7 +165,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             defer.ensureDeferred(self.handler.get_3pe_protocols())
         )
         self.mock_as_api.get_3pe_protocol.assert_not_called()
-        self.assertEquals(response, {})
+        self.assertEqual(response, {})
 
     def test_get_3pe_protocols_protocol_no_response(self):
         service = self._mkservice(False, ["my-protocol"])
@@ -177,7 +177,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_as_api.get_3pe_protocol.assert_called_once_with(
             service, "my-protocol"
         )
-        self.assertEquals(response, {})
+        self.assertEqual(response, {})
 
     def test_get_3pe_protocols_select_one_protocol(self):
         service = self._mkservice(False, ["my-protocol"])
@@ -191,7 +191,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_as_api.get_3pe_protocol.assert_called_once_with(
             service, "my-protocol"
         )
-        self.assertEquals(
+        self.assertEqual(
             response, {"my-protocol": {"x-protocol-data": 42, "instances": []}}
         )
 
@@ -207,7 +207,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_as_api.get_3pe_protocol.assert_called_once_with(
             service, "my-protocol"
         )
-        self.assertEquals(
+        self.assertEqual(
             response, {"my-protocol": {"x-protocol-data": 42, "instances": []}}
         )
 
@@ -222,7 +222,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             defer.ensureDeferred(self.handler.get_3pe_protocols())
         )
         self.mock_as_api.get_3pe_protocol.assert_called()
-        self.assertEquals(
+        self.assertEqual(
             response,
             {
                 "my-protocol": {"x-protocol-data": 42, "instances": []},
@@ -254,7 +254,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             defer.ensureDeferred(self.handler.get_3pe_protocols())
         )
         # It's expected that the second service's data doesn't appear in the response
-        self.assertEquals(
+        self.assertEqual(
             response,
             {
                 "my-protocol": {

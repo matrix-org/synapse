@@ -71,7 +71,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = self.get_success(self.auth.get_user_by_req(request))
-        self.assertEquals(requester.user.to_string(), self.test_user)
+        self.assertEqual(requester.user.to_string(), self.test_user)
 
     def test_get_user_by_req_user_bad_token(self):
         self.store.get_user_by_access_token = simple_async_mock(None)
@@ -109,7 +109,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = self.get_success(self.auth.get_user_by_req(request))
-        self.assertEquals(requester.user.to_string(), self.test_user)
+        self.assertEqual(requester.user.to_string(), self.test_user)
 
     def test_get_user_by_req_appservice_valid_token_good_ip(self):
         from netaddr import IPSet
@@ -128,7 +128,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = self.get_success(self.auth.get_user_by_req(request))
-        self.assertEquals(requester.user.to_string(), self.test_user)
+        self.assertEqual(requester.user.to_string(), self.test_user)
 
     def test_get_user_by_req_appservice_valid_token_bad_ip(self):
         from netaddr import IPSet
@@ -195,7 +195,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         request.args[b"user_id"] = [masquerading_user_id]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = self.get_success(self.auth.get_user_by_req(request))
-        self.assertEquals(
+        self.assertEqual(
             requester.user.to_string(), masquerading_user_id.decode("utf8")
         )
 
@@ -242,10 +242,10 @@ class AuthTestCase(unittest.HomeserverTestCase):
         request.args[b"org.matrix.msc3202.device_id"] = [masquerading_device_id]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = self.get_success(self.auth.get_user_by_req(request))
-        self.assertEquals(
+        self.assertEqual(
             requester.user.to_string(), masquerading_user_id.decode("utf8")
         )
-        self.assertEquals(requester.device_id, masquerading_device_id.decode("utf8"))
+        self.assertEqual(requester.device_id, masquerading_device_id.decode("utf8"))
 
     @override_config({"experimental_features": {"msc3202_device_masquerading": True}})
     def test_get_user_by_req_appservice_valid_token_invalid_device_id(self):
@@ -275,8 +275,8 @@ class AuthTestCase(unittest.HomeserverTestCase):
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
 
         failure = self.get_failure(self.auth.get_user_by_req(request), AuthError)
-        self.assertEquals(failure.value.code, 400)
-        self.assertEquals(failure.value.errcode, Codes.EXCLUSIVE)
+        self.assertEqual(failure.value.code, 400)
+        self.assertEqual(failure.value.errcode, Codes.EXCLUSIVE)
 
     def test_get_user_by_req__puppeted_token__not_tracking_puppeted_mau(self):
         self.store.get_user_by_access_token = simple_async_mock(
@@ -309,7 +309,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         self.get_success(self.auth.get_user_by_req(request))
-        self.assertEquals(self.store.insert_client_ip.call_count, 2)
+        self.assertEqual(self.store.insert_client_ip.call_count, 2)
 
     def test_get_user_from_macaroon(self):
         self.store.get_user_by_access_token = simple_async_mock(
@@ -369,9 +369,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.store.get_monthly_active_count = simple_async_mock(lots_of_users)
 
         e = self.get_failure(self.auth.check_auth_blocking(), ResourceLimitError)
-        self.assertEquals(e.value.admin_contact, self.hs.config.server.admin_contact)
-        self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
-        self.assertEquals(e.value.code, 403)
+        self.assertEqual(e.value.admin_contact, self.hs.config.server.admin_contact)
+        self.assertEqual(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+        self.assertEqual(e.value.code, 403)
 
         # Ensure does not throw an error
         self.store.get_monthly_active_count = simple_async_mock(small_number_of_users)
@@ -473,9 +473,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.auth_blocking._hs_disabled = True
         self.auth_blocking._hs_disabled_message = "Reason for being disabled"
         e = self.get_failure(self.auth.check_auth_blocking(), ResourceLimitError)
-        self.assertEquals(e.value.admin_contact, self.hs.config.server.admin_contact)
-        self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
-        self.assertEquals(e.value.code, 403)
+        self.assertEqual(e.value.admin_contact, self.hs.config.server.admin_contact)
+        self.assertEqual(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+        self.assertEqual(e.value.code, 403)
 
     def test_hs_disabled_no_server_notices_user(self):
         """Check that 'hs_disabled_message' works correctly when there is no
@@ -488,9 +488,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.auth_blocking._hs_disabled = True
         self.auth_blocking._hs_disabled_message = "Reason for being disabled"
         e = self.get_failure(self.auth.check_auth_blocking(), ResourceLimitError)
-        self.assertEquals(e.value.admin_contact, self.hs.config.server.admin_contact)
-        self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
-        self.assertEquals(e.value.code, 403)
+        self.assertEqual(e.value.admin_contact, self.hs.config.server.admin_contact)
+        self.assertEqual(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+        self.assertEqual(e.value.code, 403)
 
     def test_server_notices_mxid_special_cased(self):
         self.auth_blocking._hs_disabled = True

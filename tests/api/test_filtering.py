@@ -364,7 +364,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
 
         results = self.get_success(user_filter.filter_presence(events=events))
-        self.assertEquals(events, results)
+        self.assertEqual(events, results)
 
     def test_filter_presence_no_match(self):
         user_filter_json = {"presence": {"types": ["m.*"]}}
@@ -388,7 +388,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
 
         results = self.get_success(user_filter.filter_presence(events=events))
-        self.assertEquals([], results)
+        self.assertEqual([], results)
 
     def test_filter_room_state_match(self):
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
@@ -407,7 +407,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
 
         results = self.get_success(user_filter.filter_room_state(events=events))
-        self.assertEquals(events, results)
+        self.assertEqual(events, results)
 
     def test_filter_room_state_no_match(self):
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
@@ -428,7 +428,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         )
 
         results = self.get_success(user_filter.filter_room_state(events))
-        self.assertEquals([], results)
+        self.assertEqual([], results)
 
     def test_filter_rooms(self):
         definition = {
@@ -444,7 +444,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
 
         filtered_room_ids = list(Filter(self.hs, definition).filter_rooms(room_ids))
 
-        self.assertEquals(filtered_room_ids, ["!allowed:example.com"])
+        self.assertEqual(filtered_room_ids, ["!allowed:example.com"])
 
     @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
     def test_filter_relations(self):
@@ -486,7 +486,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
                     Filter(self.hs, definition)._check_event_relations(events)
                 )
             )
-        self.assertEquals(filtered_events, events[1:])
+        self.assertEqual(filtered_events, events[1:])
 
     def test_add_filter(self):
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
@@ -497,8 +497,8 @@ class FilteringTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.assertEquals(filter_id, 0)
-        self.assertEquals(
+        self.assertEqual(filter_id, 0)
+        self.assertEqual(
             user_filter_json,
             (
                 self.get_success(
@@ -524,6 +524,6 @@ class FilteringTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.assertEquals(filter.get_filter_json(), user_filter_json)
+        self.assertEqual(filter.get_filter_json(), user_filter_json)
 
-        self.assertRegexpMatches(repr(filter), r"<FilterCollection \{.*\}>")
+        self.assertRegex(repr(filter), r"<FilterCollection \{.*\}>")

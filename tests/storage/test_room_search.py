@@ -53,7 +53,7 @@ class EventSearchInsertionTest(HomeserverTestCase):
         result = self.get_success(
             store.search_msgs([room_id], "hi bob", ["content.body"])
         )
-        self.assertEquals(result.get("count"), 1)
+        self.assertEqual(result.get("count"), 1)
         if isinstance(store.database_engine, PostgresEngine):
             self.assertIn("hi", result.get("highlights"))
             self.assertIn("bob", result.get("highlights"))
@@ -62,14 +62,14 @@ class EventSearchInsertionTest(HomeserverTestCase):
         result = self.get_success(
             store.search_msgs([room_id], "another", ["content.body"])
         )
-        self.assertEquals(result.get("count"), 1)
+        self.assertEqual(result.get("count"), 1)
         if isinstance(store.database_engine, PostgresEngine):
             self.assertIn("another", result.get("highlights"))
 
         # Check that search works for a search term that overlaps with the message
         # containing a null byte and an unrelated message.
         result = self.get_success(store.search_msgs([room_id], "hi", ["content.body"]))
-        self.assertEquals(result.get("count"), 2)
+        self.assertEqual(result.get("count"), 2)
         result = self.get_success(
             store.search_msgs([room_id], "hi alice", ["content.body"])
         )
