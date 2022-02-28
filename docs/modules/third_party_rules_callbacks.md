@@ -166,8 +166,8 @@ deactivated (in which case their display name is set to an empty string (`""`) a
 avatar URL is set to `None`). The module is passed the Matrix ID of the user whose profile
 has been updated, their new profile, as well as a boolean that is `True` if the update
 was triggered by a server admin (and `False` otherwise). Note that this boolean is also
-`True` if the profile change happens as a result of the user logging through Single
-Sing-On, and if a server admin updates their own profile.
+`True` if the profile change happens as a result of the user logging in through Single
+Sign-On, or if a server admin updates their own profile.
 
 If multiple modules implement this callback, Synapse runs them all in order.
 

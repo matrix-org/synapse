@@ -405,7 +405,7 @@ class ThirdPartyEventRules:
 
         Args:
             user_id: The deactivated user.
-            by_admin: Whether the deactivation is performed by a server admin.
+            by_admin: Whether the deactivation was performed by a server admin.
         """
         for callback in self._on_deactivation_callbacks:
             try:

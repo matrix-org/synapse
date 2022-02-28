@@ -535,7 +535,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
 
     def test_on_profile_update(self):
         """Tests that the on_profile_update module callback is correctly called on
-        profile update.
+        profile updates.
         """
         displayname = "Foo"
         avatar_url = "mxc://matrix.org/oWQDvfewxmlRaRCkVbfetyEo"
@@ -590,7 +590,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
 
     def test_on_profile_update_admin(self):
         """Tests that the on_profile_update module callback is correctly called on
-        profile update triggered by a server admin.
+        profile updates triggered by a server admin.
         """
         displayname = "Foo"
         avatar_url = "mxc://matrix.org/oWQDvfewxmlRaRCkVbfetyEo"
