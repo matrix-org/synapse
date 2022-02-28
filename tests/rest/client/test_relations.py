@@ -79,7 +79,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "/rooms/%s/event/%s" % (self.room, event_id),
+            f"/rooms/{self.room}/event/{event_id}",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -317,9 +317,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         # Request /sync, limiting it such that only the latest event is returned
         # (and not the relation).
-        filter = urllib.parse.quote_plus(
-            '{"room": {"timeline": {"limit": 1}}}'.encode()
-        )
+        filter = urllib.parse.quote_plus(b'{"room": {"timeline": {"limit": 1}}}')
         channel = self.make_request(
             "GET", f"/sync?filter={filter}", access_token=self.user_token
         )
@@ -575,7 +573,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # Now lets redact one of the 'a' reactions
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/%s/redact/%s" % (self.room, to_redact_event_id),
+            f"/_matrix/client/r0/rooms/{self.room}/redact/{to_redact_event_id}",
             access_token=self.user_token,
             content={},
         )
@@ -583,8 +581,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "/_matrix/client/unstable/rooms/%s/aggregations/%s"
-            % (self.room, self.parent_id),
+            f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -986,9 +983,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         # Request sync, but limit the timeline so it becomes limited (and includes
         # bundled aggregations).
-        filter = urllib.parse.quote_plus(
-            '{"room": {"timeline": {"limit": 2}}}'.encode()
-        )
+        filter = urllib.parse.quote_plus(b'{"room": {"timeline": {"limit": 2}}}')
         channel = self.make_request(
             "GET", f"/sync?filter={filter}", access_token=self.user_token
         )
@@ -1053,7 +1048,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "/rooms/%s/event/%s" % (self.room, self.parent_id),
+            f"/rooms/{self.room}/event/{self.parent_id}",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -1096,7 +1091,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "/rooms/%s/event/%s" % (self.room, reply),
+            f"/rooms/{self.room}/event/{reply}",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -1198,7 +1193,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # Request the original event.
         channel = self.make_request(
             "GET",
-            "/rooms/%s/event/%s" % (self.room, self.parent_id),
+            f"/rooms/{self.room}/event/{self.parent_id}",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -1343,7 +1338,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # When bundling the unknown relation is not included.
         channel = self.make_request(
             "GET",
-            "/rooms/%s/event/%s" % (self.room, self.parent_id),
+            f"/rooms/{self.room}/event/{self.parent_id}",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
