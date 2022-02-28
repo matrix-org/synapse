@@ -1213,8 +1213,8 @@ oembed:
 # section of this file.
 
 # Enable registration for new users. Defaults to 'false'. It is highly recommended that if you enable registration,
-# you use either captcha or email verification to verify that new users are not bots. In order to enable registration
-# without captcha or email verification, you must also set `enable_registration_without_verification`, found below.
+# you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration
+# without any verification, you must also set `enable_registration_without_verification`, found below.
 #
 #enable_registration: false
 
