@@ -1387,6 +1387,16 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
 
         return event_ids, bundled_relations
 
+    def _get_aggregations(self) -> List[JsonDict]:
+        """Request /aggregations on the parent ID and includes the returned chunk."""
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        return channel.json_body["chunk"]
+
     def test_redact_relation_annotation(self) -> None:
         """
         Test that annotations of an event are properly handled after the
@@ -1417,17 +1427,8 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         )
 
         # The unredacted aggregation should still exist.
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}",
-            access_token=self.user_token,
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-
-        self.assertEqual(
-            channel.json_body,
-            {"chunk": [{"type": "m.reaction", "key": "a", "count": 1}]},
-        )
+        chunk = self._get_aggregations()
+        self.assertEqual(chunk, [{"type": "m.reaction", "key": "a", "count": 1}])
 
     def test_redact_relation_edit(self) -> None:
         """Test that edits of an event are redacted when the original event
@@ -1475,11 +1476,5 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertEqual(relations, {})
 
         # Check that aggregations returns zero
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}/m.annotation/m.reaction",
-            access_token=self.user_token,
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-        self.assertIn("chunk", channel.json_body)
-        self.assertEqual(channel.json_body["chunk"], [])
+        chunk = self._get_aggregations()
+        self.assertEqual(chunk, [])
