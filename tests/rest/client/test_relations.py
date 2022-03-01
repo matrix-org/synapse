@@ -1448,8 +1448,9 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertEqual(200, channel.code, channel.json_body)
 
         # Check the relation is returned
-        event_ids, _ = self._make_relation_requests()
+        event_ids, relations = self._make_relation_requests()
         self.assertEqual(len(event_ids), 1)
+        self.assertIn(RelationTypes.REPLACE, relations)
 
         # Redact the original event
         self._redact(self.parent_id)
