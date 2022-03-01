@@ -1,0 +1,2 @@
+Fix bug: Server notices user profile (display_name/avatar_url) are not updated when changed after server restart.
+Contributed by Jorge Florian.
