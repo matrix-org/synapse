@@ -1,0 +1,1 @@
+Add `stop_cancellation` utility function to stop `Deferred`s from being cancelled.
