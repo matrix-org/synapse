@@ -1,6 +1,8 @@
 import logging
 from typing import Iterable, NamedTuple, Optional
 
+DISTRIBUTION_NAME = "matrix-synapse"
+
 try:
     from importlib import metadata
 except ImportError:
@@ -27,11 +29,7 @@ class DependencyException(Exception):
             yield '"' + i + '"'
 
 
-EXTRAS = {
-    v
-    for k, v in metadata.distribution("matrix-synapse").metadata.items()
-    if k == "Provides-Extra"
-}
+EXTRAS = set(metadata.metadata(DISTRIBUTION_NAME).get_all("Provides-Extra"))
 
 
 class Dependency(NamedTuple):
@@ -41,7 +39,7 @@ class Dependency(NamedTuple):
 
 def _generic_dependencies() -> Iterable[Dependency]:
     """Yield pairs (requirement, must_be_installed)."""
-    requirements = metadata.requires("matrix-synapse")
+    requirements = metadata.requires(DISTRIBUTION_NAME)
     assert requirements is not None
     for raw_requirement in requirements:
         req = Requirement(raw_requirement)
@@ -54,7 +52,7 @@ def _generic_dependencies() -> Iterable[Dependency]:
 
 def _dependencies_for_extra(extra: str) -> Iterable[Dependency]:
     """Yield additional dependencies needed for a given `extra`."""
-    requirements = metadata.requires("matrix-synapse")
+    requirements = metadata.requires(DISTRIBUTION_NAME)
     assert requirements is not None
     for raw_requirement in requirements:
         req = Requirement(raw_requirement)
