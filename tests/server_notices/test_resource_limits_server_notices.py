@@ -75,7 +75,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self.user_id = "@user_id:test"
 
         self._rlsn._server_notices_manager.get_or_create_notice_room_for_user = Mock(
-            return_value=defer.succeed("!something:localhost")
+            return_value=defer.succeed(("!something:localhost", False))
         )
         self._rlsn._store.add_tag_to_room = Mock(return_value=defer.succeed(None))
         self._rlsn._store.get_tags_for_room = Mock(return_value=make_awaitable({}))

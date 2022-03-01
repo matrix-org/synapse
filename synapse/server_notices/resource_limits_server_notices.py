@@ -71,7 +71,10 @@ class ResourceLimitsServerNotices:
             # In practice, not sure we can ever get here
             return
 
-        room_id = await self._server_notices_manager.get_or_create_notice_room_for_user(
+        (
+            room_id,
+            _,
+        ) = await self._server_notices_manager.get_or_create_notice_room_for_user(
             user_id
         )
 
