@@ -57,7 +57,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                     "", self.store._get_unread_counts_by_pos_txn, room_id, user_id, 0
                 )
             )
-            self.assertEquals(
+            self.assertEqual(
                 counts,
                 NotifCounts(
                     notify_count=noitf_count,

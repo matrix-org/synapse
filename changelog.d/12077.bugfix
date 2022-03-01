@@ -1,0 +1,1 @@
+Fix a long-standing bug where Synapse would make additional failing requests over federation for missing data.
