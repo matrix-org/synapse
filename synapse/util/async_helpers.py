@@ -672,5 +672,5 @@ def stop_cancellation(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]":
         the new `Deferred`.
     """
     new_deferred: defer.Deferred[T] = defer.Deferred()
-    deferred.addBoth(new_deferred.callback)
+    deferred.chainDeferred(new_deferred)
     return new_deferred
