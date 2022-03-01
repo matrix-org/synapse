@@ -166,7 +166,11 @@ class DeactivateAccountHandler:
         await self.store.purge_account_data_for_user(user_id)
 
         # Let modules know the user has been deactivated.
-        await self._third_party_rules.on_deactivation(user_id, by_admin)
+        await self._third_party_rules.on_user_deactivation_status_changed(
+            user_id,
+            True,
+            by_admin,
+        )
 
         return identity_server_supports_unbinding
 
@@ -271,6 +275,10 @@ class DeactivateAccountHandler:
 
         # Mark the user as active.
         await self.store.set_user_deactivated_status(user_id, False)
+
+        await self._third_party_rules.on_user_deactivation_status_changed(
+            user_id, False, True
+        )
 
         # Add the user to the directory, if necessary. Note that
         # this must be done after the user is re-activated, because

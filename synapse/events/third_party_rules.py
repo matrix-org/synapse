@@ -39,7 +39,7 @@ CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK = Callable[
 ]
 ON_NEW_EVENT_CALLBACK = Callable[[EventBase, StateMap[EventBase]], Awaitable]
 ON_PROFILE_UPDATE_CALLBACK = Callable[[str, ProfileInfo, bool, bool], Awaitable]
-ON_DEACTIVATION_CALLBACK = Callable[[str, bool], Awaitable]
+ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK = Callable[[str, bool, bool], Awaitable]
 
 
 def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
@@ -158,7 +158,9 @@ class ThirdPartyEventRules:
         ] = []
         self._on_new_event_callbacks: List[ON_NEW_EVENT_CALLBACK] = []
         self._on_profile_update_callbacks: List[ON_PROFILE_UPDATE_CALLBACK] = []
-        self._on_deactivation_callbacks: List[ON_DEACTIVATION_CALLBACK] = []
+        self._on_user_deactivation_status_changed_callbacks: List[
+            ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
+        ] = []
 
     def register_third_party_rules_callbacks(
         self,
@@ -172,7 +174,7 @@ class ThirdPartyEventRules:
         ] = None,
         on_new_event: Optional[ON_NEW_EVENT_CALLBACK] = None,
         on_profile_update: Optional[ON_PROFILE_UPDATE_CALLBACK] = None,
-        on_deactivation: Optional[ON_DEACTIVATION_CALLBACK] = None,
+        on_deactivation: Optional[ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK] = None,
     ) -> None:
         """Register callbacks from modules for each hook."""
         if check_event_allowed is not None:
@@ -198,7 +200,7 @@ class ThirdPartyEventRules:
             self._on_profile_update_callbacks.append(on_profile_update)
 
         if on_deactivation is not None:
-            self._on_deactivation_callbacks.append(on_deactivation)
+            self._on_user_deactivation_status_changed_callbacks.append(on_deactivation)
 
     async def check_event_allowed(
         self, event: EventBase, context: EventContext
@@ -401,16 +403,19 @@ class ThirdPartyEventRules:
                     "Failed to run module API callback %s: %s", callback, e
                 )
 
-    async def on_deactivation(self, user_id: str, by_admin: bool) -> None:
-        """Called after a user has been deactivated.
+    async def on_user_deactivation_status_changed(
+        self, user_id: str, deactivated: bool, by_admin: bool
+    ) -> None:
+        """Called after a user has been deactivated or reactivated.
 
         Args:
             user_id: The deactivated user.
+            deactivated: Whether the user is now deactivated.
             by_admin: Whether the deactivation was performed by a server admin.
         """
-        for callback in self._on_deactivation_callbacks:
+        for callback in self._on_user_deactivation_status_changed_callbacks:
             try:
-                await callback(user_id, by_admin)
+                await callback(user_id, deactivated, by_admin)
             except Exception as e:
                 logger.exception(
                     "Failed to run module API callback %s: %s", callback, e

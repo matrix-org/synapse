@@ -634,13 +634,14 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         self.assertEqual(profile_info.display_name, displayname)
         self.assertEqual(profile_info.avatar_url, avatar_url)
 
-    def test_on_deactivation(self):
-        """Tests that the on_deactivation module callback is called correctly when
-        processing a user's deactivation.
+    def test_on_user_deactivation_status_changed(self):
+        """Tests that the on_user_deactivation_status_changed module callback is called
+        correctly when processing a user's deactivation.
         """
         # Register a mocked callback.
         deactivation_mock = Mock(return_value=make_awaitable(None))
-        self.hs.get_third_party_event_rules()._on_deactivation_callbacks.append(
+        third_party_rules = self.hs.get_third_party_event_rules()
+        third_party_rules._on_user_deactivation_status_changed_callbacks.append(
             deactivation_mock,
         )
         # Also register a mocked callback for profile updates, to check that the
@@ -678,10 +679,11 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         deactivation_mock.assert_called_once()
         args = deactivation_mock.call_args[0]
 
-        # Check that the mock was called with the right user ID, and with a False
-        # by_admin flag.
+        # Check that the mock was called with the right user ID, and with a True
+        # deactivated flag and a False by_admin flag.
         self.assertEqual(args[0], user_id)
-        self.assertFalse(args[1])
+        self.assertTrue(args[1])
+        self.assertFalse(args[2])
 
         # Check that the profile update callback was called twice (once for the display
         # name and once for the avatar URL), and that the "deactivation" boolean is true.
@@ -689,13 +691,15 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         args = profile_mock.call_args[0]
         self.assertTrue(args[3])
 
-    def test_on_deactivation_admin(self):
-        """Tests that the on_deactivation module callback is called correctly when
-        processing a user's deactivation triggered by a server admin.
+    def test_on_user_deactivation_status_changed_admin(self):
+        """Tests that the on_user_deactivation_status_changed module callback is called
+        correctly when processing a user's deactivation triggered by a server admin as
+        well as a reactivation.
         """
         # Register a mock callback.
         m = Mock(return_value=make_awaitable(None))
-        self.hs.get_third_party_event_rules()._on_deactivation_callbacks.append(m)
+        third_party_rules = self.hs.get_third_party_event_rules()
+        third_party_rules._on_user_deactivation_status_changed_callbacks.append(m)
 
         # Register an admin user.
         self.register_user("admin", "password", admin=True)
@@ -704,7 +708,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         # Register a user that we'll deactivate.
         user_id = self.register_user("altan", "password")
 
-        # Change a user's profile.
+        # Deactivate the user.
         channel = self.make_request(
             "PUT",
             "/_synapse/admin/v2/users/%s" % user_id,
@@ -717,7 +721,27 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         m.assert_called_once()
         args = m.call_args[0]
 
-        # Check that the mock was called with the right user ID, and with a True
-        # by_admin flag.
+        # Check that the mock was called with the right user ID, and with True deactivated
+        # and by_admin flags.
         self.assertEqual(args[0], user_id)
         self.assertTrue(args[1])
+        self.assertTrue(args[2])
+
+        # Reactivate the user.
+        channel = self.make_request(
+            "PUT",
+            "/_synapse/admin/v2/users/%s" % user_id,
+            {"deactivated": False, "password": "hackme"},
+            access_token=admin_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # Check that the mock was called once.
+        self.assertEqual(m.call_count, 2)
+        args = m.call_args[0]
+
+        # Check that the mock was called with the right user ID, and with a False
+        # deactivated flag and a True by_admin flag.
+        self.assertEqual(args[0], user_id)
+        self.assertFalse(args[1])
+        self.assertTrue(args[2])
