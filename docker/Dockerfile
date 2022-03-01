@@ -46,7 +46,6 @@ RUN \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy just what we need to pip install
-COPY scripts /synapse/scripts/
 COPY MANIFEST.in README.rst setup.py synctl /synapse/
 COPY synapse/__init__.py /synapse/synapse/__init__.py
 COPY synapse/python_dependencies.py /synapse/synapse/python_dependencies.py
