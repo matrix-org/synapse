@@ -803,11 +803,9 @@ class RelationsWorkerStore(SQLBaseStore):
         """
         # De-duplicate events by ID to handle the same event requested multiple times.
         #
-        # State events and redacted events do not get bundled aggregations.
+        # State events do not get bundled aggregations.
         events_by_id = {
-            event.event_id: event
-            for event in events
-            if not event.is_state() and not event.internal_metadata.is_redacted()
+            event.event_id: event for event in events if not event.is_state()
         }
 
         # event ID -> bundled aggregation in non-serialized form.
@@ -819,8 +817,14 @@ class RelationsWorkerStore(SQLBaseStore):
             if event_result:
                 results[event.event_id] = event_result
 
-        # Fetch any edits.
-        edits = await self._get_applicable_edits(events_by_id.keys())
+        # Fetch any edits (but not for redacted events).
+        edits = await self._get_applicable_edits(
+            [
+                event_id
+                for event_id, event in events_by_id.items()
+                if not event.internal_metadata.is_redacted()
+            ]
+        )
         for event_id, edit in edits.items():
             results.setdefault(event_id, BundledAggregations()).replace = edit
 

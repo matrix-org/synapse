@@ -1498,7 +1498,10 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         # The relations are returned.
         event_ids, relations = self._make_relation_requests()
         self.assertEquals(event_ids, [related_event_id])
-        self.assertEqual(relations, {})
+        self.assertEquals(
+            relations["m.annotation"],
+            {"chunk": [{"type": "m.reaction", "key": "👍", "count": 1}]},
+        )
 
         # There's nothing to aggregate.
         chunk = self._get_aggregations()
