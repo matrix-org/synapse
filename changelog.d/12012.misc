@@ -1,0 +1,1 @@
+Preparation for faster-room-join work: persist information on which events and rooms have partial state to the database.

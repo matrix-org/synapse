@@ -149,7 +149,7 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.user_dir_helper = GetUserDirectoryTables(self.store)
 
     def _purge_and_rebuild_user_dir(self) -> None:
@@ -415,7 +415,7 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
 
 class UserDirectoryStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         # alice and bob are both in !room_id. bobby is not but shares
         # a homeserver with alice.

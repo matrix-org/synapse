@@ -43,7 +43,7 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
     servlets = [admin.register_servlets]
 
     def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
+        self.store = homeserver.get_datastores().main
 
     def test_offline_to_online(self):
         wheel_timer = Mock()
@@ -61,11 +61,11 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
 
         self.assertTrue(persist_and_notify)
         self.assertTrue(state.currently_active)
-        self.assertEquals(new_state.state, state.state)
-        self.assertEquals(new_state.status_msg, state.status_msg)
-        self.assertEquals(state.last_federation_update_ts, now)
+        self.assertEqual(new_state.state, state.state)
+        self.assertEqual(new_state.status_msg, state.status_msg)
+        self.assertEqual(state.last_federation_update_ts, now)
 
-        self.assertEquals(wheel_timer.insert.call_count, 3)
+        self.assertEqual(wheel_timer.insert.call_count, 3)
         wheel_timer.insert.assert_has_calls(
             [
                 call(now=now, obj=user_id, then=new_state.last_active_ts + IDLE_TIMER),
@@ -104,11 +104,11 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         self.assertFalse(persist_and_notify)
         self.assertTrue(federation_ping)
         self.assertTrue(state.currently_active)
-        self.assertEquals(new_state.state, state.state)
-        self.assertEquals(new_state.status_msg, state.status_msg)
-        self.assertEquals(state.last_federation_update_ts, now)
+        self.assertEqual(new_state.state, state.state)
+        self.assertEqual(new_state.status_msg, state.status_msg)
+        self.assertEqual(state.last_federation_update_ts, now)
 
-        self.assertEquals(wheel_timer.insert.call_count, 3)
+        self.assertEqual(wheel_timer.insert.call_count, 3)
         wheel_timer.insert.assert_has_calls(
             [
                 call(now=now, obj=user_id, then=new_state.last_active_ts + IDLE_TIMER),
@@ -149,11 +149,11 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         self.assertFalse(persist_and_notify)
         self.assertTrue(federation_ping)
         self.assertTrue(state.currently_active)
-        self.assertEquals(new_state.state, state.state)
-        self.assertEquals(new_state.status_msg, state.status_msg)
-        self.assertEquals(state.last_federation_update_ts, now)
+        self.assertEqual(new_state.state, state.state)
+        self.assertEqual(new_state.status_msg, state.status_msg)
+        self.assertEqual(state.last_federation_update_ts, now)
 
-        self.assertEquals(wheel_timer.insert.call_count, 3)
+        self.assertEqual(wheel_timer.insert.call_count, 3)
         wheel_timer.insert.assert_has_calls(
             [
                 call(now=now, obj=user_id, then=new_state.last_active_ts + IDLE_TIMER),
@@ -191,11 +191,11 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
 
         self.assertTrue(persist_and_notify)
         self.assertFalse(state.currently_active)
-        self.assertEquals(new_state.state, state.state)
-        self.assertEquals(new_state.status_msg, state.status_msg)
-        self.assertEquals(state.last_federation_update_ts, now)
+        self.assertEqual(new_state.state, state.state)
+        self.assertEqual(new_state.status_msg, state.status_msg)
+        self.assertEqual(state.last_federation_update_ts, now)
 
-        self.assertEquals(wheel_timer.insert.call_count, 2)
+        self.assertEqual(wheel_timer.insert.call_count, 2)
         wheel_timer.insert.assert_has_calls(
             [
                 call(now=now, obj=user_id, then=new_state.last_active_ts + IDLE_TIMER),
@@ -227,10 +227,10 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         self.assertFalse(persist_and_notify)
         self.assertFalse(federation_ping)
         self.assertFalse(state.currently_active)
-        self.assertEquals(new_state.state, state.state)
-        self.assertEquals(new_state.status_msg, state.status_msg)
+        self.assertEqual(new_state.state, state.state)
+        self.assertEqual(new_state.status_msg, state.status_msg)
 
-        self.assertEquals(wheel_timer.insert.call_count, 1)
+        self.assertEqual(wheel_timer.insert.call_count, 1)
         wheel_timer.insert.assert_has_calls(
             [
                 call(
@@ -259,10 +259,10 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertTrue(persist_and_notify)
-        self.assertEquals(new_state.state, state.state)
-        self.assertEquals(state.last_federation_update_ts, now)
+        self.assertEqual(new_state.state, state.state)
+        self.assertEqual(state.last_federation_update_ts, now)
 
-        self.assertEquals(wheel_timer.insert.call_count, 0)
+        self.assertEqual(wheel_timer.insert.call_count, 0)
 
     def test_online_to_idle(self):
         wheel_timer = Mock()
@@ -281,12 +281,12 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertTrue(persist_and_notify)
-        self.assertEquals(new_state.state, state.state)
-        self.assertEquals(state.last_federation_update_ts, now)
-        self.assertEquals(new_state.state, state.state)
-        self.assertEquals(new_state.status_msg, state.status_msg)
+        self.assertEqual(new_state.state, state.state)
+        self.assertEqual(state.last_federation_update_ts, now)
+        self.assertEqual(new_state.state, state.state)
+        self.assertEqual(new_state.status_msg, state.status_msg)
 
-        self.assertEquals(wheel_timer.insert.call_count, 1)
+        self.assertEqual(wheel_timer.insert.call_count, 1)
         wheel_timer.insert.assert_has_calls(
             [
                 call(
@@ -357,8 +357,8 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
-        self.assertEquals(new_state.state, PresenceState.UNAVAILABLE)
-        self.assertEquals(new_state.status_msg, status_msg)
+        self.assertEqual(new_state.state, PresenceState.UNAVAILABLE)
+        self.assertEqual(new_state.status_msg, status_msg)
 
     def test_busy_no_idle(self):
         """
@@ -380,8 +380,8 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
-        self.assertEquals(new_state.state, PresenceState.BUSY)
-        self.assertEquals(new_state.status_msg, status_msg)
+        self.assertEqual(new_state.state, PresenceState.BUSY)
+        self.assertEqual(new_state.status_msg, status_msg)
 
     def test_sync_timeout(self):
         user_id = "@foo:bar"
@@ -399,8 +399,8 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
-        self.assertEquals(new_state.state, PresenceState.OFFLINE)
-        self.assertEquals(new_state.status_msg, status_msg)
+        self.assertEqual(new_state.state, PresenceState.OFFLINE)
+        self.assertEqual(new_state.status_msg, status_msg)
 
     def test_sync_online(self):
         user_id = "@foo:bar"
@@ -420,8 +420,8 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         )
 
         self.assertIsNotNone(new_state)
-        self.assertEquals(new_state.state, PresenceState.ONLINE)
-        self.assertEquals(new_state.status_msg, status_msg)
+        self.assertEqual(new_state.state, PresenceState.ONLINE)
+        self.assertEqual(new_state.status_msg, status_msg)
 
     def test_federation_ping(self):
         user_id = "@foo:bar"
@@ -440,7 +440,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
-        self.assertEquals(state, new_state)
+        self.assertEqual(state, new_state)
 
     def test_no_timeout(self):
         user_id = "@foo:bar"
@@ -477,8 +477,8 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         )
 
         self.assertIsNotNone(new_state)
-        self.assertEquals(new_state.state, PresenceState.OFFLINE)
-        self.assertEquals(new_state.status_msg, status_msg)
+        self.assertEqual(new_state.state, PresenceState.OFFLINE)
+        self.assertEqual(new_state.status_msg, status_msg)
 
     def test_last_active(self):
         user_id = "@foo:bar"
@@ -497,7 +497,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
-        self.assertEquals(state, new_state)
+        self.assertEqual(state, new_state)
 
 
 class PresenceHandlerTestCase(unittest.HomeserverTestCase):
@@ -891,7 +891,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         # self.event_builder_for_2 = EventBuilderFactory(hs)
         # self.event_builder_for_2.hostname = "test2"
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
 

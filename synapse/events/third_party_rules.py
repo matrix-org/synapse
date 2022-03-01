@@ -143,7 +143,7 @@ class ThirdPartyEventRules:
     def __init__(self, hs: "HomeServer"):
         self.third_party_rules = None
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self._check_event_allowed_callbacks: List[CHECK_EVENT_ALLOWED_CALLBACK] = []
         self._on_create_room_callbacks: List[ON_CREATE_ROOM_CALLBACK] = []

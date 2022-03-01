@@ -1,0 +1,1 @@
+Properly fix a long-standing bug where wrong data could be inserted in the `event_search` table when using sqlite. This could block running `synapse_port_db` with an "argument of type 'int' is not iterable" error. This bug was partially fixed by a change in Synapse 1.44.0.
