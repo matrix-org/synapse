@@ -18,6 +18,9 @@ from pathlib import Path
 from typing import List, Tuple, Iterable
 
 from jinja2 import Environment, FileSystemLoader
+from signedjson.key import generate_signing_key, write_signing_keys
+
+from synapse.util.stringutils import random_string
 
 DESIRED_WORKERS = (
     ("main", 1),
@@ -48,7 +51,7 @@ class Worker:
     ip: str
 
 
-def worker_num_to_ip(num: int):
+def worker_num_to_ip(num: int) -> str:
     return f"127.0.57.{num}"
 
 
@@ -70,11 +73,17 @@ def make_workers(workers: Iterable[Tuple[str, int]]) -> List[Worker]:
     return result
 
 
-def generate(worker_counts: Tuple[Tuple[str, int], ...], target_path: Path):
+def generate(worker_counts: Tuple[Tuple[str, int], ...], target_path: Path) -> None:
     if target_path.exists():
         print("Target path already exists. Won't overwrite.")
         return
     target_path.mkdir()
+
+    # Generate a signing key
+    key_id = "a_" + random_string(4)
+    key = (generate_signing_key(key_id),)
+    with open(target_path.joinpath("signing.key"), "w") as fout:
+        write_signing_keys(fout, key)
 
     env = Environment(loader=FileSystemLoader(dirname(__file__) + "/workers_setup"))
     hs_template = env.get_template("homeserver.yaml.j2")
@@ -125,7 +134,7 @@ def generate(worker_counts: Tuple[Tuple[str, int], ...], target_path: Path):
         fout.write(hs_config)
 
 
-def main(target_path: Path):
+def main(target_path: Path) -> None:
     generate(DESIRED_WORKERS, target_path)
 
 
