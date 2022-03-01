@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from twisted.internet import defer
-from twisted.internet.defer import CancelledError, Deferred
+from twisted.internet.defer import CancelledError, Deferred, ensureDeferred
 from twisted.internet.task import Clock
 
 from synapse.logging.context import (
@@ -21,7 +21,11 @@ from synapse.logging.context import (
     PreserveLoggingContext,
     current_context,
 )
-from synapse.util.async_helpers import ObservableDeferred, timeout_deferred
+from synapse.util.async_helpers import (
+    ObservableDeferred,
+    concurrently_execute,
+    timeout_deferred,
+)
 
 from tests.unittest import TestCase
 
@@ -171,3 +175,54 @@ class TimeoutDeferredTest(TestCase):
             )
             self.failureResultOf(timing_out_d, defer.TimeoutError)
             self.assertIs(current_context(), context_one)
+
+
+class _TestException(Exception):
+    pass
+
+
+class ConcurrentlyExecuteTest(TestCase):
+    def test_limits_runners(self):
+        """If we have more tasks than runners, we should get the limit of runners"""
+        started = 0
+        waiters = []
+        processed = []
+
+        async def callback(v):
+            # when we first enter, bump the start count
+            nonlocal started
+            started += 1
+
+            # record the fact we got an item
+            processed.append(v)
+
+            # wait for the goahead before returning
+            d2 = Deferred()
+            waiters.append(d2)
+            await d2
+
+        # set it going
+        d2 = ensureDeferred(concurrently_execute(callback, [1, 2, 3, 4, 5], 3))
+
+        # check we got exactly 3 processes
+        self.assertEqual(started, 3)
+        self.assertEqual(len(waiters), 3)
+
+        # let one finish
+        waiters.pop().callback(0)
+
+        # ... which should start another
+        self.assertEqual(started, 4)
+        self.assertEqual(len(waiters), 3)
+
+        # we still shouldn't be done
+        self.assertNoResult(d2)
+
+        # finish the job
+        while waiters:
+            waiters.pop().callback(0)
+
+        # check everything got done
+        self.assertEqual(started, 5)
+        self.assertCountEqual(processed, [1, 2, 3, 4, 5])
+        self.successResultOf(d2)

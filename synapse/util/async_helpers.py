@@ -193,9 +193,9 @@ class ObservableDeferred(Generic[_T], AbstractObservableDeferred[_T]):
 T = TypeVar("T")
 
 
-def concurrently_execute(
+async def concurrently_execute(
     func: Callable[[T], Any], args: Iterable[T], limit: int
-) -> defer.Deferred:
+) -> None:
     """Executes the function with each argument concurrently while limiting
     the number of concurrent executions.
 
@@ -221,15 +221,9 @@ def concurrently_execute(
     # We use `itertools.islice` to handle the case where the number of args is
     # less than the limit, avoiding needlessly spawning unnecessary background
     # tasks.
-    return make_deferred_yieldable(
-        defer.gatherResults(
-            [
-                run_in_background(_concurrently_execute_inner, value)
-                for value in itertools.islice(it, limit)
-            ],
-            consumeErrors=True,
-        )
-    ).addErrback(unwrapFirstError)
+    await yieldable_gather_results(
+        _concurrently_execute_inner, (value for value in itertools.islice(it, limit))
+    )
 
 
 def yieldable_gather_results(
