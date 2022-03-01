@@ -11,9 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import traceback
+
 from twisted.internet import defer
 from twisted.internet.defer import CancelledError, Deferred, ensureDeferred
 from twisted.internet.task import Clock
+from twisted.python.failure import Failure
 
 from synapse.logging.context import (
     SENTINEL_CONTEXT,
@@ -225,4 +228,57 @@ class ConcurrentlyExecuteTest(TestCase):
         # check everything got done
         self.assertEqual(started, 5)
         self.assertCountEqual(processed, [1, 2, 3, 4, 5])
+        self.successResultOf(d2)
+
+    def test_preserves_stacktraces(self):
+        """Test that the stacktrace from an exception thrown in the callback is preserved"""
+        d1 = Deferred()
+
+        async def callback(v):
+            # alas, this doesn't work at all without an await here
+            await d1
+            raise _TestException("bah")
+
+        async def caller():
+            try:
+                await concurrently_execute(callback, [1], 2)
+            except _TestException as e:
+                tb = traceback.extract_tb(e.__traceback__)
+                # we expect to see "caller", "concurrently_execute" and "callback".
+                self.assertEqual(tb[0].name, "caller")
+                self.assertEqual(tb[1].name, "concurrently_execute")
+                self.assertEqual(tb[-1].name, "callback")
+            else:
+                self.fail("No exception thrown")
+
+        d2 = ensureDeferred(caller())
+        d1.callback(0)
+        self.successResultOf(d2)
+
+    def test_preserves_stacktraces_on_preformed_failure(self):
+        """Test that the stacktrace on a Failure returned by the callback is preserved"""
+        d1 = Deferred()
+        f = Failure(_TestException("bah"))
+
+        async def callback(v):
+            # alas, this doesn't work at all without an await here
+            await d1
+            await defer.fail(f)
+
+        async def caller():
+            try:
+                await concurrently_execute(callback, [1], 2)
+            except _TestException as e:
+                tb = traceback.extract_tb(e.__traceback__)
+                # we expect to see "caller", "concurrently_execute", "callback",
+                # and some magic from inside ensureDeferred that happens when .fail
+                # is called.
+                self.assertEqual(tb[0].name, "caller")
+                self.assertEqual(tb[1].name, "concurrently_execute")
+                self.assertEqual(tb[-2].name, "callback")
+            else:
+                self.fail("No exception thrown")
+
+        d2 = ensureDeferred(caller())
+        d1.callback(0)
         self.successResultOf(d2)
