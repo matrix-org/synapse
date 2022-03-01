@@ -1390,15 +1390,11 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         """Test that edits of an event are redacted when the original event
         is redacted.
         """
-        # Send a new event
-        res = self.helper.send(self.room, body="Heyo!", tok=self.user_token)
-        original_event_id = res["event_id"]
-
         # Add a relation
         channel = self._send_relation(
             RelationTypes.REPLACE,
             "m.room.message",
-            parent_id=original_event_id,
+            parent_id=self.parent_id,
             content={
                 "msgtype": "m.text",
                 "body": "Wibble",
@@ -1411,7 +1407,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         channel = self.make_request(
             "GET",
             f"/_matrix/client/unstable/rooms/{self.room}/relations"
-            f"/{original_event_id}/m.replace/m.room.message",
+            f"/{self.parent_id}/m.replace/m.room.message",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -1420,12 +1416,13 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertEqual(len(channel.json_body["chunk"]), 1)
 
         # Redact the original event
-        self._redact(original_event_id)
+        self._redact(self.parent_id)
 
         # Try to check for remaining m.replace relations
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations/{original_event_id}/m.replace/m.room.message",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations"
+            f"/{self.parent_id}/m.replace/m.room.message",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
