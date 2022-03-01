@@ -105,7 +105,7 @@ def check_requirements(extra: Optional[str] = None) -> None:
     else:
         raise ValueError(f"Synapse does not provide the feature '{extra}'")
 
-    deps_needed = []
+    deps_unfulfilled = []
     errors = []
 
     for (requirement, must_be_installed) in dependencies:
@@ -113,15 +113,15 @@ def check_requirements(extra: Optional[str] = None) -> None:
             dist: metadata.Distribution = metadata.distribution(requirement.name)
         except metadata.PackageNotFoundError:
             if must_be_installed:
-                deps_needed.append(requirement.name)
+                deps_unfulfilled.append(requirement.name)
                 errors.append(_not_installed(requirement, extra))
         else:
             if not requirement.specifier.contains(dist.version):
-                deps_needed.append(requirement.name)
+                deps_unfulfilled.append(requirement.name)
                 errors.append(_incorrect_version(requirement, dist.version, extra))
 
-    if deps_needed:
+    if deps_unfulfilled:
         for err in errors:
             logging.error(err)
 
-        raise DependencyException(deps_needed)
+        raise DependencyException(deps_unfulfilled)
