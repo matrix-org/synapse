@@ -1357,9 +1357,10 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         )
         self.assertEqual(200, channel.code, channel.json_body)
 
-    def test_aggregation_redactions(self) -> None:
-        """Test that annotations get correctly aggregated after a redaction."""
-
+    def test_redact_relation_annotation(self) -> None:
+        """Test that annotations of an event are properly handled after the
+        annotation is redacted.
+        """
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
         self.assertEqual(200, channel.code, channel.json_body)
         to_redact_event_id = channel.json_body["event_id"]
@@ -1369,9 +1370,10 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         )
         self.assertEqual(200, channel.code, channel.json_body)
 
-        # Now lets redact one of the 'a' reactions
+        # Redact one of the reactions.
         self._redact(to_redact_event_id)
 
+        # Ensure that the aggregations are correct.
         channel = self.make_request(
             "GET",
             f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}",
@@ -1384,7 +1386,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
             {"chunk": [{"type": "m.reaction", "key": "a", "count": 1}]},
         )
 
-    def test_relations_redaction_redacts_edits(self) -> None:
+    def test_redact_relation_edit(self) -> None:
         """Test that edits of an event are redacted when the original event
         is redacted.
         """
@@ -1432,27 +1434,21 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertIn("chunk", channel.json_body)
         self.assertEqual(channel.json_body["chunk"], [])
 
-    def test_aggregations_redaction_prevents_access_to_aggregations(self) -> None:
+    def test_redact_parent(self) -> None:
         """Test that annotations of an event are redacted when the original event
         is redacted.
         """
-        # Send a new event
-        res = self.helper.send(self.room, body="Hello!", tok=self.user_token)
-        original_event_id = res["event_id"]
-
         # Add a relation
-        channel = self._send_relation(
-            RelationTypes.ANNOTATION, "m.reaction", key="👍", parent_id=original_event_id
-        )
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="👍")
         self.assertEqual(200, channel.code, channel.json_body)
 
-        # Redact the original
-        self._redact(original_event_id)
+        # Redact the original event.
+        self._redact(self.parent_id)
 
         # Check that aggregations returns zero
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{original_event_id}/m.annotation/m.reaction",
+            f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}/m.annotation/m.reaction",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
