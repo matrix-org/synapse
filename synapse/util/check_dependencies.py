@@ -11,7 +11,6 @@ except ImportError:
     import importlib_metadata as metadata  # type: ignore[no-redef]
 
 
-
 class DependencyException(Exception):
     @property
     def message(self) -> str:
