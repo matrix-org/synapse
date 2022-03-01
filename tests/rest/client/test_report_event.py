@@ -52,7 +52,7 @@ class ReportEventTestCase(unittest.HomeserverTestCase):
         self._assert_status(200, data)
 
     def test_no_reason(self) -> None:
-        data: JsonDict = {"score": 0}
+        data = {"score": 0}
         self._assert_status(200, data)
 
     def test_no_score(self) -> None:
