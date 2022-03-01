@@ -1943,14 +1943,27 @@ class PersistEventsStore:
 
         txn.execute(sql, (batch_id,))
 
-    def _handle_redaction(self, txn, redacted_event_id):
+    def _handle_redaction(
+        self, txn: LoggingTransaction, redacted_event_id: str
+    ) -> None:
         """Handles receiving a redaction and checking whether we need to remove
         any redacted relations from the database.
 
         Args:
             txn
-            redacted_event_id (str): The event that was redacted.
+            redacted_event_id: The event that was redacted.
         """
+
+        # Fetch current relations.
+        related_events = self.db_pool.simple_select_onecol_txn(
+            txn,
+            table="event_relations",
+            keyvalues={"event_id": redacted_event_id},
+            retcol="relates_to_id",
+        )
+        # Any relation information for the related events must be cleared.
+        for related_event in related_events:
+            txn.call_after(self.store._invalidate_relations_for_event, related_event)
 
         self.db_pool.simple_delete_txn(
             txn, table="event_relations", keyvalues={"event_id": redacted_event_id}

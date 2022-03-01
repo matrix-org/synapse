@@ -1415,6 +1415,18 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertEqual(200, channel.code, channel.json_body)
         unredacted_event_id = channel.json_body["event_id"]
 
+        # Both relations should exist.
+        event_ids, relations = self._make_relation_requests()
+        self.assertCountEqual(event_ids, [to_redact_event_id, unredacted_event_id])
+        self.assertEquals(
+            relations["m.annotation"],
+            {"chunk": [{"type": "m.reaction", "key": "a", "count": 2}]},
+        )
+
+        # Both relations appear in the aggregation.
+        chunk = self._get_aggregations()
+        self.assertEqual(chunk, [{"type": "m.reaction", "key": "a", "count": 2}])
+
         # Redact one of the reactions.
         self._redact(to_redact_event_id)
 
@@ -1468,6 +1480,15 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="👍")
         self.assertEqual(200, channel.code, channel.json_body)
 
+        # The relations should exist.
+        event_ids, relations = self._make_relation_requests()
+        self.assertEqual(len(event_ids), 1)
+        self.assertIn(RelationTypes.ANNOTATION, relations)
+
+        # The aggregation should exist.
+        chunk = self._get_aggregations()
+        self.assertEqual(chunk, [{"type": "m.reaction", "key": "👍", "count": 1}])
+
         # Redact the original event.
         self._redact(self.parent_id)
 
@@ -1476,6 +1497,6 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertEqual(event_ids, [])
         self.assertEqual(relations, {})
 
-        # Check that aggregations returns zero
+        # There's nothing to aggregate.
         chunk = self._get_aggregations()
         self.assertEqual(chunk, [])
