@@ -150,7 +150,7 @@ If multiple modules implement this callback, Synapse runs them all in order.
 
 ### `on_profile_update`
 
-_First introduced in Synapse v1.5X.0_
+_First introduced in Synapse v1.54.0_
 
 ```python
 async def on_profile_update(
@@ -185,7 +185,7 @@ If multiple modules implement this callback, Synapse runs them all in order.
 
 ### `on_user_deactivation_status_changed`
 
-_First introduced in Synapse v1.5X.0_
+_First introduced in Synapse v1.54.0_
 
 ```python
 async def on_user_deactivation_status_changed(
