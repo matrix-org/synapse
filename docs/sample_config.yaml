@@ -49,6 +49,7 @@ modules:
 
 
 ## Server ##
+THIS SHOULD TRIGGER CI TO FAIL
 
 # The public-facing domain of the server
 #
