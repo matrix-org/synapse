@@ -1,6 +1,8 @@
 import logging
 from typing import Iterable, NamedTuple, Optional
 
+from packaging.requirements import Requirement
+
 DISTRIBUTION_NAME = "matrix-synapse"
 
 try:
@@ -8,7 +10,6 @@ try:
 except ImportError:
     import importlib_metadata as metadata  # type: ignore[no-redef]
 
-from packaging.requirements import Requirement
 
 
 class DependencyException(Exception):
