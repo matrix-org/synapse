@@ -65,7 +65,7 @@ class LegacyDenyNewRooms(LegacyThirdPartyRulesTestModule):
     def __init__(self, config: Dict, module_api: "ModuleApi") -> None:
         super().__init__(config, module_api)
 
-    async def on_create_room(  # type: ignore[override]
+    async def on_create_room(
         self, requester: Requester, config: dict, is_requester_admin: bool
     ) -> bool:
         return False
@@ -563,7 +563,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
             tok=self.tok,
         )
 
-    def test_on_profile_update(self):
+    def test_on_profile_update(self) -> None:
         """Tests that the on_profile_update module callback is correctly called on
         profile updates.
         """
@@ -622,7 +622,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         self.assertEqual(profile_info.display_name, displayname)
         self.assertEqual(profile_info.avatar_url, avatar_url)
 
-    def test_on_profile_update_admin(self):
+    def test_on_profile_update_admin(self) -> None:
         """Tests that the on_profile_update module callback is correctly called on
         profile updates triggered by a server admin.
         """
@@ -664,7 +664,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         self.assertEqual(profile_info.display_name, displayname)
         self.assertEqual(profile_info.avatar_url, avatar_url)
 
-    def test_on_user_deactivation_status_changed(self):
+    def test_on_user_deactivation_status_changed(self) -> None:
         """Tests that the on_user_deactivation_status_changed module callback is called
         correctly when processing a user's deactivation.
         """
@@ -721,7 +721,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         args = profile_mock.call_args[0]
         self.assertTrue(args[3])
 
-    def test_on_user_deactivation_status_changed_admin(self):
+    def test_on_user_deactivation_status_changed_admin(self) -> None:
         """Tests that the on_user_deactivation_status_changed module callback is called
         correctly when processing a user's deactivation triggered by a server admin as
         well as a reactivation.
