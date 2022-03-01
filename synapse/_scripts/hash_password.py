@@ -8,9 +8,6 @@ import unicodedata
 import bcrypt
 import yaml
 
-bcrypt_rounds = 12
-password_pepper = ""
-
 
 def prompt_for_pass():
     password = getpass.getpass("Password: ")
@@ -26,7 +23,10 @@ def prompt_for_pass():
     return password
 
 
-if __name__ == "__main__":
+def main():
+    bcrypt_rounds = 12
+    password_pepper = ""
+
     parser = argparse.ArgumentParser(
         description=(
             "Calculate the hash of a new password, so that passwords can be reset"
@@ -77,3 +77,7 @@ if __name__ == "__main__":
     ).decode("ascii")
 
     print(hashed)
+
+
+if __name__ == "__main__":
+    main()

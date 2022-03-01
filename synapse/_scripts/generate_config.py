@@ -6,7 +6,8 @@ import sys
 
 from synapse.config.homeserver import HomeServerConfig
 
-if __name__ == "__main__":
+
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config-dir",
@@ -76,3 +77,7 @@ if __name__ == "__main__":
         shutil.copyfileobj(args.header_file, args.output_file)
 
     args.output_file.write(conf)
+
+
+if __name__ == "__main__":
+    main()

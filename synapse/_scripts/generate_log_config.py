@@ -19,7 +19,8 @@ import sys
 
 from synapse.config.logger import DEFAULT_LOG_CONFIG
 
-if __name__ == "__main__":
+
+def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -42,3 +43,7 @@ if __name__ == "__main__":
     out = args.output_file
     out.write(DEFAULT_LOG_CONFIG.substitute(log_file=args.log_file))
     out.flush()
+
+
+if __name__ == "__main__":
+    main()

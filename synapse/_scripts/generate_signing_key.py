@@ -19,7 +19,8 @@ from signedjson.key import generate_signing_key, write_signing_keys
 
 from synapse.util.stringutils import random_string
 
-if __name__ == "__main__":
+
+def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -34,3 +35,7 @@ if __name__ == "__main__":
     key_id = "a_" + random_string(4)
     key = (generate_signing_key(key_id),)
     write_signing_keys(args.output_file, key)
+
+
+if __name__ == "__main__":
+    main()
