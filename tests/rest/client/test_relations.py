@@ -1506,3 +1506,34 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         # There's nothing to aggregate.
         chunk = self._get_aggregations()
         self.assertEqual(chunk, [{"count": 1, "key": "👍", "type": "m.reaction"}])
+
+    @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
+    def test_redact_parent_thread(self) -> None:
+        """
+        Test that thread replies are still available when the root event is redacted.
+        """
+        channel = self._send_relation(
+            RelationTypes.THREAD,
+            EventTypes.Message,
+            content={"body": "reply 1", "msgtype": "m.text"},
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        related_event_id = channel.json_body["event_id"]
+
+        # Redact one of the reactions.
+        self._redact(self.parent_id)
+
+        # The unredacted relation should still exist.
+        event_ids, relations = self._make_relation_requests()
+        self.assertEquals(len(event_ids), 1)
+        self.assertDictContainsSubset(
+            {
+                "count": 1,
+                "current_user_participated": True,
+            },
+            relations[RelationTypes.THREAD],
+        )
+        self.assertEqual(
+            relations[RelationTypes.THREAD]["latest_event"]["event_id"],
+            related_event_id,
+        )
