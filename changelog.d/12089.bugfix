@@ -1,0 +1,1 @@
+Fix occasional 'Unhandled error in Deferred' error message.

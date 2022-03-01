@@ -11,9 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import List
+
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.rest import admin
 from synapse.rest.client import login, room, sync
+from synapse.server import HomeServer
+from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
@@ -28,7 +34,7 @@ class RedactionsTestCase(HomeserverTestCase):
         sync.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
 
         config["rc_message"] = {"per_second": 0.2, "burst_count": 10}
@@ -36,7 +42,7 @@ class RedactionsTestCase(HomeserverTestCase):
 
         return self.setup_test_homeserver(config=config)
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         # register a couple of users
         self.mod_user_id = self.register_user("user1", "pass")
         self.mod_access_token = self.login("user1", "pass")
@@ -60,7 +66,9 @@ class RedactionsTestCase(HomeserverTestCase):
             room=self.room_id, user=self.other_user_id, tok=self.other_access_token
         )
 
-    def _redact_event(self, access_token, room_id, event_id, expect_code=200):
+    def _redact_event(
+        self, access_token: str, room_id: str, event_id: str, expect_code: int = 200
+    ) -> JsonDict:
         """Helper function to send a redaction event.
 
         Returns the json body.
@@ -71,13 +79,13 @@ class RedactionsTestCase(HomeserverTestCase):
         self.assertEqual(int(channel.result["code"]), expect_code)
         return channel.json_body
 
-    def _sync_room_timeline(self, access_token, room_id):
+    def _sync_room_timeline(self, access_token: str, room_id: str) -> List[JsonDict]:
         channel = self.make_request("GET", "sync", access_token=self.mod_access_token)
         self.assertEqual(channel.result["code"], b"200")
         room_sync = channel.json_body["rooms"]["join"][room_id]
         return room_sync["timeline"]["events"]
 
-    def test_redact_event_as_moderator(self):
+    def test_redact_event_as_moderator(self) -> None:
         # as a regular user, send a message to redact
         b = self.helper.send(room_id=self.room_id, tok=self.other_access_token)
         msg_id = b["event_id"]
@@ -98,7 +106,7 @@ class RedactionsTestCase(HomeserverTestCase):
         self.assertEqual(timeline[-2]["unsigned"]["redacted_by"], redaction_id)
         self.assertEqual(timeline[-2]["content"], {})
 
-    def test_redact_event_as_normal(self):
+    def test_redact_event_as_normal(self) -> None:
         # as a regular user, send a message to redact
         b = self.helper.send(room_id=self.room_id, tok=self.other_access_token)
         normal_msg_id = b["event_id"]
@@ -133,7 +141,7 @@ class RedactionsTestCase(HomeserverTestCase):
         self.assertEqual(timeline[-3]["unsigned"]["redacted_by"], redaction_id)
         self.assertEqual(timeline[-3]["content"], {})
 
-    def test_redact_nonexistent_event(self):
+    def test_redact_nonexistent_event(self) -> None:
         # control case: an existing event
         b = self.helper.send(room_id=self.room_id, tok=self.other_access_token)
         msg_id = b["event_id"]
@@ -158,7 +166,7 @@ class RedactionsTestCase(HomeserverTestCase):
         self.assertEqual(timeline[-2]["unsigned"]["redacted_by"], redaction_id)
         self.assertEqual(timeline[-2]["content"], {})
 
-    def test_redact_create_event(self):
+    def test_redact_create_event(self) -> None:
         # control case: an existing event
         b = self.helper.send(room_id=self.room_id, tok=self.mod_access_token)
         msg_id = b["event_id"]
@@ -178,7 +186,7 @@ class RedactionsTestCase(HomeserverTestCase):
             self.other_access_token, self.room_id, create_event_id, expect_code=403
         )
 
-    def test_redact_event_as_moderator_ratelimit(self):
+    def test_redact_event_as_moderator_ratelimit(self) -> None:
         """Tests that the correct ratelimiting is applied to redactions"""
 
         message_ids = []

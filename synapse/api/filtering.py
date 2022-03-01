@@ -22,6 +22,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Mapping,
     Optional,
     Set,
     TypeVar,
@@ -361,10 +362,10 @@ class Filter:
             return self._check_fields(field_matchers)
         else:
             content = event.get("content")
-            # Content is assumed to be a dict below, so ensure it is. This should
+            # Content is assumed to be a mapping below, so ensure it is. This should
             # always be true for events, but account_data has been allowed to
             # have non-dict content.
-            if not isinstance(content, dict):
+            if not isinstance(content, Mapping):
                 content = {}
 
             sender = event.get("sender", None)

@@ -88,18 +88,18 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
             res = self.get_success(
                 self.store.have_seen_events("room1", ["event10", "event19"])
             )
-            self.assertEquals(res, {"event10"})
+            self.assertEqual(res, {"event10"})
 
             # that should result in a single db query
-            self.assertEquals(ctx.get_resource_usage().db_txn_count, 1)
+            self.assertEqual(ctx.get_resource_usage().db_txn_count, 1)
 
         # a second lookup of the same events should cause no queries
         with LoggingContext(name="test") as ctx:
             res = self.get_success(
                 self.store.have_seen_events("room1", ["event10", "event19"])
             )
-            self.assertEquals(res, {"event10"})
-            self.assertEquals(ctx.get_resource_usage().db_txn_count, 0)
+            self.assertEqual(res, {"event10"})
+            self.assertEqual(ctx.get_resource_usage().db_txn_count, 0)
 
     def test_query_via_event_cache(self):
         # fetch an event into the event cache
@@ -108,8 +108,8 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
         # looking it up should now cause no db hits
         with LoggingContext(name="test") as ctx:
             res = self.get_success(self.store.have_seen_events("room1", ["event10"]))
-            self.assertEquals(res, {"event10"})
-            self.assertEquals(ctx.get_resource_usage().db_txn_count, 0)
+            self.assertEqual(res, {"event10"})
+            self.assertEqual(ctx.get_resource_usage().db_txn_count, 0)
 
 
 class EventCacheTestCase(unittest.HomeserverTestCase):

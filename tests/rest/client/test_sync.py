@@ -237,10 +237,10 @@ class SyncTypingTests(unittest.HomeserverTestCase):
             typing_url % (room, other_user_id, other_access_token),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)
 
         channel = self.make_request("GET", "/sync?access_token=%s" % (access_token,))
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)
         next_batch = channel.json_body["next_batch"]
 
         # Stop typing.
@@ -249,7 +249,7 @@ class SyncTypingTests(unittest.HomeserverTestCase):
             typing_url % (room, other_user_id, other_access_token),
             b'{"typing": false}',
         )
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)
 
         # Start typing.
         channel = self.make_request(
@@ -257,11 +257,11 @@ class SyncTypingTests(unittest.HomeserverTestCase):
             typing_url % (room, other_user_id, other_access_token),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)
 
         # Should return immediately
         channel = self.make_request("GET", sync_url % (access_token, next_batch))
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)
         next_batch = channel.json_body["next_batch"]
 
         # Reset typing serial back to 0, as if the master had.
@@ -273,7 +273,7 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         self.helper.send(room, body="There!", tok=other_access_token)
 
         channel = self.make_request("GET", sync_url % (access_token, next_batch))
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)
         next_batch = channel.json_body["next_batch"]
 
         # This should time out! But it does not, because our stream token is
@@ -281,7 +281,7 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         # already seen) is new, since it's got a token above our new, now-reset
         # stream token.
         channel = self.make_request("GET", sync_url % (access_token, next_batch))
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)
         next_batch = channel.json_body["next_batch"]
 
         # Clear the typing information, so that it doesn't think everything is
@@ -351,7 +351,7 @@ class SyncKnockTestCase(
             b"{}",
             self.knocker_tok,
         )
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
 
         # We expect to see the knock event in the stripped room state later
         self.expected_room_state[EventTypes.Member] = {

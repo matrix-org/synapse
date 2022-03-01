@@ -104,7 +104,7 @@ class RoomEventsStoreTestCase(HomeserverTestCase):
             self.store.get_current_state(room_id=self.room.to_string())
         )
 
-        self.assertEquals(1, len(state))
+        self.assertEqual(1, len(state))
         self.assertObjectHasAttributes(
             {"type": "m.room.name", "room_id": self.room.to_string(), "name": name},
             state[0],
@@ -121,7 +121,7 @@ class RoomEventsStoreTestCase(HomeserverTestCase):
             self.store.get_current_state(room_id=self.room.to_string())
         )
 
-        self.assertEquals(1, len(state))
+        self.assertEqual(1, len(state))
         self.assertObjectHasAttributes(
             {"type": "m.room.topic", "room_id": self.room.to_string(), "topic": topic},
             state[0],

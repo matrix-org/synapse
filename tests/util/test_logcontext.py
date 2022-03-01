@@ -17,7 +17,7 @@ from .. import unittest
 
 class LoggingContextTestCase(unittest.TestCase):
     def _check_test_key(self, value):
-        self.assertEquals(current_context().name, value)
+        self.assertEqual(current_context().name, value)
 
     def test_with_context(self):
         with LoggingContext("test"):
