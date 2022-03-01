@@ -1,1 +1,1 @@
-Move CI checks out of tox, to facilitate a move to using poetry. NO FULLSTOP SHOULD TRIGGER CI TO FAIL
+Move CI checks out of tox, to facilitate a move to using poetry.
