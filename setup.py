@@ -155,6 +155,8 @@ setup(
         "console_scripts": [
             "synapse_homeserver = synapse.app.homeserver:main",
             "synapse_worker = synapse.app.generic_worker:main",
+            "register_new_matrix_user = synapse._scripts.register_new_matrix_user:main"
+            "synapse_review_recent_signups = synapse._scripts.review_recent_signups:main"
         ]
     },
     classifiers=[
