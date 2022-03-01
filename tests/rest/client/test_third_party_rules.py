@@ -65,7 +65,7 @@ class LegacyDenyNewRooms(LegacyThirdPartyRulesTestModule):
     def __init__(self, config: Dict, module_api: "ModuleApi") -> None:
         super().__init__(config, module_api)
 
-    def on_create_room(  # type: ignore[override]
+    async def on_create_room(  # type: ignore[override]
         self, requester: Requester, config: dict, is_requester_admin: bool
     ) -> bool:
         return False
