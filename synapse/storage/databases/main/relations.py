@@ -801,41 +801,32 @@ class RelationsWorkerStore(SQLBaseStore):
             A map of event ID to the bundled aggregation for the event. Not all
             events may have bundled aggregations in the results.
         """
-        # The already processed event IDs. Tracked separately from the result
-        # since the result omits events which do not have bundled aggregations.
-        seen_event_ids = set()
-
+        # De-duplicate events by ID to handle the same event requested multiple times.
+        #
         # State events and redacted events do not get bundled aggregations.
-        events = [
-            event
+        events_by_id = {
+            event.event_id: event
             for event in events
             if not event.is_state() and not event.internal_metadata.is_redacted()
-        ]
+        }
 
         # event ID -> bundled aggregation in non-serialized form.
         results: Dict[str, BundledAggregations] = {}
 
         # Fetch other relations per event.
-        for event in events:
-            # De-duplicate events by ID to handle the same event requested multiple
-            # times. The caches that _get_bundled_aggregation_for_event use should
-            # capture this, but best to reduce work.
-            if event.event_id in seen_event_ids:
-                continue
-            seen_event_ids.add(event.event_id)
-
+        for event in events_by_id.values():
             event_result = await self._get_bundled_aggregation_for_event(event, user_id)
             if event_result:
                 results[event.event_id] = event_result
 
         # Fetch any edits.
-        edits = await self._get_applicable_edits(seen_event_ids)
+        edits = await self._get_applicable_edits(events_by_id.keys())
         for event_id, edit in edits.items():
             results.setdefault(event_id, BundledAggregations()).replace = edit
 
         # Fetch thread summaries.
         if self._msc3440_enabled:
-            summaries = await self._get_thread_summaries(seen_event_ids)
+            summaries = await self._get_thread_summaries(events_by_id.keys())
             # Only fetch participated for a limited selection based on what had
             # summaries.
             participated = await self._get_threads_participated(
