@@ -1442,7 +1442,68 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         chunk = self._get_aggregations()
         self.assertEqual(chunk, [{"type": "m.reaction", "key": "a", "count": 1}])
 
-    def test_redact_relation_edit(self) -> None:
+    @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
+    def test_redact_relation_thread(self) -> None:
+        """
+        Test that thread replies are properly handled after the thread reply redacted.
+
+        The redacted event should not be included in bundled aggregations or
+        the response to relations.
+        """
+        channel = self._send_relation(
+            RelationTypes.THREAD,
+            EventTypes.Message,
+            content={"body": "reply 1", "msgtype": "m.text"},
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        unredacted_event_id = channel.json_body["event_id"]
+
+        # Note that the *last* event in the thread is redacted, as that gets
+        # included in the bundled aggregation.
+        channel = self._send_relation(
+            RelationTypes.THREAD,
+            EventTypes.Message,
+            content={"body": "reply 2", "msgtype": "m.text"},
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        to_redact_event_id = channel.json_body["event_id"]
+
+        # Both relations exist.
+        event_ids, relations = self._make_relation_requests()
+        self.assertEquals(event_ids, [to_redact_event_id, unredacted_event_id])
+        self.assertDictContainsSubset(
+            {
+                "count": 2,
+                "current_user_participated": True,
+            },
+            relations[RelationTypes.THREAD],
+        )
+        # And the latest event returned is the event that will be redacted.
+        self.assertEqual(
+            relations[RelationTypes.THREAD]["latest_event"]["event_id"],
+            to_redact_event_id,
+        )
+
+        # Redact one of the reactions.
+        self._redact(to_redact_event_id)
+
+        # The unredacted relation should still exist.
+        event_ids, relations = self._make_relation_requests()
+        self.assertEquals(event_ids, [unredacted_event_id])
+        self.assertDictContainsSubset(
+            {
+                "count": 1,
+                "current_user_participated": True,
+            },
+            relations[RelationTypes.THREAD],
+        )
+        # And the latest event is now the unredacted event.
+        self.assertEqual(
+            relations[RelationTypes.THREAD]["latest_event"]["event_id"],
+            unredacted_event_id,
+        )
+
+    def test_redact_parent_edit(self) -> None:
         """Test that edits of an event are redacted when the original event
         is redacted.
         """
