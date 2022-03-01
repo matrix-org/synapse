@@ -148,6 +148,62 @@ deny an incoming event, see [`check_event_for_spam`](spam_checker_callbacks.md#c
 
 If multiple modules implement this callback, Synapse runs them all in order.
 
+### `on_profile_update`
+
+_First introduced in Synapse v1.54.0_
+
+```python
+async def on_profile_update(
+    user_id: str,
+    new_profile: "synapse.module_api.ProfileInfo",
+    by_admin: bool,
+    deactivation: bool,
+) -> None:
+```
+
+Called after updating a local user's profile. The update can be triggered either by the
+user themselves or a server admin. The update can also be triggered by a user being
+deactivated (in which case their display name is set to an empty string (`""`) and the
+avatar URL is set to `None`). The module is passed the Matrix ID of the user whose profile
+has been updated, their new profile, as well as a `by_admin` boolean that is `True` if the
+update was triggered by a server admin (and `False` otherwise), and a `deactivated`
+boolean that is `True` if the update is a result of the user being deactivated.
+
+Note that the `by_admin` boolean is also `True` if the profile change happens as a result
+of the user logging in through Single Sign-On, or if a server admin updates their own
+profile.
+
+Per-room profile changes do not trigger this callback to be called. Synapse administrators
+wishing this callback to be called on every profile change are encouraged to disable
+per-room profiles globally using the `allow_per_room_profiles` configuration setting in
+Synapse's configuration file.
+This callback is not called when registering a user, even when setting it through the
+[`get_displayname_for_registration`](https://matrix-org.github.io/synapse/latest/modules/password_auth_provider_callbacks.html#get_displayname_for_registration)
+module callback.
+
+If multiple modules implement this callback, Synapse runs them all in order.
+
+### `on_user_deactivation_status_changed`
+
+_First introduced in Synapse v1.54.0_
+
+```python
+async def on_user_deactivation_status_changed(
+    user_id: str, deactivated: bool, by_admin: bool
+) -> None:
+```
+
+Called after deactivating a local user, or reactivating them through the admin API. The
+deactivation can be triggered either by the user themselves or a server admin. The module
+is passed the Matrix ID of the user whose status is changed, as well as a `deactivated`
+boolean that is `True` if the user is being deactivated and `False` if they're being
+reactivated, and a `by_admin` boolean that is `True` if the deactivation was triggered by
+a server admin (and `False` otherwise). This latter `by_admin` boolean is always `True`
+if the user is being reactivated, as this operation can only be performed through the
+admin API.
+
+If multiple modules implement this callback, Synapse runs them all in order.
+
 ## Example
 
 The example below is a module that implements the third-party rules callback

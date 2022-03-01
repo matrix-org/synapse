@@ -20,7 +20,7 @@ from typing import Callable, Dict, Optional
 
 import attr
 
-from synapse.python_dependencies import DependencyException, check_requirements
+from synapse.util.check_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
 

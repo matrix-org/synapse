@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from synapse.config._base import Config
-from synapse.python_dependencies import check_requirements
+from synapse.util.check_dependencies import check_requirements
 
 
 class RedisConfig(Config):
