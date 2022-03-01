@@ -992,6 +992,8 @@ class EventCreationHandler:
             and full_state_ids_at_event
             and builder.internal_metadata.is_historical()
         ):
+            # TODO(faster_joins): figure out how this works, and make sure that the
+            #   old state is complete.
             old_state = await self.store.get_events_as_list(full_state_ids_at_event)
             context = await self.state.compute_event_context(event, old_state=old_state)
         else:
