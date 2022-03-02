@@ -57,6 +57,7 @@ DEV_EXTRAS = {"lint", "mypy", "test", "dev"}
 RUNTIME_EXTRAS = (
     set(metadata.metadata(DISTRIBUTION_NAME).get_all("Provides-Extra")) - DEV_EXTRAS
 )
+VERSION = metadata.version(DISTRIBUTION_NAME)
 
 
 def _is_dev_dependency(req: Requirement) -> bool:
@@ -105,18 +106,24 @@ def _dependencies_for_extra(extra: str) -> Iterable[Dependency]:
 
 def _not_installed(requirement: Requirement, extra: Optional[str] = None) -> str:
     if extra:
-        return f"Need {requirement.name} for {extra}, but it is not installed"
+        return f"Synapse {VERSION} needs {requirement.name} for {extra}, " \
+               f"but it is not installed"
     else:
-        return f"Need {requirement.name}, but it is not installed"
+        return f"Synapse {VERSION} needs {requirement.name}, but it is not installed"
 
 
 def _incorrect_version(
     requirement: Requirement, got: str, extra: Optional[str] = None
 ) -> str:
     if extra:
-        return f"Need {requirement} for {extra}, but got {requirement.name}=={got}"
+        return (
+            f"Synapse {VERSION} needs {requirement} for {extra}, "
+            f"but got {requirement.name}=={got}"
+        )
     else:
-        return f"Need {requirement}, but got {requirement.name}=={got}"
+        return (
+            f"Synapse {VERSION} needs {requirement}, but got {requirement.name}=={got}"
+        )
 
 
 def check_requirements(extra: Optional[str] = None) -> None:
@@ -141,7 +148,7 @@ def check_requirements(extra: Optional[str] = None) -> None:
     elif extra in RUNTIME_EXTRAS:
         dependencies = _dependencies_for_extra(extra)
     else:
-        raise ValueError(f"Synapse does not provide the feature '{extra}'")
+        raise ValueError(f"Synapse {VERSION} does not provide the feature '{extra}'")
 
     deps_unfulfilled = []
     errors = []
