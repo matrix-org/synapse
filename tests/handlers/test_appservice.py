@@ -86,7 +86,6 @@ class AppServiceHandlerTestCase(unittest.TestCase):
     def test_query_user_exists_unknown_user(self):
         user_id = "@someone:anywhere"
         services = [self._mkservice(is_interested=True)]
-        services[0].is_interested_in_user.return_value = True
         self.mock_store.get_app_services.return_value = services
         self.mock_store.get_user_by_id.return_value = make_awaitable(None)
 
@@ -127,11 +126,11 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         room_id = "!alpha:bet"
         servers = ["aperture"]
-        interested_service = self._mkservice_alias(is_interested_in_alias=True)
+        interested_service = self._mkservice_alias(is_room_alias_in_namespace=True)
         services = [
-            self._mkservice_alias(is_interested_in_alias=False),
+            self._mkservice_alias(is_room_alias_in_namespace=False),
             interested_service,
-            self._mkservice_alias(is_interested_in_alias=False),
+            self._mkservice_alias(is_room_alias_in_namespace=False),
         ]
 
         self.mock_as_api.query_alias.return_value = make_awaitable(True)
@@ -325,17 +324,19 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             interested_service, ephemeral=[]
         )
 
-    def _mkservice(self, is_interested, protocols=None):
+    def _mkservice(self, is_interested: bool, protocols=None):
         service = Mock()
-        service.is_interested.return_value = make_awaitable(is_interested)
+        service.is_interested_in_event.return_value = make_awaitable(is_interested)
+        service.is_interested_in_user.return_value = make_awaitable(is_interested)
+        service.is_interested_in_room.return_value = make_awaitable(is_interested)
         service.token = "mock_service_token"
         service.url = "mock_service_url"
         service.protocols = protocols
         return service
 
-    def _mkservice_alias(self, is_interested_in_alias):
+    def _mkservice_alias(self, is_room_alias_in_namespace):
         service = Mock()
-        service.is_interested_in_alias.return_value = is_interested_in_alias
+        service.is_room_alias_in_namespace.return_value = is_room_alias_in_namespace
         service.token = "mock_service_token"
         service.url = "mock_service_url"
         return service

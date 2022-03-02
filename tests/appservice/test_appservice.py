@@ -50,7 +50,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.assertTrue(
             (
                 yield defer.ensureDeferred(
-                    self.service.is_interested(self.event, self.store)
+                    self.service.is_interested_in_event(self.event, self.store)
                 )
             )
         )
@@ -62,7 +62,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.assertFalse(
             (
                 yield defer.ensureDeferred(
-                    self.service.is_interested(self.event, self.store)
+                    self.service.is_interested_in_event(self.event, self.store)
                 )
             )
         )
@@ -76,7 +76,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.assertTrue(
             (
                 yield defer.ensureDeferred(
-                    self.service.is_interested(self.event, self.store)
+                    self.service.is_interested_in_event(self.event, self.store)
                 )
             )
         )
@@ -90,7 +90,8 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.assertTrue(
             (
                 yield defer.ensureDeferred(
-                    self.service.is_interested(self.event, self.store)
+                    # We need to provide the store here in order to carry out room checks
+                    self.service.is_interested_in_event(self.event, self.store)
                 )
             )
         )
@@ -104,7 +105,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.assertFalse(
             (
                 yield defer.ensureDeferred(
-                    self.service.is_interested(self.event, self.store)
+                    self.service.is_interested_in_event(self.event, self.store)
                 )
             )
         )
@@ -121,7 +122,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.assertTrue(
             (
                 yield defer.ensureDeferred(
-                    self.service.is_interested(self.event, self.store)
+                    self.service.is_interested_in_event(self.event, self.store)
                 )
             )
         )
@@ -174,7 +175,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.assertFalse(
             (
                 yield defer.ensureDeferred(
-                    self.service.is_interested(self.event, self.store)
+                    self.service.is_interested_in_event(self.event, self.store)
                 )
             )
         )
@@ -191,7 +192,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.assertTrue(
             (
                 yield defer.ensureDeferred(
-                    self.service.is_interested(self.event, self.store)
+                    self.service.is_interested_in_event(self.event, self.store)
                 )
             )
         )
@@ -207,7 +208,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.assertTrue(
             (
                 yield defer.ensureDeferred(
-                    self.service.is_interested(self.event, self.store)
+                    self.service.is_interested_in_event(self.event, self.store)
                 )
             )
         )
@@ -225,7 +226,9 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.assertTrue(
             (
                 yield defer.ensureDeferred(
-                    self.service.is_interested(event=self.event, store=self.store)
+                    self.service.is_interested_in_event(
+                        event=self.event, store=self.store
+                    )
                 )
             )
         )
