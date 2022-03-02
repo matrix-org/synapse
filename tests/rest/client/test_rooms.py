@@ -1426,8 +1426,8 @@ class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
 
     def test_simple(self) -> None:
         "Simple test for searching rooms over federation"
-        self.federation_client.get_public_rooms.side_effect = (  # type: ignore[attr-defined]
-            lambda *a, **k: defer.succeed({})
+        self.federation_client.get_public_rooms.side_effect = lambda *a, **k: defer.succeed(  # type: ignore[attr-defined]
+            {}
         )
 
         search_filter = {"generic_search_term": "foobar"}
