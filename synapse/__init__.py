@@ -25,11 +25,13 @@ if sys.version_info < (3, 7):
     print("Synapse requires Python 3.7 or above.")
     sys.exit(1)
 
+try:
+    import asyncio
+    from twisted.internet import asyncioreactor
 
-import asyncio
-from twisted.internet import asyncioreactor
-
-asyncioreactor.install(asyncio.get_event_loop())
+    asyncioreactor.install(asyncio.get_event_loop())
+except ImportError:
+    pass
 
 # Twisted and canonicaljson will fail to import when this file is executed to
 # get the __version__ during a fresh install. That's OK and subsequent calls to
