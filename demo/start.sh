@@ -148,9 +148,6 @@ for port in 8080 8081 8082; do
         fi
     fi
 
-    if ! grep -F "full_twisted_stacktraces" -q  "$DIR/etc/$port.config"; then
-        echo "full_twisted_stacktraces: true" >> "$DIR/etc/$port.config"
-    fi
     # Always disable reporting of stats if the option is not there.
     if ! grep -F "report_stats" -q  "$DIR/etc/$port.config" ; then
         echo "report_stats: false" >> "$DIR/etc/$port.config"
