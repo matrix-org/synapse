@@ -118,7 +118,12 @@ class AbstractFederationSender(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def send_device_messages(self, destination: str) -> None:
+    def send_device_messages(self, destination: str, immediate: bool = True) -> None:
+        """Tells the sender that a new device message is ready to be sent to the
+        destination. The `immediate` flag specifies whether the messages should
+        be tried to be sent immediately, or whether it can be delayed for a
+        short while (to aid performance).
+        """
         raise NotImplementedError()
 
     @abc.abstractmethod
@@ -666,7 +671,7 @@ class FederationSender(AbstractFederationSender):
         else:
             queue.send_edu(edu)
 
-    def send_device_messages(self, destination: str) -> None:
+    def send_device_messages(self, destination: str, immediate: bool = False) -> None:
         if destination == self.server_name:
             logger.warning("Not sending device update to ourselves")
             return
@@ -676,7 +681,11 @@ class FederationSender(AbstractFederationSender):
         ):
             return
 
-        self._get_per_destination_queue(destination).attempt_new_transaction()
+        if immediate:
+            self._get_per_destination_queue(destination).attempt_new_transaction()
+        else:
+            self._get_per_destination_queue(destination).mark_new_data()
+            self._destination_wakeup_queue.add_to_queue(destination)
 
     def wake_destination(self, destination: str) -> None:
         """Called when we want to retry sending transactions to a remote.
