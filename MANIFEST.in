@@ -17,7 +17,6 @@ recursive-include synapse/storage *.txt
 recursive-include synapse/storage *.md
 
 recursive-include docs *
-recursive-include scripts *
 recursive-include scripts-dev *
 recursive-include synapse *.pyi
 recursive-include tests *.py
