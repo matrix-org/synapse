@@ -1,0 +1,1 @@
+Use `ParamSpec` in type hints for `synapse.logging.context`.

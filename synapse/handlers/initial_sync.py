@@ -152,9 +152,9 @@ class InitialSyncHandler:
 
         public_room_ids = await self.store.get_public_room_ids()
 
-        limit = pagin_config.limit
-        if limit is None:
-            limit = 10
+        limit = 10
+        if pagin_config.limit is not None:
+            limit = pagin_config.limit
 
         async def handle_room(event: RoomsForUser) -> None:
             d: JsonDict = {

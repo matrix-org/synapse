@@ -29,7 +29,6 @@ import warnings
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
-    Any,
     Awaitable,
     Callable,
     Optional,
@@ -41,7 +40,7 @@ from typing import (
 )
 
 import attr
-from typing_extensions import Literal
+from typing_extensions import Literal, ParamSpec
 
 from twisted.internet import defer, threads
 from twisted.python.threadpool import ThreadPool
@@ -719,32 +718,33 @@ def nested_logging_context(suffix: str) -> LoggingContext:
     )
 
 
+P = ParamSpec("P")
 R = TypeVar("R")
 
 
 @overload
 def preserve_fn(  # type: ignore[misc]
-    f: Callable[..., Awaitable[R]],
-) -> Callable[..., "defer.Deferred[R]"]:
+    f: Callable[P, Awaitable[R]],
+) -> Callable[P, "defer.Deferred[R]"]:
     # The `type: ignore[misc]` above suppresses
     # "Overloaded function signatures 1 and 2 overlap with incompatible return types"
     ...
 
 
 @overload
-def preserve_fn(f: Callable[..., R]) -> Callable[..., "defer.Deferred[R]"]:
+def preserve_fn(f: Callable[P, R]) -> Callable[P, "defer.Deferred[R]"]:
     ...
 
 
 def preserve_fn(
     f: Union[
-        Callable[..., R],
-        Callable[..., Awaitable[R]],
+        Callable[P, R],
+        Callable[P, Awaitable[R]],
     ]
-) -> Callable[..., "defer.Deferred[R]"]:
+) -> Callable[P, "defer.Deferred[R]"]:
     """Function decorator which wraps the function with run_in_background"""
 
-    def g(*args: Any, **kwargs: Any) -> "defer.Deferred[R]":
+    def g(*args: P.args, **kwargs: P.kwargs) -> "defer.Deferred[R]":
         return run_in_background(f, *args, **kwargs)
 
     return g
@@ -752,7 +752,7 @@ def preserve_fn(
 
 @overload
 def run_in_background(  # type: ignore[misc]
-    f: Callable[..., Awaitable[R]], *args: Any, **kwargs: Any
+    f: Callable[P, Awaitable[R]], *args: P.args, **kwargs: P.kwargs
 ) -> "defer.Deferred[R]":
     # The `type: ignore[misc]` above suppresses
     # "Overloaded function signatures 1 and 2 overlap with incompatible return types"
@@ -761,18 +761,21 @@ def run_in_background(  # type: ignore[misc]
 
 @overload
 def run_in_background(
-    f: Callable[..., R], *args: Any, **kwargs: Any
+    f: Callable[P, R], *args: P.args, **kwargs: P.kwargs
 ) -> "defer.Deferred[R]":
     ...
 
 
-def run_in_background(
+def run_in_background(  # type: ignore[misc]
+    # The `type: ignore[misc]` above suppresses
+    # "Overloaded function implementation does not accept all possible arguments of signature 1"
+    # "Overloaded function implementation does not accept all possible arguments of signature 2"
     f: Union[
-        Callable[..., R],
-        Callable[..., Awaitable[R]],
+        Callable[P, R],
+        Callable[P, Awaitable[R]],
     ],
-    *args: Any,
-    **kwargs: Any,
+    *args: P.args,
+    **kwargs: P.kwargs,
 ) -> "defer.Deferred[R]":
     """Calls a function, ensuring that the current context is restored after
     return from the function, and that the sentinel context is set once the
@@ -872,7 +875,7 @@ def _set_context_cb(result: ResultT, context: LoggingContext) -> ResultT:
 
 
 def defer_to_thread(
-    reactor: "ISynapseReactor", f: Callable[..., R], *args: Any, **kwargs: Any
+    reactor: "ISynapseReactor", f: Callable[P, R], *args: P.args, **kwargs: P.kwargs
 ) -> "defer.Deferred[R]":
     """
     Calls the function `f` using a thread from the reactor's default threadpool and
@@ -908,9 +911,9 @@ def defer_to_thread(
 def defer_to_threadpool(
     reactor: "ISynapseReactor",
     threadpool: ThreadPool,
-    f: Callable[..., R],
-    *args: Any,
-    **kwargs: Any,
+    f: Callable[P, R],
+    *args: P.args,
+    **kwargs: P.kwargs,
 ) -> "defer.Deferred[R]":
     """
     A wrapper for twisted.internet.threads.deferToThreadpool, which handles
