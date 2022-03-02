@@ -1346,7 +1346,21 @@ class RelationsTestCase(BaseRelationsTestCase):
 
 
 class RelationRedactionTestCase(BaseRelationsTestCase):
-    """Test the behaviour of relations when the parent or child event is redacted."""
+    """
+    Test the behaviour of relations when the parent or child event is redacted.
+
+    The behaviour of each relation type is subtly different which causes the tests
+    to be a bit repetitive, they follow a naming scheme of:
+
+        test_redact_(relation|parent)_{relation_type}
+
+    The first bit of "relation" means that the event with the relation defined
+    on it (the child event) is to be redacted. A "parent" means that the target
+    of the relation (the parent event) is to be redacted.
+
+    The relation_type describes which type of relation is under test (i.e. it is
+    related to the value of rel_type in the event content).
+    """
 
     def _redact(self, event_id: str) -> None:
         channel = self.make_request(
@@ -1533,7 +1547,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertEqual(len(event_ids), 0)
         self.assertEqual(relations, {})
 
-    def test_redact_parent(self) -> None:
+    def test_redact_parent_annotation(self) -> None:
         """Test that annotations of an event are redacted when the original event
         is redacted.
         """
