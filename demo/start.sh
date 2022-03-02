@@ -6,8 +6,6 @@ CWD=$(pwd)
 
 cd "$DIR/.." || exit
 
-mkdir -p demo/etc
-
 PYTHONPATH=$(readlink -f "$(pwd)")
 export PYTHONPATH
 
@@ -24,15 +22,15 @@ for port in 8080 8081 8082; do
     # Generate the configuration for the homeserver at localhost:848x.
     python3 -m synapse.app.homeserver \
         --generate-config \
-        --server-name "localhost:$https_port" \
-        --config-path "$DIR/etc/$port.config" \
+        --server-name "localhost:$port" \
+        --config-path "$port.config" \
         --report-stats no
 
-    if ! grep -F "Customisation made by demo/start.sh" -q "$DIR/etc/$port.config"; then
+    if ! grep -F "Customisation made by demo/start.sh" -q "$port.config"; then
         # Generate TLS keys.
         openssl req -x509 -newkey rsa:4096 \
-          -keyout "$DIR/etc/localhost:$https_port.tls.key" \
-          -out "$DIR/etc/localhost:$https_port.tls.crt" \
+          -keyout "localhost:$port.tls.key" \
+          -out "localhost:$port.tls.crt" \
           -days 365 -nodes -subj "/O=matrix"
 
         # Add customisations to the configuration.
@@ -74,8 +72,8 @@ for port in 8080 8081 8082; do
             echo 'federation_verify_certificates: false'
 
             # Set paths for the TLS certificates.
-            echo "tls_certificate_path: \"$DIR/etc/localhost:$https_port.tls.crt\""
-            echo "tls_private_key_path: \"$DIR/etc/localhost:$https_port.tls.key\""
+            echo "tls_certificate_path: \"$DIR/$port/localhost:$port.tls.crt\""
+            echo "tls_private_key_path: \"$DIR/$port/localhost:$port.tls.key\""
 
             # Ignore keys from the trusted keys server
             echo '# Ignore keys from the trusted keys server'
@@ -94,7 +92,7 @@ for port in 8080 8081 8082; do
 			)
 
             echo "${allow_list}"
-        } >> "$DIR/etc/$port.config"
+        } >> "$port.config"
     fi
 
     # Check script parameters
@@ -141,18 +139,18 @@ for port in 8080 8081 8082; do
 			    burst_count: 1000
 			RC
 			)
-            echo "${ratelimiting}" >> "$DIR/etc/$port.config"
+            echo "${ratelimiting}" >> "$port.config"
         fi
     fi
 
     # Always disable reporting of stats if the option is not there.
-    if ! grep -F "report_stats" -q  "$DIR/etc/$port.config" ; then
-        echo "report_stats: false" >> "$DIR/etc/$port.config"
+    if ! grep -F "report_stats" -q  "$port.config" ; then
+        echo "report_stats: false" >> "$port.config"
     fi
 
     # Run the homeserver in the background.
     python3 -m synapse.app.homeserver \
-        --config-path "$DIR/etc/$port.config" \
+        --config-path "$port.config" \
         -D \
 
     popd || exit
