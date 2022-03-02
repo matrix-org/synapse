@@ -4,12 +4,11 @@
 
 Requires you to have a [Synapse development environment setup](https://matrix-org.github.io/synapse/develop/development/contributing_guide.html#4-install-the-dependencies).
 
-The demo setup allows running three federation Synapse servers on ports 8080,
-8081 and 8082, with host names localhost:8080, localhost:8081, localhost:8082,
-respectively.
+The demo setup allows running three federation Synapse servers, with server
+names `localhost:8480`, `localhost:8481`, and `localhost:8482`.
 
-You can access them via any Matrix client, but note that it must be able to talk
-HTTP (not HTTPS) to localhost.
+You can access them via any Matrix client over HTTP at `localhost:808{1,2,3}` or
+over HTTPS at `localhost:848{1,2,3}`.
 
 To enable the servers to communicate, self-signed SSL certificates are generated
 and the servers are configured in a highly insecure way, including:
@@ -26,10 +25,11 @@ it won't work if your HS already has a room with that name.
 
 ## Using the demo scripts
 
-There's three main scripts with straightforward purposes, none of the scripts
-take additional parameters.
+There's three main scripts with straightforward purposes:
 
 * `start.sh` will start the Synapse servers, generating any missing configuration.
+  * This accepts a single parameter `--no-rate-limit` to "disable" rate limits
+    (they actually still exist, but are very high).
 * `stop.sh` will stop the Synapse servers.
 * `clean.sh` will delete the configuration, databases, log files, etc.
 
