@@ -37,9 +37,10 @@ for port in 8080 8081 8082; do
 
         # Add customisations to the configuration.
         {
-            printf '\n\n# Customisation made by demo/start.sh\n'
+            printf '\n\n# Customisation made by demo/start.sh\n\n'
             echo "public_baseurl: http://localhost:$port/"
             echo 'enable_registration: true'
+            echo ''
 
 			# Warning, this heredoc depends on the interaction of tabs and spaces.
 			# Please don't accidentaly bork me with your fancy settings.
@@ -66,13 +67,13 @@ for port in 8080 8081 8082; do
 
             echo "${listeners}"
 
-            # Disable tls for the servers
-            printf '\n\n# Disable tls on the servers.'
+            # Disable TLS for the servers
+            printf '\n\n# Disable TLS for the servers.'
             echo '# DO NOT USE IN PRODUCTION'
             echo 'use_insecure_ssl_client_just_for_testing_do_not_use: true'
             echo 'federation_verify_certificates: false'
 
-            # Set tls paths
+            # Set paths for the TLS certificates.
             echo "tls_certificate_path: \"$DIR/etc/localhost:$https_port.tls.crt\""
             echo "tls_private_key_path: \"$DIR/etc/localhost:$https_port.tls.key\""
 
@@ -81,22 +82,18 @@ for port in 8080 8081 8082; do
             echo 'trusted_key_servers:'
             echo '  - server_name: "matrix.org"'
             echo '    accept_keys_insecurely: true'
+            echo ''
 
-			# Reduce the blacklist
-			blacklist=$(cat <<-BLACK
-			# Set the blacklist so that it doesn't include 127.0.0.1, ::1
-			federation_ip_range_blacklist:
-			  - '10.0.0.0/8'
-			  - '172.16.0.0/12'
-			  - '192.168.0.0/16'
-			  - '100.64.0.0/10'
-			  - '169.254.0.0/16'
-			  - 'fe80::/64'
-			  - 'fc00::/7'
-			BLACK
+			# Allow the servers to communicate over localhost.
+			allow_list=$(cat <<-ALLOW_LIST
+			# Allow the servers to communicate over localhost.
+			ip_range_whitelist:
+			  - '127.0.0.1/8'
+			  - '::1/128'
+			ALLOW_LIST
 			)
 
-            echo "${blacklist}"
+            echo "${allow_list}"
         } >> "$DIR/etc/$port.config"
     fi
 
