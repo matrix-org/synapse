@@ -190,7 +190,7 @@ server admin. (Note that a server admin is distinct from a room admin.)</p>
 <pre><code class="language-sql">UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 </code></pre>
 <p>A new server admin user can also be created using the <code>register_new_matrix_user</code>
-command. This is a script that is located in the <code>scripts/</code> directory, or possibly
+command. This is a script that is distributed as part of synapse. It is possibly
 already on your <code>$PATH</code> depending on how Synapse was installed.</p>
 <p>Finding your user's <code>access_token</code> is client-dependent, but will usually be shown in the client's settings.</p>
 <h2 id="making-an-admin-api-request"><a class="header" href="#making-an-admin-api-request">Making an Admin API request</a></h2>

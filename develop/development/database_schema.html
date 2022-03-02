@@ -315,9 +315,9 @@ same as integers.</p>
 <ul>
 <li>
 <p>Any new boolean column must be added to the <code>BOOLEAN_COLUMNS</code> list in
-<code>scripts/synapse_port_db</code>. This tells the port script to cast the integer
-value from SQLite to a boolean before writing the value to the postgres
-database.</p>
+<code>synapse/_scripts/synapse_port_db.py</code>. This tells the port script to cast
+the integer value from SQLite to a boolean before writing the value to the
+postgres database.</p>
 </li>
 <li>
 <p>Before SQLite 3.23, <code>TRUE</code> and <code>FALSE</code> were not recognised as constants by
