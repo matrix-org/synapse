@@ -100,6 +100,34 @@ class ObservableDeferredTest(TestCase):
         self.assertEqual(str(results[0].value), "gah!", "observer 1 errback result")
         self.assertEqual(str(results[1].value), "gah!", "observer 2 errback result")
 
+    def test_cancellation(self):
+        """Test that cancelling an observer does not affect other observers."""
+        origin_d: "Deferred[int]" = Deferred()
+        observable = ObservableDeferred(origin_d, consumeErrors=True)
+
+        observer1 = observable.observe()
+        observer2 = observable.observe()
+        observer3 = observable.observe()
+
+        self.assertFalse(observer1.called)
+        self.assertFalse(observer2.called)
+        self.assertFalse(observer3.called)
+
+        # cancel the second observer
+        observer2.cancel()
+        self.assertFalse(observer1.called)
+        self.failureResultOf(observer2, CancelledError)
+        self.assertFalse(observer3.called)
+
+        # other observers resolve as normal
+        origin_d.callback(123)
+        self.assertEqual(observer1.result, 123, "observer 1 callback result")
+        self.assertEqual(observer3.result, 123, "observer 3 callback result")
+
+        # additional observers resolve as normal
+        observer4 = observable.observe()
+        self.assertEqual(observer4.result, 123, "observer 4 callback result")
+
 
 class TimeoutDeferredTest(TestCase):
     def setUp(self):
