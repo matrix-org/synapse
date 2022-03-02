@@ -1,1 +1,0 @@
-User `assertEqual` instead of the deprecated `assertEquals` in test code.
