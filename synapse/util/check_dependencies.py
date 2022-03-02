@@ -53,7 +53,16 @@ class DependencyException(Exception):
             yield '"' + i + '"'
 
 
-EXTRAS = set(metadata.metadata(DISTRIBUTION_NAME).get_all("Provides-Extra"))
+DEV_EXTRAS = {"lint", "mypy", "test", "dev"}
+RUNTIME_EXTRAS = (
+    set(metadata.metadata(DISTRIBUTION_NAME).get_all("Provides-Extra")) - DEV_EXTRAS
+)
+
+
+def _is_dev_dependency(req: Requirement) -> bool:
+    return req.marker is not None and any(
+        req.marker.evaluate({"extra": e}) for e in DEV_EXTRAS
+    )
 
 
 class Dependency(NamedTuple):
@@ -67,6 +76,9 @@ def _generic_dependencies() -> Iterable[Dependency]:
     assert requirements is not None
     for raw_requirement in requirements:
         req = Requirement(raw_requirement)
+        if _is_dev_dependency(req):
+            continue
+
         # https://packaging.pypa.io/en/latest/markers.html#usage notes that
         #   > Evaluating an extra marker with no environment is an error
         # so we pass in a dummy empty extra value here.
@@ -80,6 +92,8 @@ def _dependencies_for_extra(extra: str) -> Iterable[Dependency]:
     assert requirements is not None
     for raw_requirement in requirements:
         req = Requirement(raw_requirement)
+        if _is_dev_dependency(req):
+            continue
         # Exclude mandatory deps by only selecting deps needed with this extra.
         if (
             req.marker is not None
@@ -124,7 +138,7 @@ def check_requirements(extra: Optional[str] = None) -> None:
     # First work out which dependencies are required, and which are optional.
     if extra is None:
         dependencies = _generic_dependencies()
-    elif extra in EXTRAS:
+    elif extra in RUNTIME_EXTRAS:
         dependencies = _dependencies_for_extra(extra)
     else:
         raise ValueError(f"Synapse does not provide the feature '{extra}'")
