@@ -52,5 +52,4 @@ prune contrib
 prune debian
 prune demo/etc
 prune docker
-prune snap
 prune stubs
