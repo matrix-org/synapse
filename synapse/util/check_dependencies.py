@@ -12,6 +12,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
+
+"""
+This module exposes a single function which checks synapse's dependencies are present
+and correctly versioned. It makes use of `importlib.metadata` to do so. The details
+are a bit murky: there's no easy way to get a map from "extras" to the packages they
+require. But this is probably just symptomatic of Python's package management.
+"""
+
 import logging
 from typing import Iterable, NamedTuple, Optional
 
@@ -23,6 +31,8 @@ try:
     from importlib import metadata
 except ImportError:
     import importlib_metadata as metadata  # type: ignore[no-redef]
+
+__all__ = ["check_requirements"]
 
 
 class DependencyException(Exception):
