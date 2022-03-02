@@ -857,7 +857,7 @@ class _RoomEntry:
 
 def _has_valid_via(e: EventBase) -> bool:
     via = e.content.get("via")
-    if not via or not isinstance(via, Sequence):
+    if not via or not isinstance(via, list):
         return False
     for v in via:
         if not isinstance(v, str):
