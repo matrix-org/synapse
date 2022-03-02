@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Optional, Tupl
 from synapse.api.errors import ModuleFailedException, SynapseError
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
+from synapse.storage.roommember import ProfileInfo
 from synapse.types import Requester, StateMap
 from synapse.util.async_helpers import maybe_awaitable
 
@@ -37,6 +38,8 @@ CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK = Callable[
     [str, StateMap[EventBase], str], Awaitable[bool]
 ]
 ON_NEW_EVENT_CALLBACK = Callable[[EventBase, StateMap[EventBase]], Awaitable]
+ON_PROFILE_UPDATE_CALLBACK = Callable[[str, ProfileInfo, bool, bool], Awaitable]
+ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK = Callable[[str, bool, bool], Awaitable]
 
 
 def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
@@ -143,7 +146,7 @@ class ThirdPartyEventRules:
     def __init__(self, hs: "HomeServer"):
         self.third_party_rules = None
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self._check_event_allowed_callbacks: List[CHECK_EVENT_ALLOWED_CALLBACK] = []
         self._on_create_room_callbacks: List[ON_CREATE_ROOM_CALLBACK] = []
@@ -154,6 +157,10 @@ class ThirdPartyEventRules:
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = []
         self._on_new_event_callbacks: List[ON_NEW_EVENT_CALLBACK] = []
+        self._on_profile_update_callbacks: List[ON_PROFILE_UPDATE_CALLBACK] = []
+        self._on_user_deactivation_status_changed_callbacks: List[
+            ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
+        ] = []
 
     def register_third_party_rules_callbacks(
         self,
@@ -166,6 +173,8 @@ class ThirdPartyEventRules:
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = None,
         on_new_event: Optional[ON_NEW_EVENT_CALLBACK] = None,
+        on_profile_update: Optional[ON_PROFILE_UPDATE_CALLBACK] = None,
+        on_deactivation: Optional[ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK] = None,
     ) -> None:
         """Register callbacks from modules for each hook."""
         if check_event_allowed is not None:
@@ -186,6 +195,12 @@ class ThirdPartyEventRules:
 
         if on_new_event is not None:
             self._on_new_event_callbacks.append(on_new_event)
+
+        if on_profile_update is not None:
+            self._on_profile_update_callbacks.append(on_profile_update)
+
+        if on_deactivation is not None:
+            self._on_user_deactivation_status_changed_callbacks.append(on_deactivation)
 
     async def check_event_allowed(
         self, event: EventBase, context: EventContext
@@ -334,9 +349,6 @@ class ThirdPartyEventRules:
 
         Args:
             event_id: The ID of the event.
-
-        Raises:
-            ModuleFailureError if a callback raised any exception.
         """
         # Bail out early without hitting the store if we don't have any callbacks
         if len(self._on_new_event_callbacks) == 0:
@@ -370,3 +382,41 @@ class ThirdPartyEventRules:
             state_events[key] = room_state_events[event_id]
 
         return state_events
+
+    async def on_profile_update(
+        self, user_id: str, new_profile: ProfileInfo, by_admin: bool, deactivation: bool
+    ) -> None:
+        """Called after the global profile of a user has been updated. Does not include
+        per-room profile changes.
+
+        Args:
+            user_id: The user whose profile was changed.
+            new_profile: The updated profile for the user.
+            by_admin: Whether the profile update was performed by a server admin.
+            deactivation: Whether this change was made while deactivating the user.
+        """
+        for callback in self._on_profile_update_callbacks:
+            try:
+                await callback(user_id, new_profile, by_admin, deactivation)
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
+
+    async def on_user_deactivation_status_changed(
+        self, user_id: str, deactivated: bool, by_admin: bool
+    ) -> None:
+        """Called after a user has been deactivated or reactivated.
+
+        Args:
+            user_id: The deactivated user.
+            deactivated: Whether the user is now deactivated.
+            by_admin: Whether the deactivation was performed by a server admin.
+        """
+        for callback in self._on_user_deactivation_status_changed_callbacks:
+            try:
+                await callback(user_id, deactivated, by_admin)
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )

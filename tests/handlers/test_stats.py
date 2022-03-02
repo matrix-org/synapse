@@ -33,7 +33,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.handler = self.hs.get_stats_handler()
 
     def _add_background_updates(self):

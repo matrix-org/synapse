@@ -48,7 +48,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor, clock, hs: HomeServer):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.frank = UserID.from_string("@1234abcd:test")
         self.bob = UserID.from_string("@4567:test")
@@ -65,7 +65,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         displayname = self.get_success(self.handler.get_displayname(self.frank))
 
-        self.assertEquals("Frank", displayname)
+        self.assertEqual("Frank", displayname)
 
     def test_set_my_name(self):
         self.get_success(
@@ -74,7 +74,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.assertEquals(
+        self.assertEqual(
             (
                 self.get_success(
                     self.store.get_profile_displayname(self.frank.localpart)
@@ -90,7 +90,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.assertEquals(
+        self.assertEqual(
             (
                 self.get_success(
                     self.store.get_profile_displayname(self.frank.localpart)
@@ -118,7 +118,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             self.store.set_profile_displayname(self.frank.localpart, "Frank")
         )
 
-        self.assertEquals(
+        self.assertEqual(
             (
                 self.get_success(
                     self.store.get_profile_displayname(self.frank.localpart)
@@ -150,7 +150,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         displayname = self.get_success(self.handler.get_displayname(self.alice))
 
-        self.assertEquals(displayname, "Alice")
+        self.assertEqual(displayname, "Alice")
         self.mock_federation.make_query.assert_called_with(
             destination="remote",
             query_type="profile",
@@ -172,7 +172,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.assertEquals({"displayname": "Caroline"}, response)
+        self.assertEqual({"displayname": "Caroline"}, response)
 
     def test_get_my_avatar(self):
         self.get_success(
@@ -182,7 +182,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
         avatar_url = self.get_success(self.handler.get_avatar_url(self.frank))
 
-        self.assertEquals("http://my.server/me.png", avatar_url)
+        self.assertEqual("http://my.server/me.png", avatar_url)
 
     def test_set_my_avatar(self):
         self.get_success(
@@ -193,7 +193,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.assertEquals(
+        self.assertEqual(
             (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
             "http://my.server/pic.gif",
         )
@@ -207,7 +207,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.assertEquals(
+        self.assertEqual(
             (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
             "http://my.server/me.png",
         )
@@ -235,7 +235,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.assertEquals(
+        self.assertEqual(
             (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
             "http://my.server/me.png",
         )
@@ -325,7 +325,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
                 properties are "mimetype" (for the file's type) and "size" (for the
                 file's size).
         """
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         for name, props in names_and_props.items():
             self.get_success(

@@ -66,7 +66,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.config = hs.config

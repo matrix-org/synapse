@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from twisted.internet import defer
+from twisted.internet.defer import Deferred
 
 from synapse.util.async_helpers import ReadWriteLock
 
@@ -83,3 +84,32 @@ class ReadWriteLockTestCase(unittest.TestCase):
         self.assertTrue(d.called)
         with d.result:
             pass
+
+    def test_lock_handoff_to_nonblocking_writer(self):
+        """Test a writer handing the lock to another writer that completes instantly."""
+        rwlock = ReadWriteLock()
+        key = "key"
+
+        unblock: "Deferred[None]" = Deferred()
+
+        async def blocking_write():
+            with await rwlock.write(key):
+                await unblock
+
+        async def nonblocking_write():
+            with await rwlock.write(key):
+                pass
+
+        d1 = defer.ensureDeferred(blocking_write())
+        d2 = defer.ensureDeferred(nonblocking_write())
+        self.assertFalse(d1.called)
+        self.assertFalse(d2.called)
+
+        # Unblock the first writer. The second writer will complete without blocking.
+        unblock.callback(None)
+        self.assertTrue(d1.called)
+        self.assertTrue(d2.called)
+
+        # The `ReadWriteLock` should operate as normal.
+        d3 = defer.ensureDeferred(nonblocking_write())
+        self.assertTrue(d3.called)

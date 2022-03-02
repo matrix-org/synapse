@@ -68,7 +68,7 @@ class ThrottleParams:
 class Pusher(metaclass=abc.ABCMeta):
     def __init__(self, hs: "HomeServer", pusher_config: PusherConfig):
         self.hs = hs
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.clock = self.hs.get_clock()
 
         self.pusher_id = pusher_config.id

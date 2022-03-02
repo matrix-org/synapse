@@ -45,7 +45,7 @@ MAX_LONG_DESC_LEN = 10000
 class GroupsServerWorkerHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.room_list_handler = hs.get_room_list_handler()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()

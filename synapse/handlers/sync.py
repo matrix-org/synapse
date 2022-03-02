@@ -266,7 +266,7 @@ class SyncResult:
 class SyncHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs_config = hs.config
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self.presence_handler = hs.get_presence_handler()
         self.event_sources = hs.get_event_sources()
@@ -697,6 +697,15 @@ class SyncHandler:
         else:
             # no events in this room - so presumably no state
             state = {}
+
+            # (erikj) This should be rarely hit, but we've had some reports that
+            # we get more state down gappy syncs than we should, so let's add
+            # some logging.
+            logger.info(
+                "Failed to find any events in room %s at %s",
+                room_id,
+                stream_position.room_key,
+            )
         return state
 
     async def compute_summary(

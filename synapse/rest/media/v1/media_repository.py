@@ -75,7 +75,7 @@ class MediaRepository:
         self.client = hs.get_federation_http_client()
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.max_upload_size = hs.config.media.max_upload_size
         self.max_image_pixels = hs.config.media.max_image_pixels
 

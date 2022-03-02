@@ -22,6 +22,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Mapping,
     Optional,
     Set,
     TypeVar,
@@ -150,7 +151,7 @@ def matrix_user_id_validator(user_id_str: str) -> UserID:
 class Filtering:
     def __init__(self, hs: "HomeServer"):
         self._hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.DEFAULT_FILTER_COLLECTION = FilterCollection(hs, {})
 
@@ -294,7 +295,7 @@ class FilterCollection:
 class Filter:
     def __init__(self, hs: "HomeServer", filter_json: JsonDict):
         self._hs = hs
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self.filter_json = filter_json
 
         self.limit = filter_json.get("limit", 10)
@@ -361,10 +362,10 @@ class Filter:
             return self._check_fields(field_matchers)
         else:
             content = event.get("content")
-            # Content is assumed to be a dict below, so ensure it is. This should
+            # Content is assumed to be a mapping below, so ensure it is. This should
             # always be true for events, but account_data has been allowed to
             # have non-dict content.
-            if not isinstance(content, dict):
+            if not isinstance(content, Mapping):
                 content = {}
 
             sender = event.get("sender", None)

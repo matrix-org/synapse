@@ -68,7 +68,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.clock = hs.get_clock()
         self.federation_event_handler = hs.get_federation_event_handler()
@@ -167,7 +167,7 @@ class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.registry = hs.get_federation_registry()
 
@@ -214,7 +214,7 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.registry = hs.get_federation_registry()
 
@@ -260,7 +260,7 @@ class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     @staticmethod
     async def _serialize_payload(room_id: str) -> JsonDict:  # type: ignore[override]
@@ -297,7 +297,7 @@ class ReplicationStoreRoomOnOutlierMembershipRestServlet(ReplicationEndpoint):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     @staticmethod
     async def _serialize_payload(room_id: str, room_version: RoomVersion) -> JsonDict:  # type: ignore[override]

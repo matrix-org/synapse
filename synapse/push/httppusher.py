@@ -138,7 +138,7 @@ class HttpPusher(Pusher):
         # XXX as per https://github.com/matrix-org/matrix-doc/issues/2627, this seems
         # to be largely redundant. perhaps we can remove it.
         badge = await push_tools.get_badge_count(
-            self.hs.get_datastore(),
+            self.hs.get_datastores().main,
             self.user_id,
             group_by_room=self._group_unread_count_by_room,
         )
@@ -288,7 +288,7 @@ class HttpPusher(Pusher):
 
         tweaks = push_rule_evaluator.tweaks_for_actions(push_action.actions)
         badge = await push_tools.get_badge_count(
-            self.hs.get_datastore(),
+            self.hs.get_datastores().main,
             self.user_id,
             group_by_room=self._group_unread_count_by_room,
         )

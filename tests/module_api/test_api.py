@@ -41,7 +41,7 @@ class ModuleApiTestCase(HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
+        self.store = homeserver.get_datastores().main
         self.module_api = homeserver.get_module_api()
         self.event_creation_handler = homeserver.get_event_creation_handler()
         self.sync_handler = homeserver.get_sync_handler()

@@ -29,7 +29,7 @@ SERVER_NOTICE_ROOM_TAG = "m.server_notice"
 
 class ServerNoticesManager:
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._config = hs.config
         self._account_data_handler = hs.get_account_data_handler()
         self._room_creation_handler = hs.get_room_creation_handler()

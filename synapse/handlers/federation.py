@@ -107,7 +107,7 @@ class FederationHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
         self.federation_client = hs.get_federation_client()
@@ -519,8 +519,17 @@ class FederationHandler:
                 state_events=state,
             )
 
+            if ret.partial_state:
+                await self.store.store_partial_state_room(room_id, ret.servers_in_room)
+
             max_stream_id = await self._federation_event_handler.process_remote_join(
-                origin, room_id, auth_chain, state, event, room_version_obj
+                origin,
+                room_id,
+                auth_chain,
+                state,
+                event,
+                room_version_obj,
+                partial_state=ret.partial_state,
             )
 
             # We wait here until this instance has seen the events come down
