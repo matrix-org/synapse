@@ -270,7 +270,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
 
         # Now lets get the last load of messages in the service notice room and
         # check that there is only one server notice
-        room_id = self.get_success(
+        (room_id, _) = self.get_success(
             self.server_notices_manager.get_or_create_notice_room_for_user(self.user_id)
         )
 
