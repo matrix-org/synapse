@@ -19,6 +19,7 @@ from twisted.trial import unittest
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.storage.databases.main.events import _LinkMap
@@ -29,7 +30,7 @@ from tests.unittest import HomeserverTestCase
 
 class EventChainStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self._next_stream_ordering = 1
 
     def test_simple(self):
@@ -391,7 +392,9 @@ class EventChainStoreTestCase(HomeserverTestCase):
         def _persist(txn):
             # We need to persist the events to the events and state_events
             # tables.
-            persist_events_store._store_event_txn(txn, [(e, {}) for e in events])
+            persist_events_store._store_event_txn(
+                txn, [(e, EventContext()) for e in events]
+            )
 
             # Actually call the function that calculates the auth chain stuff.
             persist_events_store._persist_event_auth_chain_txn(txn, events)
@@ -489,7 +492,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.user_id = self.register_user("foo", "pass")
         self.token = self.login("foo", "pass")
         self.requester = create_requester(self.user_id)

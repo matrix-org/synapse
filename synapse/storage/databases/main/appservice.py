@@ -20,14 +20,18 @@ from synapse.appservice import (
     ApplicationService,
     ApplicationServiceState,
     AppServiceTransaction,
+    TransactionOneTimeKeyCounts,
+    TransactionUnusedFallbackKeys,
 )
 from synapse.config.appservice import load_appservices
 from synapse.events import EventBase
-from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.storage._base import db_to_json
 from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
+from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
 from synapse.types import JsonDict
 from synapse.util import json_encoder
+from synapse.util.caches.descriptors import _CacheContext, cached
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -56,7 +60,7 @@ def _make_exclusive_regex(
     return exclusive_user_pattern
 
 
-class ApplicationServiceWorkerStore(SQLBaseStore):
+class ApplicationServiceWorkerStore(RoomMemberWorkerStore):
     def __init__(
         self,
         database: DatabasePool,
@@ -123,6 +127,18 @@ class ApplicationServiceWorkerStore(SQLBaseStore):
             if service.id == as_id:
                 return service
         return None
+
+    @cached(iterable=True, cache_context=True)
+    async def get_app_service_users_in_room(
+        self,
+        room_id: str,
+        app_service: "ApplicationService",
+        cache_context: _CacheContext,
+    ) -> List[str]:
+        users_in_room = await self.get_users_in_room(
+            room_id, on_invalidate=cache_context.invalidate
+        )
+        return list(filter(app_service.is_interested_in_user, users_in_room))
 
 
 class ApplicationServiceStore(ApplicationServiceWorkerStore):
@@ -198,6 +214,9 @@ class ApplicationServiceTransactionWorkerStore(
         service: ApplicationService,
         events: List[EventBase],
         ephemeral: List[JsonDict],
+        to_device_messages: List[JsonDict],
+        one_time_key_counts: TransactionOneTimeKeyCounts,
+        unused_fallback_keys: TransactionUnusedFallbackKeys,
     ) -> AppServiceTransaction:
         """Atomically creates a new transaction for this application service
         with the given list of events. Ephemeral events are NOT persisted to the
@@ -207,6 +226,11 @@ class ApplicationServiceTransactionWorkerStore(
             service: The service who the transaction is for.
             events: A list of persistent events to put in the transaction.
             ephemeral: A list of ephemeral events to put in the transaction.
+            to_device_messages: A list of to-device messages to put in the transaction.
+            one_time_key_counts: Counts of remaining one-time keys for relevant
+                appservice devices in the transaction.
+            unused_fallback_keys: Lists of unused fallback keys for relevant
+                appservice devices in the transaction.
 
         Returns:
             A new transaction.
@@ -237,7 +261,13 @@ class ApplicationServiceTransactionWorkerStore(
                 (service.id, new_txn_id, event_ids),
             )
             return AppServiceTransaction(
-                service=service, id=new_txn_id, events=events, ephemeral=ephemeral
+                service=service,
+                id=new_txn_id,
+                events=events,
+                ephemeral=ephemeral,
+                to_device_messages=to_device_messages,
+                one_time_key_counts=one_time_key_counts,
+                unused_fallback_keys=unused_fallback_keys,
             )
 
         return await self.db_pool.runInteraction(
@@ -329,8 +359,17 @@ class ApplicationServiceTransactionWorkerStore(
 
         events = await self.get_events_as_list(event_ids)
 
+        # TODO: to-device messages, one-time key counts and unused fallback keys
+        #       are not yet populated for catch-up transactions.
+        #       We likely want to populate those for reliability.
         return AppServiceTransaction(
-            service=service, id=entry["txn_id"], events=events, ephemeral=[]
+            service=service,
+            id=entry["txn_id"],
+            events=events,
+            ephemeral=[],
+            to_device_messages=[],
+            one_time_key_counts={},
+            unused_fallback_keys={},
         )
 
     def _get_last_txn(self, txn, service_id: Optional[str]) -> int:
@@ -384,14 +423,14 @@ class ApplicationServiceTransactionWorkerStore(
             "get_new_events_for_appservice", get_new_events_for_appservice_txn
         )
 
-        events = await self.get_events_as_list(event_ids)
+        events = await self.get_events_as_list(event_ids, get_prev_content=True)
 
         return upper_bound, events
 
     async def get_type_stream_id_for_appservice(
         self, service: ApplicationService, type: str
     ) -> int:
-        if type not in ("read_receipt", "presence"):
+        if type not in ("read_receipt", "presence", "to_device"):
             raise ValueError(
                 "Expected type to be a valid application stream id type, got %s"
                 % (type,)
@@ -415,16 +454,16 @@ class ApplicationServiceTransactionWorkerStore(
             "get_type_stream_id_for_appservice", get_type_stream_id_for_appservice_txn
         )
 
-    async def set_type_stream_id_for_appservice(
+    async def set_appservice_stream_type_pos(
         self, service: ApplicationService, stream_type: str, pos: Optional[int]
     ) -> None:
-        if stream_type not in ("read_receipt", "presence"):
+        if stream_type not in ("read_receipt", "presence", "to_device"):
             raise ValueError(
                 "Expected type to be a valid application stream id type, got %s"
                 % (stream_type,)
             )
 
-        def set_type_stream_id_for_appservice_txn(txn):
+        def set_appservice_stream_type_pos_txn(txn):
             stream_id_type = "%s_stream_id" % stream_type
             txn.execute(
                 "UPDATE application_services_state SET %s = ? WHERE as_id=?"
@@ -433,7 +472,7 @@ class ApplicationServiceTransactionWorkerStore(
             )
 
         await self.db_pool.runInteraction(
-            "set_type_stream_id_for_appservice", set_type_stream_id_for_appservice_txn
+            "set_appservice_stream_type_pos", set_appservice_stream_type_pos_txn
         )
 
 

@@ -18,10 +18,11 @@ import os
 import sys
 from typing import Dict, Iterable, Iterator, List
 
+from matrix_common.versionstring import get_distribution_version_string
+
 from twisted.internet.tcp import Port
 from twisted.web.resource import EncodingResourceWrapper, Resource
 from twisted.web.server import GzipEncoderFactory
-from twisted.web.static import File
 
 import synapse
 import synapse.config.logger
@@ -34,7 +35,6 @@ from synapse.api.urls import (
     MEDIA_V3_PREFIX,
     SERVER_KEY_V2_PREFIX,
     STATIC_PREFIX,
-    WEB_CLIENT_PREFIX,
 )
 from synapse.app import _base
 from synapse.app._base import (
@@ -54,13 +54,11 @@ from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import (
     OptionsResource,
     RootOptionsRedirectResource,
-    RootRedirect,
     StaticResource,
 )
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
-from synapse.python_dependencies import check_requirements
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
@@ -71,9 +69,9 @@ from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.util.check_dependencies import check_requirements
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.module_loader import load_module
-from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -132,9 +130,15 @@ class SynapseHomeServer(HomeServer):
         resources.update(self._module_web_resources)
         self._module_web_resources_consumed = True
 
-        # try to find something useful to redirect '/' to
-        if WEB_CLIENT_PREFIX in resources:
-            root_resource: Resource = RootOptionsRedirectResource(WEB_CLIENT_PREFIX)
+        # Try to find something useful to serve at '/':
+        #
+        # 1. Redirect to the web client if it is an HTTP(S) URL.
+        # 2. Redirect to the static "Synapse is running" page.
+        # 3. Do not redirect and use a blank resource.
+        if self.config.server.web_client_location:
+            root_resource: Resource = RootOptionsRedirectResource(
+                self.config.server.web_client_location
+            )
         elif STATIC_PREFIX in resources:
             root_resource = RootOptionsRedirectResource(STATIC_PREFIX)
         else:
@@ -256,28 +260,6 @@ class SynapseHomeServer(HomeServer):
         if name in ["keys", "federation"]:
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
-        if name == "webclient":
-            webclient_loc = self.config.server.web_client_location
-
-            if webclient_loc is None:
-                logger.warning(
-                    "Not enabling webclient resource, as web_client_location is unset."
-                )
-            elif webclient_loc.startswith("http://") or webclient_loc.startswith(
-                "https://"
-            ):
-                resources[WEB_CLIENT_PREFIX] = RootRedirect(webclient_loc)
-            else:
-                logger.warning(
-                    "Running webclient on the same domain is not recommended: "
-                    "https://github.com/matrix-org/synapse#security-note - "
-                    "after you move webclient to different host you can set "
-                    "web_client_location to its full URL to enable redirection."
-                )
-                # GZip is disabled here due to
-                # https://twistedmatrix.com/trac/ticket/7678
-                resources[WEB_CLIENT_PREFIX] = File(webclient_loc)
-
         if name == "metrics" and self.config.metrics.enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
 
@@ -369,7 +351,7 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
     hs = SynapseHomeServer(
         config.server.server_name,
         config=config,
-        version_string="Synapse/" + get_version_string(synapse),
+        version_string="Synapse/" + get_distribution_version_string("matrix-synapse"),
     )
 
     synapse.config.logger.setup_logging(hs, config, use_worker_options=False)
@@ -390,7 +372,7 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
 
         await _base.start(hs)
 
-        hs.get_datastore().db_pool.updates.start_doing_background_updates()
+        hs.get_datastores().main.db_pool.updates.start_doing_background_updates()
 
     register_start(start)
 

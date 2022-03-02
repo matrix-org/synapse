@@ -60,7 +60,7 @@ class Auth:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state = hs.get_state_handler()
         self._account_validity_handler = hs.get_account_validity_handler()
 
@@ -71,6 +71,7 @@ class Auth:
         self._auth_blocking = AuthBlocking(self.hs)
 
         self._track_appservice_user_ips = hs.config.appservice.track_appservice_user_ips
+        self._track_puppeted_user_ips = hs.config.api.track_puppeted_user_ips
         self._macaroon_secret_key = hs.config.key.macaroon_secret_key
         self._force_tracing_for_users = hs.config.tracing.force_tracing_for_users
 
@@ -246,6 +247,18 @@ class Auth:
                     user_agent=user_agent,
                     device_id=device_id,
                 )
+                # Track also the puppeted user client IP if enabled and the user is puppeting
+                if (
+                    user_info.user_id != user_info.token_owner
+                    and self._track_puppeted_user_ips
+                ):
+                    await self.store.insert_client_ip(
+                        user_id=user_info.user_id,
+                        access_token=access_token,
+                        ip=ip_addr,
+                        user_agent=user_agent,
+                        device_id=device_id,
+                    )
 
             if is_guest and not allow_guest:
                 raise AuthError(

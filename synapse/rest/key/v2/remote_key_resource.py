@@ -94,7 +94,7 @@ class RemoteKey(DirectServeJsonResource):
         super().__init__()
 
         self.fetcher = ServerKeyFetcher(hs)
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.federation_domain_whitelist = (
             hs.config.federation.federation_domain_whitelist

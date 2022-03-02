@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 class E2eKeysHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.federation = hs.get_federation_client()
         self.device_handler = hs.get_device_handler()
         self.is_mine = hs.is_mine
@@ -1321,21 +1321,21 @@ def _one_time_keys_match(old_key_json: str, new_key: JsonDict) -> bool:
     return old_key == new_key_copy
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class SignatureListItem:
     """An item in the signature list as used by upload_signatures_for_device_keys."""
 
-    signing_key_id = attr.ib(type=str)
-    target_user_id = attr.ib(type=str)
-    target_device_id = attr.ib(type=str)
-    signature = attr.ib(type=JsonDict)
+    signing_key_id: str
+    target_user_id: str
+    target_device_id: str
+    signature: JsonDict
 
 
 class SigningKeyEduUpdater:
     """Handles incoming signing key updates from federation and updates the DB"""
 
     def __init__(self, hs: "HomeServer", e2e_keys_handler: E2eKeysHandler):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.federation = hs.get_federation_client()
         self.clock = hs.get_clock()
         self.e2e_keys_handler = e2e_keys_handler

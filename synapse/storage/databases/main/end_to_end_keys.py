@@ -29,6 +29,10 @@ import attr
 from canonicaljson import encode_canonical_json
 
 from synapse.api.constants import DeviceKeyAlgorithms
+from synapse.appservice import (
+    TransactionOneTimeKeyCounts,
+    TransactionUnusedFallbackKeys,
+)
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import (
@@ -50,16 +54,16 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class DeviceKeyLookupResult:
     """The type returned by get_e2e_device_keys_and_signatures"""
 
-    display_name = attr.ib(type=Optional[str])
+    display_name: Optional[str]
 
     # the key data from e2e_device_keys_json. Typically includes fields like
     # "algorithm", "keys" (including the curve25519 identity key and the ed25519 signing
     # key) and "signatures" (a map from (user id) to (key id/device_id) to signature.)
-    keys = attr.ib(type=Optional[JsonDict])
+    keys: Optional[JsonDict]
 
 
 class EndToEndKeyBackgroundStore(SQLBaseStore):
@@ -387,15 +391,16 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             self.db_pool.simple_insert_many_txn(
                 txn,
                 table="e2e_one_time_keys_json",
+                keys=(
+                    "user_id",
+                    "device_id",
+                    "algorithm",
+                    "key_id",
+                    "ts_added_ms",
+                    "key_json",
+                ),
                 values=[
-                    {
-                        "user_id": user_id,
-                        "device_id": device_id,
-                        "algorithm": algorithm,
-                        "key_id": key_id,
-                        "ts_added_ms": time_now,
-                        "key_json": json_bytes,
-                    }
+                    (user_id, device_id, algorithm, key_id, time_now, json_bytes)
                     for algorithm, key_id, json_bytes in new_keys
                 ],
             )
@@ -436,6 +441,114 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
 
         return await self.db_pool.runInteraction(
             "count_e2e_one_time_keys", _count_e2e_one_time_keys
+        )
+
+    async def count_bulk_e2e_one_time_keys_for_as(
+        self, user_ids: Collection[str]
+    ) -> TransactionOneTimeKeyCounts:
+        """
+        Counts, in bulk, the one-time keys for all the users specified.
+        Intended to be used by application services for populating OTK counts in
+        transactions.
+
+        Return structure is of the shape:
+          user_id -> device_id -> algorithm -> count
+          Empty algorithm -> count dicts are created if needed to represent a
+          lack of unused one-time keys.
+        """
+
+        def _count_bulk_e2e_one_time_keys_txn(
+            txn: LoggingTransaction,
+        ) -> TransactionOneTimeKeyCounts:
+            user_in_where_clause, user_parameters = make_in_list_sql_clause(
+                self.database_engine, "user_id", user_ids
+            )
+            sql = f"""
+                SELECT user_id, device_id, algorithm, COUNT(key_id)
+                FROM devices
+                LEFT JOIN e2e_one_time_keys_json USING (user_id, device_id)
+                WHERE {user_in_where_clause}
+                GROUP BY user_id, device_id, algorithm
+            """
+            txn.execute(sql, user_parameters)
+
+            result: TransactionOneTimeKeyCounts = {}
+
+            for user_id, device_id, algorithm, count in txn:
+                # We deliberately construct empty dictionaries for
+                # users and devices without any unused one-time keys.
+                # We *could* omit these empty dicts if there have been no
+                # changes since the last transaction, but we currently don't
+                # do any change tracking!
+                device_count_by_algo = result.setdefault(user_id, {}).setdefault(
+                    device_id, {}
+                )
+                if algorithm is not None:
+                    # algorithm will be None if this device has no keys.
+                    device_count_by_algo[algorithm] = count
+
+            return result
+
+        return await self.db_pool.runInteraction(
+            "count_bulk_e2e_one_time_keys", _count_bulk_e2e_one_time_keys_txn
+        )
+
+    async def get_e2e_bulk_unused_fallback_key_types(
+        self, user_ids: Collection[str]
+    ) -> TransactionUnusedFallbackKeys:
+        """
+        Finds, in bulk, the types of unused fallback keys for all the users specified.
+        Intended to be used by application services for populating unused fallback
+        keys in transactions.
+
+        Return structure is of the shape:
+          user_id -> device_id -> algorithms
+          Empty lists are created for devices if there are no unused fallback
+          keys. This matches the response structure of MSC3202.
+        """
+        if len(user_ids) == 0:
+            return {}
+
+        def _get_bulk_e2e_unused_fallback_keys_txn(
+            txn: LoggingTransaction,
+        ) -> TransactionUnusedFallbackKeys:
+            user_in_where_clause, user_parameters = make_in_list_sql_clause(
+                self.database_engine, "devices.user_id", user_ids
+            )
+            # We can't use USING here because we require the `.used` condition
+            # to be part of the JOIN condition so that we generate empty lists
+            # when all keys are used (as opposed to just when there are no keys at all).
+            sql = f"""
+                SELECT devices.user_id, devices.device_id, algorithm
+                FROM devices
+                LEFT JOIN e2e_fallback_keys_json AS fallback_keys
+                    ON devices.user_id = fallback_keys.user_id
+                    AND devices.device_id = fallback_keys.device_id
+                    AND NOT fallback_keys.used
+                WHERE
+                    {user_in_where_clause}
+            """
+            txn.execute(sql, user_parameters)
+
+            result: TransactionUnusedFallbackKeys = {}
+
+            for user_id, device_id, algorithm in txn:
+                # We deliberately construct empty dictionaries and lists for
+                # users and devices without any unused fallback keys.
+                # We *could* omit these empty dicts if there have been no
+                # changes since the last transaction, but we currently don't
+                # do any change tracking!
+                device_unused_keys = result.setdefault(user_id, {}).setdefault(
+                    device_id, []
+                )
+                if algorithm is not None:
+                    # algorithm will be None if this device has no keys.
+                    device_unused_keys.append(algorithm)
+
+            return result
+
+        return await self.db_pool.runInteraction(
+            "_get_bulk_e2e_unused_fallback_keys", _get_bulk_e2e_unused_fallback_keys_txn
         )
 
     async def set_e2e_fallback_keys(
@@ -1186,15 +1299,22 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         """
         await self.db_pool.simple_insert_many(
             "e2e_cross_signing_signatures",
-            [
-                {
-                    "user_id": user_id,
-                    "key_id": item.signing_key_id,
-                    "target_user_id": item.target_user_id,
-                    "target_device_id": item.target_device_id,
-                    "signature": item.signature,
-                }
+            keys=(
+                "user_id",
+                "key_id",
+                "target_user_id",
+                "target_device_id",
+                "signature",
+            ),
+            values=[
+                (
+                    user_id,
+                    item.signing_key_id,
+                    item.target_user_id,
+                    item.target_device_id,
+                    item.signature,
+                )
                 for item in signatures
             ],
-            "add_e2e_signing_key",
+            desc="add_e2e_signing_key",
         )

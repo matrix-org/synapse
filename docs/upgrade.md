@@ -85,6 +85,102 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.54.0
+
+## Legacy structured logging configuration removal
+
+This release removes support for the `structured: true` logging configuration
+which was deprecated in Synapse v1.23.0. If your logging configuration contains
+`structured: true` then it should be modified based on the
+[structured logging documentation](structured_logging.md).
+
+# Upgrading to v1.53.0
+
+## Dropping support for `webclient` listeners and non-HTTP(S) `web_client_location`
+
+Per the deprecation notice in Synapse v1.51.0, listeners of type  `webclient`
+are no longer supported and configuring them is a now a configuration error.
+
+Configuring a non-HTTP(S) `web_client_location` configuration is is now a
+configuration error. Since the `webclient` listener is no longer supported, this
+setting only applies to the root path `/` of Synapse's web server and no longer
+the `/_matrix/client/` path.
+
+## Stablisation of MSC3231
+
+The unstable validity-check endpoint for the 
+[Registration Tokens](https://spec.matrix.org/v1.2/client-server-api/#get_matrixclientv1registermloginregistration_tokenvalidity) 
+feature has been stabilised and moved from:
+
+`/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity`
+
+to:
+
+`/_matrix/client/v1/register/m.login.registration_token/validity`
+
+Please update any relevant reverse proxy or firewall configurations appropriately.
+
+## Time-based cache expiry is now enabled by default
+
+Formerly, entries in the cache were not evicted regardless of whether they were accessed after storing.
+This behavior has now changed. By default entries in the cache are now evicted after 30m of not being accessed. 
+To change the default behavior, go to the `caches` section of the config and change the `expire_caches` and 
+`cache_entry_ttl` flags as necessary. Please note that these flags replace the `expiry_time` flag in the config.  
+The `expiry_time` flag will still continue to work, but it has been deprecated and will be removed in the future.
+
+## Deprecation of `capability` `org.matrix.msc3283.*`
+
+The `capabilities` of MSC3283 from the REST API `/_matrix/client/r0/capabilities`
+becomes stable.
+
+The old `capabilities`
+- `org.matrix.msc3283.set_displayname`,
+- `org.matrix.msc3283.set_avatar_url` and
+- `org.matrix.msc3283.3pid_changes`
+
+are deprecated and scheduled to be removed in Synapse v1.54.0.
+
+The new `capabilities`
+- `m.set_displayname`,
+- `m.set_avatar_url` and
+- `m.3pid_changes`
+
+are now active by default.
+
+## Removal of `user_may_create_room_with_invites`
+
+As announced with the release of [Synapse 1.47.0](#deprecation-of-the-user_may_create_room_with_invites-module-callback),
+the deprecated `user_may_create_room_with_invites` module callback has been removed.
+
+Modules relying on it can instead implement [`user_may_invite`](https://matrix-org.github.io/synapse/latest/modules/spam_checker_callbacks.html#user_may_invite)
+and use the [`get_room_state`](https://github.com/matrix-org/synapse/blob/872f23b95fa980a61b0866c1475e84491991fa20/synapse/module_api/__init__.py#L869-L876)
+module API to infer whether the invite is happening while creating a room (see [this function](https://github.com/matrix-org/synapse-domain-rule-checker/blob/e7d092dd9f2a7f844928771dbfd9fd24c2332e48/synapse_domain_rule_checker/__init__.py#L56-L89)
+as an example). Alternately, modules can also implement [`on_create_room`](https://matrix-org.github.io/synapse/latest/modules/third_party_rules_callbacks.html#on_create_room).
+
+
+# Upgrading to v1.52.0
+
+## Twisted security release
+
+Note that [Twisted 22.1.0](https://github.com/twisted/twisted/releases/tag/twisted-22.1.0)
+has recently been released, which fixes a [security issue](https://github.com/twisted/twisted/security/advisories/GHSA-92x2-jw7w-xvvx)
+within the Twisted library. We do not believe Synapse is affected by this vulnerability,
+though we advise server administrators who installed Synapse via pip to upgrade Twisted
+with `pip install --upgrade Twisted treq` as a matter of good practice. The Docker image
+`matrixdotorg/synapse` and the Debian packages from `packages.matrix.org` are using the
+updated library.
+
+# Upgrading to v1.51.0
+
+## Deprecation of `webclient` listeners and non-HTTP(S) `web_client_location`
+
+Listeners of type  `webclient` are deprecated and scheduled to be removed in
+Synapse v1.53.0.
+
+Similarly, a non-HTTP(S) `web_client_location` configuration is deprecated and
+will become a configuration error in Synapse v1.53.0.
+
+
 # Upgrading to v1.50.0
 
 ## Dropping support for old Python and Postgres versions
@@ -1118,8 +1214,7 @@ more details on upgrading your database.
 
 Synapse v1.0 is the first release to enforce validation of TLS
 certificates for the federation API. It is therefore essential that your
-certificates are correctly configured. See the
-[FAQ](MSC1711_certificates_FAQ.md) for more information.
+certificates are correctly configured.
 
 Note, v1.0 installations will also no longer be able to federate with
 servers that have not correctly configured their certificates.
@@ -1183,9 +1278,6 @@ Please be aware that, before Synapse v1.0 is released around March 2019,
 you will need to replace any self-signed certificates with those
 verified by a root CA. Information on how to do so can be found at the
 ACME docs.
-
-For more information on configuring TLS certificates see the
-[FAQ](MSC1711_certificates_FAQ.md).
 
 # Upgrading to v0.34.0
 

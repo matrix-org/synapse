@@ -17,6 +17,7 @@ import gc
 import hashlib
 import hmac
 import inspect
+import json
 import logging
 import secrets
 import time
@@ -36,9 +37,11 @@ from typing import (
 )
 from unittest.mock import Mock, patch
 
-from canonicaljson import json
+import canonicaljson
+import signedjson.key
+import unpaddedbase64
 
-from twisted.internet.defer import Deferred, ensureDeferred, succeed
+from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.python.failure import Failure
 from twisted.python.threadpool import ThreadPool
 from twisted.test.proto_helpers import MemoryReactor
@@ -48,9 +51,11 @@ from twisted.web.server import Request
 
 from synapse import events
 from synapse.api.constants import EventTypes, Membership
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.config.homeserver import HomeServerConfig
-from synapse.config.ratelimiting import FederationRateLimitConfig
-from synapse.federation.transport import server as federation_server
+from synapse.config.server import DEFAULT_ROOM_VERSION
+from synapse.crypto.event_signing import add_hashes_and_signatures
+from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import (
@@ -61,10 +66,10 @@ from synapse.logging.context import (
 )
 from synapse.rest import RegisterServletsFunc
 from synapse.server import HomeServer
+from synapse.storage.keys import FetchKeyResult
 from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
 from synapse.util.httpresourcetree import create_resource_tree
-from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests.server import FakeChannel, get_clock, make_request, setup_test_homeserver
 from tests.test_utils import event_injection, setup_awaitable_errors
@@ -147,12 +152,12 @@ class TestCase(unittest.TestCase):
 
     def assertObjectHasAttributes(self, attrs, obj):
         """Asserts that the given object has each of the attributes given, and
-        that the value of each matches according to assertEquals."""
+        that the value of each matches according to assertEqual."""
         for key in attrs.keys():
             if not hasattr(obj, key):
                 raise AssertionError("Expected obj to have a '.%s'" % key)
             try:
-                self.assertEquals(attrs[key], getattr(obj, key))
+                self.assertEqual(attrs[key], getattr(obj, key))
             except AssertionError as e:
                 raise (type(e))(f"Assert error for '.{key}':") from e
 
@@ -164,7 +169,7 @@ class TestCase(unittest.TestCase):
             actual (dict): The test result. Extra keys will not be checked.
         """
         for key in required:
-            self.assertEquals(
+            self.assertEqual(
                 required[key], actual[key], msg="%s mismatch. %s" % (key, actual)
             )
 
@@ -275,7 +280,7 @@ class HomeserverTestCase(TestCase):
 
                 # We need a valid token ID to satisfy foreign key constraints.
                 token_id = self.get_success(
-                    self.hs.get_datastore().add_access_token_to_user(
+                    self.hs.get_datastores().main.add_access_token_to_user(
                         self.helper.auth_user_id,
                         "some_fake_token",
                         None,
@@ -332,7 +337,7 @@ class HomeserverTestCase(TestCase):
 
     def wait_for_background_updates(self) -> None:
         """Block until all background database updates have completed."""
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         while not self.get_success(
             store.db_pool.updates.has_completed_background_updates()
         ):
@@ -499,7 +504,7 @@ class HomeserverTestCase(TestCase):
                 self.get_success(stor.db_pool.updates.run_background_updates(False))
 
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
-        stor = hs.get_datastore()
+        stor = hs.get_datastores().main
 
         # Run the database background updates, when running against "master".
         if hs.__class__.__name__ == "TestHomeServer":
@@ -620,18 +625,19 @@ class HomeserverTestCase(TestCase):
         self,
         username: str,
         appservice_token: str,
-    ) -> str:
+    ) -> Tuple[str, str]:
         """Register an appservice user as an application service.
         Requires the client-facing registration API be registered.
 
         Args:
             username: the user to be registered by an application service.
-                Should be a full username, i.e. ""@localpart:hostname" as opposed to just "localpart"
+                Should NOT be a full username, i.e. just "localpart" as opposed to "@localpart:hostname"
             appservice_token: the acccess token for that application service.
 
         Raises: if the request to '/register' does not return 200 OK.
 
-        Returns: the MXID of the new user.
+        Returns:
+            The MXID of the new user, the device ID of the new user's first device.
         """
         channel = self.make_request(
             "POST",
@@ -643,7 +649,7 @@ class HomeserverTestCase(TestCase):
             access_token=appservice_token,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
-        return channel.json_body["user_id"]
+        return channel.json_body["user_id"], channel.json_body["device_id"]
 
     def login(
         self,
@@ -716,14 +722,16 @@ class HomeserverTestCase(TestCase):
         Add the given event as an extremity to the room.
         """
         self.get_success(
-            self.hs.get_datastore().db_pool.simple_insert(
+            self.hs.get_datastores().main.db_pool.simple_insert(
                 table="event_forward_extremities",
                 values={"room_id": room_id, "event_id": event_id},
                 desc="test_add_extremity",
             )
         )
 
-        self.hs.get_datastore().get_latest_event_ids_in_room.invalidate((room_id,))
+        self.hs.get_datastores().main.get_latest_event_ids_in_room.invalidate(
+            (room_id,)
+        )
 
     def attempt_wrong_password_login(self, username, password):
         """Attempts to login as the user with the given password, asserting
@@ -754,42 +762,134 @@ class HomeserverTestCase(TestCase):
 
 class FederatingHomeserverTestCase(HomeserverTestCase):
     """
-    A federating homeserver that authenticates incoming requests as `other.example.com`.
+    A federating homeserver, set up to validate incoming federation requests
     """
+
+    OTHER_SERVER_NAME = "other.example.com"
+    OTHER_SERVER_SIGNATURE_KEY = signedjson.key.generate_signing_key("test")
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
+        super().prepare(reactor, clock, hs)
+
+        # poke the other server's signing key into the key store, so that we don't
+        # make requests for it
+        verify_key = signedjson.key.get_verify_key(self.OTHER_SERVER_SIGNATURE_KEY)
+        verify_key_id = "%s:%s" % (verify_key.alg, verify_key.version)
+
+        self.get_success(
+            hs.get_datastores().main.store_server_verify_keys(
+                from_server=self.OTHER_SERVER_NAME,
+                ts_added_ms=clock.time_msec(),
+                verify_keys=[
+                    (
+                        self.OTHER_SERVER_NAME,
+                        verify_key_id,
+                        FetchKeyResult(
+                            verify_key=verify_key,
+                            valid_until_ts=clock.time_msec() + 1000,
+                        ),
+                    )
+                ],
+            )
+        )
 
     def create_resource_dict(self) -> Dict[str, Resource]:
         d = super().create_resource_dict()
-        d["/_matrix/federation"] = TestTransportLayerServer(self.hs)
+        d["/_matrix/federation"] = TransportLayerServer(self.hs)
         return d
 
+    def make_signed_federation_request(
+        self,
+        method: str,
+        path: str,
+        content: Optional[JsonDict] = None,
+        await_result: bool = True,
+        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
+        client_ip: str = "127.0.0.1",
+    ) -> FakeChannel:
+        """Make an inbound signed federation request to this server
 
-class TestTransportLayerServer(JsonResource):
-    """A test implementation of TransportLayerServer
+        The request is signed as if it came from "other.example.com", which our HS
+        already has the keys for.
+        """
 
-    authenticates incoming requests as `other.example.com`.
-    """
+        if custom_headers is None:
+            custom_headers = []
+        else:
+            custom_headers = list(custom_headers)
 
-    def __init__(self, hs):
-        super().__init__(hs)
-
-        class Authenticator:
-            def authenticate_request(self, request, content):
-                return succeed("other.example.com")
-
-        authenticator = Authenticator()
-
-        ratelimiter = FederationRateLimiter(
-            hs.get_clock(),
-            FederationRateLimitConfig(
-                window_size=1,
-                sleep_limit=1,
-                sleep_delay=1,
-                reject_limit=1000,
-                concurrent=1000,
-            ),
+        custom_headers.append(
+            (
+                "Authorization",
+                _auth_header_for_request(
+                    origin=self.OTHER_SERVER_NAME,
+                    destination=self.hs.hostname,
+                    signing_key=self.OTHER_SERVER_SIGNATURE_KEY,
+                    method=method,
+                    path=path,
+                    content=content,
+                ),
+            )
         )
 
-        federation_server.register_servlets(hs, self, authenticator, ratelimiter)
+        return make_request(
+            self.reactor,
+            self.site,
+            method=method,
+            path=path,
+            content=content,
+            shorthand=False,
+            await_result=await_result,
+            custom_headers=custom_headers,
+            client_ip=client_ip,
+        )
+
+    def add_hashes_and_signatures(
+        self,
+        event_dict: JsonDict,
+        room_version: RoomVersion = KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
+    ) -> JsonDict:
+        """Adds hashes and signatures to the given event dict
+
+        Returns:
+             The modified event dict, for convenience
+        """
+        add_hashes_and_signatures(
+            room_version,
+            event_dict,
+            signature_name=self.OTHER_SERVER_NAME,
+            signing_key=self.OTHER_SERVER_SIGNATURE_KEY,
+        )
+        return event_dict
+
+
+def _auth_header_for_request(
+    origin: str,
+    destination: str,
+    signing_key: signedjson.key.SigningKey,
+    method: str,
+    path: str,
+    content: Optional[JsonDict],
+) -> str:
+    """Build a suitable Authorization header for an outgoing federation request"""
+    request_description: JsonDict = {
+        "method": method,
+        "uri": path,
+        "destination": destination,
+        "origin": origin,
+    }
+    if content is not None:
+        request_description["content"] = content
+    signature_base64 = unpaddedbase64.encode_base64(
+        signing_key.sign(
+            canonicaljson.encode_canonical_json(request_description)
+        ).signature
+    )
+    return (
+        f"X-Matrix origin={origin},"
+        f"key={signing_key.alg}:{signing_key.version},"
+        f"sig={signature_base64}"
+    )
 
 
 def override_config(extra_config):

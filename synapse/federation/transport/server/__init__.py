@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Dict, Iterable, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Type
 
 from typing_extensions import Literal
 
@@ -24,6 +24,7 @@ from synapse.federation.transport.server._base import (
 )
 from synapse.federation.transport.server.federation import (
     FEDERATION_SERVLET_CLASSES,
+    FederationAccountStatusServlet,
     FederationTimestampLookupServlet,
 )
 from synapse.federation.transport.server.groups_local import GROUP_LOCAL_SERVLET_CLASSES
@@ -36,9 +37,11 @@ from synapse.http.servlet import (
     parse_integer_from_args,
     parse_string_from_args,
 )
-from synapse.server import HomeServer
 from synapse.types import JsonDict, ThirdPartyInstanceID
 from synapse.util.ratelimitutils import FederationRateLimiter
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +49,7 @@ logger = logging.getLogger(__name__)
 class TransportLayerServer(JsonResource):
     """Handles incoming federation HTTP requests"""
 
-    def __init__(self, hs: HomeServer, servlet_groups: Optional[List[str]] = None):
+    def __init__(self, hs: "HomeServer", servlet_groups: Optional[List[str]] = None):
         """Initialize the TransportLayerServer
 
         Will by default register all servlets. For custom behaviour, pass in
@@ -113,7 +116,7 @@ class PublicRoomList(BaseFederationServlet):
 
     def __init__(
         self,
-        hs: HomeServer,
+        hs: "HomeServer",
         authenticator: Authenticator,
         ratelimiter: FederationRateLimiter,
         server_name: str,
@@ -203,7 +206,7 @@ class FederationGroupsRenewAttestaionServlet(BaseFederationServlet):
 
     def __init__(
         self,
-        hs: HomeServer,
+        hs: "HomeServer",
         authenticator: Authenticator,
         ratelimiter: FederationRateLimiter,
         server_name: str,
@@ -251,7 +254,7 @@ class OpenIdUserInfo(BaseFederationServlet):
 
     def __init__(
         self,
-        hs: HomeServer,
+        hs: "HomeServer",
         authenticator: Authenticator,
         ratelimiter: FederationRateLimiter,
         server_name: str,
@@ -297,7 +300,7 @@ DEFAULT_SERVLET_GROUPS: Dict[str, Iterable[Type[BaseFederationServlet]]] = {
 
 
 def register_servlets(
-    hs: HomeServer,
+    hs: "HomeServer",
     resource: HttpServer,
     authenticator: Authenticator,
     ratelimiter: FederationRateLimiter,
@@ -331,6 +334,13 @@ def register_servlets(
             if (
                 servletclass == FederationTimestampLookupServlet
                 and not hs.config.experimental.msc3030_enabled
+            ):
+                continue
+
+            # Only allow the `/account_status` servlet if msc3720 is enabled
+            if (
+                servletclass == FederationAccountStatusServlet
+                and not hs.config.experimental.msc3720_enabled
             ):
                 continue
 

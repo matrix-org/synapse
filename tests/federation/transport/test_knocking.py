@@ -169,7 +169,7 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
             self.assertIn(event_type, expected_room_state)
 
             # Check the state content matches
-            self.assertEquals(
+            self.assertEqual(
                 expected_room_state[event_type]["content"], event["content"]
             )
 
@@ -198,7 +198,7 @@ class FederationKnockingTestCase(
     ]
 
     def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
+        self.store = homeserver.get_datastores().main
 
         # We're not going to be properly signing events as our remote homeserver is fake,
         # therefore disable event signature checks.
@@ -245,7 +245,7 @@ class FederationKnockingTestCase(
             self.hs, room_id, user_id
         )
 
-        channel = self.make_request(
+        channel = self.make_signed_federation_request(
             "GET",
             "/_matrix/federation/v1/make_knock/%s/%s?ver=%s"
             % (
@@ -256,7 +256,7 @@ class FederationKnockingTestCase(
                 RoomVersions.V7.identifier,
             ),
         )
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
 
         # Note: We don't expect the knock membership event to be sent over federation as
         # part of the stripped room state, as the knocking homeserver already has that
@@ -266,11 +266,11 @@ class FederationKnockingTestCase(
         knock_event = channel.json_body["event"]
 
         # Check that the event has things we expect in it
-        self.assertEquals(knock_event["room_id"], room_id)
-        self.assertEquals(knock_event["sender"], fake_knocking_user_id)
-        self.assertEquals(knock_event["state_key"], fake_knocking_user_id)
-        self.assertEquals(knock_event["type"], EventTypes.Member)
-        self.assertEquals(knock_event["content"]["membership"], Membership.KNOCK)
+        self.assertEqual(knock_event["room_id"], room_id)
+        self.assertEqual(knock_event["sender"], fake_knocking_user_id)
+        self.assertEqual(knock_event["state_key"], fake_knocking_user_id)
+        self.assertEqual(knock_event["type"], EventTypes.Member)
+        self.assertEqual(knock_event["content"]["membership"], Membership.KNOCK)
 
         # Turn the event json dict into a proper event.
         # We won't sign it properly, but that's OK as we stub out event auth in `prepare`
@@ -288,13 +288,13 @@ class FederationKnockingTestCase(
         )
 
         # Send the signed knock event into the room
-        channel = self.make_request(
+        channel = self.make_signed_federation_request(
             "PUT",
             "/_matrix/federation/v1/send_knock/%s/%s"
             % (room_id, signed_knock_event.event_id),
             signed_knock_event_json,
         )
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
 
         # Check that we got the stripped room state in return
         room_state_events = channel.json_body["knock_state_events"]

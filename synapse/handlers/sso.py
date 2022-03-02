@@ -126,45 +126,45 @@ class SsoIdentityProvider(Protocol):
         raise NotImplementedError()
 
 
-@attr.s
+@attr.s(auto_attribs=True)
 class UserAttributes:
     # the localpart of the mxid that the mapper has assigned to the user.
     # if `None`, the mapper has not picked a userid, and the user should be prompted to
     # enter one.
-    localpart = attr.ib(type=Optional[str])
-    display_name = attr.ib(type=Optional[str], default=None)
-    emails = attr.ib(type=Collection[str], default=attr.Factory(list))
+    localpart: Optional[str]
+    display_name: Optional[str] = None
+    emails: Collection[str] = attr.Factory(list)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class UsernameMappingSession:
     """Data we track about SSO sessions"""
 
     # A unique identifier for this SSO provider, e.g.  "oidc" or "saml".
-    auth_provider_id = attr.ib(type=str)
+    auth_provider_id: str
 
     # user ID on the IdP server
-    remote_user_id = attr.ib(type=str)
+    remote_user_id: str
 
     # attributes returned by the ID mapper
-    display_name = attr.ib(type=Optional[str])
-    emails = attr.ib(type=Collection[str])
+    display_name: Optional[str]
+    emails: Collection[str]
 
     # An optional dictionary of extra attributes to be provided to the client in the
     # login response.
-    extra_login_attributes = attr.ib(type=Optional[JsonDict])
+    extra_login_attributes: Optional[JsonDict]
 
     # where to redirect the client back to
-    client_redirect_url = attr.ib(type=str)
+    client_redirect_url: str
 
     # expiry time for the session, in milliseconds
-    expiry_time_ms = attr.ib(type=int)
+    expiry_time_ms: int
 
     # choices made by the user
-    chosen_localpart = attr.ib(type=Optional[str], default=None)
-    use_display_name = attr.ib(type=bool, default=True)
-    emails_to_use = attr.ib(type=Collection[str], default=())
-    terms_accepted_version = attr.ib(type=Optional[str], default=None)
+    chosen_localpart: Optional[str] = None
+    use_display_name: bool = True
+    emails_to_use: Collection[str] = ()
+    terms_accepted_version: Optional[str] = None
 
 
 # the HTTP cookie used to track the mapping session id
@@ -180,7 +180,7 @@ class SsoHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._server_name = hs.hostname
         self._registration_handler = hs.get_registration_handler()
         self._auth_handler = hs.get_auth_handler()

@@ -13,12 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import heapq
-from collections.abc import Iterable
-from typing import TYPE_CHECKING, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Type, TypeVar, cast
 
 import attr
 
-from ._base import Stream, StreamUpdateResult, Token
+from synapse.replication.tcp.streams._base import (
+    Stream,
+    StreamRow,
+    StreamUpdateResult,
+    Token,
+)
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -50,12 +54,15 @@ data part are:
 """
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class EventsStreamRow:
     """A parsed row from the events replication stream"""
 
-    type = attr.ib()  # str: the TypeId of one of the *EventsStreamRows
-    data = attr.ib()  # BaseEventsStreamRow
+    type: str  # the TypeId of one of the *EventsStreamRows
+    data: "BaseEventsStreamRow"
+
+
+T = TypeVar("T", bound="BaseEventsStreamRow")
 
 
 class BaseEventsStreamRow:
@@ -68,7 +75,7 @@ class BaseEventsStreamRow:
     TypeId: str
 
     @classmethod
-    def from_data(cls, data):
+    def from_data(cls: Type[T], data: Iterable[Optional[str]]) -> T:
         """Parse the data from the replication stream into a row.
 
         By default we just call the constructor with the data list as arguments
@@ -79,28 +86,28 @@ class BaseEventsStreamRow:
         return cls(*data)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class EventsStreamEventRow(BaseEventsStreamRow):
     TypeId = "ev"
 
-    event_id = attr.ib(type=str)
-    room_id = attr.ib(type=str)
-    type = attr.ib(type=str)
-    state_key = attr.ib(type=Optional[str])
-    redacts = attr.ib(type=Optional[str])
-    relates_to = attr.ib(type=Optional[str])
-    membership = attr.ib(type=Optional[str])
-    rejected = attr.ib(type=bool)
+    event_id: str
+    room_id: str
+    type: str
+    state_key: Optional[str]
+    redacts: Optional[str]
+    relates_to: Optional[str]
+    membership: Optional[str]
+    rejected: bool
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class EventsStreamCurrentStateRow(BaseEventsStreamRow):
     TypeId = "state"
 
-    room_id = attr.ib()  # str
-    type = attr.ib()  # str
-    state_key = attr.ib()  # str
-    event_id = attr.ib()  # str, optional
+    room_id: str
+    type: str
+    state_key: str
+    event_id: Optional[str]
 
 
 _EventRows: Tuple[Type[BaseEventsStreamRow], ...] = (
@@ -117,7 +124,7 @@ class EventsStream(Stream):
     NAME = "events"
 
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             self._store._stream_id_gen.get_current_token_for_writer,
@@ -221,7 +228,7 @@ class EventsStream(Stream):
         return updates, upper_limit, limited
 
     @classmethod
-    def parse_row(cls, row):
-        (typ, data) = row
-        data = TypeToRow[typ].from_data(data)
-        return EventsStreamRow(typ, data)
+    def parse_row(cls, row: StreamRow) -> "EventsStreamRow":
+        (typ, data) = cast(Tuple[str, Iterable[Optional[str]]], row)
+        event_stream_row_data = TypeToRow[typ].from_data(data)
+        return EventsStreamRow(typ, event_stream_row_data)

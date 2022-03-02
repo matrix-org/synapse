@@ -155,7 +155,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         self.http_client = Mock(spec=["get_json"])
         self.http_client.get_json.side_effect = get_json
-        self.http_client.user_agent = "Synapse Test"
+        self.http_client.user_agent = b"Synapse Test"
 
         hs = self.setup_test_homeserver(proxied_http_client=self.http_client)
 
@@ -438,12 +438,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
         state = "state"
         nonce = "nonce"
         client_redirect_url = "http://client/redirect"
-        user_agent = "Browser"
         ip_address = "10.0.0.1"
         session = self._generate_oidc_session_token(state, nonce, client_redirect_url)
-        request = _build_callback_request(
-            code, state, session, user_agent=user_agent, ip_address=ip_address
-        )
+        request = _build_callback_request(code, state, session, ip_address=ip_address)
 
         self.get_success(self.handler.handle_oidc_callback(request))
 
@@ -859,7 +856,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         auth_handler.complete_sso_login.reset_mock()
 
         # Test if the mxid is already taken
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         user3 = UserID.from_string("@test_user_3:test")
         self.get_success(
             store.register_user(user_id=user3.to_string(), password_hash=None)
@@ -875,7 +872,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
     @override_config({"oidc_config": {**DEFAULT_CONFIG, "allow_existing_users": True}})
     def test_map_userinfo_to_existing_user(self):
         """Existing users can log in with OpenID Connect when allow_existing_users is True."""
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         user = UserID.from_string("@test_user:test")
         self.get_success(
             store.register_user(user_id=user.to_string(), password_hash=None)
@@ -999,7 +996,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         auth_handler = self.hs.get_auth_handler()
         auth_handler.complete_sso_login = simple_async_mock()
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.get_success(
             store.register_user(user_id="@test_user:test", password_hash=None)
         )
@@ -1274,7 +1271,6 @@ def _build_callback_request(
     code: str,
     state: str,
     session: str,
-    user_agent: str = "Browser",
     ip_address: str = "10.0.0.1",
 ):
     """Builds a fake SynapseRequest to mock the browser callback
@@ -1289,7 +1285,6 @@ def _build_callback_request(
            query param. Should be the same as was embedded in the session in
            _build_oidc_session.
         session: the "session" which would have been passed around in the cookie.
-        user_agent: the user-agent to present
         ip_address: the IP address to pretend the request came from
     """
     request = Mock(

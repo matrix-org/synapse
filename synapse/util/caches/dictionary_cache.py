@@ -33,7 +33,7 @@ DV = TypeVar("DV")
 
 # This class can't be generic because it uses slots with attrs.
 # See: https://github.com/python-attrs/attrs/issues/313
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class DictionaryEntry:  # should be: Generic[DKT, DV].
     """Returned when getting an entry from the cache
 
@@ -41,14 +41,13 @@ class DictionaryEntry:  # should be: Generic[DKT, DV].
         full: Whether the cache has the full or dict or just some keys.
             If not full then not all requested keys will necessarily be present
             in `value`
-        known_absent: Keys that were looked up in the dict and were not
-            there.
+        known_absent: Keys that were looked up in the dict and were not there.
         value: The full or partial dict value
     """
 
-    full = attr.ib(type=bool)
-    known_absent = attr.ib(type=Set[Any])  # should be: Set[DKT]
-    value = attr.ib(type=Dict[Any, Any])  # should be: Dict[DKT, DV]
+    full: bool
+    known_absent: Set[Any]  # should be: Set[DKT]
+    value: Dict[Any, Any]  # should be: Dict[DKT, DV]
 
     def __len__(self) -> int:
         return len(self.value)

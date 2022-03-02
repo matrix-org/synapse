@@ -23,25 +23,25 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class PusherConfig:
     """Parameters necessary to configure a pusher."""
 
-    id = attr.ib(type=Optional[str])
-    user_name = attr.ib(type=str)
-    access_token = attr.ib(type=Optional[int])
-    profile_tag = attr.ib(type=str)
-    kind = attr.ib(type=str)
-    app_id = attr.ib(type=str)
-    app_display_name = attr.ib(type=str)
-    device_display_name = attr.ib(type=str)
-    pushkey = attr.ib(type=str)
-    ts = attr.ib(type=int)
-    lang = attr.ib(type=Optional[str])
-    data = attr.ib(type=Optional[JsonDict])
-    last_stream_ordering = attr.ib(type=int)
-    last_success = attr.ib(type=Optional[int])
-    failing_since = attr.ib(type=Optional[int])
+    id: Optional[str]
+    user_name: str
+    access_token: Optional[int]
+    profile_tag: str
+    kind: str
+    app_id: str
+    app_display_name: str
+    device_display_name: str
+    pushkey: str
+    ts: int
+    lang: Optional[str]
+    data: Optional[JsonDict]
+    last_stream_ordering: int
+    last_success: Optional[int]
+    failing_since: Optional[int]
 
     def as_dict(self) -> Dict[str, Any]:
         """Information that can be retrieved about a pusher after creation."""
@@ -57,18 +57,18 @@ class PusherConfig:
         }
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class ThrottleParams:
     """Parameters for controlling the rate of sending pushes via email."""
 
-    last_sent_ts = attr.ib(type=int)
-    throttle_ms = attr.ib(type=int)
+    last_sent_ts: int
+    throttle_ms: int
 
 
 class Pusher(metaclass=abc.ABCMeta):
     def __init__(self, hs: "HomeServer", pusher_config: PusherConfig):
         self.hs = hs
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.clock = self.hs.get_clock()
 
         self.pusher_id = pusher_config.id

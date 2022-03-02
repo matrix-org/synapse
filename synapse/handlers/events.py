@@ -20,7 +20,6 @@ from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import AuthError, SynapseError
 from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
-from synapse.logging.utils import log_function
 from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, UserID
 from synapse.visibility import filter_events_for_client
@@ -34,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 class EventStreamHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.hs = hs
 
@@ -43,7 +42,6 @@ class EventStreamHandler:
         self._server_notices_sender = hs.get_server_notices_sender()
         self._event_serializer = hs.get_event_client_serializer()
 
-    @log_function
     async def get_stream(
         self,
         auth_user_id: str,
@@ -119,7 +117,7 @@ class EventStreamHandler:
 
             events.extend(to_add)
 
-            chunks = await self._event_serializer.serialize_events(
+            chunks = self._event_serializer.serialize_events(
                 events,
                 time_now,
                 as_client_event=as_client_event,
@@ -136,7 +134,7 @@ class EventStreamHandler:
 
 class EventHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
 
     async def get_event(

@@ -42,6 +42,10 @@ POSTGRES_HOST = os.environ.get("SYNAPSE_POSTGRES_HOST", None)
 POSTGRES_PASSWORD = os.environ.get("SYNAPSE_POSTGRES_PASSWORD", None)
 POSTGRES_BASE_DB = "_synapse_unit_tests_base_%s" % (os.getpid(),)
 
+# When debugging a specific test, it's occasionally useful to write the
+# DB to disk and query it with the sqlite CLI.
+SQLITE_PERSIST_DB = os.environ.get("SYNAPSE_TEST_PERSIST_SQLITE_DB") is not None
+
 # the dbname we will connect to in order to create the base database.
 POSTGRES_DBNAME_FOR_INITIAL_CREATE = "postgres"
 
@@ -363,7 +367,7 @@ async def create_room(hs, room_id: str, creator_id: str):
     """Creates and persist a creation event for the given room"""
 
     persistence_store = hs.get_storage().persistence
-    store = hs.get_datastore()
+    store = hs.get_datastores().main
     event_builder_factory = hs.get_event_builder_factory()
     event_creation_handler = hs.get_event_creation_handler()
 

@@ -103,7 +103,7 @@ class BulkPushRuleEvaluator:
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self._event_auth_handler = hs.get_event_auth_handler()
 
         # Used by `RulesForRoom` to ensure only one thing mutates the cache at a
@@ -298,7 +298,7 @@ RulesByUser = Dict[str, List[Rule]]
 StateGroup = Union[object, int]
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class RulesForRoomData:
     """The data stored in the cache by `RulesForRoom`.
 
@@ -307,29 +307,29 @@ class RulesForRoomData:
     """
 
     # event_id -> (user_id, state)
-    member_map = attr.ib(type=MemberMap, factory=dict)
+    member_map: MemberMap = attr.Factory(dict)
     # user_id -> rules
-    rules_by_user = attr.ib(type=RulesByUser, factory=dict)
+    rules_by_user: RulesByUser = attr.Factory(dict)
 
     # The last state group we updated the caches for. If the state_group of
     # a new event comes along, we know that we can just return the cached
     # result.
     # On invalidation of the rules themselves (if the user changes them),
     # we invalidate everything and set state_group to `object()`
-    state_group = attr.ib(type=StateGroup, factory=object)
+    state_group: StateGroup = attr.Factory(object)
 
     # A sequence number to keep track of when we're allowed to update the
     # cache. We bump the sequence number when we invalidate the cache. If
     # the sequence number changes while we're calculating stuff we should
     # not update the cache with it.
-    sequence = attr.ib(type=int, default=0)
+    sequence: int = 0
 
     # A cache of user_ids that we *know* aren't interesting, e.g. user_ids
     # owned by AS's, or remote users, etc. (I.e. users we will never need to
     # calculate push for)
     # These never need to be invalidated as we will never set up push for
     # them.
-    uninteresting_user_set = attr.ib(type=Set[str], factory=set)
+    uninteresting_user_set: Set[str] = attr.Factory(set)
 
 
 class RulesForRoom:
@@ -366,7 +366,7 @@ class RulesForRoom:
         """
         self.room_id = room_id
         self.is_mine_id = hs.is_mine_id
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.room_push_rule_cache_metrics = room_push_rule_cache_metrics
 
         # Used to ensure only one thing mutates the cache at a time. Keyed off
@@ -553,7 +553,7 @@ class RulesForRoom:
             self.data.state_group = state_group
 
 
-@attr.attrs(slots=True, frozen=True)
+@attr.attrs(slots=True, frozen=True, auto_attribs=True)
 class _Invalidation:
     # _Invalidation is passed as an `on_invalidate` callback to bulk_get_push_rules,
     # which means that it it is stored on the bulk_get_push_rules cache entry. In order
@@ -564,8 +564,8 @@ class _Invalidation:
     # attrs provides suitable __hash__ and __eq__ methods, provided we remember to
     # set `frozen=True`.
 
-    cache = attr.ib(type=LruCache)
-    room_id = attr.ib(type=str)
+    cache: LruCache
+    room_id: str
 
     def __call__(self) -> None:
         rules_data = self.cache.get(self.room_id, None, update_metrics=False)

@@ -178,8 +178,11 @@ recommend the use of `systemd` where available: for information on setting up
 
 ### `synapse.app.generic_worker`
 
-This worker can handle API requests matching the following regular
-expressions:
+This worker can handle API requests matching the following regular expressions.
+These endpoints can be routed to any worker. If a worker is set up to handle a
+stream then, for maximum efficiency, additional endpoints should be routed to that
+worker: refer to the [stream writers](#stream-writers) section below for further
+information.
 
     # Sync requests
     ^/_matrix/client/(v2_alpha|r0|v3)/sync$
@@ -209,7 +212,6 @@ expressions:
     ^/_matrix/federation/v1/user/devices/
     ^/_matrix/federation/v1/get_groups_publicised$
     ^/_matrix/key/v2/query
-    ^/_matrix/federation/unstable/org.matrix.msc2946/spaces/
     ^/_matrix/federation/(v1|unstable/org.matrix.msc2946)/hierarchy/
 
     # Inbound federation transaction request
@@ -222,26 +224,29 @@ expressions:
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/context/.*$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/members$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state$
-    ^/_matrix/client/unstable/org.matrix.msc2946/rooms/.*/spaces$
     ^/_matrix/client/(v1|unstable/org.matrix.msc2946)/rooms/.*/hierarchy$
     ^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/account/3pid$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/devices$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/query$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/changes$
+    ^/_matrix/client/(r0|v3|unstable)/account/3pid$
+    ^/_matrix/client/(r0|v3|unstable)/devices$
     ^/_matrix/client/versions$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_groups$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/publicised_groups$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/publicised_groups/
+    ^/_matrix/client/(r0|v3|unstable)/joined_groups$
+    ^/_matrix/client/(r0|v3|unstable)/publicised_groups$
+    ^/_matrix/client/(r0|v3|unstable)/publicised_groups/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 
+    # Encryption requests
+    ^/_matrix/client/(r0|v3|unstable)/keys/query$
+    ^/_matrix/client/(r0|v3|unstable)/keys/changes$
+    ^/_matrix/client/(r0|v3|unstable)/keys/claim$
+    ^/_matrix/client/(r0|v3|unstable)/room_keys/
+
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/login$
     ^/_matrix/client/(r0|v3|unstable)/register$
-    ^/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity$
+    ^/_matrix/client/v1/register/m.login.registration_token/validity$
 
     # Event sending requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/redact
@@ -250,6 +255,20 @@ expressions:
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/join/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/profile/
+
+    # Device requests
+    ^/_matrix/client/(r0|v3|unstable)/sendToDevice/
+
+    # Account data requests
+    ^/_matrix/client/(r0|v3|unstable)/.*/tags
+    ^/_matrix/client/(r0|v3|unstable)/.*/account_data
+
+    # Receipts requests
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/receipt
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/read_markers
+
+    # Presence requests
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
 
 
 Additionally, the following REST endpoints can be handled for GET requests:
@@ -330,12 +349,10 @@ Additionally, there is *experimental* support for moving writing of specific
 streams (such as events) off of the main process to a particular worker. (This
 is only supported with Redis-based replication.)
 
-Currently supported streams are `events` and `typing`.
-
 To enable this, the worker must have a HTTP replication listener configured,
-have a `worker_name` and be listed in the `instance_map` config. For example to
-move event persistence off to a dedicated worker, the shared configuration would
-include:
+have a `worker_name` and be listed in the `instance_map` config. The same worker
+can handle multiple streams. For example, to move event persistence off to a
+dedicated worker, the shared configuration would include:
 
 ```yaml
 instance_map:
@@ -346,6 +363,12 @@ instance_map:
 stream_writers:
     events: event_persister1
 ```
+
+Some of the streams have associated endpoints which, for maximum efficiency, should
+be routed to the workers handling that stream. See below for the currently supported
+streams and the endpoints associated with them:
+
+##### The `events` stream
 
 The `events` stream also experimentally supports having multiple writers, where
 work is sharded between them by room ID. Note that you *must* restart all worker
@@ -358,6 +381,43 @@ stream_writers:
         - event_persister1
         - event_persister2
 ```
+
+##### The `typing` stream
+
+The following endpoints should be routed directly to the workers configured as
+stream writers for the `typing` stream:
+
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing
+
+##### The `to_device` stream
+
+The following endpoints should be routed directly to the workers configured as
+stream writers for the `to_device` stream:
+
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/sendToDevice/
+
+##### The `account_data` stream
+
+The following endpoints should be routed directly to the workers configured as
+stream writers for the `account_data` stream:
+
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/tags
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/account_data
+
+##### The `receipts` stream
+
+The following endpoints should be routed directly to the workers configured as
+stream writers for the `receipts` stream:
+
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/receipt
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/read_markers
+
+##### The `presence` stream
+
+The following endpoints should be routed directly to the workers configured as
+stream writers for the `presence` stream:
+
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
 
 #### Background tasks
 

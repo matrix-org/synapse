@@ -37,6 +37,7 @@ from synapse.logging.context import current_context
 from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, start_active_span
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.storage.databases.main.event_push_actions import NotifCounts
+from synapse.storage.databases.main.relations import BundledAggregations
 from synapse.storage.roommember import MemberSummary
 from synapse.storage.state import StateFilter
 from synapse.types import (
@@ -59,10 +60,6 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
-
-# Debug logger for https://github.com/matrix-org/synapse/issues/4422
-issue4422_logger = logging.getLogger("synapse.handler.sync.4422_debug")
-
 
 # Counts the number of times we returned a non-empty sync. `type` is one of
 # "initial_sync", "full_state_sync" or "incremental_sync", `lazy_loaded` is
@@ -102,6 +99,9 @@ class TimelineBatch:
     prev_batch: StreamToken
     events: List[EventBase]
     limited: bool
+    # A mapping of event ID to the bundled aggregations for the above events.
+    # This is only calculated if limited is true.
+    bundled_aggregations: Optional[Dict[str, BundledAggregations]] = None
 
     def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
@@ -266,7 +266,7 @@ class SyncResult:
 class SyncHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs_config = hs.config
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self.presence_handler = hs.get_presence_handler()
         self.event_sources = hs.get_event_sources()
@@ -634,10 +634,19 @@ class SyncHandler:
 
             prev_batch_token = now_token.copy_and_replace("room_key", room_key)
 
+        # Don't bother to bundle aggregations if the timeline is unlimited,
+        # as clients will have all the necessary information.
+        bundled_aggregations = None
+        if limited or newly_joined_room:
+            bundled_aggregations = await self.store.get_bundled_aggregations(
+                recents, sync_config.user.to_string()
+            )
+
         return TimelineBatch(
             events=recents,
             prev_batch=prev_batch_token,
             limited=limited or newly_joined_room,
+            bundled_aggregations=bundled_aggregations,
         )
 
     async def get_state_after_event(
@@ -688,6 +697,15 @@ class SyncHandler:
         else:
             # no events in this room - so presumably no state
             state = {}
+
+            # (erikj) This should be rarely hit, but we've had some reports that
+            # we get more state down gappy syncs than we should, so let's add
+            # some logging.
+            logger.info(
+                "Failed to find any events in room %s at %s",
+                room_id,
+                stream_position.room_key,
+            )
         return state
 
     async def compute_summary(
@@ -1161,13 +1179,8 @@ class SyncHandler:
 
         num_events = 0
 
-        # debug for https://github.com/matrix-org/synapse/issues/4422
+        # debug for https://github.com/matrix-org/synapse/issues/9424
         for joined_room in sync_result_builder.joined:
-            room_id = joined_room.room_id
-            if room_id in newly_joined_rooms:
-                issue4422_logger.debug(
-                    "Sync result for newly joined room %s: %r", room_id, joined_room
-                )
             num_events += len(joined_room.timeline.events)
 
         log_kv(
@@ -1285,23 +1298,54 @@ class SyncHandler:
             # room with by looking at all users that have left a room plus users
             # that were in a room we've left.
 
-            users_who_share_room = await self.store.get_users_who_share_room_with_user(
-                user_id
+            users_that_have_changed = set()
+
+            joined_rooms = sync_result_builder.joined_room_ids
+
+            # Step 1a, check for changes in devices of users we share a room
+            # with
+            #
+            # We do this in two different ways depending on what we have cached.
+            # If we already have a list of all the user that have changed since
+            # the last sync then it's likely more efficient to compare the rooms
+            # they're in with the rooms the syncing user is in.
+            #
+            # If we don't have that info cached then we get all the users that
+            # share a room with our user and check if those users have changed.
+            changed_users = self.store.get_cached_device_list_changes(
+                since_token.device_list_key
             )
+            if changed_users is not None:
+                result = await self.store.get_rooms_for_users_with_stream_ordering(
+                    changed_users
+                )
 
-            # Always tell the user about their own devices. We check as the user
-            # ID is almost certainly already included (unless they're not in any
-            # rooms) and taking a copy of the set is relatively expensive.
-            if user_id not in users_who_share_room:
-                users_who_share_room = set(users_who_share_room)
-                users_who_share_room.add(user_id)
+                for changed_user_id, entries in result.items():
+                    # Check if the changed user shares any rooms with the user,
+                    # or if the changed user is the syncing user (as we always
+                    # want to include device list updates of their own devices).
+                    if user_id == changed_user_id or any(
+                        e.room_id in joined_rooms for e in entries
+                    ):
+                        users_that_have_changed.add(changed_user_id)
+            else:
+                users_who_share_room = (
+                    await self.store.get_users_who_share_room_with_user(user_id)
+                )
 
-            tracked_users = users_who_share_room
+                # Always tell the user about their own devices. We check as the user
+                # ID is almost certainly already included (unless they're not in any
+                # rooms) and taking a copy of the set is relatively expensive.
+                if user_id not in users_who_share_room:
+                    users_who_share_room = set(users_who_share_room)
+                    users_who_share_room.add(user_id)
 
-            # Step 1a, check for changes in devices of users we share a room with
-            users_that_have_changed = await self.store.get_users_whose_devices_changed(
-                since_token.device_list_key, tracked_users
-            )
+                tracked_users = users_who_share_room
+                users_that_have_changed = (
+                    await self.store.get_users_whose_devices_changed(
+                        since_token.device_list_key, tracked_users
+                    )
+                )
 
             # Step 1b, check for newly joined rooms
             for room_id in newly_joined_rooms:
@@ -1325,7 +1369,14 @@ class SyncHandler:
                 newly_left_users.update(left_users)
 
             # Remove any users that we still share a room with.
-            newly_left_users -= users_who_share_room
+            left_users_rooms = (
+                await self.store.get_rooms_for_users_with_stream_ordering(
+                    newly_left_users
+                )
+            )
+            for user_id, entries in left_users_rooms.items():
+                if any(e.room_id in joined_rooms for e in entries):
+                    newly_left_users.discard(user_id)
 
             return DeviceLists(changed=users_that_have_changed, left=newly_left_users)
         else:
@@ -1344,8 +1395,8 @@ class SyncHandler:
         if sync_result_builder.since_token is not None:
             since_stream_id = int(sync_result_builder.since_token.to_device_key)
 
-        if since_stream_id != int(now_token.to_device_key):
-            messages, stream_id = await self.store.get_new_messages_for_device(
+        if device_id is not None and since_stream_id != int(now_token.to_device_key):
+            messages, stream_id = await self.store.get_messages_for_device(
                 user_id, device_id, since_stream_id, now_token.to_device_key
             )
 
@@ -1616,7 +1667,7 @@ class SyncHandler:
         # TODO: Can we `SELECT ignored_user_id FROM ignored_users WHERE ignorer_user_id=?;` instead?
         ignored_account_data = (
             await self.store.get_global_account_data_by_type_for_user(
-                AccountDataTypes.IGNORED_USER_LIST, user_id=user_id
+                user_id=user_id, data_type=AccountDataTypes.IGNORED_USER_LIST
             )
         )
 
@@ -1738,18 +1789,6 @@ class SyncHandler:
                 if old_mem_ev_id:
                     old_mem_ev = await self.store.get_event(
                         old_mem_ev_id, allow_none=True
-                    )
-
-                # debug for #4422
-                if has_join:
-                    prev_membership = None
-                    if old_mem_ev:
-                        prev_membership = old_mem_ev.membership
-                    issue4422_logger.debug(
-                        "Previous membership for room %s with join: %s (event %s)",
-                        room_id,
-                        prev_membership,
-                        old_mem_ev_id,
                     )
 
                 if not old_mem_ev or old_mem_ev.membership != Membership.JOIN:
@@ -1893,13 +1932,6 @@ class SyncHandler:
                     upto_token=since_token,
                 )
 
-            if newly_joined:
-                # debugging for https://github.com/matrix-org/synapse/issues/4422
-                issue4422_logger.debug(
-                    "RoomSyncResultBuilder events for newly joined room %s: %r",
-                    room_id,
-                    entry.events,
-                )
             room_entries.append(entry)
 
         return _RoomChanges(
@@ -2076,14 +2108,6 @@ class SyncHandler:
             # Note: `batch` can be both empty and limited here in the case where
             # `_load_filtered_recents` can't find any events the user should see
             # (e.g. due to having ignored the sender of the last 50 events).
-
-            if newly_joined:
-                # debug for https://github.com/matrix-org/synapse/issues/4422
-                issue4422_logger.debug(
-                    "Timeline events after filtering in newly-joined room %s: %r",
-                    room_id,
-                    batch,
-                )
 
             # When we join the room (or the client requests full_state), we should
             # send down any existing tags. Usually the user won't have tags in a

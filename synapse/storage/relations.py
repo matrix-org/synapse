@@ -13,17 +13,20 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import attr
 
 from synapse.api.errors import SynapseError
 from synapse.types import JsonDict
 
+if TYPE_CHECKING:
+    from synapse.storage.databases.main import DataStore
+
 logger = logging.getLogger(__name__)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class PaginationChunk:
     """Returned by relation pagination APIs.
 
@@ -35,23 +38,23 @@ class PaginationChunk:
             None then there are no previous results.
     """
 
-    chunk = attr.ib(type=List[JsonDict])
-    next_batch = attr.ib(type=Optional[Any], default=None)
-    prev_batch = attr.ib(type=Optional[Any], default=None)
+    chunk: List[JsonDict]
+    next_batch: Optional[Any] = None
+    prev_batch: Optional[Any] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    async def to_dict(self, store: "DataStore") -> Dict[str, Any]:
         d = {"chunk": self.chunk}
 
         if self.next_batch:
-            d["next_batch"] = self.next_batch.to_string()
+            d["next_batch"] = await self.next_batch.to_string(store)
 
         if self.prev_batch:
-            d["prev_batch"] = self.prev_batch.to_string()
+            d["prev_batch"] = await self.prev_batch.to_string(store)
 
         return d
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class RelationPaginationToken:
     """Pagination token for relation pagination API.
 
@@ -64,8 +67,8 @@ class RelationPaginationToken:
         stream: The stream ordering of the boundary event.
     """
 
-    topological = attr.ib(type=int)
-    stream = attr.ib(type=int)
+    topological: int
+    stream: int
 
     @staticmethod
     def from_string(string: str) -> "RelationPaginationToken":
@@ -75,14 +78,14 @@ class RelationPaginationToken:
         except ValueError:
             raise SynapseError(400, "Invalid relation pagination token")
 
-    def to_string(self) -> str:
+    async def to_string(self, store: "DataStore") -> str:
         return "%d-%d" % (self.topological, self.stream)
 
     def as_tuple(self) -> Tuple[Any, ...]:
         return attr.astuple(self)
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class AggregationPaginationToken:
     """Pagination token for relation aggregation pagination API.
 
@@ -94,8 +97,8 @@ class AggregationPaginationToken:
         stream: The MAX stream ordering in the boundary group.
     """
 
-    count = attr.ib(type=int)
-    stream = attr.ib(type=int)
+    count: int
+    stream: int
 
     @staticmethod
     def from_string(string: str) -> "AggregationPaginationToken":
@@ -105,7 +108,7 @@ class AggregationPaginationToken:
         except ValueError:
             raise SynapseError(400, "Invalid aggregation pagination token")
 
-    def to_string(self) -> str:
+    async def to_string(self, store: "DataStore") -> str:
         return "%d-%d" % (self.count, self.stream)
 
     def as_tuple(self) -> Tuple[Any, ...]:

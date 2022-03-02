@@ -58,7 +58,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@attr.s(slots=True, cmp=False)
+@attr.s(slots=True, frozen=True, cmp=False, auto_attribs=True)
 class VerifyJsonRequest:
     """
     A request to verify a JSON object.
@@ -78,10 +78,10 @@ class VerifyJsonRequest:
         key_ids: The set of key_ids to that could be used to verify the JSON object
     """
 
-    server_name = attr.ib(type=str)
-    get_json_object = attr.ib(type=Callable[[], JsonDict])
-    minimum_valid_until_ts = attr.ib(type=int)
-    key_ids = attr.ib(type=List[str])
+    server_name: str
+    get_json_object: Callable[[], JsonDict]
+    minimum_valid_until_ts: int
+    key_ids: List[str]
 
     @staticmethod
     def from_json_object(
@@ -124,7 +124,7 @@ class KeyLookupError(ValueError):
     pass
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class _FetchKeyRequest:
     """A request for keys for a given server.
 
@@ -138,9 +138,9 @@ class _FetchKeyRequest:
         key_ids: The IDs of the keys to attempt to fetch
     """
 
-    server_name = attr.ib(type=str)
-    minimum_valid_until_ts = attr.ib(type=int)
-    key_ids = attr.ib(type=List[str])
+    server_name: str
+    minimum_valid_until_ts: int
+    key_ids: List[str]
 
 
 class Keyring:
@@ -476,7 +476,7 @@ class StoreKeyFetcher(KeyFetcher):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def _fetch_keys(
         self, keys_to_fetch: List[_FetchKeyRequest]
@@ -498,7 +498,7 @@ class BaseV2KeyFetcher(KeyFetcher):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.config = hs.config
 
     async def process_v2_response(

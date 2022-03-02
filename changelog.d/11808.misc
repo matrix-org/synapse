@@ -1,0 +1,1 @@
+Make method `get_room_version` use cached `get_room_version_id`.

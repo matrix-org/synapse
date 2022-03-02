@@ -73,6 +73,8 @@ class VersionsRestServlet(RestServlet):
                     "r0.5.0",
                     "r0.6.0",
                     "r0.6.1",
+                    "v1.1",
+                    "v1.2",
                 ],
                 # as per MSC1497:
                 "unstable_features": {
@@ -97,6 +99,8 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc2716": self.config.experimental.msc2716_enabled,
                     # Adds support for jump to date endpoints (/timestamp_to_event) as per MSC3030
                     "org.matrix.msc3030": self.config.experimental.msc3030_enabled,
+                    # Adds support for thread relations, per MSC3440.
+                    "org.matrix.msc3440": self.config.experimental.msc3440_enabled,
                 },
             },
         )

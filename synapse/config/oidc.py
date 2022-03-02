@@ -20,11 +20,11 @@ import attr
 
 from synapse.config._util import validate_config
 from synapse.config.sso import SsoAttributeRequirement
-from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.types import JsonDict
 from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_mxc_uri
 
+from ..util.check_dependencies import DependencyException, check_requirements
 from ._base import Config, ConfigError, read_file
 
 DEFAULT_USER_MAPPING_PROVIDER = "synapse.handlers.oidc.JinjaOidcMappingProvider"
@@ -148,10 +148,13 @@ class OIDCConfig(Config):
         #       Defaults to false. Avoid this in production.
         #
         #   user_profile_method: Whether to fetch the user profile from the userinfo
-        #       endpoint. Valid values are: 'auto' or 'userinfo_endpoint'.
+        #       endpoint, or to rely on the data returned in the id_token from the
+        #       token_endpoint.
         #
-        #       Defaults to 'auto', which fetches the userinfo endpoint if 'openid' is
-        #       included in 'scopes'. Set to 'userinfo_endpoint' to always fetch the
+        #       Valid values are: 'auto' or 'userinfo_endpoint'.
+        #
+        #       Defaults to 'auto', which uses the userinfo endpoint if 'openid' is
+        #       not included in 'scopes'. Set to 'userinfo_endpoint' to always use the
         #       userinfo endpoint.
         #
         #   allow_existing_users: set to 'true' to allow a user logging in via OIDC to

@@ -31,6 +31,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Type for the `device_one_time_key_counts` field in an appservice transaction
+#   user ID -> {device ID -> {algorithm -> count}}
+TransactionOneTimeKeyCounts = Dict[str, Dict[str, Dict[str, int]]]
+
+# Type for the `device_unused_fallback_keys` field in an appservice transaction
+#   user ID -> {device ID -> [algorithm]}
+TransactionUnusedFallbackKeys = Dict[str, Dict[str, List[str]]]
+
 
 class ApplicationServiceState(Enum):
     DOWN = "down"
@@ -72,6 +80,7 @@ class ApplicationService:
         rate_limited: bool = True,
         ip_range_whitelist: Optional[IPSet] = None,
         supports_ephemeral: bool = False,
+        msc3202_transaction_extensions: bool = False,
     ):
         self.token = token
         self.url = (
@@ -84,6 +93,7 @@ class ApplicationService:
         self.id = id
         self.ip_range_whitelist = ip_range_whitelist
         self.supports_ephemeral = supports_ephemeral
+        self.msc3202_transaction_extensions = msc3202_transaction_extensions
 
         if "|" in self.id:
             raise Exception("application service ID cannot contain '|' character")
@@ -165,22 +175,15 @@ class ApplicationService:
             return namespace.exclusive
         return False
 
-    async def _matches_user(
-        self, event: Optional[EventBase], store: Optional["DataStore"] = None
-    ) -> bool:
-        if not event:
-            return False
-
+    async def _matches_user(self, event: EventBase, store: "DataStore") -> bool:
         if self.is_interested_in_user(event.sender):
             return True
+
         # also check m.room.member state key
         if event.type == EventTypes.Member and self.is_interested_in_user(
             event.state_key
         ):
             return True
-
-        if not store:
-            return False
 
         does_match = await self.matches_user_in_member_list(event.room_id, store)
         return does_match
@@ -216,21 +219,15 @@ class ApplicationService:
             return self.is_interested_in_room(event.room_id)
         return False
 
-    async def _matches_aliases(
-        self, event: EventBase, store: Optional["DataStore"] = None
-    ) -> bool:
-        if not store or not event:
-            return False
-
+    async def _matches_aliases(self, event: EventBase, store: "DataStore") -> bool:
         alias_list = await store.get_aliases_for_room(event.room_id)
         for alias in alias_list:
             if self.is_interested_in_alias(alias):
                 return True
+
         return False
 
-    async def is_interested(
-        self, event: EventBase, store: Optional["DataStore"] = None
-    ) -> bool:
+    async def is_interested(self, event: EventBase, store: "DataStore") -> bool:
         """Check if this service is interested in this event.
 
         Args:
@@ -351,11 +348,17 @@ class AppServiceTransaction:
         id: int,
         events: List[EventBase],
         ephemeral: List[JsonDict],
+        to_device_messages: List[JsonDict],
+        one_time_key_counts: TransactionOneTimeKeyCounts,
+        unused_fallback_keys: TransactionUnusedFallbackKeys,
     ):
         self.service = service
         self.id = id
         self.events = events
         self.ephemeral = ephemeral
+        self.to_device_messages = to_device_messages
+        self.one_time_key_counts = one_time_key_counts
+        self.unused_fallback_keys = unused_fallback_keys
 
     async def send(self, as_api: "ApplicationServiceApi") -> bool:
         """Sends this transaction using the provided AS API interface.
@@ -369,6 +372,9 @@ class AppServiceTransaction:
             service=self.service,
             events=self.events,
             ephemeral=self.ephemeral,
+            to_device_messages=self.to_device_messages,
+            one_time_key_counts=self.one_time_key_counts,
+            unused_fallback_keys=self.unused_fallback_keys,
             txn_id=self.id,
         )
 

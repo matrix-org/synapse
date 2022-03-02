@@ -52,7 +52,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
         return config
 
     def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
+        self.store = homeserver.get_datastores().main
 
     def test_simple_deny_mau(self):
         # Create and sync so that the MAU counts get updated

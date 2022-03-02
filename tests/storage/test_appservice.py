@@ -88,21 +88,21 @@ class ApplicationServiceStoreTestCase(unittest.HomeserverTestCase):
 
     def test_retrieve_unknown_service_token(self) -> None:
         service = self.store.get_app_service_by_token("invalid_token")
-        self.assertEquals(service, None)
+        self.assertEqual(service, None)
 
     def test_retrieval_of_service(self) -> None:
         stored_service = self.store.get_app_service_by_token(self.as_token)
         assert stored_service is not None
-        self.assertEquals(stored_service.token, self.as_token)
-        self.assertEquals(stored_service.id, self.as_id)
-        self.assertEquals(stored_service.url, self.as_url)
-        self.assertEquals(stored_service.namespaces[ApplicationService.NS_ALIASES], [])
-        self.assertEquals(stored_service.namespaces[ApplicationService.NS_ROOMS], [])
-        self.assertEquals(stored_service.namespaces[ApplicationService.NS_USERS], [])
+        self.assertEqual(stored_service.token, self.as_token)
+        self.assertEqual(stored_service.id, self.as_id)
+        self.assertEqual(stored_service.url, self.as_url)
+        self.assertEqual(stored_service.namespaces[ApplicationService.NS_ALIASES], [])
+        self.assertEqual(stored_service.namespaces[ApplicationService.NS_ROOMS], [])
+        self.assertEqual(stored_service.namespaces[ApplicationService.NS_USERS], [])
 
     def test_retrieval_of_all_services(self) -> None:
         services = self.store.get_app_services()
-        self.assertEquals(len(services), 3)
+        self.assertEqual(len(services), 3)
 
 
 class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
@@ -182,7 +182,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
     ) -> None:
         service = Mock(id="999")
         state = self.get_success(self.store.get_appservice_state(service))
-        self.assertEquals(None, state)
+        self.assertEqual(None, state)
 
     def test_get_appservice_state_up(
         self,
@@ -194,7 +194,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         state = self.get_success(
             defer.ensureDeferred(self.store.get_appservice_state(service))
         )
-        self.assertEquals(ApplicationServiceState.UP, state)
+        self.assertEqual(ApplicationServiceState.UP, state)
 
     def test_get_appservice_state_down(
         self,
@@ -210,7 +210,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         )
         service = Mock(id=self.as_list[1]["id"])
         state = self.get_success(self.store.get_appservice_state(service))
-        self.assertEquals(ApplicationServiceState.DOWN, state)
+        self.assertEqual(ApplicationServiceState.DOWN, state)
 
     def test_get_appservices_by_state_none(
         self,
@@ -218,7 +218,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         services = self.get_success(
             self.store.get_appservices_by_state(ApplicationServiceState.DOWN)
         )
-        self.assertEquals(0, len(services))
+        self.assertEqual(0, len(services))
 
     def test_set_appservices_state_down(
         self,
@@ -235,7 +235,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
                 (ApplicationServiceState.DOWN.value,),
             )
         )
-        self.assertEquals(service.id, rows[0][0])
+        self.assertEqual(service.id, rows[0][0])
 
     def test_set_appservices_state_multiple_up(
         self,
@@ -258,7 +258,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
                 (ApplicationServiceState.UP.value,),
             )
         )
-        self.assertEquals(service.id, rows[0][0])
+        self.assertEqual(service.id, rows[0][0])
 
     def test_create_appservice_txn_first(
         self,
@@ -266,11 +266,13 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         service = Mock(id=self.as_list[0]["id"])
         events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
         txn = self.get_success(
-            defer.ensureDeferred(self.store.create_appservice_txn(service, events, []))
+            defer.ensureDeferred(
+                self.store.create_appservice_txn(service, events, [], [], {}, {})
+            )
         )
-        self.assertEquals(txn.id, 1)
-        self.assertEquals(txn.events, events)
-        self.assertEquals(txn.service, service)
+        self.assertEqual(txn.id, 1)
+        self.assertEqual(txn.events, events)
+        self.assertEqual(txn.service, service)
 
     def test_create_appservice_txn_older_last_txn(
         self,
@@ -280,10 +282,12 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         self.get_success(self._set_last_txn(service.id, 9643))  # AS is falling behind
         self.get_success(self._insert_txn(service.id, 9644, events))
         self.get_success(self._insert_txn(service.id, 9645, events))
-        txn = self.get_success(self.store.create_appservice_txn(service, events, []))
-        self.assertEquals(txn.id, 9646)
-        self.assertEquals(txn.events, events)
-        self.assertEquals(txn.service, service)
+        txn = self.get_success(
+            self.store.create_appservice_txn(service, events, [], [], {}, {})
+        )
+        self.assertEqual(txn.id, 9646)
+        self.assertEqual(txn.events, events)
+        self.assertEqual(txn.service, service)
 
     def test_create_appservice_txn_up_to_date_last_txn(
         self,
@@ -291,10 +295,12 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         service = Mock(id=self.as_list[0]["id"])
         events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
         self.get_success(self._set_last_txn(service.id, 9643))
-        txn = self.get_success(self.store.create_appservice_txn(service, events, []))
-        self.assertEquals(txn.id, 9644)
-        self.assertEquals(txn.events, events)
-        self.assertEquals(txn.service, service)
+        txn = self.get_success(
+            self.store.create_appservice_txn(service, events, [], [], {}, {})
+        )
+        self.assertEqual(txn.id, 9644)
+        self.assertEqual(txn.events, events)
+        self.assertEqual(txn.service, service)
 
     def test_create_appservice_txn_up_fuzzing(
         self,
@@ -313,10 +319,12 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         self.get_success(self._insert_txn(self.as_list[2]["id"], 10, events))
         self.get_success(self._insert_txn(self.as_list[3]["id"], 9643, events))
 
-        txn = self.get_success(self.store.create_appservice_txn(service, events, []))
-        self.assertEquals(txn.id, 9644)
-        self.assertEquals(txn.events, events)
-        self.assertEquals(txn.service, service)
+        txn = self.get_success(
+            self.store.create_appservice_txn(service, events, [], [], {}, {})
+        )
+        self.assertEqual(txn.id, 9644)
+        self.assertEqual(txn.events, events)
+        self.assertEqual(txn.service, service)
 
     def test_complete_appservice_txn_first_txn(
         self,
@@ -338,8 +346,8 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
                 (service.id,),
             )
         )
-        self.assertEquals(1, len(res))
-        self.assertEquals(txn_id, res[0][0])
+        self.assertEqual(1, len(res))
+        self.assertEqual(txn_id, res[0][0])
 
         res = self.get_success(
             self.db_pool.runQuery(
@@ -349,7 +357,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
                 (txn_id,),
             )
         )
-        self.assertEquals(0, len(res))
+        self.assertEqual(0, len(res))
 
     def test_complete_appservice_txn_existing_in_state_table(
         self,
@@ -371,9 +379,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
                 (service.id,),
             )
         )
-        self.assertEquals(1, len(res))
-        self.assertEquals(txn_id, res[0][0])
-        self.assertEquals(ApplicationServiceState.UP.value, res[0][1])
+        self.assertEqual(1, len(res))
+        self.assertEqual(txn_id, res[0][0])
+        self.assertEqual(ApplicationServiceState.UP.value, res[0][1])
 
         res = self.get_success(
             self.db_pool.runQuery(
@@ -383,7 +391,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
                 (txn_id,),
             )
         )
-        self.assertEquals(0, len(res))
+        self.assertEqual(0, len(res))
 
     def test_get_oldest_unsent_txn_none(
         self,
@@ -391,7 +399,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         service = Mock(id=self.as_list[0]["id"])
 
         txn = self.get_success(self.store.get_oldest_unsent_txn(service))
-        self.assertEquals(None, txn)
+        self.assertEqual(None, txn)
 
     def test_get_oldest_unsent_txn(self) -> None:
         service = Mock(id=self.as_list[0]["id"])
@@ -408,9 +416,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         self.get_success(self._insert_txn(service.id, 12, other_events))
 
         txn = self.get_success(self.store.get_oldest_unsent_txn(service))
-        self.assertEquals(service, txn.service)
-        self.assertEquals(10, txn.id)
-        self.assertEquals(events, txn.events)
+        self.assertEqual(service, txn.service)
+        self.assertEqual(10, txn.id)
+        self.assertEqual(events, txn.events)
 
     def test_get_appservices_by_state_single(
         self,
@@ -425,8 +433,8 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         services = self.get_success(
             self.store.get_appservices_by_state(ApplicationServiceState.DOWN)
         )
-        self.assertEquals(1, len(services))
-        self.assertEquals(self.as_list[0]["id"], services[0].id)
+        self.assertEqual(1, len(services))
+        self.assertEqual(self.as_list[0]["id"], services[0].id)
 
     def test_get_appservices_by_state_multiple(
         self,
@@ -447,8 +455,8 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         services = self.get_success(
             self.store.get_appservices_by_state(ApplicationServiceState.DOWN)
         )
-        self.assertEquals(2, len(services))
-        self.assertEquals(
+        self.assertEqual(2, len(services))
+        self.assertEqual(
             {self.as_list[2]["id"], self.as_list[0]["id"]},
             {services[0].id, services[1].id},
         )
@@ -459,7 +467,7 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
         self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
     ) -> None:
         self.service = Mock(id="foo")
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.get_success(
             self.store.set_appservice_state(self.service, ApplicationServiceState.UP)
         )
@@ -468,12 +476,12 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
         value = self.get_success(
             self.store.get_type_stream_id_for_appservice(self.service, "read_receipt")
         )
-        self.assertEquals(value, 0)
+        self.assertEqual(value, 0)
 
         value = self.get_success(
             self.store.get_type_stream_id_for_appservice(self.service, "presence")
         )
-        self.assertEquals(value, 0)
+        self.assertEqual(value, 0)
 
     def test_get_type_stream_id_for_appservice_invalid_type(self) -> None:
         self.get_failure(
@@ -481,10 +489,10 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
             ValueError,
         )
 
-    def test_set_type_stream_id_for_appservice(self) -> None:
+    def test_set_appservice_stream_type_pos(self) -> None:
         read_receipt_value = 1024
         self.get_success(
-            self.store.set_type_stream_id_for_appservice(
+            self.store.set_appservice_stream_type_pos(
                 self.service, "read_receipt", read_receipt_value
             )
         )
@@ -494,7 +502,7 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
         self.assertEqual(result, read_receipt_value)
 
         self.get_success(
-            self.store.set_type_stream_id_for_appservice(
+            self.store.set_appservice_stream_type_pos(
                 self.service, "presence", read_receipt_value
             )
         )
@@ -503,9 +511,9 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
         )
         self.assertEqual(result, read_receipt_value)
 
-    def test_set_type_stream_id_for_appservice_invalid_type(self) -> None:
+    def test_set_appservice_stream_type_pos_invalid_type(self) -> None:
         self.get_failure(
-            self.store.set_type_stream_id_for_appservice(self.service, "foobar", 1024),
+            self.store.set_appservice_stream_type_pos(self.service, "foobar", 1024),
             ValueError,
         )
 

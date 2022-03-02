@@ -57,7 +57,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
         async def _insert_client_ip(*args, **kwargs):
             return None
 
-        hs.get_datastore().insert_client_ip = _insert_client_ip
+        hs.get_datastores().main.insert_client_ip = _insert_client_ip
 
         return hs
 
@@ -72,9 +72,9 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)
 
-        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEqual(self.event_source.get_current_key(), 1)
         events = self.get_success(
             self.event_source.get_new_events(
                 user=UserID.from_string(self.user_id),
@@ -84,7 +84,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
                 is_guest=False,
             )
         )
-        self.assertEquals(
+        self.assertEqual(
             events[0],
             [
                 {
@@ -101,7 +101,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": false}',
         )
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)
 
     def test_typing_timeout(self):
         channel = self.make_request(
@@ -109,19 +109,19 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)
 
-        self.assertEquals(self.event_source.get_current_key(), 1)
+        self.assertEqual(self.event_source.get_current_key(), 1)
 
         self.reactor.advance(36)
 
-        self.assertEquals(self.event_source.get_current_key(), 2)
+        self.assertEqual(self.event_source.get_current_key(), 2)
 
         channel = self.make_request(
             "PUT",
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)
 
-        self.assertEquals(self.event_source.get_current_key(), 3)
+        self.assertEqual(self.event_source.get_current_key(), 3)

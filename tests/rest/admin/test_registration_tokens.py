@@ -34,7 +34,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
@@ -223,20 +223,13 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         # Create all possible single character tokens
         tokens = []
         for c in string.ascii_letters + string.digits + "._~-":
-            tokens.append(
-                {
-                    "token": c,
-                    "uses_allowed": None,
-                    "pending": 0,
-                    "completed": 0,
-                    "expiry_time": None,
-                }
-            )
+            tokens.append((c, None, 0, 0, None))
         self.get_success(
             self.store.db_pool.simple_insert_many(
                 "registration_tokens",
-                tokens,
-                "create_all_registration_tokens",
+                keys=("token", "uses_allowed", "pending", "completed", "expiry_time"),
+                values=tokens,
+                desc="create_all_registration_tokens",
             )
         )
 

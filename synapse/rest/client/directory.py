@@ -47,7 +47,7 @@ class ClientDirectoryServer(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.directory_handler = hs.get_directory_handler()
         self.auth = hs.get_auth()
 
@@ -129,7 +129,7 @@ class ClientDirectoryListServer(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.directory_handler = hs.get_directory_handler()
         self.auth = hs.get_auth()
 
@@ -173,7 +173,7 @@ class ClientAppserviceDirectoryListServer(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.directory_handler = hs.get_directory_handler()
         self.auth = hs.get_auth()
 

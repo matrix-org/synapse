@@ -123,37 +123,37 @@ class ByteParser(ByteWriteable, Generic[T], abc.ABC):
         pass
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class MatrixFederationRequest:
-    method = attr.ib(type=str)
+    method: str
     """HTTP method
     """
 
-    path = attr.ib(type=str)
+    path: str
     """HTTP path
     """
 
-    destination = attr.ib(type=str)
+    destination: str
     """The remote server to send the HTTP request to.
     """
 
-    json = attr.ib(default=None, type=Optional[JsonDict])
+    json: Optional[JsonDict] = None
     """JSON to send in the body.
     """
 
-    json_callback = attr.ib(default=None, type=Optional[Callable[[], JsonDict]])
+    json_callback: Optional[Callable[[], JsonDict]] = None
     """A callback to generate the JSON.
     """
 
-    query = attr.ib(default=None, type=Optional[dict])
+    query: Optional[dict] = None
     """Query arguments.
     """
 
-    txn_id = attr.ib(default=None, type=Optional[str])
+    txn_id: Optional[str] = None
     """Unique ID for this request (for logging)
     """
 
-    uri = attr.ib(init=False, type=bytes)
+    uri: bytes = attr.ib(init=False)
     """The URI of this request
     """
 
@@ -334,12 +334,11 @@ class MatrixFederationHttpClient:
         user_agent = hs.version_string
         if hs.config.server.user_agent_suffix:
             user_agent = "%s %s" % (user_agent, hs.config.server.user_agent_suffix)
-        user_agent = user_agent.encode("ascii")
 
         federation_agent = MatrixFederationAgent(
             self.reactor,
             tls_client_options_factory,
-            user_agent,
+            user_agent.encode("ascii"),
             hs.config.server.federation_ip_range_whitelist,
             hs.config.server.federation_ip_range_blacklist,
         )
@@ -352,7 +351,7 @@ class MatrixFederationHttpClient:
         )
 
         self.clock = hs.get_clock()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self.version_string_bytes = hs.version_string.encode("ascii")
         self.default_timeout = 60
 
@@ -959,6 +958,7 @@ class MatrixFederationHttpClient:
         )
         return body
 
+    @overload
     async def get_json(
         self,
         destination: str,
@@ -968,7 +968,38 @@ class MatrixFederationHttpClient:
         timeout: Optional[int] = None,
         ignore_backoff: bool = False,
         try_trailing_slash_on_400: bool = False,
+        parser: Literal[None] = None,
+        max_response_size: Optional[int] = None,
     ) -> Union[JsonDict, list]:
+        ...
+
+    @overload
+    async def get_json(
+        self,
+        destination: str,
+        path: str,
+        args: Optional[QueryArgs] = ...,
+        retry_on_dns_fail: bool = ...,
+        timeout: Optional[int] = ...,
+        ignore_backoff: bool = ...,
+        try_trailing_slash_on_400: bool = ...,
+        parser: ByteParser[T] = ...,
+        max_response_size: Optional[int] = ...,
+    ) -> T:
+        ...
+
+    async def get_json(
+        self,
+        destination: str,
+        path: str,
+        args: Optional[QueryArgs] = None,
+        retry_on_dns_fail: bool = True,
+        timeout: Optional[int] = None,
+        ignore_backoff: bool = False,
+        try_trailing_slash_on_400: bool = False,
+        parser: Optional[ByteParser] = None,
+        max_response_size: Optional[int] = None,
+    ):
         """GETs some json from the given host homeserver and path
 
         Args:
@@ -993,6 +1024,13 @@ class MatrixFederationHttpClient:
             try_trailing_slash_on_400: True if on a 400 M_UNRECOGNIZED
                 response we should try appending a trailing slash to the end of
                 the request. Workaround for #3622 in Synapse <= v0.99.3.
+
+            parser: The parser to use to decode the response. Defaults to
+                parsing as JSON.
+
+            max_response_size: The maximum size to read from the response. If None,
+                uses the default.
+
         Returns:
             Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
@@ -1027,8 +1065,17 @@ class MatrixFederationHttpClient:
         else:
             _sec_timeout = self.default_timeout
 
+        if parser is None:
+            parser = JsonParser()
+
         body = await _handle_response(
-            self.reactor, _sec_timeout, request, response, start_ms, parser=JsonParser()
+            self.reactor,
+            _sec_timeout,
+            request,
+            response,
+            start_ms,
+            parser=parser,
+            max_response_size=max_response_size,
         )
 
         return body

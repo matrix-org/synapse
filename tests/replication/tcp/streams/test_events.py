@@ -136,7 +136,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         # this is the point in the DAG where we make a fork
         fork_point: List[str] = self.get_success(
-            self.hs.get_datastore().get_latest_event_ids_in_room(self.room_id)
+            self.hs.get_datastores().main.get_latest_event_ids_in_room(self.room_id)
         )
 
         events = [
@@ -291,7 +291,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         # this is the point in the DAG where we make a fork
         fork_point: List[str] = self.get_success(
-            self.hs.get_datastore().get_latest_event_ids_in_room(self.room_id)
+            self.hs.get_datastores().main.get_latest_event_ids_in_room(self.room_id)
         )
 
         events: List[EventBase] = []

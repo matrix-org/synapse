@@ -12,11 +12,21 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import logging
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 
+from matrix_common.versionstring import get_distribution_version_string
 from typing_extensions import Literal
 
-import synapse
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import FEDERATION_UNSTABLE_PREFIX, FEDERATION_V2_PREFIX
@@ -30,12 +40,14 @@ from synapse.http.servlet import (
     parse_string_from_args,
     parse_strings_from_args,
 )
-from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util.ratelimitutils import FederationRateLimiter
-from synapse.util.versionstring import get_version_string
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+issue_8631_logger = logging.getLogger("synapse.8631_debug")
 
 
 class BaseFederationServerServlet(BaseFederationServlet):
@@ -46,7 +58,7 @@ class BaseFederationServerServlet(BaseFederationServlet):
 
     def __init__(
         self,
-        hs: HomeServer,
+        hs: "HomeServer",
         authenticator: Authenticator,
         ratelimiter: FederationRateLimiter,
         server_name: str,
@@ -94,6 +106,20 @@ class FederationSendServlet(BaseFederationServerServlet):
                 len(transaction_data.get("pdus", [])),
                 len(transaction_data.get("edus", [])),
             )
+
+            if issue_8631_logger.isEnabledFor(logging.DEBUG):
+                DEVICE_UPDATE_EDUS = ["m.device_list_update", "m.signing_key_update"]
+                device_list_updates = [
+                    edu.get("content", {})
+                    for edu in transaction_data.get("edus", [])
+                    if edu.get("edu_type") in DEVICE_UPDATE_EDUS
+                ]
+                if device_list_updates:
+                    issue_8631_logger.debug(
+                        "received transaction [%s] including device list updates: %s",
+                        transaction_id,
+                        device_list_updates,
+                    )
 
         except Exception as e:
             logger.exception(e)
@@ -385,6 +411,16 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
 
     PREFIX = FEDERATION_V2_PREFIX
 
+    def __init__(
+        self,
+        hs: "HomeServer",
+        authenticator: Authenticator,
+        ratelimiter: FederationRateLimiter,
+        server_name: str,
+    ):
+        super().__init__(hs, authenticator, ratelimiter, server_name)
+        self._msc3706_enabled = hs.config.experimental.msc3706_enabled
+
     async def on_PUT(
         self,
         origin: str,
@@ -395,7 +431,15 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
     ) -> Tuple[int, JsonDict]:
         # TODO(paul): assert that event_id parsed from path actually
         #   match those given in content
-        result = await self.handler.on_send_join_request(origin, content, room_id)
+
+        partial_state = False
+        if self._msc3706_enabled:
+            partial_state = parse_boolean_from_args(
+                query, "org.matrix.msc3706.partial_state", default=False
+            )
+        result = await self.handler.on_send_join_request(
+            origin, content, room_id, caller_supports_partial_state=partial_state
+        )
         return 200, result
 
 
@@ -571,82 +615,12 @@ class FederationVersionServlet(BaseFederationServlet):
     ) -> Tuple[int, JsonDict]:
         return (
             200,
-            {"server": {"name": "Synapse", "version": get_version_string(synapse)}},
-        )
-
-
-class FederationSpaceSummaryServlet(BaseFederationServlet):
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc2946"
-    PATH = "/spaces/(?P<room_id>[^/]*)"
-
-    def __init__(
-        self,
-        hs: HomeServer,
-        authenticator: Authenticator,
-        ratelimiter: FederationRateLimiter,
-        server_name: str,
-    ):
-        super().__init__(hs, authenticator, ratelimiter, server_name)
-        self.handler = hs.get_room_summary_handler()
-
-    async def on_GET(
-        self,
-        origin: str,
-        content: Literal[None],
-        query: Mapping[bytes, Sequence[bytes]],
-        room_id: str,
-    ) -> Tuple[int, JsonDict]:
-        suggested_only = parse_boolean_from_args(query, "suggested_only", default=False)
-
-        max_rooms_per_space = parse_integer_from_args(query, "max_rooms_per_space")
-        if max_rooms_per_space is not None and max_rooms_per_space < 0:
-            raise SynapseError(
-                400,
-                "Value for 'max_rooms_per_space' must be a non-negative integer",
-                Codes.BAD_JSON,
-            )
-
-        exclude_rooms = parse_strings_from_args(query, "exclude_rooms", default=[])
-
-        return 200, await self.handler.federation_space_summary(
-            origin, room_id, suggested_only, max_rooms_per_space, exclude_rooms
-        )
-
-    # TODO When switching to the stable endpoint, remove the POST handler.
-    async def on_POST(
-        self,
-        origin: str,
-        content: JsonDict,
-        query: Mapping[bytes, Sequence[bytes]],
-        room_id: str,
-    ) -> Tuple[int, JsonDict]:
-        suggested_only = content.get("suggested_only", False)
-        if not isinstance(suggested_only, bool):
-            raise SynapseError(
-                400, "'suggested_only' must be a boolean", Codes.BAD_JSON
-            )
-
-        exclude_rooms = content.get("exclude_rooms", [])
-        if not isinstance(exclude_rooms, list) or any(
-            not isinstance(x, str) for x in exclude_rooms
-        ):
-            raise SynapseError(400, "bad value for 'exclude_rooms'", Codes.BAD_JSON)
-
-        max_rooms_per_space = content.get("max_rooms_per_space")
-        if max_rooms_per_space is not None:
-            if not isinstance(max_rooms_per_space, int):
-                raise SynapseError(
-                    400, "bad value for 'max_rooms_per_space'", Codes.BAD_JSON
-                )
-            if max_rooms_per_space < 0:
-                raise SynapseError(
-                    400,
-                    "Value for 'max_rooms_per_space' must be a non-negative integer",
-                    Codes.BAD_JSON,
-                )
-
-        return 200, await self.handler.federation_space_summary(
-            origin, room_id, suggested_only, max_rooms_per_space, exclude_rooms
+            {
+                "server": {
+                    "name": "Synapse",
+                    "version": get_distribution_version_string("matrix-synapse"),
+                }
+            },
         )
 
 
@@ -655,7 +629,7 @@ class FederationRoomHierarchyServlet(BaseFederationServlet):
 
     def __init__(
         self,
-        hs: HomeServer,
+        hs: "HomeServer",
         authenticator: Authenticator,
         ratelimiter: FederationRateLimiter,
         server_name: str,
@@ -691,13 +665,13 @@ class RoomComplexityServlet(BaseFederationServlet):
 
     def __init__(
         self,
-        hs: HomeServer,
+        hs: "HomeServer",
         authenticator: Authenticator,
         ratelimiter: FederationRateLimiter,
         server_name: str,
     ):
         super().__init__(hs, authenticator, ratelimiter, server_name)
-        self._store = self.hs.get_datastore()
+        self._store = self.hs.get_datastores().main
 
     async def on_GET(
         self,
@@ -715,6 +689,40 @@ class RoomComplexityServlet(BaseFederationServlet):
 
         complexity = await self._store.get_room_complexity(room_id)
         return 200, complexity
+
+
+class FederationAccountStatusServlet(BaseFederationServerServlet):
+    PATH = "/query/account_status"
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc3720"
+
+    def __init__(
+        self,
+        hs: "HomeServer",
+        authenticator: Authenticator,
+        ratelimiter: FederationRateLimiter,
+        server_name: str,
+    ):
+        super().__init__(hs, authenticator, ratelimiter, server_name)
+        self._account_handler = hs.get_account_handler()
+
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Mapping[bytes, Sequence[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
+        if "user_ids" not in content:
+            raise SynapseError(
+                400, "Required parameter 'user_ids' is missing", Codes.MISSING_PARAM
+            )
+
+        statuses, failures = await self._account_handler.get_account_statuses(
+            content["user_ids"],
+            allow_remote=False,
+        )
+
+        return 200, {"account_statuses": statuses, "failures": failures}
 
 
 FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
@@ -743,9 +751,9 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     On3pidBindServlet,
     FederationVersionServlet,
     RoomComplexityServlet,
-    FederationSpaceSummaryServlet,
     FederationRoomHierarchyServlet,
     FederationRoomHierarchyUnstableServlet,
     FederationV1SendKnockServlet,
     FederationMakeKnockServlet,
+    FederationAccountStatusServlet,
 )

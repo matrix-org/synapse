@@ -50,7 +50,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
         self.event_creation_handler._consent_uri_builder = consent_uri_builder
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -465,7 +465,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
         self.event_creation_handler._consent_uri_builder = consent_uri_builder
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -1089,6 +1089,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
             )
             room_ids.append(room_id)
 
+        room_ids.sort()
+
         # Request the list of rooms
         url = "/_synapse/admin/v1/rooms"
         channel = self.make_request(
@@ -1360,6 +1362,12 @@ class RoomTestCase(unittest.HomeserverTestCase):
         room_id_2 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
         room_id_3 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
 
+        # Also create a list sorted by IDs for properties that are equal (and thus sorted by room_id)
+        sorted_by_room_id_asc = [room_id_1, room_id_2, room_id_3]
+        sorted_by_room_id_asc.sort()
+        sorted_by_room_id_desc = sorted_by_room_id_asc.copy()
+        sorted_by_room_id_desc.reverse()
+
         # Set room names in alphabetical order. room 1 -> A, 2 -> B, 3 -> C
         self.helper.send_state(
             room_id_1,
@@ -1405,41 +1413,42 @@ class RoomTestCase(unittest.HomeserverTestCase):
         _order_test("canonical_alias", [room_id_1, room_id_2, room_id_3])
         _order_test("canonical_alias", [room_id_3, room_id_2, room_id_1], reverse=True)
 
+        # Note: joined_member counts are sorted in descending order when dir=f
         _order_test("joined_members", [room_id_3, room_id_2, room_id_1])
         _order_test("joined_members", [room_id_1, room_id_2, room_id_3], reverse=True)
 
+        # Note: joined_local_member counts are sorted in descending order when dir=f
         _order_test("joined_local_members", [room_id_3, room_id_2, room_id_1])
         _order_test(
             "joined_local_members", [room_id_1, room_id_2, room_id_3], reverse=True
         )
 
-        _order_test("version", [room_id_1, room_id_2, room_id_3])
-        _order_test("version", [room_id_1, room_id_2, room_id_3], reverse=True)
+        # Note: versions are sorted in descending order when dir=f
+        _order_test("version", sorted_by_room_id_asc, reverse=True)
+        _order_test("version", sorted_by_room_id_desc)
 
-        _order_test("creator", [room_id_1, room_id_2, room_id_3])
-        _order_test("creator", [room_id_1, room_id_2, room_id_3], reverse=True)
+        _order_test("creator", sorted_by_room_id_asc)
+        _order_test("creator", sorted_by_room_id_desc, reverse=True)
 
-        _order_test("encryption", [room_id_1, room_id_2, room_id_3])
-        _order_test("encryption", [room_id_1, room_id_2, room_id_3], reverse=True)
+        _order_test("encryption", sorted_by_room_id_asc)
+        _order_test("encryption", sorted_by_room_id_desc, reverse=True)
 
-        _order_test("federatable", [room_id_1, room_id_2, room_id_3])
-        _order_test("federatable", [room_id_1, room_id_2, room_id_3], reverse=True)
+        _order_test("federatable", sorted_by_room_id_asc)
+        _order_test("federatable", sorted_by_room_id_desc, reverse=True)
 
-        _order_test("public", [room_id_1, room_id_2, room_id_3])
-        # Different sort order of SQlite and PostreSQL
-        # _order_test("public", [room_id_3, room_id_2, room_id_1], reverse=True)
+        _order_test("public", sorted_by_room_id_asc)
+        _order_test("public", sorted_by_room_id_desc, reverse=True)
 
-        _order_test("join_rules", [room_id_1, room_id_2, room_id_3])
-        _order_test("join_rules", [room_id_1, room_id_2, room_id_3], reverse=True)
+        _order_test("join_rules", sorted_by_room_id_asc)
+        _order_test("join_rules", sorted_by_room_id_desc, reverse=True)
 
-        _order_test("guest_access", [room_id_1, room_id_2, room_id_3])
-        _order_test("guest_access", [room_id_1, room_id_2, room_id_3], reverse=True)
+        _order_test("guest_access", sorted_by_room_id_asc)
+        _order_test("guest_access", sorted_by_room_id_desc, reverse=True)
 
-        _order_test("history_visibility", [room_id_1, room_id_2, room_id_3])
-        _order_test(
-            "history_visibility", [room_id_1, room_id_2, room_id_3], reverse=True
-        )
+        _order_test("history_visibility", sorted_by_room_id_asc)
+        _order_test("history_visibility", sorted_by_room_id_desc, reverse=True)
 
+        # Note: state_event counts are sorted in descending order when dir=f
         _order_test("state_events", [room_id_3, room_id_2, room_id_1])
         _order_test("state_events", [room_id_1, room_id_2, room_id_3], reverse=True)
 
@@ -1900,7 +1909,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/joined_rooms",
             access_token=self.second_tok,
         )
-        self.assertEquals(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(self.public_room_id, channel.json_body["joined_rooms"][0])
 
     def test_join_private_room_if_not_member(self) -> None:
@@ -1948,7 +1957,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/joined_rooms",
             access_token=self.admin_user_tok,
         )
-        self.assertEquals(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
 
         # Join user to room.
@@ -1971,7 +1980,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/joined_rooms",
             access_token=self.second_tok,
         )
-        self.assertEquals(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
 
     def test_join_private_room_if_owner(self) -> None:
@@ -2001,7 +2010,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/joined_rooms",
             access_token=self.second_tok,
         )
-        self.assertEquals(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
 
     def test_context_as_non_admin(self) -> None:
@@ -2035,7 +2044,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
                 % (room_id, events[midway]["event_id"]),
                 access_token=tok,
             )
-            self.assertEquals(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+            self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
             self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_context_as_admin(self) -> None:
@@ -2065,8 +2074,8 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             % (room_id, events[midway]["event_id"]),
             access_token=self.admin_user_tok,
         )
-        self.assertEquals(HTTPStatus.OK, channel.code, msg=channel.json_body)
-        self.assertEquals(
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(
             channel.json_body["event"]["event_id"], events[midway]["event_id"]
         )
 
@@ -2230,7 +2239,7 @@ class BlockRoomTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -2459,7 +2468,6 @@ PURGE_TABLES = [
     "event_search",
     "events",
     "group_rooms",
-    "public_room_list_stream",
     "receipts_graph",
     "receipts_linearized",
     "room_aliases",

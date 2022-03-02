@@ -149,7 +149,7 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.user_dir_helper = GetUserDirectoryTables(self.store)
 
     def _purge_and_rebuild_user_dir(self) -> None:
@@ -341,7 +341,9 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         # Register an AS user.
         user = self.register_user("user", "pass")
         token = self.login(user, "pass")
-        as_user = self.register_appservice_user("as_user_potato", self.appservice.token)
+        as_user, _ = self.register_appservice_user(
+            "as_user_potato", self.appservice.token
+        )
 
         # Join the AS user to rooms owned by the normal user.
         public, private = self._create_rooms_and_inject_memberships(
@@ -413,7 +415,7 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
 
 class UserDirectoryStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         # alice and bob are both in !room_id. bobby is not but shares
         # a homeserver with alice.

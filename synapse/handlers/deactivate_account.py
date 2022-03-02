@@ -29,7 +29,7 @@ class DeactivateAccountHandler:
     """Handler which deals with deactivating user accounts."""
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.hs = hs
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
@@ -38,6 +38,7 @@ class DeactivateAccountHandler:
         self._profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
         self._server_name = hs.hostname
+        self._third_party_rules = hs.get_third_party_event_rules()
 
         # Flag that indicates whether the process to part users from rooms is running
         self._user_parter_running = False
@@ -135,9 +136,13 @@ class DeactivateAccountHandler:
         if erase_data:
             user = UserID.from_string(user_id)
             # Remove avatar URL from this user
-            await self._profile_handler.set_avatar_url(user, requester, "", by_admin)
+            await self._profile_handler.set_avatar_url(
+                user, requester, "", by_admin, deactivation=True
+            )
             # Remove displayname from this user
-            await self._profile_handler.set_displayname(user, requester, "", by_admin)
+            await self._profile_handler.set_displayname(
+                user, requester, "", by_admin, deactivation=True
+            )
 
             logger.info("Marking %s as erased", user_id)
             await self.store.mark_user_erased(user_id)
@@ -156,6 +161,16 @@ class DeactivateAccountHandler:
 
         # Mark the user as deactivated.
         await self.store.set_user_deactivated_status(user_id, True)
+
+        # Remove account data (including ignored users and push rules).
+        await self.store.purge_account_data_for_user(user_id)
+
+        # Let modules know the user has been deactivated.
+        await self._third_party_rules.on_user_deactivation_status_changed(
+            user_id,
+            True,
+            by_admin,
+        )
 
         return identity_server_supports_unbinding
 
@@ -260,6 +275,10 @@ class DeactivateAccountHandler:
 
         # Mark the user as active.
         await self.store.set_user_deactivated_status(user_id, False)
+
+        await self._third_party_rules.on_user_deactivation_status_changed(
+            user_id, False, True
+        )
 
         # Add the user to the directory, if necessary. Note that
         # this must be done after the user is re-activated, because

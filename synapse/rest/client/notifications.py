@@ -35,7 +35,7 @@ class NotificationsServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
@@ -72,7 +72,7 @@ class NotificationsServlet(RestServlet):
                 "actions": pa.actions,
                 "ts": pa.received_ts,
                 "event": (
-                    await self._event_serializer.serialize_event(
+                    self._event_serializer.serialize_event(
                         notif_events[pa.event_id],
                         self.clock.time_msec(),
                         event_format=format_event_for_client_v2_without_room_id,

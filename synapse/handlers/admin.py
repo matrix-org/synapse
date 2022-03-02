@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 class AdminHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
 
@@ -55,21 +55,47 @@ class AdminHandler:
 
     async def get_user(self, user: UserID) -> Optional[JsonDict]:
         """Function to get user details"""
-        ret = await self.store.get_user_by_id(user.to_string())
-        if ret:
-            profile = await self.store.get_profileinfo(user.localpart)
-            threepids = await self.store.user_get_threepids(user.to_string())
-            external_ids = [
-                ({"auth_provider": auth_provider, "external_id": external_id})
-                for auth_provider, external_id in await self.store.get_external_ids_by_user(
-                    user.to_string()
-                )
-            ]
-            ret["displayname"] = profile.display_name
-            ret["avatar_url"] = profile.avatar_url
-            ret["threepids"] = threepids
-            ret["external_ids"] = external_ids
-        return ret
+        user_info_dict = await self.store.get_user_by_id(user.to_string())
+        if user_info_dict is None:
+            return None
+
+        # Restrict returned information to a known set of fields. This prevents additional
+        # fields added to get_user_by_id from modifying Synapse's external API surface.
+        user_info_to_return = {
+            "name",
+            "admin",
+            "deactivated",
+            "shadow_banned",
+            "creation_ts",
+            "appservice_id",
+            "consent_server_notice_sent",
+            "consent_version",
+            "user_type",
+            "is_guest",
+        }
+
+        # Restrict returned keys to a known set.
+        user_info_dict = {
+            key: value
+            for key, value in user_info_dict.items()
+            if key in user_info_to_return
+        }
+
+        # Add additional user metadata
+        profile = await self.store.get_profileinfo(user.localpart)
+        threepids = await self.store.user_get_threepids(user.to_string())
+        external_ids = [
+            ({"auth_provider": auth_provider, "external_id": external_id})
+            for auth_provider, external_id in await self.store.get_external_ids_by_user(
+                user.to_string()
+            )
+        ]
+        user_info_dict["displayname"] = profile.display_name
+        user_info_dict["avatar_url"] = profile.avatar_url
+        user_info_dict["threepids"] = threepids
+        user_info_dict["external_ids"] = external_ids
+
+        return user_info_dict
 
     async def export_user_data(self, user_id: str, writer: "ExfiltrationWriter") -> Any:
         """Write all data we have on the user to the given writer.
