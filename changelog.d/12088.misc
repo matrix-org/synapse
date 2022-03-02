@@ -1,1 +1,0 @@
-Inspect application dependencies using `importlib.metadata` or its backport.
