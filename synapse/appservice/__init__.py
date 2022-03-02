@@ -175,19 +175,6 @@ class ApplicationService:
             return namespace.exclusive
         return False
 
-    async def _matches_user(self, event: EventBase, store: "DataStore") -> bool:
-        if self.is_user_in_namespace(event.sender):
-            return True
-
-        # also check m.room.member state key
-        if event.type == EventTypes.Member and self.is_user_in_namespace(
-            event.state_key
-        ):
-            return True
-
-        does_match = await self.matches_user_in_member_list(event.room_id, store)
-        return does_match
-
     @cached(num_args=1, cache_context=True)
     async def matches_user_in_member_list(
         self,
