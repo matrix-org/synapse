@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import sys
 
 import synapse.app.homeserver
 from synapse.config import ConfigError
@@ -95,6 +96,3 @@ class RegistrationConfigTestCase(ConfigFileTestCase):
         with self.assertRaises(ConfigError):
             synapse.app.homeserver.setup(["-c", self.config_file])
 
-        # Test that setting `enable_registration_without_verification` to true overrides config error
-        self.add_lines_to_config(["enable_registration_without_verification: true"])
-        synapse.app.homeserver.setup(["-c", self.config_file])
