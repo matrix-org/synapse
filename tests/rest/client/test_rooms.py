@@ -816,7 +816,7 @@ class RoomMemberStateTestCase(RoomBase):
         self.assertEqual(200, channel.code, msg=channel.result["body"])
 
         channel = self.make_request("GET", path, content=b"")
-        self.assertEquals(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
 
         expected_response = {"membership": Membership.JOIN}
         self.assertEqual(expected_response, channel.json_body)
@@ -834,8 +834,8 @@ class RoomMemberStateTestCase(RoomBase):
         self.assertEqual(200, channel.code, msg=channel.result["body"])
 
         channel = self.make_request("GET", path, content=b"")
-        self.assertEquals(200, channel.code, msg=channel.result["body"])
-        self.assertEquals(json.loads(content), channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(json.loads(content), channel.json_body)
 
     def test_rooms_members_other_custom_keys(self) -> None:
         self.other_id = "@zzsid1:red"
@@ -853,8 +853,8 @@ class RoomMemberStateTestCase(RoomBase):
         self.assertEqual(200, channel.code, msg=channel.result["body"])
 
         channel = self.make_request("GET", path, content=b"")
-        self.assertEquals(200, channel.code, msg=channel.result["body"])
-        self.assertEquals(json.loads(content), channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(json.loads(content), channel.json_body)
 
 
 class RoomInviteRatelimitTestCase(RoomBase):
