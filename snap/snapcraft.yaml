@@ -20,7 +20,7 @@ apps:
   generate-config:
     command: generate_config
   generate-signing-key:
-    command: generate_signing_key.py
+    command: generate_signing_key
   register-new-matrix-user:
     command: register_new_matrix_user
     plugs: [network]

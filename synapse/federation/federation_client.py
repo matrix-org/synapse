@@ -1428,7 +1428,7 @@ class FederationClient(FederationBase):
 
             # Validate children_state of the room.
             children_state = room.pop("children_state", [])
-            if not isinstance(children_state, Sequence):
+            if not isinstance(children_state, list):
                 raise InvalidResponseError("'room.children_state' must be a list")
             if any(not isinstance(e, dict) for e in children_state):
                 raise InvalidResponseError("Invalid event in 'children_state' list")
@@ -1440,14 +1440,14 @@ class FederationClient(FederationBase):
 
             # Validate the children rooms.
             children = res.get("children", [])
-            if not isinstance(children, Sequence):
+            if not isinstance(children, list):
                 raise InvalidResponseError("'children' must be a list")
             if any(not isinstance(r, dict) for r in children):
                 raise InvalidResponseError("Invalid room in 'children' list")
 
             # Validate the inaccessible children.
             inaccessible_children = res.get("inaccessible_children", [])
-            if not isinstance(inaccessible_children, Sequence):
+            if not isinstance(inaccessible_children, list):
                 raise InvalidResponseError("'inaccessible_children' must be a list")
             if any(not isinstance(r, str) for r in inaccessible_children):
                 raise InvalidResponseError(
@@ -1630,7 +1630,7 @@ def _validate_hierarchy_event(d: JsonDict) -> None:
         raise ValueError("Invalid event: 'content' must be a dict")
 
     via = content.get("via")
-    if not isinstance(via, Sequence):
+    if not isinstance(via, list):
         raise ValueError("Invalid event: 'via' must be a list")
     if any(not isinstance(v, str) for v in via):
         raise ValueError("Invalid event: 'via' must be a list of strings")
