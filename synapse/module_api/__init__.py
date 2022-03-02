@@ -30,6 +30,7 @@ from typing import (
 
 import attr
 import jinja2
+from signedjson.sign import sign_json
 
 from twisted.internet import defer
 from twisted.web.resource import Resource
@@ -1265,6 +1266,21 @@ class ModuleApi:
             use.
         """
         await self._registration_handler.check_username(username)
+
+    def sign_json(self, body: JsonDict) -> JsonDict:
+        """Signs a dictionary with the homeserver's key, before it's sent as JSON.
+
+        Added in Synapse v1.55.0.
+
+        Args:
+            body: The dictionary to sign.
+
+        Returns:
+            The dictionary with a signature appended to it.
+            See https://github.com/matrix-org/python-signedjson#format for more
+            information on the format used.
+        """
+        return sign_json(body, self._server_name, self._hs.signing_key)
 
 
 class PublicRoomListManager:
