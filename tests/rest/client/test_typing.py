@@ -14,14 +14,11 @@
 # limitations under the License.
 
 """Tests REST events for /rooms paths."""
-from typing import Any
-from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.rest.client import room
 from synapse.server import HomeServer
-from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import UserID
 from synapse.util import Clock
 
