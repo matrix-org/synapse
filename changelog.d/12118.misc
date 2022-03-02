@@ -1,0 +1,1 @@
+Move scripts to Synapse package and expose as setuptools entry points.

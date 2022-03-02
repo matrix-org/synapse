@@ -84,16 +84,7 @@ else
       files=(
           "synapse" "docker" "tests"
           # annoyingly, black doesn't find these so we have to list them
-          "scripts/export_signing_key"
-          "scripts/generate_config"
-          "scripts/generate_log_config"
-          "scripts/hash_password"
-          "scripts/register_new_matrix_user"
-          "scripts/synapse_port_db"
-          "scripts/update_synapse_database"
           "scripts-dev"
-          "scripts-dev/build_debian_packages"
-          "scripts-dev/sign_json"
           "contrib" "synctl" "setup.py" "synmark" "stubs" ".ci"
       )
   fi
