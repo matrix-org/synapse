@@ -112,7 +112,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: |
-            python-dist/*
+            Sdist/*
+            Wheel/*
             debs.tar.xz
           # if it's not already published, keep the release as a draft.
           draft: true
