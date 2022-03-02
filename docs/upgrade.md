@@ -47,7 +47,7 @@ this document.
     3.  Restart Synapse:
 
         ```bash
-        ./synctl restart
+        synctl restart
         ```
 
 To check whether your update was successful, you can check the running

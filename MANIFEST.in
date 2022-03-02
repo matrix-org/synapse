@@ -1,4 +1,3 @@
-include synctl
 include LICENSE
 include VERSION
 include *.rst
