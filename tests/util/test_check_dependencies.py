@@ -92,4 +92,4 @@ class TestDependencyChecker(TestCase):
                 self.assertRaises(DependencyException, check_requirements, "cool-extra")
             with self.mock_installed_package(new):
                 # should not raise
-                check_requirements()
+                check_requirements("cool-extra")
