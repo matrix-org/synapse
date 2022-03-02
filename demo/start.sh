@@ -21,18 +21,21 @@ for port in 8080 8081 8082; do
     mkdir -p demo/$port
     pushd demo/$port || exit
 
-    #rm $DIR/etc/$port.config
+    # Generate the configuration for the homeserver at localhost:848x.
     python3 -m synapse.app.homeserver \
         --generate-config \
-        -H "localhost:$https_port" \
+        --server-name "localhost:$https_port" \
         --config-path "$DIR/etc/$port.config" \
         --report-stats no
 
     if ! grep -F "Customisation made by demo/start.sh" -q "$DIR/etc/$port.config"; then
-        # Generate tls keys
-        openssl req -x509 -newkey rsa:4096 -keyout "$DIR/etc/localhost:$https_port.tls.key" -out "$DIR/etc/localhost:$https_port.tls.crt" -days 365 -nodes -subj "/O=matrix"
+        # Generate TLS keys.
+        openssl req -x509 -newkey rsa:4096 \
+          -keyout "$DIR/etc/localhost:$https_port.tls.key" \
+          -out "$DIR/etc/localhost:$https_port.tls.crt" \
+          -days 365 -nodes -subj "/O=matrix"
 
-        # Regenerate configuration
+        # Add customisations to the configuration.
         {
             printf '\n\n# Customisation made by demo/start.sh\n'
             echo "public_baseurl: http://localhost:$port/"
@@ -148,10 +151,12 @@ for port in 8080 8081 8082; do
     if ! grep -F "full_twisted_stacktraces" -q  "$DIR/etc/$port.config"; then
         echo "full_twisted_stacktraces: true" >> "$DIR/etc/$port.config"
     fi
+    # Always disable reporting of stats if the option is not there.
     if ! grep -F "report_stats" -q  "$DIR/etc/$port.config" ; then
         echo "report_stats: false" >> "$DIR/etc/$port.config"
     fi
 
+    # Run the homeserver in the background.
     python3 -m synapse.app.homeserver \
         --config-path "$DIR/etc/$port.config" \
         -D \
