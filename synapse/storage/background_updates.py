@@ -102,10 +102,12 @@ class BackgroundUpdatePerformance:
         Returns:
             A duration in ms as a float
         """
-        if self.avg_duration_ms == 0:
-            return 0
-        elif self.total_item_count == 0:
+        # We want to return none if this is the first background update item
+        if self.total_item_count == 0:
             return None
+        # Avoid dividing by zero
+        elif self.avg_duration_ms == 0:
+            return 0
         else:
             # Use the exponential moving average so that we can adapt to
             # changes in how long the update process takes.
