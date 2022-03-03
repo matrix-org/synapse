@@ -106,8 +106,10 @@ def _dependencies_for_extra(extra: str) -> Iterable[Dependency]:
 
 def _not_installed(requirement: Requirement, extra: Optional[str] = None) -> str:
     if extra:
-        return f"Synapse {VERSION} needs {requirement.name} for {extra}, " \
-               f"but it is not installed"
+        return (
+            f"Synapse {VERSION} needs {requirement.name} for {extra}, "
+            f"but it is not installed"
+        )
     else:
         return f"Synapse {VERSION} needs {requirement.name}, but it is not installed"
 
