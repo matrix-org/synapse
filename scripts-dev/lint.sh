@@ -80,13 +80,7 @@ else
   # then lint everything!
   if [[ -z ${files+x} ]]; then
     # Lint all source code files and directories
-    # Note: this list aims to mirror the one in tox.ini
-      files=(
-          "synapse" "docker" "tests"
-          # annoyingly, black doesn't find these so we have to list them
-          "scripts-dev"
-          "contrib" "setup.py" "synmark" "stubs" ".ci"
-      )
+      files=( "." )
   fi
 fi
 
