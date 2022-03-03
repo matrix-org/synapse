@@ -263,19 +263,6 @@ class ApplicationService:
             room_id, store, on_invalidate=cache_context.invalidate
         )
 
-    def _matches_room_id(self, event: EventBase) -> bool:
-        if hasattr(event, "room_id"):
-            return self.is_room_id_in_namespace(event.room_id)
-        return False
-
-    async def _matches_aliases(self, event: EventBase, store: "DataStore") -> bool:
-        alias_list = await store.get_aliases_for_room(event.room_id)
-        for alias in alias_list:
-            if self.is_room_alias_in_namespace(alias):
-                return True
-
-        return False
-
     async def is_interested_in_event(
         self, event: EventBase, store: "DataStore"
     ) -> bool:
