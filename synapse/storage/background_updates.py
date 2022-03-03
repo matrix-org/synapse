@@ -102,7 +102,7 @@ class BackgroundUpdatePerformance:
         Returns:
             A duration in ms as a float
         """
-        # We want to return none if this is the first background update item
+        # We want to return None if this is the first background update item
         if self.total_item_count == 0:
             return None
         # Avoid dividing by zero
