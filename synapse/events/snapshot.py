@@ -101,6 +101,9 @@ class EventContext:
 
             As with _current_state_ids, this is a private attribute. It should be
             accessed via get_prev_state_ids.
+
+        partial_state: if True, we may be storing this event with a temporary,
+            incomplete state.
     """
 
     rejected: Union[bool, str] = False
@@ -113,12 +116,15 @@ class EventContext:
     _current_state_ids: Optional[StateMap[str]] = None
     _prev_state_ids: Optional[StateMap[str]] = None
 
+    partial_state: bool = False
+
     @staticmethod
     def with_state(
         state_group: Optional[int],
         state_group_before_event: Optional[int],
         current_state_ids: Optional[StateMap[str]],
         prev_state_ids: Optional[StateMap[str]],
+        partial_state: bool,
         prev_group: Optional[int] = None,
         delta_ids: Optional[StateMap[str]] = None,
     ) -> "EventContext":
@@ -129,6 +135,7 @@ class EventContext:
             state_group_before_event=state_group_before_event,
             prev_group=prev_group,
             delta_ids=delta_ids,
+            partial_state=partial_state,
         )
 
     @staticmethod
@@ -170,6 +177,7 @@ class EventContext:
             "prev_group": self.prev_group,
             "delta_ids": _encode_state_dict(self.delta_ids),
             "app_service_id": self.app_service.id if self.app_service else None,
+            "partial_state": self.partial_state,
         }
 
     @staticmethod
@@ -196,6 +204,7 @@ class EventContext:
             prev_group=input["prev_group"],
             delta_ids=_decode_state_dict(input["delta_ids"]),
             rejected=input["rejected"],
+            partial_state=input.get("partial_state", False),
         )
 
         app_service_id = input["app_service_id"]

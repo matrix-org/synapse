@@ -157,35 +157,6 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             state_key=room_id,
         )
 
-    def _assert_rooms(
-        self, result: JsonDict, rooms_and_children: Iterable[Tuple[str, Iterable[str]]]
-    ) -> None:
-        """
-        Assert that the expected room IDs and events are in the response.
-
-        Args:
-            result: The result from the API call.
-            rooms_and_children: An iterable of tuples where each tuple is:
-                The expected room ID.
-                The expected IDs of any children rooms.
-        """
-        room_ids = []
-        children_ids = []
-        for room_id, children in rooms_and_children:
-            room_ids.append(room_id)
-            if children:
-                children_ids.extend([(room_id, child_id) for child_id in children])
-        self.assertCountEqual(
-            [room.get("room_id") for room in result["rooms"]], room_ids
-        )
-        self.assertCountEqual(
-            [
-                (event.get("room_id"), event.get("state_key"))
-                for event in result["events"]
-            ],
-            children_ids,
-        )
-
     def _assert_hierarchy(
         self, result: JsonDict, rooms_and_children: Iterable[Tuple[str, Iterable[str]]]
     ) -> None:
@@ -251,11 +222,9 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
 
     def test_simple_space(self):
         """Test a simple space with a single room."""
-        result = self.get_success(self.handler.get_space_summary(self.user, self.space))
         # The result should have the space and the room in it, along with a link
         # from space -> room.
         expected = [(self.space, [self.room]), (self.room, ())]
-        self._assert_rooms(result, expected)
 
         result = self.get_success(
             self.handler.get_room_hierarchy(create_requester(self.user), self.space)
@@ -270,12 +239,6 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             room = self.helper.create_room_as(self.user, tok=self.token)
             self._add_child(self.space, room, self.token)
             rooms.append(room)
-
-        result = self.get_success(self.handler.get_space_summary(self.user, self.space))
-        # The spaces result should have the space and the first 50 rooms in it,
-        # along with the links from space -> room for those 50 rooms.
-        expected = [(self.space, rooms[:50])] + [(room, []) for room in rooms[:49]]
-        self._assert_rooms(result, expected)
 
         # The result should have the space and the rooms in it, along with the links
         # from space -> room.
@@ -300,10 +263,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         token2 = self.login("user2", "pass")
 
         # The user can see the space since it is publicly joinable.
-        result = self.get_success(self.handler.get_space_summary(user2, self.space))
         expected = [(self.space, [self.room]), (self.room, ())]
-        self._assert_rooms(result, expected)
-
         result = self.get_success(
             self.handler.get_room_hierarchy(create_requester(user2), self.space)
         )
@@ -316,7 +276,6 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             body={"join_rule": JoinRules.INVITE},
             tok=self.token,
         )
-        self.get_failure(self.handler.get_space_summary(user2, self.space), AuthError)
         self.get_failure(
             self.handler.get_room_hierarchy(create_requester(user2), self.space),
             AuthError,
@@ -329,9 +288,6 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             body={"history_visibility": HistoryVisibility.WORLD_READABLE},
             tok=self.token,
         )
-        result = self.get_success(self.handler.get_space_summary(user2, self.space))
-        self._assert_rooms(result, expected)
-
         result = self.get_success(
             self.handler.get_room_hierarchy(create_requester(user2), self.space)
         )
@@ -344,7 +300,6 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             body={"history_visibility": HistoryVisibility.JOINED},
             tok=self.token,
         )
-        self.get_failure(self.handler.get_space_summary(user2, self.space), AuthError)
         self.get_failure(
             self.handler.get_room_hierarchy(create_requester(user2), self.space),
             AuthError,
@@ -353,19 +308,12 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         # Join the space and results should be returned.
         self.helper.invite(self.space, targ=user2, tok=self.token)
         self.helper.join(self.space, user2, tok=token2)
-        result = self.get_success(self.handler.get_space_summary(user2, self.space))
-        self._assert_rooms(result, expected)
-
         result = self.get_success(
             self.handler.get_room_hierarchy(create_requester(user2), self.space)
         )
         self._assert_hierarchy(result, expected)
 
         # Attempting to view an unknown room returns the same error.
-        self.get_failure(
-            self.handler.get_space_summary(user2, "#not-a-space:" + self.hs.hostname),
-            AuthError,
-        )
         self.get_failure(
             self.handler.get_room_hierarchy(
                 create_requester(user2), "#not-a-space:" + self.hs.hostname
@@ -496,7 +444,6 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
 
         # Join the space.
         self.helper.join(self.space, user2, tok=token2)
-        result = self.get_success(self.handler.get_space_summary(user2, self.space))
         expected = [
             (
                 self.space,
@@ -520,7 +467,6 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             (world_readable_room, ()),
             (joined_room, ()),
         ]
-        self._assert_rooms(result, expected)
 
         result = self.get_success(
             self.handler.get_room_hierarchy(create_requester(user2), self.space)
@@ -554,8 +500,6 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self._add_child(subspace, self.room, token=self.token)
         self._add_child(subspace, room2, self.token)
 
-        result = self.get_success(self.handler.get_space_summary(self.user, self.space))
-
         # The result should include each room a single time and each link.
         expected = [
             (self.space, [self.room, room2, subspace]),
@@ -563,7 +507,6 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             (subspace, [subroom, self.room, room2]),
             (subroom, ()),
         ]
-        self._assert_rooms(result, expected)
 
         result = self.get_success(
             self.handler.get_room_hierarchy(create_requester(self.user), self.space)
@@ -715,7 +658,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
 
     def test_unknown_room_version(self):
         """
-        If an room with an unknown room version is encountered it should not cause
+        If a room with an unknown room version is encountered it should not cause
         the entire summary to skip.
         """
         # Poke the database and update the room version to an unknown one.
@@ -727,11 +670,12 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 desc="updated-room-version",
             )
         )
+        # Invalidate method so that it returns the currently updated version
+        # instead of the cached version.
+        self.hs.get_datastores().main.get_room_version_id.invalidate((self.room,))
 
-        result = self.get_success(self.handler.get_space_summary(self.user, self.space))
         # The result should have only the space, along with a link from space -> room.
         expected = [(self.space, [self.room])]
-        self._assert_rooms(result, expected)
 
         result = self.get_success(
             self.handler.get_room_hierarchy(create_requester(self.user), self.space)
@@ -775,33 +719,11 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             "world_readable": True,
         }
 
-        async def summarize_remote_room(
-            _self, room, suggested_only, max_children, exclude_rooms
-        ):
-            return [
-                requested_room_entry,
-                _RoomEntry(
-                    subroom,
-                    {
-                        "room_id": subroom,
-                        "world_readable": True,
-                    },
-                ),
-            ]
-
         async def summarize_remote_room_hierarchy(_self, room, suggested_only):
             return requested_room_entry, {subroom: child_room}, set()
 
         # Add a room to the space which is on another server.
         self._add_child(self.space, subspace, self.token)
-
-        with mock.patch(
-            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room",
-            new=summarize_remote_room,
-        ):
-            result = self.get_success(
-                self.handler.get_space_summary(self.user, self.space)
-            )
 
         expected = [
             (self.space, [self.room, subspace]),
@@ -809,7 +731,6 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             (subspace, [subroom]),
             (subroom, ()),
         ]
-        self._assert_rooms(result, expected)
 
         with mock.patch(
             "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
@@ -881,7 +802,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                     "room_id": restricted_room,
                     "world_readable": False,
                     "join_rules": JoinRules.RESTRICTED,
-                    "allowed_spaces": [],
+                    "allowed_room_ids": [],
                 },
             ),
             (
@@ -890,7 +811,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                     "room_id": restricted_accessible_room,
                     "world_readable": False,
                     "join_rules": JoinRules.RESTRICTED,
-                    "allowed_spaces": [self.room],
+                    "allowed_room_ids": [self.room],
                 },
             ),
             (
@@ -929,29 +850,11 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-        async def summarize_remote_room(
-            _self, room, suggested_only, max_children, exclude_rooms
-        ):
-            return [subspace_room_entry] + [
-                # A copy is made of the room data since the allowed_spaces key
-                # is removed.
-                _RoomEntry(child_room[0], dict(child_room[1]))
-                for child_room in children_rooms
-            ]
-
         async def summarize_remote_room_hierarchy(_self, room, suggested_only):
             return subspace_room_entry, dict(children_rooms), set()
 
         # Add a room to the space which is on another server.
         self._add_child(self.space, subspace, self.token)
-
-        with mock.patch(
-            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room",
-            new=summarize_remote_room,
-        ):
-            result = self.get_success(
-                self.handler.get_space_summary(self.user, self.space)
-            )
 
         expected = [
             (self.space, [self.room, subspace]),
@@ -976,7 +879,6 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             (world_readable_room, ()),
             (joined_room, ()),
         ]
-        self._assert_rooms(result, expected)
 
         with mock.patch(
             "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
@@ -1010,31 +912,17 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        async def summarize_remote_room(
-            _self, room, suggested_only, max_children, exclude_rooms
-        ):
-            return [fed_room_entry]
-
         async def summarize_remote_room_hierarchy(_self, room, suggested_only):
             return fed_room_entry, {}, set()
 
         # Add a room to the space which is on another server.
         self._add_child(self.space, fed_room, self.token)
 
-        with mock.patch(
-            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room",
-            new=summarize_remote_room,
-        ):
-            result = self.get_success(
-                self.handler.get_space_summary(self.user, self.space)
-            )
-
         expected = [
             (self.space, [self.room, fed_room]),
             (self.room, ()),
             (fed_room, ()),
         ]
-        self._assert_rooms(result, expected)
 
         with mock.patch(
             "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",

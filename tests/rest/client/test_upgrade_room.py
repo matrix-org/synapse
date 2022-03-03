@@ -13,11 +13,14 @@
 # limitations under the License.
 from typing import Optional
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.constants import EventContentFields, EventTypes, RoomTypes
 from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.rest import admin
 from synapse.rest.client import login, room, room_upgrade_rest_servlet
 from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 from tests.server import FakeChannel
@@ -31,7 +34,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         room_upgrade_rest_servlet.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs: "HomeServer"):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
 
         self.creator = self.register_user("creator", "pass")
@@ -60,7 +63,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
             access_token=token or self.creator_token,
         )
 
-    def test_upgrade(self):
+    def test_upgrade(self) -> None:
         """
         Upgrading a room should work fine.
         """
@@ -68,7 +71,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code, channel.result)
         self.assertIn("replacement_room", channel.json_body)
 
-    def test_not_in_room(self):
+    def test_not_in_room(self) -> None:
         """
         Upgrading a room should work fine.
         """
@@ -79,7 +82,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         channel = self._upgrade_room(roomless_token)
         self.assertEqual(403, channel.code, channel.result)
 
-    def test_power_levels(self):
+    def test_power_levels(self) -> None:
         """
         Another user can upgrade the room if their power level is increased.
         """
@@ -105,7 +108,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         channel = self._upgrade_room(self.other_token)
         self.assertEqual(200, channel.code, channel.result)
 
-    def test_power_levels_user_default(self):
+    def test_power_levels_user_default(self) -> None:
         """
         Another user can upgrade the room if the default power level for users is increased.
         """
@@ -131,7 +134,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         channel = self._upgrade_room(self.other_token)
         self.assertEqual(200, channel.code, channel.result)
 
-    def test_power_levels_tombstone(self):
+    def test_power_levels_tombstone(self) -> None:
         """
         Another user can upgrade the room if they can send the tombstone event.
         """
@@ -164,7 +167,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         )
         self.assertNotIn(self.other, power_levels["users"])
 
-    def test_space(self):
+    def test_space(self) -> None:
         """Test upgrading a space."""
 
         # Create a space.

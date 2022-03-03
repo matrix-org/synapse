@@ -10,12 +10,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check-sampleconfig:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - run: pip install -e .
+      - run: scripts-dev/generate_sample_config.sh --check
+
   lint:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         toxenv:
-          - "check-sampleconfig"
           - "check_codestyle"
           - "check_isort"
           - "mypy"
@@ -43,15 +50,15 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: actions/setup-python@v2
-      - run: pip install tox
-      - run: scripts-dev/check-newsfragment
+      - run: "pip install 'towncrier>=18.6.0rc1'"
+      - run: scripts-dev/check-newsfragment.sh
         env:
           PULL_REQUEST_NUMBER: ${{ github.event.number }}
 
   # Dummy step to gate other tests on without repeating the whole list
   linting-done:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
-    needs: [lint, lint-crlf, lint-newsfile]
+    needs: [lint, lint-crlf, lint-newsfile, check-sampleconfig]
     runs-on: ubuntu-latest
     steps:
       - run: "true"

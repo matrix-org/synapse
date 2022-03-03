@@ -15,13 +15,13 @@ import logging
 import sys
 from typing import Container
 
-from synapse import python_dependencies  # noqa: E402
+from synapse.util import check_dependencies
 
 logger = logging.getLogger(__name__)
 
 try:
-    python_dependencies.check_requirements()
-except python_dependencies.DependencyException as e:
+    check_dependencies.check_requirements()
+except check_dependencies.DependencyException as e:
     sys.stderr.writelines(
         e.message  # noqa: B306, DependencyException.message is a property
     )

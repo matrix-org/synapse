@@ -81,7 +81,9 @@ json_decoder = json.JSONDecoder(parse_constant=_reject_invalid_json)
 
 
 def unwrapFirstError(failure: Failure) -> Failure:
-    # defer.gatherResults and DeferredLists wrap failures.
+    # Deprecated: you probably just want to catch defer.FirstError and reraise
+    # the subFailure's value, which will do a better job of preserving stacktraces.
+    # (actually, you probably want to use yieldable_gather_results anyway)
     failure.trap(defer.FirstError)
     return failure.value.subFailure  # type: ignore[union-attr]  # Issue in Twisted's annotations
 

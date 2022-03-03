@@ -158,9 +158,9 @@ same as integers.
 There are three separate aspects to this:
 
  * Any new boolean column must be added to the `BOOLEAN_COLUMNS` list in
-   `scripts/synapse_port_db`. This tells the port script to cast the integer
-   value from SQLite to a boolean before writing the value to the postgres
-   database.
+   `synapse/_scripts/synapse_port_db.py`. This tells the port script to cast
+   the integer value from SQLite to a boolean before writing the value to the
+   postgres database.
 
  * Before SQLite 3.23, `TRUE` and `FALSE` were not recognised as constants by
    SQLite, and the `IS [NOT] TRUE`/`IS [NOT] FALSE` operators were not

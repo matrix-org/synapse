@@ -42,6 +42,16 @@ logger = logging.getLogger(__name__)
 MAX_STATE_DELTA_HOPS = 100
 
 
+def _retrieve_and_check_room_version(room_id: str, room_version_id: str) -> RoomVersion:
+    v = KNOWN_ROOM_VERSIONS.get(room_version_id)
+    if not v:
+        raise UnsupportedRoomVersionError(
+            "Room %s uses a room version %s which is no longer supported"
+            % (room_id, room_version_id)
+        )
+    return v
+
+
 # this inherits from EventsWorkerStore because it calls self.get_events
 class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
     """The parts of StateGroupStore that can be called from workers."""
@@ -62,11 +72,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 Typically this happens if support for the room's version has been
                 removed from Synapse.
         """
-        return await self.db_pool.runInteraction(
-            "get_room_version_txn",
-            self.get_room_version_txn,
-            room_id,
-        )
+        room_version_id = await self.get_room_version_id(room_id)
+        return _retrieve_and_check_room_version(room_id, room_version_id)
 
     def get_room_version_txn(
         self, txn: LoggingTransaction, room_id: str
@@ -82,15 +89,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 removed from Synapse.
         """
         room_version_id = self.get_room_version_id_txn(txn, room_id)
-        v = KNOWN_ROOM_VERSIONS.get(room_version_id)
-
-        if not v:
-            raise UnsupportedRoomVersionError(
-                "Room %s uses a room version %s which is no longer supported"
-                % (room_id, room_version_id)
-            )
-
-        return v
+        return _retrieve_and_check_room_version(room_id, room_version_id)
 
     @cached(max_entries=10000)
     async def get_room_version_id(self, room_id: str) -> str:
