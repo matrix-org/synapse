@@ -37,6 +37,7 @@ for port in 8080 8081 8082; do
             printf '\n\n# Customisation made by demo/start.sh\n'
             echo "public_baseurl: http://localhost:$port/"
             echo 'enable_registration: true'
+            echo 'enable_registration_without_verification: true'
 
 			# Warning, this heredoc depends on the interaction of tabs and spaces.
 			# Please don't accidentaly bork me with your fancy settings.
