@@ -176,7 +176,7 @@ class ApplicationService:
         return False
 
     @cached(num_args=1, cache_context=True)
-    async def matches_user_in_member_list(
+    async def _matches_user_in_member_list(
         self,
         room_id: str,
         store: "DataStore",
@@ -259,7 +259,7 @@ class ApplicationService:
 
         # And finally, perform an expensive check on whether any of the
         # users in the room match the appservice's user namespace
-        return await self.matches_user_in_member_list(
+        return await self._matches_user_in_member_list(
             room_id, store, on_invalidate=cache_context.invalidate
         )
 
@@ -316,7 +316,7 @@ class ApplicationService:
 
         # Then find out if the appservice is interested in any of those rooms
         for room_id in room_ids:
-            if await self.matches_user_in_member_list(
+            if await self.is_interested_in_room(
                 room_id, store, on_invalidate=cache_context.invalidate
             ):
                 return True
