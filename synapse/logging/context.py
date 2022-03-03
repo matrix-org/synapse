@@ -770,6 +770,7 @@ def run_in_background(  # type: ignore[misc]
     # The `type: ignore[misc]` above suppresses
     # "Overloaded function implementation does not accept all possible arguments of signature 1"
     # "Overloaded function implementation does not accept all possible arguments of signature 2"
+    # which seems like a bug in mypy.
     f: Union[
         Callable[P, R],
         Callable[P, Awaitable[R]],
