@@ -45,11 +45,11 @@ def client_patterns(
     """
     versions = []
 
-    if unstable:
-        versions.append("unstable")
     if v1:
         versions.append("api/v1")
     versions.extend(releases)
+    if unstable:
+        versions.append("unstable")
 
     if len(versions) == 1:
         versions_str = versions[0]
