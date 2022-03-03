@@ -555,7 +555,10 @@ class ReadWriteLock:
             finally:
                 with PreserveLoggingContext():
                     new_defer.callback(None)
-                if self.key_to_current_writer[key] == new_defer:
+                # `self.key_to_current_writer[key]` may be missing if there was another
+                # writer waiting for us and it completed entirely within the
+                # `new_defer.callback()` call above.
+                if self.key_to_current_writer.get(key) == new_defer:
                     self.key_to_current_writer.pop(key)
 
         return _ctx_manager()
@@ -665,3 +668,22 @@ def maybe_awaitable(value: Union[Awaitable[R], R]) -> Awaitable[R]:
         return value
 
     return DoneAwaitable(value)
+
+
+def stop_cancellation(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]":
+    """Prevent a `Deferred` from being cancelled by wrapping it in another `Deferred`.
+
+    Args:
+        deferred: The `Deferred` to protect against cancellation. Must not follow the
+            Synapse logcontext rules.
+
+    Returns:
+        A new `Deferred`, which will contain the result of the original `Deferred`,
+        but will not propagate cancellation through to the original. When cancelled,
+        the new `Deferred` will fail with a `CancelledError` and will not follow the
+        Synapse logcontext rules. `make_deferred_yieldable` should be used to wrap
+        the new `Deferred`.
+    """
+    new_deferred: defer.Deferred[T] = defer.Deferred()
+    deferred.chainDeferred(new_deferred)
+    return new_deferred

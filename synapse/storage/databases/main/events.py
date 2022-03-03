@@ -2145,6 +2145,14 @@ class PersistEventsStore:
         state_groups = {}
         for event, context in events_and_contexts:
             if event.internal_metadata.is_outlier():
+                # double-check that we don't have any events that claim to be outliers
+                # *and* have partial state (which is meaningless: we should have no
+                # state at all for an outlier)
+                if context.partial_state:
+                    raise ValueError(
+                        "Outlier event %s claims to have partial state", event.event_id
+                    )
+
                 continue
 
             # if the event was rejected, just give it the same state as its
@@ -2154,6 +2162,23 @@ class PersistEventsStore:
                 continue
 
             state_groups[event.event_id] = context.state_group
+
+        # if we have partial state for these events, record the fact. (This happens
+        # here rather than in _store_event_txn because it also needs to happen when
+        # we de-outlier an event.)
+        self.db_pool.simple_insert_many_txn(
+            txn,
+            table="partial_state_events",
+            keys=("room_id", "event_id"),
+            values=[
+                (
+                    event.room_id,
+                    event.event_id,
+                )
+                for event, ctx in events_and_contexts
+                if ctx.partial_state
+            ],
+        )
 
         self.db_pool.simple_upsert_many_txn(
             txn,

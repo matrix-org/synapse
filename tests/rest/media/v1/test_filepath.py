@@ -21,12 +21,12 @@ from tests import unittest
 
 
 class MediaFilePathsTestCase(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
 
         self.filepaths = MediaFilePaths("/media_store")
 
-    def test_local_media_filepath(self):
+    def test_local_media_filepath(self) -> None:
         """Test local media paths"""
         self.assertEqual(
             self.filepaths.local_media_filepath_rel("GerZNDnDZVjsOtardLuwfIBg"),
@@ -37,7 +37,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/local_content/Ge/rZ/NDnDZVjsOtardLuwfIBg",
         )
 
-    def test_local_media_thumbnail(self):
+    def test_local_media_thumbnail(self) -> None:
         """Test local media thumbnail paths"""
         self.assertEqual(
             self.filepaths.local_media_thumbnail_rel(
@@ -52,14 +52,14 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/local_thumbnails/Ge/rZ/NDnDZVjsOtardLuwfIBg/800-600-image-jpeg-scale",
         )
 
-    def test_local_media_thumbnail_dir(self):
+    def test_local_media_thumbnail_dir(self) -> None:
         """Test local media thumbnail directory paths"""
         self.assertEqual(
             self.filepaths.local_media_thumbnail_dir("GerZNDnDZVjsOtardLuwfIBg"),
             "/media_store/local_thumbnails/Ge/rZ/NDnDZVjsOtardLuwfIBg",
         )
 
-    def test_remote_media_filepath(self):
+    def test_remote_media_filepath(self) -> None:
         """Test remote media paths"""
         self.assertEqual(
             self.filepaths.remote_media_filepath_rel(
@@ -74,7 +74,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/remote_content/example.com/Ge/rZ/NDnDZVjsOtardLuwfIBg",
         )
 
-    def test_remote_media_thumbnail(self):
+    def test_remote_media_thumbnail(self) -> None:
         """Test remote media thumbnail paths"""
         self.assertEqual(
             self.filepaths.remote_media_thumbnail_rel(
@@ -99,7 +99,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/remote_thumbnail/example.com/Ge/rZ/NDnDZVjsOtardLuwfIBg/800-600-image-jpeg-scale",
         )
 
-    def test_remote_media_thumbnail_legacy(self):
+    def test_remote_media_thumbnail_legacy(self) -> None:
         """Test old-style remote media thumbnail paths"""
         self.assertEqual(
             self.filepaths.remote_media_thumbnail_rel_legacy(
@@ -108,7 +108,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "remote_thumbnail/example.com/Ge/rZ/NDnDZVjsOtardLuwfIBg/800-600-image-jpeg",
         )
 
-    def test_remote_media_thumbnail_dir(self):
+    def test_remote_media_thumbnail_dir(self) -> None:
         """Test remote media thumbnail directory paths"""
         self.assertEqual(
             self.filepaths.remote_media_thumbnail_dir(
@@ -117,7 +117,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/remote_thumbnail/example.com/Ge/rZ/NDnDZVjsOtardLuwfIBg",
         )
 
-    def test_url_cache_filepath(self):
+    def test_url_cache_filepath(self) -> None:
         """Test URL cache paths"""
         self.assertEqual(
             self.filepaths.url_cache_filepath_rel("2020-01-02_GerZNDnDZVjsOtar"),
@@ -128,7 +128,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/url_cache/2020-01-02/GerZNDnDZVjsOtar",
         )
 
-    def test_url_cache_filepath_legacy(self):
+    def test_url_cache_filepath_legacy(self) -> None:
         """Test old-style URL cache paths"""
         self.assertEqual(
             self.filepaths.url_cache_filepath_rel("GerZNDnDZVjsOtardLuwfIBg"),
@@ -139,7 +139,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/url_cache/Ge/rZ/NDnDZVjsOtardLuwfIBg",
         )
 
-    def test_url_cache_filepath_dirs_to_delete(self):
+    def test_url_cache_filepath_dirs_to_delete(self) -> None:
         """Test URL cache cleanup paths"""
         self.assertEqual(
             self.filepaths.url_cache_filepath_dirs_to_delete(
@@ -148,7 +148,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             ["/media_store/url_cache/2020-01-02"],
         )
 
-    def test_url_cache_filepath_dirs_to_delete_legacy(self):
+    def test_url_cache_filepath_dirs_to_delete_legacy(self) -> None:
         """Test old-style URL cache cleanup paths"""
         self.assertEqual(
             self.filepaths.url_cache_filepath_dirs_to_delete(
@@ -160,7 +160,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             ],
         )
 
-    def test_url_cache_thumbnail(self):
+    def test_url_cache_thumbnail(self) -> None:
         """Test URL cache thumbnail paths"""
         self.assertEqual(
             self.filepaths.url_cache_thumbnail_rel(
@@ -175,7 +175,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/url_cache_thumbnails/2020-01-02/GerZNDnDZVjsOtar/800-600-image-jpeg-scale",
         )
 
-    def test_url_cache_thumbnail_legacy(self):
+    def test_url_cache_thumbnail_legacy(self) -> None:
         """Test old-style URL cache thumbnail paths"""
         self.assertEqual(
             self.filepaths.url_cache_thumbnail_rel(
@@ -190,7 +190,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/url_cache_thumbnails/Ge/rZ/NDnDZVjsOtardLuwfIBg/800-600-image-jpeg-scale",
         )
 
-    def test_url_cache_thumbnail_directory(self):
+    def test_url_cache_thumbnail_directory(self) -> None:
         """Test URL cache thumbnail directory paths"""
         self.assertEqual(
             self.filepaths.url_cache_thumbnail_directory_rel(
@@ -203,7 +203,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/url_cache_thumbnails/2020-01-02/GerZNDnDZVjsOtar",
         )
 
-    def test_url_cache_thumbnail_directory_legacy(self):
+    def test_url_cache_thumbnail_directory_legacy(self) -> None:
         """Test old-style URL cache thumbnail directory paths"""
         self.assertEqual(
             self.filepaths.url_cache_thumbnail_directory_rel(
@@ -216,7 +216,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/url_cache_thumbnails/Ge/rZ/NDnDZVjsOtardLuwfIBg",
         )
 
-    def test_url_cache_thumbnail_dirs_to_delete(self):
+    def test_url_cache_thumbnail_dirs_to_delete(self) -> None:
         """Test URL cache thumbnail cleanup paths"""
         self.assertEqual(
             self.filepaths.url_cache_thumbnail_dirs_to_delete(
@@ -228,7 +228,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             ],
         )
 
-    def test_url_cache_thumbnail_dirs_to_delete_legacy(self):
+    def test_url_cache_thumbnail_dirs_to_delete_legacy(self) -> None:
         """Test old-style URL cache thumbnail cleanup paths"""
         self.assertEqual(
             self.filepaths.url_cache_thumbnail_dirs_to_delete(
@@ -241,7 +241,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             ],
         )
 
-    def test_server_name_validation(self):
+    def test_server_name_validation(self) -> None:
         """Test validation of server names"""
         self._test_path_validation(
             [
@@ -274,7 +274,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             ],
         )
 
-    def test_file_id_validation(self):
+    def test_file_id_validation(self) -> None:
         """Test validation of local, remote and legacy URL cache file / media IDs"""
         # File / media IDs get split into three parts to form paths, consisting of the
         # first two characters, next two characters and rest of the ID.
@@ -357,7 +357,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             invalid_values=invalid_file_ids,
         )
 
-    def test_url_cache_media_id_validation(self):
+    def test_url_cache_media_id_validation(self) -> None:
         """Test validation of URL cache media IDs"""
         self._test_path_validation(
             [
@@ -387,7 +387,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             ],
         )
 
-    def test_content_type_validation(self):
+    def test_content_type_validation(self) -> None:
         """Test validation of thumbnail content types"""
         self._test_path_validation(
             [
@@ -410,7 +410,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             ],
         )
 
-    def test_thumbnail_method_validation(self):
+    def test_thumbnail_method_validation(self) -> None:
         """Test validation of thumbnail methods"""
         self._test_path_validation(
             [
@@ -440,7 +440,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
         parameter: str,
         valid_values: Iterable[str],
         invalid_values: Iterable[str],
-    ):
+    ) -> None:
         """Test that the specified methods validate the named parameter as expected
 
         Args:

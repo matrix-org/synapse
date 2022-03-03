@@ -1,1 +1,0 @@
-Move common deduplication code down into `_auth_and_persist_outliers`.

@@ -3,7 +3,6 @@
 
 # things to include
 !docker
-!scripts
 !synapse
 !MANIFEST.in
 !README.rst

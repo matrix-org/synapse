@@ -172,6 +172,6 @@ frobber:
 ```
 
 Note that the sample configuration is generated from the synapse code
-and is maintained by a script, `scripts-dev/generate_sample_config`.
+and is maintained by a script, `scripts-dev/generate_sample_config.sh`.
 Making sure that the output from this script matches the desired format
 is left as an exercise for the reader!
