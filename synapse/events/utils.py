@@ -357,9 +357,7 @@ def serialize_event(
 
     if "redacted_because" in e.unsigned:
         d["unsigned"]["redacted_because"] = serialize_event(
-            e.unsigned["redacted_because"],
-            time_now_ms,
-            config=SerializeEventConfig(event_format=config.event_format),
+            e.unsigned["redacted_because"], time_now_ms, config=config
         )
 
     if config.token_id is not None:
@@ -508,11 +506,8 @@ class EventClientSerializer:
             thread = aggregations.thread
 
             # Don't bundle aggregations as this could recurse forever.
-            serialized_latest_event = self.serialize_event(
-                thread.latest_event,
-                time_now,
-                config=config,
-                bundle_aggregations=None,
+            serialized_latest_event = serialize_event(
+                thread.latest_event, time_now, config=config
             )
             # Manually apply an edit, if one exists.
             if thread.latest_edit:
