@@ -79,6 +79,9 @@ def main():
 
     client_resource = ClientRestResource(hs)
 
+    # The resulting paths that workers can handle.
+    results = []
+
     # Avoid re-processing servlets (as they might have multiple paths registered separately).
     servlet_names = set()
     for path_entry in itertools.chain(*client_resource.path_regexs.values()):
@@ -91,7 +94,11 @@ def main():
         for worker_path in worker_paths:
             # Remove any capturing groups and replace with wildcards.
             pattern = GROUP_PATTERN.sub(".*", worker_path.pattern)
-            print(pattern)
+            results.append(pattern)
+
+    # Print the results after sorting (to give a stable output).
+    for result in sorted(results):
+        print(result)
 
     # TODO Federation servlets.
 
