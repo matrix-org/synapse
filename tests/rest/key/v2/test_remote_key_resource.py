@@ -18,8 +18,8 @@ from unittest.mock import Mock
 
 import signedjson.key
 from canonicaljson import encode_canonical_json
-from nacl.signing import SigningKey
 from signedjson.sign import sign_json
+from signedjson.types import SigningKey
 
 from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.resource import NoResource, Resource
@@ -64,7 +64,7 @@ class BaseRemoteKeyResourceTestCase(unittest.HomeserverTestCase):
         ) -> Union[JsonDict, list]:
             self.assertTrue(ignore_backoff)
             self.assertEqual(destination, server_name)
-            key_id = "%s:%s" % (signing_key.alg, signing_key.version)  # type: ignore[attr-defined]
+            key_id = "%s:%s" % (signing_key.alg, signing_key.version)
             self.assertEqual(
                 path, "/_matrix/key/v2/server/%s" % (urllib.parse.quote(key_id),)
             )
