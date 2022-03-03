@@ -108,6 +108,7 @@ class PublicRoomList(BaseFederationServlet):
     """
 
     PATH = "/publicRooms"
+    WORKER_PATH = PATH
 
     def __init__(
         self,

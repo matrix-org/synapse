@@ -22,6 +22,7 @@ from typing import Pattern
 import yaml
 
 from synapse.config.homeserver import HomeServerConfig
+from synapse.federation.transport.server import TransportLayerServer
 from synapse.rest import ClientRestResource
 from synapse.server import HomeServer
 from synapse.storage import DataStore
@@ -78,6 +79,7 @@ def main():
     hs.setup()
 
     client_resource = ClientRestResource(hs)
+    federation_server = TransportLayerServer(hs)
 
     # The resulting paths that workers can handle.
     results = []
@@ -90,17 +92,29 @@ def main():
         servlet_names.add(path_entry.servlet_classname)
 
         # This assumes the servlet is attached to a class.
-        worker_paths = getattr(path_entry.callback.__self__, "WORKER_PATTERNS", [])
-        for worker_path in worker_paths:
+        worker_patterns = getattr(path_entry.callback.__self__, "WORKER_PATTERNS", [])
+        for worker_pattern in worker_patterns:
             # Remove any capturing groups and replace with wildcards.
-            pattern = GROUP_PATTERN.sub(".*", worker_path.pattern)
+            pattern = GROUP_PATTERN.sub(".*", worker_pattern.pattern)
+            results.append(pattern)
+
+    # Federation resources follow slightly different rules.
+    for path_entry in itertools.chain(*federation_server.path_regexs.values()):
+        if path_entry.servlet_classname in servlet_names:
+            continue
+        servlet_names.add(path_entry.servlet_classname)
+
+        # This assumes the servlet is attached to a class.
+        servlet = path_entry.callback.__wrapped__.__self__
+        worker_path = getattr(servlet, "WORKER_PATH", None)
+        if worker_path:
+            # See synapse.federation.transport.server._base.BaseFederationServlet.register.
+            pattern = "^" + servlet.PREFIX + worker_path
             results.append(pattern)
 
     # Print the results after sorting (to give a stable output).
     for result in sorted(results):
         print(result)
-
-    # TODO Federation servlets.
 
 
 if __name__ == "__main__":

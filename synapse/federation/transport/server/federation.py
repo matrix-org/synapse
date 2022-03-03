@@ -138,6 +138,7 @@ class FederationSendServlet(BaseFederationServerServlet):
 
 class FederationEventServlet(BaseFederationServerServlet):
     PATH = "/event/(?P<event_id>[^/]*)/?"
+    WORKER_PATH = "/event/"
 
     # This is when someone asks for a data item for a given server data_id pair.
     async def on_GET(
@@ -152,6 +153,7 @@ class FederationEventServlet(BaseFederationServerServlet):
 
 class FederationStateV1Servlet(BaseFederationServerServlet):
     PATH = "/state/(?P<room_id>[^/]*)/?"
+    WORKER_PATH = "/state/"
 
     # This is when someone asks for all data for a given room.
     async def on_GET(
@@ -170,6 +172,7 @@ class FederationStateV1Servlet(BaseFederationServerServlet):
 
 class FederationStateIdsServlet(BaseFederationServerServlet):
     PATH = "/state_ids/(?P<room_id>[^/]*)/?"
+    WORKER_PATH = "/state_ids/"
 
     async def on_GET(
         self,
@@ -187,6 +190,7 @@ class FederationStateIdsServlet(BaseFederationServerServlet):
 
 class FederationBackfillServlet(BaseFederationServerServlet):
     PATH = "/backfill/(?P<room_id>[^/]*)/?"
+    WORKER_PATH = "/backfill/"
 
     async def on_GET(
         self,
@@ -246,6 +250,7 @@ class FederationTimestampLookupServlet(BaseFederationServerServlet):
 
 class FederationQueryServlet(BaseFederationServerServlet):
     PATH = "/query/(?P<query_type>[^/]*)"
+    WORKER_PATH = "/query/"
 
     # This is when we receive a server-server Query
     async def on_GET(
@@ -262,6 +267,7 @@ class FederationQueryServlet(BaseFederationServerServlet):
 
 class FederationMakeJoinServlet(BaseFederationServerServlet):
     PATH = "/make_join/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
+    WORKER_PATH = "/make_join/"
 
     async def on_GET(
         self,
@@ -297,6 +303,7 @@ class FederationMakeJoinServlet(BaseFederationServerServlet):
 
 class FederationMakeLeaveServlet(BaseFederationServerServlet):
     PATH = "/make_leave/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
+    WORKER_PATH = "/make_leave/"
 
     async def on_GET(
         self,
@@ -312,6 +319,7 @@ class FederationMakeLeaveServlet(BaseFederationServerServlet):
 
 class FederationV1SendLeaveServlet(BaseFederationServerServlet):
     PATH = "/send_leave/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    WORKER_PATH = "/send_leave/"
 
     async def on_PUT(
         self,
@@ -327,6 +335,7 @@ class FederationV1SendLeaveServlet(BaseFederationServerServlet):
 
 class FederationV2SendLeaveServlet(BaseFederationServerServlet):
     PATH = "/send_leave/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    WORKER_PATH = "/send_leave/"
 
     PREFIX = FEDERATION_V2_PREFIX
 
@@ -381,6 +390,7 @@ class FederationV1SendKnockServlet(BaseFederationServerServlet):
 
 class FederationEventAuthServlet(BaseFederationServerServlet):
     PATH = "/event_auth/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    WORKER_PATH = "/event_auth/"
 
     async def on_GET(
         self,
@@ -395,6 +405,7 @@ class FederationEventAuthServlet(BaseFederationServerServlet):
 
 class FederationV1SendJoinServlet(BaseFederationServerServlet):
     PATH = "/send_join/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    WORKER_PATH = "/send_join/"
 
     async def on_PUT(
         self,
@@ -412,6 +423,7 @@ class FederationV1SendJoinServlet(BaseFederationServerServlet):
 
 class FederationV2SendJoinServlet(BaseFederationServerServlet):
     PATH = "/send_join/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    WORKER_PATH = "/send_join/"
 
     PREFIX = FEDERATION_V2_PREFIX
 
@@ -455,6 +467,7 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
 
 class FederationV1InviteServlet(BaseFederationServerServlet):
     PATH = "/invite/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    WORKER_PATH = "/invite/"
 
     async def on_PUT(
         self,
@@ -479,6 +492,7 @@ class FederationV1InviteServlet(BaseFederationServerServlet):
 
 class FederationV2InviteServlet(BaseFederationServerServlet):
     PATH = "/invite/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+    WORKER_PATH = "/invite/"
 
     PREFIX = FEDERATION_V2_PREFIX
 
@@ -515,6 +529,7 @@ class FederationV2InviteServlet(BaseFederationServerServlet):
 
 class FederationThirdPartyInviteExchangeServlet(BaseFederationServerServlet):
     PATH = "/exchange_third_party_invite/(?P<room_id>[^/]*)"
+    WORKER_PATH = "/exchange_third_party_invite/"
 
     async def on_PUT(
         self,
@@ -538,6 +553,7 @@ class FederationClientKeysQueryServlet(BaseFederationServerServlet):
 
 class FederationUserDevicesQueryServlet(BaseFederationServerServlet):
     PATH = "/user/devices/(?P<user_id>[^/]*)"
+    WORKER_PATH = "/user/devices/"
 
     async def on_GET(
         self,
@@ -561,6 +577,7 @@ class FederationClientKeysClaimServlet(BaseFederationServerServlet):
 
 class FederationGetMissingEventsServlet(BaseFederationServerServlet):
     PATH = "/get_missing_events/(?P<room_id>[^/]*)"
+    WORKER_PATH = "/get_missing_events/"
 
     async def on_POST(
         self,
@@ -640,6 +657,7 @@ class FederationVersionServlet(BaseFederationServlet):
 
 class FederationRoomHierarchyServlet(BaseFederationServlet):
     PATH = "/hierarchy/(?P<room_id>[^/]*)"
+    WORKER_PATH = "/hierarchy/"
 
     def __init__(
         self,
