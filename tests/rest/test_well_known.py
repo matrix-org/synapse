@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from http import HTTPStatus
+
 from twisted.web.resource import Resource
 
 from synapse.rest.well_known import well_known_resource
@@ -19,7 +21,7 @@ from tests import unittest
 
 
 class WellKnownTests(unittest.HomeserverTestCase):
-    def create_test_resource(self):
+    def create_test_resource(self) -> Resource:
         # replace the JsonResource with a Resource wrapping the WellKnownResource
         res = Resource()
         res.putChild(b".well-known", well_known_resource(self.hs))
@@ -31,12 +33,12 @@ class WellKnownTests(unittest.HomeserverTestCase):
             "default_identity_server": "https://testis",
         }
     )
-    def test_client_well_known(self):
+    def test_client_well_known(self) -> None:
         channel = self.make_request(
             "GET", "/.well-known/matrix/client", shorthand=False
         )
 
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, HTTPStatus.OK)
         self.assertEqual(
             channel.json_body,
             {
@@ -50,27 +52,27 @@ class WellKnownTests(unittest.HomeserverTestCase):
             "public_baseurl": None,
         }
     )
-    def test_client_well_known_no_public_baseurl(self):
+    def test_client_well_known_no_public_baseurl(self) -> None:
         channel = self.make_request(
             "GET", "/.well-known/matrix/client", shorthand=False
         )
 
-        self.assertEqual(channel.code, 404)
+        self.assertEqual(channel.code, HTTPStatus.NOT_FOUND)
 
     @unittest.override_config({"serve_server_wellknown": True})
-    def test_server_well_known(self):
+    def test_server_well_known(self) -> None:
         channel = self.make_request(
             "GET", "/.well-known/matrix/server", shorthand=False
         )
 
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, HTTPStatus.OK)
         self.assertEqual(
             channel.json_body,
             {"m.server": "test:443"},
         )
 
-    def test_server_well_known_disabled(self):
+    def test_server_well_known_disabled(self) -> None:
         channel = self.make_request(
             "GET", "/.well-known/matrix/server", shorthand=False
         )
-        self.assertEqual(channel.code, 404)
+        self.assertEqual(channel.code, HTTPStatus.NOT_FOUND)
