@@ -141,9 +141,7 @@ class TransactionRestServlet(RestServlet):
 
 class RoomCreateRestServlet(TransactionRestServlet):
     # No PATTERN; we have custom dispatch rules here
-    WORKER_PATTERNS = [
-        re.compile("^/_matrix/client/(api/v1|r0|v3|unstable)/createRoom$")
-    ]
+    WORKER_PATTERNS = client_patterns("/createRoom$", v1=True)
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
@@ -183,6 +181,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
 
 # TODO: Needs unit testing for generic events
 class RoomStateEventRestServlet(RestServlet):
+    WORKER_PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/state/")
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -326,6 +325,8 @@ class RoomStateEventRestServlet(RestServlet):
 
 # TODO: Needs unit testing for generic events + feedback
 class RoomSendEventRestServlet(TransactionRestServlet):
+    WORKER_PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/send", v1=True)
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -401,6 +402,8 @@ class RoomSendEventRestServlet(TransactionRestServlet):
 
 # TODO: Needs unit testing for room ID + alias joins
 class JoinRoomAliasServlet(ResolveRoomIdMixin, TransactionRestServlet):
+    WORKER_PATTERNS = client_patterns("/join/", v1=True)
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         super(ResolveRoomIdMixin, self).__init__(hs)  # ensure the Mixin is set up
@@ -773,6 +776,7 @@ class RoomEventServlet(RestServlet):
     PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)/event/(?P<event_id>[^/]*)$", v1=True
     )
+    WORKER_PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/event/")
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -966,6 +970,10 @@ class RoomForgetRestServlet(TransactionRestServlet):
 
 # TODO: Needs unit testing
 class RoomMembershipRestServlet(TransactionRestServlet):
+    WORKER_PATTERNS = client_patterns(
+        "/rooms/(?P<room_id>[^/]*)/(join|invite|leave|ban|unban|kick)$", v1=True
+    )
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
@@ -1079,6 +1087,8 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 
 
 class RoomRedactEventRestServlet(TransactionRestServlet):
+    WORKER_PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/redact", v1=True)
+
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -1252,6 +1262,7 @@ class RoomAliasListServlet(RestServlet):
 
 class SearchRestServlet(RestServlet):
     PATTERNS = client_patterns("/search$", v1=True)
+    WORKER_PATTERNS = PATTERNS
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1271,6 +1282,7 @@ class SearchRestServlet(RestServlet):
 
 class JoinedRoomsRestServlet(RestServlet):
     PATTERNS = client_patterns("/joined_rooms$", v1=True)
+    WORKER_PATTERNS = PATTERNS
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1373,6 +1385,7 @@ class TimestampLookupRestServlet(RestServlet):
 
 class RoomHierarchyRestServlet(RestServlet):
     PATTERNS = (re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/hierarchy$"),)
+    WORKERS = PATTERNS
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1413,6 +1426,7 @@ class RoomSummaryRestServlet(ResolveRoomIdMixin, RestServlet):
             "/rooms/(?P<room_identifier>[^/]*)/summary$"
         ),
     )
+    WORKER_PATTERNS = PATTERNS
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)

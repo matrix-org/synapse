@@ -182,6 +182,7 @@ class KeyQueryServlet(RestServlet):
     """
 
     PATTERNS = client_patterns("/keys/query$")
+    WORKER_PATTERNS = PATTERNS
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -225,6 +226,7 @@ class KeyChangesServlet(RestServlet):
     """
 
     PATTERNS = client_patterns("/keys/changes$")
+    WORKER_PATTERNS = PATTERNS
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -274,6 +276,7 @@ class OneTimeKeyServlet(RestServlet):
     """
 
     PATTERNS = client_patterns("/keys/claim$")
+    WORKER_PATTERNS = PATTERNS
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

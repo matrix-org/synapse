@@ -576,6 +576,8 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
 
 class ThreepidRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid$")
+    # This is used as a proxy for all the 3pid endpoints.
+    WORKER_PATTERNS = client_patterns("/account/3pid")
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

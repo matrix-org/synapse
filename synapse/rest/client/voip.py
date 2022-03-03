@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 
 class VoipRestServlet(RestServlet):
     PATTERNS = client_patterns("/voip/turnServer$", v1=True)
+    WORKER_PATTERNS = PATTERNS
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

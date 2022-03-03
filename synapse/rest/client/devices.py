@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 
 class DevicesRestServlet(RestServlet):
     PATTERNS = client_patterns("/devices$")
+    WORKER_PATTERNS = PATTERNS
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 class ReadMarkerRestServlet(RestServlet):
     PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/read_markers$")
+    WORKER_PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/read_markers")
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
