@@ -7,8 +7,9 @@ Requires you to have a [Synapse development environment setup](https://matrix-or
 The demo setup allows running three federation Synapse servers, with server
 names `localhost:8080`, `localhost:8081`, and `localhost:8082`.
 
-You can access them via any Matrix client over HTTP at `localhost:808{1,2,3}` or
-over HTTPS at `localhost:848{1,2,3}`.
+You can access them via any Matrix client over HTTP at `localhost:8080`,
+`localhost:8081`, and `localhost:8082` or over HTTPS at `localhost:8480`,
+`localhost:8481`, and `localhost:8482`.
 
 To enable the servers to communicate, self-signed SSL certificates are generated
 and the servers are configured in a highly insecure way, including:
@@ -16,8 +17,8 @@ and the servers are configured in a highly insecure way, including:
 * Not checking certificates over federation.
 * Not verifying keys.
 
-The servers are configured to store their data under `demo/808{1,2,3}`. This
-includes logs, SQLite databases, and media.
+The servers are configured to store their data under `demo/8080`, `demo/8081`, and
+`demo/8082`. This includes configuration, logs, SQLite databases, and media.
 
 Note that when joining a public room on a different HS via "#foo:bar.net", then
 you are (in the current impl) joining a room with room_id "foo". This means that
