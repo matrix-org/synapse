@@ -265,16 +265,22 @@ class ApplicationService:
 
     @cached(num_args=1, cache_context=True)
     async def is_interested_in_event(
-        self, event: EventBase, store: "DataStore", cache_context: _CacheContext
+        self,
+        event_id: str,
+        event: EventBase,
+        store: "DataStore",
+        cache_context: _CacheContext,
     ) -> bool:
         """Check if this service is interested in this event.
 
         Args:
+            event_id: The ID of the event to check. This is purely used for simplifying the
+                caching of calls to this method.
             event: The event to check.
             store: The datastore to query.
 
         Returns:
-            True if this service would like to know about this event.
+            True if this service would like to know about this event, otherwise False.
         """
         # Check if we're interested in this event's sender by namespace (or if they're the
         # sender_localpart user)
