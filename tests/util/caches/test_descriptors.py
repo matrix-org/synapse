@@ -673,14 +673,14 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             self.assertEqual(current_context(), SENTINEL_CONTEXT)
             r = yield d1
             self.assertEqual(current_context(), c1)
-            obj.mock.assert_called_once_with((10, 20), 2)
+            obj.mock.assert_called_once_with({10, 20}, 2)
             self.assertEqual(r, {10: "fish", 20: "chips"})
             obj.mock.reset_mock()
 
             # a call with different params should call the mock again
             obj.mock.return_value = {30: "peas"}
             r = yield obj.list_fn([20, 30], 2)
-            obj.mock.assert_called_once_with((30,), 2)
+            obj.mock.assert_called_once_with({30}, 2)
             self.assertEqual(r, {20: "chips", 30: "peas"})
             obj.mock.reset_mock()
 
@@ -701,7 +701,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             obj.mock.return_value = {40: "gravy"}
             iterable = (x for x in [10, 40, 40])
             r = yield obj.list_fn(iterable, 2)
-            obj.mock.assert_called_once_with((40,), 2)
+            obj.mock.assert_called_once_with({40}, 2)
             self.assertEqual(r, {10: "fish", 40: "gravy"})
 
     def test_concurrent_lookups(self):
@@ -729,7 +729,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
         d3 = obj.list_fn([10])
 
         # the mock should have been called exactly once
-        obj.mock.assert_called_once_with((10,))
+        obj.mock.assert_called_once_with({10})
         obj.mock.reset_mock()
 
         # ... and none of the calls should yet be complete
@@ -771,7 +771,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
         # cache miss
         obj.mock.return_value = {10: "fish", 20: "chips"}
         r1 = yield obj.list_fn([10, 20], 2, on_invalidate=invalidate0)
-        obj.mock.assert_called_once_with((10, 20), 2)
+        obj.mock.assert_called_once_with({10, 20}, 2)
         self.assertEqual(r1, {10: "fish", 20: "chips"})
         obj.mock.reset_mock()
 

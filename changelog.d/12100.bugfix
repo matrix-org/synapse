@@ -1,1 +1,0 @@
-Fix a long-standing bug which could cause push notifications to malfunction if `use_frozen_dicts` was set in the configuration.

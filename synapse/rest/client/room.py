@@ -1141,73 +1141,6 @@ class TimestampLookupRestServlet(RestServlet):
         }
 
 
-class RoomSpaceSummaryRestServlet(RestServlet):
-    PATTERNS = (
-        re.compile(
-            "^/_matrix/client/unstable/org.matrix.msc2946"
-            "/rooms/(?P<room_id>[^/]*)/spaces$"
-        ),
-    )
-
-    def __init__(self, hs: "HomeServer"):
-        super().__init__()
-        self._auth = hs.get_auth()
-        self._room_summary_handler = hs.get_room_summary_handler()
-
-    async def on_GET(
-        self, request: SynapseRequest, room_id: str
-    ) -> Tuple[int, JsonDict]:
-        requester = await self._auth.get_user_by_req(request, allow_guest=True)
-
-        max_rooms_per_space = parse_integer(request, "max_rooms_per_space")
-        if max_rooms_per_space is not None and max_rooms_per_space < 0:
-            raise SynapseError(
-                400,
-                "Value for 'max_rooms_per_space' must be a non-negative integer",
-                Codes.BAD_JSON,
-            )
-
-        return 200, await self._room_summary_handler.get_space_summary(
-            requester.user.to_string(),
-            room_id,
-            suggested_only=parse_boolean(request, "suggested_only", default=False),
-            max_rooms_per_space=max_rooms_per_space,
-        )
-
-    # TODO When switching to the stable endpoint, remove the POST handler.
-    async def on_POST(
-        self, request: SynapseRequest, room_id: str
-    ) -> Tuple[int, JsonDict]:
-        requester = await self._auth.get_user_by_req(request, allow_guest=True)
-        content = parse_json_object_from_request(request)
-
-        suggested_only = content.get("suggested_only", False)
-        if not isinstance(suggested_only, bool):
-            raise SynapseError(
-                400, "'suggested_only' must be a boolean", Codes.BAD_JSON
-            )
-
-        max_rooms_per_space = content.get("max_rooms_per_space")
-        if max_rooms_per_space is not None:
-            if not isinstance(max_rooms_per_space, int):
-                raise SynapseError(
-                    400, "'max_rooms_per_space' must be an integer", Codes.BAD_JSON
-                )
-            if max_rooms_per_space < 0:
-                raise SynapseError(
-                    400,
-                    "Value for 'max_rooms_per_space' must be a non-negative integer",
-                    Codes.BAD_JSON,
-                )
-
-        return 200, await self._room_summary_handler.get_space_summary(
-            requester.user.to_string(),
-            room_id,
-            suggested_only=suggested_only,
-            max_rooms_per_space=max_rooms_per_space,
-        )
-
-
 class RoomHierarchyRestServlet(RestServlet):
     PATTERNS = (
         re.compile(
@@ -1301,7 +1234,6 @@ def register_servlets(
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
-    RoomSpaceSummaryRestServlet(hs).register(http_server)
     RoomHierarchyRestServlet(hs).register(http_server)
     if hs.config.experimental.msc3266_enabled:
         RoomSummaryRestServlet(hs).register(http_server)
