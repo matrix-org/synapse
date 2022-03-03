@@ -100,7 +100,7 @@ class VersionsRestServlet(RestServlet):
                     # Adds support for jump to date endpoints (/timestamp_to_event) as per MSC3030
                     "org.matrix.msc3030": self.config.experimental.msc3030_enabled,
                     # Adds support for thread relations, per MSC3440.
-                    "org.matrix.msc3440": self.config.experimental.msc3440_enabled,
+                    "org.matrix.msc3440": True,
                 },
             },
         )
