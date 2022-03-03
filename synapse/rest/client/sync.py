@@ -86,7 +86,7 @@ class SyncRestServlet(RestServlet):
     """
 
     PATTERNS = client_patterns("/sync$")
-    WORKERS = True
+    WORKERS = PATTERNS
     ALLOWED_PRESENCE = {"online", "offline", "unavailable"}
 
     def __init__(self, hs: "HomeServer"):

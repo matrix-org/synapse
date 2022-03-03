@@ -141,6 +141,9 @@ class TransactionRestServlet(RestServlet):
 
 class RoomCreateRestServlet(TransactionRestServlet):
     # No PATTERN; we have custom dispatch rules here
+    WORKER_PATTERNS = [
+        re.compile("^/_matrix/client/(api/v1|r0|v3|unstable)/createRoom$")
+    ]
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
@@ -460,6 +463,7 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, TransactionRestServlet):
 # TODO: Needs unit testing
 class PublicRoomListRestServlet(RestServlet):
     PATTERNS = client_patterns("/publicRooms$", v1=True)
+    WORKER_PATTERNS = PATTERNS
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1195,7 +1199,7 @@ class RoomTypingRestServlet(RestServlet):
         # Limit timeout to stop people from setting silly typing timeouts.
         timeout = min(content.get("timeout", 30000), 120000)
 
-        # Defer getting the typing handler since it will raise on workers.
+        # Defer getting the typing handler since it will raise on WORKER_PATTERNS.
         typing_handler = self.hs.get_typing_writer_handler()
 
         try:

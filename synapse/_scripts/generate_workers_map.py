@@ -56,7 +56,7 @@ def main():
         "format": "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s",
     }
     # TODO
-    #logging.basicConfig(**logging_config)
+    # logging.basicConfig(**logging_config)
 
     # Load, process and sanity-check the config.
     hs_config = yaml.safe_load(args.config_path)
@@ -82,8 +82,11 @@ def main():
         servlet_names.add(path_entry.servlet_classname)
 
         # This assumes the servlet is attached to a class.
-        if getattr(path_entry.callback.__self__, "WORKERS", False):
-            print(path_entry.pattern.pattern)
+        worker_paths = getattr(path_entry.callback.__self__, "WORKER_PATTERNS", [])
+        for worker_path in worker_paths:
+            print(worker_path.pattern)
+
+    # TODO Federation servlets.
 
 
 if __name__ == "__main__":
