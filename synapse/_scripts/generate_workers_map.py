@@ -16,6 +16,8 @@
 import argparse
 import itertools
 import logging
+import re
+from typing import Pattern
 
 import yaml
 
@@ -32,6 +34,9 @@ class MockHomeserver(HomeServer):
 
     def __init__(self, config):
         super().__init__(config.server.server_name, config=config)
+
+
+GROUP_PATTERN = re.compile(r"\(\?P<[^>]+?>(.+?)\)")
 
 
 def main():
@@ -84,7 +89,9 @@ def main():
         # This assumes the servlet is attached to a class.
         worker_paths = getattr(path_entry.callback.__self__, "WORKER_PATTERNS", [])
         for worker_path in worker_paths:
-            print(worker_path.pattern)
+            # Remove any capturing groups and replace with wildcards.
+            pattern = GROUP_PATTERN.sub(".*", worker_path.pattern)
+            print(pattern)
 
     # TODO Federation servlets.
 
