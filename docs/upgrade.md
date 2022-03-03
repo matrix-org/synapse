@@ -91,15 +91,20 @@ process, for example:
 
 The `synctl` script
 [has been made](https://github.com/matrix-org/synapse/pull/12140) an
-[entry point](https://setuptools.pypa.io/en/latest/userguide/entry_point.html)
-and no longer exists at the root of Synapse's source tree. This means that
-`synctl` cannot be invoked in the form `./synctl` or `/path/to/synapse/synctl`.
-The `synctl` command will still available on your PATH:
+[entry point](https://packaging.python.org/en/latest/specifications/entry-points/)
+and no longer exists at the root of Synapse's source tree. If you wish to use
+`synctl` to manage your homeserver, you should invoke `synctl` directly, e.g. 
+`synctl start` instead of `./synctl start` or `/path/to/synctl start`. 
 
-- when Synapse is installed via `pip` or Matrix.org's
-  [Debian packages](https://packages.matrix.org/debian/), and
-- when Synapse is ran using Matrix.org's
-  [docker images](https://hub.docker.com/r/matrixdotorg/synapse)
+You will need to ensure `synctl` is on your `PATH`.
+  - This is automatically the case when using
+    [Debian packages](https://packages.matrix.org/debian/) or
+    [docker images](https://hub.docker.com/r/matrixdotorg/synapse)
+    provided by Matrix.org.
+  - When installing from a wheel, sdist, or PyPI, a `synctl` executable is added 
+    to your Python installation's `bin`. This should be on your `PATH`
+    automatically, though you might need to activate a virtual environment
+    depending on how you installed Synapse.
 
 # Upgrading to v1.54.0
 
