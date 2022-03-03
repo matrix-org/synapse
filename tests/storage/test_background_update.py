@@ -66,7 +66,7 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         self.update_handler.reset_mock()
         res = self.get_success(
             self.updates.do_next_background_update(False),
-            by=0.2,
+            by=0.02,
         )
         self.assertFalse(res)
 
