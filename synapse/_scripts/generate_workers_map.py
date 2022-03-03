@@ -74,7 +74,13 @@ def main():
 
     client_resource = ClientRestResource(hs)
 
+    # Avoid re-processing servlets (as they might have multiple paths registered separately).
+    servlet_names = set()
     for path_entry in itertools.chain(*client_resource.path_regexs.values()):
+        if path_entry.servlet_classname in servlet_names:
+            continue
+        servlet_names.add(path_entry.servlet_classname)
+
         # This assumes the servlet is attached to a class.
         if getattr(path_entry.callback.__self__, "WORKERS", False):
             print(path_entry.pattern.pattern)
