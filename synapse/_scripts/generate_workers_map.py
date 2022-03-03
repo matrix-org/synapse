@@ -112,6 +112,10 @@ def main():
             pattern = "^" + servlet.PREFIX + worker_path
             results.append(pattern)
 
+    # Add the /key resources manually since those are directly registered (not
+    # via servlets).
+    results.append("^/_matrix/key/v2/query")
+
     # Print the results after sorting (to give a stable output).
     for result in sorted(results):
         print(result)
