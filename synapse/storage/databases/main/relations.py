@@ -514,7 +514,7 @@ class RelationsWorkerStore(SQLBaseStore):
                         AND parent.room_id = child.room_id
                     WHERE
                         %s
-                        AND relation_type = ?
+                        AND (relation_type = ? OR relation_type = ?)
                     ORDER BY child.topological_ordering DESC, child.stream_ordering DESC
                 """
 
@@ -522,6 +522,7 @@ class RelationsWorkerStore(SQLBaseStore):
                 txn.database_engine, "relates_to_id", event_ids
             )
             args.append(RelationTypes.THREAD)
+            args.append(RelationTypes.UNSTABLE_THREAD)
 
             txn.execute(sql % (clause,), args)
             latest_event_ids = {}
@@ -543,7 +544,7 @@ class RelationsWorkerStore(SQLBaseStore):
                     AND parent.room_id = child.room_id
                 WHERE
                     %s
-                    AND relation_type = ?
+                    AND (relation_type = ? OR relation_type = ?)
                 GROUP BY parent.event_id
             """
 
@@ -553,6 +554,7 @@ class RelationsWorkerStore(SQLBaseStore):
                 txn.database_engine, "relates_to_id", latest_event_ids.keys()
             )
             args.append(RelationTypes.THREAD)
+            args.append(RelationTypes.UNSTABLE_THREAD)
 
             txn.execute(sql % (clause,), args)
             counts = dict(cast(List[Tuple[str, int]], txn.fetchall()))
@@ -617,14 +619,14 @@ class RelationsWorkerStore(SQLBaseStore):
                     AND parent.room_id = child.room_id
                 WHERE
                     %s
-                    AND relation_type = ?
+                    AND (relation_type = ? OR relation_type = ?)
                     AND child.sender = ?
             """
 
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "relates_to_id", event_ids
             )
-            args.extend((RelationTypes.THREAD, user_id))
+            args.extend((RelationTypes.THREAD, RelationTypes.UNSTABLE_THREAD, user_id))
 
             txn.execute(sql % (clause,), args)
             return {row[0] for row in txn.fetchall()}

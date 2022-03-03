@@ -515,11 +515,13 @@ class EventClientSerializer:
                     thread.latest_event, serialized_latest_event, thread.latest_edit
                 )
 
-            serialized_aggregations[RelationTypes.THREAD] = {
+            thread_summary = {
                 "latest_event": serialized_latest_event,
                 "count": thread.count,
                 "current_user_participated": thread.current_user_participated,
             }
+            serialized_aggregations[RelationTypes.THREAD] = thread_summary
+            serialized_aggregations[RelationTypes.UNSTABLE_THREAD] = thread_summary
 
         # Include the bundled aggregations in the event.
         if serialized_aggregations:
