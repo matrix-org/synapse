@@ -85,6 +85,22 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.55.0
+
+## `synctl` script has been moved
+
+The `synctl` script
+[has been made](https://github.com/matrix-org/synapse/pull/12140) an
+[entry point](https://setuptools.pypa.io/en/latest/userguide/entry_point.html)
+and no longer exists at the root of Synapse's source tree. This means that
+`synctl` cannot be invoked in the form `./synctl` or `/path/to/synapse/synctl`.
+The `synctl` command will still available on your PATH:
+
+- when Synapse is installed via `pip` or Matrix.org's
+  [Debian packages](https://packages.matrix.org/debian/), and
+- when Synapse is ran using Matrix.org's
+  [docker images](https://hub.docker.com/r/matrixdotorg/synapse)
+
 # Upgrading to v1.54.0
 
 ## Legacy structured logging configuration removal
