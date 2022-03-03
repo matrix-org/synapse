@@ -20,19 +20,7 @@ jobs:
       - run: scripts-dev/config-lint.sh
 
   lint:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        toxenv:
-          - "check_codestyle"
-          - "check_isort"
-          - "mypy"
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-      - run: pip install tox
-      - run: tox -e ${{ matrix.toxenv }}
+    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v1"
 
   lint-crlf:
     runs-on: ubuntu-latest
