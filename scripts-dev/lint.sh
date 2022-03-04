@@ -85,7 +85,7 @@ else
           "synapse" "docker" "tests"
           # annoyingly, black doesn't find these so we have to list them
           "scripts-dev"
-          "contrib" "synctl" "setup.py" "synmark" "stubs" ".ci"
+          "contrib" "setup.py" "synmark" "stubs" ".ci"
       )
   fi
 fi
