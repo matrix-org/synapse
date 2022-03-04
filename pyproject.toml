@@ -188,6 +188,8 @@ Pympler = { version = "*", optional = true }
 ## Developer dependencies should not get included in "all".
 ##
 [tool.poetry.extras]
+# NB: Packages that should be part of `pip install matrix-synapse[all]` need to be specified
+# twice: once here, and once in the `all` extra.
 matrix-synapse-ldap3 = ["matrix-synapse-ldap3"]
 postgres = ["psycopg2", "psycopg2cffi", "psycopg2cffi-compat"]
 saml2 = ["pysaml2"]
@@ -206,9 +208,39 @@ redis = ["txredisapi", "hiredis"]
 # Required to use experimental `caches.track_memory_usage` config option.
 cache_memory = ["pympler"]
 
-# TODO: is there a better way to avoid the duplication here?
-# See also https://github.com/python-poetry/poetry/issues/3413#issue-750319958
-all = ["matrix-synapse-ldap3", "postgres", "saml2", "oidc", "systemd", "url_preview", "sentry", "opentracing", "jwt", "redis", "cache_memory"]
+# The duplication here is awful. I hate hate hate hate hate it. However, for now I want
+# to ensure you can still `pip install matrix-synapse[all]` like today. Two motivations:
+# 1) for new installations, I want instructions in existing documentation and tutorials
+#    out there to still work.
+# 2) I don't want to hard-code a list of extras into CI if I can help it. The ideal
+#    solution here would be something like https://github.com/python-poetry/poetry/issues/3413
+# Poetry 1.2's dependency groups might make this easier. But I'm not trying that out
+# until there's a stable release of 1.2.
+#
+# NB: the strings in this list must be *package* names, not extra names.
+# Some of our extra names _are_ package names, which can lead to great confusion.
+all = [
+    # matrix-synapse-ldap3
+    "matrix-synapse-ldap3",
+    # postgres
+    "psycopg2", "psycopg2cffi", "psycopg2cffi-compat",
+    # saml2
+    "pysaml2",
+    # oidc
+    "authlib",
+    # systemd, omitted: this is a system-based requirement
+    # url_preview
+    "lxml",
+    # sentry
+    "sentry-sdk",
+    # opentracing
+    "jaeger-client", "opentracing",
+    # jwt
+    "pyjwt",
+    #redis
+    "txredisapi", "hiredis"
+    # cache_memory, omitted: this is an experimental option
+]
 
 [tool.poetry.dev-dependencies]
 ## We pin black so that our tests don't start failing on new releases.
