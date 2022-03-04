@@ -225,7 +225,7 @@ pip install --upgrade .
 </li>
 <li>
 <p>Restart Synapse:</p>
-<pre><code class="language-bash">./synctl restart
+<pre><code class="language-bash">synctl restart
 </code></pre>
 </li>
 </ol>
@@ -259,6 +259,25 @@ wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-sy
 dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
+</ul>
+<h1 id="upgrading-to-v1550"><a class="header" href="#upgrading-to-v1550">Upgrading to v1.55.0</a></h1>
+<h2 id="synctl-script-has-been-moved"><a class="header" href="#synctl-script-has-been-moved"><code>synctl</code> script has been moved</a></h2>
+<p>The <code>synctl</code> script
+<a href="https://github.com/matrix-org/synapse/pull/12140">has been made</a> an
+<a href="https://packaging.python.org/en/latest/specifications/entry-points/">entry point</a>
+and no longer exists at the root of Synapse's source tree. If you wish to use
+<code>synctl</code> to manage your homeserver, you should invoke <code>synctl</code> directly, e.g. 
+<code>synctl start</code> instead of <code>./synctl start</code> or <code>/path/to/synctl start</code>. </p>
+<p>You will need to ensure <code>synctl</code> is on your <code>PATH</code>.</p>
+<ul>
+<li>This is automatically the case when using
+<a href="https://packages.matrix.org/debian/">Debian packages</a> or
+<a href="https://hub.docker.com/r/matrixdotorg/synapse">docker images</a>
+provided by Matrix.org.</li>
+<li>When installing from a wheel, sdist, or PyPI, a <code>synctl</code> executable is added 
+to your Python installation's <code>bin</code>. This should be on your <code>PATH</code>
+automatically, though you might need to activate a virtual environment
+depending on how you installed Synapse.</li>
 </ul>
 <h1 id="upgrading-to-v1540"><a class="header" href="#upgrading-to-v1540">Upgrading to v1.54.0</a></h1>
 <h2 id="legacy-structured-logging-configuration-removal"><a class="header" href="#legacy-structured-logging-configuration-removal">Legacy structured logging configuration removal</a></h2>

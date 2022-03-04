@@ -387,8 +387,9 @@ turn_allow_guests: True
 <p>After updating the homeserver configuration, you must restart synapse:</p>
 <ul>
 <li>If you use synctl:
-<pre><code class="language-sh">cd /where/you/run/synapse
-./synctl restart
+<pre><code class="language-sh"># Depending on how Synapse is installed, synctl may already be on
+# your PATH. If not, you may need to activate a virtual environment.
+synctl restart
 </code></pre>
 </li>
 <li>If you use systemd:

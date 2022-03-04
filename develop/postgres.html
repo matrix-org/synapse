@@ -309,9 +309,9 @@ space on disk after porting to Postgres.</p>
 <p>Firstly, shut down the currently running synapse server and copy its
 database file (typically <code>homeserver.db</code>) to another location. Once the
 copy is complete, restart synapse. For instance:</p>
-<pre><code class="language-sh">./synctl stop
+<pre><code class="language-sh">synctl stop
 cp homeserver.db homeserver.db.snapshot
-./synctl start
+synctl start
 </code></pre>
 <p>Copy the old config file into a new config file:</p>
 <pre><code class="language-sh">cp homeserver.yaml homeserver-postgres.yaml
@@ -334,10 +334,10 @@ run:</p>
 </code></pre>
 <p>Once that has completed, change the synapse config to point at the
 PostgreSQL database configuration file <code>homeserver-postgres.yaml</code>:</p>
-<pre><code class="language-sh">./synctl stop
+<pre><code class="language-sh">synctl stop
 mv homeserver.yaml homeserver-old-sqlite.yaml
 mv homeserver-postgres.yaml homeserver.yaml
-./synctl start
+synctl start
 </code></pre>
 <p>Synapse should now be running against PostgreSQL.</p>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>

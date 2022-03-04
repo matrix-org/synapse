@@ -795,9 +795,9 @@ space on disk after porting to Postgres.</p>
 <p>Firstly, shut down the currently running synapse server and copy its
 database file (typically <code>homeserver.db</code>) to another location. Once the
 copy is complete, restart synapse. For instance:</p>
-<pre><code class="language-sh">./synctl stop
+<pre><code class="language-sh">synctl stop
 cp homeserver.db homeserver.db.snapshot
-./synctl start
+synctl start
 </code></pre>
 <p>Copy the old config file into a new config file:</p>
 <pre><code class="language-sh">cp homeserver.yaml homeserver-postgres.yaml
@@ -820,10 +820,10 @@ run:</p>
 </code></pre>
 <p>Once that has completed, change the synapse config to point at the
 PostgreSQL database configuration file <code>homeserver-postgres.yaml</code>:</p>
-<pre><code class="language-sh">./synctl stop
+<pre><code class="language-sh">synctl stop
 mv homeserver.yaml homeserver-old-sqlite.yaml
 mv homeserver-postgres.yaml homeserver.yaml
-./synctl start
+synctl start
 </code></pre>
 <p>Synapse should now be running against PostgreSQL.</p>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
@@ -1374,8 +1374,9 @@ turn_allow_guests: True
 <p>After updating the homeserver configuration, you must restart synapse:</p>
 <ul>
 <li>If you use synctl:
-<pre><code class="language-sh">cd /where/you/run/synapse
-./synctl restart
+<pre><code class="language-sh"># Depending on how Synapse is installed, synctl may already be on
+# your PATH. If not, you may need to activate a virtual environment.
+synctl restart
 </code></pre>
 </li>
 <li>If you use systemd:
@@ -1603,7 +1604,7 @@ pip install --upgrade .
 </li>
 <li>
 <p>Restart Synapse:</p>
-<pre><code class="language-bash">./synctl restart
+<pre><code class="language-bash">synctl restart
 </code></pre>
 </li>
 </ol>
@@ -1637,6 +1638,25 @@ wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-sy
 dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
+</ul>
+<h1 id="upgrading-to-v1550"><a class="header" href="#upgrading-to-v1550">Upgrading to v1.55.0</a></h1>
+<h2 id="synctl-script-has-been-moved"><a class="header" href="#synctl-script-has-been-moved"><code>synctl</code> script has been moved</a></h2>
+<p>The <code>synctl</code> script
+<a href="https://github.com/matrix-org/synapse/pull/12140">has been made</a> an
+<a href="https://packaging.python.org/en/latest/specifications/entry-points/">entry point</a>
+and no longer exists at the root of Synapse's source tree. If you wish to use
+<code>synctl</code> to manage your homeserver, you should invoke <code>synctl</code> directly, e.g. 
+<code>synctl start</code> instead of <code>./synctl start</code> or <code>/path/to/synctl start</code>. </p>
+<p>You will need to ensure <code>synctl</code> is on your <code>PATH</code>.</p>
+<ul>
+<li>This is automatically the case when using
+<a href="https://packages.matrix.org/debian/">Debian packages</a> or
+<a href="https://hub.docker.com/r/matrixdotorg/synapse">docker images</a>
+provided by Matrix.org.</li>
+<li>When installing from a wheel, sdist, or PyPI, a <code>synctl</code> executable is added 
+to your Python installation's <code>bin</code>. This should be on your <code>PATH</code>
+automatically, though you might need to activate a virtual environment
+depending on how you installed Synapse.</li>
 </ul>
 <h1 id="upgrading-to-v1540"><a class="header" href="#upgrading-to-v1540">Upgrading to v1.54.0</a></h1>
 <h2 id="legacy-structured-logging-configuration-removal"><a class="header" href="#legacy-structured-logging-configuration-removal">Legacy structured logging configuration removal</a></h2>
