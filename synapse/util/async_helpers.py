@@ -578,7 +578,7 @@ class ReadWriteLock:
                     # `new_defer` must only resolve once all previous readers and
                     # writers have finished.
                     # NB: `release()` won't have a logcontext in this path.
-                    to_wait_on_defer.addCallback(lambda _: release())
+                    to_wait_on_defer.addBoth(lambda _: release())
 
         return _ctx_manager()
 
