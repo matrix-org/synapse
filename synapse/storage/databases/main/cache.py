@@ -197,11 +197,11 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self.get_invited_rooms_for_local_user.invalidate((state_key,))
 
         if relates_to:
-            self.get_relations_for_event.invalidate((event_id,))
-            self.get_aggregation_groups_for_event.invalidate((event_id,))
-            self.get_applicable_edit.invalidate((event_id,))
-            self.get_thread_summary.invalidate((event_id,))
-            self.get_thread_participated.invalidate((event_id,))
+            self.get_relations_for_event.invalidate((relates_to,))
+            self.get_aggregation_groups_for_event.invalidate((relates_to,))
+            self.get_applicable_edit.invalidate((relates_to,))
+            self.get_thread_summary.invalidate((relates_to,))
+            self.get_thread_participated.invalidate((relates_to,))
 
     async def invalidate_cache_and_stream(self, cache_name: str, keys: Tuple[Any, ...]):
         """Invalidates the cache and adds it to the cache stream so slaves
