@@ -23,6 +23,99 @@ from tests import unittest
 
 
 class ReadWriteLockTestCase(unittest.TestCase):
+    def _start_reader_or_writer(
+        self,
+        read_or_write: Callable[[str], AsyncContextManager],
+        key: str,
+        return_value: str,
+    ) -> Tuple["Deferred[str]", "Deferred[None]", "Deferred[None]"]:
+        """Starts a reader or writer which acquires the lock, blocks, then completes.
+
+        Args:
+            read_or_write: A function returning a context manager for a lock.
+                Either a bound `ReadWriteLock.read` or `ReadWriteLock.write`.
+            key: The key to read or write.
+            return_value: A string that the reader or writer will resolve with when
+                done.
+
+        Returns:
+            A tuple of three `Deferred`s:
+             * A `Deferred` that resolves with `return_value` once the reader or writer
+               completes successfully.
+             * A `Deferred` that resolves once the reader or writer acquires the lock.
+             * A `Deferred` that blocks the reader or writer. Must be resolved by the
+               caller to allow the reader or writer to release the lock and complete.
+        """
+        acquired_d: "Deferred[None]" = Deferred()
+        unblock_d: "Deferred[None]" = Deferred()
+
+        async def reader_or_writer():
+            async with read_or_write(key):
+                acquired_d.callback(None)
+                await unblock_d
+            return return_value
+
+        d = defer.ensureDeferred(reader_or_writer())
+        return d, acquired_d, unblock_d
+
+    def _start_blocking_reader(
+        self, rwlock: ReadWriteLock, key: str, return_value: str
+    ) -> Tuple["Deferred[str]", "Deferred[None]", "Deferred[None]"]:
+        """Starts a reader which acquires the lock, blocks, then releases the lock.
+
+        See the docstring for `_start_reader_or_writer` for details about the arguments
+        and return values.
+        """
+        return self._start_reader_or_writer(rwlock.read, key, return_value)
+
+    def _start_blocking_writer(
+        self, rwlock: ReadWriteLock, key: str, return_value: str
+    ) -> Tuple["Deferred[str]", "Deferred[None]", "Deferred[None]"]:
+        """Starts a writer which acquires the lock, blocks, then releases the lock.
+
+        See the docstring for `_start_reader_or_writer` for details about the arguments
+        and return values.
+        """
+        return self._start_reader_or_writer(rwlock.write, key, return_value)
+
+    def _start_nonblocking_reader(
+        self, rwlock: ReadWriteLock, key: str, return_value: str
+    ) -> Tuple["Deferred[str]", "Deferred[None]"]:
+        """Starts a reader which acquires the lock, then releases it immediately.
+
+        See the docstring for `_start_reader_or_writer` for details about the arguments.
+
+        Returns:
+            A tuple of two `Deferred`s:
+             * A `Deferred` that resolves with `return_value` once the reader completes
+               successfully.
+             * A `Deferred` that resolves once the reader acquires the lock.
+        """
+        d, acquired_d, unblock_d = self._start_reader_or_writer(
+            rwlock.read, key, return_value
+        )
+        unblock_d.callback(None)
+        return d, acquired_d
+
+    def _start_nonblocking_writer(
+        self, rwlock: ReadWriteLock, key: str, return_value: str
+    ) -> Tuple["Deferred[str]", "Deferred[None]"]:
+        """Starts a writer which acquires the lock, then releases it immediately.
+
+        See the docstring for `_start_reader_or_writer` for details about the arguments.
+
+        Returns:
+            A tuple of two `Deferred`s:
+             * A `Deferred` that resolves with `return_value` once the writer completes
+               successfully.
+             * A `Deferred` that resolves once the writer acquires the lock.
+        """
+        d, acquired_d, unblock_d = self._start_reader_or_writer(
+            rwlock.write, key, return_value
+        )
+        unblock_d.callback(None)
+        return d, acquired_d
+
     def _assert_called_before_not_after(self, lst, first_false):
         for i, d in enumerate(lst[:first_false]):
             self.assertTrue(d.called, msg="%d was unexpectedly false" % i)
@@ -36,33 +129,19 @@ class ReadWriteLockTestCase(unittest.TestCase):
         rwlock = ReadWriteLock()
         key = "key"
 
-        def start_reader_or_writer(
-            read_or_write: Callable[[str], AsyncContextManager]
-        ) -> Tuple["Deferred[None]", "Deferred[None]"]:
-            acquired_d: "Deferred[None]" = Deferred()
-            release_d: "Deferred[None]" = Deferred()
-
-            async def action():
-                async with read_or_write(key):
-                    acquired_d.callback(None)
-                    await release_d
-
-            defer.ensureDeferred(action())
-            return acquired_d, release_d
-
         ds = [
-            start_reader_or_writer(rwlock.read),  # 0
-            start_reader_or_writer(rwlock.read),  # 1
-            start_reader_or_writer(rwlock.write),  # 2
-            start_reader_or_writer(rwlock.write),  # 3
-            start_reader_or_writer(rwlock.read),  # 4
-            start_reader_or_writer(rwlock.read),  # 5
-            start_reader_or_writer(rwlock.write),  # 6
+            self._start_blocking_reader(rwlock, key, "0"),
+            self._start_blocking_reader(rwlock, key, "1"),
+            self._start_blocking_writer(rwlock, key, "2"),
+            self._start_blocking_writer(rwlock, key, "3"),
+            self._start_blocking_reader(rwlock, key, "4"),
+            self._start_blocking_reader(rwlock, key, "5"),
+            self._start_blocking_writer(rwlock, key, "6"),
         ]
         # `Deferred`s that resolve when each reader or writer acquires the lock.
-        acquired_ds = [acquired_d for acquired_d, _release_d in ds]
+        acquired_ds = [acquired_d for _, acquired_d, _ in ds]
         # `Deferred`s that will trigger the release of locks when resolved.
-        release_ds = [release_d for _acquired_d, release_d in ds]
+        release_ds = [release_d for _, _, release_d in ds]
 
         self._assert_called_before_not_after(acquired_ds, 2)
 
@@ -92,62 +171,19 @@ class ReadWriteLockTestCase(unittest.TestCase):
 
         release_ds[6].callback(None)
 
-        acquired_d, release_d = start_reader_or_writer(rwlock.write)
+        _, acquired_d = self._start_nonblocking_writer(rwlock, key, "last writer")
         self.assertTrue(acquired_d.called)
-        release_d.callback(None)
 
-        acquired_d, release_d = start_reader_or_writer(rwlock.read)
+        _, acquired_d = self._start_nonblocking_reader(rwlock, key, "last reader")
         self.assertTrue(acquired_d.called)
-        release_d.callback(None)
-
-    def _start_reader_or_writer(
-        self,
-        read_or_write: Callable[[str], AsyncContextManager],
-        key: str,
-        name: str,
-    ) -> Tuple["Deferred[None]", "Deferred[None]"]:
-        """Starts a reader or writer which acquires the lock, blocks, then completes."""
-        unblock_d: "Deferred[None]" = Deferred()
-
-        async def reader_or_writer():
-            async with read_or_write(key):
-                await unblock_d
-            return f"{name} completed"
-
-        d = defer.ensureDeferred(reader_or_writer())
-        return d, unblock_d
-
-    def _start_blocking_reader(
-        self, rwlock: ReadWriteLock, key: str, name: str
-    ) -> Tuple["Deferred[None]", "Deferred[None]"]:
-        """Starts a reader which acquires the lock, blocks, then releases the lock."""
-        return self._start_reader_or_writer(rwlock.read, key, name)
-
-    def _start_blocking_writer(
-        self, rwlock: ReadWriteLock, key: str, name: str
-    ) -> Tuple["Deferred[None]", "Deferred[None]"]:
-        """Starts a writer which acquires the lock, blocks, then releases the lock."""
-        return self._start_reader_or_writer(rwlock.write, key, name)
-
-    def _start_nonblocking_reader(self, rwlock: ReadWriteLock, key: str, name: str):
-        """Starts a reader which acquires the lock, then releases it immediately."""
-        d, unblock_d = self._start_reader_or_writer(rwlock.read, key, name)
-        unblock_d.callback(None)
-        return d
-
-    def _start_nonblocking_writer(self, rwlock: ReadWriteLock, key: str, name: str):
-        """Starts a writer which acquires the lock, then releases it immediately."""
-        d, unblock_d = self._start_reader_or_writer(rwlock.write, key, name)
-        unblock_d.callback(None)
-        return d
 
     def test_lock_handoff_to_nonblocking_writer(self):
         """Test a writer handing the lock to another writer that completes instantly."""
         rwlock = ReadWriteLock()
         key = "key"
 
-        d1, unblock = self._start_blocking_writer(rwlock, key, "write 1")
-        d2 = self._start_nonblocking_writer(rwlock, key, "write 2")
+        d1, _, unblock = self._start_blocking_writer(rwlock, key, "write 1 completed")
+        d2, _ = self._start_nonblocking_writer(rwlock, key, "write 2 completed")
         self.assertFalse(d1.called)
         self.assertFalse(d2.called)
 
@@ -157,7 +193,7 @@ class ReadWriteLockTestCase(unittest.TestCase):
         self.assertTrue(d2.called)
 
         # The `ReadWriteLock` should operate as normal.
-        d3 = self._start_nonblocking_writer(rwlock, key, "write 3")
+        d3, _ = self._start_nonblocking_writer(rwlock, key, "write 3 completed")
         self.assertTrue(d3.called)
 
     def test_cancellation_while_holding_read_lock(self):
@@ -170,10 +206,10 @@ class ReadWriteLockTestCase(unittest.TestCase):
         key = "key"
 
         # 1. A reader takes the lock and blocks.
-        reader_d, _ = self._start_blocking_reader(rwlock, key, "read")
+        reader_d, _, _ = self._start_blocking_reader(rwlock, key, "read completed")
 
         # 2. A writer waits for the reader to complete.
-        writer_d = self._start_nonblocking_writer(rwlock, key, "write")
+        writer_d, _ = self._start_nonblocking_writer(rwlock, key, "write completed")
         self.assertFalse(writer_d.called)
 
         # 3. The reader is cancelled.
@@ -196,10 +232,10 @@ class ReadWriteLockTestCase(unittest.TestCase):
         key = "key"
 
         # 1. A writer takes the lock and blocks.
-        writer_d, _ = self._start_blocking_writer(rwlock, key, "write")
+        writer_d, _, _ = self._start_blocking_writer(rwlock, key, "write completed")
 
         # 2. A reader waits for the writer to complete.
-        reader_d = self._start_nonblocking_reader(rwlock, key, "read")
+        reader_d, _ = self._start_nonblocking_reader(rwlock, key, "read completed")
         self.assertFalse(reader_d.called)
 
         # 3. The writer is cancelled.
@@ -228,15 +264,17 @@ class ReadWriteLockTestCase(unittest.TestCase):
         key = "key"
 
         # 1. A writer takes the lock and blocks.
-        writer1_d, unblock_writer1 = self._start_blocking_writer(rwlock, key, "write 1")
+        writer1_d, _, unblock_writer1 = self._start_blocking_writer(
+            rwlock, key, "write 1 completed"
+        )
 
         # 2. A reader waits for the first writer to complete.
         #    This reader will be cancelled later.
-        reader_d = self._start_nonblocking_reader(rwlock, key, "read")
+        reader_d, _ = self._start_nonblocking_reader(rwlock, key, "read completed")
         self.assertFalse(reader_d.called)
 
         # 3. A second writer waits for both the first writer and the reader to complete.
-        writer2_d = self._start_nonblocking_writer(rwlock, key, "write 2")
+        writer2_d, _ = self._start_nonblocking_writer(rwlock, key, "write 2 completed")
         self.assertFalse(writer2_d.called)
 
         # 4. The waiting reader is cancelled.
@@ -277,18 +315,22 @@ class ReadWriteLockTestCase(unittest.TestCase):
         key = "key"
 
         # 1. A reader takes the lock and blocks.
-        reader_d, unblock_reader = self._start_blocking_reader(rwlock, key, "read")
+        reader_d, _, unblock_reader = self._start_blocking_reader(
+            rwlock, key, "read completed"
+        )
 
         # 2. A writer waits for the reader to complete.
-        writer1_d, unblock_writer1 = self._start_blocking_writer(rwlock, key, "write 1")
+        writer1_d, _, unblock_writer1 = self._start_blocking_writer(
+            rwlock, key, "write 1 completed"
+        )
 
         # 3. A second writer waits for both the reader and first writer to complete.
         #    This writer will be cancelled later.
-        writer2_d = self._start_nonblocking_writer(rwlock, key, "write 2")
+        writer2_d, _ = self._start_nonblocking_writer(rwlock, key, "write 2 completed")
         self.assertFalse(writer2_d.called)
 
         # 4. A third writer waits for the second writer to complete.
-        writer3_d = self._start_nonblocking_writer(rwlock, key, "write 3")
+        writer3_d, _ = self._start_nonblocking_writer(rwlock, key, "write 3 completed")
         self.assertFalse(writer3_d.called)
 
         # 5. The second writer is cancelled.
