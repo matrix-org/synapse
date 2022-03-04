@@ -508,15 +508,15 @@ class ReadWriteLock:
         self.key_to_current_writer: Dict[str, defer.Deferred] = {}
 
     def read(self, key: str) -> AsyncContextManager:
-        new_defer: "defer.Deferred[None]" = defer.Deferred()
-
-        curr_readers = self.key_to_current_readers.setdefault(key, set())
-        curr_writer = self.key_to_current_writer.get(key, None)
-
-        curr_readers.add(new_defer)
-
         @asynccontextmanager
         async def _ctx_manager() -> AsyncIterator[None]:
+            new_defer: "defer.Deferred[None]" = defer.Deferred()
+
+            curr_readers = self.key_to_current_readers.setdefault(key, set())
+            curr_writer = self.key_to_current_writer.get(key, None)
+
+            curr_readers.add(new_defer)
+
             try:
                 # We wait for the latest writer to finish writing. We can safely ignore
                 # any existing readers... as they're readers.
@@ -534,23 +534,23 @@ class ReadWriteLock:
         return _ctx_manager()
 
     def write(self, key: str) -> AsyncContextManager:
-        new_defer: "defer.Deferred[None]" = defer.Deferred()
-
-        curr_readers = self.key_to_current_readers.get(key, set())
-        curr_writer = self.key_to_current_writer.get(key, None)
-
-        # We wait on all latest readers and writer.
-        to_wait_on = list(curr_readers)
-        if curr_writer:
-            to_wait_on.append(curr_writer)
-
-        # We can clear the list of current readers since `new_defer` waits
-        # for them to finish.
-        curr_readers.clear()
-        self.key_to_current_writer[key] = new_defer
-
         @asynccontextmanager
         async def _ctx_manager() -> AsyncIterator[None]:
+            new_defer: "defer.Deferred[None]" = defer.Deferred()
+
+            curr_readers = self.key_to_current_readers.get(key, set())
+            curr_writer = self.key_to_current_writer.get(key, None)
+
+            # We wait on all latest readers and writer.
+            to_wait_on = list(curr_readers)
+            if curr_writer:
+                to_wait_on.append(curr_writer)
+
+            # We can clear the list of current readers since `new_defer` waits
+            # for them to finish.
+            curr_readers.clear()
+            self.key_to_current_writer[key] = new_defer
+
             to_wait_on_defer = defer.gatherResults(to_wait_on)
             try:
                 # Wait for all current readers and the latest writer to finish.
