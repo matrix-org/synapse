@@ -1576,7 +1576,7 @@ docs = ["sphinx", "repoze.sphinx.autointerface"]
 test = ["zope.i18nmessageid", "zope.testing", "zope.testrunner"]
 
 [extras]
-all = ["matrix-synapse-ldap3", "opentracing"]
+all = ["matrix-synapse-ldap3", "psycopg2", "psycopg2cffi", "psycopg2cffi-compat", "pysaml2", "authlib", "lxml", "sentry-sdk", "jaeger-client", "opentracing", "pyjwt", "txredisapi", "hiredis"]
 cache_memory = ["Pympler"]
 jwt = ["pyjwt"]
 matrix-synapse-ldap3 = ["matrix-synapse-ldap3"]
@@ -1593,7 +1593,7 @@ url_preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "e08406f439d4087207f802ea57171503eba86641a81cf61464e36ebcee465929"
+content-hash = "92465e65bef59c43c6112f332e5cf987740899801dbd34c19245db15b5c6362d"
 
 [metadata.files]
 appdirs = [
