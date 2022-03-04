@@ -59,23 +59,23 @@ jobs:
       matrix:
         python-version: ["3.7", "3.8", "3.9", "3.10"]
         database: ["sqlite"]
-        toxenv: ["py"]
+        extras: ["all"]
         include:
           # Newest Python without optional deps
           - python-version: "3.10"
-            toxenv: "py-noextras"
+            extras: ""
 
           # Oldest Python with PostgreSQL
           - python-version: "3.7"
             database: "postgres"
             postgres-version: "10"
-            toxenv: "py"
+            extras: "all"
 
           # Newest Python with newest PostgreSQL
           - python-version: "3.10"
             database: "postgres"
             postgres-version: "14"
-            toxenv: "py"
+            extras: "all"
 
     steps:
       - uses: actions/checkout@v2
@@ -87,17 +87,16 @@ jobs:
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_INITDB_ARGS="--lc-collate C --lc-ctype C --encoding UTF8" \
             postgres:${{ matrix.postgres-version }}
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@dmr/try-extras
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install tox
+          extras: ${{ matrix.extras }}
       - name: Await PostgreSQL
         if: ${{ matrix.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
-      - run: tox -e ${{ matrix.toxenv }}
+      - run: poetry run trial --jobs=2 tests
         env:
-          TRIAL_FLAGS: "--jobs=2"
           SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
           SYNAPSE_POSTGRES_HOST: localhost
           SYNAPSE_POSTGRES_USER: postgres
@@ -143,23 +142,24 @@ jobs:
 
   trial-pypy:
     # Very slow; only run if the branch name includes 'pypy'
+    # Note: sqlite only; no postgres
     if: ${{ contains(github.ref, 'pypy') && !failure() && !cancelled() }}
     needs: linting-done
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["pypy-3.7"]
+        extras: [""]
 
     steps:
       - uses: actions/checkout@v2
+      # TODO: why is this list different from  above?
       - run: sudo apt-get -qq install xmlsec1 libxml2-dev libxslt-dev
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@dmr/try-extras
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install tox
-      - run: tox -e py
-        env:
-          TRIAL_FLAGS: "--jobs=2"
+          extras: ${{ matrix.extras }}
+      - run: poetry run trial --jobs=2 tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
