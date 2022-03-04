@@ -238,8 +238,9 @@ After updating the homeserver configuration, you must restart synapse:
 
   * If you use synctl:
     ```sh
-    cd /where/you/run/synapse
-    ./synctl restart
+    # Depending on how Synapse is installed, synctl may already be on
+    # your PATH. If not, you may need to activate a virtual environment.
+    synctl restart
     ```
   * If you use systemd:
     ```sh

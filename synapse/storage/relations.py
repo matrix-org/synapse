@@ -55,37 +55,6 @@ class PaginationChunk:
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)
-class RelationPaginationToken:
-    """Pagination token for relation pagination API.
-
-    As the results are in topological order, we can use the
-    `topological_ordering` and `stream_ordering` fields of the events at the
-    boundaries of the chunk as pagination tokens.
-
-    Attributes:
-        topological: The topological ordering of the boundary event
-        stream: The stream ordering of the boundary event.
-    """
-
-    topological: int
-    stream: int
-
-    @staticmethod
-    def from_string(string: str) -> "RelationPaginationToken":
-        try:
-            t, s = string.split("-")
-            return RelationPaginationToken(int(t), int(s))
-        except ValueError:
-            raise SynapseError(400, "Invalid relation pagination token")
-
-    async def to_string(self, store: "DataStore") -> str:
-        return "%d-%d" % (self.topological, self.stream)
-
-    def as_tuple(self) -> Tuple[Any, ...]:
-        return attr.astuple(self)
-
-
-@attr.s(frozen=True, slots=True, auto_attribs=True)
 class AggregationPaginationToken:
     """Pagination token for relation aggregation pagination API.
 

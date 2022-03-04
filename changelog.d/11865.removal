@@ -1,1 +1,0 @@
-Deprecate using `synctl` with the config option `synctl_cache_factor` and print a warning if a user still uses this option.

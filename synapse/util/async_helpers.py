@@ -41,7 +41,7 @@ from typing import (
 )
 
 import attr
-from typing_extensions import AsyncContextManager
+from typing_extensions import AsyncContextManager, Literal
 
 from twisted.internet import defer
 from twisted.internet.defer import CancelledError
@@ -96,6 +96,10 @@ class ObservableDeferred(Generic[_T], AbstractObservableDeferred[_T]):
     """
 
     __slots__ = ["_deferred", "_observers", "_result"]
+
+    _deferred: "defer.Deferred[_T]"
+    _observers: Union[List["defer.Deferred[_T]"], Tuple[()]]
+    _result: Union[None, Tuple[Literal[True], _T], Tuple[Literal[False], Failure]]
 
     def __init__(self, deferred: "defer.Deferred[_T]", consumeErrors: bool = False):
         object.__setattr__(self, "_deferred", deferred)
@@ -159,12 +163,14 @@ class ObservableDeferred(Generic[_T], AbstractObservableDeferred[_T]):
         effect the underlying deferred.
         """
         if not self._result:
+            assert isinstance(self._observers, list)
             d: "defer.Deferred[_T]" = defer.Deferred()
             self._observers.append(d)
             return d
+        elif self._result[0]:
+            return defer.succeed(self._result[1])
         else:
-            success, res = self._result
-            return defer.succeed(res) if success else defer.fail(res)
+            return defer.fail(self._result[1])
 
     def observers(self) -> "Collection[defer.Deferred[_T]]":
         return self._observers
@@ -176,6 +182,8 @@ class ObservableDeferred(Generic[_T], AbstractObservableDeferred[_T]):
         return self._result is not None and self._result[0] is True
 
     def get_result(self) -> Union[_T, Failure]:
+        if self._result is None:
+            raise ValueError(f"{self!r} has no result yet")
         return self._result[1]
 
     def __getattr__(self, name: str) -> Any:

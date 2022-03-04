@@ -25,7 +25,7 @@ from synapse.appservice import (
     TransactionUnusedFallbackKeys,
 )
 from synapse.events import EventBase
-from synapse.events.utils import serialize_event
+from synapse.events.utils import SerializeEventConfig, serialize_event
 from synapse.http.client import SimpleHttpClient
 from synapse.types import JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
@@ -321,16 +321,18 @@ class ApplicationServiceApi(SimpleHttpClient):
             serialize_event(
                 e,
                 time_now,
-                as_client_event=True,
-                # If this is an invite or a knock membership event, and we're interested
-                # in this user, then include any stripped state alongside the event.
-                include_stripped_room_state=(
-                    e.type == EventTypes.Member
-                    and (
-                        e.membership == Membership.INVITE
-                        or e.membership == Membership.KNOCK
-                    )
-                    and service.is_interested_in_user(e.state_key)
+                config=SerializeEventConfig(
+                    as_client_event=True,
+                    # If this is an invite or a knock membership event, and we're interested
+                    # in this user, then include any stripped state alongside the event.
+                    include_stripped_room_state=(
+                        e.type == EventTypes.Member
+                        and (
+                            e.membership == Membership.INVITE
+                            or e.membership == Membership.KNOCK
+                        )
+                        and service.is_interested_in_user(e.state_key)
+                    ),
                 ),
             )
             for e in events
