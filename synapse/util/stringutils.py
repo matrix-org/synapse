@@ -86,14 +86,17 @@ def parse_server_name(server_name: str) -> Tuple[str, Optional[int]]:
         ValueError if the server name could not be parsed.
     """
     try:
-        if server_name[-1] == "]":
+        if not server_name:
+            # Nothing provided
+            return "", None
+        elif server_name[-1] == "]":
             # ipv6 literal, hopefully
             return server_name, None
-
-        domain_port = server_name.rsplit(":", 1)
-        domain = domain_port[0]
-        port = int(domain_port[1]) if domain_port[1:] else None
-        return domain, port
+        elif ":" not in server_name:
+            # hostname only
+            return server_name, None
+        domain, port = server_name.rsplit(":", 1)
+        return domain, int(port) if port else None
     except Exception:
         raise ValueError("Invalid server name '%s'" % server_name)
 
@@ -123,6 +126,8 @@ def parse_and_validate_server_name(server_name: str) -> Tuple[str, Optional[int]
     # that nobody is sneaking IP literals in that look like hostnames, etc.
 
     # look for ipv6 literals
+    if not host:
+        raise ValueError(f"Server name '{server_name}' has an invalid format.")
     if host[0] == "[":
         if host[-1] != "]":
             raise ValueError("Mismatched [...] in server name '%s'" % (server_name,))
