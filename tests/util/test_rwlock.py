@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import AsyncContextManager, Callable, Tuple
+from typing import AsyncContextManager, Callable, Sequence, Tuple
 
 from twisted.internet import defer
 from twisted.internet.defer import CancelledError, Deferred
@@ -116,13 +116,22 @@ class ReadWriteLockTestCase(unittest.TestCase):
         unblock_d.callback(None)
         return d, acquired_d
 
-    def _assert_called_before_not_after(self, lst, first_false):
-        for i, d in enumerate(lst[:first_false]):
-            self.assertTrue(d.called, msg="%d was unexpectedly false" % i)
+    def _assert_first_n_resolved(
+        self, deferreds: Sequence["defer.Deferred[None]"], n: int
+    ) -> None:
+        """Assert that exactly the first n `Deferred`s in the given list are resolved.
 
-        for i, d in enumerate(lst[first_false:]):
+        Args:
+            deferreds: The list of `Deferred`s to be checked.
+            n: The number of `Deferred`s at the start of `deferreds` that should be
+                resolved.
+        """
+        for i, d in enumerate(deferreds[:n]):
+            self.assertTrue(d.called, msg="deferred %d was unexpectedly unresolved" % i)
+
+        for i, d in enumerate(deferreds[n:]):
             self.assertFalse(
-                d.called, msg="%d was unexpectedly true" % (i + first_false)
+                d.called, msg="deferred %d was unexpectedly resolved" % (i + n)
             )
 
     def test_rwlock(self):
@@ -143,34 +152,45 @@ class ReadWriteLockTestCase(unittest.TestCase):
         # `Deferred`s that will trigger the release of locks when resolved.
         release_ds = [release_d for _, _, release_d in ds]
 
-        self._assert_called_before_not_after(acquired_ds, 2)
+        # The first two readers should acquire their locks.
+        self._assert_first_n_resolved(acquired_ds, 2)
 
-        self._assert_called_before_not_after(acquired_ds, 2)
+        # Release one of the read locks. The next writer should not acquire the lock,
+        # because there is another reader holding the lock.
+        self._assert_first_n_resolved(acquired_ds, 2)
         release_ds[0].callback(None)
-        self._assert_called_before_not_after(acquired_ds, 2)
+        self._assert_first_n_resolved(acquired_ds, 2)
 
-        self._assert_called_before_not_after(acquired_ds, 2)
+        # Release the other read lock. The next writer should acquire the lock.
+        self._assert_first_n_resolved(acquired_ds, 2)
         release_ds[1].callback(None)
-        self._assert_called_before_not_after(acquired_ds, 3)
+        self._assert_first_n_resolved(acquired_ds, 3)
 
-        self._assert_called_before_not_after(acquired_ds, 3)
+        # Release the write lock. The next writer should acquire the lock.
+        self._assert_first_n_resolved(acquired_ds, 3)
         release_ds[2].callback(None)
-        self._assert_called_before_not_after(acquired_ds, 4)
+        self._assert_first_n_resolved(acquired_ds, 4)
 
-        self._assert_called_before_not_after(acquired_ds, 4)
+        # Release the write lock. The next two readers should acquire locks.
+        self._assert_first_n_resolved(acquired_ds, 4)
         release_ds[3].callback(None)
-        self._assert_called_before_not_after(acquired_ds, 6)
+        self._assert_first_n_resolved(acquired_ds, 6)
 
-        self._assert_called_before_not_after(acquired_ds, 6)
+        # Release one of the read locks. The next writer should not acquire the lock,
+        # because there is another reader holding the lock.
+        self._assert_first_n_resolved(acquired_ds, 6)
         release_ds[5].callback(None)
-        self._assert_called_before_not_after(acquired_ds, 6)
+        self._assert_first_n_resolved(acquired_ds, 6)
 
-        self._assert_called_before_not_after(acquired_ds, 6)
+        # Release the other read lock. The next writer should acquire the lock.
+        self._assert_first_n_resolved(acquired_ds, 6)
         release_ds[4].callback(None)
-        self._assert_called_before_not_after(acquired_ds, 7)
+        self._assert_first_n_resolved(acquired_ds, 7)
 
+        # Release the write lock.
         release_ds[6].callback(None)
 
+        # Acquire and release the write and read locks one last time for good measure.
         _, acquired_d = self._start_nonblocking_writer(rwlock, key, "last writer")
         self.assertTrue(acquired_d.called)
 
