@@ -341,7 +341,6 @@ class SyncKnockTestCase(
             hs, self.room_id, self.user_id
         )
 
-    @override_config({"experimental_features": {"msc2403_enabled": True}})
     def test_knock_room_state(self) -> None:
         """Tests that /sync returns state from a room after knocking on it."""
         # Knock on a room
