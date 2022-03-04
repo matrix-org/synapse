@@ -395,7 +395,7 @@ jobs:
       - trial
       - trial-olddeps
       - sytest
-      - export_data
+      - export-data
       - portdb
       - complement
     runs-on: ubuntu-latest
