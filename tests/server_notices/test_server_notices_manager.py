@@ -87,11 +87,12 @@ class TestServiceNoticeManager(unittest.HomeserverTestCase):
         )
 
         self.server_notices_manager._room_member_handler.update_membership.assert_called_once()
-        call_args_content = self.server_notices_manager._room_member_handler.update_membership.call_args.kwargs[
-            "content"
-        ]
+        (
+            _,
+            kwargs,
+        ) = self.server_notices_manager._room_member_handler.update_membership.call_args
 
-        assert call_args_content == {
+        assert kwargs["content"] == {
             "displayname": self.hs.config.servernotices.server_notices_mxid_display_name,
             "avatar_url": self.hs.config.servernotices.server_notices_mxid_avatar_url,
         }
@@ -120,11 +121,12 @@ class TestServiceNoticeManager(unittest.HomeserverTestCase):
         )
 
         self.server_notices_manager._room_member_handler.update_membership.assert_called_once()
-        call_args_content = self.server_notices_manager._room_member_handler.update_membership.call_args.kwargs[
-            "content"
-        ]
+        (
+            _,
+            kwargs,
+        ) = self.server_notices_manager._room_member_handler.update_membership.call_args
 
-        assert call_args_content == {
+        assert kwargs["content"] == {
             "displayname": self.hs.config.servernotices.server_notices_mxid_display_name,
             "avatar_url": self.hs.config.servernotices.server_notices_mxid_avatar_url,
         }
