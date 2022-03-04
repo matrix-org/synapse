@@ -28,8 +28,9 @@ if sys.version_info < (3, 7):
 # Allow using the asyncio reactor via env var.
 if bool(os.environ.get("SYNAPSE_ASYNC_IO_REACTOR", False)):
     try:
-        import twisted
         from incremental import Version
+
+        import twisted
 
         # We need a bugfix that is included in Twisted 21.2.0:
         # https://twistedmatrix.com/trac/ticket/9787
