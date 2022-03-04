@@ -14,14 +14,11 @@
 # limitations under the License.
 
 """Tests REST events for /rooms paths."""
-from typing import Any
-from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.rest.client import room
 from synapse.server import HomeServer
-from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import UserID
 from synapse.util import Clock
 
@@ -39,35 +36,8 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
     servlets = [room.register_servlets]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
-        hs = self.setup_test_homeserver(
-            "red",
-            federation_http_client=None,
-            federation_client=Mock(),
-        )
-
+        hs = self.setup_test_homeserver("red")
         self.event_source = hs.get_event_sources().sources.typing
-
-        hs.get_federation_handler = Mock()  # type: ignore[assignment]
-
-        async def get_user_by_access_token(
-            token: str,
-            rights: str = "access",
-            allow_expired: bool = False,
-        ) -> TokenLookupResult:
-            return TokenLookupResult(
-                user_id=self.user_id,
-                is_guest=False,
-                token_id=1,
-            )
-
-        hs.get_auth().get_user_by_access_token = get_user_by_access_token  # type: ignore[assignment]
-
-        async def _insert_client_ip(*args: Any, **kwargs: Any) -> None:
-            return None
-
-        hs.get_datastores().main.insert_client_ip = _insert_client_ip  # type: ignore[assignment]
-
         return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:

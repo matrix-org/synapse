@@ -1,0 +1,1 @@
+Use the proper serialization format for bundled thread aggregations. The bug has existed since Synapse v1.48.0.
