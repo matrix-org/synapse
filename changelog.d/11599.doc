@@ -1,1 +1,0 @@
-Document support for the `to_device`, `account_data`, `receipts`, and `presence` stream writers for workers.

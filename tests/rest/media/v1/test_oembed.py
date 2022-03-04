@@ -16,7 +16,7 @@ import json
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.rest.media.v1.oembed import OEmbedProvider
+from synapse.rest.media.v1.oembed import OEmbedProvider, OEmbedResult
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
@@ -25,15 +25,15 @@ from tests.unittest import HomeserverTestCase
 
 
 class OEmbedTests(HomeserverTestCase):
-    def prepare(self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer):
-        self.oembed = OEmbedProvider(homeserver)
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.oembed = OEmbedProvider(hs)
 
-    def parse_response(self, response: JsonDict):
+    def parse_response(self, response: JsonDict) -> OEmbedResult:
         return self.oembed.parse_oembed_response(
             "https://test", json.dumps(response).encode("utf-8")
         )
 
-    def test_version(self):
+    def test_version(self) -> None:
         """Accept versions that are similar to 1.0 as a string or int (or missing)."""
         for version in ("1.0", 1.0, 1):
             result = self.parse_response({"version": version, "type": "link"})

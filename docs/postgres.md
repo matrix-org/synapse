@@ -153,9 +153,9 @@ database file (typically `homeserver.db`) to another location. Once the
 copy is complete, restart synapse. For instance:
 
 ```sh
-./synctl stop
+synctl stop
 cp homeserver.db homeserver.db.snapshot
-./synctl start
+synctl start
 ```
 
 Copy the old config file into a new config file:
@@ -192,10 +192,10 @@ Once that has completed, change the synapse config to point at the
 PostgreSQL database configuration file `homeserver-postgres.yaml`:
 
 ```sh
-./synctl stop
+synctl stop
 mv homeserver.yaml homeserver-old-sqlite.yaml
 mv homeserver-postgres.yaml homeserver.yaml
-./synctl start
+synctl start
 ```
 
 Synapse should now be running against PostgreSQL.

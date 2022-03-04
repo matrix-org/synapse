@@ -1,4 +1,3 @@
-include synctl
 include LICENSE
 include VERSION
 include *.rst
@@ -52,5 +51,4 @@ prune contrib
 prune debian
 prune demo/etc
 prune docker
-prune snap
 prune stubs
