@@ -506,7 +506,7 @@ class DeviceHandler(DeviceWorkerHandler):
                 "Sending device list update notif for %r to: %r", user_id, hosts
             )
             for host in hosts:
-                self.federation_sender.send_device_messages(host)
+                self.federation_sender.send_device_messages(host, immediate=False)
                 log_kv({"message": "sent device update to host", "host": host})
 
     async def notify_user_signature_update(
