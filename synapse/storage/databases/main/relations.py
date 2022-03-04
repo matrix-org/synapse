@@ -91,14 +91,6 @@ class RelationsWorkerStore(SQLBaseStore):
 
         self._msc3440_enabled = hs.config.experimental.msc3440_enabled
 
-    def _invalidate_relations_for_event(self, event_id: str) -> None:
-        """Invalidate the relation caches for an event."""
-        self.get_relations_for_event.invalidate((event_id,))
-        self.get_aggregation_groups_for_event.invalidate((event_id,))
-        self.get_applicable_edit.invalidate((event_id,))
-        self.get_thread_summary.invalidate((event_id,))
-        self.get_thread_participated.invalidate((event_id,))
-
     @cached(tree=True)
     async def get_relations_for_event(
         self,

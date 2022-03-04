@@ -1964,7 +1964,21 @@ class PersistEventsStore:
         )
         # Any relation information for the related events must be cleared.
         if relates_to is not None:
-            txn.call_after(self.store._invalidate_relations_for_event, relates_to)
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_relations_for_event, (relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_aggregation_groups_for_event, (relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_applicable_edit, (relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_thread_summary, (relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_thread_participated, (relates_to,)
+            )
 
         self.db_pool.simple_delete_txn(
             txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
