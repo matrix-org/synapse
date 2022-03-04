@@ -24,8 +24,7 @@ from synapse.api.constants import EventTypes, RelationTypes
 from synapse.rest import admin
 from synapse.rest.client import login, register, relations, room, sync
 from synapse.server import HomeServer
-from synapse.storage.relations import RelationPaginationToken
-from synapse.types import JsonDict, StreamToken
+from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests import unittest
@@ -281,15 +280,6 @@ class RelationsTestCase(BaseRelationsTestCase):
             channel.json_body["chunk"][0],
         )
 
-    def _stream_token_to_relation_token(self, token: str) -> str:
-        """Convert a StreamToken into a legacy token (RelationPaginationToken)."""
-        room_key = self.get_success(StreamToken.from_string(self.store, token)).room_key
-        return self.get_success(
-            RelationPaginationToken(
-                topological=room_key.topological, stream=room_key.stream
-            ).to_string(self.store)
-        )
-
     def test_repeated_paginate_relations(self) -> None:
         """Test that if we paginate using a limit and tokens then we get the
         expected events.
@@ -309,34 +299,6 @@ class RelationsTestCase(BaseRelationsTestCase):
             from_token = ""
             if prev_token:
                 from_token = "&from=" + prev_token
-
-            channel = self.make_request(
-                "GET",
-                f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1{from_token}",
-                access_token=self.user_token,
-            )
-            self.assertEqual(200, channel.code, channel.json_body)
-
-            found_event_ids.extend(e["event_id"] for e in channel.json_body["chunk"])
-            next_batch = channel.json_body.get("next_batch")
-
-            self.assertNotEqual(prev_token, next_batch)
-            prev_token = next_batch
-
-            if not prev_token:
-                break
-
-        # We paginated backwards, so reverse
-        found_event_ids.reverse()
-        self.assertEqual(found_event_ids, expected_event_ids)
-
-        # Reset and try again, but convert the tokens to the legacy format.
-        prev_token = ""
-        found_event_ids = []
-        for _ in range(20):
-            from_token = ""
-            if prev_token:
-                from_token = "&from=" + self._stream_token_to_relation_token(prev_token)
 
             channel = self.make_request(
                 "GET",
@@ -517,39 +479,6 @@ class RelationsTestCase(BaseRelationsTestCase):
             from_token = ""
             if prev_token:
                 from_token = "&from=" + prev_token
-
-            channel = self.make_request(
-                "GET",
-                f"/_matrix/client/unstable/rooms/{self.room}"
-                f"/aggregations/{self.parent_id}/{RelationTypes.ANNOTATION}"
-                f"/m.reaction/{encoded_key}?limit=1{from_token}",
-                access_token=self.user_token,
-            )
-            self.assertEqual(200, channel.code, channel.json_body)
-
-            self.assertEqual(len(channel.json_body["chunk"]), 1, channel.json_body)
-
-            found_event_ids.extend(e["event_id"] for e in channel.json_body["chunk"])
-
-            next_batch = channel.json_body.get("next_batch")
-
-            self.assertNotEqual(prev_token, next_batch)
-            prev_token = next_batch
-
-            if not prev_token:
-                break
-
-        # We paginated backwards, so reverse
-        found_event_ids.reverse()
-        self.assertEqual(found_event_ids, expected_event_ids)
-
-        # Reset and try again, but convert the tokens to the legacy format.
-        prev_token = ""
-        found_event_ids = []
-        for _ in range(20):
-            from_token = ""
-            if prev_token:
-                from_token = "&from=" + self._stream_token_to_relation_token(prev_token)
 
             channel = self.make_request(
                 "GET",
