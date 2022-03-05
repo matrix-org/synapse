@@ -45,6 +45,7 @@ from synapse.http.servlet import (
 )
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import set_tag
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client._base import client_patterns
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.storage.state import StateFilter
@@ -745,6 +746,8 @@ class RoomForgetRestServlet(TransactionRestServlet):
         super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
+        self.store = hs.get_datastores().main
+        self.storage = hs.get_storage()
 
     def register(self, http_server: HttpServer) -> None:
         PATTERNS = "/rooms/(?P<room_id>[^/]*)/forget"
@@ -756,6 +759,14 @@ class RoomForgetRestServlet(TransactionRestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
 
         await self.room_member_handler.forget(user=requester.user, room_id=room_id)
+
+        forgotten = await self.store.is_locally_forgotten_room(room_id)
+        if forgotten:
+            run_as_background_process(
+                "purge_room_after_last_forget",
+                self.storage.purge_events.purge_room,
+                room_id,
+            )
 
         return 200, {}
 

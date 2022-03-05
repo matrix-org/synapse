@@ -793,6 +793,21 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     async def is_host_invited(self, room_id: str, host: str) -> bool:
         return await self._check_host_room_membership(room_id, host, Membership.INVITE)
 
+    async def is_locally_forgotten_room(self, room_id: str) -> bool:
+        sql = """
+            SELECT 1 FROM room_memberships
+            WHERE room_id = ?
+                AND user_id LIKE ?
+                AND forgotten != 1
+            LIMIT 1
+        """
+
+        rows = await self.db_pool.execute(
+            "is_forgotten_room", None, sql, room_id, "%:" + self.hs.hostname
+        )
+        # If any rows still exist it means someone has not forgotten this room yet
+        return not rows
+
     async def _check_host_room_membership(
         self, room_id: str, host: str, membership: str
     ) -> bool:
