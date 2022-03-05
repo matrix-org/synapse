@@ -634,13 +634,72 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(4)
 
         # Check that tombstone events changes increase the unread counter.
-        self.helper.send_state(
+        res1 = self.helper.send_state(
             self.room_id,
             EventTypes.Tombstone,
             {"replacement_room": "!someroom:test"},
             tok=self.tok2,
         )
         self._check_unread_count(5)
+        res2 = self.helper.send(self.room_id, "hello", tok=self.tok2)
+
+        # Make sure both m.read and org.matrix.msc2285.read.private advance
+        channel = self.make_request(
+            "POST",
+            "/rooms/%s/receipt/m.read/%s" % (self.room_id, res1["event_id"]),
+            {},
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self._check_unread_count(1)
+
+        channel = self.make_request(
+            "POST",
+            "/rooms/%s/receipt/org.matrix.msc2285.read.private/%s"
+            % (self.room_id, res2["event_id"]),
+            {},
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self._check_unread_count(0)
+
+    def test_doesnt_reverse_read_receipts(self) -> None:
+        # Join the new user
+        self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
+
+        # Send messages
+        res1 = self.helper.send(self.room_id, "hello", tok=self.tok2)
+        res2 = self.helper.send(self.room_id, "hello", tok=self.tok2)
+
+        # Read last event
+        channel = self.make_request(
+            "POST",
+            "/rooms/%s/receipt/m.read/%s" % (self.room_id, res2["event_id"]),
+            {},
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self._check_unread_count(0)
+
+        # Make sure neither m.read not org.matrix.msc2285.read.private reverse
+        channel = self.make_request(
+            "POST",
+            "/rooms/%s/receipt/org.matrix.msc2285.read.private/%s"
+            % (self.room_id, res1["event_id"]),
+            {},
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self._check_no_room_changes()
+
+        channel = self.make_request(
+            "POST",
+            "/rooms/%s/receipt/m.read/%s" % (self.room_id, res1["event_id"]),
+            {},
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self._check_no_room_changes()
 
     def _check_unread_count(self, expected_count: int) -> None:
         """Syncs and compares the unread count with the expected value."""
@@ -658,6 +717,24 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             room_entry["org.matrix.msc2654.unread_count"],
             expected_count,
             room_entry,
+        )
+
+        # Store the next batch for the next request.
+        self.next_batch = channel.json_body["next_batch"]
+
+    def _check_no_room_changes(self) -> None:
+        """Syncs and makes sure the rooms part of sync is empty."""
+
+        channel = self.make_request(
+            "GET",
+            self.url % self.next_batch,
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self.assertEqual(
+            channel.json_body.get("rooms", None),
+            None,
+            channel.json_body,
         )
 
         # Store the next batch for the next request.
