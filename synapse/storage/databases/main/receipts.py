@@ -118,15 +118,14 @@ class ReceiptsWorkerStore(SQLBaseStore):
             desc="get_receipts_for_room",
         )
 
-    @cached(num_args=3)
+    @cached(num_args=2)
     async def get_last_receipt_event_id_for_user(
-        self, user_id: str, room_id: str, receipt_type: str
+        self, user_id: str, room_id: str
     ) -> Optional[str]:
         return await self.db_pool.simple_select_one_onecol(
             table="receipts_linearized",
             keyvalues={
                 "room_id": room_id,
-                "receipt_type": receipt_type,
                 "user_id": user_id,
             },
             retcol="event_id",
@@ -134,22 +133,18 @@ class ReceiptsWorkerStore(SQLBaseStore):
             allow_none=True,
         )
 
-    @cached(num_args=2)
-    async def get_receipts_for_user(
-        self, user_id: str, receipt_type: str
-    ) -> Dict[str, str]:
+    @cached(num_args=1)
+    async def get_receipts_for_user(self, user_id: str) -> Dict[str, str]:
         rows = await self.db_pool.simple_select_list(
             table="receipts_linearized",
-            keyvalues={"user_id": user_id, "receipt_type": receipt_type},
+            keyvalues={"user_id": user_id},
             retcols=("room_id", "event_id"),
             desc="get_receipts_for_user",
         )
 
         return {row["room_id"]: row["event_id"] for row in rows}
 
-    async def get_receipts_for_user_with_orderings(
-        self, user_id: str, receipt_type: str
-    ) -> JsonDict:
+    async def get_receipts_for_user_with_orderings(self, user_id: str) -> JsonDict:
         def f(txn: LoggingTransaction) -> List[Tuple[str, str, int, int]]:
             sql = (
                 "SELECT rl.room_id, rl.event_id,"
@@ -490,9 +485,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     ) -> None:
         self.get_receipts_for_user.invalidate((user_id, receipt_type))
         self._get_linearized_receipts_for_room.invalidate((room_id,))
-        self.get_last_receipt_event_id_for_user.invalidate(
-            (user_id, room_id, receipt_type)
-        )
+        self.get_last_receipt_event_id_for_user.invalidate((user_id, room_id))
         self._invalidate_get_users_with_receipts_in_room(room_id, receipt_type, user_id)
         self.get_receipts_for_room.invalidate((room_id, receipt_type))
 
@@ -541,14 +534,20 @@ class ReceiptsWorkerStore(SQLBaseStore):
         # have to compare orderings of existing receipts
         if stream_ordering is not None:
             sql = (
-                "SELECT stream_ordering, event_id FROM events"
-                " INNER JOIN receipts_linearized as r USING (event_id, room_id)"
-                " WHERE r.room_id = ? AND r.receipt_type = ? AND r.user_id = ?"
+                "SELECT e.stream_ordering, e.event_id, r.receipt_type FROM events AS e"
+                " INNER JOIN receipts_linearized AS r USING (event_id, room_id)"
+                " WHERE r.room_id = ? AND r.user_id = ?"
             )
-            txn.execute(sql, (room_id, receipt_type, user_id))
+            txn.execute(sql, (room_id, user_id))
 
-            for so, eid in txn:
-                if int(so) >= stream_ordering:
+            for so, eid, rt in txn:
+                if int(so) >= stream_ordering and (
+                    receipt_type == rt
+                    or (
+                        rt == ReceiptTypes.READ
+                        and receipt_type == ReceiptTypes.READ_PRIVATE
+                    )
+                ):
                     logger.debug(
                         "Ignoring new receipt for %s in favour of existing "
                         "one for later event %s",
@@ -583,7 +582,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
             lock=False,
         )
 
-        if receipt_type == ReceiptTypes.READ and stream_ordering is not None:
+        if (
+            receipt_type in [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE]
+            and stream_ordering is not None
+        ):
             self._remove_old_push_actions_before_txn(
                 txn, room_id=room_id, user_id=user_id, stream_ordering=stream_ordering
             )

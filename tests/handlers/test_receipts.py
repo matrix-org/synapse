@@ -15,7 +15,7 @@
 
 from typing import List
 
-from synapse.api.constants import ReadReceiptEventFields
+from synapse.api.constants import ReceiptTypes
 from synapse.types import JsonDict
 
 from tests import unittest
@@ -25,20 +25,15 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.event_source = hs.get_event_sources().sources.receipt
 
-    # In the first param of _test_filters_hidden we use "hidden" instead of
-    # ReadReceiptEventFields.MSC2285_HIDDEN. We do this because we're mocking
-    # the data from the database which doesn't use the prefix
-
     def test_filters_out_hidden_receipt(self):
         self._test_filters_hidden(
             [
                 {
                     "content": {
                         "$1435641916114394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ_PRIVATE: {
                                 "@rikj:jki.re": {
                                     "ts": 1436451550453,
-                                    "hidden": True,
                                 }
                             }
                         }
@@ -56,10 +51,9 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                 {
                     "content": {
                         "$1435641916hfgh4394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ_PRIVATE: {
                                 "@me:server.org": {
                                     "ts": 1436451550453,
-                                    "hidden": True,
                                 },
                             }
                         }
@@ -72,10 +66,9 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                 {
                     "content": {
                         "$1435641916hfgh4394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ_PRIVATE: {
                                 "@me:server.org": {
                                     "ts": 1436451550453,
-                                    ReadReceiptEventFields.MSC2285_HIDDEN: True,
                                 },
                             }
                         }
@@ -92,16 +85,17 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                 {
                     "content": {
                         "$1dgdgrd5641916114394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ_PRIVATE: {
                                 "@rikj:jki.re": {
                                     "ts": 1436451550453,
-                                    "hidden": True,
                                 },
+                            },
+                            ReceiptTypes.READ: {
                                 "@user:jki.re": {
                                     "ts": 1436451550453,
                                 },
-                            }
-                        }
+                            },
+                        },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
                     "type": "m.receipt",
@@ -111,7 +105,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                 {
                     "content": {
                         "$1dgdgrd5641916114394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ: {
                                 "@user:jki.re": {
                                     "ts": 1436451550453,
                                 }
@@ -130,15 +124,14 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                 {
                     "content": {
                         "$14356419edgd14394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ_PRIVATE: {
                                 "@rikj:jki.re": {
                                     "ts": 1436451550453,
-                                    "hidden": True,
                                 },
                             }
                         },
                         "$1435641916114394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ: {
                                 "@user:jki.re": {
                                     "ts": 1436451550453,
                                 }
@@ -153,7 +146,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                 {
                     "content": {
                         "$1435641916114394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ: {
                                 "@user:jki.re": {
                                     "ts": 1436451550453,
                                 }
@@ -171,9 +164,9 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             [
                 {
                     "content": {
-                        "$14356419ggffg114394fHBLK:matrix.org": {"m.read": {}},
+                        "$14356419ggffg114394fHBLK:matrix.org": {ReceiptTypes.READ: {}},
                         "$1435641916114394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ: {
                                 "@user:jki.re": {
                                     "ts": 1436451550453,
                                 }
@@ -187,9 +180,9 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             [
                 {
                     "content": {
-                        "$14356419ggffg114394fHBLK:matrix.org": {"m.read": {}},
+                        "$14356419ggffg114394fHBLK:matrix.org": {ReceiptTypes.READ: {}},
                         "$1435641916114394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ: {
                                 "@user:jki.re": {
                                     "ts": 1436451550453,
                                 }
@@ -209,7 +202,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                     "content": {
                         "$143564gdfg6114394fHBLK:matrix.org": {},
                         "$1435641916114394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ: {
                                 "@user:jki.re": {
                                     "ts": 1436451550453,
                                 }
@@ -225,7 +218,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                     "content": {
                         "$143564gdfg6114394fHBLK:matrix.org": {},
                         "$1435641916114394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ: {
                                 "@user:jki.re": {
                                     "ts": 1436451550453,
                                 }
@@ -244,10 +237,9 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                 {
                     "content": {
                         "$14356419edgd14394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ_PRIVATE: {
                                 "@rikj:jki.re": {
                                     "ts": 1436451550453,
-                                    "hidden": True,
                                 },
                             }
                         },
@@ -258,7 +250,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                 {
                     "content": {
                         "$1435641916114394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ: {
                                 "@user:jki.re": {
                                     "ts": 1436451550453,
                                 }
@@ -273,7 +265,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                 {
                     "content": {
                         "$1435641916114394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ: {
                                 "@user:jki.re": {
                                     "ts": 1436451550453,
                                 }
@@ -297,7 +289,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                 {
                     "content": {
                         "$14356419edgd14394fHBLK:matrix.org": {
-                            "m.read": {
+                            ReceiptTypes.READ: {
                                 "@rikj:jki.re": "string",
                             }
                         },
@@ -306,7 +298,19 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                     "type": "m.receipt",
                 },
             ],
-            [],
+            [
+                {
+                    "content": {
+                        "$14356419edgd14394fHBLK:matrix.org": {
+                            ReceiptTypes.READ: {
+                                "@rikj:jki.re": "string",
+                            }
+                        },
+                    },
+                    "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
+                    "type": "m.receipt",
+                },
+            ],
         )
 
     def _test_filters_hidden(

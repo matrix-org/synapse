@@ -14,7 +14,7 @@
 import logging
 from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
-from synapse.api.constants import ReadReceiptEventFields, ReceiptTypes
+from synapse.api.constants import ReceiptTypes
 from synapse.appservice import ApplicationService
 from synapse.streams import EventSource
 from synapse.types import JsonDict, ReadReceipt, UserID, get_domain_from_id
@@ -138,7 +138,7 @@ class ReceiptsHandler:
         return True
 
     async def received_client_receipt(
-        self, room_id: str, receipt_type: str, user_id: str, event_id: str, hidden: bool
+        self, room_id: str, receipt_type: str, user_id: str, event_id: str
     ) -> None:
         """Called when a client tells us a local user has read up to the given
         event_id in the room.
@@ -148,7 +148,7 @@ class ReceiptsHandler:
             receipt_type=receipt_type,
             user_id=user_id,
             event_ids=[event_id],
-            data={"ts": int(self.clock.time_msec()), "hidden": hidden},
+            data={"ts": int(self.clock.time_msec())},
         )
 
         is_new = await self._handle_new_receipts([receipt])
@@ -156,7 +156,8 @@ class ReceiptsHandler:
             return
 
         if self.federation_sender and not (
-            self.hs.config.experimental.msc2285_enabled and hidden
+            self.hs.config.experimental.msc2285_enabled
+            and receipt_type == ReceiptTypes.READ_PRIVATE
         ):
             await self.federation_sender.send_read_receipt(receipt)
 
@@ -178,35 +179,27 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
             for event_id in content.keys():
                 event_content = content.get(event_id, {})
-                m_read = event_content.get(ReceiptTypes.READ, {})
 
-                # If m_read is missing copy over the original event_content as there is nothing to process here
-                if not m_read:
-                    new_event["content"][event_id] = event_content.copy()
+                m_read = event_content.get(ReceiptTypes.READ, None)
+                if m_read:
+                    new_event["content"][event_id] = {ReceiptTypes.READ: m_read}
                     continue
 
-                new_users = {}
-                for rr_user_id, user_rr in m_read.items():
-                    try:
-                        hidden = user_rr.get("hidden")
-                    except AttributeError:
-                        # Due to https://github.com/matrix-org/synapse/issues/10376
-                        # there are cases where user_rr is a string, in those cases
-                        # we just ignore the read receipt
-                        continue
+                m_read_private = event_content.get(ReceiptTypes.READ_PRIVATE, None)
+                if m_read_private:
+                    new_users = {}
+                    for rr_user_id, user_rr in m_read_private.items():
+                        if rr_user_id == user_id:
+                            new_users[rr_user_id] = user_rr.copy()
 
-                    if hidden is not True or rr_user_id == user_id:
-                        new_users[rr_user_id] = user_rr.copy()
-                        # If hidden has a value replace hidden with the correct prefixed key
-                        if hidden is not None:
-                            new_users[rr_user_id].pop("hidden")
-                            new_users[rr_user_id][
-                                ReadReceiptEventFields.MSC2285_HIDDEN
-                            ] = hidden
+                    # Set new users unless empty
+                    if len(new_users.keys()) > 0:
+                        new_event["content"][event_id] = {
+                            ReceiptTypes.READ_PRIVATE: new_users
+                        }
+                    continue
 
-                # Set new users unless empty
-                if len(new_users.keys()) > 0:
-                    new_event["content"][event_id] = {ReceiptTypes.READ: new_users}
+                new_event["content"][event_id] = event_content
 
             # Append new_event to visible_events unless empty
             if len(new_event["content"].keys()) > 0:

@@ -13,7 +13,6 @@
 # limitations under the License.
 from typing import Dict
 
-from synapse.api.constants import ReceiptTypes
 from synapse.events import EventBase
 from synapse.push.presentable_names import calculate_room_name, name_from_member_event
 from synapse.storage import Storage
@@ -24,7 +23,7 @@ async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -
     invites = await store.get_invited_rooms_for_local_user(user_id)
     joins = await store.get_rooms_for_user(user_id)
 
-    my_receipts_by_room = await store.get_receipts_for_user(user_id, ReceiptTypes.READ)
+    my_receipts_by_room = await store.get_receipts_for_user(user_id)
 
     badge = len(invites)
 

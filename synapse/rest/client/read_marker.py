@@ -15,8 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.constants import ReadReceiptEventFields, ReceiptTypes
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.constants import ReceiptTypes
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -48,27 +47,26 @@ class ReadMarkerRestServlet(RestServlet):
         await self.presence_handler.bump_presence_active_time(requester.user)
 
         body = parse_json_object_from_request(request)
+
         read_event_id = body.get(ReceiptTypes.READ, None)
-        hidden = body.get(ReadReceiptEventFields.MSC2285_HIDDEN, False)
-
-        if not isinstance(hidden, bool):
-            raise SynapseError(
-                400,
-                "Param %s must be a boolean, if given"
-                % ReadReceiptEventFields.MSC2285_HIDDEN,
-                Codes.BAD_JSON,
-            )
-
         if read_event_id:
             await self.receipts_handler.received_client_receipt(
                 room_id,
                 ReceiptTypes.READ,
                 user_id=requester.user.to_string(),
                 event_id=read_event_id,
-                hidden=hidden,
             )
 
-        read_marker_event_id = body.get("m.fully_read", None)
+        read_private_event_id = body.get(ReceiptTypes.READ_PRIVATE, None)
+        if read_private_event_id:
+            await self.receipts_handler.received_client_receipt(
+                room_id,
+                ReceiptTypes.READ_PRIVATE,
+                user_id=requester.user.to_string(),
+                event_id=read_private_event_id,
+            )
+
+        read_marker_event_id = body.get(ReceiptTypes.FULLY_READ, None)
         if read_marker_event_id:
             await self.read_marker_handler.received_client_read_marker(
                 room_id,
