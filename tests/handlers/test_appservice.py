@@ -59,11 +59,11 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.event_source = hs.get_event_sources()
 
     def test_notify_interested_services(self):
-        interested_service = self._mkservice(is_interested=True)
+        interested_service = self._mkservice(is_interested_in_event=True)
         services = [
-            self._mkservice(is_interested=False),
+            self._mkservice(is_interested_in_event=False),
             interested_service,
-            self._mkservice(is_interested=False),
+            self._mkservice(is_interested_in_event=False),
         ]
 
         self.mock_as_api.query_user.return_value = make_awaitable(True)
@@ -85,7 +85,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
     def test_query_user_exists_unknown_user(self):
         user_id = "@someone:anywhere"
-        services = [self._mkservice(is_interested=True)]
+        services = [self._mkservice(is_interested_in_event=True)]
         services[0].is_interested_in_user.return_value = True
         self.mock_store.get_app_services.return_value = services
         self.mock_store.get_user_by_id.return_value = make_awaitable(None)
@@ -102,7 +102,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
     def test_query_user_exists_known_user(self):
         user_id = "@someone:anywhere"
-        services = [self._mkservice(is_interested=True)]
+        services = [self._mkservice(is_interested_in_event=True)]
         services[0].is_interested_in_user.return_value = True
         self.mock_store.get_app_services.return_value = services
         self.mock_store.get_user_by_id.return_value = make_awaitable({"name": user_id})
@@ -127,11 +127,11 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         room_id = "!alpha:bet"
         servers = ["aperture"]
-        interested_service = self._mkservice_alias(is_interested_in_alias=True)
+        interested_service = self._mkservice_alias(is_room_alias_in_namespace=True)
         services = [
-            self._mkservice_alias(is_interested_in_alias=False),
+            self._mkservice_alias(is_room_alias_in_namespace=False),
             interested_service,
-            self._mkservice_alias(is_interested_in_alias=False),
+            self._mkservice_alias(is_room_alias_in_namespace=False),
         ]
 
         self.mock_as_api.query_alias.return_value = make_awaitable(True)
@@ -147,8 +147,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_as_api.query_alias.assert_called_once_with(
             interested_service, room_alias_str
         )
-        self.assertEquals(result.room_id, room_id)
-        self.assertEquals(result.servers, servers)
+        self.assertEqual(result.room_id, room_id)
+        self.assertEqual(result.servers, servers)
 
     def test_get_3pe_protocols_no_appservices(self):
         self.mock_store.get_app_services.return_value = []
@@ -156,7 +156,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             defer.ensureDeferred(self.handler.get_3pe_protocols("my-protocol"))
         )
         self.mock_as_api.get_3pe_protocol.assert_not_called()
-        self.assertEquals(response, {})
+        self.assertEqual(response, {})
 
     def test_get_3pe_protocols_no_protocols(self):
         service = self._mkservice(False, [])
@@ -165,7 +165,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             defer.ensureDeferred(self.handler.get_3pe_protocols())
         )
         self.mock_as_api.get_3pe_protocol.assert_not_called()
-        self.assertEquals(response, {})
+        self.assertEqual(response, {})
 
     def test_get_3pe_protocols_protocol_no_response(self):
         service = self._mkservice(False, ["my-protocol"])
@@ -177,7 +177,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_as_api.get_3pe_protocol.assert_called_once_with(
             service, "my-protocol"
         )
-        self.assertEquals(response, {})
+        self.assertEqual(response, {})
 
     def test_get_3pe_protocols_select_one_protocol(self):
         service = self._mkservice(False, ["my-protocol"])
@@ -191,7 +191,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_as_api.get_3pe_protocol.assert_called_once_with(
             service, "my-protocol"
         )
-        self.assertEquals(
+        self.assertEqual(
             response, {"my-protocol": {"x-protocol-data": 42, "instances": []}}
         )
 
@@ -207,7 +207,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_as_api.get_3pe_protocol.assert_called_once_with(
             service, "my-protocol"
         )
-        self.assertEquals(
+        self.assertEqual(
             response, {"my-protocol": {"x-protocol-data": 42, "instances": []}}
         )
 
@@ -222,7 +222,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             defer.ensureDeferred(self.handler.get_3pe_protocols())
         )
         self.mock_as_api.get_3pe_protocol.assert_called()
-        self.assertEquals(
+        self.assertEqual(
             response,
             {
                 "my-protocol": {"x-protocol-data": 42, "instances": []},
@@ -254,7 +254,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             defer.ensureDeferred(self.handler.get_3pe_protocols())
         )
         # It's expected that the second service's data doesn't appear in the response
-        self.assertEquals(
+        self.assertEqual(
             response,
             {
                 "my-protocol": {
@@ -275,7 +275,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         to be pushed out to interested appservices, and that the stream ID is
         updated accordingly.
         """
-        interested_service = self._mkservice(is_interested=True)
+        interested_service = self._mkservice(is_interested_in_event=True)
         services = [interested_service]
         self.mock_store.get_app_services.return_value = services
         self.mock_store.get_type_stream_id_for_appservice.return_value = make_awaitable(
@@ -304,7 +304,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         Test sending out of order ephemeral events to the appservice handler
         are ignored.
         """
-        interested_service = self._mkservice(is_interested=True)
+        interested_service = self._mkservice(is_interested_in_event=True)
         services = [interested_service]
 
         self.mock_store.get_app_services.return_value = services
@@ -325,17 +325,45 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             interested_service, ephemeral=[]
         )
 
-    def _mkservice(self, is_interested, protocols=None):
+    def _mkservice(
+        self, is_interested_in_event: bool, protocols: Optional[Iterable] = None
+    ) -> Mock:
+        """
+        Create a new mock representing an ApplicationService.
+
+        Args:
+            is_interested_in_event: Whether this application service will be considered
+                interested in all events.
+            protocols: The third-party protocols that this application service claims to
+                support.
+
+        Returns:
+            A mock representing the ApplicationService.
+        """
         service = Mock()
-        service.is_interested.return_value = make_awaitable(is_interested)
+        service.is_interested_in_event.return_value = make_awaitable(
+            is_interested_in_event
+        )
         service.token = "mock_service_token"
         service.url = "mock_service_url"
         service.protocols = protocols
         return service
 
-    def _mkservice_alias(self, is_interested_in_alias):
+    def _mkservice_alias(self, is_room_alias_in_namespace: bool) -> Mock:
+        """
+        Create a new mock representing an ApplicationService that is or is not interested
+        any given room aliase.
+
+        Args:
+            is_room_alias_in_namespace: If true, the application service will be interested
+                in all room aliases that are queried against it. If false, the application
+                service will not be interested in any room aliases.
+
+        Returns:
+            A mock representing the ApplicationService.
+        """
         service = Mock()
-        service.is_interested_in_alias.return_value = is_interested_in_alias
+        service.is_room_alias_in_namespace.return_value = is_room_alias_in_namespace
         service.token = "mock_service_token"
         service.url = "mock_service_url"
         return service

@@ -383,7 +383,7 @@ class RootConfig:
         Build a default configuration file
 
         This is used when the user explicitly asks us to generate a config file
-        (eg with --generate_config).
+        (eg with --generate-config).
 
         Args:
             config_dir_path: The path where the config files are kept. Used to

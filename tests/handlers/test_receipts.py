@@ -314,4 +314,4 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
     ):
         """Tests that the _filter_out_hidden returns the expected output"""
         filtered_events = self.event_source.filter_out_hidden(events, "@me:server.org")
-        self.assertEquals(filtered_events, expected_output)
+        self.assertEqual(filtered_events, expected_output)
