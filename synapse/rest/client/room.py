@@ -875,6 +875,9 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
 
+        # MSC2244 (mass redactions) and MSC2174 (move 'redacts' into event content)
+        self._msc2174_msc2244_enabled = hs.config.experimental.msc2174_msc2244_enabled
+
     def register(self, http_server: HttpServer) -> None:
         PATTERNS = "/rooms/(?P<room_id>[^/]*)/redact/(?P<event_id>[^/]*)"
         register_txn_path(self, PATTERNS, http_server)
@@ -888,6 +891,12 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         content = parse_json_object_from_request(request)
+
+        if self._msc2174_msc2244_enabled:
+            # Include a "redacts" array in the *event content* that contains the
+            # event ID to redact in accordance with MSC2244.
+            # The top-level "redacts" key is kept for backwards compatibility.
+            content["redacts"] = [event_id]
 
         try:
             (

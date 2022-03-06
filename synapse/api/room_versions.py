@@ -81,6 +81,9 @@ class RoomVersion:
     msc2716_historical: bool
     # MSC2716: Adds support for redacting "insertion", "chunk", and "marker" events
     msc2716_redactions: bool
+    # MSC2174: Move the "redacts" key from the top-level of the event to the content
+    # MSC2244: Adds support for a "redacts" array of event IDs in an event's content
+    msc2174_msc2244_redactions: bool
 
 
 class RoomVersions:
