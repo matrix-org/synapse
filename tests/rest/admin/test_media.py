@@ -634,7 +634,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         media_repo = hs.get_media_repository_resource()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.server_name = hs.hostname
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
@@ -767,7 +767,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         media_repo = hs.get_media_repository_resource()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")

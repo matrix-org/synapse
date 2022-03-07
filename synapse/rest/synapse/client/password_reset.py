@@ -44,7 +44,7 @@ class PasswordResetSubmitTokenResource(DirectServeHtmlResource):
         super().__init__()
 
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self._local_threepid_handling_disabled_due_to_email_config = (
             hs.config.email.local_threepid_handling_disabled_due_to_email_config

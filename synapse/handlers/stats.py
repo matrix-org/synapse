@@ -39,7 +39,7 @@ class StatsHandler:
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state = hs.get_state_handler()
         self.server_name = hs.hostname
         self.clock = hs.get_clock()

@@ -63,7 +63,7 @@ class DeviceWorkerHandler:
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
         self.state_store = hs.get_storage().state
@@ -506,7 +506,7 @@ class DeviceHandler(DeviceWorkerHandler):
                 "Sending device list update notif for %r to: %r", user_id, hosts
             )
             for host in hosts:
-                self.federation_sender.send_device_messages(host)
+                self.federation_sender.send_device_messages(host, immediate=False)
                 log_kv({"message": "sent device update to host", "host": host})
 
     async def notify_user_signature_update(
@@ -628,7 +628,7 @@ class DeviceListUpdater:
     "Handles incoming device list updates from federation and updates the DB"
 
     def __init__(self, hs: "HomeServer", device_handler: DeviceHandler):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.federation = hs.get_federation_client()
         self.clock = hs.get_clock()
         self.device_handler = device_handler

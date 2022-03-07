@@ -166,6 +166,16 @@ def _load_appservice(
 
     supports_ephemeral = as_info.get("de.sorunome.msc2409.push_ephemeral", False)
 
+    # Opt-in flag for the MSC3202-specific transactional behaviour.
+    # When enabled, appservice transactions contain the following information:
+    #  - device One-Time Key counts
+    #  - device unused fallback key usage states
+    msc3202_transaction_extensions = as_info.get("org.matrix.msc3202", False)
+    if not isinstance(msc3202_transaction_extensions, bool):
+        raise ValueError(
+            "The `org.matrix.msc3202` option should be true or false if specified."
+        )
+
     return ApplicationService(
         token=as_info["as_token"],
         hostname=hostname,
@@ -174,8 +184,9 @@ def _load_appservice(
         hs_token=as_info["hs_token"],
         sender=user_id,
         id=as_info["id"],
-        supports_ephemeral=supports_ephemeral,
         protocols=protocols,
         rate_limited=rate_limited,
         ip_range_whitelist=ip_range_whitelist,
+        supports_ephemeral=supports_ephemeral,
+        msc3202_transaction_extensions=msc3202_transaction_extensions,
     )

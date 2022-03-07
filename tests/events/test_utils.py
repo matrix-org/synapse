@@ -16,6 +16,7 @@ from synapse.api.constants import EventContentFields
 from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.events.utils import (
+    SerializeEventConfig,
     copy_power_levels_contents,
     prune_event,
     serialize_event,
@@ -392,10 +393,12 @@ class PruneEventTestCase(unittest.TestCase):
 
 class SerializeEventTestCase(unittest.TestCase):
     def serialize(self, ev, fields):
-        return serialize_event(ev, 1479807801915, only_event_fields=fields)
+        return serialize_event(
+            ev, 1479807801915, config=SerializeEventConfig(only_event_fields=fields)
+        )
 
     def test_event_fields_works_with_keys(self):
-        self.assertEquals(
+        self.assertEqual(
             self.serialize(
                 MockEvent(sender="@alice:localhost", room_id="!foo:bar"), ["room_id"]
             ),
@@ -403,7 +406,7 @@ class SerializeEventTestCase(unittest.TestCase):
         )
 
     def test_event_fields_works_with_nested_keys(self):
-        self.assertEquals(
+        self.assertEqual(
             self.serialize(
                 MockEvent(
                     sender="@alice:localhost",
@@ -416,7 +419,7 @@ class SerializeEventTestCase(unittest.TestCase):
         )
 
     def test_event_fields_works_with_dot_keys(self):
-        self.assertEquals(
+        self.assertEqual(
             self.serialize(
                 MockEvent(
                     sender="@alice:localhost",
@@ -429,7 +432,7 @@ class SerializeEventTestCase(unittest.TestCase):
         )
 
     def test_event_fields_works_with_nested_dot_keys(self):
-        self.assertEquals(
+        self.assertEqual(
             self.serialize(
                 MockEvent(
                     sender="@alice:localhost",
@@ -445,7 +448,7 @@ class SerializeEventTestCase(unittest.TestCase):
         )
 
     def test_event_fields_nops_with_unknown_keys(self):
-        self.assertEquals(
+        self.assertEqual(
             self.serialize(
                 MockEvent(
                     sender="@alice:localhost",
@@ -458,7 +461,7 @@ class SerializeEventTestCase(unittest.TestCase):
         )
 
     def test_event_fields_nops_with_non_dict_keys(self):
-        self.assertEquals(
+        self.assertEqual(
             self.serialize(
                 MockEvent(
                     sender="@alice:localhost",
@@ -471,7 +474,7 @@ class SerializeEventTestCase(unittest.TestCase):
         )
 
     def test_event_fields_nops_with_array_keys(self):
-        self.assertEquals(
+        self.assertEqual(
             self.serialize(
                 MockEvent(
                     sender="@alice:localhost",
@@ -484,7 +487,7 @@ class SerializeEventTestCase(unittest.TestCase):
         )
 
     def test_event_fields_all_fields_if_empty(self):
-        self.assertEquals(
+        self.assertEqual(
             self.serialize(
                 MockEvent(
                     type="foo",

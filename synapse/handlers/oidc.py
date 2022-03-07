@@ -273,7 +273,7 @@ class OidcProvider:
         token_generator: "OidcSessionTokenGenerator",
         provider: OidcProviderConfig,
     ):
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
         self._token_generator = token_generator
 

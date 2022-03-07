@@ -55,8 +55,8 @@ from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import Requester, RoomAlias, StreamToken, UserID, create_requester
-from synapse.util import json_decoder, json_encoder, log_failure
-from synapse.util.async_helpers import Linearizer, gather_results, unwrapFirstError
+from synapse.util import json_decoder, json_encoder, log_failure, unwrapFirstError
+from synapse.util.async_helpers import Linearizer, gather_results
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_events_for_client
@@ -75,7 +75,7 @@ class MessageHandler:
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.state = hs.get_state_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
@@ -397,7 +397,7 @@ class EventCreationHandler:
         self.hs = hs
         self.auth = hs.get_auth()
         self._event_auth_handler = hs.get_event_auth_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
@@ -992,6 +992,8 @@ class EventCreationHandler:
             and full_state_ids_at_event
             and builder.internal_metadata.is_historical()
         ):
+            # TODO(faster_joins): figure out how this works, and make sure that the
+            #   old state is complete.
             old_state = await self.store.get_events_as_list(full_state_ids_at_event)
             context = await self.state.compute_event_context(event, old_state=old_state)
         else:
@@ -1066,6 +1068,9 @@ class EventCreationHandler:
         # event multiple times).
         if relation_type == RelationTypes.ANNOTATION:
             aggregation_key = relation["key"]
+
+            if len(aggregation_key) > 500:
+                raise SynapseError(400, "Aggregation key is too long")
 
             already_exists = await self.store.has_user_annotated_event(
                 relates_to, event.type, aggregation_key, event.sender

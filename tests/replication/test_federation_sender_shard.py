@@ -204,7 +204,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
 
     def create_room_with_remote_server(self, user, token, remote_server="other_server"):
         room = self.helper.create_room_as(user, tok=token)
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         federation = self.hs.get_federation_event_handler()
 
         prev_event_ids = self.get_success(store.get_latest_event_ids_in_room(room))

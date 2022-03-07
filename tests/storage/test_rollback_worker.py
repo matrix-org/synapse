@@ -56,7 +56,7 @@ class WorkerSchemaTests(HomeserverTestCase):
     def test_rolling_back(self):
         """Test that workers can start if the DB is a newer schema version"""
 
-        db_pool = self.hs.get_datastore().db_pool
+        db_pool = self.hs.get_datastores().main.db_pool
         db_conn = LoggingDatabaseConnection(
             db_pool._db_pool.connect(),
             db_pool.engine,
@@ -72,7 +72,7 @@ class WorkerSchemaTests(HomeserverTestCase):
 
     def test_not_upgraded_old_schema_version(self):
         """Test that workers don't start if the DB has an older schema version"""
-        db_pool = self.hs.get_datastore().db_pool
+        db_pool = self.hs.get_datastores().main.db_pool
         db_conn = LoggingDatabaseConnection(
             db_pool._db_pool.connect(),
             db_pool.engine,
@@ -92,7 +92,7 @@ class WorkerSchemaTests(HomeserverTestCase):
         Test that workers don't start if the DB is on the current schema version,
         but there are still outstanding delta migrations to run.
         """
-        db_pool = self.hs.get_datastore().db_pool
+        db_pool = self.hs.get_datastores().main.db_pool
         db_conn = LoggingDatabaseConnection(
             db_pool._db_pool.connect(),
             db_pool.engine,

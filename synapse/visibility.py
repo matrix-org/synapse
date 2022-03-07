@@ -81,8 +81,9 @@ async def filter_events_for_client(
 
     types = ((EventTypes.RoomHistoryVisibility, ""), (EventTypes.Member, user_id))
 
+    # we exclude outliers at this point, and then handle them separately later
     event_id_to_state = await storage.state.get_state_for_events(
-        frozenset(e.event_id for e in events),
+        frozenset(e.event_id for e in events if not e.internal_metadata.outlier),
         state_filter=StateFilter.from_types(types),
     )
 
@@ -154,6 +155,17 @@ async def filter_events_for_client(
         if event.event_id in always_include_ids:
             return event
 
+        # we need to handle outliers separately, since we don't have the room state.
+        if event.internal_metadata.outlier:
+            # Normally these can't be seen by clients, but we make an exception for
+            # for out-of-band membership events (eg, incoming invites, or rejections of
+            # said invite) for the user themselves.
+            if event.type == EventTypes.Member and event.state_key == user_id:
+                logger.debug("Returning out-of-band-membership event %s", event)
+                return event
+
+            return None
+
         state = event_id_to_state[event.event_id]
 
         # get the room_visibility at the time of the event.
@@ -198,6 +210,9 @@ async def filter_events_for_client(
 
             # Always allow the user to see their own leave events, otherwise
             # they won't see the room disappear if they reject the invite
+            #
+            # (Note this doesn't work for out-of-band invite rejections, which don't
+            # have prev_state populated. They are handled above in the outlier code.)
             if membership == "leave" and (
                 prev_membership == "join" or prev_membership == "invite"
             ):

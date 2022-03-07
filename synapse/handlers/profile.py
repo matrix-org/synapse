@@ -54,7 +54,7 @@ class ProfileHandler:
     PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.hs = hs
 
@@ -70,6 +70,8 @@ class ProfileHandler:
         self.allowed_avatar_mimetypes = hs.config.server.allowed_avatar_mimetypes
 
         self.server_name = hs.config.server.server_name
+
+        self._third_party_rules = hs.get_third_party_event_rules()
 
         if hs.config.worker.run_background_tasks:
             self.clock.looping_call(
@@ -171,6 +173,7 @@ class ProfileHandler:
         requester: Requester,
         new_displayname: str,
         by_admin: bool = False,
+        deactivation: bool = False,
     ) -> None:
         """Set the displayname of a user
 
@@ -179,6 +182,7 @@ class ProfileHandler:
             requester: The user attempting to make this change.
             new_displayname: The displayname to give this user.
             by_admin: Whether this change was made by an administrator.
+            deactivation: Whether this change was made while deactivating the user.
         """
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this homeserver")
@@ -227,6 +231,10 @@ class ProfileHandler:
             target_user.to_string(), profile
         )
 
+        await self._third_party_rules.on_profile_update(
+            target_user.to_string(), profile, by_admin, deactivation
+        )
+
         await self._update_join_states(requester, target_user)
 
     async def get_avatar_url(self, target_user: UserID) -> Optional[str]:
@@ -261,6 +269,7 @@ class ProfileHandler:
         requester: Requester,
         new_avatar_url: str,
         by_admin: bool = False,
+        deactivation: bool = False,
     ) -> None:
         """Set a new avatar URL for a user.
 
@@ -269,6 +278,7 @@ class ProfileHandler:
             requester: The user attempting to make this change.
             new_avatar_url: The avatar URL to give this user.
             by_admin: Whether this change was made by an administrator.
+            deactivation: Whether this change was made while deactivating the user.
         """
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this homeserver")
@@ -313,6 +323,10 @@ class ProfileHandler:
         profile = await self.store.get_profileinfo(target_user.localpart)
         await self.user_directory_handler.handle_local_profile_change(
             target_user.to_string(), profile
+        )
+
+        await self._third_party_rules.on_profile_update(
+            target_user.to_string(), profile, by_admin, deactivation
         )
 
         await self._update_join_states(requester, target_user)

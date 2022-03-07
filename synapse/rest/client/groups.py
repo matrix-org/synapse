@@ -705,7 +705,7 @@ class GroupAdminUsersInviteServlet(RestServlet):
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.is_mine_id = hs.is_mine_id
 
     @_validate_group_id
@@ -854,7 +854,7 @@ class GroupSelfUpdatePublicityServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     @_validate_group_id
     async def on_PUT(
@@ -879,7 +879,7 @@ class PublicisedGroupsForUserServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.groups_handler = hs.get_groups_local_handler()
 
     async def on_GET(
@@ -901,7 +901,7 @@ class PublicisedGroupsForUsersServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.groups_handler = hs.get_groups_local_handler()
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:

@@ -76,7 +76,7 @@ class PerDestinationQueue:
     ):
         self._server_name = hs.hostname
         self._clock = hs.get_clock()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._transaction_manager = transaction_manager
         self._instance_name = hs.get_instance_name()
         self._federation_shard_config = hs.config.worker.federation_shard_config
@@ -218,6 +218,16 @@ class PerDestinationQueue:
     def send_edu(self, edu: Edu) -> None:
         self._pending_edus.append(edu)
         self.attempt_new_transaction()
+
+    def mark_new_data(self) -> None:
+        """Marks that the destination has new data to send, without starting a
+        new transaction.
+
+        If a transaction loop is already in progress then a new transcation will
+        be attempted when the current one finishes.
+        """
+
+        self._new_data_to_send = True
 
     def attempt_new_transaction(self) -> None:
         """Try to start a new transaction to this destination
@@ -381,9 +391,8 @@ class PerDestinationQueue:
                 )
             )
 
-        last_successful_stream_ordering = self._last_successful_stream_ordering
-
-        if last_successful_stream_ordering is None:
+        _tmp_last_successful_stream_ordering = self._last_successful_stream_ordering
+        if _tmp_last_successful_stream_ordering is None:
             # if it's still None, then this means we don't have the information
             # in our database ­ we haven't successfully sent a PDU to this server
             # (at least since the introduction of the feature tracking
@@ -392,6 +401,8 @@ class PerDestinationQueue:
             # needs catching up — so catching up is futile; let's stop.
             self._catching_up = False
             return
+
+        last_successful_stream_ordering: int = _tmp_last_successful_stream_ordering
 
         # get at most 50 catchup room/PDUs
         while True:

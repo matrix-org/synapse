@@ -38,7 +38,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.room_shutdown_handler = hs.get_room_shutdown_handler()
         self.pagination_handler = hs.get_pagination_handler()
         self.server_notices_manager = self.hs.get_server_notices_manager()
