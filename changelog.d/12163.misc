@@ -1,0 +1,1 @@
+Reduce number of DB queries made during processing of `/sync`.

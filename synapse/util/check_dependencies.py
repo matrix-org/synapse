@@ -1,3 +1,25 @@
+#  Copyright 2022 The Matrix.org Foundation C.I.C.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+#
+
+"""
+This module exposes a single function which checks synapse's dependencies are present
+and correctly versioned. It makes use of `importlib.metadata` to do so. The details
+are a bit murky: there's no easy way to get a map from "extras" to the packages they
+require. But this is probably just symptomatic of Python's package management.
+"""
+
 import logging
 from typing import Iterable, NamedTuple, Optional
 
@@ -9,6 +31,8 @@ try:
     from importlib import metadata
 except ImportError:
     import importlib_metadata as metadata  # type: ignore[no-redef]
+
+__all__ = ["check_requirements"]
 
 
 class DependencyException(Exception):
@@ -29,7 +53,17 @@ class DependencyException(Exception):
             yield '"' + i + '"'
 
 
-EXTRAS = set(metadata.metadata(DISTRIBUTION_NAME).get_all("Provides-Extra"))
+DEV_EXTRAS = {"lint", "mypy", "test", "dev"}
+RUNTIME_EXTRAS = (
+    set(metadata.metadata(DISTRIBUTION_NAME).get_all("Provides-Extra")) - DEV_EXTRAS
+)
+VERSION = metadata.version(DISTRIBUTION_NAME)
+
+
+def _is_dev_dependency(req: Requirement) -> bool:
+    return req.marker is not None and any(
+        req.marker.evaluate({"extra": e}) for e in DEV_EXTRAS
+    )
 
 
 class Dependency(NamedTuple):
@@ -43,6 +77,9 @@ def _generic_dependencies() -> Iterable[Dependency]:
     assert requirements is not None
     for raw_requirement in requirements:
         req = Requirement(raw_requirement)
+        if _is_dev_dependency(req):
+            continue
+
         # https://packaging.pypa.io/en/latest/markers.html#usage notes that
         #   > Evaluating an extra marker with no environment is an error
         # so we pass in a dummy empty extra value here.
@@ -56,6 +93,8 @@ def _dependencies_for_extra(extra: str) -> Iterable[Dependency]:
     assert requirements is not None
     for raw_requirement in requirements:
         req = Requirement(raw_requirement)
+        if _is_dev_dependency(req):
+            continue
         # Exclude mandatory deps by only selecting deps needed with this extra.
         if (
             req.marker is not None
@@ -67,18 +106,26 @@ def _dependencies_for_extra(extra: str) -> Iterable[Dependency]:
 
 def _not_installed(requirement: Requirement, extra: Optional[str] = None) -> str:
     if extra:
-        return f"Need {requirement.name} for {extra}, but it is not installed"
+        return (
+            f"Synapse {VERSION} needs {requirement.name} for {extra}, "
+            f"but it is not installed"
+        )
     else:
-        return f"Need {requirement.name}, but it is not installed"
+        return f"Synapse {VERSION} needs {requirement.name}, but it is not installed"
 
 
 def _incorrect_version(
     requirement: Requirement, got: str, extra: Optional[str] = None
 ) -> str:
     if extra:
-        return f"Need {requirement} for {extra}, but got {requirement.name}=={got}"
+        return (
+            f"Synapse {VERSION} needs {requirement} for {extra}, "
+            f"but got {requirement.name}=={got}"
+        )
     else:
-        return f"Need {requirement}, but got {requirement.name}=={got}"
+        return (
+            f"Synapse {VERSION} needs {requirement}, but got {requirement.name}=={got}"
+        )
 
 
 def check_requirements(extra: Optional[str] = None) -> None:
@@ -100,10 +147,10 @@ def check_requirements(extra: Optional[str] = None) -> None:
     # First work out which dependencies are required, and which are optional.
     if extra is None:
         dependencies = _generic_dependencies()
-    elif extra in EXTRAS:
+    elif extra in RUNTIME_EXTRAS:
         dependencies = _dependencies_for_extra(extra)
     else:
-        raise ValueError(f"Synapse does not provide the feature '{extra}'")
+        raise ValueError(f"Synapse {VERSION} does not provide the feature '{extra}'")
 
     deps_unfulfilled = []
     errors = []
