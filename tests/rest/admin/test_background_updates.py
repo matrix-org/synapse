@@ -136,7 +136,6 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
         """Test the status API works with a background update."""
 
         # Create a new background update
-
         self._register_bg_update()
 
         self.store.db_pool.updates.start_doing_background_updates()
@@ -160,7 +159,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
                         "average_items_per_ms": 0.1,
                         "total_duration_ms": 1000.0,
                         "total_item_count": (
-                            BackgroundUpdater.default_background_batch_size
+                            self.updater.default_background_batch_size
                         ),
                     }
                 },
@@ -215,7 +214,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
                         "average_items_per_ms": 0.1,
                         "total_duration_ms": 1000.0,
                         "total_item_count": (
-                            BackgroundUpdater.default_background_batch_size
+                            self.updater.default_background_batch_size
                         ),
                     }
                 },
@@ -244,7 +243,7 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
                         "average_items_per_ms": 0.1,
                         "total_duration_ms": 1000.0,
                         "total_item_count": (
-                            BackgroundUpdater.default_background_batch_size
+                            self.updater.default_background_batch_size
                         ),
                     }
                 },
