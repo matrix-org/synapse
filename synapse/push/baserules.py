@@ -172,6 +172,38 @@ BASE_APPEND_OVERRIDE_RULES = [
         ],
         "actions": ["dont_notify"],
     },
+    # Disable notifications for auto-accepted room invites
+    # NOTE: this rule must be a higher prio than .m.rule.invite_for_me because
+    # that will also match the same events.
+    {
+        "rule_id": "global/override/com.beeper.suppress_auto_invite",
+        "conditions": [
+            {  # member event
+                "kind": "event_match",
+                "key": "type",
+                "pattern": "m.room.member",
+                "_id": "_member",
+            },
+            {  # with membership = invite
+                "kind": "event_match",
+                "key": "content.membership",
+                "pattern": "invite",
+                "_id": "_invite_member",
+            },
+            {  # matching the current user ID
+                "kind": "event_match",
+                "key": "state_key",
+                "pattern_type": "user_id",
+            },
+            {  # with the will_auto_accept field
+                "kind": "event_match",
+                "key": "fi.mau.will_auto_accept",
+                "pattern": "*",
+                "_id": "_will_auto_accept",
+            },
+        ],
+        "actions": ["dont_notify"],
+    },
     # NB. .m.rule.invite_for_me must be higher prio than .m.rule.member_event
     # otherwise invites will be matched by .m.rule.member_event
     {
