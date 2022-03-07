@@ -367,7 +367,7 @@ async def create_room(hs, room_id: str, creator_id: str):
     """Creates and persist a creation event for the given room"""
 
     persistence_store = hs.get_storage().persistence
-    store = hs.get_datastore()
+    store = hs.get_datastores().main
     event_builder_factory = hs.get_event_builder_factory()
     event_creation_handler = hs.get_event_creation_handler()
 

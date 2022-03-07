@@ -298,6 +298,9 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 # This user has new messages sent to them. Query messages for them
                 user_ids_to_query.add(user_id)
 
+        if not user_ids_to_query:
+            return {}, to_stream_id
+
         def get_device_messages_txn(txn: LoggingTransaction):
             # Build a query to select messages from any of the given devices that
             # are between the given stream id bounds.
@@ -362,7 +365,10 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             # intended for each device.
             last_processed_stream_pos = to_stream_id
             recipient_device_to_messages: Dict[Tuple[str, str], List[JsonDict]] = {}
+            rowcount = 0
             for row in txn:
+                rowcount += 1
+
                 last_processed_stream_pos = row[0]
                 recipient_user_id = row[1]
                 recipient_device_id = row[2]
@@ -373,7 +379,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                     (recipient_user_id, recipient_device_id), []
                 ).append(message_dict)
 
-            if limit is not None and txn.rowcount == limit:
+            if limit is not None and rowcount == limit:
                 # We ended up bumping up against the message limit. There may be more messages
                 # to retrieve. Return what we have, as well as the last stream position that
                 # was processed.

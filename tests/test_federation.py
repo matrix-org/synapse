@@ -52,11 +52,13 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
             )
         )[0]["room_id"]
 
-        self.store = self.homeserver.get_datastore()
+        self.store = self.homeserver.get_datastores().main
 
         # Figure out what the most recent event is
         most_recent = self.get_success(
-            self.homeserver.get_datastore().get_latest_event_ids_in_room(self.room_id)
+            self.homeserver.get_datastores().main.get_latest_event_ids_in_room(
+                self.room_id
+            )
         )[0]
 
         join_event = make_event_from_dict(
@@ -185,7 +187,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
 
         # Register a mock on the store so that the incoming update doesn't fail because
         # we don't share a room with the user.
-        store = self.homeserver.get_datastore()
+        store = self.homeserver.get_datastores().main
         store.get_rooms_for_user = Mock(return_value=make_awaitable(["!someroom:test"]))
 
         # Manually inject a fake device list update. We need this update to include at

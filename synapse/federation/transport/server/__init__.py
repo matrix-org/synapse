@@ -24,6 +24,7 @@ from synapse.federation.transport.server._base import (
 )
 from synapse.federation.transport.server.federation import (
     FEDERATION_SERVLET_CLASSES,
+    FederationAccountStatusServlet,
     FederationTimestampLookupServlet,
 )
 from synapse.federation.transport.server.groups_local import GROUP_LOCAL_SERVLET_CLASSES
@@ -333,6 +334,13 @@ def register_servlets(
             if (
                 servletclass == FederationTimestampLookupServlet
                 and not hs.config.experimental.msc3030_enabled
+            ):
+                continue
+
+            # Only allow the `/account_status` servlet if msc3720 is enabled
+            if (
+                servletclass == FederationAccountStatusServlet
+                and not hs.config.experimental.msc3720_enabled
             ):
                 continue
 

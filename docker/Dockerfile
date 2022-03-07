@@ -11,10 +11,10 @@
 # There is an optional PYTHON_VERSION build argument which sets the
 # version of python to build against: for example:
 #
-#    DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --build-arg PYTHON_VERSION=3.9 .
+#    DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --build-arg PYTHON_VERSION=3.10 .
 #
 
-ARG PYTHON_VERSION=3.8
+ARG PYTHON_VERSION=3.9
 
 ###
 ### Stage 0: builder
@@ -46,8 +46,7 @@ RUN \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy just what we need to pip install
-COPY scripts /synapse/scripts/
-COPY MANIFEST.in README.rst setup.py synctl /synapse/
+COPY MANIFEST.in README.rst setup.py /synapse/
 COPY synapse/__init__.py /synapse/synapse/__init__.py
 COPY synapse/python_dependencies.py /synapse/synapse/python_dependencies.py
 
@@ -97,8 +96,6 @@ RUN \
 COPY --from=builder /install /usr/local
 COPY ./docker/start.py /start.py
 COPY ./docker/conf /conf
-
-VOLUME ["/data"]
 
 EXPOSE 8008/tcp 8009/tcp 8448/tcp
 

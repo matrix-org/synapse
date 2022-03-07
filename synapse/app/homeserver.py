@@ -18,6 +18,8 @@ import os
 import sys
 from typing import Dict, Iterable, Iterator, List
 
+from matrix_common.versionstring import get_distribution_version_string
+
 from twisted.internet.tcp import Port
 from twisted.web.resource import EncodingResourceWrapper, Resource
 from twisted.web.server import GzipEncoderFactory
@@ -26,6 +28,7 @@ import synapse
 import synapse.config.logger
 from synapse import events
 from synapse.api.urls import (
+    CLIENT_API_PREFIX,
     FEDERATION_PREFIX,
     LEGACY_MEDIA_PREFIX,
     MEDIA_R0_PREFIX,
@@ -56,7 +59,6 @@ from synapse.http.server import (
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
-from synapse.python_dependencies import check_requirements
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
@@ -67,9 +69,9 @@ from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.util.check_dependencies import check_requirements
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.module_loader import load_module
-from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -195,13 +197,7 @@ class SynapseHomeServer(HomeServer):
 
             resources.update(
                 {
-                    "/_matrix/client/api/v1": client_resource,
-                    "/_matrix/client/r0": client_resource,
-                    "/_matrix/client/v1": client_resource,
-                    "/_matrix/client/v3": client_resource,
-                    "/_matrix/client/unstable": client_resource,
-                    "/_matrix/client/v2_alpha": client_resource,
-                    "/_matrix/client/versions": client_resource,
+                    CLIENT_API_PREFIX: client_resource,
                     "/.well-known": well_known_resource(self),
                     "/_synapse/admin": AdminRestResource(self),
                     **build_synapse_client_resource_tree(self),
@@ -355,7 +351,7 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
     hs = SynapseHomeServer(
         config.server.server_name,
         config=config,
-        version_string="Synapse/" + get_version_string(synapse),
+        version_string="Synapse/" + get_distribution_version_string("matrix-synapse"),
     )
 
     synapse.config.logger.setup_logging(hs, config, use_worker_options=False)
@@ -376,7 +372,7 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
 
         await _base.start(hs)
 
-        hs.get_datastore().db_pool.updates.start_doing_background_updates()
+        hs.get_datastores().main.db_pool.updates.start_doing_background_updates()
 
     register_start(start)
 

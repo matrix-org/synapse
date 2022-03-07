@@ -36,7 +36,7 @@ class ResourceLimitsServerNotices:
 
     def __init__(self, hs: "HomeServer"):
         self._server_notices_manager = hs.get_server_notices_manager()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._auth = hs.get_auth()
         self._config = hs.config
         self._resouce_limited = False

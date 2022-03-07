@@ -14,6 +14,7 @@
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
+from twisted.internet.address import IPv4Address
 from twisted.internet.protocol import Protocol
 from twisted.web.resource import Resource
 
@@ -53,7 +54,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         server_factory = ReplicationStreamProtocolFactory(hs)
         self.streamer = hs.get_replication_streamer()
         self.server: ServerReplicationStreamProtocol = server_factory.buildProtocol(
-            None
+            IPv4Address("TCP", "127.0.0.1", 0)
         )
 
         # Make a new HomeServer object for the worker
@@ -67,7 +68,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
         # Since we use sqlite in memory databases we need to make sure the
         # databases objects are the same.
-        self.worker_hs.get_datastore().db_pool = hs.get_datastore().db_pool
+        self.worker_hs.get_datastores().main.db_pool = hs.get_datastores().main.db_pool
 
         # Normally we'd pass in the handler to `setup_test_homeserver`, which would
         # eventually hit "Install @cache_in_self attributes" in tests/utils.py.
@@ -232,7 +233,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         # We may have an attempt to connect to redis for the external cache already.
         self.connect_any_redis_attempts()
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.database_pool = store.db_pool
 
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -331,7 +332,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
                 lambda: self._handle_http_replication_attempt(worker_hs, port),
             )
 
-        store = worker_hs.get_datastore()
+        store = worker_hs.get_datastores().main
         store.db_pool._db_pool = self.database_pool._db_pool
 
         # Set up TCP replication between master and the new worker if we don't
@@ -345,7 +346,9 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
                 self.clock,
                 repl_handler,
             )
-            server = self.server_factory.buildProtocol(None)
+            server = self.server_factory.buildProtocol(
+                IPv4Address("TCP", "127.0.0.1", 0)
+            )
 
             client_transport = FakeTransport(server, self.reactor)
             client.makeConnection(client_transport)

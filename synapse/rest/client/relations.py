@@ -27,12 +27,8 @@ from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
-from synapse.storage.relations import (
-    AggregationPaginationToken,
-    PaginationChunk,
-    RelationPaginationToken,
-)
-from synapse.types import JsonDict
+from synapse.storage.relations import AggregationPaginationToken, PaginationChunk
+from synapse.types import JsonDict, StreamToken
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -54,7 +50,7 @@ class RelationPaginationServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
         self.event_handler = hs.get_event_handler()
@@ -80,6 +76,9 @@ class RelationPaginationServlet(RestServlet):
             raise SynapseError(404, "Unknown parent event.")
 
         limit = parse_integer(request, "limit", default=5)
+        direction = parse_string(
+            request, "org.matrix.msc3715.dir", default="b", allowed_values=["f", "b"]
+        )
         from_token_str = parse_string(request, "from")
         to_token_str = parse_string(request, "to")
 
@@ -90,11 +89,10 @@ class RelationPaginationServlet(RestServlet):
             # Return the relations
             from_token = None
             if from_token_str:
-                from_token = RelationPaginationToken.from_string(from_token_str)
-
+                from_token = await StreamToken.from_string(self.store, from_token_str)
             to_token = None
             if to_token_str:
-                to_token = RelationPaginationToken.from_string(to_token_str)
+                to_token = await StreamToken.from_string(self.store, to_token_str)
 
             pagination_chunk = await self.store.get_relations_for_event(
                 event_id=parent_id,
@@ -102,6 +100,7 @@ class RelationPaginationServlet(RestServlet):
                 relation_type=relation_type,
                 event_type=event_type,
                 limit=limit,
+                direction=direction,
                 from_token=from_token,
                 to_token=to_token,
             )
@@ -125,7 +124,7 @@ class RelationPaginationServlet(RestServlet):
             events, now, bundle_aggregations=aggregations
         )
 
-        return_value = pagination_chunk.to_dict()
+        return_value = await pagination_chunk.to_dict(self.store)
         return_value["chunk"] = serialized_events
         return_value["original_event"] = original_event
 
@@ -160,7 +159,7 @@ class RelationAggregationPaginationServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.event_handler = hs.get_event_handler()
 
     async def on_GET(
@@ -216,7 +215,7 @@ class RelationAggregationPaginationServlet(RestServlet):
                 to_token=to_token,
             )
 
-        return 200, pagination_chunk.to_dict()
+        return 200, await pagination_chunk.to_dict(self.store)
 
 
 class RelationAggregationGroupPaginationServlet(RestServlet):
@@ -252,7 +251,7 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
         self.event_handler = hs.get_event_handler()
@@ -289,11 +288,10 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
 
         from_token = None
         if from_token_str:
-            from_token = RelationPaginationToken.from_string(from_token_str)
-
+            from_token = await StreamToken.from_string(self.store, from_token_str)
         to_token = None
         if to_token_str:
-            to_token = RelationPaginationToken.from_string(to_token_str)
+            to_token = await StreamToken.from_string(self.store, to_token_str)
 
         result = await self.store.get_relations_for_event(
             event_id=parent_id,
@@ -313,7 +311,7 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
         now = self.clock.time_msec()
         serialized_events = self._event_serializer.serialize_events(events, now)
 
-        return_value = result.to_dict()
+        return_value = await result.to_dict(self.store)
         return_value["chunk"] = serialized_events
 
         return 200, return_value

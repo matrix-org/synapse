@@ -28,7 +28,7 @@ class KeyQueryTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def test_rejects_device_id_ice_key_outside_of_list(self):
+    def test_rejects_device_id_ice_key_outside_of_list(self) -> None:
         self.register_user("alice", "wonderland")
         alice_token = self.login("alice", "wonderland")
         bob = self.register_user("bob", "uncle")
@@ -49,7 +49,7 @@ class KeyQueryTestCase(unittest.HomeserverTestCase):
             channel.result,
         )
 
-    def test_rejects_device_key_given_as_map_to_bool(self):
+    def test_rejects_device_key_given_as_map_to_bool(self) -> None:
         self.register_user("alice", "wonderland")
         alice_token = self.login("alice", "wonderland")
         bob = self.register_user("bob", "uncle")
@@ -73,7 +73,7 @@ class KeyQueryTestCase(unittest.HomeserverTestCase):
             channel.result,
         )
 
-    def test_requires_device_key(self):
+    def test_requires_device_key(self) -> None:
         """`device_keys` is required. We should complain if it's missing."""
         self.register_user("alice", "wonderland")
         alice_token = self.login("alice", "wonderland")

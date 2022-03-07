@@ -47,7 +47,7 @@ events_processed_counter = Counter("synapse_handlers_appservice_events_processed
 
 class ApplicationServicesHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.is_mine_id = hs.is_mine_id
         self.appservice_api = hs.get_application_service_api()
         self.scheduler = hs.get_application_service_scheduler()
@@ -571,7 +571,7 @@ class ApplicationServicesHandler:
         room_alias_str = room_alias.to_string()
         services = self.store.get_app_services()
         alias_query_services = [
-            s for s in services if (s.is_interested_in_alias(room_alias_str))
+            s for s in services if (s.is_room_alias_in_namespace(room_alias_str))
         ]
         for alias_service in alias_query_services:
             is_known_alias = await self.appservice_api.query_alias(
@@ -660,7 +660,7 @@ class ApplicationServicesHandler:
         # inside of a list comprehension anymore.
         interested_list = []
         for s in services:
-            if await s.is_interested(event, self.store):
+            if await s.is_interested_in_event(event.event_id, event, self.store):
                 interested_list.append(s)
 
         return interested_list

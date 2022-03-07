@@ -22,6 +22,7 @@ from twisted.python.failure import Failure
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
+from synapse.events.utils import SerializeEventConfig
 from synapse.handlers.room import ShutdownRoomResponse
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.state import StateFilter
@@ -127,7 +128,7 @@ class PaginationHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
         self.clock = hs.get_clock()
@@ -541,13 +542,15 @@ class PaginationHandler:
 
         time_now = self.clock.time_msec()
 
+        serialize_options = SerializeEventConfig(as_client_event=as_client_event)
+
         chunk = {
             "chunk": (
                 self._event_serializer.serialize_events(
                     events,
                     time_now,
+                    config=serialize_options,
                     bundle_aggregations=aggregations,
-                    as_client_event=as_client_event,
                 )
             ),
             "start": await from_token.to_string(self.store),
@@ -556,7 +559,7 @@ class PaginationHandler:
 
         if state:
             chunk["state"] = self._event_serializer.serialize_events(
-                state, time_now, as_client_event=as_client_event
+                state, time_now, config=serialize_options
             )
 
         return chunk

@@ -560,8 +560,10 @@ class LruCache(Generic[KT, VT]):
         def cache_pop(key: KT, default: Optional[T] = None) -> Union[None, T, VT]:
             node = cache.get(key, None)
             if node:
-                delete_node(node)
+                evicted_len = delete_node(node)
                 cache.pop(node.key, None)
+                if metrics:
+                    metrics.inc_evictions(EvictionReason.invalidation, evicted_len)
                 return node.value
             else:
                 return default

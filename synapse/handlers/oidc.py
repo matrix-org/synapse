@@ -273,7 +273,7 @@ class OidcProvider:
         token_generator: "OidcSessionTokenGenerator",
         provider: OidcProviderConfig,
     ):
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
         self._token_generator = token_generator
 
@@ -544,9 +544,9 @@ class OidcProvider:
         """
         metadata = await self.load_metadata()
         token_endpoint = metadata.get("token_endpoint")
-        raw_headers = {
+        raw_headers: Dict[str, str] = {
             "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": self._http_client.user_agent,
+            "User-Agent": self._http_client.user_agent.decode("ascii"),
             "Accept": "application/json",
         }
 

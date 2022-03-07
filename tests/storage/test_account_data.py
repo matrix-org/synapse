@@ -21,7 +21,7 @@ from tests import unittest
 
 class IgnoredUsersTestCase(unittest.HomeserverTestCase):
     def prepare(self, hs, reactor, clock):
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.user = "@user:test"
 
     def _update_ignore_list(

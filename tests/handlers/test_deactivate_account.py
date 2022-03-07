@@ -34,7 +34,7 @@ class DeactivateAccountTestCase(HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
         self.user = self.register_user("user", "pass")
         self.token = self.login("user", "pass")

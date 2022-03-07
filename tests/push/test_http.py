@@ -62,7 +62,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Register the pusher
         user_tuple = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_tuple.token_id
 
@@ -108,7 +108,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Register the pusher
         user_tuple = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_tuple.token_id
 
@@ -138,7 +138,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Get the stream ordering before it gets sent
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by({"user_name": user_id})
+            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
@@ -149,7 +149,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # It hasn't succeeded yet, so the stream ordering shouldn't have moved
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by({"user_name": user_id})
+            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
@@ -170,7 +170,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # The stream ordering has increased
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by({"user_name": user_id})
+            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
@@ -192,7 +192,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # The stream ordering has increased, again
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by({"user_name": user_id})
+            self.hs.get_datastores().main.get_pushers_by({"user_name": user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
@@ -224,7 +224,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Register the pusher
         user_tuple = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_tuple.token_id
 
@@ -344,7 +344,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Register the pusher
         user_tuple = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_tuple.token_id
 
@@ -430,7 +430,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Register the pusher
         user_tuple = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_tuple.token_id
 
@@ -507,7 +507,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Register the pusher
         user_tuple = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_tuple.token_id
 
@@ -571,9 +571,7 @@ class HTTPPusherTests(HomeserverTestCase):
         # Carry out our option-value specific test
         #
         # This push should still only contain an unread count of 1 (for 1 unread room)
-        self.assertEqual(
-            self.push_attempts[5][2]["notification"]["counts"]["unread"], 1
-        )
+        self._check_push_attempt(6, 1)
 
     @override_config({"push": {"group_unread_count_by_room": False}})
     def test_push_unread_count_message_count(self):
@@ -585,11 +583,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Carry out our option-value specific test
         #
-        # We're counting every unread message, so there should now be 4 since the
+        # We're counting every unread message, so there should now be 3 since the
         # last read receipt
-        self.assertEqual(
-            self.push_attempts[5][2]["notification"]["counts"]["unread"], 4
-        )
+        self._check_push_attempt(6, 3)
 
     def _test_push_unread_count(self):
         """
@@ -597,8 +593,9 @@ class HTTPPusherTests(HomeserverTestCase):
 
         Note that:
         * Sending messages will cause push notifications to go out to relevant users
-        * Sending a read receipt will cause a "badge update" notification to go out to
-          the user that sent the receipt
+        * Sending a read receipt will cause the HTTP pusher to check whether the unread
+            count has changed since the last push notification. If so, a "badge update"
+            notification goes out to the user that sent the receipt
         """
         # Register the user who gets notified
         user_id = self.register_user("user", "pass")
@@ -616,7 +613,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Register the pusher
         user_tuple = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_tuple.token_id
 
@@ -642,24 +639,74 @@ class HTTPPusherTests(HomeserverTestCase):
         # position in the room. We'll set the read position to this event in a moment
         first_message_event_id = response["event_id"]
 
-        # Advance time a bit (so the pusher will register something has happened) and
-        # make the push succeed
-        self.push_attempts[0][0].callback({})
-        self.pump()
+        expected_push_attempts = 1
+        self._check_push_attempt(expected_push_attempts, 0)
 
-        # Check our push made it
+        self._send_read_request(access_token, first_message_event_id, room_id)
+
+        # Unread count has not changed. Therefore, ensure that read request does not
+        # trigger a push notification.
         self.assertEqual(len(self.push_attempts), 1)
-        self.assertEqual(
-            self.push_attempts[0][1], "http://example.com/_matrix/push/v1/notify"
-        )
 
+        # Send another message
+        response2 = self.helper.send(
+            room_id, body="How's the weather today?", tok=other_access_token
+        )
+        second_message_event_id = response2["event_id"]
+
+        expected_push_attempts += 1
+
+        self._check_push_attempt(expected_push_attempts, 1)
+
+        self._send_read_request(access_token, second_message_event_id, room_id)
+        expected_push_attempts += 1
+
+        self._check_push_attempt(expected_push_attempts, 0)
+
+        # If we're grouping by room, sending more messages shouldn't increase the
+        # unread count, as they're all being sent in the same room. Otherwise, it
+        # should. Therefore, the last call to _check_push_attempt is done in the
+        # caller method.
+        self.helper.send(room_id, body="Hello?", tok=other_access_token)
+        expected_push_attempts += 1
+
+        self._advance_time_and_make_push_succeed(expected_push_attempts)
+
+        self.helper.send(room_id, body="Hello??", tok=other_access_token)
+        expected_push_attempts += 1
+
+        self._advance_time_and_make_push_succeed(expected_push_attempts)
+
+        self.helper.send(room_id, body="HELLO???", tok=other_access_token)
+
+    def _advance_time_and_make_push_succeed(self, expected_push_attempts):
+        self.pump()
+        self.push_attempts[expected_push_attempts - 1][0].callback({})
+
+    def _check_push_attempt(
+        self, expected_push_attempts: int, expected_unread_count_last_push: int
+    ) -> None:
+        """
+        Makes sure that the last expected push attempt succeeds and checks whether
+        it contains the expected unread count.
+        """
+        self._advance_time_and_make_push_succeed(expected_push_attempts)
+        # Check our push made it
+        self.assertEqual(len(self.push_attempts), expected_push_attempts)
+        _, push_url, push_body = self.push_attempts[expected_push_attempts - 1]
+        self.assertEqual(
+            push_url,
+            "http://example.com/_matrix/push/v1/notify",
+        )
         # Check that the unread count for the room is 0
         #
         # The unread count is zero as the user has no read receipt in the room yet
         self.assertEqual(
-            self.push_attempts[0][2]["notification"]["counts"]["unread"], 0
+            push_body["notification"]["counts"]["unread"],
+            expected_unread_count_last_push,
         )
 
+    def _send_read_request(self, access_token, message_event_id, room_id):
         # Now set the user's read receipt position to the first event
         #
         # This will actually trigger a new notification to be sent out so that
@@ -667,56 +714,8 @@ class HTTPPusherTests(HomeserverTestCase):
         # count goes down
         channel = self.make_request(
             "POST",
-            "/rooms/%s/receipt/m.read/%s" % (room_id, first_message_event_id),
+            "/rooms/%s/receipt/m.read/%s" % (room_id, message_event_id),
             {},
             access_token=access_token,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
-
-        # Advance time and make the push succeed
-        self.push_attempts[1][0].callback({})
-        self.pump()
-
-        # Unread count is still zero as we've read the only message in the room
-        self.assertEqual(len(self.push_attempts), 2)
-        self.assertEqual(
-            self.push_attempts[1][2]["notification"]["counts"]["unread"], 0
-        )
-
-        # Send another message
-        self.helper.send(
-            room_id, body="How's the weather today?", tok=other_access_token
-        )
-
-        # Advance time and make the push succeed
-        self.push_attempts[2][0].callback({})
-        self.pump()
-
-        # This push should contain an unread count of 1 as there's now been one
-        # message since our last read receipt
-        self.assertEqual(len(self.push_attempts), 3)
-        self.assertEqual(
-            self.push_attempts[2][2]["notification"]["counts"]["unread"], 1
-        )
-
-        # Since we're grouping by room, sending more messages shouldn't increase the
-        # unread count, as they're all being sent in the same room
-        self.helper.send(room_id, body="Hello?", tok=other_access_token)
-
-        # Advance time and make the push succeed
-        self.pump()
-        self.push_attempts[3][0].callback({})
-
-        self.helper.send(room_id, body="Hello??", tok=other_access_token)
-
-        # Advance time and make the push succeed
-        self.pump()
-        self.push_attempts[4][0].callback({})
-
-        self.helper.send(room_id, body="HELLO???", tok=other_access_token)
-
-        # Advance time and make the push succeed
-        self.pump()
-        self.push_attempts[5][0].callback({})
-
-        self.assertEqual(len(self.push_attempts), 6)

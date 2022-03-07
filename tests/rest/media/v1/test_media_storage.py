@@ -94,7 +94,7 @@ class MediaStorageTests(unittest.HomeserverTestCase):
         self.assertTrue(os.path.exists(local_path))
 
         # Asserts the file is under the expected local cache directory
-        self.assertEquals(
+        self.assertEqual(
             os.path.commonprefix([self.primary_base_path, local_path]),
             self.primary_base_path,
         )
@@ -243,7 +243,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         media_resource = hs.get_media_repository_resource()
         self.download_resource = media_resource.children[b"download"]
         self.thumbnail_resource = media_resource.children[b"thumbnail"]
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.media_repo = hs.get_media_repository()
 
         self.media_id = "example.com/12345"

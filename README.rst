@@ -246,7 +246,7 @@ Password reset
 ==============
 
 Users can reset their password through their client. Alternatively, a server admin
-can reset a users password using the `admin API <docs/admin_api/user_admin_api.rst#reset-password>`_
+can reset a users password using the `admin API <docs/admin_api/user_admin_api.md#reset-password>`_
 or by directly editing the database as shown below.
 
 First calculate the hash of the new password::

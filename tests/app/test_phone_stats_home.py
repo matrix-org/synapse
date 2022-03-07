@@ -32,7 +32,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
         self.helper.send(room_id, "message", tok=access_token)
 
         # Check the R30 results do not count that user.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
+        r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 0})
 
         # Advance 30 days (+ 1 second, because strict inequality causes issues if we are
@@ -40,7 +40,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
         self.reactor.advance(30 * ONE_DAY_IN_SECONDS + 1)
 
         # (Make sure the user isn't somehow counted by this point.)
-        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
+        r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 0})
 
         # Send a message (this counts as activity)
@@ -51,21 +51,21 @@ class PhoneHomeTestCase(HomeserverTestCase):
         self.reactor.advance(2 * 60 * 60)
 
         # *Now* the user is counted.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
+        r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 1, "unknown": 1})
 
         # Advance 29 days. The user has now not posted for 29 days.
         self.reactor.advance(29 * ONE_DAY_IN_SECONDS)
 
         # The user is still counted.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
+        r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 1, "unknown": 1})
 
         # Advance another day. The user has now not posted for 30 days.
         self.reactor.advance(ONE_DAY_IN_SECONDS)
 
         # The user is now no longer counted in R30.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
+        r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 0})
 
     def test_r30_minimum_usage_using_default_config(self):
@@ -84,7 +84,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
         self.helper.send(room_id, "message", tok=access_token)
 
         # Check the R30 results do not count that user.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
+        r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 0})
 
         # Advance 30 days (+ 1 second, because strict inequality causes issues if we are
@@ -92,7 +92,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
         self.reactor.advance(30 * ONE_DAY_IN_SECONDS + 1)
 
         # (Make sure the user isn't somehow counted by this point.)
-        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
+        r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 0})
 
         # Send a message (this counts as activity)
@@ -103,14 +103,14 @@ class PhoneHomeTestCase(HomeserverTestCase):
         self.reactor.advance(2 * 60 * 60)
 
         # *Now* the user is counted.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
+        r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 1, "unknown": 1})
 
         # Advance 27 days. The user has now not posted for 27 days.
         self.reactor.advance(27 * ONE_DAY_IN_SECONDS)
 
         # The user is still counted.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
+        r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 1, "unknown": 1})
 
         # Advance another day. The user has now not posted for 28 days.
@@ -119,7 +119,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
         # The user is now no longer counted in R30.
         # (This is because the user_ips table has been pruned, which by default
         # only preserves the last 28 days of entries.)
-        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
+        r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 0})
 
     def test_r30_user_must_be_retained_for_at_least_a_month(self):
@@ -135,7 +135,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
         self.helper.send(room_id, "message", tok=access_token)
 
         # Check the user does not contribute to R30 yet.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
+        r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 0})
 
         for _ in range(30):
@@ -144,14 +144,16 @@ class PhoneHomeTestCase(HomeserverTestCase):
             self.helper.send(room_id, "I'm still here", tok=access_token)
 
             # Notice that the user *still* does not contribute to R30!
-            r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
+            r30_results = self.get_success(
+                self.hs.get_datastores().main.count_r30_users()
+            )
             self.assertEqual(r30_results, {"all": 0})
 
         self.reactor.advance(ONE_DAY_IN_SECONDS)
         self.helper.send(room_id, "Still here!", tok=access_token)
 
         # *Now* the user appears in R30.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
+        r30_results = self.get_success(self.hs.get_datastores().main.count_r30_users())
         self.assertEqual(r30_results, {"all": 1, "unknown": 1})
 
 
@@ -196,7 +198,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         # (user_daily_visits is updated every 5 minutes using a looping call.)
         self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         # Check the R30 results do not count that user.
         r30_results = self.get_success(store.count_r30v2_users())
@@ -275,7 +277,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         # (user_daily_visits is updated every 5 minutes using a looping call.)
         self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         # Check the user does not contribute to R30 yet.
         r30_results = self.get_success(store.count_r30v2_users())
@@ -347,7 +349,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         # (user_daily_visits is updated every 5 minutes using a looping call.)
         self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         # Check that the user does not contribute to R30v2, even though it's been
         # more than 30 days since registration.
