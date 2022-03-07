@@ -1946,38 +1946,38 @@ class PersistEventsStore:
     def _handle_redact_relations(
         self, txn: LoggingTransaction, redacted_event_id: str
     ) -> None:
-        """Handles receiving a redaction and checking whether we need to remove
-        any redacted relations from the database.
+        """Handles receiving a redaction and checking whether the redacted event
+        has any relations which must be removed from the database.
 
         Args:
             txn
             redacted_event_id: The event that was redacted.
         """
 
-        # Fetch current relations.
-        relates_to = self.db_pool.simple_select_one_onecol_txn(
+        # Fetch the current relation of the event being redacted.
+        redacted_relates_to = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="event_relations",
             keyvalues={"event_id": redacted_event_id},
             retcol="relates_to_id",
             allow_none=True,
         )
-        # Any relation information for the related events must be cleared.
-        if relates_to is not None:
+        # Any relation information for the related event must be cleared.
+        if redacted_relates_to is not None:
             self.store._invalidate_cache_and_stream(
-                txn, self.store.get_relations_for_event, (relates_to,)
+                txn, self.store.get_relations_for_event, (redacted_relates_to,)
             )
             self.store._invalidate_cache_and_stream(
-                txn, self.store.get_aggregation_groups_for_event, (relates_to,)
+                txn, self.store.get_aggregation_groups_for_event, (redacted_relates_to,)
             )
             self.store._invalidate_cache_and_stream(
-                txn, self.store.get_applicable_edit, (relates_to,)
+                txn, self.store.get_applicable_edit, (redacted_relates_to,)
             )
             self.store._invalidate_cache_and_stream(
-                txn, self.store.get_thread_summary, (relates_to,)
+                txn, self.store.get_thread_summary, (redacted_relates_to,)
             )
             self.store._invalidate_cache_and_stream(
-                txn, self.store.get_thread_participated, (relates_to,)
+                txn, self.store.get_thread_participated, (redacted_relates_to,)
             )
 
         self.db_pool.simple_delete_txn(
