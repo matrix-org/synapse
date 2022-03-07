@@ -23,7 +23,9 @@ class RoomDirectoryConfigTestCase(HomeserverTestCase):
     # values are loaded when the corresponding config options are commented out, which is why there isn't
     # a config specified here.
     def test_default_configuration(self):
-        background_updater = BackgroundUpdater(self.hs, self.hs.get_datastore().db_pool)
+        background_updater = BackgroundUpdater(
+            self.hs, self.hs.get_datastores().main.db_pool
+        )
 
         self.assertEqual(background_updater.minimum_background_batch_size, 1)
         self.assertEqual(background_updater.default_background_batch_size, 100)
@@ -44,7 +46,9 @@ class RoomDirectoryConfigTestCase(HomeserverTestCase):
         )
     )
     def test_custom_configuration(self):
-        background_updater = BackgroundUpdater(self.hs, self.hs.get_datastore().db_pool)
+        background_updater = BackgroundUpdater(
+            self.hs, self.hs.get_datastores().main.db_pool
+        )
 
         self.assertEqual(background_updater.minimum_background_batch_size, 5)
         self.assertEqual(background_updater.default_background_batch_size, 50)
