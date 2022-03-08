@@ -1812,9 +1812,7 @@ class PersistEventsStore:
             txn.call_after(self.store.get_applicable_edit.invalidate, (parent_id,))
 
         if rel_type == RelationTypes.THREAD:
-            txn.call_after(
-                self.store.get_thread_summary.invalidate, (parent_id, event.room_id)
-            )
+            txn.call_after(self.store.get_thread_summary.invalidate, (parent_id,))
             # It should be safe to only invalidate the cache if the user has not
             # previously participated in the thread, but that's difficult (and
             # potentially error-prone) so it is always invalidated.
