@@ -547,7 +547,9 @@ class RelationsTestCase(BaseRelationsTestCase):
         )
         self.assertEqual(400, channel.code, channel.json_body)
 
-    @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
+    @unittest.override_config(
+        {"experimental_features": {"msc3440_enabled": True, "msc3666_enabled": True}}
+    )
     def test_bundled_aggregations(self) -> None:
         """
         Test that annotations, references, and threads get correctly bundled.
@@ -757,6 +759,7 @@ class RelationsTestCase(BaseRelationsTestCase):
             },
         )
 
+    @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
     def test_ignore_invalid_room(self) -> None:
         """Test that we ignore invalid relations over federation."""
         # Create another room and send a message in it.
@@ -1063,6 +1066,7 @@ class RelationsTestCase(BaseRelationsTestCase):
             {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
         )
 
+    @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
     def test_edit_thread(self) -> None:
         """Test that editing a thread works."""
 
@@ -1380,6 +1384,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         chunk = self._get_aggregations()
         self.assertEqual(chunk, [{"type": "m.reaction", "key": "a", "count": 1}])
 
+    @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
     def test_redact_relation_thread(self) -> None:
         """
         Test that thread replies are properly handled after the thread reply redacted.
