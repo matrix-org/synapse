@@ -297,7 +297,8 @@ provider for SSO (Single sign-on). Details in
 section <code>sso</code> and <code>oidc_providers</code>.
 <ul>
 <li><code>auth_provider</code> - string. ID of the external identity provider. Value of <code>idp_id</code>
-in homeserver configuration.</li>
+in the homeserver configuration. Note that no error is raised if the provided
+value is not in the homeserver configuration.</li>
 <li><code>external_id</code> - string, user ID in the external identity provider.</li>
 </ul>
 </li>

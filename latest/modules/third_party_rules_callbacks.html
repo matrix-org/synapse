@@ -290,6 +290,48 @@ it will be included in this state.</p>
 into the room, which means this callback cannot be used to deny persisting the event. To
 deny an incoming event, see <a href="spam_checker_callbacks.html#check_event_for_spam"><code>check_event_for_spam</code></a> instead.</p>
 <p>If multiple modules implement this callback, Synapse runs them all in order.</p>
+<h3 id="on_profile_update"><a class="header" href="#on_profile_update"><code>on_profile_update</code></a></h3>
+<p><em>First introduced in Synapse v1.54.0</em></p>
+<pre><code class="language-python">async def on_profile_update(
+    user_id: str,
+    new_profile: &quot;synapse.module_api.ProfileInfo&quot;,
+    by_admin: bool,
+    deactivation: bool,
+) -&gt; None:
+</code></pre>
+<p>Called after updating a local user's profile. The update can be triggered either by the
+user themselves or a server admin. The update can also be triggered by a user being
+deactivated (in which case their display name is set to an empty string (<code>&quot;&quot;</code>) and the
+avatar URL is set to <code>None</code>). The module is passed the Matrix ID of the user whose profile
+has been updated, their new profile, as well as a <code>by_admin</code> boolean that is <code>True</code> if the
+update was triggered by a server admin (and <code>False</code> otherwise), and a <code>deactivated</code>
+boolean that is <code>True</code> if the update is a result of the user being deactivated.</p>
+<p>Note that the <code>by_admin</code> boolean is also <code>True</code> if the profile change happens as a result
+of the user logging in through Single Sign-On, or if a server admin updates their own
+profile.</p>
+<p>Per-room profile changes do not trigger this callback to be called. Synapse administrators
+wishing this callback to be called on every profile change are encouraged to disable
+per-room profiles globally using the <code>allow_per_room_profiles</code> configuration setting in
+Synapse's configuration file.
+This callback is not called when registering a user, even when setting it through the
+<a href="https://matrix-org.github.io/synapse/latest/modules/password_auth_provider_callbacks.html#get_displayname_for_registration"><code>get_displayname_for_registration</code></a>
+module callback.</p>
+<p>If multiple modules implement this callback, Synapse runs them all in order.</p>
+<h3 id="on_user_deactivation_status_changed"><a class="header" href="#on_user_deactivation_status_changed"><code>on_user_deactivation_status_changed</code></a></h3>
+<p><em>First introduced in Synapse v1.54.0</em></p>
+<pre><code class="language-python">async def on_user_deactivation_status_changed(
+    user_id: str, deactivated: bool, by_admin: bool
+) -&gt; None:
+</code></pre>
+<p>Called after deactivating a local user, or reactivating them through the admin API. The
+deactivation can be triggered either by the user themselves or a server admin. The module
+is passed the Matrix ID of the user whose status is changed, as well as a <code>deactivated</code>
+boolean that is <code>True</code> if the user is being deactivated and <code>False</code> if they're being
+reactivated, and a <code>by_admin</code> boolean that is <code>True</code> if the deactivation was triggered by
+a server admin (and <code>False</code> otherwise). This latter <code>by_admin</code> boolean is always <code>True</code>
+if the user is being reactivated, as this operation can only be performed through the
+admin API.</p>
+<p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 <h2 id="example"><a class="header" href="#example">Example</a></h2>
 <p>The example below is a module that implements the third-party rules callback
 <code>check_event_allowed</code> to censor incoming messages as dictated by a third-party service.</p>

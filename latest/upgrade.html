@@ -260,6 +260,12 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1540"><a class="header" href="#upgrading-to-v1540">Upgrading to v1.54.0</a></h1>
+<h2 id="legacy-structured-logging-configuration-removal"><a class="header" href="#legacy-structured-logging-configuration-removal">Legacy structured logging configuration removal</a></h2>
+<p>This release removes support for the <code>structured: true</code> logging configuration
+which was deprecated in Synapse v1.23.0. If your logging configuration contains
+<code>structured: true</code> then it should be modified based on the
+<a href="structured_logging.html">structured logging documentation</a>.</p>
 <h1 id="upgrading-to-v1530"><a class="header" href="#upgrading-to-v1530">Upgrading to v1.53.0</a></h1>
 <h2 id="dropping-support-for-webclient-listeners-and-non-https-web_client_location"><a class="header" href="#dropping-support-for-webclient-listeners-and-non-https-web_client_location">Dropping support for <code>webclient</code> listeners and non-HTTP(S) <code>web_client_location</code></a></h2>
 <p>Per the deprecation notice in Synapse v1.51.0, listeners of type  <code>webclient</code>

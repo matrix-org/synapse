@@ -1638,6 +1638,12 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1540"><a class="header" href="#upgrading-to-v1540">Upgrading to v1.54.0</a></h1>
+<h2 id="legacy-structured-logging-configuration-removal"><a class="header" href="#legacy-structured-logging-configuration-removal">Legacy structured logging configuration removal</a></h2>
+<p>This release removes support for the <code>structured: true</code> logging configuration
+which was deprecated in Synapse v1.23.0. If your logging configuration contains
+<code>structured: true</code> then it should be modified based on the
+<a href="structured_logging.html">structured logging documentation</a>.</p>
 <h1 id="upgrading-to-v1530"><a class="header" href="#upgrading-to-v1530">Upgrading to v1.53.0</a></h1>
 <h2 id="dropping-support-for-webclient-listeners-and-non-https-web_client_location"><a class="header" href="#dropping-support-for-webclient-listeners-and-non-https-web_client_location">Dropping support for <code>webclient</code> listeners and non-HTTP(S) <code>web_client_location</code></a></h2>
 <p>Per the deprecation notice in Synapse v1.51.0, listeners of type  <code>webclient</code>
@@ -3075,7 +3081,7 @@ presence:
 # For example, for room version 1, default_room_version should be set
 # to &quot;1&quot;.
 #
-#default_room_version: &quot;6&quot;
+#default_room_version: &quot;9&quot;
 
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
@@ -5805,13 +5811,11 @@ loggers:
 with the SQL layer at 'WARNING', and will log JSON formatted messages to a
 remote endpoint at 10.1.2.3:9999.</p>
 <h2 id="upgrading-from-legacy-structured-logging-configuration"><a class="header" href="#upgrading-from-legacy-structured-logging-configuration">Upgrading from legacy structured logging configuration</a></h2>
-<p>Versions of Synapse prior to v1.23.0 included a custom structured logging
-configuration which is deprecated. It used a <code>structured: true</code> flag and
-configured <code>drains</code> instead of <code>handlers</code> and <code>formatters</code>.</p>
-<p>Synapse currently automatically converts the old configuration to the new
-configuration, but this will be removed in a future version of Synapse. The
-following reference can be used to update your configuration. Based on the drain
-<code>type</code>, we can pick a new handler:</p>
+<p>Versions of Synapse prior to v1.54.0 automatically converted the legacy
+structured logging configuration, which was deprecated in v1.23.0, to the standard
+library logging configuration.</p>
+<p>The following reference can be used to update your configuration. Based on the
+drain <code>type</code>, we can pick a new handler:</p>
 <ol>
 <li>For a type of <code>console</code>, <code>console_json</code>, or <code>console_json_terse</code>: a handler
 with a class of <code>logging.StreamHandler</code> and a <code>stream</code> of <code>ext://sys.stdout</code>
@@ -7946,10 +7950,14 @@ Synapse instances. Spam checker callbacks can be registered using the module API
 <p><em>First introduced in Synapse v1.37.0</em></p>
 <pre><code class="language-python">async def check_event_for_spam(event: &quot;synapse.events.EventBase&quot;) -&gt; Union[bool, str]
 </code></pre>
-<p>Called when receiving an event from a client or via federation. The module can return
-either a <code>bool</code> to indicate whether the event must be rejected because of spam, or a <code>str</code>
-to indicate the event must be rejected because of spam and to give a rejection reason to
-forward to clients.</p>
+<p>Called when receiving an event from a client or via federation. The callback must return
+either:</p>
+<ul>
+<li>an error message string, to indicate the event must be rejected because of spam and 
+give a rejection reason to forward to clients;</li>
+<li>the boolean <code>True</code>, to indicate that the event is spammy, but not provide further details; or</li>
+<li>the booelan <code>False</code>, to indicate that the event is not considered spammy.</li>
+</ul>
 <p>If multiple modules implement this callback, they will be considered in order. If a
 callback returns <code>False</code>, Synapse falls through to the next one. The value of the first
 callback that does not return <code>False</code> will be used. If this happens, Synapse will not call
@@ -7959,7 +7967,9 @@ any of the subsequent implementations of this callback.</p>
 <pre><code class="language-python">async def user_may_join_room(user: str, room: str, is_invited: bool) -&gt; bool
 </code></pre>
 <p>Called when a user is trying to join a room. The module must return a <code>bool</code> to indicate
-whether the user can join the room. The user is represented by their Matrix user ID (e.g.
+whether the user can join the room. Return <code>False</code> to prevent the user from joining the
+room; otherwise return <code>True</code> to permit the joining.</p>
+<p>The user is represented by their Matrix user ID (e.g.
 <code>@alice:example.com</code>) and the room is represented by its Matrix ID (e.g.
 <code>!room:example.com</code>). The module is also given a boolean to indicate whether the user
 currently has a pending invite in the room.</p>
@@ -7975,7 +7985,8 @@ any of the subsequent implementations of this callback.</p>
 </code></pre>
 <p>Called when processing an invitation. The module must return a <code>bool</code> indicating whether
 the inviter can invite the invitee to the given room. Both inviter and invitee are
-represented by their Matrix user ID (e.g. <code>@alice:example.com</code>).</p>
+represented by their Matrix user ID (e.g. <code>@alice:example.com</code>). Return <code>False</code> to prevent
+the invitation; otherwise return <code>True</code> to permit it.</p>
 <p>If multiple modules implement this callback, they will be considered in order. If a
 callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
@@ -7991,7 +8002,8 @@ any of the subsequent implementations of this callback.</p>
 </code></pre>
 <p>Called when processing an invitation using a third-party identifier (also called a 3PID,
 e.g. an email address or a phone number). The module must return a <code>bool</code> indicating
-whether the inviter can invite the invitee to the given room.</p>
+whether the inviter can invite the invitee to the given room. Return <code>False</code> to prevent
+the invitation; otherwise return <code>True</code> to permit it.</p>
 <p>The inviter is represented by their Matrix user ID (e.g. <code>@alice:example.com</code>), and the
 invitee is represented by its medium (e.g. &quot;email&quot;) and its address
 (e.g. <code>alice@example.com</code>). See <a href="https://matrix.org/docs/spec/appendices#pid-types">the Matrix specification</a>
@@ -8016,7 +8028,8 @@ any of the subsequent implementations of this callback.</p>
 <pre><code class="language-python">async def user_may_create_room(user: str) -&gt; bool
 </code></pre>
 <p>Called when processing a room creation request. The module must return a <code>bool</code> indicating
-whether the given user (represented by their Matrix user ID) is allowed to create a room.</p>
+whether the given user (represented by their Matrix user ID) is allowed to create a room.
+Return <code>False</code> to prevent room creation; otherwise return <code>True</code> to permit it.</p>
 <p>If multiple modules implement this callback, they will be considered in order. If a
 callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
@@ -8027,7 +8040,8 @@ any of the subsequent implementations of this callback.</p>
 </code></pre>
 <p>Called when trying to associate an alias with an existing room. The module must return a
 <code>bool</code> indicating whether the given user (represented by their Matrix user ID) is allowed
-to set the given alias.</p>
+to set the given alias. Return <code>False</code> to prevent the alias creation; otherwise return 
+<code>True</code> to permit it.</p>
 <p>If multiple modules implement this callback, they will be considered in order. If a
 callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
@@ -8038,7 +8052,8 @@ any of the subsequent implementations of this callback.</p>
 </code></pre>
 <p>Called when trying to publish a room to the homeserver's public rooms directory. The
 module must return a <code>bool</code> indicating whether the given user (represented by their
-Matrix user ID) is allowed to publish the given room.</p>
+Matrix user ID) is allowed to publish the given room. Return <code>False</code> to prevent the
+room from being published; otherwise return <code>True</code> to permit its publication.</p>
 <p>If multiple modules implement this callback, they will be considered in order. If a
 callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
 callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
@@ -8048,8 +8063,10 @@ any of the subsequent implementations of this callback.</p>
 <pre><code class="language-python">async def check_username_for_spam(user_profile: Dict[str, str]) -&gt; bool
 </code></pre>
 <p>Called when computing search results in the user directory. The module must return a
-<code>bool</code> indicating whether the given user profile can appear in search results. The profile
-is represented as a dictionary with the following keys:</p>
+<code>bool</code> indicating whether the given user should be excluded from user directory 
+searches. Return <code>True</code> to indicate that the user is spammy and exclude them from 
+search results; otherwise return <code>False</code>.</p>
+<p>The profile is represented as a dictionary with the following keys:</p>
 <ul>
 <li><code>user_id</code>: The Matrix ID for this user.</li>
 <li><code>display_name</code>: The user's display name.</li>
@@ -8095,8 +8112,9 @@ this callback.</p>
     file_info: &quot;synapse.rest.media.v1._base.FileInfo&quot;,
 ) -&gt; bool
 </code></pre>
-<p>Called when storing a local or remote file. The module must return a boolean indicating
-whether the given file can be stored in the homeserver's media store.</p>
+<p>Called when storing a local or remote file. The module must return a <code>bool</code> indicating
+whether the given file should be excluded from the homeserver's media store. Return
+<code>True</code> to prevent this file from being stored; otherwise return <code>False</code>.</p>
 <p>If multiple modules implement this callback, they will be considered in order. If a
 callback returns <code>False</code>, Synapse falls through to the next one. The value of the first
 callback that does not return <code>False</code> will be used. If this happens, Synapse will not call
@@ -8251,6 +8269,48 @@ it will be included in this state.</p>
 <p>Note that this callback is called when the event has already been processed and stored
 into the room, which means this callback cannot be used to deny persisting the event. To
 deny an incoming event, see <a href="modules/spam_checker_callbacks.html#check_event_for_spam"><code>check_event_for_spam</code></a> instead.</p>
+<p>If multiple modules implement this callback, Synapse runs them all in order.</p>
+<h3 id="on_profile_update"><a class="header" href="#on_profile_update"><code>on_profile_update</code></a></h3>
+<p><em>First introduced in Synapse v1.54.0</em></p>
+<pre><code class="language-python">async def on_profile_update(
+    user_id: str,
+    new_profile: &quot;synapse.module_api.ProfileInfo&quot;,
+    by_admin: bool,
+    deactivation: bool,
+) -&gt; None:
+</code></pre>
+<p>Called after updating a local user's profile. The update can be triggered either by the
+user themselves or a server admin. The update can also be triggered by a user being
+deactivated (in which case their display name is set to an empty string (<code>&quot;&quot;</code>) and the
+avatar URL is set to <code>None</code>). The module is passed the Matrix ID of the user whose profile
+has been updated, their new profile, as well as a <code>by_admin</code> boolean that is <code>True</code> if the
+update was triggered by a server admin (and <code>False</code> otherwise), and a <code>deactivated</code>
+boolean that is <code>True</code> if the update is a result of the user being deactivated.</p>
+<p>Note that the <code>by_admin</code> boolean is also <code>True</code> if the profile change happens as a result
+of the user logging in through Single Sign-On, or if a server admin updates their own
+profile.</p>
+<p>Per-room profile changes do not trigger this callback to be called. Synapse administrators
+wishing this callback to be called on every profile change are encouraged to disable
+per-room profiles globally using the <code>allow_per_room_profiles</code> configuration setting in
+Synapse's configuration file.
+This callback is not called when registering a user, even when setting it through the
+<a href="https://matrix-org.github.io/synapse/latest/modules/password_auth_provider_callbacks.html#get_displayname_for_registration"><code>get_displayname_for_registration</code></a>
+module callback.</p>
+<p>If multiple modules implement this callback, Synapse runs them all in order.</p>
+<h3 id="on_user_deactivation_status_changed"><a class="header" href="#on_user_deactivation_status_changed"><code>on_user_deactivation_status_changed</code></a></h3>
+<p><em>First introduced in Synapse v1.54.0</em></p>
+<pre><code class="language-python">async def on_user_deactivation_status_changed(
+    user_id: str, deactivated: bool, by_admin: bool
+) -&gt; None:
+</code></pre>
+<p>Called after deactivating a local user, or reactivating them through the admin API. The
+deactivation can be triggered either by the user themselves or a server admin. The module
+is passed the Matrix ID of the user whose status is changed, as well as a <code>deactivated</code>
+boolean that is <code>True</code> if the user is being deactivated and <code>False</code> if they're being
+reactivated, and a <code>by_admin</code> boolean that is <code>True</code> if the deactivation was triggered by
+a server admin (and <code>False</code> otherwise). This latter <code>by_admin</code> boolean is always <code>True</code>
+if the user is being reactivated, as this operation can only be performed through the
+admin API.</p>
 <p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 <h2 id="example-1"><a class="header" href="#example-1">Example</a></h2>
 <p>The example below is a module that implements the third-party rules callback
@@ -8457,7 +8517,7 @@ If the module doesn't wish to return a callback, it must return None instead.</p
 <p>If multiple modules implement this callback, they will be considered in order. If a
 callback returns <code>None</code>, Synapse falls through to the next one. The value of the first
 callback that does not return <code>None</code> will be used. If this happens, Synapse will not call
-any of the subsequent implementations of this callback. If every callback return <code>None</code>,
+any of the subsequent implementations of this callback. If every callback returns <code>None</code>,
 the authentication is denied.</p>
 <h3 id="on_logged_out"><a class="header" href="#on_logged_out"><code>on_logged_out</code></a></h3>
 <p><em>First introduced in Synapse v1.46.0</em></p>
@@ -8517,9 +8577,30 @@ return <code>None</code>.</p>
 <p>If multiple modules implement this callback, they will be considered in order. If a
 callback returns <code>None</code>, Synapse falls through to the next one. The value of the first
 callback that does not return <code>None</code> will be used. If this happens, Synapse will not call
-any of the subsequent implementations of this callback. If every callback return <code>None</code>,
+any of the subsequent implementations of this callback. If every callback returns <code>None</code>,
 the username provided by the user is used, if any (otherwise one is automatically
 generated).</p>
+<h3 id="get_displayname_for_registration"><a class="header" href="#get_displayname_for_registration"><code>get_displayname_for_registration</code></a></h3>
+<p><em>First introduced in Synapse v1.54.0</em></p>
+<pre><code class="language-python">async def get_displayname_for_registration(
+    uia_results: Dict[str, Any],
+    params: Dict[str, Any],
+) -&gt; Optional[str]
+</code></pre>
+<p>Called when registering a new user. The module can return a display name to set for the
+user being registered by returning it as a string, or <code>None</code> if it doesn't wish to force a
+display name for this user.</p>
+<p>This callback is called once <a href="https://spec.matrix.org/latest/client-server-api/#user-interactive-authentication-api">User-Interactive Authentication</a>
+has been completed by the user. It is not called when registering a user via SSO. It is
+passed two dictionaries, which include the information that the user has provided during
+the registration process. These dictionaries are identical to the ones passed to
+<a href="modules/password_auth_provider_callbacks.html#get_username_for_registration"><code>get_username_for_registration</code></a>, so refer to the
+documentation of this callback for more information about them.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>None</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>None</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback. If every callback returns <code>None</code>,
+the username will be used (e.g. <code>alice</code> if the user being registered is <code>@alice:example.com</code>).</p>
 <h2 id="is_3pid_allowed"><a class="header" href="#is_3pid_allowed"><code>is_3pid_allowed</code></a></h2>
 <p><em>First introduced in Synapse v1.53.0</em></p>
 <pre><code class="language-python">async def is_3pid_allowed(self, medium: str, address: str, registration: bool) -&gt; bool
@@ -8546,7 +8627,7 @@ any of the subsequent implementations of this callback.</p>
 <li><code>m.login.password</code> (defined in <a href="https://matrix.org/docs/spec/client_server/latest#password-based">the spec</a>)
 <ul>
 <li>Expects a <code>password</code> field to be sent to <code>/login</code></li>
-<li>Is checked by the method: <code>self.check_pass</code> </li>
+<li>Is checked by the method: <code>self.check_pass</code></li>
 </ul>
 </li>
 </ul>
@@ -8805,8 +8886,11 @@ recommend the use of <code>systemd</code> where available: for information on se
 <a href="synctl_workers.html">Using synctl with Workers</a>.</p>
 <h2 id="available-worker-applications"><a class="header" href="#available-worker-applications">Available worker applications</a></h2>
 <h3 id="synapseappgeneric_worker"><a class="header" href="#synapseappgeneric_worker"><code>synapse.app.generic_worker</code></a></h3>
-<p>This worker can handle API requests matching the following regular
-expressions:</p>
+<p>This worker can handle API requests matching the following regular expressions.
+These endpoints can be routed to any worker. If a worker is set up to handle a
+stream then, for maximum efficiency, additional endpoints should be routed to that
+worker: refer to the <a href="workers.html#stream-writers">stream writers</a> section below for further
+information.</p>
 <pre><code># Sync requests
 ^/_matrix/client/(v2_alpha|r0|v3)/sync$
 ^/_matrix/client/(api/v1|v2_alpha|r0|v3)/events$
@@ -8835,7 +8919,6 @@ expressions:</p>
 ^/_matrix/federation/v1/user/devices/
 ^/_matrix/federation/v1/get_groups_publicised$
 ^/_matrix/key/v2/query
-^/_matrix/federation/unstable/org.matrix.msc2946/spaces/
 ^/_matrix/federation/(v1|unstable/org.matrix.msc2946)/hierarchy/
 
 # Inbound federation transaction request
@@ -8848,21 +8931,24 @@ expressions:</p>
 ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/context/.*$
 ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/members$
 ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state$
-^/_matrix/client/unstable/org.matrix.msc2946/rooms/.*/spaces$
 ^/_matrix/client/(v1|unstable/org.matrix.msc2946)/rooms/.*/hierarchy$
 ^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
-^/_matrix/client/(api/v1|r0|v3|unstable)/account/3pid$
-^/_matrix/client/(api/v1|r0|v3|unstable)/devices$
-^/_matrix/client/(api/v1|r0|v3|unstable)/keys/query$
-^/_matrix/client/(api/v1|r0|v3|unstable)/keys/changes$
+^/_matrix/client/(r0|v3|unstable)/account/3pid$
+^/_matrix/client/(r0|v3|unstable)/devices$
 ^/_matrix/client/versions$
 ^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$
-^/_matrix/client/(api/v1|r0|v3|unstable)/joined_groups$
-^/_matrix/client/(api/v1|r0|v3|unstable)/publicised_groups$
-^/_matrix/client/(api/v1|r0|v3|unstable)/publicised_groups/
+^/_matrix/client/(r0|v3|unstable)/joined_groups$
+^/_matrix/client/(r0|v3|unstable)/publicised_groups$
+^/_matrix/client/(r0|v3|unstable)/publicised_groups/
 ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event/
 ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
 ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
+
+# Encryption requests
+^/_matrix/client/(r0|v3|unstable)/keys/query$
+^/_matrix/client/(r0|v3|unstable)/keys/changes$
+^/_matrix/client/(r0|v3|unstable)/keys/claim$
+^/_matrix/client/(r0|v3|unstable)/room_keys/
 
 # Registration/login requests
 ^/_matrix/client/(api/v1|r0|v3|unstable)/login$
@@ -8876,6 +8962,20 @@ expressions:</p>
 ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
 ^/_matrix/client/(api/v1|r0|v3|unstable)/join/
 ^/_matrix/client/(api/v1|r0|v3|unstable)/profile/
+
+# Device requests
+^/_matrix/client/(r0|v3|unstable)/sendToDevice/
+
+# Account data requests
+^/_matrix/client/(r0|v3|unstable)/.*/tags
+^/_matrix/client/(r0|v3|unstable)/.*/account_data
+
+# Receipts requests
+^/_matrix/client/(r0|v3|unstable)/rooms/.*/receipt
+^/_matrix/client/(r0|v3|unstable)/rooms/.*/read_markers
+
+# Presence requests
+^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
 </code></pre>
 <p>Additionally, the following REST endpoints can be handled for GET requests:</p>
 <pre><code>^/_matrix/federation/v1/groups/
@@ -8941,11 +9041,10 @@ effects of bursts of events from that bridge on events sent by normal users.</p>
 <p>Additionally, there is <em>experimental</em> support for moving writing of specific
 streams (such as events) off of the main process to a particular worker. (This
 is only supported with Redis-based replication.)</p>
-<p>Currently supported streams are <code>events</code> and <code>typing</code>.</p>
 <p>To enable this, the worker must have a HTTP replication listener configured,
-have a <code>worker_name</code> and be listed in the <code>instance_map</code> config. For example to
-move event persistence off to a dedicated worker, the shared configuration would
-include:</p>
+have a <code>worker_name</code> and be listed in the <code>instance_map</code> config. The same worker
+can handle multiple streams. For example, to move event persistence off to a
+dedicated worker, the shared configuration would include:</p>
 <pre><code class="language-yaml">instance_map:
     event_persister1:
         host: localhost
@@ -8954,6 +9053,10 @@ include:</p>
 stream_writers:
     events: event_persister1
 </code></pre>
+<p>Some of the streams have associated endpoints which, for maximum efficiency, should
+be routed to the workers handling that stream. See below for the currently supported
+streams and the endpoints associated with them:</p>
+<h5 id="the-events-stream"><a class="header" href="#the-events-stream">The <code>events</code> stream</a></h5>
 <p>The <code>events</code> stream also experimentally supports having multiple writers, where
 work is sharded between them by room ID. Note that you <em>must</em> restart all worker
 instances when adding or removing event persisters. An example <code>stream_writers</code>
@@ -8962,6 +9065,33 @@ configuration with multiple writers:</p>
     events:
         - event_persister1
         - event_persister2
+</code></pre>
+<h5 id="the-typing-stream"><a class="header" href="#the-typing-stream">The <code>typing</code> stream</a></h5>
+<p>The following endpoints should be routed directly to the workers configured as
+stream writers for the <code>typing</code> stream:</p>
+<pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing
+</code></pre>
+<h5 id="the-to_device-stream"><a class="header" href="#the-to_device-stream">The <code>to_device</code> stream</a></h5>
+<p>The following endpoints should be routed directly to the workers configured as
+stream writers for the <code>to_device</code> stream:</p>
+<pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/sendToDevice/
+</code></pre>
+<h5 id="the-account_data-stream"><a class="header" href="#the-account_data-stream">The <code>account_data</code> stream</a></h5>
+<p>The following endpoints should be routed directly to the workers configured as
+stream writers for the <code>account_data</code> stream:</p>
+<pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/.*/tags
+^/_matrix/client/(api/v1|r0|v3|unstable)/.*/account_data
+</code></pre>
+<h5 id="the-receipts-stream"><a class="header" href="#the-receipts-stream">The <code>receipts</code> stream</a></h5>
+<p>The following endpoints should be routed directly to the workers configured as
+stream writers for the <code>receipts</code> stream:</p>
+<pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/receipt
+^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/read_markers
+</code></pre>
+<h5 id="the-presence-stream"><a class="header" href="#the-presence-stream">The <code>presence</code> stream</a></h5>
+<p>The following endpoints should be routed directly to the workers configured as
+stream writers for the <code>presence</code> stream:</p>
+<pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
 </code></pre>
 <h4 id="background-tasks"><a class="header" href="#background-tasks">Background tasks</a></h4>
 <p>There is also <em>experimental</em> support for moving background tasks to a separate
@@ -11128,7 +11258,8 @@ provider for SSO (Single sign-on). Details in
 section <code>sso</code> and <code>oidc_providers</code>.
 <ul>
 <li><code>auth_provider</code> - string. ID of the external identity provider. Value of <code>idp_id</code>
-in homeserver configuration.</li>
+in the homeserver configuration. Note that no error is raised if the provided
+value is not in the homeserver configuration.</li>
 <li><code>external_id</code> - string, user ID in the external identity provider.</li>
 </ul>
 </li>
@@ -12241,7 +12372,7 @@ parts of the process.</p>
 <p>Note that, prior to Synapse 1.41, any call which returns a coroutine will need to be wrapped in <code>ensureDeferred</code>.</p>
 <p>As a simple example, retrieving an event from the database:</p>
 <pre><code class="language-pycon">&gt;&gt;&gt; from twisted.internet import defer
-&gt;&gt;&gt; defer.ensureDeferred(hs.get_datastore().get_event('$1416420717069yeQaw:matrix.org'))
+&gt;&gt;&gt; defer.ensureDeferred(hs.get_datastores().main.get_event('$1416420717069yeQaw:matrix.org'))
 &lt;Deferred at 0x7ff253fc6998 current result: &lt;FrozenEvent event_id='$1416420717069yeQaw:matrix.org', type='m.room.create', state_key=''&gt;&gt;
 </code></pre>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="how-to-monitor-synapse-metrics-using-prometheus"><a class="header" href="#how-to-monitor-synapse-metrics-using-prometheus">How to monitor Synapse metrics using Prometheus</a></h1>
