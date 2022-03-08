@@ -353,13 +353,12 @@ class ReadWriteLockTestCase(unittest.TestCase):
         writer3_d, _ = self._start_nonblocking_writer(rwlock, key, "write 3 completed")
         self.assertFalse(writer3_d.called)
 
-        # 5. The second writer is cancelled.
+        # 5. The second writer is cancelled, but continues waiting for the lock.
         #    The reader, first writer and third writer should not be cancelled.
         #    The first writer should still be waiting on the reader.
-        #    The third writer should still be waiting, even though the second writer has
-        #    been cancelled.
+        #    The third writer should still be waiting on the second writer.
         writer2_d.cancel()
-        self.failureResultOf(writer2_d, CancelledError)
+        self.assertNoResult(writer2_d)
         self.assertFalse(reader_d.called, "Reader was unexpectedly cancelled")
         self.assertFalse(writer1_d.called, "First writer was unexpectedly cancelled")
         self.assertFalse(
@@ -370,9 +369,10 @@ class ReadWriteLockTestCase(unittest.TestCase):
 
         # 6. Unblock the reader, which should complete.
         #    The first writer should be given the lock and block.
-        #    The third writer should still be waiting.
+        #    The third writer should still be waiting on the second writer.
         unblock_reader.callback(None)
         self.assertEqual("read completed", self.successResultOf(reader_d))
+        self.assertNoResult(writer2_d)
         self.assertFalse(
             writer3_d.called,
             "Third writer was unexpectedly given the lock before the first writer "
@@ -383,7 +383,11 @@ class ReadWriteLockTestCase(unittest.TestCase):
         unblock_writer1.callback(None)
         self.assertEqual("write 1 completed", self.successResultOf(writer1_d))
 
-        # 8. The third writer should take the lock and complete.
+        # 8. The second writer should take the lock and release it immediately, since it
+        #    has been cancelled.
+        self.failureResultOf(writer2_d, CancelledError)
+
+        # 9. The third writer should take the lock and complete.
         self.assertTrue(
             writer3_d.called, "Third writer is stuck waiting for a cancelled writer"
         )

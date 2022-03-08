@@ -562,31 +562,22 @@ class ReadWriteLock:
             to_wait_on_defer = defer.gatherResults(to_wait_on)
             try:
                 # Wait for all current readers and the latest writer to finish.
-                # May raise a `CancelledError` if the `Deferred` wrapping us is
-                # cancelled. The `Deferred`s we are waiting on must not be cancelled,
-                # since we do not own them.
-                await make_deferred_yieldable(stop_cancellation(to_wait_on_defer))
+                # May raise a `CancelledError` immediately after the wait if the
+                # `Deferred` wrapping us is cancelled. We must only release the lock
+                # once we have acquired it, hence the delay.
+                await make_deferred_yieldable(
+                    delay_cancellation(to_wait_on_defer, all=True)
+                )
                 yield
             finally:
-
-                def release() -> None:
-                    with PreserveLoggingContext():
-                        new_defer.callback(None)
-                    # `self.key_to_current_writer[key]` may be missing if there was another
-                    # writer waiting for us and it completed entirely within the
-                    # `new_defer.callback()` call above.
-                    if self.key_to_current_writer.get(key) == new_defer:
-                        self.key_to_current_writer.pop(key)
-
-                if to_wait_on_defer.called:
-                    release()
-                else:
-                    # We don't have the lock yet, probably because we were cancelled
-                    # while waiting for it. We can't call `release()` yet, since
-                    # `new_defer` must only resolve once all previous readers and
-                    # writers have finished.
-                    # NB: `release()` won't have a logcontext in this path.
-                    to_wait_on_defer.addBoth(lambda _: release())
+                # Release the lock.
+                with PreserveLoggingContext():
+                    new_defer.callback(None)
+                # `self.key_to_current_writer[key]` may be missing if there was another
+                # writer waiting for us and it completed entirely within the
+                # `new_defer.callback()` call above.
+                if self.key_to_current_writer.get(key) == new_defer:
+                    self.key_to_current_writer.pop(key)
 
         return _ctx_manager()
 
