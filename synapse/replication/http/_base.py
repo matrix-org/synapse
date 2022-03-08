@@ -21,8 +21,8 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Tuple
 
 from prometheus_client import Counter, Gauge
 
-from twisted.web.server import Request
 from twisted.internet.error import ConnectError, DNSLookupError
+from twisted.web.server import Request
 
 from synapse.api.errors import HttpResponseException, SynapseError
 from synapse.http import RequestTimedOutError
@@ -239,6 +239,12 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                     "/".join(url_args),
                 )
 
+                headers: Dict[bytes, List[bytes]] = {}
+                # Add an authorization header, if configured.
+                if replication_secret:
+                    headers[b"Authorization"] = [b"Bearer " + replication_secret]
+                opentracing.inject_header_dict(headers, check_destination=False)
+
                 try:
                     # Keep track of attempts made so we can bail if we don't manage to
                     # connect to the target after N tries.
@@ -247,13 +253,6 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                     # have a good idea that the request has either succeeded or failed
                     # on the master, and so whether we should clean up or not.
                     while True:
-                        headers: Dict[bytes, List[bytes]] = {}
-                        # Add an authorization header, if configured.
-                        if replication_secret:
-                            headers[b"Authorization"] = [
-                                b"Bearer " + replication_secret
-                            ]
-                        opentracing.inject_header_dict(headers, check_destination=False)
                         try:
                             result = await request_func(uri, data, headers=headers)
                             break
@@ -272,7 +271,9 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                             if attempts > cls.RETRY_ON_CONNECT_ERROR_ATTEMPTS:
                                 raise
 
-                            logger.warning("%s request connection failed; retrying", cls.NAME)
+                            logger.warning(
+                                "%s request connection failed; retrying", cls.NAME
+                            )
 
                             await clock.sleep(2 ** attempts)
                             attempts += 1
