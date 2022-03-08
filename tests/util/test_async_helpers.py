@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import traceback
+from typing import Callable
+
+from parameterized import parameterized_class
 
 from twisted.internet import defer
 from twisted.internet.defer import CancelledError, Deferred, ensureDeferred
@@ -313,13 +316,21 @@ class ConcurrentlyExecuteTest(TestCase):
         self.successResultOf(d2)
 
 
-class StopCancellationTests(TestCase):
-    """Tests for the `stop_cancellation` function."""
+@parameterized_class(
+    ("wrap_deferred",),
+    [
+        (lambda _self, deferred: stop_cancellation(deferred),),
+    ],
+)
+class CancellationWrapperTests(TestCase):
+    """Common tests for the `stop_cancellation` and `delay_cancellation` functions."""
+
+    wrap_deferred: Callable[[TestCase, "Deferred[str]"], "Deferred[str]"]
 
     def test_succeed(self):
         """Test that the new `Deferred` receives the result."""
         deferred: "Deferred[str]" = Deferred()
-        wrapper_deferred = stop_cancellation(deferred)
+        wrapper_deferred = self.wrap_deferred(deferred)
 
         # Success should propagate through.
         deferred.callback("success")
@@ -329,13 +340,17 @@ class StopCancellationTests(TestCase):
     def test_failure(self):
         """Test that the new `Deferred` receives the `Failure`."""
         deferred: "Deferred[str]" = Deferred()
-        wrapper_deferred = stop_cancellation(deferred)
+        wrapper_deferred = self.wrap_deferred(deferred)
 
         # Failure should propagate through.
         deferred.errback(ValueError("abc"))
         self.assertTrue(wrapper_deferred.called)
         self.failureResultOf(wrapper_deferred, ValueError)
         self.assertIsNone(deferred.result, "`Failure` was not consumed")
+
+
+class StopCancellationTests(TestCase):
+    """Tests for the `stop_cancellation` function."""
 
     def test_cancellation(self):
         """Test that cancellation of the new `Deferred` leaves the original running."""
@@ -347,10 +362,10 @@ class StopCancellationTests(TestCase):
         self.assertTrue(wrapper_deferred.called)
         self.failureResultOf(wrapper_deferred, CancelledError)
         self.assertFalse(
-            deferred.called, "Original `Deferred` was unexpectedly cancelled."
+            deferred.called, "Original `Deferred` was unexpectedly cancelled"
         )
 
-        # Now make the inner `Deferred` fail.
+        # Now make the original `Deferred` fail.
         # The `Failure` must be consumed, otherwise unwanted tracebacks will be printed
         # in logs.
         deferred.errback(ValueError("abc"))
