@@ -1041,6 +1041,7 @@ class RoomAppserviceTsParamTestCase(RoomBase):
         self._check_event_ts(event_id)
 
     def _check_event_ts(self, event_id):
+        # check that the event was successfully persisted to the database with the correct timestamp.
         res = self.get_success(self.hs.get_datastore().get_event(event_id))
         self.assertEquals(self.ts, res.origin_server_ts)
 
