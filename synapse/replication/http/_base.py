@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Tuple
 from prometheus_client import Counter, Gauge
 
 from twisted.web.server import Request
+from twisted.internet.error import ConnectError, DNSLookupError
 
 from synapse.api.errors import HttpResponseException, SynapseError
 from synapse.http import RequestTimedOutError
@@ -94,6 +95,8 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
     METHOD = "POST"
     CACHE = True
     RETRY_ON_TIMEOUT = True
+    RETRY_ON_CONNECT_ERROR = True
+    RETRY_ON_CONNECT_ERROR_ATTEMPTS = 5  # =63s (2^6-1)
 
     def __init__(self, hs: "HomeServer"):
         if self.CACHE:
@@ -237,6 +240,9 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                 )
 
                 try:
+                    # Keep track of attempts made so we can bail if we don't manage to
+                    # connect to the target after N tries.
+                    attempts = 0
                     # We keep retrying the same request for timeouts. This is so that we
                     # have a good idea that the request has either succeeded or failed
                     # on the master, and so whether we should clean up or not.
@@ -255,11 +261,21 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                             if not cls.RETRY_ON_TIMEOUT:
                                 raise
 
-                        logger.warning("%s request timed out; retrying", cls.NAME)
+                            logger.warning("%s request timed out; retrying", cls.NAME)
 
-                        # If we timed out we probably don't need to worry about backing
-                        # off too much, but lets just wait a little anyway.
-                        await clock.sleep(1)
+                            # If we timed out we probably don't need to worry about backing
+                            # off too much, but lets just wait a little anyway.
+                            await clock.sleep(1)
+                        except (ConnectError, DNSLookupError):
+                            if not cls.RETRY_ON_CONNECT_ERROR:
+                                raise
+                            if attempts > cls.RETRY_ON_CONNECT_ERROR_ATTEMPTS:
+                                raise
+
+                            logger.warning("%s request connection failed; retrying", cls.NAME)
+
+                            await clock.sleep(2 ** attempts)
+                            attempts += 1
                 except HttpResponseException as e:
                     # We convert to SynapseError as we know that it was a SynapseError
                     # on the main process that we should send to the client. (And
