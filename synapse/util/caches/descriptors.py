@@ -40,6 +40,7 @@ from twisted.python.failure import Failure
 
 from synapse.logging.context import make_deferred_yieldable, preserve_fn
 from synapse.util import unwrapFirstError
+from synapse.util.async_helpers import delay_cancellation
 from synapse.util.caches.deferred_cache import DeferredCache
 from synapse.util.caches.lrucache import LruCache
 
@@ -322,6 +323,11 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
                 ret = defer.maybeDeferred(preserve_fn(self.orig), obj, *args, **kwargs)
                 ret = cache.set(cache_key, ret, callback=invalidate_callback)
 
+                # We started a new call to `self.orig`, so we must always wait for it to
+                # complete. Otherwise we might mark our current logging context as
+                # finished while `self.orig` is still using it in the background.
+                ret = delay_cancellation(ret, all=True)
+
             return make_deferred_yieldable(ret)
 
         wrapped = cast(_CachedFunction, _wrapped)
@@ -482,6 +488,11 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
                 d = defer.gatherResults(cached_defers, consumeErrors=True).addCallbacks(
                     lambda _: results, unwrapFirstError
                 )
+                if missing:
+                    # We started a new call to `self.orig`, so we must always wait for it to
+                    # complete. Otherwise we might mark our current logging context as
+                    # finished while `self.orig` is still using it in the background.
+                    d = delay_cancellation(d, all=True)
                 return make_deferred_yieldable(d)
             else:
                 return defer.succeed(results)
