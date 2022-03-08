@@ -72,7 +72,7 @@ from synapse.events import EventBase
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.databases.main import DataStore
-from synapse.types import JsonDict
+from synapse.types import DeviceLists, JsonDict
 from synapse.util import Clock
 
 if TYPE_CHECKING:
@@ -122,6 +122,7 @@ class ApplicationServiceScheduler:
         events: Optional[Collection[EventBase]] = None,
         ephemeral: Optional[Collection[JsonDict]] = None,
         to_device_messages: Optional[Collection[JsonDict]] = None,
+        device_list_summary: Optional[DeviceLists] = None,
     ) -> None:
         """
         Enqueue some data to be sent off to an application service.
@@ -133,10 +134,18 @@ class ApplicationServiceScheduler:
             to_device_messages: The to-device messages to send. These differ from normal
                 to-device messages sent to clients, as they have 'to_device_id' and
                 'to_user_id' fields.
+            device_list_summary: A summary of users that the application service either needs
+                to refresh the device lists of, or those that the application service need no
+                longer track the device lists of.
         """
         # We purposefully allow this method to run with empty events/ephemeral
         # collections, so that callers do not need to check iterable size themselves.
-        if not events and not ephemeral and not to_device_messages:
+        if (
+            not events
+            and not ephemeral
+            and not to_device_messages
+            and not device_list_summary
+        ):
             return
 
         if events:
@@ -147,6 +156,10 @@ class ApplicationServiceScheduler:
             self.queuer.queued_to_device_messages.setdefault(appservice.id, []).extend(
                 to_device_messages
             )
+        if device_list_summary:
+            self.queuer.queued_device_list_summaries.setdefault(
+                appservice.id, []
+            ).append(device_list_summary)
 
         # Kick off a new application service transaction
         self.queuer.start_background_request(appservice)
@@ -169,6 +182,8 @@ class _ServiceQueuer:
         self.queued_ephemeral: Dict[str, List[JsonDict]] = {}
         # dict of {service_id: [to_device_message_json]}
         self.queued_to_device_messages: Dict[str, List[JsonDict]] = {}
+        # dict of {service_id: [device_list_summary]}
+        self.queued_device_list_summaries: Dict[str, List[DeviceLists]] = {}
 
         # the appservices which currently have a transaction in flight
         self.requests_in_flight: Set[str] = set()
@@ -212,7 +227,40 @@ class _ServiceQueuer:
                 ]
                 del all_to_device_messages[:MAX_TO_DEVICE_MESSAGES_PER_TRANSACTION]
 
-                if not events and not ephemeral and not to_device_messages_to_send:
+                # Consolidate any pending device list summaries into a single, up-to-date
+                # summary.
+                # Note: this code assumes that in a single DeviceLists, a user will
+                # never be in both "changed" and "left" sets.
+                device_list_summary = DeviceLists()
+                while self.queued_device_list_summaries.get(service.id, []):
+                    # Pop a summary off the front of the queue
+                    summary = self.queued_device_list_summaries[service.id].pop(0)
+
+                    # For every user in the incoming "changed" set:
+                    #   * Remove them from the existing "left" set if necessary
+                    #     (as we need to start tracking them again)
+                    #   * Add them to the existing "changed" set if necessary.
+                    for user_id in summary.changed:
+                        if user_id in device_list_summary.left:
+                            device_list_summary.left.remove(user_id)
+                        device_list_summary.changed.add(user_id)
+
+                    # For every user in the incoming "left" set:
+                    #   * Remove them from the existing "changed" set if necessary
+                    #     (we no longer need to track them)
+                    #   * Add them to the existing "left" set if necessary.
+                    for user_id in summary.left:
+                        if user_id in device_list_summary.changed:
+                            device_list_summary.changed.remove(user_id)
+                        device_list_summary.left.add(user_id)
+
+                if (
+                    not events
+                    and not ephemeral
+                    and not to_device_messages_to_send
+                    # Note that DeviceLists implements __bool__
+                    and not device_list_summary
+                ):
                     return
 
                 one_time_key_counts: Optional[TransactionOneTimeKeyCounts] = None
@@ -240,6 +288,7 @@ class _ServiceQueuer:
                         to_device_messages_to_send,
                         one_time_key_counts,
                         unused_fallback_keys,
+                        device_list_summary,
                     )
                 except Exception:
                     logger.exception("AS request failed")
@@ -322,6 +371,7 @@ class _TransactionController:
         to_device_messages: Optional[List[JsonDict]] = None,
         one_time_key_counts: Optional[TransactionOneTimeKeyCounts] = None,
         unused_fallback_keys: Optional[TransactionUnusedFallbackKeys] = None,
+        device_list_summary: Optional[DeviceLists] = None,
     ) -> None:
         """
         Create a transaction with the given data and send to the provided
@@ -336,6 +386,7 @@ class _TransactionController:
                 appservice devices in the transaction.
             unused_fallback_keys: Lists of unused fallback keys for relevant
                 appservice devices in the transaction.
+            device_list_summary: The device list summary to include in the transaction.
         """
         try:
             txn = await self.store.create_appservice_txn(
@@ -345,6 +396,7 @@ class _TransactionController:
                 to_device_messages=to_device_messages or [],
                 one_time_key_counts=one_time_key_counts or {},
                 unused_fallback_keys=unused_fallback_keys or {},
+                device_list_summary=device_list_summary or DeviceLists(),
             )
             service_is_up = await self._is_service_up(service)
             if service_is_up:
