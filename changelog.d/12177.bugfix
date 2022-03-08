@@ -1,0 +1,1 @@
+Fix a bug introduced in 1.54.0rc1 which meant that Synapse would refuse to start if pre-release versions of dependencies were installed.
