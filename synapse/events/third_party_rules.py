@@ -174,7 +174,9 @@ class ThirdPartyEventRules:
         ] = None,
         on_new_event: Optional[ON_NEW_EVENT_CALLBACK] = None,
         on_profile_update: Optional[ON_PROFILE_UPDATE_CALLBACK] = None,
-        on_deactivation: Optional[ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK] = None,
+        on_user_deactivation_status_changed: Optional[
+            ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
+        ] = None,
     ) -> None:
         """Register callbacks from modules for each hook."""
         if check_event_allowed is not None:
@@ -199,8 +201,10 @@ class ThirdPartyEventRules:
         if on_profile_update is not None:
             self._on_profile_update_callbacks.append(on_profile_update)
 
-        if on_deactivation is not None:
-            self._on_user_deactivation_status_changed_callbacks.append(on_deactivation)
+        if on_user_deactivation_status_changed is not None:
+            self._on_user_deactivation_status_changed_callbacks.append(
+                on_user_deactivation_status_changed,
+            )
 
     async def check_event_allowed(
         self, event: EventBase, context: EventContext

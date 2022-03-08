@@ -50,7 +50,7 @@ def format_for_config(public_key: nacl.signing.VerifyKey, expiry_ts: int):
     )
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -85,7 +85,6 @@ if __name__ == "__main__":
         else format_plain
     )
 
-    keys = []
     for file in args.key_file:
         try:
             res = read_signing_keys(file)
@@ -98,3 +97,7 @@ if __name__ == "__main__":
             res = []
         for key in res:
             formatter(get_verify_key(key))
+
+
+if __name__ == "__main__":
+    main()
