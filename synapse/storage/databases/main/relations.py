@@ -91,10 +91,10 @@ class RelationsWorkerStore(SQLBaseStore):
 
         self._msc3440_enabled = hs.config.experimental.msc3440_enabled
 
-    @cached(tree=True)
+    @cached(num_args=9, tree=True)
     async def get_relations_for_event(
         self,
-        event: EventBase,
+        event_id: str,
         room_id: str,
         relation_type: Optional[str] = None,
         event_type: Optional[str] = None,
@@ -103,6 +103,7 @@ class RelationsWorkerStore(SQLBaseStore):
         direction: str = "b",
         from_token: Optional[StreamToken] = None,
         to_token: Optional[StreamToken] = None,
+        event: Optional[EventBase] = None,
     ) -> PaginationChunk:
         """Get a list of relations for an event, ordered by topological ordering.
 
@@ -117,14 +118,20 @@ class RelationsWorkerStore(SQLBaseStore):
                 oldest first (`"f"`).
             from_token: Fetch rows from the given token, or from the start if None.
             to_token: Fetch rows up to the given token, or up to the end if None.
+            event: The matching EventBase to event_id. This *must* be provided.
 
         Returns:
             List of event IDs that match relations requested. The rows are of
             the form `{"event_id": "..."}`.
         """
+        # We don't use `event_id`, its there so that we can cache based on
+        # it. The `event_id` must match the `event.event_id`.
+        assert event is not None
+        assert event.event_id == event_id
 
         where_clause = ["relates_to_id = ?", "room_id = ?"]
         where_args: List[Union[str, int]] = [event.event_id, room_id]
+        is_redacted = event.internal_metadata.is_redacted()
 
         if relation_type is not None:
             where_clause.append("relation_type = ?")
@@ -177,7 +184,6 @@ class RelationsWorkerStore(SQLBaseStore):
             last_topo_id = None
             last_stream_id = None
             events = []
-            is_redacted = event.internal_metadata.is_redacted()
             for row in txn:
                 # Do not include edits for redacted events as they leak event
                 # content.
@@ -780,7 +786,7 @@ class RelationsWorkerStore(SQLBaseStore):
             )
 
         references = await self.get_relations_for_event(
-            event, room_id, RelationTypes.REFERENCE, direction="f"
+            event_id, room_id, RelationTypes.REFERENCE, direction="f", event=event
         )
         if references.chunk:
             aggregations.references = await references.to_dict(cast("DataStore", self))
