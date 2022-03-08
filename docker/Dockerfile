@@ -16,18 +16,31 @@
 
 ARG PYTHON_VERSION=3.9
 
+FROM docker.io/python:${PYTHON_VERSION}-slim as base
+
 ###
 ### Stage 0: builder
 ###
-FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
-# install the OS build deps
-#
+# Irritatingly, there is no blessed guide on how to distribute an application with its
+# poetry-managed environment in a docker image. For a while,
+# `poetry export | pip install -r /dev/stdin` seemed plausible but is limited by bugs
+# in `poetry export` whose fixes (scheduled for poetry 1.2) have yet to be released.
+# The best references I could find are
+#     https://github.com/python-poetry/poetry/discussions/1879#discussioncomment-216865
+#     https://stackoverflow.com/questions/53835198/integrating-python-poetry-with-docker?answertab=scoredesc#tab-top
+FROM base as builder
+
 # RUN --mount is specific to buildkit and is documented at
 # https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/syntax.md#build-mounts-run---mount.
-# Here we use it to set up a cache for apt, to improve rebuild speeds on
-# slow connections.
-#
+# Here we use it to set up a cache for pip (below, for apt and poetry), to improve
+# rebuild speeds on slow connections.
+# We install poetry as --user so that it doesn't end up in the system-wide python
+# installation. That gets copied later into the runtime image.
+RUN --mount=type=cache,target=/root/.cache/pip \
+  pip install poetry==1.1.12
+
+# install the OS build deps
 RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -45,33 +58,36 @@ RUN \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy just what we need to pip install
-COPY MANIFEST.in README.rst /synapse/
-COPY synapse/__init__.py /synapse/synapse/__init__.py
-COPY synapse/python_dependencies.py /synapse/synapse/python_dependencies.py
+WORKDIR /synapse
 
+# Copy just what we need to poetry install
+COPY pyproject.toml poetry.lock README.rst /synapse/
+
+# Install to the Python installation which hosts `pip`. In this case, it's the system
+# Python.
+ENV POETRY_VIRTUALENVS_IN_PROJECT=true \
+    POETRY_VIRTUALENVS_CREATE=true \
+    POETRY_HOME=/opt/poetry
 # To speed up rebuilds, install all of the dependencies before we copy over
-# the whole synapse project so that we this layer in the Docker cache can be
+# the whole synapse project, so that this layer in the Docker cache can be
 # used while you develop on the source
-#
-# This is aiming at installing the `install_requires` and `extras_require` from `setup.py`
-RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install --prefix="/install" --no-warn-script-location \
-    /synapse[all]
+RUN --mount=type=cache,target=/opt/poetry/artifacts \
+    --mount=type=cache,target=/opt/poetry/.cache/pypoetry/cache \
+  poetry install --no-dev --no-root --no-interaction --no-ansi --extras all
 
-# Copy over the rest of the project
+# Copy over the synapse source code.
 COPY synapse /synapse/synapse/
 
-# Install the synapse package itself and all of its children packages.
-#
-# This is aiming at installing only the `packages=find_packages(...)` from `setup.py
-RUN pip install --prefix="/install" --no-deps --no-warn-script-location /synapse
+# Install the synapse package itself, by omitting the --no-root argument
+RUN --mount=type=cache,target=/opt/poetry/artifacts \
+    --mount=type=cache,target=/opt/poetry/cache \
+  poetry install --no-dev --no-interaction --no-ansi --extras all
 
 ###
 ### Stage 1: runtime
 ###
 
-FROM docker.io/python:${PYTHON_VERSION}-slim
+FROM base
 
 LABEL org.opencontainers.image.url='https://matrix.org/docs/projects/server/synapse'
 LABEL org.opencontainers.image.documentation='https://github.com/matrix-org/synapse/blob/master/docker/README.md'
@@ -93,7 +109,7 @@ RUN \
     openssl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /install /usr/local
+COPY --from=builder /synapse/ /synapse
 COPY ./docker/start.py /start.py
 COPY ./docker/conf /conf
 

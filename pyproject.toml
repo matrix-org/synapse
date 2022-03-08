@@ -62,7 +62,6 @@ readme = "README.rst"
 repository = "https://github.com/matrix-org/synapse"
 packages = [
     { include = "synapse" },
-    { include = "synmark" },
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -79,6 +78,7 @@ include = [
     { path = "INSTALL.md", format = "sdist" },
     { path = "mypy.ini", format = "sdist" },
     { path = "scripts-dev", format = "sdist" },
+    { path = "synmark", format="sdist" },
     { path = "sytest-blacklist", format = "sdist" },
     { path = "tests", format = "sdist" },
     { path = "tox.ini", format = "sdist" },

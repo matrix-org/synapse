@@ -5,5 +5,7 @@
 !docker
 !synapse
 !README.rst
+!pyproject.toml
+!poetry.lock
 
 **/__pycache__
