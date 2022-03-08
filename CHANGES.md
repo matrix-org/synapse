@@ -1,3 +1,21 @@
+Synapse 1.54.0 (2022-03-08)
+===========================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.54.0rc1 preventing the new module callbacks introduced in this release from being registered by modules. ([\#12141](https://github.com/matrix-org/synapse/issues/12141))
+- Fix a bug introduced in Synapse 1.54.0rc1 which meant that Synapse would refuse to start if pre-release versions of dependencies were installed. ([\#12177](https://github.com/matrix-org/synapse/issues/12177))
+
+
+Internal Changes
+----------------
+
+- Update release script to insert the previous version when writing "No significant changes" line in the changelog. ([\#12127](https://github.com/matrix-org/synapse/issues/12127))
+- Inspect application dependencies using `importlib.metadata` or its backport. ([\#12129](https://github.com/matrix-org/synapse/issues/12129))
+- Relax the version guard for "packaging" added in #12088. ([\#12166](https://github.com/matrix-org/synapse/issues/12166))
+
+
 Synapse 1.54.0rc1 (2022-03-02)
 ==============================
 
