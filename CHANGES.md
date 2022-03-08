@@ -1,8 +1,26 @@
-Synapse 1.54.0rc1 (2022-03-02)
-==============================
+Synapse 1.54.0 (2022-03-08)
+===========================
 
 Please note that this will be the last release of Synapse that is compatible with Mjolnir 1.3.1 and earlier.
 Administrators of servers which have the Mjolnir module installed are advised to upgrade Mjolnir to version 1.3.2 or later.
+
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.54.0rc1 preventing the new module callbacks introduced in this release from being registered by modules. ([\#12141](https://github.com/matrix-org/synapse/issues/12141))
+- Fix a bug introduced in Synapse 1.54.0rc1 where runtime dependency version checks would mistakenly check development dependencies if they were present and would not accept pre-release versions of dependencies. ([\#12129](https://github.com/matrix-org/synapse/issues/12129), [\#12177](https://github.com/matrix-org/synapse/issues/12177))
+
+
+Internal Changes
+----------------
+
+- Update release script to insert the previous version when writing "No significant changes" line in the changelog. ([\#12127](https://github.com/matrix-org/synapse/issues/12127))
+- Relax the version guard for "packaging" added in [\#12088](https://github.com/matrix-org/synapse/issues/12088). ([\#12166](https://github.com/matrix-org/synapse/issues/12166))
+
+
+Synapse 1.54.0rc1 (2022-03-02)
+==============================
 
 
 Features

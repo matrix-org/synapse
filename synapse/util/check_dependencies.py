@@ -163,7 +163,8 @@ def check_requirements(extra: Optional[str] = None) -> None:
                 deps_unfulfilled.append(requirement.name)
                 errors.append(_not_installed(requirement, extra))
         else:
-            if not requirement.specifier.contains(dist.version):
+            # We specify prereleases=True to allow prereleases such as RCs.
+            if not requirement.specifier.contains(dist.version, prereleases=True):
                 deps_unfulfilled.append(requirement.name)
                 errors.append(_incorrect_version(requirement, dist.version, extra))
 
