@@ -37,6 +37,19 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         self.updates.register_background_update_handler(
             "test_update", self.update_handler
         )
+        self.store = self.hs.get_datastores().main
+
+    async def update(self, progress, count):
+        duration_ms = 10
+        await self.clock.sleep((count * duration_ms) / 1000)
+        progress = {"my_key": progress["my_key"] + 1}
+        await self.store.db_pool.runInteraction(
+            "update_progress",
+            self.updates._background_update_progress_txn,
+            "test_update",
+            progress,
+        )
+        return count
 
     def test_do_background_update(self):
         # the time we claim it takes to update one item when running the update
@@ -45,27 +58,14 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         # the target runtime for each bg update
         target_background_update_duration_ms = 100
 
-        store = self.hs.get_datastores().main
         self.get_success(
-            store.db_pool.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 values={"update_name": "test_update", "progress_json": '{"my_key": 1}'},
             )
         )
 
-        # first step: make a bit of progress
-        async def update(progress, count):
-            await self.clock.sleep((count * duration_ms) / 1000)
-            progress = {"my_key": progress["my_key"] + 1}
-            await store.db_pool.runInteraction(
-                "update_progress",
-                self.updates._background_update_progress_txn,
-                "test_update",
-                progress,
-            )
-            return count
-
-        self.update_handler.side_effect = update
+        self.update_handler.side_effect = self.update
         self.update_handler.reset_mock()
         res = self.get_success(
             self.updates.do_next_background_update(False),
@@ -109,33 +109,19 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
             """
         )
     )
-    def test_do_background_update_default_batch_set_by_config(self):
+    def test_background_update_default_batch_set_by_config(self):
         """
         Test that the background update is run with the default_batch_size set by the config
         """
-        # the time we claim it takes to update one item when running the update
-        duration_ms = 10
 
-        store = self.hs.get_datastores().main
         self.get_success(
-            store.db_pool.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 values={"update_name": "test_update", "progress_json": '{"my_key": 1}'},
             )
         )
 
-        async def update(progress, count):
-            await self.clock.sleep((count * duration_ms) / 1000)
-            progress = {"my_key": progress["my_key"] + 1}
-            await store.db_pool.runInteraction(
-                "update_progress",
-                self.updates._background_update_progress_txn,
-                "test_update",
-                progress,
-            )
-            return count
-
-        self.update_handler.side_effect = update
+        self.update_handler.side_effect = self.update
         self.update_handler.reset_mock()
         res = self.get_success(
             self.updates.do_next_background_update(False),
@@ -151,29 +137,14 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         Test default background update behavior, which is to sleep
         """
 
-        # the time we claim it takes to update one item when running the update
-        duration_ms = 10
-
-        store = self.hs.get_datastores().main
         self.get_success(
-            store.db_pool.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 values={"update_name": "test_update", "progress_json": '{"my_key": 1}'},
             )
         )
 
-        async def update(progress, count):
-            await self.clock.sleep((count * duration_ms) / 1000)
-            progress = {"my_key": progress["my_key"] + 1}
-            await store.db_pool.runInteraction(
-                "update_progress",
-                self.updates._background_update_progress_txn,
-                "test_update",
-                progress,
-            )
-            return count
-
-        self.update_handler.side_effect = update
+        self.update_handler.side_effect = self.update
         self.update_handler.reset_mock()
         self.updates.start_doing_background_updates(),
 
@@ -199,28 +170,14 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         Test that changing the sleep time in the config changes how long it sleeps
         """
 
-        duration_ms = 10
-
-        store = self.hs.get_datastores().main
         self.get_success(
-            store.db_pool.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 values={"update_name": "test_update", "progress_json": '{"my_key": 1}'},
             )
         )
 
-        async def update(progress, count):
-            await self.clock.sleep((count * duration_ms) / 1000)
-            progress = {"my_key": progress["my_key"] + 1}
-            await store.db_pool.runInteraction(
-                "update_progress",
-                self.updates._background_update_progress_txn,
-                "test_update",
-                progress,
-            )
-            return count
-
-        self.update_handler.side_effect = update
+        self.update_handler.side_effect = self.update
         self.update_handler.reset_mock()
         self.updates.start_doing_background_updates(),
 
@@ -245,29 +202,15 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         """
         Test that disabling sleep in the config results in bg update not sleeping
         """
-        # the time we claim it takes to update one item when running the update
-        duration_ms = 10
 
-        store = self.hs.get_datastores().main
         self.get_success(
-            store.db_pool.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 values={"update_name": "test_update", "progress_json": '{"my_key": 1}'},
             )
         )
 
-        async def update(progress, count):
-            await self.clock.sleep((count * duration_ms) / 1000)
-            progress = {"my_key": progress["my_key"] + 1}
-            await store.db_pool.runInteraction(
-                "update_progress",
-                self.updates._background_update_progress_txn,
-                "test_update",
-                progress,
-            )
-            return count
-
-        self.update_handler.side_effect = update
+        self.update_handler.side_effect = self.update
         self.update_handler.reset_mock()
         self.updates.start_doing_background_updates(),
 
@@ -287,29 +230,17 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         """
         Test that the desired duration set in the config is used in determining batch size
         """
-        # the time we claim it takes to update one item when running the update
+        # Duration of one background update item
         duration_ms = 10
 
-        store = self.hs.get_datastores().main
         self.get_success(
-            store.db_pool.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 values={"update_name": "test_update", "progress_json": '{"my_key": 1}'},
             )
         )
 
-        async def update(progress, count):
-            await self.clock.sleep((count * duration_ms) / 1000)
-            progress = {"my_key": progress["my_key"] + 1}
-            await store.db_pool.runInteraction(
-                "update_progress",
-                self.updates._background_update_progress_txn,
-                "test_update",
-                progress,
-            )
-            return count
-
-        self.update_handler.side_effect = update
+        self.update_handler.side_effect = self.update
         self.update_handler.reset_mock()
         res = self.get_success(
             self.updates.do_next_background_update(False),
@@ -346,18 +277,18 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         # a very long-running individual update
         duration_ms = 50
 
-        store = self.hs.get_datastores().main
         self.get_success(
-            store.db_pool.simple_insert(
+            self.store.db_pool.simple_insert(
                 "background_updates",
                 values={"update_name": "test_update", "progress_json": '{"my_key": 1}'},
             )
         )
 
+        # Run the update with the long-running update item
         async def update(progress, count):
             await self.clock.sleep((count * duration_ms) / 1000)
             progress = {"my_key": progress["my_key"] + 1}
-            await store.db_pool.runInteraction(
+            await self.store.db_pool.runInteraction(
                 "update_progress",
                 self.updates._background_update_progress_txn,
                 "test_update",
@@ -374,7 +305,7 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         self.assertFalse(res)
 
         # the first update was run with the default batch size, this should be run with minimum batch size
-        # as the individual updates took a very long time
+        # as the first items took a very long time
         async def update(progress, count):
             self.assertEqual(progress, {"my_key": 2})
             self.assertEqual(count, 5)
