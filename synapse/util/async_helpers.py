@@ -693,6 +693,6 @@ def stop_cancellation(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]":
         The new `Deferred` will not follow the Synapse logcontext rules and should be
         wrapped with `make_deferred_yieldable`.
     """
-    new_deferred: defer.Deferred[T] = defer.Deferred()
+    new_deferred: "defer.Deferred[T]" = defer.Deferred()
     deferred.chainDeferred(new_deferred)
     return new_deferred
