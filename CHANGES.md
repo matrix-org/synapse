@@ -1,6 +1,10 @@
 Synapse 1.54.0 (2022-03-08)
 ===========================
 
+Please note that this will be the last release of Synapse that is compatible with Mjolnir 1.3.1 and earlier.
+Administrators of servers which have the Mjolnir module installed are advised to upgrade Mjolnir to version 1.3.2 or later.
+
+
 Bugfixes
 --------
 
@@ -18,9 +22,6 @@ Internal Changes
 
 Synapse 1.54.0rc1 (2022-03-02)
 ==============================
-
-Please note that this will be the last release of Synapse that is compatible with Mjolnir 1.3.1 and earlier.
-Administrators of servers which have the Mjolnir module installed are advised to upgrade Mjolnir to version 1.3.2 or later.
 
 
 Features
