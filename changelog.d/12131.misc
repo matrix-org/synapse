@@ -1,0 +1,1 @@
+Fix CI not attaching source distributions and wheels to the GitHub releases.
