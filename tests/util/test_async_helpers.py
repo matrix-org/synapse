@@ -26,10 +26,12 @@ from synapse.logging.context import (
     LoggingContext,
     PreserveLoggingContext,
     current_context,
+    make_deferred_yieldable,
 )
 from synapse.util.async_helpers import (
     ObservableDeferred,
     concurrently_execute,
+    delay_cancellation,
     stop_cancellation,
     timeout_deferred,
 )
@@ -320,6 +322,7 @@ class ConcurrentlyExecuteTest(TestCase):
     ("wrap_deferred",),
     [
         (lambda _self, deferred: stop_cancellation(deferred),),
+        (lambda _self, deferred: delay_cancellation(deferred, all=True),),
     ],
 )
 class CancellationWrapperTests(TestCase):
@@ -370,3 +373,113 @@ class StopCancellationTests(TestCase):
         # in logs.
         deferred.errback(ValueError("abc"))
         self.assertIsNone(deferred.result, "`Failure` was not consumed")
+
+
+class DelayCancellationTests(TestCase):
+    """Tests for the `delay_cancellation` function."""
+
+    def test_cancellation(self):
+        """Test that cancellation of the new `Deferred` waits for the original."""
+        deferred: "Deferred[str]" = Deferred()
+        wrapper_deferred = delay_cancellation(deferred, all=True)
+
+        # Cancel the new `Deferred`.
+        wrapper_deferred.cancel()
+        self.assertNoResult(wrapper_deferred)
+        self.assertFalse(
+            deferred.called, "Original `Deferred` was unexpectedly cancelled"
+        )
+
+        # Now make the original `Deferred` fail.
+        # The `Failure` must be consumed, otherwise unwanted tracebacks will be printed
+        # in logs.
+        deferred.errback(ValueError("abc"))
+        self.assertIsNone(deferred.result, "`Failure` was not consumed")
+
+        # Now that the original `Deferred` has failed, we should get a `CancelledError`.
+        self.failureResultOf(wrapper_deferred, CancelledError)
+
+    def test_suppresses_second_cancellation(self):
+        """Test that a second cancellation is suppressed when the `all` flag is set.
+
+        Identical to `test_cancellation` except the new `Deferred` is cancelled twice.
+        """
+        deferred: "Deferred[str]" = Deferred()
+        wrapper_deferred = delay_cancellation(deferred, all=True)
+
+        # Cancel the new `Deferred`, twice.
+        wrapper_deferred.cancel()
+        wrapper_deferred.cancel()
+        self.assertNoResult(wrapper_deferred)
+        self.assertFalse(
+            deferred.called, "Original `Deferred` was unexpectedly cancelled"
+        )
+
+        # Now make the original `Deferred` fail.
+        # The `Failure` must be consumed, otherwise unwanted tracebacks will be printed
+        # in logs.
+        deferred.errback(ValueError("abc"))
+        self.assertIsNone(deferred.result, "`Failure` was not consumed")
+
+        # Now that the original `Deferred` has failed, we should get a `CancelledError`.
+        self.failureResultOf(wrapper_deferred, CancelledError)
+
+    def test_raises_second_cancellation(self):
+        """Test that a second cancellation is instant when the `all` flag is not set."""
+        deferred: "Deferred[str]" = Deferred()
+        wrapper_deferred = delay_cancellation(deferred, all=False)
+
+        # Cancel the new `Deferred`, twice.
+        wrapper_deferred.cancel()
+        wrapper_deferred.cancel()
+        self.failureResultOf(wrapper_deferred, CancelledError)
+        self.assertFalse(
+            deferred.called, "Original `Deferred` was unexpectedly cancelled"
+        )
+
+        # Now make the original `Deferred` fail.
+        # The `Failure` must be consumed, otherwise unwanted tracebacks will be printed
+        # in logs.
+        deferred.errback(ValueError("abc"))
+        self.assertIsNone(deferred.result, "`Failure` was not consumed")
+
+    def test_propagates_cancelled_error(self):
+        """Test that a `CancelledError` from the original `Deferred` gets propagated."""
+        deferred: "Deferred[str]" = Deferred()
+        wrapper_deferred = delay_cancellation(deferred, all=True)
+
+        # Fail the original `Deferred` with a `CancelledError`.
+        cancelled_error = CancelledError()
+        deferred.errback(cancelled_error)
+
+        # The new `Deferred` should fail with exactly the same `CancelledError`.
+        self.assertTrue(wrapper_deferred.called)
+        self.assertIs(cancelled_error, self.failureResultOf(wrapper_deferred).value)
+
+    def test_preserves_logcontext_when_delaying_multiple_cancellations(self):
+        """Test that logging contexts are preserved when the `all` flag is set."""
+        blocking_d: "Deferred[None]" = Deferred()
+
+        async def inner():
+            await make_deferred_yieldable(blocking_d)
+
+        async def outer():
+            with LoggingContext("c") as c:
+                try:
+                    await delay_cancellation(defer.ensureDeferred(inner()), all=True)
+                    self.fail("`CancelledError` was not raised")
+                except CancelledError:
+                    self.assertEqual(c, current_context())
+                    # Succeed with no error, unless the logging context is wrong.
+
+        # Run and block inside `inner()`.
+        d = defer.ensureDeferred(outer())
+        self.assertEqual(SENTINEL_CONTEXT, current_context())
+
+        d.cancel()
+        d.cancel()
+
+        # Now unblock. `outer()` will consume the `CancelledError` and check the
+        # logging context.
+        blocking_d.callback(None)
+        self.successResultOf(d)
