@@ -499,7 +499,7 @@ class RelationsWorkerStore(SQLBaseStore):
                         AND parent.room_id = child.room_id
                     WHERE
                         %s
-                        AND (relation_type = ? OR relation_type = ?)
+                        AND %s
                     ORDER BY parent.event_id, child.topological_ordering DESC, child.stream_ordering DESC
                 """
             else:
@@ -514,17 +514,22 @@ class RelationsWorkerStore(SQLBaseStore):
                         AND parent.room_id = child.room_id
                     WHERE
                         %s
-                        AND (relation_type = ? OR relation_type = ?)
+                        AND %s
                     ORDER BY child.topological_ordering DESC, child.stream_ordering DESC
                 """
 
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "relates_to_id", event_ids
             )
-            args.append(RelationTypes.THREAD)
-            args.append(RelationTypes.UNSTABLE_THREAD)
 
-            txn.execute(sql % (clause,), args)
+            args.append(RelationTypes.THREAD)
+            if self._msc3440_enabled:
+                relations_clause = "(relation_type = ? OR relation_type = ?)"
+                args.append(RelationTypes.UNSTABLE_THREAD)
+            else:
+                relations_clause = "relation_type = ?"
+
+            txn.execute(sql % (clause, relations_clause), args)
             latest_event_ids = {}
             for parent_event_id, child_event_id in txn:
                 # Only consider the latest threaded reply (by topological ordering).
@@ -544,7 +549,7 @@ class RelationsWorkerStore(SQLBaseStore):
                     AND parent.room_id = child.room_id
                 WHERE
                     %s
-                    AND (relation_type = ? OR relation_type = ?)
+                    AND %s
                 GROUP BY parent.event_id
             """
 
@@ -553,10 +558,15 @@ class RelationsWorkerStore(SQLBaseStore):
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "relates_to_id", latest_event_ids.keys()
             )
-            args.append(RelationTypes.THREAD)
-            args.append(RelationTypes.UNSTABLE_THREAD)
 
-            txn.execute(sql % (clause,), args)
+            args.append(RelationTypes.THREAD)
+            if self._msc3440_enabled:
+                relations_clause = "(relation_type = ? OR relation_type = ?)"
+                args.append(RelationTypes.UNSTABLE_THREAD)
+            else:
+                relations_clause = "relation_type = ?"
+
+            txn.execute(sql % (clause, relations_clause), args)
             counts = dict(cast(List[Tuple[str, int]], txn.fetchall()))
 
             return counts, latest_event_ids
@@ -619,16 +629,24 @@ class RelationsWorkerStore(SQLBaseStore):
                     AND parent.room_id = child.room_id
                 WHERE
                     %s
-                    AND (relation_type = ? OR relation_type = ?)
+                    AND %s
                     AND child.sender = ?
             """
 
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "relates_to_id", event_ids
             )
-            args.extend((RelationTypes.THREAD, RelationTypes.UNSTABLE_THREAD, user_id))
 
-            txn.execute(sql % (clause,), args)
+            args.append(RelationTypes.THREAD)
+            if self._msc3440_enabled:
+                relations_clause = "(relation_type = ? OR relation_type = ?)"
+                args.append(RelationTypes.UNSTABLE_THREAD)
+            else:
+                relations_clause = "relation_type = ?"
+
+            args.append(user_id)
+
+            txn.execute(sql % (clause, relations_clause), args)
             return {row[0] for row in txn.fetchall()}
 
         participated_threads = await self.db_pool.runInteraction(
@@ -832,26 +850,23 @@ class RelationsWorkerStore(SQLBaseStore):
             results.setdefault(event_id, BundledAggregations()).replace = edit
 
         # Fetch thread summaries.
-        if self._msc3440_enabled:
-            summaries = await self._get_thread_summaries(seen_event_ids)
-            # Only fetch participated for a limited selection based on what had
-            # summaries.
-            participated = await self._get_threads_participated(
-                summaries.keys(), user_id
-            )
-            for event_id, summary in summaries.items():
-                if summary:
-                    thread_count, latest_thread_event, edit = summary
-                    results.setdefault(
-                        event_id, BundledAggregations()
-                    ).thread = _ThreadAggregation(
-                        latest_event=latest_thread_event,
-                        latest_edit=edit,
-                        count=thread_count,
-                        # If there's a thread summary it must also exist in the
-                        # participated dictionary.
-                        current_user_participated=participated[event_id],
-                    )
+        summaries = await self._get_thread_summaries(seen_event_ids)
+        # Only fetch participated for a limited selection based on what had
+        # summaries.
+        participated = await self._get_threads_participated(summaries.keys(), user_id)
+        for event_id, summary in summaries.items():
+            if summary:
+                thread_count, latest_thread_event, edit = summary
+                results.setdefault(
+                    event_id, BundledAggregations()
+                ).thread = _ThreadAggregation(
+                    latest_event=latest_thread_event,
+                    latest_edit=edit,
+                    count=thread_count,
+                    # If there's a thread summary it must also exist in the
+                    # participated dictionary.
+                    current_user_participated=participated[event_id],
+                )
 
         return results
 
