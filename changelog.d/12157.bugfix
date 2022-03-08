@@ -1,0 +1,1 @@
+Fix a bug introduced in #4864 whereby background updates are never run with the default background batch size.
