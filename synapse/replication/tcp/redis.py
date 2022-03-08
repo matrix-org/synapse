@@ -93,7 +93,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
 
     synapse_handler: "ReplicationCommandHandler"
     synapse_stream_name: str
-    synapse_outbound_redis_connection: txredisapi.RedisProtocol
+    synapse_outbound_redis_connection: txredisapi.ConnectionHandler
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
@@ -313,7 +313,7 @@ class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
     protocol = RedisSubscriber
 
     def __init__(
-        self, hs: "HomeServer", outbound_redis_connection: txredisapi.RedisProtocol
+        self, hs: "HomeServer", outbound_redis_connection: txredisapi.ConnectionHandler
     ):
 
         super().__init__(
@@ -353,7 +353,7 @@ def lazyConnection(
     reconnect: bool = True,
     password: Optional[str] = None,
     replyTimeout: int = 30,
-) -> txredisapi.RedisProtocol:
+) -> txredisapi.ConnectionHandler:
     """Creates a connection to Redis that is lazily set up and reconnects if the
     connections is lost.
     """
