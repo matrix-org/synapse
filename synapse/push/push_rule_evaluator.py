@@ -247,6 +247,8 @@ def _flatten_dict(
     if result is None:
         result = {}
     for key, value in d.items():
+        if isinstance(value, bool):
+            value = str(value)
         if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
         elif isinstance(value, dict):
