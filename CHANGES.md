@@ -16,7 +16,7 @@ Internal Changes
 ----------------
 
 - Update release script to insert the previous version when writing "No significant changes" line in the changelog. ([\#12127](https://github.com/matrix-org/synapse/issues/12127))
-- Relax the version guard for "packaging" added in ([\#12088](https://github.com/matrix-org/synapse/issues/12088)). ([\#12166](https://github.com/matrix-org/synapse/issues/12166))
+- Relax the version guard for "packaging" added in [\#12088](https://github.com/matrix-org/synapse/issues/12088). ([\#12166](https://github.com/matrix-org/synapse/issues/12166))
 
 
 Synapse 1.54.0rc1 (2022-03-02)
