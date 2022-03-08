@@ -1,0 +1,1 @@
+Convert event content booleans to strings when evaluating push rules. Contributed by Nick @ Beeper.
