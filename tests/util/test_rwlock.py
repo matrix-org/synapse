@@ -364,7 +364,7 @@ class ReadWriteLockTestCase(unittest.TestCase):
         self.assertFalse(writer1_d.called, "First writer was unexpectedly cancelled")
         self.assertFalse(
             writer3_d.called,
-            "Third writer was unexpectedly cancelled or given the lock before the first"
+            "Third writer was unexpectedly cancelled or given the lock before the first "
             "writer finished",
         )
 
