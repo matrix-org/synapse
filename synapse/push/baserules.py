@@ -198,7 +198,7 @@ BASE_APPEND_OVERRIDE_RULES = [
             {  # with the will_auto_accept field
                 "kind": "event_match",
                 "key": "content.fi.mau.will_auto_accept",
-                "pattern": "*",
+                "pattern": "true",
                 "_id": "_will_auto_accept",
             },
         ],
