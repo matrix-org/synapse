@@ -156,8 +156,8 @@ class ThirdPartyEventRules:
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = []
         self._on_new_event_callbacks: List[ON_NEW_EVENT_CALLBACK] = []
-        self._check_can_shutdown_room: List[CHECK_CAN_SHUTDOWN_ROOM_CALLBACK] = []
-        self._check_can_deactivate_user: List[CHECK_CAN_DEACTIVATE_USER_CALLBACK] = []
+        self._check_can_shutdown_room_callbacks: List[CHECK_CAN_SHUTDOWN_ROOM_CALLBACK] = []
+        self._check_can_deactivate_user_callbacks: List[CHECK_CAN_DEACTIVATE_USER_CALLBACK] = []
 
     def register_third_party_rules_callbacks(
         self,
@@ -194,10 +194,10 @@ class ThirdPartyEventRules:
             self._on_new_event_callbacks.append(on_new_event)
 
         if check_can_shutdown_room is not None:
-            self._check_can_shutdown_room.append(check_can_shutdown_room)
+            self._check_can_shutdown_room_callbacks.append(check_can_shutdown_room)
 
         if check_can_deactivate_user is not None:
-            self._check_can_deactivate_user.append(check_can_deactivate_user)
+            self._check_can_deactivate_user_callbacks.append(check_can_deactivate_user)
 
     async def check_event_allowed(
         self, event: EventBase, context: EventContext
@@ -367,16 +367,13 @@ class ThirdPartyEventRules:
 
     async def check_can_shutdown_room(self, user_id: str, room_id: str) -> bool:
         """Intercept requests to shutdown a room. If `False` is returned, the
-        room should not be shut down.
+         room must not be shut down.
 
         Args:
             requester: The ID of the user requesting the shutdown.
             room_id: The ID of the room.
-
-        Raises:
-            ModuleFailureError if a callback raised any exception.
         """
-        for callback in self._check_can_shutdown_room:
+        for callback in self._check_can_shutdown_room_callbacks:
             try:
                 if await callback(user_id, room_id) is False:
                     return False
@@ -395,11 +392,8 @@ class ThirdPartyEventRules:
         Args:
             requester
             user_id: The ID of the room.
-
-        Raises:
-            ModuleFailureError if a callback raised any exception.
         """
-        for callback in self._check_can_deactivate_user:
+        for callback in self._check_can_deactivate_user_callbacks:
             try:
                 if await callback(requester, user_id) is False:
                     return False

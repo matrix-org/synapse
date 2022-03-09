@@ -159,7 +159,7 @@ async def check_can_shutdown_room(
 ) -> bool:
 ```
 
-Called when a user requests the shutdown of a room. The module must return a
+Called when an admin user requests the shutdown of a room. The module must return a
 boolean indicating whether the shutdown can go through. If the callback returns `False`,
 the shutdown will not proceed and the caller will see a `M_FOBIDDEN` error.
 
@@ -179,7 +179,7 @@ async def check_can_deactivate_user(
 ) -> bool:
 ```
 
-Called when a user requests the deactivation of a user. User deactivation may be
+Called when the deactivation of a user is requested. User deactivation can be
 performed by an admin or the user themselves, so developers are encouraged to check the
 requester when implementing this callback. The module must return a
 boolean indicating whether the deactivation can go through. If the callback returns `False`,
