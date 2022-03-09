@@ -78,6 +78,8 @@ class _CacheDescriptorBase:
         arg_spec = inspect.getfullargspec(orig)
         all_args = arg_spec.args
 
+        # There's no reason that keyword-only arguments couldn't be supported,
+        # but right now they're buggy so do not allow them.
         if arg_spec.kwonlyargs:
             raise ValueError(
                 "_CacheDescriptorBase does not support keyword-only arguments."
