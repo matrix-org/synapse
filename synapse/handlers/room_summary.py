@@ -295,7 +295,7 @@ class RoomSummaryHandler:
             # inaccessible to the requesting user.
             if room_entry:
                 # Add the room (including the stripped m.space.child events).
-                rooms_result.append(room_entry.as_json())
+                rooms_result.append(room_entry.as_json(for_client=True))
 
                 # If this room is not at the max-depth, check if there are any
                 # children to process.
@@ -843,21 +843,32 @@ class _RoomEntry:
     # This may not include all children.
     children_state_events: Sequence[JsonDict] = ()
 
-    def as_json(self) -> JsonDict:
+    def as_json(self, for_client: bool = False) -> JsonDict:
         """
         Returns a JSON dictionary suitable for the room hierarchy endpoint.
 
         It returns the room summary including the stripped m.space.child events
         as a sub-key.
+
+        Args:
+            for_client: If true, any server-server only fields are stripped from
+                the result.
+
         """
         result = dict(self.room)
+
+        # Before returning to the client, remove the allowed_room_ids key, if it
+        # exists.
+        if for_client:
+            result.pop("allowed_room_ids", False)
+
         result["children_state"] = self.children_state_events
         return result
 
 
 def _has_valid_via(e: EventBase) -> bool:
     via = e.content.get("via")
-    if not via or not isinstance(via, Sequence):
+    if not via or not isinstance(via, list):
         return False
     for v in via:
         if not isinstance(v, str):

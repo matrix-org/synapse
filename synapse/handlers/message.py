@@ -1069,6 +1069,9 @@ class EventCreationHandler:
         if relation_type == RelationTypes.ANNOTATION:
             aggregation_key = relation["key"]
 
+            if len(aggregation_key) > 500:
+                raise SynapseError(400, "Aggregation key is too long")
+
             already_exists = await self.store.has_user_annotated_event(
                 relates_to, event.type, aggregation_key, event.sender
             )

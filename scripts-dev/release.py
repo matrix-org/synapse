@@ -17,6 +17,8 @@
 """An interactive script for doing a release. See `cli()` below.
 """
 
+import glob
+import os
 import re
 import subprocess
 import sys
@@ -209,8 +211,8 @@ def prepare():
     with open("synapse/__init__.py", "w") as f:
         f.write(parsed_synapse_ast.dumps())
 
-    # Generate changelogs
-    run_until_successful("python3 -m towncrier", shell=True)
+    # Generate changelogs.
+    generate_and_write_changelog(current_version)
 
     # Generate debian changelogs
     if parsed_new_version.pre is not None:
@@ -521,6 +523,30 @@ def get_changes_for_version(wanted_version: version.Version) -> str:
         version_changelog.extend(changes_by_line[section.start_line : section.end_line])
 
     return "\n".join(version_changelog)
+
+
+def generate_and_write_changelog(current_version: version.Version):
+    # We do this by getting a draft so that we can edit it before writing to the
+    # changelog.
+    result = run_until_successful(
+        "python3 -m towncrier --draft", shell=True, capture_output=True
+    )
+    new_changes = result.stdout.decode("utf-8")
+    new_changes = new_changes.replace(
+        "No significant changes.", f"No significant changes since {current_version}."
+    )
+
+    # Prepend changes to changelog
+    with open("CHANGES.md", "r+") as f:
+        existing_content = f.read()
+        f.seek(0, 0)
+        f.write(new_changes)
+        f.write("\n")
+        f.write(existing_content)
+
+    # Remove all the news fragments
+    for f in glob.iglob("changelog.d/*.*"):
+        os.remove(f)
 
 
 if __name__ == "__main__":

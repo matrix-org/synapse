@@ -13,19 +13,24 @@
 # limitations under the License.
 import urllib.parse
 from io import BytesIO, StringIO
+from typing import Any, Dict, Optional, Union
 from unittest.mock import Mock
 
 import signedjson.key
 from canonicaljson import encode_canonical_json
-from nacl.signing import SigningKey
 from signedjson.sign import sign_json
+from signedjson.types import SigningKey
 
-from twisted.web.resource import NoResource
+from twisted.test.proto_helpers import MemoryReactor
+from twisted.web.resource import NoResource, Resource
 
 from synapse.crypto.keyring import PerspectivesKeyFetcher
 from synapse.http.site import SynapseRequest
 from synapse.rest.key.v2 import KeyApiV2Resource
+from synapse.server import HomeServer
 from synapse.storage.keys import FetchKeyResult
+from synapse.types import JsonDict
+from synapse.util import Clock
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.stringutils import random_string
 
@@ -35,11 +40,11 @@ from tests.utils import default_config
 
 
 class BaseRemoteKeyResourceTestCase(unittest.HomeserverTestCase):
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         self.http_client = Mock()
         return self.setup_test_homeserver(federation_http_client=self.http_client)
 
-    def create_test_resource(self):
+    def create_test_resource(self) -> Resource:
         return create_resource_tree(
             {"/_matrix/key/v2": KeyApiV2Resource(self.hs)}, root_resource=NoResource()
         )
@@ -51,7 +56,12 @@ class BaseRemoteKeyResourceTestCase(unittest.HomeserverTestCase):
         Tell the mock http client to expect an outgoing GET request for the given key
         """
 
-        async def get_json(destination, path, ignore_backoff=False, **kwargs):
+        async def get_json(
+            destination: str,
+            path: str,
+            ignore_backoff: bool = False,
+            **kwargs: Any,
+        ) -> Union[JsonDict, list]:
             self.assertTrue(ignore_backoff)
             self.assertEqual(destination, server_name)
             key_id = "%s:%s" % (signing_key.alg, signing_key.version)
@@ -84,7 +94,8 @@ class RemoteKeyResourceTestCase(BaseRemoteKeyResourceTestCase):
         Checks that the response is a 200 and returns the decoded json body.
         """
         channel = FakeChannel(self.site, self.reactor)
-        req = SynapseRequest(channel, self.site)
+        # channel is a `FakeChannel` but `HTTPChannel` is expected
+        req = SynapseRequest(channel, self.site)  # type: ignore[arg-type]
         req.content = BytesIO(b"")
         req.requestReceived(
             b"GET",
@@ -97,7 +108,7 @@ class RemoteKeyResourceTestCase(BaseRemoteKeyResourceTestCase):
         resp = channel.json_body
         return resp
 
-    def test_get_key(self):
+    def test_get_key(self) -> None:
         """Fetch a remote key"""
         SERVER_NAME = "remote.server"
         testkey = signedjson.key.generate_signing_key("ver1")
@@ -114,7 +125,7 @@ class RemoteKeyResourceTestCase(BaseRemoteKeyResourceTestCase):
         self.assertIn(SERVER_NAME, keys[0]["signatures"])
         self.assertIn(self.hs.hostname, keys[0]["signatures"])
 
-    def test_get_own_key(self):
+    def test_get_own_key(self) -> None:
         """Fetch our own key"""
         testkey = signedjson.key.generate_signing_key("ver1")
         self.expect_outgoing_key_request(self.hs.hostname, testkey)
@@ -141,7 +152,7 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
     endpoint, to check that the two implementations are compatible.
     """
 
-    def default_config(self):
+    def default_config(self) -> Dict[str, Any]:
         config = super().default_config()
 
         # replace the signing key with our own
@@ -152,7 +163,7 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
 
         return config
 
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         # make a second homeserver, configured to use the first one as a key notary
         self.http_client2 = Mock()
         config = default_config(name="keyclient")
@@ -175,7 +186,9 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
 
         # wire up outbound POST /key/v2/query requests from hs2 so that they
         # will be forwarded to hs1
-        async def post_json(destination, path, data):
+        async def post_json(
+            destination: str, path: str, data: Optional[JsonDict] = None
+        ) -> Union[JsonDict, list]:
             self.assertEqual(destination, self.hs.hostname)
             self.assertEqual(
                 path,
@@ -183,7 +196,8 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
             )
 
             channel = FakeChannel(self.site, self.reactor)
-            req = SynapseRequest(channel, self.site)
+            # channel is a `FakeChannel` but `HTTPChannel` is expected
+            req = SynapseRequest(channel, self.site)  # type: ignore[arg-type]
             req.content = BytesIO(encode_canonical_json(data))
 
             req.requestReceived(
@@ -198,7 +212,7 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
 
         self.http_client2.post_json.side_effect = post_json
 
-    def test_get_key(self):
+    def test_get_key(self) -> None:
         """Fetch a key belonging to a random server"""
         # make up a key to be fetched.
         testkey = signedjson.key.generate_signing_key("abc")
@@ -218,7 +232,7 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
             signedjson.key.encode_verify_key_base64(testkey.verify_key),
         )
 
-    def test_get_notary_key(self):
+    def test_get_notary_key(self) -> None:
         """Fetch a key belonging to the notary server"""
         # make up a key to be fetched. We randomise the keyid to try to get it to
         # appear before the key server signing key sometimes (otherwise we bail out
@@ -240,7 +254,7 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
             signedjson.key.encode_verify_key_base64(testkey.verify_key),
         )
 
-    def test_get_notary_keyserver_key(self):
+    def test_get_notary_keyserver_key(self) -> None:
         """Fetch the notary's keyserver key"""
         # we expect hs1 to make a regular key request to itself
         self.expect_outgoing_key_request(self.hs.hostname, self.hs_signing_key)

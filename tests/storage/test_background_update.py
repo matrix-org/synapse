@@ -66,13 +66,13 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         self.update_handler.reset_mock()
         res = self.get_success(
             self.updates.do_next_background_update(False),
-            by=0.01,
+            by=0.02,
         )
         self.assertFalse(res)
 
         # on the first call, we should get run with the default background update size
         self.update_handler.assert_called_once_with(
-            {"my_key": 1}, self.updates.MINIMUM_BACKGROUND_BATCH_SIZE
+            {"my_key": 1}, self.updates.DEFAULT_BACKGROUND_BATCH_SIZE
         )
 
         # second step: complete the update

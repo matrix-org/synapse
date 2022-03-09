@@ -155,10 +155,10 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
                 "current_updates": {
                     "master": {
                         "name": "test_update",
-                        "average_items_per_ms": 0.001,
+                        "average_items_per_ms": 0.1,
                         "total_duration_ms": 1000.0,
                         "total_item_count": (
-                            BackgroundUpdater.MINIMUM_BACKGROUND_BATCH_SIZE
+                            BackgroundUpdater.DEFAULT_BACKGROUND_BATCH_SIZE
                         ),
                     }
                 },
@@ -210,10 +210,10 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
                 "current_updates": {
                     "master": {
                         "name": "test_update",
-                        "average_items_per_ms": 0.001,
+                        "average_items_per_ms": 0.1,
                         "total_duration_ms": 1000.0,
                         "total_item_count": (
-                            BackgroundUpdater.MINIMUM_BACKGROUND_BATCH_SIZE
+                            BackgroundUpdater.DEFAULT_BACKGROUND_BATCH_SIZE
                         ),
                     }
                 },
@@ -239,10 +239,10 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
                 "current_updates": {
                     "master": {
                         "name": "test_update",
-                        "average_items_per_ms": 0.001,
+                        "average_items_per_ms": 0.1,
                         "total_duration_ms": 1000.0,
                         "total_item_count": (
-                            BackgroundUpdater.MINIMUM_BACKGROUND_BATCH_SIZE
+                            BackgroundUpdater.DEFAULT_BACKGROUND_BATCH_SIZE
                         ),
                     }
                 },
@@ -278,11 +278,9 @@ class BackgroundUpdatesTestCase(unittest.HomeserverTestCase):
                 "current_updates": {
                     "master": {
                         "name": "test_update",
-                        "average_items_per_ms": 0.001,
+                        "average_items_per_ms": 0.05263157894736842,
                         "total_duration_ms": 2000.0,
-                        "total_item_count": (
-                            2 * BackgroundUpdater.MINIMUM_BACKGROUND_BATCH_SIZE
-                        ),
+                        "total_item_count": (110),
                     }
                 },
                 "enabled": True,
