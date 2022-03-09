@@ -524,7 +524,7 @@ Note that if a reverse proxy is used , then `/_matrix/media/` must be routed for
 Handles searches in the user directory. It can handle REST endpoints matching
 the following regular expressions:
 
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/user_directory/search$
+    ^/_matrix/client/(r0|v3|unstable)/user_directory/search$
 
 When using this worker you must also set `update_user_directory: False` in the
 shared configuration file to stop the main synapse running background
