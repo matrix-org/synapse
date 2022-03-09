@@ -384,38 +384,38 @@ stream_writers:
 
 ##### The `typing` stream
 
-The following endpoints should be routed directly to the workers configured as
-stream writers for the `typing` stream:
+The following endpoints should be routed directly to a single worker configured
+as stream writers for the `typing` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing
 
 ##### The `to_device` stream
 
-The following endpoints should be routed directly to the workers configured as
-stream writers for the `to_device` stream:
+The following endpoints should be routed directly to a single worker configured
+as stream writers for the `to_device` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/sendToDevice/
 
 ##### The `account_data` stream
 
-The following endpoints should be routed directly to the workers configured as
-stream writers for the `account_data` stream:
+The following endpoints should be routed directly to a single worker configured
+as stream writers for the `account_data` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/tags
     ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/account_data
 
 ##### The `receipts` stream
 
-The following endpoints should be routed directly to the workers configured as
-stream writers for the `receipts` stream:
+The following endpoints should be routed directly to a single worker configured
+as stream writers for the `receipts` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/receipt
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/read_markers
 
 ##### The `presence` stream
 
-The following endpoints should be routed directly to the workers configured as
-stream writers for the `presence` stream:
+The following endpoints should be routed directly to a single worker configured
+as stream writers for the `presence` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
 
