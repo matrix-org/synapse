@@ -462,7 +462,6 @@ class DelayCancellationTests(TestCase):
         self.assertEqual(SENTINEL_CONTEXT, current_context())
 
         d.cancel()
-        d.cancel()
 
         # Now unblock. `outer()` will consume the `CancelledError` and check the
         # logging context.
