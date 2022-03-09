@@ -88,6 +88,10 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             `_handle_request` must return a Deferred.
         RETRY_ON_TIMEOUT(bool): Whether or not to retry the request when a 504
             is received.
+        RETRY_ON_CONNECT_ERROR (bool): Whether or not to retry the request when
+            a connection error is received.
+        RETRY_ON_CONNECT_ERROR_ATTEMPTS (int): Number of attempts to retry when
+            receiving connection errors, each will backoff exponentially longer.
     """
 
     NAME: str = abc.abstractproperty()  # type: ignore
