@@ -290,6 +290,35 @@ it will be included in this state.</p>
 into the room, which means this callback cannot be used to deny persisting the event. To
 deny an incoming event, see <a href="spam_checker_callbacks.html#check_event_for_spam"><code>check_event_for_spam</code></a> instead.</p>
 <p>If multiple modules implement this callback, Synapse runs them all in order.</p>
+<h3 id="check_can_shutdown_room"><a class="header" href="#check_can_shutdown_room"><code>check_can_shutdown_room</code></a></h3>
+<p><em>First introduced in Synapse v1.55.0</em></p>
+<pre><code class="language-python">async def check_can_shutdown_room(
+    user_id: str, room_id: str,
+) -&gt; bool:
+</code></pre>
+<p>Called when an admin user requests the shutdown of a room. The module must return a
+boolean indicating whether the shutdown can go through. If the callback returns <code>False</code>,
+the shutdown will not proceed and the caller will see a <code>M_FORBIDDEN</code> error.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
+<h3 id="check_can_deactivate_user"><a class="header" href="#check_can_deactivate_user"><code>check_can_deactivate_user</code></a></h3>
+<p><em>First introduced in Synapse v1.55.0</em></p>
+<pre><code class="language-python">async def check_can_deactivate_user(
+    user_id: str, by_admin: bool,
+) -&gt; bool:
+</code></pre>
+<p>Called when the deactivation of a user is requested. User deactivation can be
+performed by an admin or the user themselves, so developers are encouraged to check the
+requester when implementing this callback. The module must return a
+boolean indicating whether the deactivation can go through. If the callback returns <code>False</code>,
+the deactivation will not proceed and the caller will see a <code>M_FORBIDDEN</code> error.</p>
+<p>The module is passed two parameters, <code>user_id</code> which is the ID of the user being deactivated, and <code>by_admin</code> which is <code>True</code> if the request is made by a serve admin, and <code>False</code> otherwise.</p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>True</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>True</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h3 id="on_profile_update"><a class="header" href="#on_profile_update"><code>on_profile_update</code></a></h3>
 <p><em>First introduced in Synapse v1.54.0</em></p>
 <pre><code class="language-python">async def on_profile_update(
