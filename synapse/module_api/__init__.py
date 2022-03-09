@@ -285,15 +285,12 @@ class ModuleApi:
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = None,
         on_new_event: Optional[ON_NEW_EVENT_CALLBACK] = None,
-<<<<<<< HEAD
         check_can_shutdown_room: Optional[CHECK_CAN_SHUTDOWN_ROOM_CALLBACK] = None,
         check_can_deactivate_user: Optional[CHECK_CAN_DEACTIVATE_USER_CALLBACK] = None,
-=======
         on_profile_update: Optional[ON_PROFILE_UPDATE_CALLBACK] = None,
         on_user_deactivation_status_changed: Optional[
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = None,
->>>>>>> origin/develop
     ) -> None:
         """Registers callbacks for third party event rules capabilities.
 
@@ -305,13 +302,10 @@ class ModuleApi:
             check_threepid_can_be_invited=check_threepid_can_be_invited,
             check_visibility_can_be_modified=check_visibility_can_be_modified,
             on_new_event=on_new_event,
-<<<<<<< HEAD
             check_can_shutdown_room=check_can_shutdown_room,
             check_can_deactivate_user=check_can_deactivate_user,
-=======
             on_profile_update=on_profile_update,
             on_user_deactivation_status_changed=on_user_deactivation_status_changed,
->>>>>>> origin/develop
         )
 
     def register_presence_router_callbacks(

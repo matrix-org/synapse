@@ -159,8 +159,12 @@ class ThirdPartyEventRules:
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = []
         self._on_new_event_callbacks: List[ON_NEW_EVENT_CALLBACK] = []
-        self._check_can_shutdown_room_callbacks: List[CHECK_CAN_SHUTDOWN_ROOM_CALLBACK] = []
-        self._check_can_deactivate_user_callbacks: List[CHECK_CAN_DEACTIVATE_USER_CALLBACK] = []
+        self._check_can_shutdown_room_callbacks: List[
+            CHECK_CAN_SHUTDOWN_ROOM_CALLBACK
+        ] = []
+        self._check_can_deactivate_user_callbacks: List[
+            CHECK_CAN_DEACTIVATE_USER_CALLBACK
+        ] = []
         self._on_profile_update_callbacks: List[ON_PROFILE_UPDATE_CALLBACK] = []
         self._on_user_deactivation_status_changed_callbacks: List[
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
