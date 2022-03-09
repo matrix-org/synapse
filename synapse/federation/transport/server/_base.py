@@ -63,7 +63,7 @@ class Authenticator:
 
         self.replication_client = None
         if hs.config.worker.worker_app:
-            self.replication_client = hs.get_tcp_replication()
+            self.replication_client = hs.get_replication_command_handlere()
 
     # A method just so we can pass 'self' as the authenticator to the Servlets
     async def authenticate_request(

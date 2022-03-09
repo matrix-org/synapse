@@ -325,7 +325,7 @@ class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
             password=hs.config.redis.redis_password,
         )
 
-        self.synapse_handler = hs.get_tcp_replication()
+        self.synapse_handler = hs.get_replication_command_handlere()
         self.synapse_stream_name = hs.hostname
 
         self.synapse_outbound_redis_connection = outbound_redis_connection
