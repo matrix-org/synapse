@@ -203,7 +203,6 @@ information.
     ^/_matrix/federation/(v1|v2)/send_join/
     ^/_matrix/federation/(v1|v2)/send_leave/
     ^/_matrix/federation/(v1|v2)/invite/
-    ^/_matrix/federation/v1/query_auth/
     ^/_matrix/federation/v1/event_auth/
     ^/_matrix/federation/v1/exchange_third_party_invite/
     ^/_matrix/federation/v1/user/devices/
