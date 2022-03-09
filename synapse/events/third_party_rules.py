@@ -39,7 +39,7 @@ CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK = Callable[
 ]
 ON_NEW_EVENT_CALLBACK = Callable[[EventBase, StateMap[EventBase]], Awaitable]
 CHECK_CAN_SHUTDOWN_ROOM_CALLBACK = Callable[[str, str], Awaitable[bool]]
-CHECK_CAN_DEACTIVATE_USER_CALLBACK = Callable[[Requester, str], Awaitable[bool]]
+CHECK_CAN_DEACTIVATE_USER_CALLBACK = Callable[[str, str | None], Awaitable[bool]]
 ON_PROFILE_UPDATE_CALLBACK = Callable[[str, ProfileInfo, bool, bool], Awaitable]
 ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK = Callable[[str, bool, bool], Awaitable]
 
@@ -403,7 +403,9 @@ class ThirdPartyEventRules:
         return True
 
     async def check_can_deactivate_user(
-        self, requester: Requester, user_id: str
+        self,
+        user_id: str,
+        admin_user_id: str | None,
     ) -> bool:
         """Intercept requests to deactivate a user. If `False` is returned, the
         user should not be deactivated.
@@ -414,7 +416,7 @@ class ThirdPartyEventRules:
         """
         for callback in self._check_can_deactivate_user_callbacks:
             try:
-                if await callback(requester, user_id) is False:
+                if await callback(user_id, admin_user_id) is False:
                     return False
             except Exception as e:
                 logger.exception(

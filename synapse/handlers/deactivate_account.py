@@ -78,7 +78,7 @@ class DeactivateAccountHandler:
 
         # Check if this user can be deactivated
         if not await self._third_party_rules.check_can_deactivate_user(
-            requester, user_id
+            user_id, requester.user.to_string() if by_admin else None
         ):
             raise SynapseError(
                 403, "Deactivation of this user is forbidden", Codes.FORBIDDEN

@@ -816,11 +816,11 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         deactivation_mock.assert_called_once()
         args = deactivation_mock.call_args[0]
 
-        # Check that the mock was called with the right requester
-        self.assertEqual(args[0].user.to_string(), user_id)
-
         # Check that the mock was called with the right user ID
-        self.assertEqual(args[1], user_id)
+        self.assertEqual(args[0], user_id)
+
+        # Check that the admin user ID was not provided
+        self.assertEqual(args[1], None)
 
     def test_check_can_deactivate_user_admin(self) -> None:
         """Tests that the on_user_deactivation_status_changed module callback is called
@@ -855,11 +855,11 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         deactivation_mock.assert_called_once()
         args = deactivation_mock.call_args[0]
 
-        # Check that the mock was called with the right requester
-        self.assertEqual(args[0].user.to_string(), admin_user_id)
-
         # Check that the mock was called with the right user ID
-        self.assertEqual(args[1], user_id)
+        self.assertEqual(args[0], user_id)
+
+        # Check that the mock was called with the right admin user id
+        self.assertEqual(args[1], admin_user_id)
 
     def test_check_can_shutdown_room(self) -> None:
         """Tests that the check_can_shutdown_room module callback is called

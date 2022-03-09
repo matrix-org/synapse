@@ -161,7 +161,7 @@ async def check_can_shutdown_room(
 
 Called when an admin user requests the shutdown of a room. The module must return a
 boolean indicating whether the shutdown can go through. If the callback returns `False`,
-the shutdown will not proceed and the caller will see a `M_FOBIDDEN` error.
+the shutdown will not proceed and the caller will see a `M_FORBIDDEN` error.
 
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `True`, Synapse falls through to the next one. The value of the first
@@ -174,8 +174,8 @@ _First introduced in Synapse v1.5X.0_
 
 ```python
 async def check_can_deactivate_user(
-    requester: "synapse.types.Requester",
     user_id: str,
+    admin_user_id: str|None,
 ) -> bool:
 ```
 
@@ -183,7 +183,7 @@ Called when the deactivation of a user is requested. User deactivation can be
 performed by an admin or the user themselves, so developers are encouraged to check the
 requester when implementing this callback. The module must return a
 boolean indicating whether the deactivation can go through. If the callback returns `False`,
-the deactivation will not proceed and the caller will see a `M_FOBIDDEN` error.
+the deactivation will not proceed and the caller will see a `M_FORBIDDEN` error.
 
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `True`, Synapse falls through to the next one. The value of the first
