@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import List
 from unittest.mock import Mock
 
 from twisted.internet.defer import Deferred
@@ -39,12 +40,12 @@ class HTTPPusherTests(HomeserverTestCase):
         return config
 
     def make_homeserver(self, reactor, clock):
-        self.push_attempts = []
+        self.push_attempts: List[tuple[Deferred, str, dict]] = []
 
         m = Mock()
 
         def post_json_get_json(url, body):
-            d = Deferred()
+            d: Deferred = Deferred()
             self.push_attempts.append((d, url, body))
             return make_deferred_yieldable(d)
 
