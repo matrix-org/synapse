@@ -1274,6 +1274,24 @@ class ModuleApi:
         """
         await self._registration_handler.check_username(username)
 
+    async def store_remote_3pid_association(
+        self, user_id: str, medium: str, address: str, id_server: str
+    ) -> None:
+        """Stores an existing association between a user ID and a third-party identifier.
+
+        The association must already exist on the remote identity server.
+
+        Added in Synapse v1.55.0.
+
+        Args:
+            user_id: The user ID that's been associated with the 3PID.
+            medium: The medium of the 3PID (current supported values are "msisdn" and
+                "email").
+            address: The address of the 3PID.
+            id_server: The identity server the 3PID association has been registered on.
+        """
+        await self._store.add_user_bound_threepid(user_id, medium, address, id_server)
+
 
 class PublicRoomListManager:
     """Contains methods for adding to, removing from and querying whether a room
