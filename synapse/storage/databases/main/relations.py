@@ -91,10 +91,11 @@ class RelationsWorkerStore(SQLBaseStore):
 
         self._msc3440_enabled = hs.config.experimental.msc3440_enabled
 
-    @cached(num_args=9, tree=True)
+    @cached(uncached_args=("event",), tree=True)
     async def get_relations_for_event(
         self,
         event_id: str,
+        event: EventBase,
         room_id: str,
         relation_type: Optional[str] = None,
         event_type: Optional[str] = None,
@@ -103,12 +104,12 @@ class RelationsWorkerStore(SQLBaseStore):
         direction: str = "b",
         from_token: Optional[StreamToken] = None,
         to_token: Optional[StreamToken] = None,
-        event: Optional[EventBase] = None,
     ) -> PaginationChunk:
         """Get a list of relations for an event, ordered by topological ordering.
 
         Args:
             event_id: Fetch events that relate to this event ID.
+            event: The matching EventBase to event_id.
             room_id: The room the event belongs to.
             relation_type: Only fetch events with this relation type, if given.
             event_type: Only fetch events with this event type, if given.
@@ -118,15 +119,13 @@ class RelationsWorkerStore(SQLBaseStore):
                 oldest first (`"f"`).
             from_token: Fetch rows from the given token, or from the start if None.
             to_token: Fetch rows up to the given token, or up to the end if None.
-            event: The matching EventBase to event_id. This *must* be provided.
 
         Returns:
             List of event IDs that match relations requested. The rows are of
             the form `{"event_id": "..."}`.
         """
-        # We don't use `event_id`, its there so that we can cache based on
+        # We don't use `event_id`, it's there so that we can cache based on
         # it. The `event_id` must match the `event.event_id`.
-        assert event is not None
         assert event.event_id == event_id
 
         where_clause = ["relates_to_id = ?", "room_id = ?"]
@@ -786,7 +785,7 @@ class RelationsWorkerStore(SQLBaseStore):
             )
 
         references = await self.get_relations_for_event(
-            event_id, room_id, RelationTypes.REFERENCE, direction="f", event=event
+            event_id, event, room_id, RelationTypes.REFERENCE, direction="f"
         )
         if references.chunk:
             aggregations.references = await references.to_dict(cast("DataStore", self))

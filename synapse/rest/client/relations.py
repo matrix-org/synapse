@@ -92,6 +92,7 @@ class RelationPaginationServlet(RestServlet):
 
         pagination_chunk = await self.store.get_relations_for_event(
             event_id=parent_id,
+            event=event,
             room_id=room_id,
             relation_type=relation_type,
             event_type=event_type,
@@ -99,7 +100,6 @@ class RelationPaginationServlet(RestServlet):
             direction=direction,
             from_token=from_token,
             to_token=to_token,
-            event=event,
         )
 
         events = await self.store.get_events_as_list(
@@ -288,6 +288,7 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
 
         result = await self.store.get_relations_for_event(
             event_id=parent_id,
+            event=event,
             room_id=room_id,
             relation_type=relation_type,
             event_type=event_type,
@@ -295,7 +296,6 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
             limit=limit,
             from_token=from_token,
             to_token=to_token,
-            event=event,
         )
 
         events = await self.store.get_events_as_list(
