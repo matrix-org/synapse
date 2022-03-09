@@ -424,7 +424,6 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 "kind": "related_event_match",
                 "key": "sender",
                 "pattern_type": "user_id",
-                "_id": "_sender",
             },
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": False}],
