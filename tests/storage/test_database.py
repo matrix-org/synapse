@@ -15,7 +15,10 @@
 from typing import Callable, NoReturn, Tuple
 from unittest.mock import Mock
 
+from twisted.internet import defer
+from twisted.internet.defer import CancelledError, Deferred
 from twisted.test.proto_helpers import MemoryReactor
+from synapse.logging.context import LoggingContext
 
 from synapse.server import HomeServer
 from synapse.storage.database import (
@@ -133,3 +136,59 @@ class CallbacksTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(after_callback.call_count, 2)  # no additional calls
         exception_callback.assert_not_called()
+
+
+class CancellationTestCase(unittest.HomeserverTestCase):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.store = hs.get_datastores().main
+        self.db_pool: DatabasePool = self.store.db_pool
+
+    def test_after_callback(self) -> None:
+        """Test that the after callback is called when a transaction succeeds."""
+        d: "Deferred[None]"
+        after_callback = Mock()
+        exception_callback = Mock()
+
+        def _test_txn(txn: LoggingTransaction) -> None:
+            txn.call_after(after_callback, 123, 456, extra=789)
+            txn.call_on_exception(exception_callback, 987, 654, extra=321)
+            d.cancel()
+
+        d = defer.ensureDeferred(
+            self.db_pool.runInteraction("test_transaction", _test_txn)
+        )
+        self.get_failure(d, CancelledError)
+
+        after_callback.assert_called_once_with(123, 456, extra=789)
+        exception_callback.assert_not_called()
+
+    def test_exception_callback(self) -> None:
+        """Test that the exception callback is called when a transaction fails."""
+        d: "Deferred[None]"
+        after_callback = Mock()
+        exception_callback = Mock()
+
+        def _test_txn(txn: LoggingTransaction) -> None:
+            txn.call_after(after_callback, 123, 456, extra=789)
+            txn.call_on_exception(exception_callback, 987, 654, extra=321)
+            d.cancel()
+            # Simulate a retryable failure on every attempt.
+            raise self.db_pool.engine.module.OperationalError()
+
+        d = defer.ensureDeferred(
+            self.db_pool.runInteraction("test_transaction", _test_txn)
+        )
+        self.get_failure(d, CancelledError)
+
+        after_callback.assert_not_called()
+        exception_callback.assert_has_calls(
+            [
+                ((987, 654), {"extra": 321}),
+                ((987, 654), {"extra": 321}),
+                ((987, 654), {"extra": 321}),
+                ((987, 654), {"extra": 321}),
+                ((987, 654), {"extra": 321}),
+                ((987, 654), {"extra": 321}),
+            ]
+        )
+        self.assertEqual(exception_callback.call_count, 6)  # no additional calls
