@@ -270,6 +270,8 @@ information.
 Additionally, the following REST endpoints can be handled for GET requests:
 
     ^/_matrix/federation/v1/groups/
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/pushrules/
+    ^/_matrix/client/(r0|v3|unstable)/groups/
 
 Pagination requests can also be handled, but all requests for a given
 room must be routed to the same instance. Additionally, care must be taken to
