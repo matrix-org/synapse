@@ -1,0 +1,1 @@
+Handle cancellation in `DatabasePool.runInteraction()`.
