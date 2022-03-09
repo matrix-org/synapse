@@ -719,33 +719,12 @@ def delay_cancellation(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]":
         wrapped with `make_deferred_yieldable`.
     """
 
-    def cancel_errback(failure: Failure) -> Union[Failure, "defer.Deferred[T]"]:
-        """Insert another `Deferred` into the chain to delay cancellation.
+    def handle_cancel(new_deferred: "defer.Deferred[T]") -> None:
+        new_deferred.pause()
+        new_deferred.errback(Failure(CancelledError()))
 
-        Called when the original `Deferred` resolves or the new `Deferred` is
-        cancelled.
-        """
-        failure.trap(CancelledError)
+        deferred.addBoth(lambda _: new_deferred.unpause())
 
-        if deferred.called and not deferred.paused:
-            # The `CancelledError` came from the original `Deferred`. Pass it through.
-            return failure
-
-        # Construct another `Deferred` that will only fail with the `CancelledError`
-        # once the original `Deferred` resolves.
-        delay_deferred: "defer.Deferred[T]" = defer.Deferred()
-        deferred.chainDeferred(delay_deferred)
-
-        # Intercept cancellations recursively. Each cancellation will cause another
-        # `Deferred` to be inserted into the chain.
-        delay_deferred.addErrback(cancel_errback)
-
-        # Override the result with the `CancelledError`.
-        delay_deferred.addBoth(lambda _: failure)
-
-        return delay_deferred
-
-    new_deferred: "defer.Deferred[T]" = defer.Deferred()
+    new_deferred: "defer.Deferred[T]" = defer.Deferred(handle_cancel)
     deferred.chainDeferred(new_deferred)
-    new_deferred.addErrback(cancel_errback)
     return new_deferred
