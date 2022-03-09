@@ -695,3 +695,31 @@ def stop_cancellation(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]":
     new_deferred: defer.Deferred[T] = defer.Deferred()
     deferred.chainDeferred(new_deferred)
     return new_deferred
+
+
+def delay_cancellation(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]":
+    """Delay cancellation of a `Deferred` until it resolves.
+    Has the same effect as `stop_cancellation`, but the returned `Deferred` will not
+    resolve with a `CancelledError` until the original `Deferred` resolves.
+    Args:
+        deferred: The `Deferred` to protect against cancellation. May optionally follow
+            the Synapse logcontext rules.
+    Returns:
+        A new `Deferred`, which will contain the result of the original `Deferred`.
+        The new `Deferred` will not propagate cancellation through to the original.
+        When cancelled, the new `Deferred` will wait until the original `Deferred`
+        resolves before failing with a `CancelledError`.
+        The new `Deferred` will follow the Synapse logcontext rules if `deferred`
+        follows the Synapse logcontext rules. Otherwise the new `Deferred` should be
+        wrapped with `make_deferred_yieldable`.
+    """
+
+    def handle_cancel(new_deferred: "defer.Deferred[T]") -> None:
+        new_deferred.pause()
+        new_deferred.errback(Failure(CancelledError()))
+
+        deferred.addBoth(lambda _: new_deferred.unpause())
+
+    new_deferred: "defer.Deferred[T]" = defer.Deferred(handle_cancel)
+    deferred.chainDeferred(new_deferred)
+    return new_deferred
