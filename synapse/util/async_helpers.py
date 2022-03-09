@@ -698,17 +698,15 @@ def stop_cancellation(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]":
     return new_deferred
 
 
-def delay_cancellation(deferred: "defer.Deferred[T]", all: bool) -> "defer.Deferred[T]":
+def delay_cancellation(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]":
     """Delay cancellation of a `Deferred` until it resolves.
 
     Has the same effect as `stop_cancellation`, but the returned `Deferred` will not
     resolve with a `CancelledError` until the original `Deferred` resolves.
 
     Args:
-        deferred: The `Deferred` to protect against cancellation. Must not follow the
-            Synapse logcontext rules if `all` is `False`.
-        all: `True` to delay multiple cancellations. `False` to delay only the first
-            cancellation.
+        deferred: The `Deferred` to protect against cancellation. May optionally follow
+            the Synapse logcontext rules.
 
     Returns:
         A new `Deferred`, which will contain the result of the original `Deferred`.
@@ -716,9 +714,9 @@ def delay_cancellation(deferred: "defer.Deferred[T]", all: bool) -> "defer.Defer
         When cancelled, the new `Deferred` will wait until the original `Deferred`
         resolves before failing with a `CancelledError`.
 
-        The new `Deferred` will only follow the Synapse logcontext rules if `all` is
-        `True` and `deferred` follows the Synapse logcontext rules. Otherwise the new
-        `Deferred` should be wrapped with `make_deferred_yieldable`.
+        The new `Deferred` will follow the Synapse logcontext rules if `deferred`
+        follows the Synapse logcontext rules. Otherwise the new `Deferred` should be
+        wrapped with `make_deferred_yieldable`.
     """
 
     def cancel_errback(failure: Failure) -> Union[Failure, "defer.Deferred[T]"]:
@@ -738,10 +736,9 @@ def delay_cancellation(deferred: "defer.Deferred[T]", all: bool) -> "defer.Defer
         delay_deferred: "defer.Deferred[T]" = defer.Deferred()
         deferred.chainDeferred(delay_deferred)
 
-        if all:
-            # Intercept cancellations recursively. Each cancellation will cause another
-            # `Deferred` to be inserted into the chain.
-            delay_deferred.addErrback(cancel_errback)
+        # Intercept cancellations recursively. Each cancellation will cause another
+        # `Deferred` to be inserted into the chain.
+        delay_deferred.addErrback(cancel_errback)
 
         # Override the result with the `CancelledError`.
         delay_deferred.addBoth(lambda _: failure)
