@@ -274,7 +274,7 @@ def _condition_checker(
     cache: Dict[str, bool],
 ) -> bool:
     for cond in conditions:
-        _id = cond.get("_id", None)
+        _id = cond.get("_cache_key", None)
         if _id:
             res = cache.get(_id, None)
             if res is False:
