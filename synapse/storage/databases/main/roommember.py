@@ -795,11 +795,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     async def is_locally_forgotten_room(self, room_id: str) -> bool:
         sql = """
-            SELECT 1 FROM room_memberships
-            WHERE room_id = ?
-                AND user_id LIKE ?
-                AND forgotten != 1
-            LIMIT 1
+            SELECT count(*) FROM local_current_membership
+            INNER JOIN room_memberships USING (room_id, event_id)
+            WHERE 
+                room_id = ?
+                AND forgotten = 0;
         """
 
         rows = await self.db_pool.execute(
