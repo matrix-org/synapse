@@ -522,12 +522,12 @@ class RelationsWorkerStore(SQLBaseStore):
                 txn.database_engine, "relates_to_id", event_ids
             )
 
-            args.append(RelationTypes.THREAD)
             if self._msc3440_enabled:
                 relations_clause = "(relation_type = ? OR relation_type = ?)"
-                args.append(RelationTypes.UNSTABLE_THREAD)
+                args.extend((RelationTypes.THREAD, RelationTypes.UNSTABLE_THREAD))
             else:
                 relations_clause = "relation_type = ?"
+                args.append(RelationTypes.THREAD)
 
             txn.execute(sql % (clause, relations_clause), args)
             latest_event_ids = {}
@@ -559,12 +559,12 @@ class RelationsWorkerStore(SQLBaseStore):
                 txn.database_engine, "relates_to_id", latest_event_ids.keys()
             )
 
-            args.append(RelationTypes.THREAD)
             if self._msc3440_enabled:
                 relations_clause = "(relation_type = ? OR relation_type = ?)"
-                args.append(RelationTypes.UNSTABLE_THREAD)
+                args.extend((RelationTypes.THREAD, RelationTypes.UNSTABLE_THREAD))
             else:
                 relations_clause = "relation_type = ?"
+                args.append(RelationTypes.THREAD)
 
             txn.execute(sql % (clause, relations_clause), args)
             counts = dict(cast(List[Tuple[str, int]], txn.fetchall()))
@@ -637,12 +637,12 @@ class RelationsWorkerStore(SQLBaseStore):
                 txn.database_engine, "relates_to_id", event_ids
             )
 
-            args.append(RelationTypes.THREAD)
             if self._msc3440_enabled:
                 relations_clause = "(relation_type = ? OR relation_type = ?)"
-                args.append(RelationTypes.UNSTABLE_THREAD)
+                args.extend((RelationTypes.THREAD, RelationTypes.UNSTABLE_THREAD))
             else:
                 relations_clause = "relation_type = ?"
+                args.append(RelationTypes.THREAD)
 
             args.append(user_id)
 
