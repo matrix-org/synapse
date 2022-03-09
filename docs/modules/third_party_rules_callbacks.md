@@ -173,8 +173,7 @@ _First introduced in Synapse v1.5X.0_
 
 ```python
 async def check_can_deactivate_user(
-    user_id: str,
-    by_admin: bool,
+    user_id: str, by_admin: bool,
 ) -> bool:
 ```
 
