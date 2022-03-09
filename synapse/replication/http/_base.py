@@ -269,17 +269,21 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                             # If we timed out we probably don't need to worry about backing
                             # off too much, but lets just wait a little anyway.
                             await clock.sleep(1)
-                        except (ConnectError, DNSLookupError):
+                        except (ConnectError, DNSLookupError) as e:
                             if not cls.RETRY_ON_CONNECT_ERROR:
                                 raise
                             if attempts > cls.RETRY_ON_CONNECT_ERROR_ATTEMPTS:
                                 raise
 
+                            delay = 2 ** attempts
                             logger.warning(
-                                "%s request connection failed; retrying", cls.NAME
+                                "%s request connection failed; retrying in %ds: %r",
+                                cls.NAME,
+                                delay,
+                                e,
                             )
 
-                            await clock.sleep(2 ** attempts)
+                            await clock.sleep(delay)
                             attempts += 1
                 except HttpResponseException as e:
                     # We convert to SynapseError as we know that it was a SynapseError
