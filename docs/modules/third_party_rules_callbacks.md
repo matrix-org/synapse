@@ -154,8 +154,7 @@ _First introduced in Synapse v1.5X.0_
 
 ```python
 async def check_can_shutdown_room(
-    user_id: str
-    room_id: str,
+    user_id: str, room_id: str,
 ) -> bool:
 ```
 
