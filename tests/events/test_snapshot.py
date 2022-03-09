@@ -28,7 +28,7 @@ class TestEventContext(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
 
         self.user_id = self.register_user("u1", "pass")

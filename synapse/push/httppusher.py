@@ -109,6 +109,7 @@ class HttpPusher(Pusher):
         self.data_minus_url = {}
         self.data_minus_url.update(self.data)
         del self.data_minus_url["url"]
+        self.badge_count_last_call: Optional[int] = None
 
     def on_started(self, should_check_for_notifs: bool) -> None:
         """Called when this pusher has been started.
@@ -132,11 +133,13 @@ class HttpPusher(Pusher):
         # XXX as per https://github.com/matrix-org/matrix-doc/issues/2627, this seems
         # to be largely redundant. perhaps we can remove it.
         badge = await push_tools.get_badge_count(
-            self.hs.get_datastore(),
+            self.hs.get_datastores().main,
             self.user_id,
             group_by_room=self._group_unread_count_by_room,
         )
-        await self._send_badge(badge)
+        if self.badge_count_last_call is None or self.badge_count_last_call != badge:
+            self.badge_count_last_call = badge
+            await self._send_badge(badge)
 
     def on_timer(self) -> None:
         self._start_processing()
@@ -280,7 +283,7 @@ class HttpPusher(Pusher):
 
         tweaks = push_rule_evaluator.tweaks_for_actions(push_action.actions)
         badge = await push_tools.get_badge_count(
-            self.hs.get_datastore(),
+            self.hs.get_datastores().main,
             self.user_id,
             group_by_room=self._group_unread_count_by_room,
         )
@@ -322,7 +325,7 @@ class HttpPusher(Pusher):
         # This was checked in the __init__, but mypy doesn't seem to know that.
         assert self.data is not None
         if self.data.get("format") == "event_id_only":
-            d = {
+            d: Dict[str, Any] = {
                 "notification": {
                     "event_id": event.event_id,
                     "room_id": event.room_id,
@@ -402,6 +405,8 @@ class HttpPusher(Pusher):
         rejected = []
         if "rejected" in resp:
             rejected = resp["rejected"]
+        else:
+            self.badge_count_last_call = badge
         return rejected
 
     async def _send_badge(self, badge: int) -> None:

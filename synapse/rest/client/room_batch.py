@@ -75,7 +75,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
         self.room_batch_handler = hs.get_room_batch_handler()

@@ -103,8 +103,8 @@ CONDITIONAL_REQUIREMENTS["lint"] = [
 ]
 
 CONDITIONAL_REQUIREMENTS["mypy"] = [
-    "mypy==0.910",
-    "mypy-zope==0.3.2",
+    "mypy==0.931",
+    "mypy-zope==0.3.5",
     "types-bleach>=4.1.0",
     "types-jsonschema>=3.2.0",
     "types-opentracing>=2.4.2",
@@ -165,6 +165,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ],
     scripts=["synctl"] + glob.glob("scripts/*"),
     cmdclass={"test": TestCommand},

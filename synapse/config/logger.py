@@ -33,7 +33,6 @@ from twisted.logger import (
     globalLogBeginner,
 )
 
-from synapse.logging._structured import setup_structured_logging
 from synapse.logging.context import LoggingContextFilter
 from synapse.logging.filter import MetadataFilter
 
@@ -136,6 +135,12 @@ disable_existing_loggers: false
 LOG_FILE_ERROR = """\
 Support for the log_file configuration option and --log-file command-line option was
 removed in Synapse 1.3.0. You should instead set up a separate log configuration file.
+"""
+
+STRUCTURED_ERROR = """\
+Support for the structured configuration option was removed in Synapse 1.54.0.
+You should instead use the standard logging configuration. See
+https://matrix-org.github.io/synapse/v1.54/structured_logging.html
 """
 
 
@@ -292,10 +297,9 @@ def _load_logging_config(log_config_path: str) -> None:
     if not log_config:
         logging.warning("Loaded a blank logging config?")
 
-    # If the old structured logging configuration is being used, convert it to
-    # the new style configuration.
+    # If the old structured logging configuration is being used, raise an error.
     if "structured" in log_config and log_config.get("structured"):
-        log_config = setup_structured_logging(log_config)
+        raise ConfigError(STRUCTURED_ERROR)
 
     logging.config.dictConfig(log_config)
 

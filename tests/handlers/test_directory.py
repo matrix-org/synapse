@@ -46,7 +46,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
         self.handler = hs.get_directory_handler()
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.my_room = RoomAlias.from_string("#my-room:test")
         self.your_room = RoomAlias.from_string("#your-room:test")
@@ -63,7 +63,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
         result = self.get_success(self.handler.get_association(self.my_room))
 
-        self.assertEquals({"room_id": "!8765qwer:test", "servers": ["test"]}, result)
+        self.assertEqual({"room_id": "!8765qwer:test", "servers": ["test"]}, result)
 
     def test_get_remote_association(self):
         self.mock_federation.make_query.return_value = make_awaitable(
@@ -72,7 +72,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
         result = self.get_success(self.handler.get_association(self.remote_room))
 
-        self.assertEquals(
+        self.assertEqual(
             {"room_id": "!8765qwer:test", "servers": ["test", "remote"]}, result
         )
         self.mock_federation.make_query.assert_called_with(
@@ -94,7 +94,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
             self.handler.on_directory_query({"room_alias": "#your-room:test"})
         )
 
-        self.assertEquals({"room_id": "!8765asdf:test", "servers": ["test"]}, response)
+        self.assertEqual({"room_id": "!8765asdf:test", "servers": ["test"]}, response)
 
 
 class TestCreateAlias(unittest.HomeserverTestCase):
@@ -174,7 +174,7 @@ class TestDeleteAlias(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.handler = hs.get_directory_handler()
         self.state_handler = hs.get_state_handler()
 
@@ -224,7 +224,7 @@ class TestDeleteAlias(unittest.HomeserverTestCase):
                 create_requester(self.test_user), self.room_alias
             )
         )
-        self.assertEquals(self.room_id, result)
+        self.assertEqual(self.room_id, result)
 
         # Confirm the alias is gone.
         self.get_failure(
@@ -243,7 +243,7 @@ class TestDeleteAlias(unittest.HomeserverTestCase):
                 create_requester(self.admin_user), self.room_alias
             )
         )
-        self.assertEquals(self.room_id, result)
+        self.assertEqual(self.room_id, result)
 
         # Confirm the alias is gone.
         self.get_failure(
@@ -269,7 +269,7 @@ class TestDeleteAlias(unittest.HomeserverTestCase):
                 create_requester(self.test_user), self.room_alias
             )
         )
-        self.assertEquals(self.room_id, result)
+        self.assertEqual(self.room_id, result)
 
         # Confirm the alias is gone.
         self.get_failure(
@@ -289,7 +289,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.handler = hs.get_directory_handler()
         self.state_handler = hs.get_state_handler()
 
@@ -411,7 +411,7 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
             b"directory/room/%23test%3Atest",
             {"room_id": room_id},
         )
-        self.assertEquals(403, channel.code, channel.result)
+        self.assertEqual(403, channel.code, channel.result)
 
     def test_allowed(self):
         room_id = self.helper.create_room_as(self.user_id)
@@ -421,7 +421,7 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
             b"directory/room/%23unofficial_test%3Atest",
             {"room_id": room_id},
         )
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
 
     def test_denied_during_creation(self):
         """A room alias that is not allowed should be rejected during creation."""
@@ -443,8 +443,8 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
             "GET",
             b"directory/room/%23unofficial_test%3Atest",
         )
-        self.assertEquals(200, channel.code, channel.result)
-        self.assertEquals(channel.json_body["room_id"], room_id)
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(channel.json_body["room_id"], room_id)
 
 
 class TestCreatePublishedRoomACL(unittest.HomeserverTestCase):
@@ -572,7 +572,7 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
         channel = self.make_request(
             "PUT", b"directory/list/room/%s" % (room_id.encode("ascii"),), b"{}"
         )
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
 
         self.room_list_handler = hs.get_room_list_handler()
         self.directory_handler = hs.get_directory_handler()
@@ -585,7 +585,7 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
 
         # Room list is enabled so we should get some results
         channel = self.make_request("GET", b"publicRooms")
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["chunk"]) > 0)
 
         self.room_list_handler.enable_room_list_search = False
@@ -593,7 +593,7 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
 
         # Room list disabled so we should get no results
         channel = self.make_request("GET", b"publicRooms")
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["chunk"]) == 0)
 
         # Room list disabled so we shouldn't be allowed to publish rooms
@@ -601,4 +601,4 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
         channel = self.make_request(
             "PUT", b"directory/list/room/%s" % (room_id.encode("ascii"),), b"{}"
         )
-        self.assertEquals(403, channel.code, channel.result)
+        self.assertEqual(403, channel.code, channel.result)

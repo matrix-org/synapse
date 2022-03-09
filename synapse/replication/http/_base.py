@@ -293,7 +293,9 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                     raise e.to_synapse_error()
                 except Exception as e:
                     _outgoing_request_counter.labels(cls.NAME, "ERR").inc()
-                    raise SynapseError(502, "Failed to talk to main process") from e
+                    raise SynapseError(
+                        502, f"Failed to talk to {instance_name} process"
+                    ) from e
 
                 _outgoing_request_counter.labels(cls.NAME, 200).inc()
                 return result

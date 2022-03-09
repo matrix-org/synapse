@@ -10,12 +10,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check-sampleconfig:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - run: pip install -e .
+      - run: scripts-dev/generate_sample_config --check
+
   lint:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         toxenv:
-          - "check-sampleconfig"
           - "check_codestyle"
           - "check_isort"
           - "mypy"
@@ -43,29 +50,15 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: actions/setup-python@v2
-      - run: pip install tox
+      - run: "pip install 'towncrier>=18.6.0rc1'"
       - run: scripts-dev/check-newsfragment
         env:
           PULL_REQUEST_NUMBER: ${{ github.event.number }}
 
-  lint-sdist:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-        with:
-          python-version: "3.x"
-      - run: pip install wheel
-      - run: python setup.py sdist bdist_wheel
-      - uses: actions/upload-artifact@v2
-        with:
-          name: Python Distributions
-          path: dist/*
-
   # Dummy step to gate other tests on without repeating the whole list
   linting-done:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
-    needs: [lint, lint-crlf, lint-newsfile, lint-sdist]
+    needs: [lint, lint-crlf, lint-newsfile, check-sampleconfig]
     runs-on: ubuntu-latest
     steps:
       - run: "true"
@@ -397,7 +390,6 @@ jobs:
       - lint
       - lint-crlf
       - lint-newsfile
-      - lint-sdist
       - trial
       - trial-olddeps
       - sytest

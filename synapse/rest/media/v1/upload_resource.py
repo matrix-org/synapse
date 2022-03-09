@@ -37,7 +37,7 @@ class UploadResource(DirectServeJsonResource):
 
         self.media_repo = media_repo
         self.filepaths = media_repo.filepaths
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
         self.auth = hs.get_auth()

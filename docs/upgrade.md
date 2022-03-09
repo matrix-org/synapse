@@ -85,6 +85,15 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.54.0
+
+## Legacy structured logging configuration removal
+
+This release removes support for the `structured: true` logging configuration
+which was deprecated in Synapse v1.23.0. If your logging configuration contains
+`structured: true` then it should be modified based on the
+[structured logging documentation](structured_logging.md).
+
 # Upgrading to v1.53.0
 
 ## Dropping support for `webclient` listeners and non-HTTP(S) `web_client_location`
@@ -157,7 +166,7 @@ Note that [Twisted 22.1.0](https://github.com/twisted/twisted/releases/tag/twist
 has recently been released, which fixes a [security issue](https://github.com/twisted/twisted/security/advisories/GHSA-92x2-jw7w-xvvx)
 within the Twisted library. We do not believe Synapse is affected by this vulnerability,
 though we advise server administrators who installed Synapse via pip to upgrade Twisted
-with `pip install --upgrade Twisted` as a matter of good practice. The Docker image
+with `pip install --upgrade Twisted treq` as a matter of good practice. The Docker image
 `matrixdotorg/synapse` and the Debian packages from `packages.matrix.org` are using the
 updated library.
 

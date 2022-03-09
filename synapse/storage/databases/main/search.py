@@ -28,6 +28,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.types import JsonDict
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -114,6 +115,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
     EVENT_SEARCH_ORDER_UPDATE_NAME = "event_search_order"
     EVENT_SEARCH_USE_GIST_POSTGRES_NAME = "event_search_postgres_gist"
     EVENT_SEARCH_USE_GIN_POSTGRES_NAME = "event_search_postgres_gin"
+    EVENT_SEARCH_DELETE_NON_STRINGS = "event_search_sqlite_delete_non_strings"
 
     def __init__(
         self,
@@ -144,6 +146,10 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
         self.db_pool.updates.register_background_update_handler(
             self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME, self._background_reindex_gin_search
+        )
+
+        self.db_pool.updates.register_background_update_handler(
+            self.EVENT_SEARCH_DELETE_NON_STRINGS, self._background_delete_non_strings
         )
 
     async def _background_reindex_search(self, progress, batch_size):
@@ -371,6 +377,27 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
         return num_rows
 
+    async def _background_delete_non_strings(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Deletes rows with non-string `value`s from `event_search` if using sqlite.
+
+        Prior to Synapse 1.44.0, malformed events received over federation could cause integers
+        to be inserted into the `event_search` table when using sqlite.
+        """
+
+        def delete_non_strings_txn(txn: LoggingTransaction) -> None:
+            txn.execute("DELETE FROM event_search WHERE typeof(value) != 'text'")
+
+        await self.db_pool.runInteraction(
+            self.EVENT_SEARCH_DELETE_NON_STRINGS, delete_non_strings_txn
+        )
+
+        await self.db_pool.updates._end_background_update(
+            self.EVENT_SEARCH_DELETE_NON_STRINGS
+        )
+        return 1
+
 
 class SearchStore(SearchBackgroundUpdateStore):
     def __init__(
@@ -381,17 +408,19 @@ class SearchStore(SearchBackgroundUpdateStore):
     ):
         super().__init__(database, db_conn, hs)
 
-    async def search_msgs(self, room_ids, search_term, keys):
+    async def search_msgs(
+        self, room_ids: Collection[str], search_term: str, keys: Iterable[str]
+    ) -> JsonDict:
         """Performs a full text search over events with given keys.
 
         Args:
-            room_ids (list): List of room ids to search in
-            search_term (str): Search term to search for
-            keys (list): List of keys to search in, currently supports
+            room_ids: List of room ids to search in
+            search_term: Search term to search for
+            keys: List of keys to search in, currently supports
                 "content.body", "content.name", "content.topic"
 
         Returns:
-            list of dicts
+            Dictionary of results
         """
         clauses = []
 
@@ -499,10 +528,10 @@ class SearchStore(SearchBackgroundUpdateStore):
         self,
         room_ids: Collection[str],
         search_term: str,
-        keys: List[str],
+        keys: Iterable[str],
         limit,
         pagination_token: Optional[str] = None,
-    ) -> List[dict]:
+    ) -> JsonDict:
         """Performs a full text search over events with given keys.
 
         Args:

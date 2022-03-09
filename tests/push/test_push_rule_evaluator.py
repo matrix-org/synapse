@@ -14,6 +14,8 @@
 
 from typing import Any, Dict
 
+import frozendict
+
 from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent
 from synapse.push import push_rule_evaluator
@@ -189,6 +191,13 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             condition,
             {"value": "FoobaZz"},
             "pattern should only match at the start/end of the value",
+        )
+
+        # it should work on frozendicts too
+        self._assert_matches(
+            condition,
+            frozendict.frozendict({"value": "FoobaZ"}),
+            "patterns should match on frozendicts",
         )
 
         # wildcards should match

@@ -176,7 +176,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         def get_users_who_share_room_with_user(user_id):
             return defer.succeed({"@user2:host2"})
 
-        hs.get_datastore().get_users_who_share_room_with_user = (
+        hs.get_datastores().main.get_users_who_share_room_with_user = (
             get_users_who_share_room_with_user
         )
 
@@ -395,7 +395,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         # run the prune job
         self.reactor.advance(10)
         self.get_success(
-            self.hs.get_datastore()._prune_old_outbound_device_pokes(prune_age=1)
+            self.hs.get_datastores().main._prune_old_outbound_device_pokes(prune_age=1)
         )
 
         # recover the server
@@ -445,7 +445,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         # run the prune job
         self.reactor.advance(10)
         self.get_success(
-            self.hs.get_datastore()._prune_old_outbound_device_pokes(prune_age=1)
+            self.hs.get_datastores().main._prune_old_outbound_device_pokes(prune_age=1)
         )
 
         # recover the server
