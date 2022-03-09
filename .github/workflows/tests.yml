@@ -295,9 +295,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: sudo apt-get -qq install xmlsec1
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@dmr/try-extras
         with:
           python-version: ${{ matrix.python-version }}
+          extras: "postgres"
       - run: .ci/scripts/test_synapse_port_db.sh
 
   complement:
