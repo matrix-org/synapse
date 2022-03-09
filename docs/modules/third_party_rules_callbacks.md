@@ -184,8 +184,7 @@ requester when implementing this callback. The module must return a
 boolean indicating whether the deactivation can go through. If the callback returns `False`,
 the deactivation will not proceed and the caller will see a `M_FORBIDDEN` error.
 
-`by_admin` will be `True` if the request is made by an admin, or `False` if the request
-was made by the user themselves.
+The module is passed two parameters, `user_id` which is the ID of the user being deactivated, and `by_admin` which is `True` if the request is made by a serve admin, and `False` otherwise.
 
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `True`, Synapse falls through to the next one. The value of the first
