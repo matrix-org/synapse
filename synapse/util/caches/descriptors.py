@@ -20,6 +20,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Collection,
     Dict,
     Generic,
     Hashable,
@@ -69,6 +70,7 @@ class _CacheDescriptorBase:
         self,
         orig: Callable[..., Any],
         num_args: Optional[int],
+        uncached_args: Optional[Collection[str]] = None,
         cache_context: bool = False,
     ):
         self.orig = orig
@@ -88,6 +90,9 @@ class _CacheDescriptorBase:
                 " named `cache_context`"
             )
 
+        if num_args is not None and uncached_args is not None:
+            raise ValueError("Cannot provide both num_args and uncached_args")
+
         if num_args is None:
             num_args = len(all_args) - 1
             if cache_context:
@@ -104,6 +109,11 @@ class _CacheDescriptorBase:
 
         # list of the names of the args used as the cache key
         self.arg_names = all_args[1 : num_args + 1]
+
+        # If there are args to not cache on, filter them out (and fix the size of num_args).
+        if uncached_args is not None:
+            self.num_args -= len(uncached_args)
+            self.arg_names = [n for n in self.arg_names if n not in uncached_args]
 
         # self.arg_defaults is a map of arg name to its default value for each
         # argument that has a default value
@@ -186,7 +196,9 @@ class LruCacheDescriptor(_CacheDescriptorBase):
         max_entries: int = 1000,
         cache_context: bool = False,
     ):
-        super().__init__(orig, num_args=None, cache_context=cache_context)
+        super().__init__(
+            orig, num_args=None, uncached_args=None, cache_context=cache_context
+        )
         self.max_entries = max_entries
 
     def __get__(self, obj: Optional[Any], owner: Optional[Type]) -> Callable[..., Any]:
@@ -260,6 +272,9 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
         num_args: number of positional arguments (excluding ``self`` and
             ``cache_context``) to use as cache keys. Defaults to all named
             args of the function.
+        uncached_args: a list of argument names to not use as the cache key.
+            (``self`` and ``cache_context`` are always ignored.) Cannot be used
+            with num_args.
         tree:
         cache_context:
         iterable:
@@ -273,12 +288,18 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
         orig: Callable[..., Any],
         max_entries: int = 1000,
         num_args: Optional[int] = None,
+        uncached_args: Optional[Collection[str]] = None,
         tree: bool = False,
         cache_context: bool = False,
         iterable: bool = False,
         prune_unread_entries: bool = True,
     ):
-        super().__init__(orig, num_args=num_args, cache_context=cache_context)
+        super().__init__(
+            orig,
+            num_args=num_args,
+            uncached_args=uncached_args,
+            cache_context=cache_context,
+        )
 
         if tree and self.num_args < 2:
             raise RuntimeError(
@@ -369,7 +390,7 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
                 but including list_name) to use as cache keys. Defaults to all
                 named args of the function.
         """
-        super().__init__(orig, num_args=num_args)
+        super().__init__(orig, num_args=num_args, uncached_args=None)
 
         self.list_name = list_name
 
@@ -532,6 +553,7 @@ class _CacheContext:
 def cached(
     max_entries: int = 1000,
     num_args: Optional[int] = None,
+    uncached_args: Optional[Collection[str]] = None,
     tree: bool = False,
     cache_context: bool = False,
     iterable: bool = False,
@@ -541,6 +563,7 @@ def cached(
         orig,
         max_entries=max_entries,
         num_args=num_args,
+        uncached_args=uncached_args,
         tree=tree,
         cache_context=cache_context,
         iterable=iterable,
