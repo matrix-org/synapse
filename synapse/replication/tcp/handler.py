@@ -295,9 +295,7 @@ class ReplicationCommandHandler:
             raise Exception("Unrecognised command %s in stream queue", cmd.NAME)
 
     def start_replication(self, hs: "HomeServer") -> None:
-        """Helper method to start a replication connection to the remote server
-        using TCP.
-        """
+        """Helper method to start replication."""
         if hs.config.redis.redis_enabled:
             from synapse.replication.tcp.redis import (
                 RedisDirectTcpReplicationClientFactory,
