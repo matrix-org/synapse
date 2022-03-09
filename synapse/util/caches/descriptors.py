@@ -119,8 +119,9 @@ class _CacheDescriptorBase:
 
         # If there are args to not cache on, filter them out (and fix the size of num_args).
         if uncached_args is not None:
-            self.num_args -= len(uncached_args)
-            self.arg_names = [n for n in self.arg_names if n not in uncached_args]
+            include_arg_in_cache_key = [n not in uncached_args for n in self.arg_names]
+        else:
+            include_arg_in_cache_key = [True] * len(self.arg_names)
 
         # self.arg_defaults is a map of arg name to its default value for each
         # argument that has a default value
@@ -137,7 +138,7 @@ class _CacheDescriptorBase:
         self.add_cache_context = cache_context
 
         self.cache_key_builder = _get_cache_key_builder(
-            self.arg_names, self.arg_defaults
+            self.arg_names, include_arg_in_cache_key, self.arg_defaults
         )
 
 
@@ -621,12 +622,15 @@ def cachedList(
 
 
 def _get_cache_key_builder(
-    param_names: Sequence[str], param_defaults: Mapping[str, Any]
+    param_names: Sequence[str],
+    include_params: Sequence[bool],
+    param_defaults: Mapping[str, Any],
 ) -> Callable[[Sequence[Any], Mapping[str, Any]], CacheKey]:
     """Construct a function which will build cache keys suitable for a cached function
 
     Args:
         param_names: list of formal parameter names for the cached function
+        include_params: list of bools of whether to include the parameter name in the cache key
         param_defaults: a mapping from parameter name to default value for that param
 
     Returns:
@@ -638,6 +642,7 @@ def _get_cache_key_builder(
 
     if len(param_names) == 1:
         nm = param_names[0]
+        assert include_params[0] is True
 
         def get_cache_key(args: Sequence[Any], kwargs: Mapping[str, Any]) -> CacheKey:
             if nm in kwargs:
@@ -650,13 +655,18 @@ def _get_cache_key_builder(
     else:
 
         def get_cache_key(args: Sequence[Any], kwargs: Mapping[str, Any]) -> CacheKey:
-            return tuple(_get_cache_key_gen(param_names, param_defaults, args, kwargs))
+            return tuple(
+                _get_cache_key_gen(
+                    param_names, include_params, param_defaults, args, kwargs
+                )
+            )
 
     return get_cache_key
 
 
 def _get_cache_key_gen(
     param_names: Iterable[str],
+    include_params: Iterable[bool],
     param_defaults: Mapping[str, Any],
     args: Sequence[Any],
     kwargs: Mapping[str, Any],
@@ -667,16 +677,21 @@ def _get_cache_key_gen(
     This is essentially the same operation as `inspect.getcallargs`, but optimised so
     that we don't need to inspect the target function for each call.
     """
+    if param_names == ():
+        pass
 
     # We loop through each arg name, looking up if its in the `kwargs`,
     # otherwise using the next argument in `args`. If there are no more
     # args then we try looking the arg name up in the defaults.
     pos = 0
-    for nm in param_names:
+    for nm, inc in zip(param_names, include_params):
         if nm in kwargs:
-            yield kwargs[nm]
+            if inc:
+                yield kwargs[nm]
         elif pos < len(args):
-            yield args[pos]
+            if inc:
+                yield args[pos]
             pos += 1
         else:
-            yield param_defaults[nm]
+            if inc:
+                yield param_defaults[nm]

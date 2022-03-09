@@ -151,32 +151,34 @@ class DescriptorTestCase(unittest.TestCase):
         """
 
         class Cls:
+            # Note that it is important that this is not the last argument to
+            # test behaviour of skipping arguments properly.
             @descriptors.cached(uncached_args=("arg2",))
-            def fn(self, arg1, arg2):
-                return self.mock(arg1, arg2)
+            def fn(self, arg1, arg2, arg3):
+                return self.mock(arg1, arg2, arg3)
 
             def __init__(self):
                 self.mock = mock.Mock()
 
         obj = Cls()
         obj.mock.return_value = "fish"
-        r = yield obj.fn(1, 2)
+        r = yield obj.fn(1, 2, 3)
         self.assertEqual(r, "fish")
-        obj.mock.assert_called_once_with(1, 2)
+        obj.mock.assert_called_once_with(1, 2, 3)
         obj.mock.reset_mock()
 
         # a call with different params should call the mock again
         obj.mock.return_value = "chips"
-        r = yield obj.fn(2, 3)
+        r = yield obj.fn(2, 3, 4)
         self.assertEqual(r, "chips")
-        obj.mock.assert_called_once_with(2, 3)
+        obj.mock.assert_called_once_with(2, 3, 4)
         obj.mock.reset_mock()
 
         # the two values should now be cached; we should be able to vary
         # the second argument and still get the cached result.
-        r = yield obj.fn(1, 4)
+        r = yield obj.fn(1, 4, 3)
         self.assertEqual(r, "fish")
-        r = yield obj.fn(2, 5)
+        r = yield obj.fn(2, 5, 4)
         self.assertEqual(r, "chips")
         obj.mock.assert_not_called()
 
