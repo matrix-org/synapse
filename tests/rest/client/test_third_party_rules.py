@@ -834,7 +834,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         )
 
         # Register an admin user.
-        admin_user_id = self.register_user("admin", "password", admin=True)
+        self.register_user("admin", "password", admin=True)
         admin_tok = self.login("admin", "password")
 
         # Register a user that we'll deactivate.
