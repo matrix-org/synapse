@@ -1,0 +1,1 @@
+Fix a long-standing bug where excess presence events may be sent to an application service after it is initially configured.
