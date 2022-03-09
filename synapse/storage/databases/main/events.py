@@ -1518,7 +1518,7 @@ class PersistEventsStore:
                 )
 
                 # Remove from relations table.
-                self._handle_redaction(txn, event.redacts)
+                self._handle_redact_relations(txn, event.redacts)
 
         # Update the event_forward_extremities, event_backward_extremities and
         # event_edges tables.
@@ -1943,14 +1943,42 @@ class PersistEventsStore:
 
         txn.execute(sql, (batch_id,))
 
-    def _handle_redaction(self, txn, redacted_event_id):
-        """Handles receiving a redaction and checking whether we need to remove
-        any redacted relations from the database.
+    def _handle_redact_relations(
+        self, txn: LoggingTransaction, redacted_event_id: str
+    ) -> None:
+        """Handles receiving a redaction and checking whether the redacted event
+        has any relations which must be removed from the database.
 
         Args:
             txn
-            redacted_event_id (str): The event that was redacted.
+            redacted_event_id: The event that was redacted.
         """
+
+        # Fetch the current relation of the event being redacted.
+        redacted_relates_to = self.db_pool.simple_select_one_onecol_txn(
+            txn,
+            table="event_relations",
+            keyvalues={"event_id": redacted_event_id},
+            retcol="relates_to_id",
+            allow_none=True,
+        )
+        # Any relation information for the related event must be cleared.
+        if redacted_relates_to is not None:
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_relations_for_event, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_aggregation_groups_for_event, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_applicable_edit, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_thread_summary, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_thread_participated, (redacted_relates_to,)
+            )
 
         self.db_pool.simple_delete_txn(
             txn, table="event_relations", keyvalues={"event_id": redacted_event_id}

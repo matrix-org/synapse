@@ -155,6 +155,7 @@ setup(
             # Application
             "synapse_homeserver = synapse.app.homeserver:main",
             "synapse_worker = synapse.app.generic_worker:main",
+            "synctl = synapse._scripts.synctl:main",
             # Scripts
             "export_signing_key = synapse._scripts.export_signing_key:main",
             "generate_config = synapse._scripts.generate_config:main",
@@ -177,6 +178,5 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
     ],
-    scripts=["synctl"],
     cmdclass={"test": TestCommand},
 )
