@@ -129,7 +129,7 @@ class _CacheDescriptorBase:
 
         self.add_cache_context = cache_context
 
-        self.cache_key_builder = get_cache_key_builder(
+        self.cache_key_builder = _get_cache_key_builder(
             self.arg_names, self.arg_defaults
         )
 
@@ -613,7 +613,7 @@ def cachedList(
     return cast(Callable[[F], _CachedFunction[F]], func)
 
 
-def get_cache_key_builder(
+def _get_cache_key_builder(
     param_names: Sequence[str], param_defaults: Mapping[str, Any]
 ) -> Callable[[Sequence[Any], Mapping[str, Any]], CacheKey]:
     """Construct a function which will build cache keys suitable for a cached function
