@@ -846,7 +846,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     async def _get_joined_hosts(
         self, room_id: str, state_group: int, state_entry: "_StateCacheEntry"
     ) -> FrozenSet[str]:
-        # We don't use `state_group`, its there so that we can cache based on
+        # We don't use `state_group`, it's there so that we can cache based on
         # it. However, its important that its never None, since two
         # current_state's with a state_group of None are likely to be different.
         #
