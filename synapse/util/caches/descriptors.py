@@ -78,6 +78,11 @@ class _CacheDescriptorBase:
         arg_spec = inspect.getfullargspec(orig)
         all_args = arg_spec.args
 
+        if arg_spec.kwonlyargs:
+            raise ValueError(
+                "_CacheDescriptorBase does not support keyword-only arguments."
+            )
+
         if "cache_context" in all_args:
             if not cache_context:
                 raise ValueError(
