@@ -169,7 +169,7 @@ any of the subsequent implementations of this callback.
 
 ### `check_can_deactivate_user`
 
-_First introduced in Synapse v1.5X.0_
+_First introduced in Synapse v1.55.0_
 
 ```python
 async def check_can_deactivate_user(
