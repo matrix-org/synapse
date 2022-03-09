@@ -150,7 +150,7 @@ If multiple modules implement this callback, Synapse runs them all in order.
 
 ### `check_can_shutdown_room`
 
-_First introduced in Synapse v1.5X.0_
+_First introduced in Synapse v1.55.0_
 
 ```python
 async def check_can_shutdown_room(
