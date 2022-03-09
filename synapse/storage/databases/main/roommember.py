@@ -839,16 +839,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         with Measure(self._clock, "get_joined_hosts"):
             return await self._get_joined_hosts(
-                room_id, state_group, state_entry.state, state_entry=state_entry
+                room_id, state_group, state_entry=state_entry
             )
 
     @cached(num_args=2, max_entries=10000, iterable=True)
     async def _get_joined_hosts(
-        self,
-        room_id: str,
-        state_group: int,
-        current_state_ids: StateMap[str],
-        state_entry: "_StateCacheEntry",
+        self, room_id: str, state_group: int, state_entry: "_StateCacheEntry"
     ) -> FrozenSet[str]:
         # We don't use `state_group`, its there so that we can cache based on
         # it. However, its important that its never None, since two
