@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import traceback
-from typing import Callable
 
 from parameterized import parameterized_class
 
@@ -319,16 +318,21 @@ class ConcurrentlyExecuteTest(TestCase):
 
 
 @parameterized_class(
-    ("wrap_deferred",),
-    [
-        (lambda _self, deferred: stop_cancellation(deferred),),
-        (lambda _self, deferred: delay_cancellation(deferred, all=True),),
-    ],
+    ("wrapper",),
+    [("stop_cancellation",), ("delay_cancellation",)],
 )
 class CancellationWrapperTests(TestCase):
     """Common tests for the `stop_cancellation` and `delay_cancellation` functions."""
 
-    wrap_deferred: Callable[[TestCase, "Deferred[str]"], "Deferred[str]"]
+    wrapper: str
+
+    def wrap_deferred(self, deferred: "Deferred[str]") -> "Deferred[str]":
+        if self.wrapper == "stop_cancellation":
+            return stop_cancellation(deferred)
+        elif self.wrapper == "delay_cancellation":
+            return delay_cancellation(deferred, all=True)
+        else:
+            raise ValueError(f"Unsupported wrapper type: {self.wrapper}")
 
     def test_succeed(self):
         """Test that the new `Deferred` receives the result."""
