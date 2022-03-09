@@ -185,8 +185,8 @@ worker: refer to the [stream writers](#stream-writers) section below for further
 information.
 
     # Sync requests
-    ^/_matrix/client/(v2_alpha|r0|v3)/sync$
-    ^/_matrix/client/(api/v1|v2_alpha|r0|v3)/events$
+    ^/_matrix/client/(r0|v3)/sync$
+    ^/_matrix/client/(api/v1|r0|v3)/events$
     ^/_matrix/client/(api/v1|r0|v3)/initialSync$
     ^/_matrix/client/(api/v1|r0|v3)/rooms/[^/]+/initialSync$
 
