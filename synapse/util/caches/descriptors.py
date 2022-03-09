@@ -140,8 +140,7 @@ class _LruCachedFunction(Generic[F]):
 
 
 def lru_cache(
-    max_entries: int = 1000,
-    cache_context: bool = False,
+    *, max_entries: int = 1000, cache_context: bool = False
 ) -> Callable[[F], _LruCachedFunction[F]]:
     """A method decorator that applies a memoizing cache around the function.
 
@@ -551,6 +550,7 @@ class _CacheContext:
 
 
 def cached(
+    *,
     max_entries: int = 1000,
     num_args: Optional[int] = None,
     uncached_args: Optional[Collection[str]] = None,
@@ -574,7 +574,7 @@ def cached(
 
 
 def cachedList(
-    cached_method_name: str, list_name: str, num_args: Optional[int] = None
+    *, cached_method_name: str, list_name: str, num_args: Optional[int] = None
 ) -> Callable[[F], _CachedFunction[F]]:
     """Creates a descriptor that wraps a function in a `CacheListDescriptor`.
 
