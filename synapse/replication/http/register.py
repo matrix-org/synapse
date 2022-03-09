@@ -36,7 +36,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.registration_handler = hs.get_registration_handler()
 
     @staticmethod
@@ -112,7 +112,7 @@ class ReplicationPostRegisterActionsServlet(ReplicationEndpoint):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.registration_handler = hs.get_registration_handler()
 
     @staticmethod

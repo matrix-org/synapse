@@ -45,7 +45,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(federation_http_client=None)
         self.handler = hs.get_federation_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state_store = hs.get_storage().state
         self._event_auth_handler = hs.get_event_auth_handler()
         return hs

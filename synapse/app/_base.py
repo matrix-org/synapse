@@ -448,7 +448,7 @@ async def start(hs: "HomeServer") -> None:
 
     # It is now safe to start your Synapse.
     hs.start_listening()
-    hs.get_datastore().db_pool.start_profiling()
+    hs.get_datastores().main.db_pool.start_profiling()
     hs.get_pusherpool().start()
 
     # Log when we start the shut down process.

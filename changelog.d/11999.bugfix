@@ -1,1 +1,0 @@
-Fix long standing bug where `get_rooms_for_user` was not correctly invalidated for remote users when the server left a room.

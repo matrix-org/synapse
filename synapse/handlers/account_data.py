@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 class AccountDataHandler:
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._instance_name = hs.get_instance_name()
         self._notifier = hs.get_notifier()
 
@@ -166,7 +166,7 @@ class AccountDataHandler:
 
 class AccountDataEventSource(EventSource[int, JsonDict]):
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     def get_current_key(self, direction: str = "f") -> int:
         return self.store.get_max_account_data_stream_id()

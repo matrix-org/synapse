@@ -20,7 +20,7 @@ from twisted.internet import protocol
 from twisted.internet.defer import Deferred
 
 class RedisProtocol(protocol.Protocol):
-    def publish(self, channel: str, message: bytes): ...
+    def publish(self, channel: str, message: bytes) -> "Deferred[None]": ...
     def ping(self) -> "Deferred[None]": ...
     def set(
         self,
@@ -52,11 +52,14 @@ def lazyConnection(
     convertNumbers: bool = ...,
 ) -> RedisProtocol: ...
 
-class ConnectionHandler: ...
+# ConnectionHandler doesn't actually inherit from RedisProtocol, but it proxies
+# most methods to it via ConnectionHandler.__getattr__.
+class ConnectionHandler(RedisProtocol):
+    def disconnect(self) -> "Deferred[None]": ...
 
 class RedisFactory(protocol.ReconnectingClientFactory):
     continueTrying: bool
-    handler: RedisProtocol
+    handler: ConnectionHandler
     pool: List[RedisProtocol]
     replyTimeout: Optional[int]
     def __init__(

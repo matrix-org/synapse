@@ -27,48 +27,13 @@ from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
-from synapse.storage.relations import (
-    AggregationPaginationToken,
-    PaginationChunk,
-    RelationPaginationToken,
-)
-from synapse.types import JsonDict, RoomStreamToken, StreamToken
+from synapse.storage.relations import AggregationPaginationToken, PaginationChunk
+from synapse.types import JsonDict, StreamToken
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
-    from synapse.storage.databases.main import DataStore
 
 logger = logging.getLogger(__name__)
-
-
-async def _parse_token(
-    store: "DataStore", token: Optional[str]
-) -> Optional[StreamToken]:
-    """
-    For backwards compatibility support RelationPaginationToken, but new pagination
-    tokens are generated as full StreamTokens, to be compatible with /sync and /messages.
-    """
-    if not token:
-        return None
-    # Luckily the format for StreamToken and RelationPaginationToken differ enough
-    # that they can easily be separated. An "_" appears in the serialization of
-    # RoomStreamToken (as part of StreamToken), but RelationPaginationToken uses
-    # "-" only for separators.
-    if "_" in token:
-        return await StreamToken.from_string(store, token)
-    else:
-        relation_token = RelationPaginationToken.from_string(token)
-        return StreamToken(
-            room_key=RoomStreamToken(relation_token.topological, relation_token.stream),
-            presence_key=0,
-            typing_key=0,
-            receipt_key=0,
-            account_data_key=0,
-            push_rules_key=0,
-            to_device_key=0,
-            device_list_key=0,
-            groups_key=0,
-        )
 
 
 class RelationPaginationServlet(RestServlet):
@@ -85,7 +50,7 @@ class RelationPaginationServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
         self.event_handler = hs.get_event_handler()
@@ -122,8 +87,12 @@ class RelationPaginationServlet(RestServlet):
             pagination_chunk = PaginationChunk(chunk=[])
         else:
             # Return the relations
-            from_token = await _parse_token(self.store, from_token_str)
-            to_token = await _parse_token(self.store, to_token_str)
+            from_token = None
+            if from_token_str:
+                from_token = await StreamToken.from_string(self.store, from_token_str)
+            to_token = None
+            if to_token_str:
+                to_token = await StreamToken.from_string(self.store, to_token_str)
 
             pagination_chunk = await self.store.get_relations_for_event(
                 event_id=parent_id,
@@ -190,7 +159,7 @@ class RelationAggregationPaginationServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.event_handler = hs.get_event_handler()
 
     async def on_GET(
@@ -282,7 +251,7 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
         self.event_handler = hs.get_event_handler()
@@ -317,8 +286,12 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
         from_token_str = parse_string(request, "from")
         to_token_str = parse_string(request, "to")
 
-        from_token = await _parse_token(self.store, from_token_str)
-        to_token = await _parse_token(self.store, to_token_str)
+        from_token = None
+        if from_token_str:
+            from_token = await StreamToken.from_string(self.store, from_token_str)
+        to_token = None
+        if to_token_str:
+            to_token = await StreamToken.from_string(self.store, to_token_str)
 
         result = await self.store.get_relations_for_event(
             event_id=parent_id,

@@ -21,7 +21,7 @@ python -m synapse.app.homeserver --generate-keys -c .ci/sqlite-config.yaml
 echo "--- Prepare test database"
 
 # Make sure the SQLite3 database is using the latest schema and has no pending background update.
-scripts/update_synapse_database --database-config .ci/sqlite-config.yaml --run-background-updates
+update_synapse_database --database-config .ci/sqlite-config.yaml --run-background-updates
 
 # Run the export-data command on the sqlite test database
 python -m synapse.app.admin_cmd -c .ci/sqlite-config.yaml  export-data @anon-20191002_181700-832:localhost:8800 \
@@ -41,7 +41,7 @@ fi
 
 # Port the SQLite databse to postgres so we can check command works against postgres
 echo "+++ Port SQLite3 databse to postgres"
-scripts/synapse_port_db --sqlite-database .ci/test_db.db --postgres-config .ci/postgres-config.yaml
+synapse_port_db --sqlite-database .ci/test_db.db --postgres-config .ci/postgres-config.yaml
 
 # Run the export-data command on postgres database
 python -m synapse.app.admin_cmd -c .ci/postgres-config.yaml  export-data @anon-20191002_181700-832:localhost:8800 \

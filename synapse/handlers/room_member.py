@@ -66,7 +66,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.config = hs.config
@@ -1736,8 +1736,8 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             txn_id=txn_id,
             prev_event_ids=prev_event_ids,
             auth_event_ids=auth_event_ids,
+            outlier=True,
         )
-        event.internal_metadata.outlier = True
         event.internal_metadata.out_of_band_membership = True
 
         result_event = await self.event_creation_handler.handle_new_client_event(

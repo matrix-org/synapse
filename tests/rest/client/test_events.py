@@ -16,8 +16,12 @@
 
 from unittest.mock import Mock
 
+from twisted.test.proto_helpers import MemoryReactor
+
 import synapse.rest.admin
 from synapse.rest.client import events, login, room
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -32,7 +36,7 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
 
         config = self.default_config()
         config["enable_registration_captcha"] = False
@@ -41,11 +45,11 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
 
         hs = self.setup_test_homeserver(config=config)
 
-        hs.get_federation_handler = Mock()
+        hs.get_federation_handler = Mock()  # type: ignore[assignment]
 
         return hs
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
 
         # register an account
         self.user_id = self.register_user("sid1", "pass")
@@ -55,7 +59,7 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         self.other_user = self.register_user("other2", "pass")
         self.other_token = self.login(self.other_user, "pass")
 
-    def test_stream_basic_permissions(self):
+    def test_stream_basic_permissions(self) -> None:
         # invalid token, expect 401
         # note: this is in violation of the original v1 spec, which expected
         # 403. However, since the v1 spec no longer exists and the v1
@@ -65,18 +69,18 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET", "/events?access_token=%s" % ("invalid" + self.token,)
         )
-        self.assertEquals(channel.code, 401, msg=channel.result)
+        self.assertEqual(channel.code, 401, msg=channel.result)
 
         # valid token, expect content
         channel = self.make_request(
             "GET", "/events?access_token=%s&timeout=0" % (self.token,)
         )
-        self.assertEquals(channel.code, 200, msg=channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
         self.assertTrue("chunk" in channel.json_body)
         self.assertTrue("start" in channel.json_body)
         self.assertTrue("end" in channel.json_body)
 
-    def test_stream_room_permissions(self):
+    def test_stream_room_permissions(self) -> None:
         room_id = self.helper.create_room_as(self.other_user, tok=self.other_token)
         self.helper.send(room_id, tok=self.other_token)
 
@@ -89,10 +93,10 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET", "/events?access_token=%s&timeout=0" % (self.token,)
         )
-        self.assertEquals(channel.code, 200, msg=channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)
 
         # We may get a presence event for ourselves down
-        self.assertEquals(
+        self.assertEqual(
             0,
             len(
                 [
@@ -111,7 +115,7 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
 
         # left to room (expect no content for room)
 
-    def TODO_test_stream_items(self):
+    def TODO_test_stream_items(self) -> None:
         # new user, no content
 
         # join room, expect 1 item (join)
@@ -136,7 +140,7 @@ class GetEventsTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def prepare(self, hs, reactor, clock):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
 
         # register an account
         self.user_id = self.register_user("sid1", "pass")
@@ -144,7 +148,7 @@ class GetEventsTestCase(unittest.HomeserverTestCase):
 
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.token)
 
-    def test_get_event_via_events(self):
+    def test_get_event_via_events(self) -> None:
         resp = self.helper.send(self.room_id, tok=self.token)
         event_id = resp["event_id"]
 
@@ -153,4 +157,4 @@ class GetEventsTestCase(unittest.HomeserverTestCase):
             "/events/" + event_id,
             access_token=self.token,
         )
-        self.assertEquals(channel.code, 200, msg=channel.result)
+        self.assertEqual(channel.code, 200, msg=channel.result)

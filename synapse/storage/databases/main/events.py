@@ -130,7 +130,7 @@ class PersistEventsStore:
         *,
         current_state_for_room: Dict[str, StateMap[str]],
         state_delta_for_room: Dict[str, DeltaState],
-        new_forward_extremeties: Dict[str, List[str]],
+        new_forward_extremities: Dict[str, Set[str]],
         use_negative_stream_ordering: bool = False,
         inhibit_local_membership_updates: bool = False,
     ) -> None:
@@ -143,7 +143,7 @@ class PersistEventsStore:
                 the room based on forward extremities
             state_delta_for_room: Map from room_id to the delta to apply to
                 room state
-            new_forward_extremities: Map from room_id to list of event IDs
+            new_forward_extremities: Map from room_id to set of event IDs
                 that are the new forward extremities of the room.
             use_negative_stream_ordering: Whether to start stream_ordering on
                 the negative side and decrement. This should be set as True
@@ -193,7 +193,7 @@ class PersistEventsStore:
                 events_and_contexts=events_and_contexts,
                 inhibit_local_membership_updates=inhibit_local_membership_updates,
                 state_delta_for_room=state_delta_for_room,
-                new_forward_extremeties=new_forward_extremeties,
+                new_forward_extremities=new_forward_extremities,
             )
             persist_event_counter.inc(len(events_and_contexts))
 
@@ -220,7 +220,7 @@ class PersistEventsStore:
             for room_id, new_state in current_state_for_room.items():
                 self.store.get_current_state_ids.prefill((room_id,), new_state)
 
-            for room_id, latest_event_ids in new_forward_extremeties.items():
+            for room_id, latest_event_ids in new_forward_extremities.items():
                 self.store.get_latest_event_ids_in_room.prefill(
                     (room_id,), list(latest_event_ids)
                 )
@@ -334,8 +334,8 @@ class PersistEventsStore:
         events_and_contexts: List[Tuple[EventBase, EventContext]],
         inhibit_local_membership_updates: bool = False,
         state_delta_for_room: Optional[Dict[str, DeltaState]] = None,
-        new_forward_extremeties: Optional[Dict[str, List[str]]] = None,
-    ):
+        new_forward_extremities: Optional[Dict[str, Set[str]]] = None,
+    ) -> None:
         """Insert some number of room events into the necessary database tables.
 
         Rejected events are only inserted into the events table, the events_json table,
@@ -353,13 +353,13 @@ class PersistEventsStore:
                 from the database. This is useful when retrying due to
                 IntegrityError.
             state_delta_for_room: The current-state delta for each room.
-            new_forward_extremetie: The new forward extremities for each room.
+            new_forward_extremities: The new forward extremities for each room.
                 For each room, a list of the event ids which are the forward
                 extremities.
 
         """
         state_delta_for_room = state_delta_for_room or {}
-        new_forward_extremeties = new_forward_extremeties or {}
+        new_forward_extremities = new_forward_extremities or {}
 
         all_events_and_contexts = events_and_contexts
 
@@ -372,7 +372,7 @@ class PersistEventsStore:
 
         self._update_forward_extremities_txn(
             txn,
-            new_forward_extremities=new_forward_extremeties,
+            new_forward_extremities=new_forward_extremities,
             max_stream_order=max_stream_order,
         )
 
@@ -1158,7 +1158,10 @@ class PersistEventsStore:
             )
 
     def _update_forward_extremities_txn(
-        self, txn, new_forward_extremities, max_stream_order
+        self,
+        txn: LoggingTransaction,
+        new_forward_extremities: Dict[str, Set[str]],
+        max_stream_order: int,
     ):
         for room_id in new_forward_extremities.keys():
             self.db_pool.simple_delete_txn(
@@ -1473,10 +1476,10 @@ class PersistEventsStore:
 
     def _update_metadata_tables_txn(
         self,
-        txn,
+        txn: LoggingTransaction,
         *,
-        events_and_contexts,
-        all_events_and_contexts,
+        events_and_contexts: List[Tuple[EventBase, EventContext]],
+        all_events_and_contexts: List[Tuple[EventBase, EventContext]],
         inhibit_local_membership_updates: bool = False,
     ):
         """Update all the miscellaneous tables for new events
@@ -1515,7 +1518,7 @@ class PersistEventsStore:
                 )
 
                 # Remove from relations table.
-                self._handle_redaction(txn, event.redacts)
+                self._handle_redact_relations(txn, event.redacts)
 
         # Update the event_forward_extremities, event_backward_extremities and
         # event_edges tables.
@@ -1940,33 +1943,61 @@ class PersistEventsStore:
 
         txn.execute(sql, (batch_id,))
 
-    def _handle_redaction(self, txn, redacted_event_id):
-        """Handles receiving a redaction and checking whether we need to remove
-        any redacted relations from the database.
+    def _handle_redact_relations(
+        self, txn: LoggingTransaction, redacted_event_id: str
+    ) -> None:
+        """Handles receiving a redaction and checking whether the redacted event
+        has any relations which must be removed from the database.
 
         Args:
             txn
-            redacted_event_id (str): The event that was redacted.
+            redacted_event_id: The event that was redacted.
         """
+
+        # Fetch the current relation of the event being redacted.
+        redacted_relates_to = self.db_pool.simple_select_one_onecol_txn(
+            txn,
+            table="event_relations",
+            keyvalues={"event_id": redacted_event_id},
+            retcol="relates_to_id",
+            allow_none=True,
+        )
+        # Any relation information for the related event must be cleared.
+        if redacted_relates_to is not None:
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_relations_for_event, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_aggregation_groups_for_event, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_applicable_edit, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_thread_summary, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_thread_participated, (redacted_relates_to,)
+            )
 
         self.db_pool.simple_delete_txn(
             txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
         )
 
-    def _store_room_topic_txn(self, txn, event):
-        if hasattr(event, "content") and "topic" in event.content:
+    def _store_room_topic_txn(self, txn: LoggingTransaction, event: EventBase):
+        if isinstance(event.content.get("topic"), str):
             self.store_event_search_txn(
                 txn, event, "content.topic", event.content["topic"]
             )
 
-    def _store_room_name_txn(self, txn, event):
-        if hasattr(event, "content") and "name" in event.content:
+    def _store_room_name_txn(self, txn: LoggingTransaction, event: EventBase):
+        if isinstance(event.content.get("name"), str):
             self.store_event_search_txn(
                 txn, event, "content.name", event.content["name"]
             )
 
-    def _store_room_message_txn(self, txn, event):
-        if hasattr(event, "content") and "body" in event.content:
+    def _store_room_message_txn(self, txn: LoggingTransaction, event: EventBase):
+        if isinstance(event.content.get("body"), str):
             self.store_event_search_txn(
                 txn, event, "content.body", event.content["body"]
             )
@@ -2142,6 +2173,14 @@ class PersistEventsStore:
         state_groups = {}
         for event, context in events_and_contexts:
             if event.internal_metadata.is_outlier():
+                # double-check that we don't have any events that claim to be outliers
+                # *and* have partial state (which is meaningless: we should have no
+                # state at all for an outlier)
+                if context.partial_state:
+                    raise ValueError(
+                        "Outlier event %s claims to have partial state", event.event_id
+                    )
+
                 continue
 
             # if the event was rejected, just give it the same state as its
@@ -2151,6 +2190,23 @@ class PersistEventsStore:
                 continue
 
             state_groups[event.event_id] = context.state_group
+
+        # if we have partial state for these events, record the fact. (This happens
+        # here rather than in _store_event_txn because it also needs to happen when
+        # we de-outlier an event.)
+        self.db_pool.simple_insert_many_txn(
+            txn,
+            table="partial_state_events",
+            keys=("room_id", "event_id"),
+            values=[
+                (
+                    event.room_id,
+                    event.event_id,
+                )
+                for event, ctx in events_and_contexts
+                if ctx.partial_state
+            ],
+        )
 
         self.db_pool.simple_upsert_many_txn(
             txn,

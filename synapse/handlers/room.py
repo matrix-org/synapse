@@ -105,7 +105,7 @@ class EventContext:
 
 class RoomCreationHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.hs = hs
@@ -1115,7 +1115,7 @@ class RoomContextHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
 
@@ -1246,7 +1246,7 @@ class RoomContextHandler:
 class TimestampLookupHandler:
     def __init__(self, hs: "HomeServer"):
         self.server_name = hs.hostname
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state_handler = hs.get_state_handler()
         self.federation_client = hs.get_federation_client()
 
@@ -1386,7 +1386,7 @@ class TimestampLookupHandler:
 
 class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def get_new_events(
         self,
@@ -1477,7 +1477,7 @@ class RoomShutdownHandler:
         self._replication = hs.get_replication_data_handler()
         self._third_party_rules = hs.get_third_party_event_rules()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def shutdown_room(
         self,

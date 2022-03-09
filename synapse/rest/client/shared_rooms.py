@@ -41,7 +41,7 @@ class UserSharedRoomsServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.user_directory_active = hs.config.server.update_user_directory
 
     async def on_GET(

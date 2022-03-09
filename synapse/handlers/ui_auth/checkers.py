@@ -139,7 +139,7 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
 class _BaseThreepidAuthChecker:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def _check_threepid(self, medium: str, authdict: dict) -> dict:
         if "threepid_creds" not in authdict:
@@ -255,7 +255,7 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
         super().__init__(hs)
         self.hs = hs
         self._enabled = bool(hs.config.registration.registration_requires_token)
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     def is_enabled(self) -> bool:
         return self._enabled

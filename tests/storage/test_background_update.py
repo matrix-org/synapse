@@ -24,7 +24,7 @@ from tests.test_utils import make_awaitable, simple_async_mock
 
 class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
-        self.updates: BackgroundUpdater = self.hs.get_datastore().db_pool.updates
+        self.updates: BackgroundUpdater = self.hs.get_datastores().main.db_pool.updates
         # the base test class should have run the real bg updates for us
         self.assertTrue(
             self.get_success(self.updates.has_completed_background_updates())
@@ -42,7 +42,7 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         # the target runtime for each bg update
         target_background_update_duration_ms = 100
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.get_success(
             store.db_pool.simple_insert(
                 "background_updates",
@@ -66,13 +66,13 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         self.update_handler.reset_mock()
         res = self.get_success(
             self.updates.do_next_background_update(False),
-            by=0.01,
+            by=0.02,
         )
         self.assertFalse(res)
 
         # on the first call, we should get run with the default background update size
         self.update_handler.assert_called_once_with(
-            {"my_key": 1}, self.updates.MINIMUM_BACKGROUND_BATCH_SIZE
+            {"my_key": 1}, self.updates.DEFAULT_BACKGROUND_BATCH_SIZE
         )
 
         # second step: complete the update
@@ -102,7 +102,7 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
 
 class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
-        self.updates: BackgroundUpdater = self.hs.get_datastore().db_pool.updates
+        self.updates: BackgroundUpdater = self.hs.get_datastores().main.db_pool.updates
         # the base test class should have run the real bg updates for us
         self.assertTrue(
             self.get_success(self.updates.has_completed_background_updates())
@@ -138,7 +138,7 @@ class BackgroundUpdateControllerTestCase(unittest.HomeserverTestCase):
         )
 
     def test_controller(self):
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.get_success(
             store.db_pool.simple_insert(
                 "background_updates",

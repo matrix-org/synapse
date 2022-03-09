@@ -29,7 +29,7 @@ class ReceiptsHandler:
     def __init__(self, hs: "HomeServer"):
         self.notifier = hs.get_notifier()
         self.server_name = hs.config.server.server_name
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.event_auth_handler = hs.get_event_auth_handler()
 
         self.hs = hs
@@ -163,7 +163,7 @@ class ReceiptsHandler:
 
 class ReceiptEventSource(EventSource[int, JsonDict]):
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.config = hs.config
 
     @staticmethod
@@ -269,7 +269,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         # Then filter down to rooms that the AS can read
         events = []
         for room_id, event in rooms_to_events.items():
-            if not await service.matches_user_in_member_list(room_id, self.store):
+            if not await service.is_interested_in_room(room_id, self.store):
                 continue
 
             events.append(event)

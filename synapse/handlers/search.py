@@ -49,7 +49,7 @@ class _SearchResult:
 
 class SearchHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state_handler = hs.get_state_handler()
         self.clock = hs.get_clock()
         self.hs = hs
@@ -654,7 +654,7 @@ class SearchHandler:
                 self.storage, user.to_string(), res.events_after
             )
 
-            context = {
+            context: JsonDict = {
                 "events_before": events_before,
                 "events_after": events_after,
                 "start": await now_token.copy_and_replace(

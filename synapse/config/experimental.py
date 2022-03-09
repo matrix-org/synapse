@@ -47,16 +47,22 @@ class ExperimentalConfig(Config):
         # MSC3030 (Jump to date API endpoint)
         self.msc3030_enabled: bool = experimental.get("msc3030_enabled", False)
 
-        # The portion of MSC3202 which is related to device masquerading.
-        self.msc3202_device_masquerading_enabled: bool = experimental.get(
-            "msc3202_device_masquerading", False
-        )
-
         # MSC2409 (this setting only relates to optionally sending to-device messages).
         # Presence, typing and read receipt EDUs are already sent to application services that
         # have opted in to receive them. If enabled, this adds to-device messages to that list.
         self.msc2409_to_device_messages_enabled: bool = experimental.get(
             "msc2409_to_device_messages_enabled", False
+        )
+
+        # The portion of MSC3202 which is related to device masquerading.
+        self.msc3202_device_masquerading_enabled: bool = experimental.get(
+            "msc3202_device_masquerading", False
+        )
+
+        # Portion of MSC3202 related to transaction extensions:
+        # sending one-time key counts and fallback key usage to application services.
+        self.msc3202_transaction_extensions: bool = experimental.get(
+            "msc3202_transaction_extensions", False
         )
 
         # MSC3706 (server-side support for partial state in /send_join responses)
@@ -65,3 +71,6 @@ class ExperimentalConfig(Config):
         # experimental support for faster joins over federation (msc2775, msc3706)
         # requires a target server with msc3706_enabled enabled.
         self.faster_joins_enabled: bool = experimental.get("faster_joins", False)
+
+        # MSC3720 (Account status endpoint)
+        self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)

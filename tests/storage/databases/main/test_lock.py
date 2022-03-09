@@ -20,7 +20,7 @@ from tests import unittest
 
 class LockTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs: HomeServer):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     def test_simple_lock(self):
         """Test that we can take out a lock and that while we hold it nobody
