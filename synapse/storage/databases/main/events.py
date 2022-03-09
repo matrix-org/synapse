@@ -1619,9 +1619,15 @@ class PersistEventsStore:
 
         txn.call_after(prefill)
 
-    def _store_redaction(self, txn, event):
-        # invalidate the cache for the redacted event
+    def _store_redaction(self, txn: LoggingTransaction, event: EventBase) -> None:
+        # invalidate the caches for the redacted event
         txn.call_after(self.store._invalidate_get_event_cache, event.redacts)
+        self.store._invalidate_cache_and_stream(
+            txn, self.store.get_relations_for_event, (event.redacts,)
+        )
+        self.store._invalidate_cache_and_stream(
+            txn, self.store.get_applicable_edit, (event.redacts,)
+        )
 
         self.db_pool.simple_upsert_txn(
             txn,
@@ -1977,15 +1983,6 @@ class PersistEventsStore:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_thread_participated, (redacted_relates_to,)
             )
-
-        # Caches which might leak edits must be invalidated for the event being
-        # redacted.
-        self.store._invalidate_cache_and_stream(
-            txn, self.store.get_relations_for_event, (redacted_event_id,)
-        )
-        self.store._invalidate_cache_and_stream(
-            txn, self.store.get_applicable_edit, (redacted_event_id,)
-        )
 
         self.db_pool.simple_delete_txn(
             txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
