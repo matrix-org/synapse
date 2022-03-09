@@ -1,1 +1,1 @@
-Document stream writer `to_device`, `account_data`, `receipts`, and `presence` can only be used on a single worker.
+Document stream writer `typing`, `to_device`, `account_data`, `receipts`, and `presence` can only be used on a single worker.
