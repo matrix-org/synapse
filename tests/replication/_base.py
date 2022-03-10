@@ -536,8 +536,13 @@ class FakeRedisPubSubProtocol(Protocol):
             self.send("OK")
         elif command == b"GET":
             self.send(None)
+
+        # Connection keep-alives.
+        elif command == b"PING":
+            self.send("PONG")
+
         else:
-            raise Exception("Unknown command")
+            raise Exception(f"Unknown command: {command}")
 
     def send(self, msg):
         """Send a message back to the client."""
