@@ -128,18 +128,18 @@ jobs:
           || true
 
   trial-olddeps:
+    # Note: sqlite only; no postgres
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
-    needs: linting-done
+#    needs: linting-done
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - name: Test with old deps
         uses: docker://ubuntu:focal # For old python and sqlite
+        # Note: focal seems to be using 3.8, but the oldest is 3.7?
         with:
           workdir: /github/workspace
           entrypoint: .ci/scripts/test_old_deps.sh
-        env:
-          TRIAL_FLAGS: "--jobs=2"
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
