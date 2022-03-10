@@ -38,6 +38,8 @@ CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK = Callable[
     [str, StateMap[EventBase], str], Awaitable[bool]
 ]
 ON_NEW_EVENT_CALLBACK = Callable[[EventBase, StateMap[EventBase]], Awaitable]
+CHECK_CAN_SHUTDOWN_ROOM_CALLBACK = Callable[[str, str], Awaitable[bool]]
+CHECK_CAN_DEACTIVATE_USER_CALLBACK = Callable[[str, bool], Awaitable[bool]]
 ON_PROFILE_UPDATE_CALLBACK = Callable[[str, ProfileInfo, bool, bool], Awaitable]
 ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK = Callable[[str, bool, bool], Awaitable]
 
@@ -157,6 +159,12 @@ class ThirdPartyEventRules:
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = []
         self._on_new_event_callbacks: List[ON_NEW_EVENT_CALLBACK] = []
+        self._check_can_shutdown_room_callbacks: List[
+            CHECK_CAN_SHUTDOWN_ROOM_CALLBACK
+        ] = []
+        self._check_can_deactivate_user_callbacks: List[
+            CHECK_CAN_DEACTIVATE_USER_CALLBACK
+        ] = []
         self._on_profile_update_callbacks: List[ON_PROFILE_UPDATE_CALLBACK] = []
         self._on_user_deactivation_status_changed_callbacks: List[
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
@@ -173,6 +181,8 @@ class ThirdPartyEventRules:
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = None,
         on_new_event: Optional[ON_NEW_EVENT_CALLBACK] = None,
+        check_can_shutdown_room: Optional[CHECK_CAN_SHUTDOWN_ROOM_CALLBACK] = None,
+        check_can_deactivate_user: Optional[CHECK_CAN_DEACTIVATE_USER_CALLBACK] = None,
         on_profile_update: Optional[ON_PROFILE_UPDATE_CALLBACK] = None,
         on_user_deactivation_status_changed: Optional[
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
@@ -198,6 +208,11 @@ class ThirdPartyEventRules:
         if on_new_event is not None:
             self._on_new_event_callbacks.append(on_new_event)
 
+        if check_can_shutdown_room is not None:
+            self._check_can_shutdown_room_callbacks.append(check_can_shutdown_room)
+
+        if check_can_deactivate_user is not None:
+            self._check_can_deactivate_user_callbacks.append(check_can_deactivate_user)
         if on_profile_update is not None:
             self._on_profile_update_callbacks.append(on_profile_update)
 
@@ -368,6 +383,46 @@ class ThirdPartyEventRules:
                 logger.exception(
                     "Failed to run module API callback %s: %s", callback, e
                 )
+
+    async def check_can_shutdown_room(self, user_id: str, room_id: str) -> bool:
+        """Intercept requests to shutdown a room. If `False` is returned, the
+         room must not be shut down.
+
+        Args:
+            requester: The ID of the user requesting the shutdown.
+            room_id: The ID of the room.
+        """
+        for callback in self._check_can_shutdown_room_callbacks:
+            try:
+                if await callback(user_id, room_id) is False:
+                    return False
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
+        return True
+
+    async def check_can_deactivate_user(
+        self,
+        user_id: str,
+        by_admin: bool,
+    ) -> bool:
+        """Intercept requests to deactivate a user. If `False` is returned, the
+        user should not be deactivated.
+
+        Args:
+            requester
+            user_id: The ID of the room.
+        """
+        for callback in self._check_can_deactivate_user_callbacks:
+            try:
+                if await callback(user_id, by_admin) is False:
+                    return False
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
+        return True
 
     async def _get_state_map_for_room(self, room_id: str) -> StateMap[EventBase]:
         """Given a room ID, return the state events of that room.

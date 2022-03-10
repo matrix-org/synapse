@@ -1619,9 +1619,12 @@ class PersistEventsStore:
 
         txn.call_after(prefill)
 
-    def _store_redaction(self, txn, event):
-        # invalidate the cache for the redacted event
+    def _store_redaction(self, txn: LoggingTransaction, event: EventBase) -> None:
+        # Invalidate the caches for the redacted event, note that these caches
+        # are also cleared as part of event replication in _invalidate_caches_for_event.
         txn.call_after(self.store._invalidate_get_event_cache, event.redacts)
+        txn.call_after(self.store.get_relations_for_event.invalidate, (event.redacts,))
+        txn.call_after(self.store.get_applicable_edit.invalidate, (event.redacts,))
 
         self.db_pool.simple_upsert_txn(
             txn,
@@ -1815,9 +1818,7 @@ class PersistEventsStore:
             rel_type == RelationTypes.THREAD
             or rel_type == RelationTypes.UNSTABLE_THREAD
         ):
-            txn.call_after(
-                self.store.get_thread_summary.invalidate, (parent_id, event.room_id)
-            )
+            txn.call_after(self.store.get_thread_summary.invalidate, (parent_id,))
             # It should be safe to only invalidate the cache if the user has not
             # previously participated in the thread, but that's difficult (and
             # potentially error-prone) so it is always invalidated.

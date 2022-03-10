@@ -4,6 +4,9 @@ set -e
 
 DIR="$( cd "$( dirname "$0" )" && pwd )"
 
+# Ensure that the servers are stopped.
+$DIR/stop.sh
+
 PID_FILE="$DIR/servers.pid"
 
 if [ -f "$PID_FILE" ]; then

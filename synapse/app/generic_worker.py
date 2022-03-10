@@ -417,7 +417,7 @@ class GenericWorkerServer(HomeServer):
             else:
                 logger.warning("Unsupported listener type: %s", listener.type)
 
-        self.get_tcp_replication().start_replication(self)
+        self.get_replication_command_handler().start_replication(self)
 
 
 def start(config_options: List[str]) -> None:

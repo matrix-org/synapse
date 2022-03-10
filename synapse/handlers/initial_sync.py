@@ -153,8 +153,9 @@ class InitialSyncHandler:
 
         public_room_ids = await self.store.get_public_room_ids()
 
-        limit = pagin_config.limit
-        if limit is None:
+        if pagin_config.limit is not None:
+            limit = pagin_config.limit
+        else:
             limit = 10
 
         serializer_options = SerializeEventConfig(as_client_event=as_client_event)
