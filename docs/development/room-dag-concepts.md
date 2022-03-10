@@ -47,7 +47,7 @@ reason). Other things that make outliers different from regular events:
 
  * We don't have state for them, so there should be no entry in
    `event_to_state_groups` for an outlier. (In practice this isn't always
-   the case, though I'm not sure why).
+   the case, though I'm not sure why: see https://github.com/matrix-org/synapse/issues/12201).
 
  * We don't record entries for them in the `event_edges`,
    `event_forward_extremeties` or `event_backward_extremities` tables.
@@ -76,7 +76,7 @@ events' `prev_events` yet. (In this definition, outliers, rejected events, and
 soft-failed events don't count.)
 
 The forward extremities of a room (or at least, a subset of them, if there are
-many) are used as the `prev_events` when the next event is sent.
+more than ten) are used as the `prev_events` when the next event is sent.
 
 The "current state" of a room (ie: the state which would be used if we
 generated a new event) is, therefore, the resolution of the room states
