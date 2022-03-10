@@ -55,7 +55,7 @@ class BackgroundUpdateConfig(Config):
         """
 
     def read_config(self, config, **kwargs) -> None:
-        bg_update_config = config.get("background_updates", {})
+        bg_update_config = config.get("background_updates") or {}
 
         self.update_duration_ms = bg_update_config.get(
             "background_update_duration_ms", 100
