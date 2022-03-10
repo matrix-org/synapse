@@ -25,8 +25,17 @@ export VIRTUALENV_NO_DOWNLOAD=1
 # patch the project definitions in-place
 # replace all lower bounds with exact bounds
 # delete all lines referring to psycopg2 --- so no postgres support
-
 # but make the pyopenssl 17.0, which can work against an
-  #    # OpenSSL 1.1 compiled cryptography (as older ones don't compile on Travis).
-sed -i -e "s/[~>]=/==/g" -e "/psycopg2/d" pyproject.toml
-pip install -e .[all]
+# OpenSSL 1.1 compiled cryptography (as older ones don't compile on Travis).
+
+sed -i \
+   -e "s/[~>]=/==/g" \
+   -e "/psycopg2/d" \
+   -e "s/pyopenssl==16.0.0/pyopenssl==17.0.0/" \
+   pyproject.toml
+
+python3 -m venv venv
+# Can't install with -e. Error message:
+# > A "pyproject.toml" file was found, but editable mode currently requires a setup.py based build.
+venv/bin/pip install .[all]
+venv/bin/trial -j 2 tests
