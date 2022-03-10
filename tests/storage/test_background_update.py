@@ -105,7 +105,8 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
     @override_config(
         yaml.safe_load(
             """
-            default_batch_size: 20
+            background_updates:
+                default_batch_size: 20
             """
         )
     )
@@ -161,7 +162,8 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
     @override_config(
         yaml.safe_load(
             """
-            sleep_duration_ms: 500
+            background_updates:
+                sleep_duration_ms: 500
             """
         )
     )
@@ -194,7 +196,8 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
     @override_config(
         yaml.safe_load(
             """
-            sleep_enabled: false
+            background_updates:
+                sleep_enabled: false
             """
         )
     )
@@ -222,7 +225,8 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
     @override_config(
         yaml.safe_load(
             """
-            background_update_duration_ms: 500
+            background_updates:
+                background_update_duration_ms: 500
             """
         )
     )
@@ -266,7 +270,8 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
     @override_config(
         yaml.safe_load(
             """
-            min_batch_size: 5
+            background_updates:
+                min_batch_size: 5
             """
         )
     )

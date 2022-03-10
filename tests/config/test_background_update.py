@@ -37,11 +37,12 @@ class RoomDirectoryConfigTestCase(HomeserverTestCase):
     @override_config(
         yaml.safe_load(
             """
-            background_update_duration_ms: 1000
-            sleep_enabled: false
-            sleep_duration_ms: 600
-            min_batch_size: 5
-            default_batch_size: 50
+            background_updates:
+                background_update_duration_ms: 1000
+                sleep_enabled: false
+                sleep_duration_ms: 600
+                min_batch_size: 5
+                default_batch_size: 50
             """
         )
     )
