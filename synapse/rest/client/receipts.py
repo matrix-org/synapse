@@ -75,6 +75,7 @@ class ReceiptRestServlet(RestServlet):
         if "Android" in user_agent:
             if pattern.match(user_agent) or "Riot" in user_agent:
                 allow_empty_body = True
+        # This call makes sure possible empty body is handled correctly
         parse_json_object_from_request(request, allow_empty_body)
 
         await self.presence_handler.bump_presence_active_time(requester.user)
