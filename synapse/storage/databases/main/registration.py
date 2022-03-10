@@ -49,7 +49,6 @@ class ExternalIDReuseException(Exception):
     because this external id is given to an other user."""
 
 
-
 @attr.s(frozen=True, slots=True, auto_attribs=True)
 class TokenLookupResult:
     """Result of looking up an access token.
