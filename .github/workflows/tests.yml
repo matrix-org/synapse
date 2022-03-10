@@ -126,8 +126,7 @@ jobs:
         with:
           workdir: /github/workspace
           entrypoint: .ci/scripts/test_old_deps.sh
-        env:
-          TRIAL_FLAGS: "--jobs=2"
+      - run: trial --jobs=2 tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
