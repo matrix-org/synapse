@@ -54,7 +54,7 @@ class ReceiptRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
-        if receipt_type not in [
+        if self.hs.config.experimental.msc2285_enabled and receipt_type not in [
             ReceiptTypes.READ,
             ReceiptTypes.READ_PRIVATE,
             ReceiptTypes.FULLY_READ,
@@ -63,6 +63,11 @@ class ReceiptRestServlet(RestServlet):
                 400,
                 "Receipt type must be 'm.read', 'org.matrix.msc2285.read.private' or 'm.fully_read'",
             )
+        elif (
+            not self.hs.config.experimental.msc2285_enabled
+            and receipt_type != ReceiptTypes.READ
+        ):
+            raise SynapseError(400, "Receipt type must be 'm.read'")
 
         # Do not allow older SchildiChat and Element Android clients (prior to Element/1.[012].x) to send an empty body.
         user_agent = get_request_user_agent(request)

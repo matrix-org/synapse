@@ -535,6 +535,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             tok=self.tok,
         )
 
+    @override_config({"experimental_features": {"msc2285_enabled": True}})
     def test_unread_counts(self) -> None:
         """Tests that /sync returns the right value for the unread count (MSC2654)."""
 
@@ -663,6 +664,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.json_body)
         self._check_unread_count(0)
 
+    @override_config({"experimental_features": {"msc2285_enabled": True}})
     def test_doesnt_reverse_read_receipts(self) -> None:
         # Join the new user
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
