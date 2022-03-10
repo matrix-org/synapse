@@ -2738,8 +2738,8 @@ redis:
 # Background updates are database updates that are run in the background in batches.
 # The duration, minimum batch size, default batch size, whether to sleep between batches and if so, how long to
 # sleep can all be configured. This is helpful to speed up or slow down the updates.
-
-background_updates: 
+#
+background_updates:
     # How long in milliseconds to run a batch of background updates for. Defaults to 100. Uncomment and set
     # a time to change the default.
     #
