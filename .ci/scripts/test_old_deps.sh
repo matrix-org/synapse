@@ -31,14 +31,12 @@ export VIRTUALENV_NO_DOWNLOAD=1
 sed -i \
    -e "s/[~>]=/==/g" \
    -e "/psycopg2/d" \
-   -e "s/pyopenssl==16.0.0/pyopenssl==17.0.0/" \
+   -e 's/pyOpenSSL = "==16.0.0"/pyOpenSSL = "==17.0.0"/' \
    pyproject.toml
 
 # There are almost certainly going to be dependency conflicts there, so I'm going to use plain pip to install rather than poetry.
 
-python3 -m venv venv
 # Can't install with -e. Error message:
 # > A "pyproject.toml" file was found, but editable mode currently requires a setup.py based build.
-source venv/bin/activate
 pip install .[all]
 trial -j 2 tests
