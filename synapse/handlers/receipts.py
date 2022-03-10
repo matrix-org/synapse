@@ -187,15 +187,10 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
                 m_read_private = event_content.get(ReceiptTypes.READ_PRIVATE, None)
                 if m_read_private:
-                    new_users = {}
-                    for rr_user_id, user_rr in m_read_private.items():
-                        if rr_user_id == user_id:
-                            new_users[rr_user_id] = user_rr.copy()
-
-                    # Set new users unless empty
-                    if len(new_users.keys()) > 0:
+                    user_rr = m_read_private.get(user_id, None)
+                    if user_rr:
                         new_event["content"][event_id] = {
-                            ReceiptTypes.READ_PRIVATE: new_users
+                            ReceiptTypes.READ_PRIVATE: {user_id: user_rr.copy()}
                         }
                     continue
 
