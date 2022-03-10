@@ -54,6 +54,6 @@ class SlavedClientIpStore(BaseSlavedStore):
 
         self.client_ip_last_seen.set(key, now)
 
-        self.hs.get_replication_command_handlere().send_user_ip(
+        self.hs.get_replication_command_handler().send_user_ip(
             user_id, access_token, ip, user_agent, device_id, now
         )
