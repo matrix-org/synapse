@@ -110,7 +110,8 @@ You will need to ensure `synctl` is on your `PATH`.
 ## Compatibility dropped for Mjolnir 1.3.1 and earlier
 
 Synapse v1.55.0 drops support for Mjolnir 1.3.1 and earlier.
-If you use the Mjolnir module to moderate your homeserver, please upgrade Mjolnir to version 1.3.2 or later before upgrading Synapse.
+If you use the Mjolnir module to moderate your homeserver,
+please upgrade Mjolnir to version 1.3.2 or later before upgrading Synapse.
 
 
 # Upgrading to v1.54.0
