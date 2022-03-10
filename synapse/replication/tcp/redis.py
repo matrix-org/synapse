@@ -256,6 +256,13 @@ class SynapseRedisFactory(txredisapi.RedisFactory):
             convertNumbers=convertNumbers,
         )
 
+        # Set the homeserver reactor as the clock, if this is not done than
+        # twisted.internet.protocol.ReconnectingClientFactory.retry will default
+        # to the reactor.
+        self.clock = hs.get_reactor()
+
+        # Send pings every 30 seconds (not that get_clock() returns a Clock, not
+        # a reactor).
         hs.get_clock().looping_call(self._send_ping, 30 * 1000)
 
     @wrap_as_background_process("redis_ping")
