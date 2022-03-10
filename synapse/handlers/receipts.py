@@ -166,6 +166,13 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
     @staticmethod
     def filter_out_hidden(events: List[JsonDict], user_id: str) -> List[JsonDict]:
+        """
+        This method takes in what is returned by
+        get_linearized_receipts_for_rooms() and goes through read receipts
+        filtering out m.read.private receipts if they were not sent by the
+        current user.
+        """
+
         visible_events = []
 
         # filter out hidden receipts the user shouldn't see
@@ -182,6 +189,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
                     new_event["content"][event_id] = {ReceiptTypes.READ: m_read}
                     continue
 
+                # Filter the private read receipts to only the requesting user
                 m_read_private = event_content.get(ReceiptTypes.READ_PRIVATE, None)
                 if m_read_private:
                     user_rr = m_read_private.get(user_id, None)
