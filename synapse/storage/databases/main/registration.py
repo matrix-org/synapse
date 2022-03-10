@@ -48,7 +48,6 @@ class ExternalIDReuseException(Exception):
     """Exception if writing an external id for a user fails,
     because this external id is given to an other user."""
 
-    pass
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)

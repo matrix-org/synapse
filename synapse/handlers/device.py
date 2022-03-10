@@ -371,7 +371,6 @@ class DeviceHandler(DeviceWorkerHandler):
                 log_kv(
                     {"reason": "User doesn't have device id.", "device_id": device_id}
                 )
-                pass
             else:
                 raise
 
@@ -414,7 +413,6 @@ class DeviceHandler(DeviceWorkerHandler):
                 # no match
                 set_tag("error", True)
                 set_tag("reason", "User doesn't have that device id.")
-                pass
             else:
                 raise
 

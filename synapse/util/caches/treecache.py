@@ -22,7 +22,6 @@ class TreeCacheNode(dict):
     leaves.
     """
 
-    pass
 
 
 class TreeCache:

@@ -328,7 +328,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         Does nothing in this base class; overridden in derived classes to start the
         appropriate listeners.
         """
-        pass
 
     def setup_background_tasks(self) -> None:
         """
