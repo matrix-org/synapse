@@ -734,7 +734,7 @@ class ApplicationServicesHandlerDeviceListsTestCase(unittest.HomeserverTestCase)
             # Ensure that the resulting JSON uses the unstable prefix and contains the
             # expected users
             self.put_json.assert_called_once()
-            json_body = self.put_json.call_args.kwargs["json_body"]
+            json_body = self.put_json.call_args[1]["json_body"]
 
             # Our application service should have received a device list update with
             # "local_user" in the "changed" list
