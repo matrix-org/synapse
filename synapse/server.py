@@ -639,7 +639,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ReadMarkerHandler(self)
 
     @cache_in_self
-    def get_tcp_replication(self) -> ReplicationCommandHandler:
+    def get_replication_command_handler(self) -> ReplicationCommandHandler:
         return ReplicationCommandHandler(self)
 
     @cache_in_self
