@@ -3,7 +3,6 @@
 # minimal requirements for tox and hands over to the py3-old tox environment.
 
 # Prevent tzdata from asking for user input
-ls
 export DEBIAN_FRONTEND=noninteractive
 
 set -ex
@@ -37,9 +36,22 @@ sed -i-backup \
 
 # There are almost certainly going to be dependency conflicts there, so I'm going to use plain pip to install rather than poetry.
 
-# Can't install with -e. Error message:
+# Can't pip install with -e. Error message:
 # > A "pyproject.toml" file was found, but editable mode currently requires a setup.py based build.
+# Needs PEP 660 support in poetry, sigh. See
+# https://github.com/python-poetry/poetry/issues/34#issuecomment-1055142428
+# So instead, make a virtualenv and install in there.
+
+python3 -m venv env
+source env/bin/activate
+# At the time of writing, this notes:
+#  ERROR: ldap3 2.9.1 has requirement pyasn1>=0.4.6, but you'll have pyasn1 0.1.9 which is incompatible.
+# Helpfully, pip doesn't indicate the error; it returns 0.
+# TODO: bump pyasn to >=0.4.6?
 pip install .[all]
 
-ls
-trial -j 2 tests
+
+# I've no idea why, but trial complains
+#     twisted.python.reflect.ModuleNotFound: No module named 'tests'
+# Unless I invoke trial in this way.
+python3 -m twisted.trial -j 2 tests
