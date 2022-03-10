@@ -29,7 +29,7 @@ export VIRTUALENV_NO_DOWNLOAD=1
 # but make the pyopenssl 17.0, which can work against an
 # OpenSSL 1.1 compiled cryptography (as older ones don't compile on Travis).
 
-sed -i orig \
+sed -i-backup \
    -e "s/[~>]=/==/g" \
    -e "/psycopg2/d" \
    -e 's/pyOpenSSL = "==16.0.0"/pyOpenSSL = "==17.0.0"/' \
