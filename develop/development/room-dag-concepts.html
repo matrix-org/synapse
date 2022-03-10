@@ -205,24 +205,62 @@ incrementing integer, but backfilled events start with <code>stream_ordering=-1<
 rather than skipping any that arrived late; whereas if you're looking at a
 historical section of timeline (i.e. <code>/messages</code>), you want to see the best
 representation of the state of the room as others were seeing it at the time.</p>
+<h2 id="outliers"><a class="header" href="#outliers">Outliers</a></h2>
+<p>We mark an event as an <code>outlier</code> when we haven't figured out the state for the
+room at that point in the DAG yet. They are &quot;floating&quot; events that we haven't
+yet correlated to the DAG.</p>
+<p>Outliers typically arise when we fetch the auth chain or state for a given
+event. When that happens, we just grab the events in the state/auth chain,
+without calculating the state at those events, or backfilling their
+<code>prev_events</code>.</p>
+<p>So, typically, we won't have the <code>prev_events</code> of an <code>outlier</code> in the database,
+(though it's entirely possible that we <em>might</em> have them for some other
+reason). Other things that make outliers different from regular events:</p>
+<ul>
+<li>
+<p>We don't have state for them, so there should be no entry in
+<code>event_to_state_groups</code> for an outlier. (In practice this isn't always
+the case, though I'm not sure why: see https://github.com/matrix-org/synapse/issues/12201).</p>
+</li>
+<li>
+<p>We don't record entries for them in the <code>event_edges</code>,
+<code>event_forward_extremeties</code> or <code>event_backward_extremities</code> tables.</p>
+</li>
+</ul>
+<p>Since outliers are not tied into the DAG, they do not normally form part of the
+timeline sent down to clients via <code>/sync</code> or <code>/messages</code>; however there is an
+exception:</p>
+<h3 id="out-of-band-membership-events"><a class="header" href="#out-of-band-membership-events">Out-of-band membership events</a></h3>
+<p>A special case of outlier events are some membership events for federated rooms
+that we aren't full members of. For example:</p>
+<ul>
+<li>invites received over federation, before we join the room</li>
+<li><em>rejections</em> for said invites</li>
+<li>knock events for rooms that we would like to join but have not yet joined.</li>
+</ul>
+<p>In all the above cases, we don't have the state for the room, which is why they
+are treated as outliers. They are a bit special though, in that they are
+proactively sent to clients via <code>/sync</code>.</p>
 <h2 id="forward-extremity"><a class="header" href="#forward-extremity">Forward extremity</a></h2>
-<p>Most-recent-in-time events in the DAG which are not referenced by any other events' <code>prev_events</code> yet.</p>
-<p>The forward extremities of a room are used as the <code>prev_events</code> when the next event is sent.</p>
+<p>Most-recent-in-time events in the DAG which are not referenced by any other
+events' <code>prev_events</code> yet. (In this definition, outliers, rejected events, and
+soft-failed events don't count.)</p>
+<p>The forward extremities of a room (or at least, a subset of them, if there are
+more than ten) are used as the <code>prev_events</code> when the next event is sent.</p>
+<p>The &quot;current state&quot; of a room (ie: the state which would be used if we
+generated a new event) is, therefore, the resolution of the room states
+at each of the forward extremities.</p>
 <h2 id="backward-extremity"><a class="header" href="#backward-extremity">Backward extremity</a></h2>
 <p>The current marker of where we have backfilled up to and will generally be the
 <code>prev_events</code> of the oldest-in-time events we have in the DAG. This gives a starting point when
 backfilling history.</p>
-<p>When we persist a non-outlier event, we clear it as a backward extremity and set
-all of its <code>prev_events</code> as the new backward extremities if they aren't already
-persisted in the <code>events</code> table.</p>
-<h2 id="outliers"><a class="header" href="#outliers">Outliers</a></h2>
-<p>We mark an event as an <code>outlier</code> when we haven't figured out the state for the
-room at that point in the DAG yet.</p>
-<p>We won't <em>necessarily</em> have the <code>prev_events</code> of an <code>outlier</code> in the database,
-but it's entirely possible that we <em>might</em>.</p>
-<p>For example, when we fetch the event auth chain or state for a given event, we
-mark all of those claimed auth events as outliers because we haven't done the
-state calculation ourself.</p>
+<p>Note that, unlike forward extremities, we typically don't have any backward
+extremity events themselves in the database - or, if we do, they will be &quot;outliers&quot; (see
+above). Either way, we don't expect to have the room state at a backward extremity.</p>
+<p>When we persist a non-outlier event, if it was previously a backward extremity,
+we clear it as a backward extremity and set all of its <code>prev_events</code> as the new
+backward extremities if they aren't already persisted as non-outliers. This
+therefore keeps the backward extremities up-to-date.</p>
 <h2 id="state-groups"><a class="header" href="#state-groups">State groups</a></h2>
 <p>For every non-outlier event we need to know the state at that event. Instead of
 storing the full state for each event in the DB (i.e. a <code>event_id -&gt; state</code>
