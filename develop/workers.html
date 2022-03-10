@@ -473,8 +473,10 @@ streams (such as events) off of the main process to a particular worker. (This
 is only supported with Redis-based replication.)</p>
 <p>To enable this, the worker must have a HTTP replication listener configured,
 have a <code>worker_name</code> and be listed in the <code>instance_map</code> config. The same worker
-can handle multiple streams. For example, to move event persistence off to a
-dedicated worker, the shared configuration would include:</p>
+can handle multiple streams, but unless otherwise documented, each stream can only
+have a single writer.</p>
+<p>For example, to move event persistence off to a dedicated worker, the shared
+configuration would include:</p>
 <pre><code class="language-yaml">instance_map:
     event_persister1:
         host: localhost
@@ -487,8 +489,8 @@ stream_writers:
 be routed to the workers handling that stream. See below for the currently supported
 streams and the endpoints associated with them:</p>
 <h5 id="the-events-stream"><a class="header" href="#the-events-stream">The <code>events</code> stream</a></h5>
-<p>The <code>events</code> stream also experimentally supports having multiple writers, where
-work is sharded between them by room ID. Note that you <em>must</em> restart all worker
+<p>The <code>events</code> stream experimentally supports having multiple writers, where work
+is sharded between them by room ID. Note that you <em>must</em> restart all worker
 instances when adding or removing event persisters. An example <code>stream_writers</code>
 configuration with multiple writers:</p>
 <pre><code class="language-yaml">stream_writers:
@@ -497,30 +499,30 @@ configuration with multiple writers:</p>
         - event_persister2
 </code></pre>
 <h5 id="the-typing-stream"><a class="header" href="#the-typing-stream">The <code>typing</code> stream</a></h5>
-<p>The following endpoints should be routed directly to the workers configured as
-stream writers for the <code>typing</code> stream:</p>
+<p>The following endpoints should be routed directly to the worker configured as
+the stream writer for the <code>typing</code> stream:</p>
 <pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing
 </code></pre>
 <h5 id="the-to_device-stream"><a class="header" href="#the-to_device-stream">The <code>to_device</code> stream</a></h5>
-<p>The following endpoints should be routed directly to the workers configured as
-stream writers for the <code>to_device</code> stream:</p>
+<p>The following endpoints should be routed directly to the worker configured as
+the stream writer for the <code>to_device</code> stream:</p>
 <pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/sendToDevice/
 </code></pre>
 <h5 id="the-account_data-stream"><a class="header" href="#the-account_data-stream">The <code>account_data</code> stream</a></h5>
-<p>The following endpoints should be routed directly to the workers configured as
-stream writers for the <code>account_data</code> stream:</p>
+<p>The following endpoints should be routed directly to the worker configured as
+the stream writer for the <code>account_data</code> stream:</p>
 <pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/.*/tags
 ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/account_data
 </code></pre>
 <h5 id="the-receipts-stream"><a class="header" href="#the-receipts-stream">The <code>receipts</code> stream</a></h5>
-<p>The following endpoints should be routed directly to the workers configured as
-stream writers for the <code>receipts</code> stream:</p>
+<p>The following endpoints should be routed directly to the worker configured as
+the stream writer for the <code>receipts</code> stream:</p>
 <pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/receipt
 ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/read_markers
 </code></pre>
 <h5 id="the-presence-stream"><a class="header" href="#the-presence-stream">The <code>presence</code> stream</a></h5>
-<p>The following endpoints should be routed directly to the workers configured as
-stream writers for the <code>presence</code> stream:</p>
+<p>The following endpoints should be routed directly to the worker configured as
+the stream writer for the <code>presence</code> stream:</p>
 <pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
 </code></pre>
 <h4 id="background-tasks"><a class="header" href="#background-tasks">Background tasks</a></h4>
