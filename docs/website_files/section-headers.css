@@ -5,3 +5,16 @@
 .chapter-item {
     margin-left: 1em;
 }
+
+/*
+ * Prevents a large gap between successive section headers.
+ *
+ * mdbook sets 'margin-top: 2.5em' on h2 and h3 headers. This makes sense when separating
+ * a header from the paragraph beforehand, but has the downside of introducing a large
+ * gap between headers that are next to each other with no text in between.
+ *
+ * This rule reduces the margin in this case.
+ */
+ h1 + h2, h2 + h3 {
+    margin-top: 1.0em;
+ }
