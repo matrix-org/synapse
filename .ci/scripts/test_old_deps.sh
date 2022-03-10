@@ -3,6 +3,7 @@
 # minimal requirements for tox and hands over to the py3-old tox environment.
 
 # Prevent tzdata from asking for user input
+ls
 export DEBIAN_FRONTEND=noninteractive
 
 set -ex
@@ -28,7 +29,7 @@ export VIRTUALENV_NO_DOWNLOAD=1
 # but make the pyopenssl 17.0, which can work against an
 # OpenSSL 1.1 compiled cryptography (as older ones don't compile on Travis).
 
-sed -i \
+sed -i orig \
    -e "s/[~>]=/==/g" \
    -e "/psycopg2/d" \
    -e 's/pyOpenSSL = "==16.0.0"/pyOpenSSL = "==17.0.0"/' \
@@ -39,4 +40,6 @@ sed -i \
 # Can't install with -e. Error message:
 # > A "pyproject.toml" file was found, but editable mode currently requires a setup.py based build.
 pip install .[all]
+
+ls
 trial -j 2 tests
