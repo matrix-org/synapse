@@ -33,7 +33,7 @@ site-url = "/synapse/"
 additional-css = [
     "docs/website_files/table-of-contents.css",
     "docs/website_files/remove-nav-buttons.css",
-    "docs/website_files/indent-section-headers.css",
+    "docs/website_files/section-headers.css",
 ]
 additional-js = ["docs/website_files/table-of-contents.js"]
 theme = "docs/website_files/theme"
