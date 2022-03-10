@@ -191,6 +191,10 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
 
         if redacts:
             self._invalidate_get_event_cache(redacts)
+            # Caches which might leak edits must be invalidated for the event being
+            # redacted.
+            self.get_relations_for_event.invalidate((redacts,))
+            self.get_applicable_edit.invalidate((redacts,))
 
         if etype == EventTypes.Member:
             self._membership_stream_cache.entity_has_changed(state_key, stream_ordering)
