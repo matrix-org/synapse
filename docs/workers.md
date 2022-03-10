@@ -351,8 +351,11 @@ is only supported with Redis-based replication.)
 
 To enable this, the worker must have a HTTP replication listener configured,
 have a `worker_name` and be listed in the `instance_map` config. The same worker
-can handle multiple streams. For example, to move event persistence off to a
-dedicated worker, the shared configuration would include:
+can handle multiple streams, but unless otherwise documented, each stream can only
+have a single writer.
+
+For example, to move event persistence off to a dedicated worker, the shared
+configuration would include:
 
 ```yaml
 instance_map:
@@ -370,8 +373,8 @@ streams and the endpoints associated with them:
 
 ##### The `events` stream
 
-The `events` stream also experimentally supports having multiple writers, where
-work is sharded between them by room ID. Note that you *must* restart all worker
+The `events` stream experimentally supports having multiple writers, where work
+is sharded between them by room ID. Note that you *must* restart all worker
 instances when adding or removing event persisters. An example `stream_writers`
 configuration with multiple writers:
 
@@ -384,38 +387,38 @@ stream_writers:
 
 ##### The `typing` stream
 
-The following endpoints should be routed directly to the workers configured as
-stream writers for the `typing` stream:
+The following endpoints should be routed directly to the worker configured as
+the stream writer for the `typing` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing
 
 ##### The `to_device` stream
 
-The following endpoints should be routed directly to the workers configured as
-stream writers for the `to_device` stream:
+The following endpoints should be routed directly to the worker configured as
+the stream writer for the `to_device` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/sendToDevice/
 
 ##### The `account_data` stream
 
-The following endpoints should be routed directly to the workers configured as
-stream writers for the `account_data` stream:
+The following endpoints should be routed directly to the worker configured as
+the stream writer for the `account_data` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/tags
     ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/account_data
 
 ##### The `receipts` stream
 
-The following endpoints should be routed directly to the workers configured as
-stream writers for the `receipts` stream:
+The following endpoints should be routed directly to the worker configured as
+the stream writer for the `receipts` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/receipt
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/read_markers
 
 ##### The `presence` stream
 
-The following endpoints should be routed directly to the workers configured as
-stream writers for the `presence` stream:
+The following endpoints should be routed directly to the worker configured as
+the stream writer for the `presence` stream:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
 
