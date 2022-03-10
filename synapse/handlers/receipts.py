@@ -155,10 +155,7 @@ class ReceiptsHandler:
         if not is_new:
             return
 
-        if self.federation_sender and not (
-            self.hs.config.experimental.msc2285_enabled
-            and receipt_type == ReceiptTypes.READ_PRIVATE
-        ):
+        if self.federation_sender and receipt_type != ReceiptTypes.READ_PRIVATE:
             await self.federation_sender.send_read_receipt(receipt)
 
 
