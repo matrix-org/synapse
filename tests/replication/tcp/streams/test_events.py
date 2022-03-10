@@ -420,7 +420,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         # Manually send an old RDATA command, which should get dropped. This
         # re-uses the row from above, but with an earlier stream token.
-        self.hs.get_tcp_replication().send_command(
+        self.hs.get_replication_command_handler().send_command(
             RdataCommand("events", "master", 1, row)
         )
 

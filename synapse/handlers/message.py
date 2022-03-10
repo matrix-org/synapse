@@ -1079,7 +1079,10 @@ class EventCreationHandler:
                 raise SynapseError(400, "Can't send same reaction twice")
 
         # Don't attempt to start a thread if the parent event is a relation.
-        elif relation_type == RelationTypes.THREAD:
+        elif (
+            relation_type == RelationTypes.THREAD
+            or relation_type == RelationTypes.UNSTABLE_THREAD
+        ):
             if await self.store.event_includes_relation(relates_to):
                 raise SynapseError(
                     400, "Cannot start threads from an event with a relation"

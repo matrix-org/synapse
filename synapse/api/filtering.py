@@ -88,7 +88,9 @@ ROOM_EVENT_FILTER_SCHEMA = {
         "org.matrix.labels": {"type": "array", "items": {"type": "string"}},
         "org.matrix.not_labels": {"type": "array", "items": {"type": "string"}},
         # MSC3440, filtering by event relations.
+        "related_by_senders": {"type": "array", "items": {"type": "string"}},
         "io.element.relation_senders": {"type": "array", "items": {"type": "string"}},
+        "related_by_rel_types": {"type": "array", "items": {"type": "string"}},
         "io.element.relation_types": {"type": "array", "items": {"type": "string"}},
     },
 }
@@ -318,19 +320,18 @@ class Filter:
         self.labels = filter_json.get("org.matrix.labels", None)
         self.not_labels = filter_json.get("org.matrix.not_labels", [])
 
-        # Ideally these would be rejected at the endpoint if they were provided
-        # and not supported, but that would involve modifying the JSON schema
-        # based on the homeserver configuration.
+        self.related_by_senders = self.filter_json.get("related_by_senders", None)
+        self.related_by_rel_types = self.filter_json.get("related_by_rel_types", None)
+
+        # Fallback to the unstable prefix if the stable version is not given.
         if hs.config.experimental.msc3440_enabled:
-            self.relation_senders = self.filter_json.get(
+            self.related_by_senders = self.related_by_senders or self.filter_json.get(
                 "io.element.relation_senders", None
             )
-            self.relation_types = self.filter_json.get(
-                "io.element.relation_types", None
+            self.related_by_rel_types = (
+                self.related_by_rel_types
+                or self.filter_json.get("io.element.relation_types", None)
             )
-        else:
-            self.relation_senders = None
-            self.relation_types = None
 
     def filters_all_types(self) -> bool:
         return "*" in self.not_types
@@ -461,7 +462,7 @@ class Filter:
         event_ids = [event.event_id for event in events if isinstance(event, EventBase)]  # type: ignore[attr-defined]
         event_ids_to_keep = set(
             await self._store.events_have_relations(
-                event_ids, self.relation_senders, self.relation_types
+                event_ids, self.related_by_senders, self.related_by_rel_types
             )
         )
 
@@ -474,7 +475,7 @@ class Filter:
     async def filter(self, events: Iterable[FilterEvent]) -> List[FilterEvent]:
         result = [event for event in events if self._check(event)]
 
-        if self.relation_senders or self.relation_types:
+        if self.related_by_senders or self.related_by_rel_types:
             return await self._check_event_relations(result)
 
         return result

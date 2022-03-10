@@ -251,7 +251,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
                 self.connect_any_redis_attempts,
             )
 
-            self.hs.get_tcp_replication().start_replication(self.hs)
+            self.hs.get_replication_command_handler().start_replication(self.hs)
 
         # When we see a connection attempt to the master replication listener we
         # automatically set up the connection. This is so that tests don't
@@ -375,7 +375,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         )
 
         if worker_hs.config.redis.redis_enabled:
-            worker_hs.get_tcp_replication().start_replication(worker_hs)
+            worker_hs.get_replication_command_handler().start_replication(worker_hs)
 
         return worker_hs
 

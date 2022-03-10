@@ -424,13 +424,13 @@ class WorkerPresenceHandler(BasePresenceHandler):
 
     async def _on_shutdown(self) -> None:
         if self._presence_enabled:
-            self.hs.get_tcp_replication().send_command(
+            self.hs.get_replication_command_handler().send_command(
                 ClearUserSyncsCommand(self.instance_id)
             )
 
     def send_user_sync(self, user_id: str, is_syncing: bool, last_sync_ms: int) -> None:
         if self._presence_enabled:
-            self.hs.get_tcp_replication().send_user_sync(
+            self.hs.get_replication_command_handler().send_user_sync(
                 self.instance_id, user_id, is_syncing, last_sync_ms
             )
 
