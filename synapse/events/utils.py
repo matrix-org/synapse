@@ -38,6 +38,7 @@ from synapse.util.frozenutils import unfreeze
 from . import EventBase
 
 if TYPE_CHECKING:
+    from synapse.server import HomeServer
     from synapse.storage.databases.main.relations import BundledAggregations
 
 
@@ -395,6 +396,9 @@ class EventClientSerializer:
     clients.
     """
 
+    def __init__(self, hs: "HomeServer"):
+        self._msc3440_enabled = hs.config.experimental.msc3440_enabled
+
     def serialize_event(
         self,
         event: Union[JsonDict, EventBase],
@@ -515,11 +519,14 @@ class EventClientSerializer:
                     thread.latest_event, serialized_latest_event, thread.latest_edit
                 )
 
-            serialized_aggregations[RelationTypes.THREAD] = {
+            thread_summary = {
                 "latest_event": serialized_latest_event,
                 "count": thread.count,
                 "current_user_participated": thread.current_user_participated,
             }
+            serialized_aggregations[RelationTypes.THREAD] = thread_summary
+            if self._msc3440_enabled:
+                serialized_aggregations[RelationTypes.UNSTABLE_THREAD] = thread_summary
 
         # Include the bundled aggregations in the event.
         if serialized_aggregations:
