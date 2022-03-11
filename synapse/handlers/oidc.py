@@ -45,6 +45,7 @@ from synapse.types import JsonDict, UserID, map_username_to_mxid_localpart
 from synapse.util import Clock, json_decoder
 from synapse.util.caches.cached_call import RetryOnExceptionCachedCall
 from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
+from synapse.util.templates import _localpart_from_email_filter
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -1308,6 +1309,11 @@ def jinja_finalize(thing: Any) -> Any:
 
 
 env = Environment(finalize=jinja_finalize)
+env.filters.update(
+    {
+        "localpart_from_email": _localpart_from_email_filter,
+    }
+)
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)

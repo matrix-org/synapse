@@ -36,6 +36,13 @@ Turns a `mxc://` URL for media content into an HTTP(S) one using the homeserver'
 
 Example: `message.sender_avatar_url|mxc_to_http(32,32)`
 
+```python
+localpart_from_email(address: str) -> str
+```
+
+Returns the local part of an email address (e.g. `alice` in `alice@example.com`).
+
+Example: `user.email_address|localpart_from_email`
 
 ## Email templates
 
