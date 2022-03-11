@@ -169,7 +169,7 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
                 "kind": "event_match",
                 "key": "content.msgtype",
                 "pattern": "m.notice",
-                "_id": "_suppress_notices",
+                "_cache_key": "_suppress_notices",
             }
         ],
         "actions": ["dont_notify"],
@@ -183,13 +183,13 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.room.member",
-                "_id": "_member",
+                "_cache_key": "_member",
             },
             {
                 "kind": "event_match",
                 "key": "content.membership",
                 "pattern": "invite",
-                "_id": "_invite_member",
+                "_cache_key": "_invite_member",
             },
             {"kind": "event_match", "key": "state_key", "pattern_type": "user_id"},
         ],
@@ -212,7 +212,7 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.room.member",
-                "_id": "_member",
+                "_cache_key": "_member",
             }
         ],
         "actions": ["dont_notify"],
@@ -237,12 +237,12 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
                 "kind": "event_match",
                 "key": "content.body",
                 "pattern": "@room",
-                "_id": "_roomnotif_content",
+                "_cache_key": "_roomnotif_content",
             },
             {
                 "kind": "sender_notification_permission",
                 "key": "room",
-                "_id": "_roomnotif_pl",
+                "_cache_key": "_roomnotif_pl",
             },
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": True}],
@@ -254,13 +254,13 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.room.tombstone",
-                "_id": "_tombstone",
+                "_cache_key": "_tombstone",
             },
             {
                 "kind": "event_match",
                 "key": "state_key",
                 "pattern": "",
-                "_id": "_tombstone_statekey",
+                "_cache_key": "_tombstone_statekey",
             },
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": True}],
@@ -272,7 +272,7 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.reaction",
-                "_id": "_reaction",
+                "_cache_key": "_reaction",
             }
         ],
         "actions": ["dont_notify"],
@@ -288,7 +288,7 @@ BASE_APPEND_UNDERRIDE_RULES: List[Dict[str, Any]] = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.call.invite",
-                "_id": "_call",
+                "_cache_key": "_call",
             }
         ],
         "actions": [
@@ -302,12 +302,12 @@ BASE_APPEND_UNDERRIDE_RULES: List[Dict[str, Any]] = [
     {
         "rule_id": "global/underride/.m.rule.room_one_to_one",
         "conditions": [
-            {"kind": "room_member_count", "is": "2", "_id": "member_count"},
+            {"kind": "room_member_count", "is": "2", "_cache_key": "member_count"},
             {
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.room.message",
-                "_id": "_message",
+                "_cache_key": "_message",
             },
         ],
         "actions": [
@@ -321,12 +321,12 @@ BASE_APPEND_UNDERRIDE_RULES: List[Dict[str, Any]] = [
     {
         "rule_id": "global/underride/.m.rule.encrypted_room_one_to_one",
         "conditions": [
-            {"kind": "room_member_count", "is": "2", "_id": "member_count"},
+            {"kind": "room_member_count", "is": "2", "_cache_key": "member_count"},
             {
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.room.encrypted",
-                "_id": "_encrypted",
+                "_cache_key": "_encrypted",
             },
         ],
         "actions": [
@@ -342,7 +342,7 @@ BASE_APPEND_UNDERRIDE_RULES: List[Dict[str, Any]] = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.room.message",
-                "_id": "_message",
+                "_cache_key": "_message",
             }
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": False}],
@@ -356,7 +356,7 @@ BASE_APPEND_UNDERRIDE_RULES: List[Dict[str, Any]] = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.room.encrypted",
-                "_id": "_encrypted",
+                "_cache_key": "_encrypted",
             }
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": False}],
@@ -368,19 +368,19 @@ BASE_APPEND_UNDERRIDE_RULES: List[Dict[str, Any]] = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "im.vector.modular.widgets",
-                "_id": "_type_modular_widgets",
+                "_cache_key": "_type_modular_widgets",
             },
             {
                 "kind": "event_match",
                 "key": "content.type",
                 "pattern": "jitsi",
-                "_id": "_content_type_jitsi",
+                "_cache_key": "_content_type_jitsi",
             },
             {
                 "kind": "event_match",
                 "key": "state_key",
                 "pattern": "*",
-                "_id": "_is_state_event",
+                "_cache_key": "_is_state_event",
             },
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": False}],
