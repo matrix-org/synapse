@@ -2731,8 +2731,6 @@ redis:
   #password: <secret_password>
 
 
-
-
 ## Background Updates ##
 
 # Background updates are database updates that are run in the background in batches.
