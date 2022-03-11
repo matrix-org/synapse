@@ -1359,12 +1359,15 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
                         "invalid jinja template", path=["extra_attributes", key]
                     ) from e
 
+        confirm_localpart = config.get("confirm_localpart") or False
+
         return JinjaOidcMappingConfig(
             subject_claim=subject_claim,
             localpart_template=localpart_template,
             display_name_template=display_name_template,
             email_template=email_template,
             extra_attributes=extra_attributes,
+            confirm_localpart=confirm_localpart,
         )
 
     def get_remote_user_id(self, userinfo: UserInfo) -> str:
