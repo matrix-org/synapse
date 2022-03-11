@@ -205,6 +205,10 @@ already available as part of Jinja 2:</p>
 <p>Turns a <code>mxc://</code> URL for media content into an HTTP(S) one using the homeserver's
 <code>public_baseurl</code> configuration setting as the URL's base.</p>
 <p>Example: <code>message.sender_avatar_url|mxc_to_http(32,32)</code></p>
+<pre><code class="language-python">localpart_from_email(address: str) -&gt; str
+</code></pre>
+<p>Returns the local part of an email address (e.g. <code>alice</code> in <code>alice@example.com</code>).</p>
+<p>Example: <code>user.email_address|localpart_from_email</code></p>
 <h2 id="email-templates"><a class="header" href="#email-templates">Email templates</a></h2>
 <p>Below are the templates Synapse will look for when generating the content of an email:</p>
 <ul>
