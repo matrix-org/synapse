@@ -32,6 +32,7 @@ sed -i-backup \
    -e "s/[~>]=/==/g" \
    -e "/psycopg2/d" \
    -e 's/pyOpenSSL = "==16.0.0"/pyOpenSSL = "==17.0.0"/' \
+   -e '/psycopg2/d' \
    -e '/systemd/d' \
    pyproject.toml
 
@@ -65,6 +66,7 @@ python3 -c "$REMOVE_DEV_DEPENDENCIES"
 #  ERROR: ldap3 2.9.1 has requirement pyasn1>=0.4.6, but you'll have pyasn1 0.1.9 which is incompatible.
 # Helpfully, pip doesn't indicate the error; it returns 0.
 # TODO: bump pyasn to >=0.4.6?
-pipx install poetry
+pipx install poetry==1.1.12
+~/.local/bin/poetry lock
 ~/.local/bin/poetry install -E "all test"
 ~/.local/bin/poetry run trial -j2 tests
