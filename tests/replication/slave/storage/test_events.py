@@ -250,10 +250,13 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.replicate()
         self.check("get_rooms_for_user_with_stream_ordering", (USER_ID_2,), set())
 
-        # limit the replication rate
-        repl_transport = self._server_transport
-        assert isinstance(repl_transport, FakeTransport)
-        repl_transport.autoflush = False
+        # limit the replication rate from server -> client.
+        print(len(self._redis_transports))
+        print(self._redis_transports)
+        assert len(self._redis_transports) == 1
+        for _, repl_transport in self._redis_transports:
+            assert isinstance(repl_transport, FakeTransport)
+            repl_transport.autoflush = False
 
         # build the join and message events and persist them in the same batch.
         logger.info("----- build test events ------")
