@@ -463,7 +463,7 @@ flag to `git commit`, which uses the name and email set in your
 If you would like to provide your legal name privately to the Matrix.org
 Foundation (instead of in a public commit or comment), you can do so
 by emailing your legal name and a link to the pull request to
-[dco@matrix.org](mailto:dco@matrix.org).
+[dco@matrix.org](mailto:dco@matrix.org?subject=Private%20sign%20off).
 It helps to include "sign off" or similar in the subject line. You will then
 be instructed further.
 
