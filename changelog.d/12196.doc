@@ -1,0 +1,1 @@
+Document that the `typing`, `to_device`, `account_data`, `receipts`, and `presence` stream writer can only be used on a single worker.

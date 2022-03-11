@@ -27,7 +27,9 @@ class DummyDistribution(metadata.Distribution):
 
 
 old = DummyDistribution("0.1.2")
+old_release_candidate = DummyDistribution("0.1.2rc3")
 new = DummyDistribution("1.2.3")
+new_release_candidate = DummyDistribution("1.2.3rc4")
 
 # could probably use stdlib TestCase --- no need for twisted here
 
@@ -110,3 +112,20 @@ class TestDependencyChecker(TestCase):
             with self.mock_installed_package(new):
                 # should not raise
                 check_requirements("cool-extra")
+
+    def test_release_candidates_satisfy_dependency(self) -> None:
+        """
+        Tests that release candidates count as far as satisfying a dependency
+        is concerned.
+        (Regression test, see #12176.)
+        """
+        with patch(
+            "synapse.util.check_dependencies.metadata.requires",
+            return_value=["dummypkg >= 1"],
+        ):
+            with self.mock_installed_package(old_release_candidate):
+                self.assertRaises(DependencyException, check_requirements)
+
+            with self.mock_installed_package(new_release_candidate):
+                # should not raise
+                check_requirements()

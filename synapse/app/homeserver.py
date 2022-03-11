@@ -273,7 +273,7 @@ class SynapseHomeServer(HomeServer):
             # If redis is enabled we connect via the replication command handler
             # in the same way as the workers (since we're effectively a client
             # rather than a server).
-            self.get_tcp_replication().start_replication(self)
+            self.get_replication_command_handler().start_replication(self)
 
         for listener in self.config.server.listeners:
             if listener.type == "http":
