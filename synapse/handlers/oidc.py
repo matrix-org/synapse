@@ -1360,6 +1360,8 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
                     ) from e
 
         confirm_localpart = config.get("confirm_localpart") or False
+        if not isinstance(confirm_localpart, bool):
+            raise ConfigError("must be a bool", path=["confirm_localpart"])
 
         return JinjaOidcMappingConfig(
             subject_claim=subject_claim,
