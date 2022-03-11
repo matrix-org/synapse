@@ -151,7 +151,7 @@ class BasePresenceHandler(abc.ABC):
 
     @abc.abstractmethod
     async def user_syncing(
-        self, user_id: str, affect_presence: bool
+        self, user_id: str, affect_presence: bool, presence_state: str
     ) -> ContextManager[None]:
         """Returns a context manager that should surround any stream requests
         from the user.
@@ -233,7 +233,6 @@ class BasePresenceHandler(abc.ABC):
         self,
         target_user: UserID,
         state: JsonDict,
-        ignore_status_msg: bool = False,
         force_notify: bool = False,
     ) -> None:
         """Set the presence state of the user.
@@ -463,7 +462,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
                 self.send_user_sync(user_id, False, last_sync_ms)
 
     async def user_syncing(
-        self, user_id: str, affect_presence: bool
+        self, user_id: str, affect_presence: bool, presence_state: str
     ) -> ContextManager[None]:
         """Record that a user is syncing.
 
@@ -567,7 +566,6 @@ class WorkerPresenceHandler(BasePresenceHandler):
         self,
         target_user: UserID,
         state: JsonDict,
-        ignore_status_msg: bool = False,
         force_notify: bool = False,
     ) -> None:
         """Set the presence state of the user.
@@ -604,7 +602,6 @@ class WorkerPresenceHandler(BasePresenceHandler):
             instance_name=self._presence_writer_instance,
             user_id=user_id,
             state=state,
-            ignore_status_msg=ignore_status_msg,
             force_notify=force_notify,
         )
 
@@ -944,7 +941,10 @@ class PresenceHandler(BasePresenceHandler):
         await self._update_states([prev_state.copy_and_replace(**new_fields)])
 
     async def user_syncing(
-        self, user_id: str, affect_presence: bool = True
+        self,
+        user_id: str,
+        affect_presence: bool = True,
+        presence_state: str = PresenceState.ONLINE,
     ) -> ContextManager[None]:
         """Returns a context manager that should surround any stream requests
         from the user.
@@ -969,13 +969,14 @@ class PresenceHandler(BasePresenceHandler):
             self.user_to_num_current_syncs[user_id] = curr_sync + 1
 
             prev_state = await self.current_state_for_user(user_id)
-            if prev_state.state == PresenceState.OFFLINE:
-                # If they're currently offline then bring them online, otherwise
-                # just update the last sync times.
+            if prev_state.state != PresenceState.BUSY:
+                # If they're busy then they don't stop being busy just by syncing,
+                # so just update the last sync & last active times. Otherwise, set the
+                # new presence value
                 await self._update_states(
                     [
                         prev_state.copy_and_replace(
-                            state=PresenceState.ONLINE,
+                            state=presence_state,
                             last_active_ts=self.clock.time_msec(),
                             last_user_sync_ts=self.clock.time_msec(),
                         )
@@ -985,7 +986,8 @@ class PresenceHandler(BasePresenceHandler):
                 await self._update_states(
                     [
                         prev_state.copy_and_replace(
-                            last_user_sync_ts=self.clock.time_msec()
+                            last_active_ts=self.clock.time_msec(),
+                            last_user_sync_ts=self.clock.time_msec(),
                         )
                     ]
                 )
@@ -1168,7 +1170,6 @@ class PresenceHandler(BasePresenceHandler):
         self,
         target_user: UserID,
         state: JsonDict,
-        ignore_status_msg: bool = False,
         force_notify: bool = False,
     ) -> None:
         """Set the presence state of the user.
@@ -1200,9 +1201,7 @@ class PresenceHandler(BasePresenceHandler):
         prev_state = await self.current_state_for_user(user_id)
 
         new_fields = {"state": presence}
-
-        if not ignore_status_msg:
-            new_fields["status_msg"] = status_msg
+        new_fields["status_msg"] = status_msg
 
         if presence == PresenceState.ONLINE or (
             presence == PresenceState.BUSY and self._busy_presence_enabled

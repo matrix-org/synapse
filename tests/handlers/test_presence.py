@@ -652,6 +652,85 @@ class PresenceHandlerTestCase(unittest.HomeserverTestCase):
         # Mark user as online and `status_msg = None`
         self._set_presencestate_with_status_msg(user_id, PresenceState.ONLINE, None)
 
+    def test_set_presence_from_syncing_not_set(self):
+        """Test that presence is not set by syncing if affect_presence is false"""
+        user_id = "@test:server"
+        status_msg = "I'm here!"
+
+        self._set_presencestate_with_status_msg(
+            user_id, PresenceState.UNAVAILABLE, status_msg
+        )
+
+        self.get_success(
+            self.presence_handler.user_syncing(user_id, False, PresenceState.ONLINE)
+        )
+
+        state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(user_id))
+        )
+        # we should still be unavailable
+        self.assertEqual(state.state, PresenceState.UNAVAILABLE)
+        # and status message should still be the same
+        self.assertEqual(state.status_msg, status_msg)
+
+    def test_set_presence_from_syncing_is_set(self):
+        """Test that presence is set by syncing if affect_presence is true"""
+        user_id = "@test:server"
+        status_msg = "I'm here!"
+
+        self._set_presencestate_with_status_msg(
+            user_id, PresenceState.UNAVAILABLE, status_msg
+        )
+
+        self.get_success(
+            self.presence_handler.user_syncing(user_id, True, PresenceState.ONLINE)
+        )
+
+        state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(user_id))
+        )
+        # we should now be online
+        self.assertEqual(state.state, PresenceState.ONLINE)
+
+    def test_set_presence_from_syncing_keeps_status(self):
+        """Test that presence set by syncing retains status message"""
+        user_id = "@test:server"
+        status_msg = "I'm here!"
+
+        self._set_presencestate_with_status_msg(
+            user_id, PresenceState.UNAVAILABLE, status_msg
+        )
+
+        self.get_success(
+            self.presence_handler.user_syncing(user_id, True, PresenceState.ONLINE)
+        )
+
+        state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(user_id))
+        )
+        # our status message should be the same as it was before
+        self.assertEqual(state.status_msg, status_msg)
+
+    def test_set_presence_from_syncing_keeps_busy(self):
+        """Test that presence set by syncing doesn't affect busy status"""
+        # while this isn't the default
+        self.presence_handler._busy_presence_enabled = True
+
+        user_id = "@test:server"
+        status_msg = "I'm busy!"
+
+        self._set_presencestate_with_status_msg(user_id, PresenceState.BUSY, status_msg)
+
+        self.get_success(
+            self.presence_handler.user_syncing(user_id, True, PresenceState.ONLINE)
+        )
+
+        state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(user_id))
+        )
+        # we should still be busy
+        self.assertEqual(state.state, PresenceState.BUSY)
+
     def _set_presencestate_with_status_msg(
         self, user_id: str, state: PresenceState, status_msg: Optional[str]
     ):
