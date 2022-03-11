@@ -118,7 +118,7 @@ jobs:
   trial-olddeps:
     # Note: sqlite only; no postgres
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
-    needs: linting-done
+#    needs: linting-done
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
