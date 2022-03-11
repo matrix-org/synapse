@@ -67,8 +67,8 @@ class ReplicationStreamProtocolFactory(ServerFactory):
 class ReplicationStreamer:
     """Handles replication connections.
 
-    This needs to be poked when new replication data may be available. When new
-    data is available it will propagate to all connected clients.
+    This needs to be poked when new replication data may be available.
+    When new data is available it will propagate to all Redis subscribers.
     """
 
     def __init__(self, hs: "HomeServer"):
@@ -109,7 +109,7 @@ class ReplicationStreamer:
 
     def on_notifier_poke(self) -> None:
         """Checks if there is actually any new data and sends it to the
-        connections if there are.
+        Redis subscribers if there are.
 
         This should get called each time new data is available, even if it
         is currently being executed, so that nothing gets missed
