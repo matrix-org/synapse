@@ -772,13 +772,16 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         self.assertEqual(channel.code, 200)
 
+        # Check we start with no pushes
+        self.assertEqual(len(self.push_attempts), 0)
+
         # The other user joins
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
 
         # The other user sends a message (ignored by dont_notify push rule set above)
         self.helper.send(room, body="Hi!", tok=other_access_token)
+        self.assertEqual(len(self.push_attempts), 0)
 
         # The user sends a message back (sends a notification)
         self.helper.send(room, body="Hello", tok=access_token)
-
         self.assertEqual(len(self.push_attempts), 1)
