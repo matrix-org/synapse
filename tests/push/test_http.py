@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List
+from typing import List, Tuple
 from unittest.mock import Mock
 
 from twisted.internet.defer import Deferred
@@ -722,7 +722,7 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         self.assertEqual(channel.code, 200, channel.json_body)
 
-    def _make_user_with_pusher(self, username):
+    def _make_user_with_pusher(self, username: str) -> Tuple[str, str]:
         user_id = self.register_user(username, "pass")
         access_token = self.login(username, "pass")
 
