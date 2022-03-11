@@ -310,7 +310,9 @@ class EventBase(metaclass=abc.ABCMeta):
     depth: DictProperty[int] = DictProperty("depth")
     content: DictProperty[JsonDict] = DictProperty("content")
     hashes: DictProperty[Dict[str, str]] = DictProperty("hashes")
-    origin: DictProperty[str] = DictProperty("origin")
+    origin: DictProperty[str] = DictProperty(
+        "origin"
+    )  # CAN WE GET RID OF THIS??!!!??!?!
     origin_server_ts: DictProperty[int] = DictProperty("origin_server_ts")
     redacts: DefaultDictProperty[Optional[str]] = DefaultDictProperty("redacts", None)
     room_id: DictProperty[str] = DictProperty("room_id")

@@ -54,3 +54,6 @@ book/
 # complement
 /complement-*
 /master.tar.gz
+
+# rust
+/event_rs/target*
