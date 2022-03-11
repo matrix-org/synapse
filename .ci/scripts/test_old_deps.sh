@@ -48,7 +48,7 @@ source env/bin/activate
 #  ERROR: ldap3 2.9.1 has requirement pyasn1>=0.4.6, but you'll have pyasn1 0.1.9 which is incompatible.
 # Helpfully, pip doesn't indicate the error; it returns 0.
 # TODO: bump pyasn to >=0.4.6?
-pip install .[all]
+pip install .[all,test]
 
 
 # I've no idea why, but trial complains
