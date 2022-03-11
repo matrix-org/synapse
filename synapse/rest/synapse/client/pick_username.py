@@ -98,7 +98,9 @@ class AccountDetailsResource(DirectServeHtmlResource):
             "user_attributes": {
                 "display_name": session.display_name,
                 "emails": session.emails,
-                "remote_user_id": map_username_to_mxid_localpart(session.remote_user_id)
+                "remote_user_id": map_username_to_mxid_localpart(
+                    session.remote_user_id
+                ),
             },
         }
 
