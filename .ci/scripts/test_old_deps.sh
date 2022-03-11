@@ -29,11 +29,14 @@ export VIRTUALENV_NO_DOWNLOAD=1
 # - OpenSSL 1.1 compiled cryptography (as older ones don't compile on Travis).
 # - remove pygithub from dev dependencies, because this wants a higher version of
 #   pynacl than our minimum and we're not using it here
+# - remove systemd-python. This used to be omitted when running `python_dependencies.py`
+#   as a script; we preserve this behaviour here.
 sed -i-backup \
    -e "s/[~>]=/==/g" \
    -e "/psycopg2/d" \
    -e 's/pyOpenSSL = "==16.0.0"/pyOpenSSL = "==17.0.0"/' \
    -e '/pygithub/d' \
+   -e '/systemd/d' \
    pyproject.toml
 
 # There are almost certainly going to be dependency conflicts there, so I'm going to
