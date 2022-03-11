@@ -368,8 +368,11 @@ for the brand of the IdP</li>
 <li><code>user_attributes</code>: an object containing details about the user that
 we received from the IdP. May have the following attributes:
 <ul>
-<li>display_name: the user's display_name</li>
-<li>emails: a list of email addresses
+<li><code>display_name</code>: the user's display name</li>
+<li><code>emails</code>: a list of email addresses</li>
+<li><code>localpart</code>: the local part of the Matrix user ID to register,
+if <code>localpart_template</code> is set in the mapping provider configuration (empty
+string if not)
 The template should render a form which submits the following fields:</li>
 </ul>
 </li>

@@ -4890,8 +4890,13 @@ saml2_config:
 #
 #             localpart_template: Jinja2 template for the localpart of the MXID.
 #                 If this is not set, the user will be prompted to choose their
-#                 own username (see 'sso_auth_account_details.html' in the 'sso'
-#                 section of this file).
+#                 own username (see the documentation for the
+#                 'sso_auth_account_details.html' template).
+#
+#             confirm_localpart: Whether to prompt the user to validate (or
+#                 change) the generated localpart (see the documentation for the
+#                 'sso_auth_account_details.html' template), instead of
+#                 registering the account right away.
 #
 #             display_name_template: Jinja2 template for the display name to set
 #                 on first login. If unset, no displayname will be set.
@@ -6090,8 +6095,11 @@ for the brand of the IdP</li>
 <li><code>user_attributes</code>: an object containing details about the user that
 we received from the IdP. May have the following attributes:
 <ul>
-<li>display_name: the user's display_name</li>
-<li>emails: a list of email addresses
+<li><code>display_name</code>: the user's display name</li>
+<li><code>emails</code>: a list of email addresses</li>
+<li><code>localpart</code>: the local part of the Matrix user ID to register,
+if <code>localpart_template</code> is set in the mapping provider configuration (empty
+string if not)
 The template should render a form which submits the following fields:</li>
 </ul>
 </li>
