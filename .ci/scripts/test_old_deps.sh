@@ -9,7 +9,7 @@ set -ex
 
 apt-get update
 apt-get install -y \
-        python3 python3-dev python3-pip python3-venv \
+        python3 python3-dev python3-pip python3-venv pipx \
         libxml2-dev libxslt-dev xmlsec1 zlib1g-dev tox libjpeg-dev libwebp-dev
 
 export LANG="C.UTF-8"
@@ -34,7 +34,8 @@ sed -i-backup \
    -e 's/pyOpenSSL = "==16.0.0"/pyOpenSSL = "==17.0.0"/' \
    pyproject.toml
 
-# There are almost certainly going to be dependency conflicts there, so I'm going to use plain pip to install rather than poetry.
+# There are almost certainly going to be dependency conflicts there, so I'm going to
+# use plain pip to install rather than poetry.
 
 # Can't pip install with -e. Error message:
 # > A "pyproject.toml" file was found, but editable mode currently requires a setup.py based build.
@@ -42,16 +43,10 @@ sed -i-backup \
 # https://github.com/python-poetry/poetry/issues/34#issuecomment-1055142428
 # So instead, make a virtualenv and install in there.
 
-python3 -m venv env
-source env/bin/activate
-# At the time of writing, this notes:
-#  ERROR: ldap3 2.9.1 has requirement pyasn1>=0.4.6, but you'll have pyasn1 0.1.9 which is incompatible.
-# Helpfully, pip doesn't indicate the error; it returns 0.
-# TODO: bump pyasn to >=0.4.6?
-pip install .[all,test]
-
+pipx install poetry
+poetry install --extras all
 
 # I've no idea why, but trial complains
 #     twisted.python.reflect.ModuleNotFound: No module named 'tests'
 # Unless I invoke trial in this way.
-python3 -m twisted.trial -j 2 tests
+poetry run trial -j 2 tests
