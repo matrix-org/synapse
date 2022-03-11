@@ -44,9 +44,9 @@ sed -i-backup \
 # So instead, make a virtualenv and install in there.
 
 pipx install poetry
-poetry install --extras all
+~/.local/bin/poetry install --extras all
 
 # I've no idea why, but trial complains
 #     twisted.python.reflect.ModuleNotFound: No module named 'tests'
 # Unless I invoke trial in this way.
-poetry run trial -j 2 tests
+~/.local/bin/poetry run trial -j 2 tests
