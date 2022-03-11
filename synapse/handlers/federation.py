@@ -963,12 +963,15 @@ class FederationHandler:
 
         state_map = next(iter(state_groups.values()))
 
-        # we need the state *before* event.
         state_key = event.get_state_key()
-        if (
-            state_key is not None
-            and state_map.get((event.type, state_key)) == event.event_id
-        ):
+        if state_key is not None:
+            # the event was not rejected (get_event raises a NotFoundError for rejected
+            # events) so the state at the event should include the event itself.
+            assert (
+                state_map.get((event.type, state_key)) == event.event_id
+            ), "State at event did not include event itself"
+
+            # ... but we need the state *before* that event
             if "replaces_state" in event.unsigned:
                 prev_id = event.unsigned["replaces_state"]
                 state_map[(event.type, state_key)] = prev_id
