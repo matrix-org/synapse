@@ -18,7 +18,7 @@ from synapse.storage.background_updates import BackgroundUpdater
 from tests.unittest import HomeserverTestCase, override_config
 
 
-class RoomDirectoryConfigTestCase(HomeserverTestCase):
+class BackgroundUpdateConfigTestCase(HomeserverTestCase):
     # Tests that the default values in the config are correctly loaded. Note that the default
     # values are loaded when the corresponding config options are commented out, which is why there isn't
     # a config specified here.
