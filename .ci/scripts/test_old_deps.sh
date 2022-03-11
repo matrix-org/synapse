@@ -45,7 +45,8 @@ sed -i-backup \
 # https://github.com/python-poetry/poetry/issues/34#issuecomment-1055142428
 # So instead, make a virtualenv and install in there.
 
-pipx install poetry
+pipx install poetry==1.1.12
+~/.local/bin/poetry lock
 ~/.local/bin/poetry install --extras all
 
 # I've no idea why, but trial complains
