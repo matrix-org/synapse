@@ -1228,6 +1228,7 @@ class OidcSessionData:
 
 class UserAttributeDict(TypedDict):
     localpart: Optional[str]
+    confirm_localpart: bool
     display_name: Optional[str]
     emails: List[str]
 
@@ -1316,6 +1317,7 @@ class JinjaOidcMappingConfig:
     display_name_template: Optional[Template]
     email_template: Optional[Template]
     extra_attributes: Dict[str, Template]
+    confirm_localpart: bool = False
 
 
 class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
@@ -1398,7 +1400,10 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             emails.append(email)
 
         return UserAttributeDict(
-            localpart=localpart, display_name=display_name, emails=emails
+            localpart=localpart,
+            display_name=display_name,
+            emails=emails,
+            confirm_localpart=self._config.confirm_localpart,
         )
 
     async def get_extra_attributes(self, userinfo: UserInfo, token: Token) -> JsonDict:

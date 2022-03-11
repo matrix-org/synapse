@@ -27,7 +27,7 @@ from synapse.http.server import (
 )
 from synapse.http.servlet import parse_boolean, parse_string
 from synapse.http.site import SynapseRequest
-from synapse.types import JsonDict, map_username_to_mxid_localpart
+from synapse.types import JsonDict
 from synapse.util.templates import build_jinja_env
 
 if TYPE_CHECKING:
@@ -92,15 +92,20 @@ class AccountDetailsResource(DirectServeHtmlResource):
             self._sso_handler.render_error(request, "bad_session", e.msg, code=e.code)
             return
 
+        # The configuration might mandate going through this step to validate an
+        # automatically generated localpart, so session.chosen_localpart might already
+        # be set.
+        localpart = ""
+        if session.chosen_localpart is not None:
+            localpart = session.chosen_localpart
+
         idp_id = session.auth_provider_id
         template_params = {
             "idp": self._sso_handler.get_identity_providers()[idp_id],
             "user_attributes": {
                 "display_name": session.display_name,
                 "emails": session.emails,
-                "remote_user_id": map_username_to_mxid_localpart(
-                    session.remote_user_id
-                ),
+                "localpart": localpart,
             },
         }
 

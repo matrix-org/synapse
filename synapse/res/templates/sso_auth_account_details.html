@@ -138,7 +138,7 @@
         <div class="username_input" id="username_input">
           <label for="field-username">Username</label>
           <div class="prefix">@</div>
-          <input type="text" name="username" id="field-username" value="{{ user_attributes.remote_user_id }}" autofocus>
+          <input type="text" name="username" id="field-username" value="{{ user_attributes.localpart }}" autofocus>
           <div class="postfix">:{{ server_name }}</div>
         </div>
         <output for="username_input" id="field-username-output"></output>

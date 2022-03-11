@@ -178,8 +178,9 @@ Below are the templates Synapse will look for when generating pages related to S
       we received from the IdP. May have the following attributes:
         * `display_name`: the user's display name
         * `emails`: a list of email addresses
-        * `remote_user_id`: the user's ID on the IdP, [converted](https://spec.matrix.org/v1.2/appendices/#mapping-from-other-character-sets)
-          to the valid syntax for a Matrix username
+        * `localpart`: the local part of the Matrix user ID to register,
+          if `localpart_template` is set in the mapping provider configuration (empty
+          string if not)
   The template should render a form which submits the following fields:
     * `username`: the localpart of the user's chosen user id
 * `sso_new_user_consent.html`: HTML page allowing the user to consent to the
