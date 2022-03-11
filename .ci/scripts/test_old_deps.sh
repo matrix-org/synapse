@@ -23,15 +23,17 @@ export VIRTUALENV_NO_DOWNLOAD=1
 # rather than this sed script. But that's an Opinion.
 
 # patch the project definitions in-place
-# replace all lower bounds with exact bounds
-# delete all lines referring to psycopg2 --- so no postgres support
-# but make the pyopenssl 17.0, which can work against an
-# OpenSSL 1.1 compiled cryptography (as older ones don't compile on Travis).
-
+# - replace all lower bounds with exact bounds
+# - delete all lines referring to psycopg2 --- so no postgres support
+# - but make the pyopenssl 17.0, which can work against an
+# - OpenSSL 1.1 compiled cryptography (as older ones don't compile on Travis).
+# - remove pygithub from dev dependencies, because this wants a higher version of
+#   pynacl than our minimum and we're not using it here
 sed -i-backup \
    -e "s/[~>]=/==/g" \
    -e "/psycopg2/d" \
    -e 's/pyOpenSSL = "==16.0.0"/pyOpenSSL = "==17.0.0"/' \
+   -e '/pygithub/d' \
    pyproject.toml
 
 # There are almost certainly going to be dependency conflicts there, so I'm going to
