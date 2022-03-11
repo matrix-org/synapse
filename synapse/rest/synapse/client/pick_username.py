@@ -27,7 +27,7 @@ from synapse.http.server import (
 )
 from synapse.http.servlet import parse_boolean, parse_string
 from synapse.http.site import SynapseRequest
-from synapse.types import JsonDict
+from synapse.types import JsonDict, map_username_to_mxid_localpart
 from synapse.util.templates import build_jinja_env
 
 if TYPE_CHECKING:
@@ -98,6 +98,7 @@ class AccountDetailsResource(DirectServeHtmlResource):
             "user_attributes": {
                 "display_name": session.display_name,
                 "emails": session.emails,
+                "remote_user_id": map_username_to_mxid_localpart(session.remote_user_id)
             },
         }
 
