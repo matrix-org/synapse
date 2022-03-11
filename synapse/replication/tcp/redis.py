@@ -263,6 +263,7 @@ class SynapseRedisFactory(txredisapi.RedisFactory):
             replyTimeout=replyTimeout,
             convertNumbers=convertNumbers,
         )
+        self.hs = hs
 
         # Set the homeserver reactor as the clock, if this is not done than
         # twisted.internet.protocol.ReconnectingClientFactory.retry will default

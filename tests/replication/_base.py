@@ -163,6 +163,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
     def reconnect(self):
         self.disconnect()
+        print("RECONNECTING")
 
         # Make a `FakeConnector` to emulate the behavior of `connectTCP. That
         # creates an `IConnector`, which is responsible for calling the factory
@@ -193,6 +194,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         self.connect_any_redis_attempts()
 
     def disconnect(self):
+        print("DISCONNECTING")
         for (
             client_to_server_transport,
             server_to_client_transport,
@@ -296,6 +298,11 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
             client_protocol = client_factory.buildProtocol(None)
             server_protocol = self._redis_server.buildProtocol(None)
+            if client_protocol.__class__.__name__ == "RedisSubscriber":
+                print(client_protocol, client_protocol.synapse_handler._presence_handler.hs, client_protocol.synapse_outbound_redis_connection)
+            else:
+                print(client_protocol, client_protocol.factory.hs)
+            print()
 
             client_to_server_transport = FakeTransport(
                 server_protocol, self.reactor, client_protocol

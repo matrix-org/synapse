@@ -252,7 +252,8 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
         # limit the replication rate from server -> client.
         print(len(self._redis_transports))
-        print(self._redis_transports)
+        for x in self._redis_transports:
+            print(f"\t{x}")
         assert len(self._redis_transports) == 1
         for _, repl_transport in self._redis_transports:
             assert isinstance(repl_transport, FakeTransport)
