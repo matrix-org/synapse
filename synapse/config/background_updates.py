@@ -20,8 +20,6 @@ class BackgroundUpdateConfig(Config):
 
     def generate_config_section(self, **kwargs) -> str:
         return """\
-
-
         ## Background Updates ##
 
         # Background updates are database updates that are run in the background in batches.
