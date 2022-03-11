@@ -182,8 +182,13 @@ class OIDCConfig(Config):
         #
         #             localpart_template: Jinja2 template for the localpart of the MXID.
         #                 If this is not set, the user will be prompted to choose their
-        #                 own username (see 'sso_auth_account_details.html' in the 'sso'
-        #                 section of this file).
+        #                 own username (see the documentation for the
+        #                 'sso_auth_account_details.html' template).
+        #
+        #             confirm_localpart: Whether to prompt the user to validate (or
+        #                 change) the generated localpart (see the documentation for the
+        #                 'sso_auth_account_details.html' template), instead of
+        #                 registering the account right away.
         #
         #             display_name_template: Jinja2 template for the display name to set
         #                 on first login. If unset, no displayname will be set.

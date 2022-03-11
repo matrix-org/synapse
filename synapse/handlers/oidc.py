@@ -1228,6 +1228,7 @@ class OidcSessionData:
 
 class UserAttributeDict(TypedDict):
     localpart: Optional[str]
+    confirm_localpart: bool
     display_name: Optional[str]
     emails: List[str]
 
@@ -1316,6 +1317,7 @@ class JinjaOidcMappingConfig:
     display_name_template: Optional[Template]
     email_template: Optional[Template]
     extra_attributes: Dict[str, Template]
+    confirm_localpart: bool = False
 
 
 class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
@@ -1357,12 +1359,17 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
                         "invalid jinja template", path=["extra_attributes", key]
                     ) from e
 
+        confirm_localpart = config.get("confirm_localpart") or False
+        if not isinstance(confirm_localpart, bool):
+            raise ConfigError("must be a bool", path=["confirm_localpart"])
+
         return JinjaOidcMappingConfig(
             subject_claim=subject_claim,
             localpart_template=localpart_template,
             display_name_template=display_name_template,
             email_template=email_template,
             extra_attributes=extra_attributes,
+            confirm_localpart=confirm_localpart,
         )
 
     def get_remote_user_id(self, userinfo: UserInfo) -> str:
@@ -1398,7 +1405,10 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
             emails.append(email)
 
         return UserAttributeDict(
-            localpart=localpart, display_name=display_name, emails=emails
+            localpart=localpart,
+            display_name=display_name,
+            emails=emails,
+            confirm_localpart=self._config.confirm_localpart,
         )
 
     async def get_extra_attributes(self, userinfo: UserInfo, token: Token) -> JsonDict:
