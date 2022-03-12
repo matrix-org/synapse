@@ -85,6 +85,20 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.56.0
+
+## Groups/communities feature has been deprecated
+
+The non-standard groups/communities feature in Synapse has been deprecated and will
+be disabled by default in Synapse v1.58.0.
+
+You can test disabling it by adding the following to your homeserver configuration:
+
+```yaml
+experimental_features:
+  groups_enabled: false
+```
+
 # Upgrading to v1.55.0
 
 ## `synctl` script has been moved

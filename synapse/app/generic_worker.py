@@ -322,7 +322,8 @@ class GenericWorkerServer(HomeServer):
 
                     presence.register_servlets(self, resource)
 
-                    groups.register_servlets(self, resource)
+                    if self.config.experimental.groups_enabled:
+                        groups.register_servlets(self, resource)
 
                     resources.update({CLIENT_API_PREFIX: resource})
 
