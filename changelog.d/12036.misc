@@ -1,1 +1,1 @@
-Refactor `shared_rooms` to `mutual_rooms` (MSC2666), as per proposal changes.
+Rename `shared_rooms` to `mutual_rooms` (MSC2666), as per proposal changes.
