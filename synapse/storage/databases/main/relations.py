@@ -152,18 +152,18 @@ class RelationsWorkerStore(SQLBaseStore):
 
             last_topo_id = None
             last_stream_id = None
-            events = []
+            event_ids = []
             for row in txn:
                 # Do not include edits for redacted events as they leak event
                 # content.
                 if not is_redacted or row[1] != RelationTypes.REPLACE:
-                    events.append({"event_id": row[0]})
+                    event_ids.append({"event_id": row[0]})
                 last_topo_id = row[2]
                 last_stream_id = row[3]
 
             # If there are more events, generate the next pagination key.
             next_token = None
-            if len(events) > limit and last_topo_id and last_stream_id:
+            if len(event_ids) > limit and last_topo_id and last_stream_id:
                 next_key = RoomStreamToken(last_topo_id, last_stream_id)
                 if from_token:
                     next_token = from_token.copy_and_replace("room_key", next_key)
@@ -181,7 +181,9 @@ class RelationsWorkerStore(SQLBaseStore):
                     )
 
             return PaginationChunk(
-                chunk=list(events[:limit]), next_batch=next_token, prev_batch=from_token
+                chunk=list(event_ids[:limit]),
+                next_batch=next_token,
+                prev_batch=from_token,
             )
 
         return await self.db_pool.runInteraction(
