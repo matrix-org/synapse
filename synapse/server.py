@@ -145,7 +145,7 @@ from synapse.util.stringutils import random_string
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from txredisapi import RedisProtocol
+    from txredisapi import ConnectionHandler
 
     from synapse.handlers.oidc import OidcHandler
     from synapse.handlers.saml import SamlHandler
@@ -328,7 +328,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         Does nothing in this base class; overridden in derived classes to start the
         appropriate listeners.
         """
-        pass
 
     def setup_background_tasks(self) -> None:
         """
@@ -639,7 +638,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ReadMarkerHandler(self)
 
     @cache_in_self
-    def get_tcp_replication(self) -> ReplicationCommandHandler:
+    def get_replication_command_handler(self) -> ReplicationCommandHandler:
         return ReplicationCommandHandler(self)
 
     @cache_in_self
@@ -754,7 +753,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:
-        return EventClientSerializer()
+        return EventClientSerializer(self)
 
     @cache_in_self
     def get_password_policy_handler(self) -> PasswordPolicyHandler:
@@ -807,7 +806,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return AccountHandler(self)
 
     @cache_in_self
-    def get_outbound_redis_connection(self) -> "RedisProtocol":
+    def get_outbound_redis_connection(self) -> "ConnectionHandler":
         """
         The Redis connection used for replication.
 

@@ -245,8 +245,8 @@ class SpamChecker:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
-        sent by a local user. If it is sent by a user on another server, then
-        users receive a blank event.
+        sent by a local user. If it is sent by a user on another server, the
+        event is soft-failed.
 
         Args:
             event: the event to be checked

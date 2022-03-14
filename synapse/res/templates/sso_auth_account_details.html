@@ -130,15 +130,15 @@
   </head>
   <body>
     <header>
-      <h1>Your account is nearly ready</h1>
-      <p>Check your details before creating an account on {{ server_name }}</p>
+      <h1>Choose your user name</h1>
+      <p>This is required to create your account on {{ server_name }}, and you can't change this later.</p>
     </header>
     <main>
       <form method="post" class="form__input" id="form">
         <div class="username_input" id="username_input">
           <label for="field-username">Username</label>
           <div class="prefix">@</div>
-          <input type="text" name="username" id="field-username" autofocus>
+          <input type="text" name="username" id="field-username" value="{{ user_attributes.localpart }}" autofocus>
           <div class="postfix">:{{ server_name }}</div>
         </div>
         <output for="username_input" id="field-username-output"></output>
