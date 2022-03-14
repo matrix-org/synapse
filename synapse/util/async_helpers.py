@@ -564,7 +564,8 @@ class ReadWriteLock:
                 # Wait for all current readers and the latest writer to finish.
                 # May raise a `CancelledError` immediately after the wait if the
                 # `Deferred` wrapping us is cancelled. We must only release the lock
-                # once we have acquired it, hence the delay.
+                # once we have acquired it, hence the use of `delay_cancellation`
+                # rather than `stop_cancellation`.
                 await make_deferred_yieldable(delay_cancellation(to_wait_on_defer))
                 yield
             finally:
