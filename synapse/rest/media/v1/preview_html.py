@@ -144,9 +144,7 @@ def decode_body(
     return etree.fromstring(body, parser)
 
 
-def parse_html_to_open_graph(
-    tree: "etree.Element", media_uri: str
-) -> Dict[str, Optional[str]]:
+def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     """
     Parse the HTML document into an Open Graph response.
 
@@ -209,7 +207,7 @@ def parse_html_to_open_graph(
             "//*/meta[translate(@itemprop, 'IMAGE', 'image')='image']/@content"
         )
         if meta_image:
-            og["og:image"] = rebase_url(meta_image[0], media_uri)
+            og["og:image"] = meta_image[0]
         else:
             # TODO: consider inlined CSS styles as well as width & height attribs
             images = tree.xpath("//img[@src][number(@width)>10][number(@height)>10]")

@@ -322,7 +322,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
                 # Parse Open Graph information from the HTML in case the oEmbed
                 # response failed or is incomplete.
-                og_from_html = parse_html_to_open_graph(tree, media_info.uri)
+                og_from_html = parse_html_to_open_graph(tree)
 
                 # Compile the Open Graph response by using the scraped
                 # information from the HTML and overlaying any information
