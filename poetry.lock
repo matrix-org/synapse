@@ -661,7 +661,7 @@ pyparsing = ">=2.0.2,<3.0.5 || >3.0.5"
 name = "parameterized"
 version = "0.8.1"
 description = "Parameterized testing with any Python test framework"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -1576,12 +1576,13 @@ redis = ["txredisapi", "hiredis"]
 saml2 = ["pysaml2"]
 sentry = ["sentry-sdk"]
 systemd = ["systemd-python"]
+test = ["parameterized"]
 url_preview = ["lxml"]
 
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "568b9ec860636ec456031d3b424a67bf8de3121c292a81818a2f259757fe5236"
+content-hash = "1fc5da3d43f640c8d47885202257946e3bab7a83a987f192fefd29acb22e97e0"
 
 [metadata.files]
 appdirs = [

@@ -170,6 +170,7 @@ pyjwt = { version = ">=1.6.4", optional = true }
 txredisapi = { version = ">=1.4.7", optional = true }
 hiredis = { version = "*", optional = true }
 Pympler = { version = "*", optional = true }
+parameterized = { version = ">=0.7.0", optional = true }
 
 ## Developer dependencies should not get included in "all".
 ##
@@ -193,6 +194,7 @@ jwt = ["pyjwt"]
 redis = ["txredisapi", "hiredis"]
 # Required to use experimental `caches.track_memory_usage` config option.
 cache_memory = ["pympler"]
+test = ["parameterized"]
 
 # The duplication here is awful. I hate hate hate hate hate it. However, for now I want
 # to ensure you can still `pip install matrix-synapse[all]` like today. Two motivations:
@@ -226,6 +228,7 @@ all = [
     #redis
     "txredisapi", "hiredis"
     # cache_memory, omitted: this is an experimental option
+    # test, omitted: it's useful to have this separate from dev deps in the olddeps job
 ]
 
 [tool.poetry.dev-dependencies]
