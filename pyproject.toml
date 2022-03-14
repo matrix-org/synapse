@@ -99,6 +99,8 @@ synapse_port_db = "synapse._scripts.synapse_port_db:main"
 synapse_review_recent_signups = "synapse._scripts.review_recent_signups:main"
 update_synapse_database = "synapse._scripts.update_synapse_database:main"
 
+# TODO add synctl
+
 [tool.poetry.dependencies]
 python = "^3.7"
 
