@@ -720,6 +720,9 @@ def delay_cancellation(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]":
     """
 
     def handle_cancel(new_deferred: "defer.Deferred[T]") -> None:
+        # before the new deferred is cancelled, we `pause` it to stop the cancellation
+        # propagating. we then `unpause` it once the wrapped deferred completes, to
+        # propagate the exception.
         new_deferred.pause()
         new_deferred.errback(Failure(CancelledError()))
 
