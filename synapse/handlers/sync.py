@@ -28,7 +28,7 @@ from typing import (
 import attr
 from prometheus_client import Counter
 
-from synapse.api.constants import AccountDataTypes, EventTypes, Membership, ReceiptTypes
+from synapse.api.constants import EventTypes, Membership, ReceiptTypes
 from synapse.api.filtering import FilterCollection
 from synapse.api.presence import UserPresenceState
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
@@ -1601,7 +1601,7 @@ class SyncHandler:
                         return set(), set(), set(), set()
 
         # 3. Work out which rooms need reporting in the sync response.
-        ignored_users = await self._get_ignored_users(user_id)
+        ignored_users = await self.store.ignored_users(user_id)
         if since_token:
             room_changes = await self._get_rooms_changed(
                 sync_result_builder, ignored_users
@@ -1656,29 +1656,6 @@ class SyncHandler:
             set(newly_left_rooms),
             newly_left_users,
         )
-
-    async def _get_ignored_users(self, user_id: str) -> FrozenSet[str]:
-        """Retrieve the users ignored by the given user from their global account_data.
-
-        Returns an empty set if
-        - there is no global account_data entry for ignored_users
-        - there is such an entry, but it's not a JSON object.
-        """
-        # TODO: Can we `SELECT ignored_user_id FROM ignored_users WHERE ignorer_user_id=?;` instead?
-        ignored_account_data = (
-            await self.store.get_global_account_data_by_type_for_user(
-                user_id=user_id, data_type=AccountDataTypes.IGNORED_USER_LIST
-            )
-        )
-
-        # If there is ignored users account data and it matches the proper type,
-        # then use it.
-        ignored_users: FrozenSet[str] = frozenset()
-        if ignored_account_data:
-            ignored_users_data = ignored_account_data.get("ignored_users", {})
-            if isinstance(ignored_users_data, dict):
-                ignored_users = frozenset(ignored_users_data.keys())
-        return ignored_users
 
     async def _have_rooms_changed(
         self, sync_result_builder: "SyncResultBuilder"
