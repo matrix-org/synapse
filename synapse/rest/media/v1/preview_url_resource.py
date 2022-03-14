@@ -588,12 +588,14 @@ class PreviewUrlResource(DirectServeJsonResource):
         if "og:image" not in og or not og["og:image"]:
             return
 
+        # The image URL from the HTML might be relative to the previewed page,
+        # convert it to an URL which can be requested directly.
+        image_url = rebase_url(og["og:image"], media_info.uri)
+
         # FIXME: it might be cleaner to use the same flow as the main /preview_url
         # request itself and benefit from the same caching etc.  But for now we
         # just rely on the caching on the master request to speed things up.
-        image_info = await self._handle_url(
-            rebase_url(og["og:image"], media_info.uri), user, allow_data_urls=True
-        )
+        image_info = await self._handle_url(image_url, user, allow_data_urls=True)
 
         if _is_media(image_info.media_type):
             # TODO: make sure we don't choke on white-on-transparent images
