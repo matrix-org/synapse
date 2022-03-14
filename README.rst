@@ -312,6 +312,9 @@ We recommend using the demo which starts 3 federated instances running on ports 
 
 (to stop, you can use `./demo/stop.sh`)
 
+See the [demo documentation](https://matrix-org.github.io/synapse/develop/development/demo.html)
+for more information.
+
 If you just want to start a single instance of the app and run it directly::
 
     # Create the homeserver.yaml config once

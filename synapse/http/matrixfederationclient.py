@@ -120,7 +120,6 @@ class ByteParser(ByteWriteable, Generic[T], abc.ABC):
         """Called when response has finished streaming and the parser should
         return the final result (or error).
         """
-        pass
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -601,7 +600,6 @@ class MatrixFederationHttpClient:
                             response.code,
                             response_phrase,
                         )
-                        pass
                     else:
                         logger.info(
                             "{%s} [%s] Got response headers: %d %s",
