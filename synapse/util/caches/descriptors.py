@@ -354,7 +354,7 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
                 # We started a new call to `self.orig`, so we must always wait for it to
                 # complete. Otherwise we might mark our current logging context as
                 # finished while `self.orig` is still using it in the background.
-                ret = delay_cancellation(ret, all=True)
+                ret = delay_cancellation(ret)
 
             return make_deferred_yieldable(ret)
 
@@ -520,7 +520,7 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
                     # We started a new call to `self.orig`, so we must always wait for it to
                     # complete. Otherwise we might mark our current logging context as
                     # finished while `self.orig` is still using it in the background.
-                    d = delay_cancellation(d, all=True)
+                    d = delay_cancellation(d)
                 return make_deferred_yieldable(d)
             else:
                 return defer.succeed(results)
