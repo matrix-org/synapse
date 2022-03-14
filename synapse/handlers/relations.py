@@ -21,6 +21,7 @@ from synapse.api.constants import RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.types import JsonDict, Requester, StreamToken
+from synapse.visibility import filter_events_for_client
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -62,6 +63,7 @@ class BundledAggregations:
 class RelationsHandler:
     def __init__(self, hs: "HomeServer"):
         self._main_store = hs.get_datastores().main
+        self._storage = hs.get_storage()
         self._auth = hs.get_auth()
         self._clock = hs.get_clock()
         self._event_handler = hs.get_event_handler()
@@ -103,7 +105,8 @@ class RelationsHandler:
 
         user_id = requester.user.to_string()
 
-        await self._auth.check_user_in_room_or_world_readable(
+        # TODO Properly handle a user leaving a room.
+        (_, member_event_id) = await self._auth.check_user_in_room_or_world_readable(
             room_id, user_id, allow_departed_users=True
         )
 
@@ -128,6 +131,10 @@ class RelationsHandler:
 
         events = await self._main_store.get_events_as_list(
             [c["event_id"] for c in pagination_chunk.chunk]
+        )
+
+        events = await filter_events_for_client(
+            self._storage, user_id, events, is_peeking=(member_event_id is None)
         )
 
         now = self._clock.time_msec()
