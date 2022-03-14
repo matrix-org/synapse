@@ -943,7 +943,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             def fn(self, arg1):
                 pass
 
-            @cachedList("fn", "args")
+            @cachedList(cached_method_name="fn", list_name="args")
             async def list_fn(self, args):
                 await complete_lookup
                 return {arg: str(arg) for arg in args}
@@ -978,7 +978,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             def fn(self, arg1):
                 pass
 
-            @cachedList("fn", "args")
+            @cachedList(cached_method_name="fn", list_name="args")
             async def list_fn(self, args):
                 await make_deferred_yieldable(complete_lookup)
                 self.inner_context_was_finished = current_context().finished
