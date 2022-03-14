@@ -5,6 +5,11 @@ on:
     - cron: 0 8 * * *
 
   workflow_dispatch:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   mypy:
@@ -12,10 +17,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@dmr/try-extras
+        with:
+          python-version: "3.x"
+          extras: "all"
       - run: .ci/patch_for_twisted_trunk.sh
-      - run: pip install tox
-      - run: tox -e mypy
+      - run: poetry run mypy
 
   trial:
     runs-on: ubuntu-latest
@@ -23,14 +30,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: sudo apt-get -qq install xmlsec1
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@dmr/try-extras
         with:
-          python-version: 3.7
+          python-version: "3.x"
+          extras: "all test"
       - run: .ci/patch_for_twisted_trunk.sh
-      - run: pip install tox
-      - run: tox -e py
-        env:
-          TRIAL_FLAGS: "--jobs=2"
+      - run: poetry run trial --jobs 2 tests
 
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
@@ -72,21 +77,21 @@ jobs:
             /logs/results.tap
             /logs/**/*.log*
 
-  # open an issue if the build fails, so we know about it.
-  open-issue:
-    if: failure()
-    needs:
-      - mypy
-      - trial
-      - sytest
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: JasonEtco/create-an-issue@5d9504915f79f9cc6d791934b8ef34f2353dd74d # v2.5.0, 2020-12-06
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          update_existing: true
-          filename: .ci/twisted_trunk_build_failed_issue_template.md
+#  # open an issue if the build fails, so we know about it.
+#  open-issue:
+#    if: failure()
+#    needs:
+#      - mypy
+#      - trial
+#      - sytest
+#
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#      - uses: actions/checkout@v2
+#      - uses: JasonEtco/create-an-issue@5d9504915f79f9cc6d791934b8ef34f2353dd74d # v2.5.0, 2020-12-06
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        with:
+#          update_existing: true
+#          filename: .ci/twisted_trunk_build_failed_issue_template.md
