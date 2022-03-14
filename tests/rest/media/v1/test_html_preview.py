@@ -16,7 +16,6 @@ from synapse.rest.media.v1.preview_html import (
     _get_html_media_encodings,
     decode_body,
     parse_html_to_open_graph,
-    rebase_url,
     summarize_paragraphs,
 )
 
@@ -448,34 +447,3 @@ class MediaEncodingTestCase(unittest.TestCase):
             'text/html; charset="invalid"',
         )
         self.assertEqual(list(encodings), ["utf-8", "cp1252"])
-
-
-class RebaseUrlTestCase(unittest.TestCase):
-    def test_relative(self) -> None:
-        """Relative URLs should be resolved based on the context of the base URL."""
-        self.assertEqual(
-            rebase_url("subpage", "https://example.com/foo/"),
-            "https://example.com/foo/subpage",
-        )
-        self.assertEqual(
-            rebase_url("sibling", "https://example.com/foo"),
-            "https://example.com/sibling",
-        )
-        self.assertEqual(
-            rebase_url("/bar", "https://example.com/foo/"),
-            "https://example.com/bar",
-        )
-
-    def test_absolute(self) -> None:
-        """Absolute URLs should not be modified."""
-        self.assertEqual(
-            rebase_url("https://alice.com/a/", "https://example.com/foo/"),
-            "https://alice.com/a/",
-        )
-
-    def test_data(self) -> None:
-        """Data URLs should not be modified."""
-        self.assertEqual(
-            rebase_url("data:,Hello%2C%20World%21", "https://example.com/foo/"),
-            "data:,Hello%2C%20World%21",
-        )

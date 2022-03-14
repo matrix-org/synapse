@@ -16,7 +16,6 @@ import itertools
 import logging
 import re
 from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Set, Union
-from urllib.parse import urlparse, urljoin
 
 if TYPE_CHECKING:
     from lxml import etree
@@ -316,28 +315,6 @@ def _iterate_over_text(
                 ),
                 elements,
             )
-
-
-def rebase_url(url: str, base: str) -> str:
-    """
-    Resolves a potentially relative `url` against an absolute `base` URL.
-
-    For example:
-
-        >>> rebase_url("subpage", "https://example.com/foo/")
-        'https://example.com/foo/subpage'
-        >>> rebase_url("sibling", "https://example.com/foo")
-        'https://example.com/sibling'
-        >>> rebase_url("/bar", "https://example.com/foo/")
-        'https://example.com/bar'
-        >>> rebase_url("https://alice.com/a/", "https://example.com/foo/")
-        'https://alice.com/a'
-    """
-    url_parts = urlparse(url)
-    # If this is a data URL, do nothing.
-    if url_parts.scheme == "data":
-        return url
-    return urljoin(base, url)
 
 
 def summarize_paragraphs(
