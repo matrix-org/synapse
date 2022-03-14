@@ -7,16 +7,22 @@ on:
   workflow_dispatch:
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   mypy:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@v1
+        with:
+          python-version: "3.x"
+          extras: "all"
       - run: .ci/patch_for_twisted_trunk.sh
-      - run: pip install tox
-      - run: tox -e mypy
+      - run: poetry run mypy
 
   trial:
     runs-on: ubuntu-latest
@@ -24,14 +30,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: sudo apt-get -qq install xmlsec1
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@v1
         with:
-          python-version: 3.7
+          python-version: "3.x"
+          extras: "all test"
       - run: .ci/patch_for_twisted_trunk.sh
-      - run: pip install tox
-      - run: tox -e py
-        env:
-          TRIAL_FLAGS: "--jobs=2"
+      - run: poetry run trial --jobs 2 tests
 
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
@@ -56,11 +60,18 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Patch dependencies
-        run: .ci/patch_for_twisted_trunk.sh
+        run: >-
+          ln -s -T /venv /src/.venv &&
+          .ci/patch_for_twisted_trunk.sh &&
+          unlink /src/.venv
         working-directory: /src
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
+        env:
+          # Use offline mode to avoid reinstalling the pinned version of
+          # twisted.
+          OFFLINE: 1
       - name: Summarise results.tap
         if: ${{ always() }}
         run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
