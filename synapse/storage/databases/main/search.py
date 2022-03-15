@@ -125,9 +125,6 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        if not hs.config.server.enable_search:
-            return
-
         self.db_pool.updates.register_background_update_handler(
             self.EVENT_SEARCH_UPDATE_NAME, self._background_reindex_search
         )
@@ -243,9 +240,13 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
             return len(event_search_rows)
 
-        result = await self.db_pool.runInteraction(
-            self.EVENT_SEARCH_UPDATE_NAME, reindex_search_txn
-        )
+        if self.hs.config.server.enable_search:
+            result = await self.db_pool.runInteraction(
+                self.EVENT_SEARCH_UPDATE_NAME, reindex_search_txn
+            )
+        else:
+            # Don't index anything if search is not enabled.
+            result = 0
 
         if not result:
             await self.db_pool.updates._end_background_update(

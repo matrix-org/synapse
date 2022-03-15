@@ -36,7 +36,6 @@ def run_upgrade(cur, database_engine, config, *args, **kwargs):
         config_files = config.appservice.app_service_config_files
     except AttributeError:
         logger.warning("Could not get app_service_config_files from config")
-        pass
 
     appservices = load_appservices(config.server.server_name, config_files)
 
