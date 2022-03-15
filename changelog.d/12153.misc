@@ -1,1 +1,0 @@
-Move CI checks out of tox, to facilitate a move to using poetry.
