@@ -1518,7 +1518,7 @@ class PersistEventsStore:
                 )
 
                 # Remove from relations table.
-                self._handle_redaction(txn, event.redacts)
+                self._handle_redact_relations(txn, event.redacts)
 
         # Update the event_forward_extremities, event_backward_extremities and
         # event_edges tables.
@@ -1619,9 +1619,12 @@ class PersistEventsStore:
 
         txn.call_after(prefill)
 
-    def _store_redaction(self, txn, event):
-        # invalidate the cache for the redacted event
+    def _store_redaction(self, txn: LoggingTransaction, event: EventBase) -> None:
+        # Invalidate the caches for the redacted event, note that these caches
+        # are also cleared as part of event replication in _invalidate_caches_for_event.
         txn.call_after(self.store._invalidate_get_event_cache, event.redacts)
+        txn.call_after(self.store.get_relations_for_event.invalidate, (event.redacts,))
+        txn.call_after(self.store.get_applicable_edit.invalidate, (event.redacts,))
 
         self.db_pool.simple_upsert_txn(
             txn,
@@ -1811,10 +1814,11 @@ class PersistEventsStore:
         if rel_type == RelationTypes.REPLACE:
             txn.call_after(self.store.get_applicable_edit.invalidate, (parent_id,))
 
-        if rel_type == RelationTypes.THREAD:
-            txn.call_after(
-                self.store.get_thread_summary.invalidate, (parent_id, event.room_id)
-            )
+        if (
+            rel_type == RelationTypes.THREAD
+            or rel_type == RelationTypes.UNSTABLE_THREAD
+        ):
+            txn.call_after(self.store.get_thread_summary.invalidate, (parent_id,))
             # It should be safe to only invalidate the cache if the user has not
             # previously participated in the thread, but that's difficult (and
             # potentially error-prone) so it is always invalidated.
@@ -1943,14 +1947,42 @@ class PersistEventsStore:
 
         txn.execute(sql, (batch_id,))
 
-    def _handle_redaction(self, txn, redacted_event_id):
-        """Handles receiving a redaction and checking whether we need to remove
-        any redacted relations from the database.
+    def _handle_redact_relations(
+        self, txn: LoggingTransaction, redacted_event_id: str
+    ) -> None:
+        """Handles receiving a redaction and checking whether the redacted event
+        has any relations which must be removed from the database.
 
         Args:
             txn
-            redacted_event_id (str): The event that was redacted.
+            redacted_event_id: The event that was redacted.
         """
+
+        # Fetch the current relation of the event being redacted.
+        redacted_relates_to = self.db_pool.simple_select_one_onecol_txn(
+            txn,
+            table="event_relations",
+            keyvalues={"event_id": redacted_event_id},
+            retcol="relates_to_id",
+            allow_none=True,
+        )
+        # Any relation information for the related event must be cleared.
+        if redacted_relates_to is not None:
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_relations_for_event, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_aggregation_groups_for_event, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_applicable_edit, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_thread_summary, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_thread_participated, (redacted_relates_to,)
+            )
 
         self.db_pool.simple_delete_txn(
             txn, table="event_relations", keyvalues={"event_id": redacted_event_id}

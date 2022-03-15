@@ -54,11 +54,15 @@ from synapse.events.spamcheck import (
     USER_MAY_SEND_3PID_INVITE_CALLBACK,
 )
 from synapse.events.third_party_rules import (
+    CHECK_CAN_DEACTIVATE_USER_CALLBACK,
+    CHECK_CAN_SHUTDOWN_ROOM_CALLBACK,
     CHECK_EVENT_ALLOWED_CALLBACK,
     CHECK_THREEPID_CAN_BE_INVITED_CALLBACK,
     CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK,
     ON_CREATE_ROOM_CALLBACK,
     ON_NEW_EVENT_CALLBACK,
+    ON_PROFILE_UPDATE_CALLBACK,
+    ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
 )
 from synapse.handlers.account_validity import (
     IS_USER_EXPIRED_CALLBACK,
@@ -281,6 +285,12 @@ class ModuleApi:
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = None,
         on_new_event: Optional[ON_NEW_EVENT_CALLBACK] = None,
+        check_can_shutdown_room: Optional[CHECK_CAN_SHUTDOWN_ROOM_CALLBACK] = None,
+        check_can_deactivate_user: Optional[CHECK_CAN_DEACTIVATE_USER_CALLBACK] = None,
+        on_profile_update: Optional[ON_PROFILE_UPDATE_CALLBACK] = None,
+        on_user_deactivation_status_changed: Optional[
+            ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
+        ] = None,
     ) -> None:
         """Registers callbacks for third party event rules capabilities.
 
@@ -292,6 +302,10 @@ class ModuleApi:
             check_threepid_can_be_invited=check_threepid_can_be_invited,
             check_visibility_can_be_modified=check_visibility_can_be_modified,
             on_new_event=on_new_event,
+            check_can_shutdown_room=check_can_shutdown_room,
+            check_can_deactivate_user=check_can_deactivate_user,
+            on_profile_update=on_profile_update,
+            on_user_deactivation_status_changed=on_user_deactivation_status_changed,
         )
 
     def register_presence_router_callbacks(

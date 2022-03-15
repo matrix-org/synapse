@@ -295,9 +295,7 @@ class ReplicationCommandHandler:
             raise Exception("Unrecognised command %s in stream queue", cmd.NAME)
 
     def start_replication(self, hs: "HomeServer") -> None:
-        """Helper method to start a replication connection to the remote server
-        using TCP.
-        """
+        """Helper method to start replication."""
         if hs.config.redis.redis_enabled:
             from synapse.replication.tcp.redis import (
                 RedisDirectTcpReplicationClientFactory,
@@ -711,7 +709,7 @@ class ReplicationCommandHandler:
         self.send_command(RemoteServerUpCommand(server))
 
     def stream_update(self, stream_name: str, token: Optional[int], data: Any) -> None:
-        """Called when a new update is available to stream to clients.
+        """Called when a new update is available to stream to Redis subscribers.
 
         We need to check if the client is interested in the stream or not
         """

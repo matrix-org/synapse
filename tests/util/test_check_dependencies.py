@@ -27,7 +27,9 @@ class DummyDistribution(metadata.Distribution):
 
 
 old = DummyDistribution("0.1.2")
+old_release_candidate = DummyDistribution("0.1.2rc3")
 new = DummyDistribution("1.2.3")
+new_release_candidate = DummyDistribution("1.2.3rc4")
 
 # could probably use stdlib TestCase --- no need for twisted here
 
@@ -65,6 +67,23 @@ class TestDependencyChecker(TestCase):
                 # should not raise
                 check_requirements()
 
+    def test_checks_ignore_dev_dependencies(self) -> None:
+        """Bot generic and per-extra checks should ignore dev dependencies."""
+        with patch(
+            "synapse.util.check_dependencies.metadata.requires",
+            return_value=["dummypkg >= 1; extra == 'mypy'"],
+        ), patch("synapse.util.check_dependencies.RUNTIME_EXTRAS", {"cool-extra"}):
+            # We're testing that none of these calls raise.
+            with self.mock_installed_package(None):
+                check_requirements()
+                check_requirements("cool-extra")
+            with self.mock_installed_package(old):
+                check_requirements()
+                check_requirements("cool-extra")
+            with self.mock_installed_package(new):
+                check_requirements()
+                check_requirements("cool-extra")
+
     def test_generic_check_of_optional_dependency(self) -> None:
         """Complain if an optional package is old."""
         with patch(
@@ -85,11 +104,28 @@ class TestDependencyChecker(TestCase):
         with patch(
             "synapse.util.check_dependencies.metadata.requires",
             return_value=["dummypkg >= 1; extra == 'cool-extra'"],
-        ), patch("synapse.util.check_dependencies.EXTRAS", {"cool-extra"}):
+        ), patch("synapse.util.check_dependencies.RUNTIME_EXTRAS", {"cool-extra"}):
             with self.mock_installed_package(None):
                 self.assertRaises(DependencyException, check_requirements, "cool-extra")
             with self.mock_installed_package(old):
                 self.assertRaises(DependencyException, check_requirements, "cool-extra")
             with self.mock_installed_package(new):
+                # should not raise
+                check_requirements("cool-extra")
+
+    def test_release_candidates_satisfy_dependency(self) -> None:
+        """
+        Tests that release candidates count as far as satisfying a dependency
+        is concerned.
+        (Regression test, see #12176.)
+        """
+        with patch(
+            "synapse.util.check_dependencies.metadata.requires",
+            return_value=["dummypkg >= 1"],
+        ):
+            with self.mock_installed_package(old_release_candidate):
+                self.assertRaises(DependencyException, check_requirements)
+
+            with self.mock_installed_package(new_release_candidate):
                 # should not raise
                 check_requirements()

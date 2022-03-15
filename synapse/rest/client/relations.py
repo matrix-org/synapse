@@ -27,7 +27,7 @@ from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.client._base import client_patterns
-from synapse.storage.relations import AggregationPaginationToken, PaginationChunk
+from synapse.storage.relations import AggregationPaginationToken
 from synapse.types import JsonDict, StreamToken
 
 if TYPE_CHECKING:
@@ -82,28 +82,25 @@ class RelationPaginationServlet(RestServlet):
         from_token_str = parse_string(request, "from")
         to_token_str = parse_string(request, "to")
 
-        if event.internal_metadata.is_redacted():
-            # If the event is redacted, return an empty list of relations
-            pagination_chunk = PaginationChunk(chunk=[])
-        else:
-            # Return the relations
-            from_token = None
-            if from_token_str:
-                from_token = await StreamToken.from_string(self.store, from_token_str)
-            to_token = None
-            if to_token_str:
-                to_token = await StreamToken.from_string(self.store, to_token_str)
+        # Return the relations
+        from_token = None
+        if from_token_str:
+            from_token = await StreamToken.from_string(self.store, from_token_str)
+        to_token = None
+        if to_token_str:
+            to_token = await StreamToken.from_string(self.store, to_token_str)
 
-            pagination_chunk = await self.store.get_relations_for_event(
-                event_id=parent_id,
-                room_id=room_id,
-                relation_type=relation_type,
-                event_type=event_type,
-                limit=limit,
-                direction=direction,
-                from_token=from_token,
-                to_token=to_token,
-            )
+        pagination_chunk = await self.store.get_relations_for_event(
+            event_id=parent_id,
+            event=event,
+            room_id=room_id,
+            relation_type=relation_type,
+            event_type=event_type,
+            limit=limit,
+            direction=direction,
+            from_token=from_token,
+            to_token=to_token,
+        )
 
         events = await self.store.get_events_as_list(
             [c["event_id"] for c in pagination_chunk.chunk]
@@ -193,27 +190,23 @@ class RelationAggregationPaginationServlet(RestServlet):
         from_token_str = parse_string(request, "from")
         to_token_str = parse_string(request, "to")
 
-        if event.internal_metadata.is_redacted():
-            # If the event is redacted, return an empty list of relations
-            pagination_chunk = PaginationChunk(chunk=[])
-        else:
-            # Return the relations
-            from_token = None
-            if from_token_str:
-                from_token = AggregationPaginationToken.from_string(from_token_str)
+        # Return the relations
+        from_token = None
+        if from_token_str:
+            from_token = AggregationPaginationToken.from_string(from_token_str)
 
-            to_token = None
-            if to_token_str:
-                to_token = AggregationPaginationToken.from_string(to_token_str)
+        to_token = None
+        if to_token_str:
+            to_token = AggregationPaginationToken.from_string(to_token_str)
 
-            pagination_chunk = await self.store.get_aggregation_groups_for_event(
-                event_id=parent_id,
-                room_id=room_id,
-                event_type=event_type,
-                limit=limit,
-                from_token=from_token,
-                to_token=to_token,
-            )
+        pagination_chunk = await self.store.get_aggregation_groups_for_event(
+            event_id=parent_id,
+            room_id=room_id,
+            event_type=event_type,
+            limit=limit,
+            from_token=from_token,
+            to_token=to_token,
+        )
 
         return 200, await pagination_chunk.to_dict(self.store)
 
@@ -295,6 +288,7 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
 
         result = await self.store.get_relations_for_event(
             event_id=parent_id,
+            event=event,
             room_id=room_id,
             relation_type=relation_type,
             event_type=event_type,
