@@ -129,21 +129,19 @@ class PaginationTestCase(HomeserverTestCase):
 
     def test_filter_relation_senders(self):
         # Messages which second user reacted to.
-        filter = {"io.element.relation_senders": [self.second_user_id]}
+        filter = {"related_by_senders": [self.second_user_id]}
         chunk = self._filter_messages(filter)
         self.assertEqual(len(chunk), 1, chunk)
         self.assertEqual(chunk[0].event_id, self.event_id_1)
 
         # Messages which third user reacted to.
-        filter = {"io.element.relation_senders": [self.third_user_id]}
+        filter = {"related_by_senders": [self.third_user_id]}
         chunk = self._filter_messages(filter)
         self.assertEqual(len(chunk), 1, chunk)
         self.assertEqual(chunk[0].event_id, self.event_id_2)
 
         # Messages which either user reacted to.
-        filter = {
-            "io.element.relation_senders": [self.second_user_id, self.third_user_id]
-        }
+        filter = {"related_by_senders": [self.second_user_id, self.third_user_id]}
         chunk = self._filter_messages(filter)
         self.assertEqual(len(chunk), 2, chunk)
         self.assertCountEqual(
@@ -152,20 +150,20 @@ class PaginationTestCase(HomeserverTestCase):
 
     def test_filter_relation_type(self):
         # Messages which have annotations.
-        filter = {"io.element.relation_types": [RelationTypes.ANNOTATION]}
+        filter = {"related_by_rel_types": [RelationTypes.ANNOTATION]}
         chunk = self._filter_messages(filter)
         self.assertEqual(len(chunk), 1, chunk)
         self.assertEqual(chunk[0].event_id, self.event_id_1)
 
         # Messages which have references.
-        filter = {"io.element.relation_types": [RelationTypes.REFERENCE]}
+        filter = {"related_by_rel_types": [RelationTypes.REFERENCE]}
         chunk = self._filter_messages(filter)
         self.assertEqual(len(chunk), 1, chunk)
         self.assertEqual(chunk[0].event_id, self.event_id_2)
 
         # Messages which have either annotations or references.
         filter = {
-            "io.element.relation_types": [
+            "related_by_rel_types": [
                 RelationTypes.ANNOTATION,
                 RelationTypes.REFERENCE,
             ]
@@ -179,8 +177,8 @@ class PaginationTestCase(HomeserverTestCase):
     def test_filter_relation_senders_and_type(self):
         # Messages which second user reacted to.
         filter = {
-            "io.element.relation_senders": [self.second_user_id],
-            "io.element.relation_types": [RelationTypes.ANNOTATION],
+            "related_by_senders": [self.second_user_id],
+            "related_by_rel_types": [RelationTypes.ANNOTATION],
         }
         chunk = self._filter_messages(filter)
         self.assertEqual(len(chunk), 1, chunk)
@@ -201,7 +199,7 @@ class PaginationTestCase(HomeserverTestCase):
             tok=self.second_tok,
         )
 
-        filter = {"io.element.relation_senders": [self.second_user_id]}
+        filter = {"related_by_senders": [self.second_user_id]}
         chunk = self._filter_messages(filter)
         self.assertEqual(len(chunk), 1, chunk)
         self.assertEqual(chunk[0].event_id, self.event_id_1)

@@ -118,7 +118,8 @@ class ClientRestResource(JsonResource):
         thirdparty.register_servlets(hs, client_resource)
         sendtodevice.register_servlets(hs, client_resource)
         user_directory.register_servlets(hs, client_resource)
-        groups.register_servlets(hs, client_resource)
+        if hs.config.experimental.groups_enabled:
+            groups.register_servlets(hs, client_resource)
         room_upgrade_rest_servlet.register_servlets(hs, client_resource)
         room_batch.register_servlets(hs, client_resource)
         capabilities.register_servlets(hs, client_resource)

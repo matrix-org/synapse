@@ -462,6 +462,8 @@ class FederationSenderHandler:
 
                 # We ACK this token over replication so that the master can drop
                 # its in memory queues
-                self._hs.get_tcp_replication().send_federation_ack(current_position)
+                self._hs.get_replication_command_handler().send_federation_ack(
+                    current_position
+                )
         except Exception:
             logger.exception("Error updating federation stream position")
