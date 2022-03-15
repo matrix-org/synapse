@@ -1,1 +1,1 @@
-Allow appservices to set the `origin_server_ts` of a state event by providing the query parameter `ts` in `PUT /_matrix/client/r0/rooms/{roomId}/state/{eventType}/{stateKey}`.
+Allow application services to set the `origin_server_ts` of a state event by providing the query parameter `ts` in `PUT /_matrix/client/r0/rooms/{roomId}/state/{eventType}/{stateKey}`, per [MSC3316](https://github.com/matrix-org/matrix-doc/pull/3316). Contributed by @lukasdenk.

@@ -1014,6 +1014,7 @@ class RoomAppserviceTsParamTestCase(unittest.HomeserverTestCase):
     def test_send_event_ts(self):
         ts = 1
         event_id = self._send(ts)
+        # check that the event was successfully persisted to the database with the correct timestamp.
         res = self.get_success(self.hs.get_datastore().get_event(event_id))
         self.assertEquals(ts, res.origin_server_ts)
 
