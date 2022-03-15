@@ -1,10 +1,12 @@
 Synapse 1.55.0rc1 (2022-03-15)
 ==============================
 
+This release removes a workaround introduced in Synapse 1.50.0 for Mjolnir compatibility. **This breaks compatibility with Mjolnir 1.3.1 and earlier. ([\#11700](https://github.com/matrix-org/synapse/issues/11700))**; Mjolnir users should upgrade Mjolnir before upgrading Synapse to this version.
+
 Features
 --------
 
-- Add third-party rules rules callbacks `check_can_shutdown_room` and `check_can_deactivate_user`. ([\#12028](https://github.com/matrix-org/synapse/issues/12028))
+- Add third-party rules callbacks `check_can_shutdown_room` and `check_can_deactivate_user`. ([\#12028](https://github.com/matrix-org/synapse/issues/12028))
 - Improve performance of logging in for large accounts. ([\#12132](https://github.com/matrix-org/synapse/issues/12132))
 - Add experimental env var `SYNAPSE_ASYNC_IO_REACTOR` that causes Synapse to use the asyncio reactor for Twisted. ([\#12135](https://github.com/matrix-org/synapse/issues/12135))
 - Support the stable identifiers from [MSC3440](https://github.com/matrix-org/matrix-doc/pull/3440): threads. ([\#12151](https://github.com/matrix-org/synapse/issues/12151))
@@ -16,9 +18,9 @@ Bugfixes
 
 - Use the proper serialization format for bundled thread aggregations. The bug has existed since Synapse v1.48.0. ([\#12090](https://github.com/matrix-org/synapse/issues/12090))
 - Fix a long-standing bug when redacting events with relations. ([\#12113](https://github.com/matrix-org/synapse/issues/12113), [\#12121](https://github.com/matrix-org/synapse/issues/12121), [\#12130](https://github.com/matrix-org/synapse/issues/12130), [\#12189](https://github.com/matrix-org/synapse/issues/12189))
-- Fix a bug introduced in #4864 whereby background updates are never run with the default background batch size. ([\#12157](https://github.com/matrix-org/synapse/issues/12157))
+- Fix a bug introduced in Synapse 1.7.2 whereby background updates are never run with the default background batch size. ([\#12157](https://github.com/matrix-org/synapse/issues/12157))
 - Fix a bug where non-standard information was returned from the `/hierarchy` API. Introduced in Synapse v1.41.0. ([\#12175](https://github.com/matrix-org/synapse/issues/12175))
-- Fix a bug introduced in 1.54.0 that broke background updates on sqlite homeservers while search was disabled. ([\#12215](https://github.com/matrix-org/synapse/issues/12215))
+- Fix a bug introduced in Synapse 1.54.0 that broke background updates on sqlite homeservers while search was disabled. ([\#12215](https://github.com/matrix-org/synapse/issues/12215))
 
 
 Improved Documentation
@@ -34,7 +36,7 @@ Improved Documentation
 Deprecations and Removals
 -------------------------
 
-- Remove workaround introduced in Synapse 1.50.0 for Mjolnir compatibility. Breaks compatibility with Mjolnir 1.3.1 and earlier. ([\#11700](https://github.com/matrix-org/synapse/issues/11700))
+- **Remove workaround introduced in Synapse 1.50.0 for Mjolnir compatibility. Breaks compatibility with Mjolnir 1.3.1 and earlier. ([\#11700](https://github.com/matrix-org/synapse/issues/11700))**
 - Remove backwards compatibilty with pagination tokens from the `/relations` and `/aggregations` endpoints generated from Synapse < v1.52.0. ([\#12138](https://github.com/matrix-org/synapse/issues/12138))
 - The groups/communities feature in Synapse has been deprecated. ([\#12200](https://github.com/matrix-org/synapse/issues/12200))
 
