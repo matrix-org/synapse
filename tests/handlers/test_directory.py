@@ -40,7 +40,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
         def register_query_handler(
             query_type: str, handler: Callable[[dict], Awaitable[JsonDict]]
-        ):
+        ) -> None:
             self.query_handlers[query_type] = handler
 
         self.mock_registry.register_query_handler = register_query_handler
