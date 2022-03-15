@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, NoReturn, Tuple
+from typing import Callable, Tuple
 from unittest.mock import Mock, call
 
 from twisted.test.proto_helpers import MemoryReactor
