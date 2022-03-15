@@ -152,7 +152,6 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
 
     Args:
         tree: The parsed HTML document.
-        media_url: The URI used to download the body.
 
     Returns:
         The Open Graph response as a dictionary.
