@@ -213,7 +213,7 @@ class BulkPushRuleEvaluator:
         if not event.is_state():
             ignorers = await self.store.ignored_by(event.sender)
         else:
-            ignorers = set()
+            ignorers = frozenset()
 
         for uid, rules in rules_by_user.items():
             if event.sender == uid:
