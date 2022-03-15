@@ -81,18 +81,16 @@ class CallbacksTestCase(unittest.HomeserverTestCase):
 
     def test_exception_callback(self) -> None:
         """Test that the exception callback is called when a transaction fails."""
-        after_callback, exception_callback = self._run_interaction(lambda txn: 1 / 0)
+        _test_txn = Mock(side_effect=ZeroDivisionError)
+        after_callback, exception_callback = self._run_interaction(_test_txn)
 
         after_callback.assert_not_called()
         exception_callback.assert_called_once_with(987, 654, extra=321)
 
     def test_failed_retry(self) -> None:
         """Test that the exception callback is called for every failed attempt."""
-
-        def _test_txn(txn: LoggingTransaction) -> NoReturn:
-            """Simulate a retryable failure on every attempt."""
-            raise self.db_pool.engine.module.OperationalError()
-
+        # Always raise an `OperationalError`.
+        _test_txn = Mock(side_effect=self.db_pool.engine.module.OperationalError)
         after_callback, exception_callback = self._run_interaction(_test_txn)
 
         after_callback.assert_not_called()
@@ -110,21 +108,12 @@ class CallbacksTestCase(unittest.HomeserverTestCase):
 
     def test_successful_retry(self) -> None:
         """Test callbacks for a failed transaction followed by a successful attempt."""
-        first_attempt = True
-
-        def _test_txn(txn: LoggingTransaction) -> None:
-            """Simulate a retryable failure on the first attempt only."""
-            nonlocal first_attempt
-            if first_attempt:
-                first_attempt = False
-                raise self.db_pool.engine.module.OperationalError()
-            else:
-                return None
-
+        # Raise an `OperationalError` on the first attempt only.
+        _test_txn = Mock(side_effect=[self.db_pool.engine.module.OperationalError, None])
         after_callback, exception_callback = self._run_interaction(_test_txn)
 
         # Calling both `after_callback`s when the first attempt failed is rather
-        # dubious (#12184). But let's document the behaviour in a test.
+        # surprising (#12184). Let's document the behaviour in a test.
         after_callback.assert_has_calls(
             [
                 call(123, 456, extra=789),
