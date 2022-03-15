@@ -1627,7 +1627,6 @@ class SyncHandler:
             logger.debug("Generating room entry for %s", room_entry.room_id)
             await self._generate_room_entry(
                 sync_result_builder,
-                ignored_users,
                 room_entry,
                 ephemeral=ephemeral_by_room.get(room_entry.room_id, []),
                 tags=tags_by_room.get(room_entry.room_id),
@@ -1999,7 +1998,6 @@ class SyncHandler:
     async def _generate_room_entry(
         self,
         sync_result_builder: "SyncResultBuilder",
-        ignored_users: FrozenSet[str],
         room_builder: "RoomSyncResultBuilder",
         ephemeral: List[JsonDict],
         tags: Optional[Dict[str, Dict[str, Any]]],
@@ -2028,7 +2026,6 @@ class SyncHandler:
 
         Args:
             sync_result_builder
-            ignored_users: Set of users ignored by user.
             room_builder
             ephemeral: List of new ephemeral events for room
             tags: List of *all* tags for room, or None if there has been
