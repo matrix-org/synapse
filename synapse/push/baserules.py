@@ -162,18 +162,6 @@ BASE_PREPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
 
 
 BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
-    {
-        "rule_id": "global/override/.m.rule.suppress_notices",
-        "conditions": [
-            {
-                "kind": "event_match",
-                "key": "content.msgtype",
-                "pattern": "m.notice",
-                "_id": "_suppress_notices",
-            }
-        ],
-        "actions": ["dont_notify"],
-    },
     # Disable notifications for auto-accepted room invites
     # NOTE: this rule must be a higher prio than .m.rule.invite_for_me because
     # that will also match the same events.
@@ -301,6 +289,21 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
 
 
 BASE_APPEND_UNDERRIDE_RULES: List[Dict[str, Any]] = [
+    # Beeper change: this rule is moved down from override. This means room
+    # rules take precedence, so if you enable bot notifications (by modifying
+    # this rule) notifications will not be sent for muted rooms.
+    {
+        "rule_id": "global/override/.m.rule.suppress_notices",
+        "conditions": [
+            {
+                "kind": "event_match",
+                "key": "content.msgtype",
+                "pattern": "m.notice",
+                "_id": "_suppress_notices",
+            }
+        ],
+        "actions": ["dont_notify"],
+    },
     {
         "rule_id": "global/underride/.m.rule.call",
         "conditions": [
