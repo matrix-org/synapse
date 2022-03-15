@@ -19,6 +19,8 @@
 
 import json
 from typing import Iterable, List
+
+from authlib.common.urls import url_encode
 from unittest.mock import Mock, call, patch
 from urllib import parse as urlparse
 
@@ -42,7 +44,7 @@ from synapse.server import HomeServer
 from synapse.types import JsonDict, RoomAlias, UserID, create_requester
 from synapse.util.stringutils import random_string
 
-from tests import unittest
+from tests import unittest, server
 from tests.test_utils import make_awaitable
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
@@ -970,7 +972,7 @@ class RoomJoinTestCase(RoomBase):
         self.helper.join(self.room3, self.user2, expect_code=403, tok=self.tok2)
 
 
-class RoomAppserviceTsParamTestCase(RoomBase):
+class RoomAppserviceTsParamTestCase(unittest.HomeserverTestCase):
     servlets = [
         room.register_servlets,
         synapse.rest.admin.register_servlets,
@@ -978,8 +980,6 @@ class RoomAppserviceTsParamTestCase(RoomBase):
     ]
 
     def prepare(self, reactor, clock, homeserver):
-        self.ts = 1
-
         self.appservice_user, _ = self.register_appservice_user(
             "as_user_potato", self.appservice.token
         )
@@ -1010,39 +1010,26 @@ class RoomAppserviceTsParamTestCase(RoomBase):
             hs = self.setup_test_homeserver(config=config)
         return hs
 
-    def test_state_event_msc3316_ts(self):
-        normal_user = self.register_user("thomas", "hackme")
-        event_id = self.helper.invite(
-            self.room,
-            self.appservice_user,
-            normal_user,
-            tok=self.appservice.token,
-            msc3316_ts=self.ts,
-            appservice_user_id=self.appservice_user,
-        )
-        self._check_event_ts(event_id)
 
     def test_send_event_ts(self):
-        event_id = self.helper.send(
-            self.room,
-            tok=self.appservice.token,
-            ts=self.ts,
-            appservice_user_id=self.appservice_user,
-        )["event_id"]
-        self._check_event_ts(event_id)
-
-    def test_send_event_msc3316_ts(self):
-        event_id = self.helper.send(
-            self.room,
-            tok=self.appservice.token,
-            msc3316_ts=self.ts,
-            appservice_user_id=self.appservice_user,
-        )["event_id"]
-        self._check_event_ts(event_id)
-
-    def _check_event_ts(self, event_id):
+        ts = 1
+        event_id = self._send(ts)
         res = self.get_success(self.hs.get_datastore().get_event(event_id))
-        self.assertEquals(self.ts, res.origin_server_ts)
+        self.assertEquals(ts, res.origin_server_ts)
+
+    def _send(self, ts:int) ->str:
+        url_params = {
+            "user_id": self.appservice_user,
+            "ts": ts,
+        }
+        channel = server.make_request(
+            "PUT",
+            path=f"/_matrix/client/r0/rooms/{self.room}/send/m.room.message/{None}?" + url_encode(url_params),
+            content={"membership": "invite"},
+            access_token=self.appservice.token,
+        )
+        self.assertEqual(channel.code, 200)
+        return channel.json_body["event_id"]
 
 
 class RoomJoinRatelimitTestCase(RoomBase):
