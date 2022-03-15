@@ -109,7 +109,9 @@ class CallbacksTestCase(unittest.HomeserverTestCase):
     def test_successful_retry(self) -> None:
         """Test callbacks for a failed transaction followed by a successful attempt."""
         # Raise an `OperationalError` on the first attempt only.
-        _test_txn = Mock(side_effect=[self.db_pool.engine.module.OperationalError, None])
+        _test_txn = Mock(
+            side_effect=[self.db_pool.engine.module.OperationalError, None]
+        )
         after_callback, exception_callback = self._run_interaction(_test_txn)
 
         # Calling both `after_callback`s when the first attempt failed is rather
