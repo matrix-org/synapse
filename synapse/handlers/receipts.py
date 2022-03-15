@@ -184,22 +184,20 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
             for event_id in content.keys():
                 event_content = content.get(event_id, {})
 
-                m_read = event_content.get(ReceiptTypes.READ, None)
-                if m_read:
-                    new_event["content"][event_id] = {ReceiptTypes.READ: m_read}
-                    continue
+                receipt_event = {}
+                for receipt_type, receipt_content in event_content.items():
+                    if receipt_type == ReceiptTypes.READ_PRIVATE:
+                        user_rr = receipt_content.get(user_id, None)
+                        if user_rr:
+                            receipt_event[ReceiptTypes.READ_PRIVATE] = {
+                                user_id: user_rr.copy()
+                            }
+                    else:
+                        receipt_event[receipt_type] = receipt_content.copy()
 
-                # Filter the private read receipts to only the requesting user
-                m_read_private = event_content.get(ReceiptTypes.READ_PRIVATE, None)
-                if m_read_private:
-                    user_rr = m_read_private.get(user_id, None)
-                    if user_rr:
-                        new_event["content"][event_id] = {
-                            ReceiptTypes.READ_PRIVATE: {user_id: user_rr.copy()}
-                        }
-                    continue
-
-                new_event["content"][event_id] = event_content
+                # Append receipt_event to new_event unless empty
+                if len(receipt_event.keys()) > 0:
+                    new_event["content"][event_id] = receipt_event.copy()
 
             # Append new_event to visible_events unless empty
             if len(new_event["content"].keys()) > 0:

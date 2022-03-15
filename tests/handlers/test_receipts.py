@@ -216,7 +216,6 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             [
                 {
                     "content": {
-                        "$143564gdfg6114394fHBLK:matrix.org": {},
                         "$1435641916114394fHBLK:matrix.org": {
                             ReceiptTypes.READ: {
                                 "@user:jki.re": {
@@ -310,6 +309,60 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
                     "type": "m.receipt",
                 },
+            ],
+        )
+
+    def test_leaves_our_hidden_and_their_public(self):
+        self._test_filters_hidden(
+            [
+                {
+                    "content": {
+                        "$1dgdgrd5641916114394fHBLK:matrix.org": {
+                            ReceiptTypes.READ_PRIVATE: {
+                                "@me:server.org": {
+                                    "ts": 1436451550453,
+                                },
+                            },
+                            ReceiptTypes.READ: {
+                                "@rikj:jki.re": {
+                                    "ts": 1436451550453,
+                                },
+                            },
+                            "a.receipt.type": {
+                                "@rikj:jki.re": {
+                                    "ts": 1436451550453,
+                                },
+                            },
+                        },
+                    },
+                    "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
+                    "type": "m.receipt",
+                }
+            ],
+            [
+                {
+                    "content": {
+                        "$1dgdgrd5641916114394fHBLK:matrix.org": {
+                            ReceiptTypes.READ_PRIVATE: {
+                                "@me:server.org": {
+                                    "ts": 1436451550453,
+                                },
+                            },
+                            ReceiptTypes.READ: {
+                                "@rikj:jki.re": {
+                                    "ts": 1436451550453,
+                                },
+                            },
+                            "a.receipt.type": {
+                                "@rikj:jki.re": {
+                                    "ts": 1436451550453,
+                                },
+                            },
+                        }
+                    },
+                    "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
+                    "type": "m.receipt",
+                }
             ],
         )
 
