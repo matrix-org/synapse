@@ -173,7 +173,7 @@ pyjwt = { version = ">=1.6.4", optional = true }
 txredisapi = { version = ">=1.4.7", optional = true }
 hiredis = { version = "*", optional = true }
 Pympler = { version = "*", optional = true }
-parameterized = { version = ">=0.7.0", optional = true }
+parameterized = { version = ">=0.7.4", optional = true }
 
 ## Developer dependencies should not get included in "all".
 ##
@@ -257,7 +257,9 @@ types-setuptools = ">=57.4.0"
 # Dependencies which are exclusively required by unit test code. This is
 # NOT a list of all modules that are necessary to run the unit tests.
 # Tests assume that all optional dependencies are installed.
-parameterized = ">=0.7.0"
+# parameterized<0.7.4 can create classes with names that would normally be invalid
+# identifiers. trial really does not like this when running with multiple workers.
+parameterized = ">=0.7.4"
 
 # The following are used by the release script
 click = "==7.1.2"
