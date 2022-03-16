@@ -610,7 +610,7 @@ class RelationsTestCase(BaseRelationsTestCase):
         threaded_event_id = channel.json_body["event_id"]
 
         new_body = {"msgtype": "m.text", "body": "I've been edited!"}
-        channel = self._send_relation(
+        self._send_relation(
             RelationTypes.REPLACE,
             "m.room.message",
             content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
@@ -650,7 +650,7 @@ class RelationsTestCase(BaseRelationsTestCase):
         edit_event_id = channel.json_body["event_id"]
 
         # Edit the edit event.
-        channel = self._send_relation(
+        self._send_relation(
             RelationTypes.REPLACE,
             "m.room.message",
             content={
@@ -1031,7 +1031,7 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
             idx += 1
 
         # Also send a different type of reaction so that we test we don't see it
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="a")
+        self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="a")
 
         prev_token = ""
         found_event_ids: List[str] = []
