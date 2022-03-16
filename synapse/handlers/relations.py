@@ -230,7 +230,7 @@ class RelationsHandler:
                 results[event.event_id] = event_result
 
         # Fetch any edits (but not for redacted events).
-        edits = await self._main_store._get_applicable_edits(
+        edits = await self._main_store.get_applicable_edits(
             [
                 event_id
                 for event_id, event in events_by_id.items()
@@ -241,10 +241,10 @@ class RelationsHandler:
             results.setdefault(event_id, BundledAggregations()).replace = edit
 
         # Fetch thread summaries.
-        summaries = await self._main_store._get_thread_summaries(events_by_id.keys())
+        summaries = await self._main_store.get_thread_summaries(events_by_id.keys())
         # Only fetch participated for a limited selection based on what had
         # summaries.
-        participated = await self._main_store._get_threads_participated(
+        participated = await self._main_store.get_threads_participated(
             summaries.keys(), user_id
         )
         for event_id, summary in summaries.items():
